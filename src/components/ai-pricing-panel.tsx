@@ -40,15 +40,43 @@ export function AiPricingPanel() {
     dimensions: "120 × 80 × 25 mm",
     quantity: "50",
     customer: "Strojmetal a.s.",
+    customerEmail: "",
     requirements: "Tolerance H7, kalení 58-60 HRC, povrch Ra 0,8",
   });
   const [estimate, setEstimate] = React.useState<Estimate | null>(null);
   const [quote, setQuote] = React.useState<Quote | null>(null);
-  const [loading, setLoading] = React.useState<"" | "price" | "quote">("");
+  const [loading, setLoading] = React.useState<"" | "price" | "quote" | "all">("");
   const [extracting, setExtracting] = React.useState(false);
   const [extractMsg, setExtractMsg] = React.useState<string | null>(null);
+  const [autoMsg, setAutoMsg] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const processAll = async () => {
+    setLoading("all"); setError(null); setAutoMsg(null); setQuote(null);
+    try {
+      const res = await fetch("/api/ai/process-inquiry", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, quantity: Number(form.quantity), autoSend: !!form.customerEmail }),
+      });
+      const data = await res.json();
+      if (data.error) { setError(data.error); return; }
+      if (data.estimate) setEstimate(data.estimate);
+      if (data.quote) setQuote(data.quote);
+      const r = data.result;
+      if (r?.ok) {
+        setAutoMsg(
+          `Nabídka ${r.number} naceněna, vygenerována${r.archived ? ", archivována (PDF)" : ""} a ` +
+          (r.sent ? "odeslána zákazníkovi." : "zařazena ke schválení.") + (r.sentReason ? ` (${r.sentReason})` : ""),
+        );
+      } else if (r?.error) {
+        setAutoMsg(`Naceněno a vytvořeno, ale uložení: ${r.error}`);
+      } else {
+        setAutoMsg("Naceněno a vytvořena nabídka (uložení vyžaduje Supabase servisní klíč).");
+      }
+    } catch { setError("Nepodařilo se zpracovat."); }
+    finally { setLoading(""); }
+  };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,6 +154,7 @@ export function AiPricingPanel() {
           <Field label="Rozměry"><Input value={form.dimensions} onChange={upd("dimensions")} /></Field>
           <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" /></Field>
           <Field label="Zákazník"><Input value={form.customer} onChange={upd("customer")} /></Field>
+          <Field label="E-mail zákazníka (pro odeslání)"><Input value={form.customerEmail} onChange={upd("customerEmail")} type="email" placeholder="nepovinné" /></Field>
         </div>
         <Field label="Specifické požadavky">
           <Textarea value={form.requirements} onChange={upd("requirements")} className="min-h-[60px]" />
@@ -146,8 +175,17 @@ export function AiPricingPanel() {
           {extractMsg && <span className="text-xs text-success">{extractMsg}</span>}
         </div>
 
+        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+          <div className="mb-2 text-sm font-medium">AI od A do Z jedním klikem</div>
+          <Button onClick={processAll} disabled={loading !== ""}>
+            {loading === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Naceň → vytvoř nabídku → ulož &amp; zařaď ke schválení{form.customerEmail ? " &amp; odešli" : ""}
+          </Button>
+          {autoMsg && <p className="mt-2 text-sm text-success">{autoMsg}</p>}
+        </div>
+
         <div className="flex flex-wrap gap-2">
-          <Button onClick={price} disabled={loading !== ""}>
+          <Button variant="outline" onClick={price} disabled={loading !== ""}>
             {loading === "price" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
             Naceň jako technolog
           </Button>
