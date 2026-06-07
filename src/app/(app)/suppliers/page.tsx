@@ -3,9 +3,10 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { suppliers } from "@/lib/mock-data";
+import { getSuppliers } from "@/lib/data/queries";
 
-export default function SuppliersPage() {
+export default async function SuppliersPage() {
+  const suppliers = await getSuppliers();
   return (
     <div className="space-y-6">
       <PageHeader

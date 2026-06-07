@@ -4,10 +4,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { customers } from "@/lib/mock-data";
+import { getCustomers } from "@/lib/data/queries";
 import { formatCZK } from "@/lib/utils";
 
-export default function CustomersPage() {
+export default async function CustomersPage() {
+  const customers = await getCustomers();
   return (
     <div className="space-y-6">
       <PageHeader

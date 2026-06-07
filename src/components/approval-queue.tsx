@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AiConfidence } from "@/components/ai-confidence";
 import { useAutomation } from "@/components/automation-provider";
-import { approvalQueue, type ApprovalItem } from "@/lib/mock-data";
+import { approvalQueue as fallbackQueue, type ApprovalItem } from "@/lib/mock-data";
 import { relativeTime } from "@/lib/utils";
 
 const typeIcon: Record<ApprovalItem["type"], React.ReactNode> = {
@@ -17,9 +17,15 @@ const typeIcon: Record<ApprovalItem["type"], React.ReactNode> = {
   Kategorizace: <Tag className="h-4 w-4" />,
 };
 
-export function ApprovalQueue({ compact = false }: { compact?: boolean }) {
+export function ApprovalQueue({
+  compact = false,
+  initialItems,
+}: {
+  compact?: boolean;
+  initialItems?: ApprovalItem[];
+}) {
   const { mode } = useAutomation();
-  const [items, setItems] = React.useState(approvalQueue);
+  const [items, setItems] = React.useState(initialItems ?? fallbackQueue);
 
   const resolve = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 

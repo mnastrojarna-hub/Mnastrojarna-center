@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { drawings } from "@/lib/mock-data";
+import { getDrawings } from "@/lib/data/queries";
 import { formatDate } from "@/lib/utils";
 
 const typeVariant: Record<string, "default" | "secondary" | "success" | "warning"> = {
@@ -14,7 +14,8 @@ const typeVariant: Record<string, "default" | "secondary" | "success" | "warning
   IMG: "success",
 };
 
-export default function DrawingsPage() {
+export default async function DrawingsPage() {
+  const drawings = await getDrawings();
   return (
     <div className="space-y-6">
       <PageHeader

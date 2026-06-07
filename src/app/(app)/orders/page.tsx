@@ -4,10 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/status-badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { orders, orderStatusOrder } from "@/lib/mock-data";
+import { orderStatusOrder } from "@/lib/mock-data";
+import { getOrders } from "@/lib/data/queries";
 import { formatCZK, formatDate } from "@/lib/utils";
 
-export default function OrdersPage() {
+export default async function OrdersPage() {
+  const orders = await getOrders();
   const countByStatus = (status: string) => orders.filter((o) => o.status === status).length;
 
   return (

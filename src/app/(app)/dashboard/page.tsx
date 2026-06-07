@@ -6,10 +6,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge, OrderStatusBadge } from "@/components/status-badge";
 import { AiConfidence } from "@/components/ai-confidence";
-import { dashboardStats, emails, orders } from "@/lib/mock-data";
+import { dashboardStats } from "@/lib/mock-data";
+import { getEmails, getOrders, getApprovalQueue } from "@/lib/data/queries";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const [emails, orders, approvals] = await Promise.all([
+    getEmails(),
+    getOrders(),
+    getApprovalQueue(),
+  ]);
   const recentEmails = emails.filter((e) => e.category !== "Spam").slice(0, 4);
   const activeOrders = orders.filter((o) => o.status !== "Dokončeno").slice(0, 4);
 
@@ -47,7 +53,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
-          <ApprovalQueue />
+          <ApprovalQueue initialItems={approvals} />
 
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">

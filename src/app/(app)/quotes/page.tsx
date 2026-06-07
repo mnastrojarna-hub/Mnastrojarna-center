@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QuoteStatusBadge } from "@/components/status-badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { quotes } from "@/lib/mock-data";
+import { getQuotes } from "@/lib/data/queries";
 import { formatCZK, formatDate } from "@/lib/utils";
 
-export default function QuotesPage() {
+export default async function QuotesPage() {
+  const quotes = await getQuotes();
   return (
     <div className="space-y-6">
       <PageHeader
