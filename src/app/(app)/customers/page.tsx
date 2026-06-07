@@ -37,7 +37,7 @@ export default async function CustomersPage() {
             </TableHeader>
             <TableBody>
               {customers.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer">
+                <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell className="text-muted-foreground">{c.ico}</TableCell>
                   <TableCell>

@@ -11,6 +11,7 @@ const emailCategoryVariant: Record<string, BadgeProps["variant"]> = {
   Reklamace: "destructive",
   "Technická dokumentace": "secondary",
   Spam: "muted",
+  Ostatní: "secondary",
 };
 
 const orderStatusVariant: Record<string, BadgeProps["variant"]> = {
@@ -20,6 +21,7 @@ const orderStatusVariant: Record<string, BadgeProps["variant"]> = {
   "Ve výrobě": "default",
   Expedováno: "success",
   Dokončeno: "muted",
+  Zrušeno: "destructive",
 };
 
 const quoteStatusVariant: Record<string, BadgeProps["variant"]> = {

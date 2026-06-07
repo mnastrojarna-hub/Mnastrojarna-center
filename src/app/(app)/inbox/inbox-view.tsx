@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Sparkles, Send, Pencil, Archive, Reply, Paperclip, Filter, RefreshCw } from "lucide-react";
+import { Mail, Sparkles, Send, Pencil, Archive, Reply, Paperclip, Filter, RefreshCw, ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,15 +17,20 @@ const categories = [
   "Vše",
   "Poptávka",
   "Objednávka",
+  "Potvrzení objednávky",
   "Nabídka dodavatele",
   "Faktura",
+  "Upomínka",
   "Reklamace",
+  "Technická dokumentace",
+  "Ostatní",
   "Spam",
 ] as const;
 
 export function InboxView({ emails }: { emails: EmailItem[] }) {
   const [filter, setFilter] = React.useState<(typeof categories)[number]>("Vše");
   const [selectedId, setSelectedId] = React.useState<string>(emails[0]?.id ?? "");
+  const [mobileDetail, setMobileDetail] = React.useState(false); // master-detail přepínač na mobilu
   const [syncing, setSyncing] = React.useState(false);
   const [syncMsg, setSyncMsg] = React.useState<string | null>(null);
   const { mode } = useAutomation();
@@ -49,7 +54,14 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
   };
 
   const filtered = emails.filter((e) => filter === "Vše" || e.category === filter);
-  const selected = emails.find((e) => e.id === selectedId) ?? filtered[0];
+  const selected = filtered.find((e) => e.id === selectedId) ?? filtered[0];
+
+  const changeFilter = (cat: (typeof categories)[number]) => {
+    setFilter(cat);
+    const first = emails.find((e) => cat === "Vše" || e.category === cat);
+    setSelectedId(first?.id ?? "");
+    setMobileDetail(false);
+  };
 
   return (
     <div className="space-y-5">
@@ -73,7 +85,7 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => setFilter(cat)}
+            onClick={() => changeFilter(cat)}
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               filter === cat
@@ -87,7 +99,7 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <div className="space-y-2 lg:col-span-2">
+        <div className={cn("space-y-2 lg:col-span-2 lg:block", mobileDetail && "hidden")}>
           {filtered.length === 0 && (
             <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Žádné e-maily v této kategorii.</CardContent></Card>
           )}
@@ -96,13 +108,20 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
               key={email.id}
               email={email}
               active={email.id === selected?.id}
-              onClick={() => setSelectedId(email.id)}
+              onClick={() => {
+                setSelectedId(email.id);
+                setMobileDetail(true);
+              }}
             />
           ))}
         </div>
 
-        <div className="lg:col-span-3">
-          {selected ? <EmailDetail email={selected} mode={mode} /> : <EmptyDetail />}
+        <div className={cn("lg:col-span-3 lg:block", !mobileDetail && "hidden")}>
+          {selected ? (
+            <EmailDetail email={selected} mode={mode} onBack={() => setMobileDetail(false)} />
+          ) : (
+            <EmptyDetail />
+          )}
         </div>
       </div>
     </div>
@@ -140,10 +159,24 @@ function EmailRow({ email, active, onClick }: { email: EmailItem; active: boolea
   );
 }
 
-function EmailDetail({ email, mode }: { email: EmailItem; mode: "full" | "approval" }) {
+function EmailDetail({
+  email,
+  mode,
+  onBack,
+}: {
+  email: EmailItem;
+  mode: "full" | "approval";
+  onBack: () => void;
+}) {
   return (
-    <Card className="sticky top-2">
+    <Card className="lg:sticky lg:top-2">
       <CardContent className="p-5">
+        <button
+          onClick={onBack}
+          className="mb-3 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground lg:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" /> Zpět na seznam
+        </button>
         <div className="flex items-start gap-3">
           <Avatar className="h-10 w-10">
             <AvatarFallback>{email.from.split(" ").map((n) => n[0]).join("")}</AvatarFallback>

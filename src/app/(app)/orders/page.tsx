@@ -24,7 +24,7 @@ export default async function OrdersPage() {
         }
       />
 
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {orderStatusOrder.map((status) => (
           <Card key={status}>
             <CardContent className="p-3">
@@ -51,7 +51,7 @@ export default async function OrdersPage() {
             </TableHeader>
             <TableBody>
               {orders.map((order) => (
-                <TableRow key={order.id} className="cursor-pointer">
+                <TableRow key={order.id}>
                   <TableCell className="font-medium">{order.number}</TableCell>
                   <TableCell>{order.customer}</TableCell>
                   <TableCell className="text-muted-foreground">{order.title}</TableCell>

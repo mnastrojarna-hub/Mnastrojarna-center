@@ -22,8 +22,8 @@ export default function SettingsPage() {
           <CardDescription>Pošta se stahuje a analyzuje automaticky.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Connection name="Microsoft 365 / Outlook" detail="obchod@nastrojarna.cz" status="connected" />
-          <Connection name="IMAP — hosting90" detail="info@nastrojarna.cz" status="connected" />
+          <Connection name="Microsoft 365 / Outlook" detail="obchod@mnastrojarna.cz" status="connected" />
+          <Connection name="IMAP — hosting90" detail="info@mnastrojarna.cz" status="connected" />
           <Connection name="Gmail" detail="Nepřipojeno" status="disconnected" />
         </CardContent>
       </Card>

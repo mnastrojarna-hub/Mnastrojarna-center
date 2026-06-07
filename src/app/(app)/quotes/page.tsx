@@ -55,7 +55,7 @@ export default async function QuotesPage() {
             </TableHeader>
             <TableBody>
               {quotes.map((q) => (
-                <TableRow key={q.id} className="cursor-pointer">
+                <TableRow key={q.id}>
                   <TableCell className="font-medium">{q.number}</TableCell>
                   <TableCell>{q.customer}</TableCell>
                   <TableCell>

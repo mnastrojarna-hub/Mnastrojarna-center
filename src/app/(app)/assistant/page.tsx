@@ -16,23 +16,31 @@ const suggestions = [
 ];
 
 interface Msg {
+  id: string;
   role: "user" | "assistant";
   text: string;
 }
 
+let msgSeq = 0;
+const newMsg = (role: Msg["role"], text: string): Msg => ({
+  id: `m${++msgSeq}`,
+  role,
+  text,
+});
+
 export default function AssistantPage() {
   const [messages, setMessages] = React.useState<Msg[]>([
-    {
-      role: "assistant",
-      text: "Ahoj! Jsem firemní AI asistent. Zeptej se mě na cenu výkresu, podobný díl, marži zákazníka nebo provize obchodníka.",
-    },
+    newMsg(
+      "assistant",
+      "Ahoj! Jsem firemní AI asistent. Zeptej se mě na cenu výkresu, podobný díl, marži zákazníka nebo provize obchodníka.",
+    ),
   ]);
   const [input, setInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
-    setMessages((m) => [...m, { role: "user", text }]);
+    setMessages((m) => [...m, newMsg("user", text)]);
     setInput("");
     setLoading(true);
     try {
@@ -42,28 +50,22 @@ export default function AssistantPage() {
         body: JSON.stringify({ question: text }),
       });
       const data = await res.json();
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: data.answer ?? data.error ?? "Bez odpovědi." },
-      ]);
+      setMessages((m) => [...m, newMsg("assistant", data.answer ?? data.error ?? "Bez odpovědi.")]);
     } catch {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: "Nepodařilo se spojit s AI. Zkus to prosím znovu." },
-      ]);
+      setMessages((m) => [...m, newMsg("assistant", "Nepodařilo se spojit s AI. Zkus to prosím znovu.")]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex h-[calc(100dvh-12rem)] min-h-[24rem] max-w-3xl flex-col gap-4 md:h-[calc(100vh-8rem)]">
       <PageHeader title="AI Asistent" description="Ptej se přirozeným jazykem na cokoliv z firmy." />
 
       <Card className="flex flex-1 flex-col overflow-hidden">
         <CardContent className="flex-1 space-y-4 overflow-y-auto scrollbar-thin p-5">
-          {messages.map((m, i) => (
-            <div key={i} className={cn("flex gap-3", m.role === "user" && "flex-row-reverse")}>
+          {messages.map((m) => (
+            <div key={m.id} className={cn("flex gap-3", m.role === "user" && "flex-row-reverse")}>
               <div
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",

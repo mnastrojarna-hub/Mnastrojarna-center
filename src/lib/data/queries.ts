@@ -9,8 +9,8 @@ import type {
 import * as mock from "@/lib/mock-data";
 
 /**
- * Datová vrstva: čte ze Supabase, při nenakonfigurované nebo prázdné DB
- * vrací demo data (mock), aby UI fungovalo i bez živého backendu.
+ * Datová vrstva: čte ze Supabase (vč. joinů na zákazníky/obchodníky),
+ * při nenakonfigurované nebo prázdné DB vrací demo data, aby UI fungovalo i bez živého backendu.
  */
 
 async function supa() {
@@ -22,16 +22,25 @@ async function supa() {
   }
 }
 
+function warn(scope: string, error: { message: string } | null) {
+  if (error) console.error(`[data:${scope}] Supabase chyba: ${error.message} — používám demo data.`);
+}
+
+// Pomocné typy pro vnořené (joinované) vztahy
+type WithCustomer = { customers?: { name: string } | null };
+type WithOwner = { profiles?: { full_name: string } | null };
+
 export async function getEmails(): Promise<mock.EmailItem[]> {
   const db = await supa();
   if (db) {
     const { data, error } = await db
       .from("emails")
-      .select("*")
+      .select("*, customers(name)")
       .order("received_at", { ascending: false })
       .limit(100);
+    warn("emails", error);
     if (!error && data && data.length) {
-      return (data as Email[]).map((e) => ({
+      return (data as (Email & WithCustomer)[]).map((e) => ({
         id: e.id,
         from: e.from_name ?? e.from_email ?? "—",
         fromEmail: e.from_email ?? "",
@@ -39,7 +48,7 @@ export async function getEmails(): Promise<mock.EmailItem[]> {
         preview: e.snippet ?? e.body_text?.slice(0, 140) ?? "",
         category: (e.category ? emailCategoryLabel[e.category] : "Ostatní") as mock.EmailCategory,
         priority: (e.priority ? priorityLabel[e.priority] : "Střední") as mock.EmailItem["priority"],
-        customer: undefined,
+        customer: e.customers?.name,
         receivedAt: e.received_at,
         aiConfidence: e.ai_confidence ?? 0,
         unread: !e.is_read,
@@ -58,6 +67,7 @@ export async function getApprovalQueue(): Promise<mock.ApprovalItem[]> {
       .select("*")
       .eq("status", "pending")
       .order("created_at", { ascending: false });
+    warn("approval_queue", error);
     if (!error && data && data.length) {
       return (data as ApprovalItemRow[]).map((a) => ({
         id: a.id,
@@ -76,17 +86,21 @@ export async function getApprovalQueue(): Promise<mock.ApprovalItem[]> {
 export async function getOrders(): Promise<mock.OrderItem[]> {
   const db = await supa();
   if (db) {
-    const { data, error } = await db.from("orders").select("*").order("created_at", { ascending: false });
+    const { data, error } = await db
+      .from("orders")
+      .select("*, customers(name), profiles(full_name)")
+      .order("created_at", { ascending: false });
+    warn("orders", error);
     if (!error && data && data.length) {
-      return (data as Order[]).map((o) => ({
+      return (data as (Order & WithCustomer & WithOwner)[]).map((o) => ({
         id: o.id,
         number: o.number ?? "",
-        customer: "—",
+        customer: o.customers?.name ?? "—",
         title: o.title ?? "",
         status: orderStatusLabel[o.status] as mock.OrderItem["status"],
         value: Number(o.value ?? 0),
         dueDate: o.due_date ?? "",
-        owner: "—",
+        owner: o.profiles?.full_name ?? "—",
       }));
     }
   }
@@ -96,18 +110,28 @@ export async function getOrders(): Promise<mock.OrderItem[]> {
 export async function getQuotes(): Promise<mock.QuoteItem[]> {
   const db = await supa();
   if (db) {
-    const { data, error } = await db.from("quotes").select("*").order("created_at", { ascending: false });
+    const { data, error } = await db
+      .from("quotes")
+      .select("*, customers(name), quote_items(quantity, drawings(drawing_number))")
+      .order("created_at", { ascending: false });
+    warn("quotes", error);
     if (!error && data && data.length) {
-      return (data as Quote[]).map((q) => ({
-        id: q.id,
-        number: q.number ?? "",
-        customer: "—",
-        drawing: "—",
-        qty: 0,
-        status: quoteStatusLabel[q.status] as mock.QuoteItem["status"],
-        value: q.total ? Number(q.total) : undefined,
-        createdAt: q.created_at,
-      }));
+      type QRow = Quote & WithCustomer & {
+        quote_items?: { quantity: number; drawings?: { drawing_number: string } | null }[];
+      };
+      return (data as QRow[]).map((q) => {
+        const items = q.quote_items ?? [];
+        return {
+          id: q.id,
+          number: q.number ?? "",
+          customer: q.customers?.name ?? "—",
+          drawing: items[0]?.drawings?.drawing_number ?? "—",
+          qty: items.reduce((s, it) => s + (it.quantity ?? 0), 0),
+          status: quoteStatusLabel[q.status] as mock.QuoteItem["status"],
+          value: q.total ? Number(q.total) : undefined,
+          createdAt: q.created_at,
+        };
+      });
     }
   }
   return mock.quotes;
@@ -116,19 +140,27 @@ export async function getQuotes(): Promise<mock.QuoteItem[]> {
 export async function getCustomers(): Promise<mock.CustomerItem[]> {
   const db = await supa();
   if (db) {
-    const { data, error } = await db.from("customers").select("*").order("name");
+    const { data, error } = await db
+      .from("customers")
+      .select("*, orders(value), profiles(full_name)")
+      .order("name");
+    warn("customers", error);
     if (!error && data && data.length) {
-      return (data as Customer[]).map((c) => ({
-        id: c.id,
-        name: c.name,
-        ico: c.ico ?? "—",
-        country: c.country,
-        contact: c.email ?? "—",
-        email: c.email ?? "",
-        orders: 0,
-        revenue: 0,
-        owner: "—",
-      }));
+      type CRow = Customer & WithOwner & { orders?: { value: number | null }[] };
+      return (data as CRow[]).map((c) => {
+        const ords = c.orders ?? [];
+        return {
+          id: c.id,
+          name: c.name,
+          ico: c.ico ?? "—",
+          country: c.country,
+          contact: c.email ?? "—",
+          email: c.email ?? "",
+          orders: ords.length,
+          revenue: ords.reduce((s, o) => s + Number(o.value ?? 0), 0),
+          owner: c.profiles?.full_name ?? "—",
+        };
+      });
     }
   }
   return mock.customers;
@@ -138,6 +170,7 @@ export async function getSuppliers(): Promise<mock.SupplierItem[]> {
   const db = await supa();
   if (db) {
     const { data, error } = await db.from("suppliers").select("*").order("name");
+    warn("suppliers", error);
     if (!error && data && data.length) {
       return (data as Supplier[]).map((s) => ({
         id: s.id,
@@ -156,13 +189,17 @@ export async function getSuppliers(): Promise<mock.SupplierItem[]> {
 export async function getDrawings(): Promise<mock.DrawingItem[]> {
   const db = await supa();
   if (db) {
-    const { data, error } = await db.from("drawings").select("*").order("created_at", { ascending: false });
+    const { data, error } = await db
+      .from("drawings")
+      .select("*, customers(name)")
+      .order("created_at", { ascending: false });
+    warn("drawings", error);
     if (!error && data && data.length) {
-      return (data as Drawing[]).map((d) => ({
+      return (data as (Drawing & WithCustomer)[]).map((d) => ({
         id: d.id,
         number: d.drawing_number,
         revision: d.revision,
-        customer: "—",
+        customer: d.customers?.name ?? "—",
         material: d.material ?? "—",
         dimensions: d.dimensions ?? "—",
         qty: d.quantity ?? 0,

@@ -58,7 +58,7 @@ export default async function DrawingsPage() {
             </TableHeader>
             <TableBody>
               {drawings.map((d) => (
-                <TableRow key={d.id} className="cursor-pointer">
+                <TableRow key={d.id}>
                   <TableCell className="font-medium">{d.number}</TableCell>
                   <TableCell>
                     <Badge variant="outline">{d.revision}</Badge>

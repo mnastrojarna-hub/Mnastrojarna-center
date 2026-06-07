@@ -9,7 +9,7 @@ const items = [
   { title: "Přehled", href: "/dashboard", icon: LayoutDashboard },
   { title: "Inbox", href: "/inbox", icon: Inbox },
   { title: "Nabídky", href: "/quotes", icon: FileText },
-  { title: "Zakázky", href: "/orders", icon: ClipboardList },
+  { title: "Objednávky", href: "/orders", icon: ClipboardList },
   { title: "AI", href: "/assistant", icon: Sparkles },
 ];
 

@@ -57,9 +57,9 @@ export function Topbar() {
             <DropdownMenuItem>Připojené schránky</DropdownMenuItem>
             <DropdownMenuSeparator />
             <form action={signOut}>
-              <button type="submit" className="w-full">
-                <DropdownMenuItem className="text-destructive focus:text-destructive">Odhlásit se</DropdownMenuItem>
-              </button>
+              <DropdownMenuItem asChild className="text-destructive focus:text-destructive">
+                <button type="submit" className="w-full cursor-pointer">Odhlásit se</button>
+              </DropdownMenuItem>
             </form>
           </DropdownMenuContent>
         </DropdownMenu>
