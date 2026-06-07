@@ -83,9 +83,27 @@ export const DEFAULT_RULES: Record<string, AgentRules> = {
     updated_by: null,
     updated_at: new Date().toISOString(),
   },
+  extraction: {
+    agent_key: "extraction",
+    label: "Čtení z příloh (výkresy, objednávky)",
+    instructions:
+      "Přečti přílohu (výkres, objednávku, poptávku — PDF i obrázek) a vytáhni strukturovaná data: typ dokumentu, číslo výkresu, materiál, rozměry, množství, zákazníka a specifické požadavky. Co nelze přečíst, nech prázdné a sniž confidence.",
+    always_rules: [
+      "Vždy přepiš číslo výkresu a revizi přesně dle dokumentu",
+      "Vždy rozpoznej tolerance, drsnost povrchu a tepelné zpracování",
+      "Vždy uveď množství jako číslo (ks)",
+    ],
+    never_rules: [
+      "Nikdy nedomýšlej údaje, které v dokumentu nejsou",
+      "Nikdy nezaměňuj číslo výkresu za číslo objednávky",
+      "Nikdy nehádej materiál, pokud není uveden",
+    ],
+    updated_by: null,
+    updated_at: new Date().toISOString(),
+  },
 };
 
-export const AGENT_KEYS = ["email", "pricing", "quote", "confirmation"] as const;
+export const AGENT_KEYS = ["email", "pricing", "quote", "confirmation", "extraction"] as const;
 
 export async function getAllAgentRules(): Promise<AgentRules[]> {
   return Promise.all(AGENT_KEYS.map((k) => getAgentRules(k)));

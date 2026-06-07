@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Loader2, Calculator, FileText, AlertCircle } from "lucide-react";
+import { Sparkles, Loader2, Calculator, FileText, AlertCircle, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,37 @@ export function AiPricingPanel() {
   const [estimate, setEstimate] = React.useState<Estimate | null>(null);
   const [quote, setQuote] = React.useState<Quote | null>(null);
   const [loading, setLoading] = React.useState<"" | "price" | "quote">("");
+  const [extracting, setExtracting] = React.useState(false);
+  const [extractMsg, setExtractMsg] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtracting(true); setExtractMsg(null); setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/ai/extract", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.error) { setError(data.error); }
+      else {
+        const x = data.extracted;
+        setForm((f) => ({
+          ...f,
+          drawingNumber: x.drawing_number || f.drawingNumber,
+          material: x.material || f.material,
+          dimensions: x.dimensions || f.dimensions,
+          quantity: x.quantity ? String(x.quantity) : f.quantity,
+          customer: x.customer || f.customer,
+          requirements: x.requirements || f.requirements,
+        }));
+        setExtractMsg(`Přečteno z přílohy (${Math.round((x.confidence ?? 0) * 100)} % jistota). Zkontroluj a naceň.`);
+      }
+    } catch { setError("Nepodařilo se přečíst přílohu."); }
+    finally { setExtracting(false); if (fileRef.current) fileRef.current.value = ""; }
+  };
 
   const upd = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -100,6 +130,21 @@ export function AiPricingPanel() {
         <Field label="Specifické požadavky">
           <Textarea value={form.requirements} onChange={upd("requirements")} className="min-h-[60px]" />
         </Field>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/pdf,image/png,image/jpeg,image/webp"
+            onChange={onFile}
+            className="hidden"
+          />
+          <Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={extracting}>
+            {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Načíst z přílohy (PDF/výkres)
+          </Button>
+          {extractMsg && <span className="text-xs text-success">{extractMsg}</span>}
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <Button onClick={price} disabled={loading !== ""}>

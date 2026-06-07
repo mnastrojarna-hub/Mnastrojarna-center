@@ -372,3 +372,76 @@ export async function generateConfirmation(input: {
 
   return textOf(message).trim();
 }
+
+// ── Čtení z přílohy (výkres / objednávka) přes Claude vision ─
+export interface ExtractedDocument {
+  doc_type: "poptavka" | "objednavka" | "vykres" | "faktura" | "ostatni";
+  drawing_number: string;
+  revision: string;
+  material: string;
+  dimensions: string;
+  quantity: number;
+  customer: string;
+  requirements: string;
+  summary: string;
+  confidence: number;
+}
+
+export async function extractFromDocument(input: {
+  mediaType: string; // application/pdf | image/png | image/jpeg | image/webp
+  dataBase64: string;
+  rules?: string;
+}): Promise<ExtractedDocument> {
+  const { apiKey, model } = await getAiConfig();
+  if (!apiKey) {
+    return {
+      doc_type: "ostatni", drawing_number: "", revision: "", material: "",
+      dimensions: "", quantity: 0, customer: "", requirements: "",
+      summary: "AI není nakonfigurováno — doplň Claude API klíč v Nastavení → Integrace.",
+      confidence: 0,
+    };
+  }
+
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      doc_type: { type: "string", enum: ["poptavka", "objednavka", "vykres", "faktura", "ostatni"] },
+      drawing_number: { type: "string" },
+      revision: { type: "string" },
+      material: { type: "string" },
+      dimensions: { type: "string" },
+      quantity: { type: "integer" },
+      customer: { type: "string" },
+      requirements: { type: "string" },
+      summary: { type: "string" },
+      confidence: { type: "number" },
+    },
+    required: ["doc_type", "drawing_number", "revision", "material", "dimensions", "quantity", "customer", "requirements", "summary", "confidence"],
+  };
+
+  const isPdf = input.mediaType === "application/pdf";
+  const source = { type: "base64" as const, media_type: input.mediaType, data: input.dataBase64 };
+  const fileBlock = (isPdf
+    ? { type: "document", source }
+    : { type: "image", source }) as Anthropic.ContentBlockParam;
+
+  const message = await new Anthropic({ apiKey }).messages.create({
+    model,
+    max_tokens: 1500,
+    output_config: { effort: "medium", format: { type: "json_schema", schema } },
+    system:
+      "Jsi technik nástrojárny Mnástrojárna. Z přiloženého dokumentu (výkres, objednávka, poptávka) " +
+      "vytáhni strukturovaná data: typ dokumentu, číslo výkresu a revizi, materiál, rozměry, množství (ks), " +
+      "zákazníka a specifické požadavky (tolerance, drsnost, tepelné zpracování). Co nelze přečíst, nech prázdné a sniž confidence." +
+      (input.rules ? `\n\n${input.rules}` : ""),
+    messages: [
+      {
+        role: "user",
+        content: [fileBlock, { type: "text", text: "Přečti dokument a vrať strukturovaná data dle schématu." }],
+      },
+    ],
+  });
+
+  return JSON.parse(textOf(message)) as ExtractedDocument;
+}
