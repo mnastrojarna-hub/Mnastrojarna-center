@@ -1,13 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "./database.types";
+import { isSupabaseConfigured } from "./config";
 
-/** True, pokud je Supabase nakonfigurovaný (env proměnné). */
-export function isSupabaseConfigured() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  );
-}
+export { isSupabaseConfigured };
 
 /**
  * Supabase klient pro server (Server Components, Server Actions, Route Handlers).

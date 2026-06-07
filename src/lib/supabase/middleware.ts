@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabaseEnv, isSupabaseConfigured } from "./config";
 
 /**
  * Obnova Supabase session v Next.js middleware (auth cookies).
@@ -7,11 +8,9 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-  // Bez nakonfigurovaného Supabase necháváme průchod (dev / build bez .env).
-  if (!url || !key) return supabaseResponse;
+  // Bez platné konfigurace (prázdné / placeholder / neplatná URL) necháváme průchod.
+  if (!isSupabaseConfigured()) return supabaseResponse;
+  const { url, key } = getSupabaseEnv() as { url: string; key: string };
 
   const supabase = createServerClient(url, key, {
     cookies: {
