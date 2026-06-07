@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Boxes } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { navSections } from "@/lib/nav";
 import { badgeCounts } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -12,14 +12,8 @@ export function Sidebar() {
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
-      <div className="flex h-14 items-center gap-2.5 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Boxes className="h-5 w-5" />
-        </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold">CNC Sales OS</div>
-          <div className="text-[11px] text-muted-foreground">Nástrojárna AI</div>
-        </div>
+      <div className="flex h-14 items-center px-5">
+        <Logo subtitle="CNC Sales OS" />
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto scrollbar-thin px-3 py-3">

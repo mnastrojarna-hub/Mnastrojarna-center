@@ -110,6 +110,28 @@ OCR:
 
 ---
 
+## Branding (dle logomanuálu `mnastrojarna_logomanual_5_4.pdf`)
+
+Firma: **Mnástrojárna s.r.o.** — slogan *„místo pro Vaši kooperaci…"*
+
+Barvy:
+
+| Barva | HEX | RGB | CMYK |
+| --- | --- | --- | --- |
+| Korporátní červená | `#E03930` | 244 57 48 | 0 94 100 0 |
+| Antracit | `#272425` | 39 36 37 | 0 0 0 100 |
+| Korporátní šedá | `#6C6D6F` | 108 109 111 | 0 0 0 70 |
+
+Písma:
+
+* **Roboto** (light / regular / bold) — delší bloky textu → použito jako hlavní UI font
+* Audimat (nadpisy) — není na Google Fonts, v UI nahrazeno Roboto
+
+Logo: symbol frézy (šrafovaný štít v korporátní červené) + wordmark „Mnástrojárna".
+V aplikaci: `src/components/logo.tsx` (vektorová rekreace), favicon `src/app/icon.svg`.
+
+---
+
 ## Režim provozu (KLÍČOVÉ)
 
 Systém má pro každou automatizovanou akci jeden ze dvou režimů:
