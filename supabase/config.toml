@@ -1,5 +1,6 @@
 # Supabase konfigurace — projekt Mnástrojárna (CNC Sales OS)
 # project_id = referenční ID projektu (z URL https://<project_id>.supabase.co)
+# deploy: trigger initial schema deploy
 project_id = "cqdhkzvzxdnzutizsjuz"
 
 [db]

@@ -21,26 +21,35 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
-      - name: Guard — chybí secrets?
-        if: ${{ env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_ID == '' }}
+      - name: Kontrola secrets
+        id: guard
         run: |
-          echo "::warning::Supabase secrets nejsou nastavené — deploy přeskočen. Viz SUPABASE_SETUP.md."
-          exit 0
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_ID" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::warning::Supabase secrets nejsou nastavené — deploy přeskočen. Viz SUPABASE_SETUP.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/checkout@v4
+        if: steps.guard.outputs.ready == 'true'
 
       - name: Setup Supabase CLI
+        if: steps.guard.outputs.ready == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Link projektu
+        if: steps.guard.outputs.ready == 'true'
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Push DB migrací
+        if: steps.guard.outputs.ready == 'true'
         run: supabase db push
 
       - name: Deploy Edge Functions
+        if: steps.guard.outputs.ready == 'true'
         run: |
           if [ -d "supabase/functions" ] && [ -n "$(ls -A supabase/functions 2>/dev/null)" ]; then
             supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
