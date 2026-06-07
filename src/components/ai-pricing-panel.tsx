@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AiConfidence } from "@/components/ai-confidence";
+import { submitAiQuote, type SubmitQuoteResult } from "@/app/actions/ai-quote";
 import { formatCZK } from "@/lib/utils";
 
 interface Estimate {
@@ -119,8 +120,63 @@ export function AiPricingPanel() {
 
         {estimate && <EstimateView e={estimate} />}
         {quote && <QuoteView q={quote} />}
+        {quote && <SubmitBar quote={quote} customer={form.customer} />}
       </CardContent>
     </Card>
+  );
+}
+
+function SubmitBar({ quote, customer }: { quote: Quote; customer: string }) {
+  const [email, setEmail] = React.useState("");
+  const [busy, setBusy] = React.useState<"" | "save" | "send">("");
+  const [result, setResult] = React.useState<SubmitQuoteResult | null>(null);
+
+  const submit = async (autoSend: boolean) => {
+    setBusy(autoSend ? "send" : "save");
+    setResult(null);
+    const res = await submitAiQuote({
+      customer,
+      customerEmail: email || undefined,
+      items: quote.items,
+      coverEmail: quote.cover_email,
+      leadTimeDays: quote.lead_time_days,
+      validUntilDays: quote.valid_until_days,
+      autoSend,
+    });
+    setResult(res);
+    setBusy("");
+  };
+
+  return (
+    <div className="space-y-2 rounded-lg border p-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="E-mail zákazníka (pro odeslání)"
+          type="email"
+          className="sm:max-w-xs"
+        />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => submit(false)} disabled={busy !== ""}>
+            {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Uložit & zařadit ke schválení
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => submit(true)} disabled={busy !== "" || !email}>
+            {busy === "send" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Odeslat zákazníkovi
+          </Button>
+        </div>
+      </div>
+      {result && (
+        <p className={result.ok ? "text-sm text-success" : "text-sm text-destructive"}>
+          {result.ok
+            ? `Nabídka ${result.number} uložena${result.archived ? " a archivována (PDF)" : ""}` +
+              (result.sent ? " a odeslána zákazníkovi." : result.sentReason ? ` · odeslání: ${result.sentReason}` : ".")
+            : result.error}
+        </p>
+      )}
+    </div>
   );
 }
 
