@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Search, Bell } from "lucide-react";
 import { useCommandPalette } from "@/components/command-palette";
 import { AutomationModeToggle } from "@/components/automation-mode-toggle";
@@ -52,9 +53,8 @@ export function Topbar() {
               <div className="text-xs font-normal text-muted-foreground">Super Admin</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profil</DropdownMenuItem>
-            <DropdownMenuItem>Nastavení automatizace</DropdownMenuItem>
-            <DropdownMenuItem>Připojené schránky</DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href="/settings">Nastavení</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href="/settings">API klíče a schránky</Link></DropdownMenuItem>
             <DropdownMenuSeparator />
             <form action={signOut}>
               <DropdownMenuItem asChild className="text-destructive focus:text-destructive">

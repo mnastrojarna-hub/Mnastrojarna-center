@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { AgentRules } from "@/lib/supabase/database.types";
 
 /**
@@ -112,7 +112,7 @@ export async function getAllAgentRules(): Promise<AgentRules[]> {
 export async function getAgentRules(agentKey = "email"): Promise<AgentRules> {
   if (isSupabaseConfigured()) {
     try {
-      const db = await createClient();
+      const db = await createOperatorClient();
       const { data, error } = await db
         .from("ai_agent_rules")
         .select("*")

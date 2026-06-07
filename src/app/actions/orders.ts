@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { OrderStatus } from "@/lib/supabase/database.types";
 
 // CZ popisek → enum stav v DB
@@ -33,7 +33,7 @@ export async function updateOrderStatus(
   if (!isSupabaseConfigured()) return { ok: true };
 
   try {
-    const db = await createClient();
+    const db = await createOperatorClient();
     const patch: Record<string, unknown> = { status };
     const ts = STATUS_TIMESTAMP[status];
     if (ts) patch[ts] = new Date().toISOString();

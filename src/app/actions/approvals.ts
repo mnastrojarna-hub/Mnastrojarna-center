@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 /**
  * Vyřízení položky fronty ke schválení. Best-effort: u demo dat (bez Supabase)
@@ -12,7 +12,7 @@ export async function resolveApproval(
 ): Promise<{ ok: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: true };
   try {
-    const supabase = await createClient();
+    const supabase = await createOperatorClient();
     const { error } = await supabase
       .from("approval_queue")
       .update({ status: action, resolved_at: new Date().toISOString() } as never)

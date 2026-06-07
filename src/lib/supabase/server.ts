@@ -46,3 +46,19 @@ export function createAdminClient() {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 }
+
+/** True, pokud je k dispozici servisní klíč (jednofiremní „operátorský" režim). */
+export function hasServiceKey() {
+  return Boolean(process.env.SUPABASE_SECRET_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL);
+}
+
+/**
+ * Operátorský klient pro jednofiremní provoz: pokud je nastaven servisní klíč,
+ * použije admin klienta (data se reálně čtou i zapisují bez nutnosti přihlášení).
+ * Jinak spadne na uživatelskou session (RLS).
+ */
+export async function createOperatorClient() {
+  if (hasServiceKey()) return createAdminClient();
+  return createClient();
+}
+

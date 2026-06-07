@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { Mailbox } from "@/lib/supabase/database.types";
 
 /** Metadata nastavení (bez tajných hodnot — jen příznak „nastaveno"). */
@@ -15,7 +15,7 @@ export interface SettingMeta {
 export async function getIntegrationSettingsMeta(): Promise<SettingMeta[]> {
   if (!isSupabaseConfigured()) return [];
   try {
-    const db = await createClient();
+    const db = await createOperatorClient();
     const { data, error } = await db
       .from("integration_settings")
       .select("key, label, category, is_secret, value")
@@ -39,7 +39,7 @@ export async function getIntegrationSettingsMeta(): Promise<SettingMeta[]> {
 export async function getMailboxes(): Promise<Mailbox[]> {
   if (!isSupabaseConfigured()) return [];
   try {
-    const db = await createClient();
+    const db = await createOperatorClient();
     const { data, error } = await db.from("mailboxes").select("*").order("created_at", { ascending: false });
     if (error || !data) return [];
     return data as Mailbox[];

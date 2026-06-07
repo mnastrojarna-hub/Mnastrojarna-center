@@ -11,10 +11,10 @@ if [ ! -f .env.local ]; then
   cp .env.example .env.local
 fi
 
-if [ ! -d node_modules ]; then
-  echo "→ Instaluji závislosti…"
-  npm install --no-audit --no-fund
-fi
+# Vždy doinstaluj závislosti (idempotentní — rychlé když je vše aktuální,
+# doinstaluje nově přidané balíčky po stažení změn).
+echo "→ Instaluji / aktualizuji závislosti…"
+npm install --no-audit --no-fund
 
 echo "→ Spouštím vývojový server… (Ctrl+C pro ukončení)"
 echo "→ Otevři: http://localhost:3000"
