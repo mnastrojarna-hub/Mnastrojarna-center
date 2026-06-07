@@ -5,6 +5,7 @@ import {
   Factory,
   FileBox,
   FileText,
+  ReceiptText,
   ClipboardList,
   Wallet,
   BrainCircuit,
@@ -38,6 +39,7 @@ export const navSections: NavSection[] = [
     items: [
       { title: "Poptávky & Nabídky", href: "/quotes", icon: FileText, badgeKey: "quotes", description: "Generátor nabídek" },
       { title: "Objednávky", href: "/orders", icon: ClipboardList, badgeKey: "orders", description: "Zakázky a stavy výroby" },
+      { title: "Dokumenty", href: "/documents", icon: ReceiptText, description: "Faktury, nabídky, dodací listy (PDF)" },
       { title: "Zákazníci", href: "/customers", icon: Users, description: "CRM" },
       { title: "Dodavatelé", href: "/suppliers", icon: Factory, description: "Databáze dodavatelů" },
     ],
