@@ -1,15 +1,27 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronRight, ReceiptText, Truck, Cog, MapPin, FileBox, CalendarClock, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, ReceiptText, Truck, Cog, MapPin, FileBox, CalendarClock, AlertTriangle, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/status-badge";
+import { updateOrderStatus } from "@/app/actions/orders";
 import { type OrderItem, orderStatusOrder } from "@/lib/mock-data";
 import { cn, formatCZK, formatDate } from "@/lib/utils";
 
 export function OrderBook({ orders }: { orders: OrderItem[] }) {
   const [open, setOpen] = React.useState<string | null>(orders[0]?.id ?? null);
+  const [statuses, setStatuses] = React.useState<Record<string, OrderItem["status"]>>({});
+
+  const statusOf = (o: OrderItem) => statuses[o.id] ?? o.status;
+
+  const advance = (o: OrderItem) => {
+    const cur = orderStatusOrder.indexOf(statusOf(o));
+    const next = orderStatusOrder[cur + 1];
+    if (!next) return;
+    setStatuses((s) => ({ ...s, [o.id]: next }));
+    void updateOrderStatus(o.id, next);
+  };
 
   return (
     <Card>
@@ -18,6 +30,8 @@ export function OrderBook({ orders }: { orders: OrderItem[] }) {
           {orders.map((o) => {
             const expanded = open === o.id;
             const overdue = isOverdue(o);
+            const st = statusOf(o);
+            const nextStatus = orderStatusOrder[orderStatusOrder.indexOf(st) + 1];
             return (
               <div key={o.id}>
                 <button
@@ -28,8 +42,8 @@ export function OrderBook({ orders }: { orders: OrderItem[] }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{o.number}</span>
-                      <OrderStatusBadge status={o.status} />
-                      {overdue && o.status !== "Dokončeno" && (
+                      <OrderStatusBadge status={st} />
+                      {overdue && st !== "Dokončeno" && (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
                           <AlertTriangle className="h-3 w-3" /> po termínu
                         </span>
@@ -45,7 +59,14 @@ export function OrderBook({ orders }: { orders: OrderItem[] }) {
 
                 {expanded && (
                   <div className="space-y-4 bg-muted/30 px-4 pb-4 pt-1 sm:px-10">
-                    <StageTimeline status={o.status} />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <StageTimeline status={st} />
+                      {nextStatus && (
+                        <Button size="sm" variant="secondary" onClick={() => advance(o)} className="shrink-0">
+                          <ArrowRight className="h-4 w-4" /> Posunout: {nextStatus}
+                        </Button>
+                      )}
+                    </div>
 
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <Info icon={<FileBox className="h-4 w-4" />} label="Výkres / materiál" value={`${o.drawing ?? "—"} · ${o.material ?? "—"}`} />
