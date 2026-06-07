@@ -1,8 +1,9 @@
-import { Plus, Star, Sparkles, Clock } from "lucide-react";
+import { Star, Clock } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { QuickAddDialog } from "@/components/quick-add-dialog";
+import { createSupplier } from "@/app/actions/crm";
 import { getSuppliers } from "@/lib/data/queries";
 
 export default async function SuppliersPage() {
@@ -11,26 +12,31 @@ export default async function SuppliersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dodavatelé"
-        description="Technologie, materiály, ceny a dodací lhůty. AI doporučí nejvhodnějšího dodavatele."
+        description="Technologie, materiály, ceny a dodací lhůty pro kooperace."
         actions={
-          <Button>
-            <Plus className="h-4 w-4" /> Nový dodavatel
-          </Button>
+          <QuickAddDialog
+            triggerLabel="Nový dodavatel"
+            title="Nový dodavatel"
+            action={createSupplier}
+            fields={[
+              { name: "name", label: "Název", required: true, placeholder: "Hofmann Tools GmbH" },
+              { name: "country", label: "Země", placeholder: "DE" },
+              { name: "email", label: "E-mail", type: "email" },
+              { name: "technologies", label: "Technologie (oddělené čárkou)", placeholder: "Kalení, Povlakování" },
+              { name: "materials", label: "Materiály (oddělené čárkou)", placeholder: "1.2343, 1.2379" },
+              { name: "leadDays", label: "Dodací lhůta (dní)", type: "number" },
+            ]}
+          />
         }
       />
 
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="flex items-start gap-3 p-4">
-          <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-          <div className="text-sm">
-            <div className="font-medium">Doporučení AI pro výkres VK-2291 (1.2379)</div>
-            <p className="text-muted-foreground">
-              Nejvýhodnější: <b className="text-foreground">Hofmann Tools GmbH</b> — nejlepší historická
-              cena materiálu, dodání do 7 dní, hodnocení 4,7.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {suppliers.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Zatím žádní dodavatelé. Přidej prvního přes tlačítko Nový dodavatel.
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {suppliers.map((s) => (

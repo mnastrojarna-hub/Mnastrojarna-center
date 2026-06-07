@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { commissions } from "@/lib/mock-data";
 import { formatCZK } from "@/lib/utils";
@@ -8,21 +8,14 @@ import { formatCZK } from "@/lib/utils";
 export default function CommissionsPage() {
   const totalCommission = commissions.reduce((s, c) => s + c.commission, 0);
   const totalRevenue = commissions.reduce((s, c) => s + c.revenue, 0);
+  const month = new Intl.DateTimeFormat("cs-CZ", { month: "long", year: "numeric" }).format(new Date());
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Provize obchodníků"
         description="Obrat, marže a provize se počítají automaticky dle smlouvy každého obchodníka."
-        actions={
-          <Tabs defaultValue="month">
-            <TabsList>
-              <TabsTrigger value="month">Měsíc</TabsTrigger>
-              <TabsTrigger value="quarter">Kvartál</TabsTrigger>
-              <TabsTrigger value="year">Rok</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        }
+        actions={<Badge variant="secondary">Období: {month}</Badge>}
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

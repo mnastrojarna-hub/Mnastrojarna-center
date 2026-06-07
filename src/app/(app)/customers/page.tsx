@@ -1,9 +1,9 @@
-import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { QuickAddDialog } from "@/components/quick-add-dialog";
+import { createCustomer } from "@/app/actions/crm";
 import { getCustomers } from "@/lib/data/queries";
 import { formatCZK } from "@/lib/utils";
 
@@ -15,9 +15,19 @@ export default async function CustomersPage() {
         title="Zákazníci (CRM)"
         description="Firmy, kontakty a celá historie komunikace na jednom místě."
         actions={
-          <Button>
-            <Plus className="h-4 w-4" /> Nový zákazník
-          </Button>
+          <QuickAddDialog
+            triggerLabel="Nový zákazník"
+            title="Nový zákazník"
+            action={createCustomer}
+            fields={[
+              { name: "name", label: "Název firmy", required: true, placeholder: "Strojmetal a.s." },
+              { name: "ico", label: "IČO", placeholder: "45274649" },
+              { name: "dic", label: "DIČ", placeholder: "CZ45274649" },
+              { name: "country", label: "Země", placeholder: "CZ" },
+              { name: "email", label: "E-mail", type: "email", placeholder: "nakup@firma.cz" },
+              { name: "phone", label: "Telefon" },
+            ]}
+          />
         }
       />
 
@@ -36,6 +46,13 @@ export default async function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {customers.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    Zatím žádní zákazníci. Přidej prvního přes tlačítko Nový zákazník.
+                  </TableCell>
+                </TableRow>
+              )}
               {customers.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
@@ -45,7 +62,9 @@ export default async function CustomersPage() {
                   </TableCell>
                   <TableCell>
                     <div>{c.contact}</div>
-                    <div className="text-xs text-muted-foreground">{c.email}</div>
+                    {c.email && c.email !== c.contact && (
+                      <div className="text-xs text-muted-foreground">{c.email}</div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">{c.orders}</TableCell>
                   <TableCell className="text-right font-medium">{formatCZK(c.revenue)}</TableCell>

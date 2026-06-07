@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Sparkles, Send, Pencil, Archive, Reply, Paperclip, Filter, RefreshCw, ArrowLeft } from "lucide-react";
+import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,9 +73,6 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
             {syncMsg && <span className="hidden text-xs text-muted-foreground sm:inline">{syncMsg}</span>}
             <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} /> Synchronizovat
-            </Button>
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4" /> Filtry
             </Button>
           </div>
         }
@@ -187,9 +184,6 @@ function EmailDetail({
               {email.from} · {email.fromEmail}
             </p>
           </div>
-          <Button variant="ghost" size="icon-sm" aria-label="Archivovat">
-            <Archive className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -202,7 +196,7 @@ function EmailDetail({
         </div>
 
         <div className="mt-4 rounded-lg bg-muted/50 p-4 text-sm leading-relaxed text-muted-foreground">
-          {email.preview} Lorem ipsum — kompletní tělo e-mailu se načte ze Supabase Storage / IMAP.
+          {email.preview}
         </div>
 
         <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
@@ -228,19 +222,14 @@ function EmailDetail({
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {mode === "full" ? (
                 <Badge variant="success">
-                  <Sparkles className="h-3 w-3" /> Bude odesláno automaticky
+                  <Sparkles className="h-3 w-3" /> V plné automatice se odešle samo
                 </Badge>
               ) : (
-                <Button size="sm">
-                  <Send className="h-4 w-4" /> Schválit a odeslat
-                </Button>
+                <Badge variant="warning">Čeká na schválení ve frontě (Dashboard)</Badge>
               )}
-              <Button variant="outline" size="sm">
-                <Pencil className="h-4 w-4" /> Upravit
-              </Button>
-              <Button variant="ghost" size="sm">
-                <Paperclip className="h-4 w-4" /> Přílohy
-              </Button>
+              <span className="text-xs text-muted-foreground">
+                Schválení/odeslání a úpravy probíhají ve frontě ke schválení.
+              </span>
             </div>
           </div>
         )}

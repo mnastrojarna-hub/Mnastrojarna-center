@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { Plus, Sparkles, FileText } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { QuoteStatusBadge } from "@/components/status-badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { getQuotes } from "@/lib/data/queries";
@@ -15,32 +13,10 @@ export default async function QuotesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Poptávky & Nabídky"
-        description="AI z poptávky vytvoří koncept nabídky — ty jen doplníš cenu a schválíš."
-        actions={
-          <Button>
-            <Plus className="h-4 w-4" /> Nová nabídka
-          </Button>
-        }
+        description="AI z poptávky (i z přílohy) ocení a vytvoří nabídku — ty doplníš/schválíš."
       />
 
       <AiPricingPanel />
-
-      <Card className="border-primary/30 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4 text-primary" /> AI právě připravila 1 nový koncept
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-4">
-          <div className="text-sm text-muted-foreground">
-            <b className="text-foreground">NAB-2026-119</b> pro Strojmetal a.s. — 50 ks dílu VK-2291,
-            materiál 1.2379. Doplň cenu a odešli.
-          </div>
-          <Button size="sm">
-            <FileText className="h-4 w-4" /> Otevřít koncept
-          </Button>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardContent className="p-0">

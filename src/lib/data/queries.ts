@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import {
   emailCategoryLabel, priorityLabel, orderStatusLabel, quoteStatusLabel, approvalTypeLabel,
 } from "@/lib/data/labels";
@@ -9,17 +9,23 @@ import type {
 import * as mock from "@/lib/mock-data";
 
 /**
- * Datová vrstva: čte ze Supabase (vč. joinů na zákazníky/obchodníky),
- * při nenakonfigurované nebo prázdné DB vrací demo data, aby UI fungovalo i bez živého backendu.
+ * Datová vrstva. Se servisním klíčem (operátorský režim) čte REÁLNÁ data
+ * (i prázdná → prázdný stav). Bez něj (nebo bez Supabase) vrací demo data,
+ * aby UI fungovalo i bez živého backendu.
  */
 
 async function supa() {
   if (!isSupabaseConfigured()) return null;
   try {
-    return await createClient();
+    return await createOperatorClient();
   } catch {
     return null;
   }
+}
+
+/** Reálný režim: máme servisní klíč → vracíme skutečná (i prázdná) data místo demo. */
+function real() {
+  return hasServiceKey();
 }
 
 function warn(scope: string, error: { message: string } | null) {
@@ -56,6 +62,7 @@ export async function getEmails(): Promise<mock.EmailItem[]> {
       }));
     }
   }
+  if (real()) return [];
   return mock.emails;
 }
 
@@ -80,6 +87,7 @@ export async function getApprovalQueue(): Promise<mock.ApprovalItem[]> {
       }));
     }
   }
+  if (real()) return [];
   return mock.approvalQueue;
 }
 
@@ -107,6 +115,7 @@ export async function getOrders(): Promise<mock.OrderItem[]> {
       }));
     }
   }
+  if (real()) return [];
   return mock.orders;
 }
 
@@ -137,6 +146,7 @@ export async function getQuotes(): Promise<mock.QuoteItem[]> {
       });
     }
   }
+  if (real()) return [];
   return mock.quotes;
 }
 
@@ -166,6 +176,7 @@ export async function getCustomers(): Promise<mock.CustomerItem[]> {
       });
     }
   }
+  if (real()) return [];
   return mock.customers;
 }
 
@@ -186,6 +197,7 @@ export async function getSuppliers(): Promise<mock.SupplierItem[]> {
       }));
     }
   }
+  if (real()) return [];
   return mock.suppliers;
 }
 
@@ -211,5 +223,6 @@ export async function getDrawings(): Promise<mock.DrawingItem[]> {
       }));
     }
   }
+  if (real()) return [];
   return mock.drawings;
 }

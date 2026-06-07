@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Pencil, X, Mail, FileText, Factory, Tag, Bot } from "lucide-react";
+import { Check, X, Mail, FileText, Factory, Tag, Bot } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,12 @@ export function ApprovalQueue({
     void resolveApproval(id, action); // best-effort perzistence
   };
 
+  const approveAll = () => {
+    const ids = items.map((i) => i.id);
+    setItems([]);
+    ids.forEach((id) => void resolveApproval(id, "approved"));
+  };
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -47,7 +53,9 @@ export function ApprovalQueue({
             <Bot className="h-3.5 w-3.5" /> Plná automatika
           </span>
         ) : (
-          <Button variant="ghost" size="sm">Schválit vše</Button>
+          items.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={approveAll}>Schválit vše</Button>
+          )
         )}
       </CardHeader>
       <CardContent className="space-y-2">
@@ -86,9 +94,6 @@ export function ApprovalQueue({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Button variant="ghost" size="icon-sm" aria-label="Upravit">
-                <Pencil className="h-4 w-4" />
-              </Button>
               <Button variant="ghost" size="icon-sm" aria-label="Zamítnout" onClick={() => resolve(item.id, "rejected")}>
                 <X className="h-4 w-4" />
               </Button>
