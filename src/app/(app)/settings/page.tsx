@@ -1,16 +1,17 @@
 import { Mail, KeyRound, ShieldCheck, BrainCircuit } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AutomationSettings } from "@/components/automation-settings";
 import { AgentRulesEditor } from "@/components/agent-rules-editor";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
-import { getAgentRules } from "@/lib/ai/rules";
+import { getAgentRules, getAllAgentRules } from "@/lib/ai/rules";
 import { getIntegrationSettingsMeta, getMailboxes } from "@/lib/data/settings-data";
 
 export default async function SettingsPage() {
-  const [emailRules, settings, mailboxes] = await Promise.all([
-    getAgentRules("email"),
+  const [agentRules, settings, mailboxes] = await Promise.all([
+    getAllAgentRules(),
     getIntegrationSettingsMeta(),
     getMailboxes(),
   ]);
@@ -53,18 +54,30 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Pravidla AI agenta pošty */}
+      {/* Pravidla AI agentů — řízení slovními příkazy */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <BrainCircuit className="h-4 w-4 text-muted-foreground" /> {emailRules.label}
+            <BrainCircuit className="h-4 w-4 text-muted-foreground" /> Pravidla AI agentů
           </CardTitle>
           <CardDescription>
-            Řiď agenta běžnou řečí — co má dělat, co musí <b>vždy</b> a co <b>nikdy</b>.
+            Laď každého agenta běžnou řečí — co má dělat, co musí <b>vždy</b> a co <b>nikdy</b>.
+            Platí pro třídění pošty, oceňování dle výkresu (jako technolog), nabídky i potvrzení.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AgentRulesEditor rules={emailRules} />
+          <Tabs defaultValue={agentRules[0]?.agent_key}>
+            <TabsList className="mb-4 flex-wrap">
+              {agentRules.map((r) => (
+                <TabsTrigger key={r.agent_key} value={r.agent_key}>{r.label}</TabsTrigger>
+              ))}
+            </TabsList>
+            {agentRules.map((r) => (
+              <TabsContent key={r.agent_key} value={r.agent_key}>
+                <AgentRulesEditor rules={r} />
+              </TabsContent>
+            ))}
+          </Tabs>
         </CardContent>
       </Card>
 

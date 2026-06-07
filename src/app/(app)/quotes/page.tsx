@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { QuoteStatusBadge } from "@/components/status-badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { getQuotes } from "@/lib/data/queries";
+import { AiPricingPanel } from "@/components/ai-pricing-panel";
 import { formatCZK, formatDate } from "@/lib/utils";
 
 export default async function QuotesPage() {
@@ -21,6 +22,8 @@ export default async function QuotesPage() {
           </Button>
         }
       />
+
+      <AiPricingPanel />
 
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
