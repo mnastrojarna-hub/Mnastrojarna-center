@@ -232,6 +232,16 @@ export interface AgentRules {
   updated_at: string;
 }
 
+export interface IntegrationSetting {
+  key: string;
+  value: string | null;
+  is_secret: boolean;
+  category: string;
+  label: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
 type Tbl<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -258,6 +268,7 @@ export interface Database {
       commission_entries: Tbl<CommissionEntry>;
       knowledge_documents: Tbl<KnowledgeDocument>;
       ai_agent_rules: Tbl<AgentRules>;
+      integration_settings: Tbl<IntegrationSetting>;
     };
     Views: Record<string, never>;
     Functions: {

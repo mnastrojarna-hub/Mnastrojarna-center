@@ -1,60 +1,66 @@
-import { Mail, Bot, Plug, ShieldCheck, BrainCircuit } from "lucide-react";
+import { Mail, KeyRound, ShieldCheck, BrainCircuit } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AutomationSettings } from "@/components/automation-settings";
 import { AgentRulesEditor } from "@/components/agent-rules-editor";
+import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
+import { MailboxManager } from "@/components/mailbox-manager";
 import { getAgentRules } from "@/lib/ai/rules";
+import { getIntegrationSettingsMeta, getMailboxes } from "@/lib/data/settings-data";
 
 export default async function SettingsPage() {
-  const emailRules = await getAgentRules("email");
+  const [emailRules, settings, mailboxes] = await Promise.all([
+    getAgentRules("email"),
+    getIntegrationSettingsMeta(),
+    getMailboxes(),
+  ]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Nastavení"
-        description="Připojení schránek, AI a režim automatizace pro každý modul."
+        description="Schránky, API klíče, pravidla AI a režim automatizace."
       />
 
-      {/* Připojené schránky */}
+      {/* API klíče a integrace */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Mail className="h-4 w-4 text-muted-foreground" /> Připojené schránky
+            <KeyRound className="h-4 w-4 text-muted-foreground" /> API klíče a integrace
           </CardTitle>
-          <CardDescription>Pošta se stahuje a analyzuje automaticky.</CardDescription>
+          <CardDescription>
+            Claude API, IMAP (hosting90) a Microsoft 365. Tajné klíče se ukládají bezpečně na serveru
+            (jen super admin) a nezobrazují se zpět.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <Connection name="Microsoft 365 / Outlook" detail="obchod@mnastrojarna.cz" status="connected" />
-          <Connection name="IMAP — hosting90" detail="info@mnastrojarna.cz" status="connected" />
-          <Connection name="Gmail" detail="Nepřipojeno" status="disconnected" />
+        <CardContent>
+          <IntegrationSettingsEditor settings={settings} />
         </CardContent>
       </Card>
 
-      {/* AI */}
+      {/* Schránky */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Bot className="h-4 w-4 text-muted-foreground" /> AI engine
+            <Mail className="h-4 w-4 text-muted-foreground" /> E-mailové schránky
           </CardTitle>
-          <CardDescription>Sdílí API klíč s Claude Code.</CardDescription>
+          <CardDescription>
+            Přidej libovolný počet schránek. Pošta se z nich stahuje a automaticky třídí AI.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <Connection name="Claude API (Anthropic)" detail="model: claude-opus-4-8" status="connected" />
-          <Connection name="Embeddings + pgvector" detail="Supabase Vector" status="connected" />
+        <CardContent>
+          <MailboxManager mailboxes={mailboxes} />
         </CardContent>
       </Card>
 
-      {/* Pravidla AI agenta pošty — řízení slovními příkazy */}
+      {/* Pravidla AI agenta pošty */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <BrainCircuit className="h-4 w-4 text-muted-foreground" /> {emailRules.label}
           </CardTitle>
           <CardDescription>
-            Řiď agenta běžnou řečí — co má dělat, co musí <b>vždy</b> a co <b>nikdy</b>. Pravidla se
-            promítnou do třídění pošty i do návrhů odpovědí.
+            Řiď agenta běžnou řečí — co má dělat, co musí <b>vždy</b> a co <b>nikdy</b>.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -76,37 +82,6 @@ export default async function SettingsPage() {
           <AutomationSettings />
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Connection({
-  name,
-  detail,
-  status,
-}: {
-  name: string;
-  detail: string;
-  status: "connected" | "disconnected";
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-          <Plug className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div>
-          <div className="text-sm font-medium">{name}</div>
-          <div className="text-xs text-muted-foreground">{detail}</div>
-        </div>
-      </div>
-      {status === "connected" ? (
-        <Badge variant="success">Připojeno</Badge>
-      ) : (
-        <Button variant="outline" size="sm">
-          Připojit
-        </Button>
-      )}
     </div>
   );
 }

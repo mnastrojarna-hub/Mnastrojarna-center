@@ -1,6 +1,7 @@
 import "server-only";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
 import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
+import { getImapConfig, getGraphConfig } from "@/lib/settings";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { EmailCategory, PriorityLevel } from "@/lib/supabase/database.types";
 
@@ -27,22 +28,17 @@ export interface SyncResult {
   message?: string;
 }
 
-function imapConfigured() {
-  return Boolean(process.env.IMAP_HOST && process.env.IMAP_USER && process.env.IMAP_PASSWORD);
-}
-
-function graphConfigured() {
-  return Boolean(process.env.MS_GRAPH_CLIENT_ID && process.env.MS_GRAPH_CLIENT_SECRET && process.env.MS_GRAPH_TENANT_ID);
-}
+type ImapCfg = { host?: string; port: number; user?: string; password?: string };
+type GraphCfg = { clientId?: string; clientSecret?: string; tenantId?: string; user?: string };
 
 // ── IMAP (hosting90) ────────────────────────────────────────
-export async function fetchImapEmails(limit = 20): Promise<RawEmail[]> {
+export async function fetchImapEmails(cfg: ImapCfg, limit = 20): Promise<RawEmail[]> {
   const { ImapFlow } = await import("imapflow");
   const client = new ImapFlow({
-    host: process.env.IMAP_HOST!,
-    port: Number(process.env.IMAP_PORT || 993),
+    host: cfg.host!,
+    port: cfg.port,
     secure: true,
-    auth: { user: process.env.IMAP_USER!, pass: process.env.IMAP_PASSWORD! },
+    auth: { user: cfg.user!, pass: cfg.password! },
     logger: false,
   });
 
@@ -76,15 +72,15 @@ export async function fetchImapEmails(limit = 20): Promise<RawEmail[]> {
 }
 
 // ── Microsoft Graph (Outlook / M365) ────────────────────────
-async function graphToken(): Promise<string> {
+async function graphToken(cfg: GraphCfg): Promise<string> {
   const params = new URLSearchParams({
-    client_id: process.env.MS_GRAPH_CLIENT_ID!,
-    client_secret: process.env.MS_GRAPH_CLIENT_SECRET!,
+    client_id: cfg.clientId!,
+    client_secret: cfg.clientSecret!,
     scope: "https://graph.microsoft.com/.default",
     grant_type: "client_credentials",
   });
   const res = await fetch(
-    `https://login.microsoftonline.com/${process.env.MS_GRAPH_TENANT_ID}/oauth2/v2.0/token`,
+    `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`,
     { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params },
   );
   if (!res.ok) throw new Error(`Graph token chyba: ${res.status}`);
@@ -92,8 +88,8 @@ async function graphToken(): Promise<string> {
   return data.access_token as string;
 }
 
-export async function fetchGraphEmails(userPrincipal: string, limit = 20): Promise<RawEmail[]> {
-  const token = await graphToken();
+export async function fetchGraphEmails(cfg: GraphCfg, userPrincipal: string, limit = 20): Promise<RawEmail[]> {
+  const token = await graphToken(cfg);
   const res = await fetch(
     `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userPrincipal)}/messages?$top=${limit}&$select=id,subject,from,bodyPreview,receivedDateTime`,
     { headers: { Authorization: `Bearer ${token}` } },
@@ -169,15 +165,20 @@ async function ingestEmails(emails: RawEmail[]): Promise<number> {
 }
 
 export async function syncMailbox(limit = 20): Promise<SyncResult> {
+  const imap = await getImapConfig();
+  const graph = await getGraphConfig();
+  const graphReady = Boolean(graph.clientId && graph.clientSecret && graph.tenantId);
+  const imapReady = Boolean(imap.host && imap.user && imap.password);
+
   try {
-    if (graphConfigured()) {
-      const user = process.env.MS_GRAPH_USER || process.env.IMAP_USER || "";
-      const emails = await fetchGraphEmails(user, limit);
+    if (graphReady) {
+      const user = graph.user || imap.user || "";
+      const emails = await fetchGraphEmails(graph, user, limit);
       const ingested = await ingestEmails(emails);
       return { source: "graph", configured: true, fetched: emails.length, ingested };
     }
-    if (imapConfigured()) {
-      const emails = await fetchImapEmails(limit);
+    if (imapReady) {
+      const emails = await fetchImapEmails(imap, limit);
       const ingested = await ingestEmails(emails);
       return { source: "imap", configured: true, fetched: emails.length, ingested };
     }
@@ -186,11 +187,11 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
       configured: false,
       fetched: 0,
       ingested: 0,
-      message: "Žádná schránka není nakonfigurována (IMAP hosting90 nebo Microsoft Graph).",
+      message: "Žádná schránka není nakonfigurována. Přidej IMAP nebo Microsoft 365 v Nastavení → Integrace.",
     };
   } catch (err) {
     return {
-      source: graphConfigured() ? "graph" : "imap",
+      source: graphReady ? "graph" : "imap",
       configured: true,
       fetched: 0,
       ingested: 0,

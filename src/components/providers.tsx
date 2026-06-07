@@ -8,7 +8,7 @@ import { CommandPaletteProvider } from "@/components/command-palette";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <NextThemesProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
       <AutomationProvider>
         <TooltipProvider delayDuration={200}>
           <CommandPaletteProvider>{children}</CommandPaletteProvider>

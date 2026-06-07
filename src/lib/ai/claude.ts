@@ -1,20 +1,16 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { EmailCategory, PriorityLevel } from "@/lib/supabase/database.types";
+import { getAiConfig } from "@/lib/settings";
 
 /**
- * AI vrstva nad Claude API (Anthropic). Sdílí klíč s Claude Code.
- * Bez ANTHROPIC_API_KEY funkce vrací bezpečný fallback, aby appka běžela i bez AI.
+ * AI vrstva nad Claude API (Anthropic). Klíč a model se berou z nastavení
+ * (DB integration_settings → fallback na ANTHROPIC_API_KEY v env).
+ * Bez klíče funkce vrací bezpečný fallback, aby appka běžela i bez AI.
  */
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
-
-export function isAiConfigured() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
-}
-
-function client() {
-  return new Anthropic(); // čte ANTHROPIC_API_KEY z prostředí
+export async function isAiConfigured() {
+  return Boolean((await getAiConfig()).apiKey);
 }
 
 function textOf(message: Anthropic.Message): string {
@@ -45,13 +41,14 @@ export async function categorizeEmail(input: {
   body: string;
   rules?: string; // firemní pravidla (VŽDY/NIKDY/pokyny) z ai_agent_rules
 }): Promise<EmailAnalysis> {
-  if (!isAiConfigured()) {
+  const { apiKey, model } = await getAiConfig();
+  if (!apiKey) {
     return {
       category: "ostatni",
       priority: "stredni",
       importance: 50,
       is_spam: false,
-      summary: "AI není nakonfigurováno (chybí ANTHROPIC_API_KEY).",
+      summary: "AI není nakonfigurováno (doplň Claude API klíč v Nastavení).",
       confidence: 0,
     };
   }
@@ -70,8 +67,8 @@ export async function categorizeEmail(input: {
     required: ["category", "priority", "importance", "is_spam", "summary", "confidence"],
   };
 
-  const message = await client().messages.create({
-    model: MODEL,
+  const message = await new Anthropic({ apiKey }).messages.create({
+    model,
     max_tokens: 1024,
     output_config: {
       effort: "low",
@@ -102,12 +99,13 @@ export async function draftReply(input: {
   category?: string;
   rules?: string;
 }): Promise<string> {
-  if (!isAiConfigured()) {
-    return "Dobrý den,\n\nděkujeme za Vaši zprávu. (Návrh vygeneruje AI po nastavení ANTHROPIC_API_KEY.)\n\nS pozdravem,\nMnástrojárna s.r.o.";
+  const { apiKey, model } = await getAiConfig();
+  if (!apiKey) {
+    return "Dobrý den,\n\nděkujeme za Vaši zprávu. (Návrh vygeneruje AI po doplnění Claude API klíče v Nastavení.)\n\nS pozdravem,\nMNástrojárna s.r.o.";
   }
 
-  const message = await client().messages.create({
-    model: MODEL,
+  const message = await new Anthropic({ apiKey }).messages.create({
+    model,
     max_tokens: 1500,
     output_config: { effort: "medium" },
     system:
@@ -131,12 +129,13 @@ export async function askAssistant(input: {
   question: string;
   context?: string;
 }): Promise<string> {
-  if (!isAiConfigured()) {
-    return "AI asistent zatím není aktivní — doplň ANTHROPIC_API_KEY do prostředí (sdílí klíč s Claude Code). Po nastavení odpovím nad tvými daty (RAG: nabídky, objednávky, výkresy).";
+  const { apiKey, model } = await getAiConfig();
+  if (!apiKey) {
+    return "AI asistent zatím není aktivní — doplň Claude API klíč v Nastavení → Integrace. Po nastavení odpovím nad tvými daty (RAG: nabídky, objednávky, výkresy).";
   }
 
-  const message = await client().messages.create({
-    model: MODEL,
+  const message = await new Anthropic({ apiKey }).messages.create({
+    model,
     max_tokens: 2000,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium" },
