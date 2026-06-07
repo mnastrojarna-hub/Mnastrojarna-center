@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Sparkles, Send, Pencil, Archive, Reply, Paperclip, Filter } from "lucide-react";
+import { Mail, Sparkles, Send, Pencil, Archive, Reply, Paperclip, Filter, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,27 @@ const categories = [
 export function InboxView({ emails }: { emails: EmailItem[] }) {
   const [filter, setFilter] = React.useState<(typeof categories)[number]>("Vše");
   const [selectedId, setSelectedId] = React.useState<string>(emails[0]?.id ?? "");
+  const [syncing, setSyncing] = React.useState(false);
+  const [syncMsg, setSyncMsg] = React.useState<string | null>(null);
   const { mode } = useAutomation();
+
+  const sync = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/emails/sync", { method: "POST" });
+      const data = await res.json();
+      setSyncMsg(
+        data.configured
+          ? `Staženo ${data.fetched}, zpracováno ${data.ingested}.`
+          : (data.message ?? "Schránka není nakonfigurována."),
+      );
+    } catch {
+      setSyncMsg("Synchronizace selhala.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const filtered = emails.filter((e) => filter === "Vše" || e.category === filter);
   const selected = emails.find((e) => e.id === selectedId) ?? filtered[0];
@@ -37,9 +57,15 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
         title="AI Inbox"
         description="Každý e-mail je automaticky roztříděn, ohodnocen a propojen se zákazníkem."
         actions={
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4" /> Filtry
-          </Button>
+          <div className="flex items-center gap-2">
+            {syncMsg && <span className="hidden text-xs text-muted-foreground sm:inline">{syncMsg}</span>}
+            <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
+              <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} /> Synchronizovat
+            </Button>
+            <Button variant="outline" size="sm">
+              <Filter className="h-4 w-4" /> Filtry
+            </Button>
+          </div>
         }
       />
 

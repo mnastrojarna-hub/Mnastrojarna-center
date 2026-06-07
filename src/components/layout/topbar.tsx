@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { signOut } from "@/app/auth/actions";
 
 export function Topbar() {
   const { setOpen } = useCommandPalette();
@@ -55,7 +56,11 @@ export function Topbar() {
             <DropdownMenuItem>Nastavení automatizace</DropdownMenuItem>
             <DropdownMenuItem>Připojené schránky</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">Odhlásit se</DropdownMenuItem>
+            <form action={signOut}>
+              <button type="submit" className="w-full">
+                <DropdownMenuItem className="text-destructive focus:text-destructive">Odhlásit se</DropdownMenuItem>
+              </button>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

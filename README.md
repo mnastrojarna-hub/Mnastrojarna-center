@@ -1,4 +1,4 @@
-# CNC Sales OS
+# CNC Sales OS — Mnástrojárna
 
 AI asistovaná obchodní a e-mailová kancelář pro nástrojárnu — CRM + ERP + e-mailový klient + dokumentový systém + AI asistent v jedné moderní SaaS aplikaci.
 
@@ -9,41 +9,56 @@ AI asistovaná obchodní a e-mailová kancelář pro nástrojárnu — CRM + ERP
 | Vrstva | Technologie |
 | --- | --- |
 | Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, ShadCN-style UI |
-| Backend | Supabase (PostgreSQL, Auth, Storage, Realtime, Edge Functions) |
-| AI | Claude API (Anthropic) + Embeddings/pgvector (RAG) |
+| Backend | Supabase (PostgreSQL + pgvector, Auth, Storage, Realtime, Edge Functions) |
+| AI | Claude API (Anthropic, `claude-opus-4-8`) + embeddings/pgvector (RAG) |
 | E-mail | Microsoft 365 / Outlook (Graph API), IMAP/SMTP (hosting90) |
-| Nasazení | Vercel |
+| Nasazení | Vercel + Supabase (deploy migrací přes git, viz `SUPABASE_SETUP.md`) |
 
 ## Filozofie ovládání
 
-**AI dělá vše automaticky, člověk pouze koriguje.** Každá automatizovaná akce běží v jednom ze dvou režimů:
+**AI dělá vše automaticky, člověk pouze koriguje.** Každá automatizovaná akce běží v jednom ze dvou režimů — **Plná automatika (100 %)** nebo **Se schválením**. Přepíná se globálně (horní lišta) i per-modul (Nastavení).
 
-- **Plná automatika (100 %)** — AI provede akci sama.
-- **Se schválením** — AI vše připraví, ty jedním klikem schválíš / upravíš / zamítneš.
+## Co je hotové
 
-Režim se přepíná globálně (horní lišta) i pro každý modul zvlášť (Nastavení).
+**Frontend / UX**
+- App shell: sidebar, topbar, command palette (⌘K), dark/light mode, responzivní + mobilní nav
+- Moduly: Dashboard, AI Inbox, Nabídky, Objednávky, Zákazníci, Dodavatelé, Archiv výkresů, Znalostní DB, AI Asistent, Provize, Nastavení
+- Branding dle logomanuálu (červená `#E03930`, antracit, šedá; font Roboto; logo frézy)
+- Fronta ke schválení, AI confidence indikátory, přepínač režimu automatizace
 
-## Stav: UI/UX prototyp
+**Backend (Supabase)**
+- 20 tabulek (profiles+role, CRM, dodavatelé, výkresy+pgvector, nabídky/objednávky, e-maily, automatizace, fronta schvalování, provize, znalostní DB, audit log)
+- RLS politiky dle rolí (super_admin / obchodnik / zamestnanec), RAG funkce `match_drawings` / `match_knowledge`, číslování dokladů
+- Migrace ověřené na PG16 + pgvector; `supabase/seed.sql` pro lokální dev
+- Datová vrstva s fallbackem na demo data (appka běží i bez živé DB)
 
-Aktuálně je hotová kompletní **UI/UX vrstva** s ukázkovými daty (`src/lib/mock-data.ts`):
+**AI (Claude)**
+- Kategorizace e-mailů, návrhy odpovědí, firemní asistent (`src/lib/ai/claude.ts`)
+- API: `/api/assistant`, `/api/emails/categorize`, `/api/emails/sync`
 
-- Dashboard, AI Inbox, Poptávky & Nabídky, Objednávky, Zákazníci (CRM), Dodavatelé,
-  Archiv výkresů, Znalostní DB, AI Asistent, Provize, Nastavení
-- Globální vyhledávání (⌘K, Raycast styl), dark/light mode, responzivní layout, fronta ke schválení
+**E-mail ingest**
+- IMAP (hosting90) + Microsoft Graph (Outlook) → AI analýza → uložení + fronta ke schválení
 
-Další krok: návrh DB schématu v Supabase a napojení reálných dat + Claude API.
+**Auth**
+- Supabase Auth (login `/login`, server actions, middleware pro session)
 
-## Spuštění
+## Spuštění (lokálně)
 
 ```bash
-cp .env.example .env.local   # doplň Supabase / Anthropic / e-mail klíče
+cp .env.example .env.local   # doplň klíče (Supabase už předvyplněno v .env.local)
 npm install
 npm run dev                  # http://localhost:3000
 ```
 
+## Co je potřeba doplnit pro plný provoz (secrets)
+
+| Kde | Co | Proč |
+| --- | --- | --- |
+| `.env.local` / Vercel | `ANTHROPIC_API_KEY` | živá AI (jinak fallback) |
+| `.env.local` / Vercel | `SUPABASE_SECRET_KEY` | serverový zápis (ingest pošty) |
+| `.env.local` / Vercel | `IMAP_*` nebo `MS_GRAPH_*` | stahování pošty |
+| GitHub Secrets | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_ID` | automatický deploy migrací — viz `SUPABASE_SETUP.md` |
+
 ## Skripty
 
-- `npm run dev` — vývojový server
-- `npm run build` — produkční build
-- `npm run typecheck` — kontrola typů
-- `npm run lint` — ESLint
+- `npm run dev` — vývoj · `npm run build` — produkční build · `npm run typecheck` · `npm run lint`
