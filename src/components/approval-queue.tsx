@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AiConfidence } from "@/components/ai-confidence";
 import { useAutomation } from "@/components/automation-provider";
 import { approvalQueue as fallbackQueue, type ApprovalItem } from "@/lib/mock-data";
+import { resolveApproval } from "@/app/actions/approvals";
 import { relativeTime } from "@/lib/utils";
 
 const typeIcon: Record<ApprovalItem["type"], React.ReactNode> = {
@@ -27,7 +28,10 @@ export function ApprovalQueue({
   const { mode } = useAutomation();
   const [items, setItems] = React.useState(initialItems ?? fallbackQueue);
 
-  const resolve = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
+  const resolve = (id: string, action: "approved" | "rejected") => {
+    setItems((prev) => prev.filter((i) => i.id !== id)); // optimistická aktualizace
+    void resolveApproval(id, action); // best-effort perzistence
+  };
 
   return (
     <Card>
@@ -85,10 +89,10 @@ export function ApprovalQueue({
               <Button variant="ghost" size="icon-sm" aria-label="Upravit">
                 <Pencil className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon-sm" aria-label="Zamítnout" onClick={() => resolve(item.id)}>
+              <Button variant="ghost" size="icon-sm" aria-label="Zamítnout" onClick={() => resolve(item.id, "rejected")}>
                 <X className="h-4 w-4" />
               </Button>
-              <Button variant="success" size="icon-sm" aria-label="Schválit" onClick={() => resolve(item.id)}>
+              <Button variant="success" size="icon-sm" aria-label="Schválit" onClick={() => resolve(item.id, "approved")}>
                 <Check className="h-4 w-4" />
               </Button>
             </div>
