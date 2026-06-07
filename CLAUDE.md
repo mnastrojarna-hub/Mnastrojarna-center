@@ -60,7 +60,7 @@ UX musí být navrženo tak, aby obchodník většinu práce zvládl během něk
 
 Frontend:
 
-* Next.js 15
+* Next.js 15 (App Router)
 * React
 * TypeScript
 * Tailwind CSS
@@ -68,39 +68,58 @@ Frontend:
 
 Backend:
 
+* **Supabase** (PostgreSQL + Auth + Storage + Realtime + Edge Functions)
 * Next.js Server Actions
 * API Routes
 * TypeScript
 
 Databáze:
 
-* PostgreSQL
-* Prisma ORM
+* **Supabase PostgreSQL**
+* pgvector (embeddings / RAG)
+* Row Level Security (role a oprávnění na úrovni DB)
 
 Autentizace:
 
-* NextAuth
+* **Supabase Auth** (role: super_admin / obchodnik / zamestnanec)
 
 Souborové úložiště:
 
-* Cloudflare R2
+* **Supabase Storage** (výkresy, PDF, přílohy e-mailů)
 
 Nasazení:
 
 * Vercel
 
+E-mail (připojení):
+
+* **Outlook / Microsoft 365** (Graph API)
+* **IMAP/SMTP přes hosting90** (firemní schránka)
+
 AI:
 
-* OpenAI API
-* Embeddings
-* Vector Database
-* RAG
+* **Claude API (Anthropic)** — již dostupné, sdílí klíč s Claude Code
+* Embeddings + pgvector (Vector Database v Supabase)
+* RAG nad historickými nabídkami / objednávkami / e-maily
 
 OCR:
 
 * PDF OCR
 * OCR obrázků
-* Extrakce textu z PDF
+* Extrakce textu z PDF (výkresy → metadata)
+
+---
+
+## Režim provozu (KLÍČOVÉ)
+
+Systém má pro každou automatizovanou akci jeden ze dvou režimů:
+
+1. **Plná automatika (100 %)** — AI provede akci sama (kategorizace, odpověď, nacenění, párování) bez zásahu člověka.
+2. **Automatika se schválením** — AI vše připraví, ale akce čeká ve **frontě ke schválení**; uživatel ji jedním klikem schválí, upraví, nebo zamítne.
+
+Princip UX: **AI dělá vše automaticky, člověk pouze ručně koriguje.** Výchozí stav je vyplněno/navrženo AI — uživatel pouze potvrzuje výjimky.
+
+Režim lze nastavit globálně i per-modul (např. kategorizace e-mailů = plná automatika, odesílání nabídek = se schválením).
 
 ---
 
