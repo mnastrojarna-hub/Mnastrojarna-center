@@ -1,5 +1,16 @@
 # CNC SALES OS – AI Obchodní a E-mailový Systém pro Nástrojárnu
 
+## Pracovní režim (POVINNÉ — priorita nad vším ostatním)
+
+1. **Pracuj plně autonomně.** Pokračuj v práci, dokud není celý systém **100 % hotový, funkční, odzkoušený a interně otestovaný** (všechny funkce a moduly).
+2. **Neptej se na dílčí rozhodnutí.** Detaily a jemné doladění řešíme až poté, co bude vše kompletně hotové a funkční. Volím rozumné defaulty a jdu dál.
+3. **Po každé etapě interně otestuj:** `npm run typecheck`, `npm run build`, `npm run lint` musí projít; u logiky piš a spouštěj testy; u UI udělej smoke-test (dev server / render).
+4. **Commituj a pushuj** průběžně na branch `claude/cnc-sales-os-ai-cbR2f`. Žádný krok nenechávej rozdělaný.
+5. **Výjimka pro dotaz:** pouze když fyzicky chybí tajný údaj (token/heslo/secret), který nemůžu sám získat — i tak připravím vše tak, aby to fungovalo po jeho doplnění, a pokračuji dál.
+6. Hotovo = zelený build, zelené testy, projité všechny moduly, nasaditelné na Vercel + Supabase.
+
+---
+
 ## Vize projektu
 
 Vytvoř produkční webovou aplikaci nasaditelnou na Vercel.

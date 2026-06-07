@@ -1,0 +1,11 @@
+# Supabase konfigurace — projekt Mnástrojárna (CNC Sales OS)
+# project_id = referenční ID projektu (z URL https://<project_id>.supabase.co)
+project_id = "cqdhkzvzxdnzutizsjuz"
+
+[db]
+# Verze Postgresu na Supabase
+major_version = 15
+
+[auth]
+# Role aplikace: super_admin / obchodnik / zamestnanec (řešeno v profiles + RLS)
+enable_signup = true

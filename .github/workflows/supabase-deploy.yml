@@ -1,0 +1,49 @@
+name: Supabase Deploy
+
+# Automatický deploy DB migrací a Edge Functions do Supabase při push.
+# Spustí se jen když jsou nastavené potřebné GitHub Secrets (viz SUPABASE_SETUP.md):
+#   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_ID
+
+on:
+  push:
+    branches:
+      - main
+      - claude/cnc-sales-os-ai-cbR2f
+    paths:
+      - "supabase/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - name: Guard — chybí secrets?
+        if: ${{ env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_ID == '' }}
+        run: |
+          echo "::warning::Supabase secrets nejsou nastavené — deploy přeskočen. Viz SUPABASE_SETUP.md."
+          exit 0
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link projektu
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Push DB migrací
+        run: supabase db push
+
+      - name: Deploy Edge Functions
+        run: |
+          if [ -d "supabase/functions" ] && [ -n "$(ls -A supabase/functions 2>/dev/null)" ]; then
+            supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
+          else
+            echo "Žádné Edge Functions k nasazení."
+          fi
