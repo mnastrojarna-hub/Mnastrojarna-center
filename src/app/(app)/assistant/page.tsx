@@ -28,18 +28,32 @@ export default function AssistantPage() {
     },
   ]);
   const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
 
-  const send = (text: string) => {
-    if (!text.trim()) return;
-    setMessages((m) => [
-      ...m,
-      { role: "user", text },
-      {
-        role: "assistant",
-        text: "Procházím znalostní databázi (RAG nad historickými nabídkami a objednávkami)… V produkci sem napojím Claude API + pgvector a vrátím konkrétní odpověď se zdroji.",
-      },
-    ]);
+  const send = async (text: string) => {
+    if (!text.trim() || loading) return;
+    setMessages((m) => [...m, { role: "user", text }]);
     setInput("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text }),
+      });
+      const data = await res.json();
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: data.answer ?? data.error ?? "Bez odpovědi." },
+      ]);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: "Nepodařilo se spojit s AI. Zkus to prosím znovu." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,6 +84,16 @@ export default function AssistantPage() {
               </div>
             </div>
           ))}
+          {loading && (
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Sparkles className="h-4 w-4 animate-pulse" />
+              </div>
+              <div className="rounded-2xl bg-muted px-4 py-2.5 text-sm text-muted-foreground">
+                AI přemýšlí…
+              </div>
+            </div>
+          )}
         </CardContent>
 
         <div className="border-t p-3">
@@ -96,8 +120,9 @@ export default function AssistantPage() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Napiš dotaz…"
               className="flex-1"
+              disabled={loading}
             />
-            <Button type="submit" size="icon" aria-label="Odeslat">
+            <Button type="submit" size="icon" aria-label="Odeslat" disabled={loading}>
               <Send className="h-4 w-4" />
             </Button>
           </form>
