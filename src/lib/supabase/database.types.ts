@@ -123,6 +123,17 @@ export interface Order {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  // Výroba (migrace 0011)
+  confirmed_at?: string | null;
+  technology?: string | null;
+  manufacturing_location?: string | null;
+  supplier_id?: string | null;
+  specific_requirements?: string | null;
+  production_started_at?: string | null;
+  produced_at?: string | null;
+  shipped_at?: string | null;
+  delivered_at?: string | null;
+  delivery_method?: string | null;
 }
 
 export interface OrderItem {

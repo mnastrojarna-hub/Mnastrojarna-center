@@ -101,6 +101,9 @@ export async function getOrders(): Promise<mock.OrderItem[]> {
         value: Number(o.value ?? 0),
         dueDate: o.due_date ?? "",
         owner: o.profiles?.full_name ?? "—",
+        technology: o.technology ?? undefined,
+        location: o.manufacturing_location ?? undefined,
+        requirements: o.specific_requirements ?? undefined,
       }));
     }
   }

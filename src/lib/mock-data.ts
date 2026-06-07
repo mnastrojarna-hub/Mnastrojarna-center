@@ -166,14 +166,22 @@ export interface OrderItem {
   value: number;
   dueDate: string;
   owner: string;
+  // Výrobní pole (kniha zakázek)
+  drawing?: string;
+  material?: string;
+  quantity?: number;
+  technology?: string;
+  location?: string;
+  requirements?: string;
+  customerEmail?: string;
 }
 
 export const orders: OrderItem[] = [
-  { id: "o1", number: "OBJ-4471", customer: "TDK Precision s.r.o.", title: "Frézované díly VK-2188", status: "Ve výrobě", value: 184000, dueDate: "2026-06-20", owner: "M. Novák" },
-  { id: "o2", number: "OBJ-4470", customer: "Strojmetal a.s.", title: "Soustružené čepy VK-2102", status: "Objednáno", value: 92500, dueDate: "2026-06-18", owner: "M. Novák" },
-  { id: "o3", number: "OBJ-4469", customer: "Beneš CNC", title: "Formová deska 1.2311", status: "Nacenění", value: 240000, dueDate: "2026-07-02", owner: "P. Kraus" },
-  { id: "o4", number: "OBJ-4468", customer: "TDK Precision s.r.o.", title: "Kalené vložky", status: "Expedováno", value: 67000, dueDate: "2026-06-10", owner: "M. Novák" },
-  { id: "o5", number: "OBJ-4467", customer: "AeroParts EU", title: "Hliníkové konzole 7075", status: "Dokončeno", value: 311000, dueDate: "2026-06-04", owner: "P. Kraus" },
+  { id: "o1", number: "OBJ-4471", customer: "TDK Precision s.r.o.", title: "Frézované díly VK-2188", status: "Ve výrobě", value: 184000, dueDate: "2026-06-20", owner: "M. Novák", drawing: "VK-2188", material: "1.2343", quantity: 120, technology: "Frézování 5-osé + broušení", location: "Interní výroba", requirements: "Tolerance H7, Ra 0,8", customerEmail: "nakup@tdkprecision.com" },
+  { id: "o2", number: "OBJ-4470", customer: "Strojmetal a.s.", title: "Soustružené čepy VK-2102", status: "Objednáno", value: 92500, dueDate: "2026-06-18", owner: "M. Novák", drawing: "VK-2102", material: "1.4301", quantity: 200, technology: "CNC soustružení", location: "Interní výroba", requirements: "Pasivace", customerEmail: "dvorak@strojmetal.cz" },
+  { id: "o3", number: "OBJ-4469", customer: "Beneš CNC", title: "Formová deska 1.2311", status: "Nacenění", value: 240000, dueDate: "2026-07-02", owner: "P. Kraus", drawing: "VK-2271", material: "1.2311", quantity: 8, technology: "Frézování + EDM", location: "Kooperace — kalení", requirements: "Rovinnost 0,02", customerEmail: "info@benescnc.cz" },
+  { id: "o4", number: "OBJ-4468", customer: "TDK Precision s.r.o.", title: "Kalené vložky", status: "Expedováno", value: 67000, dueDate: "2026-06-10", owner: "M. Novák", drawing: "VK-2188", material: "1.2379", quantity: 40, technology: "Broušení + kalení", location: "Kooperace — TepKal", requirements: "58–60 HRC", customerEmail: "nakup@tdkprecision.com" },
+  { id: "o5", number: "OBJ-4467", customer: "AeroParts EU", title: "Hliníkové konzole 7075", status: "Dokončeno", value: 311000, dueDate: "2026-06-04", owner: "P. Kraus", drawing: "VK-2255", material: "7075-T6", quantity: 200, technology: "Frézování 3-osé", location: "Interní výroba", requirements: "Eloxování", customerEmail: "weber@aeroparts.eu" },
 ];
 
 export const orderStatusOrder: OrderItem["status"][] = [

@@ -38,7 +38,7 @@ export const navSections: NavSection[] = [
     label: "Obchod",
     items: [
       { title: "Poptávky & Nabídky", href: "/quotes", icon: FileText, badgeKey: "quotes", description: "Generátor nabídek" },
-      { title: "Objednávky", href: "/orders", icon: ClipboardList, badgeKey: "orders", description: "Zakázky a stavy výroby" },
+      { title: "Kniha zakázek", href: "/orders", icon: ClipboardList, badgeKey: "orders", description: "Výrobní tok, termíny, doklady" },
       { title: "Dokumenty", href: "/documents", icon: ReceiptText, description: "Faktury, nabídky, dodací listy (PDF)" },
       { title: "Zákazníci", href: "/customers", icon: Users, description: "CRM" },
       { title: "Dodavatelé", href: "/suppliers", icon: Factory, description: "Databáze dodavatelů" },
