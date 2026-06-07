@@ -222,6 +222,16 @@ export interface KnowledgeDocument {
   created_at: string;
 }
 
+export interface AgentRules {
+  agent_key: string;
+  label: string;
+  instructions: string;
+  always_rules: string[];
+  never_rules: string[];
+  updated_by: string | null;
+  updated_at: string;
+}
+
 type Tbl<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -247,6 +257,7 @@ export interface Database {
       approval_queue: Tbl<ApprovalItemRow>;
       commission_entries: Tbl<CommissionEntry>;
       knowledge_documents: Tbl<KnowledgeDocument>;
+      ai_agent_rules: Tbl<AgentRules>;
     };
     Views: Record<string, never>;
     Functions: {

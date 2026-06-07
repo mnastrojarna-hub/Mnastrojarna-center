@@ -43,6 +43,7 @@ export async function categorizeEmail(input: {
   from: string;
   subject: string;
   body: string;
+  rules?: string; // firemní pravidla (VŽDY/NIKDY/pokyny) z ai_agent_rules
 }): Promise<EmailAnalysis> {
   if (!isAiConfigured()) {
     return {
@@ -80,7 +81,8 @@ export async function categorizeEmail(input: {
       "Jsi asistent nástrojárny Mnástrojárna. Klasifikuj příchozí e-mail do jedné z kategorií " +
       "a urči prioritu, důležitost (0–100), zda jde o spam, krátké shrnutí česky a confidence (0–1). " +
       "Kategorie: poptavka, objednavka, nabidka_dodavatele, potvrzeni_objednavky, faktura, upominka, " +
-      "reklamace, technicka_dokumentace, spam, ostatni.",
+      "reklamace, technicka_dokumentace, spam, ostatni." +
+      (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
         role: "user",
@@ -98,6 +100,7 @@ export async function draftReply(input: {
   subject: string;
   body: string;
   category?: string;
+  rules?: string;
 }): Promise<string> {
   if (!isAiConfigured()) {
     return "Dobrý den,\n\nděkujeme za Vaši zprávu. (Návrh vygeneruje AI po nastavení ANTHROPIC_API_KEY.)\n\nS pozdravem,\nMnástrojárna s.r.o.";
@@ -110,7 +113,8 @@ export async function draftReply(input: {
     system:
       "Jsi obchodní asistent firmy Mnástrojárna s.r.o. (nástrojárna). Napiš zdvořilou, věcnou " +
       "odpověď v češtině na příchozí e-mail. Bez vymýšlení cen a termínů — pokud chybí, napiš, že " +
-      "je doplníme. Podpis: 'S pozdravem, Mnástrojárna s.r.o.'. Vrať pouze tělo e-mailu.",
+      "je doplníme. Podpis: 'S pozdravem, Mnástrojárna s.r.o.'. Vrať pouze tělo e-mailu." +
+      (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
         role: "user",

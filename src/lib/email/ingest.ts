@@ -1,5 +1,6 @@
 import "server-only";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
+import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { EmailCategory, PriorityLevel } from "@/lib/supabase/database.types";
 
@@ -116,10 +117,11 @@ export async function fetchGraphEmails(userPrincipal: string, limit = 20): Promi
 async function ingestEmails(emails: RawEmail[]): Promise<number> {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) return 0;
   const db = createAdminClient();
+  const rules = buildRulesPrompt(await getAgentRules("email")); // slovní pravidla agenta
   let count = 0;
 
   for (const e of emails) {
-    const analysis = await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body });
+    const analysis = await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body, rules });
     const hasDraft = !analysis.is_spam && analysis.category !== "spam";
 
     const { data: inserted, error } = await db
@@ -151,7 +153,7 @@ async function ingestEmails(emails: RawEmail[]): Promise<number> {
 
     // Připrav návrh odpovědi do fronty ke schválení
     if (hasDraft) {
-      const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category: analysis.category });
+      const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category: analysis.category, rules });
       await db.from("approval_queue").insert({
         type: "email_reply",
         title: `Odpověď: ${e.subject}`.slice(0, 120),
