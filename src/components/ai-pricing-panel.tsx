@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AiConfidence } from "@/components/ai-confidence";
+import { CorrectionButton } from "@/components/correction-button";
 import { submitAiQuote, type SubmitQuoteResult } from "@/app/actions/ai-quote";
 import { formatCZK } from "@/lib/utils";
 
@@ -173,6 +174,15 @@ export function AiPricingPanel() {
             Načíst z přílohy (PDF/výkres)
           </Button>
           {extractMsg && <span className="text-xs text-success">{extractMsg}</span>}
+          {extractMsg && (
+            <CorrectionButton
+              agentKey="extraction"
+              field="extraction"
+              context={`Výkres ${form.drawingNumber}, materiál ${form.material}, ${form.quantity} ks`}
+              aiValue="viz předvyplněná pole"
+              label="Přečteno špatně? Oprav (AI se naučí)"
+            />
+          )}
         </div>
 
         <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
@@ -201,7 +211,12 @@ export function AiPricingPanel() {
           </div>
         )}
 
-        {estimate && <EstimateView e={estimate} />}
+        {estimate && (
+          <EstimateView
+            e={estimate}
+            context={`Výkres ${form.drawingNumber}, ${form.material}, ${form.quantity} ks, ${form.requirements}`}
+          />
+        )}
         {quote && <QuoteView q={quote} />}
         {quote && <SubmitBar quote={quote} customer={form.customer} />}
       </CardContent>
@@ -272,7 +287,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function EstimateView({ e }: { e: Estimate }) {
+function EstimateView({ e, context }: { e: Estimate; context: string }) {
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
       <div className="flex items-center justify-between">
@@ -309,6 +324,15 @@ function EstimateView({ e }: { e: Estimate }) {
           {e.needs_clarification.map((n, i) => <Badge key={i} variant="warning">{n}</Badge>)}
         </div>
       )}
+      <div className="border-t pt-2">
+        <CorrectionButton
+          agentKey="pricing"
+          field="price"
+          context={context}
+          aiValue={`cena/ks ${e.unit_price} Kč, marže ${e.margin_percent} %, lhůta ${e.lead_time_days} d`}
+          label="Cena/výpočet špatně? Oprav (AI se naučí)"
+        />
+      </div>
     </div>
   );
 }

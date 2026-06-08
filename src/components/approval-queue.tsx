@@ -9,7 +9,18 @@ import { AiConfidence } from "@/components/ai-confidence";
 import { useAutomation } from "@/components/automation-provider";
 import { approvalQueue as fallbackQueue, type ApprovalItem } from "@/lib/mock-data";
 import { resolveApproval } from "@/app/actions/approvals";
+import { CorrectionButton } from "@/components/correction-button";
 import { relativeTime } from "@/lib/utils";
+
+function agentKeyForType(type: ApprovalItem["type"]): string {
+  switch (type) {
+    case "E-mail odpověď": return "email";
+    case "Nabídka": return "quote";
+    case "Objednávka dodavateli": return "quote";
+    case "Kategorizace": return "email";
+    default: return "confirmation";
+  }
+}
 
 const typeIcon: Record<ApprovalItem["type"], React.ReactNode> = {
   "E-mail odpověď": <Mail className="h-4 w-4" />,
@@ -92,6 +103,17 @@ export function ApprovalQueue({
                 <span className="truncate">{item.target}</span>
                 <span>· {relativeTime(item.createdAt)}</span>
               </div>
+              {!compact && (
+                <div className="mt-1">
+                  <CorrectionButton
+                    agentKey={agentKeyForType(item.type)}
+                    field="content"
+                    context={`${item.type}: ${item.title} (${item.target})`}
+                    aiValue={item.summary}
+                    label="Špatně? Oprav (AI se naučí)"
+                  />
+                </div>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <Button variant="ghost" size="icon-sm" aria-label="Zamítnout" onClick={() => resolve(item.id, "rejected")}>
