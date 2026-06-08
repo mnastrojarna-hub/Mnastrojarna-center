@@ -2,6 +2,8 @@ import "server-only";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
 import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
 import { getImapConfig, getGraphConfig } from "@/lib/settings";
+import { getModuleMode } from "@/lib/automation";
+import { sendMail, isSmtpConfigured } from "@/lib/email/send";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { EmailCategory, PriorityLevel } from "@/lib/supabase/database.types";
 
@@ -114,6 +116,8 @@ async function ingestEmails(emails: RawEmail[]): Promise<number> {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) return 0;
   const db = createAdminClient();
   const rules = buildRulesPrompt(await getAgentRules("email")); // slovní pravidla agenta
+  const replyMode = await getModuleMode("reply"); // 'full' = odeslat hned
+  const smtpReady = await isSmtpConfigured();
   let count = 0;
 
   for (const e of emails) {
@@ -147,18 +151,44 @@ async function ingestEmails(emails: RawEmail[]): Promise<number> {
     if (error || !inserted) continue;
     count++;
 
-    // Připrav návrh odpovědi do fronty ke schválení
+    // Návrh odpovědi: plná automatika = odeslat hned, jinak do fronty ke schválení
     if (hasDraft) {
       const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category: analysis.category, rules });
-      await db.from("approval_queue").insert({
-        type: "email_reply",
-        title: `Odpověď: ${e.subject}`.slice(0, 120),
-        summary: analysis.summary,
-        payload: { body: draft },
-        target: e.fromEmail,
-        ai_confidence: analysis.confidence,
-        email_id: inserted.id,
-      });
+
+      let sentAuto = false;
+      if (replyMode === "full" && smtpReady && e.fromEmail) {
+        const res = await sendMail({
+          to: e.fromEmail,
+          subject: `Re: ${e.subject}`,
+          text: draft,
+        });
+        sentAuto = res.sent;
+      }
+
+      if (sentAuto) {
+        await db.from("emails").update({ has_draft: false } as never).eq("id", inserted.id);
+        await db.from("approval_queue").insert({
+          type: "email_reply",
+          title: `Automaticky odesláno: ${e.subject}`.slice(0, 120),
+          summary: analysis.summary,
+          payload: { body: draft },
+          target: e.fromEmail,
+          ai_confidence: analysis.confidence,
+          email_id: inserted.id,
+          status: "auto_executed",
+          resolved_at: new Date().toISOString(),
+        });
+      } else {
+        await db.from("approval_queue").insert({
+          type: "email_reply",
+          title: `Odpověď: ${e.subject}`.slice(0, 120),
+          summary: analysis.summary,
+          payload: { body: draft },
+          target: e.fromEmail,
+          ai_confidence: analysis.confidence,
+          email_id: inserted.id,
+        });
+      }
     }
   }
   return count;

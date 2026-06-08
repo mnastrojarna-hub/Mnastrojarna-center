@@ -2,18 +2,23 @@
 
 import { Bot, ShieldCheck } from "lucide-react";
 import { useAutomation } from "@/components/automation-provider";
+import { setGlobalMode } from "@/app/actions/automation";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export function AutomationModeToggle() {
   const { mode, setMode } = useAutomation();
+  const choose = (m: "full" | "approval") => {
+    setMode(m); // okamžitá UI změna (localStorage)
+    void setGlobalMode(m); // perzistence do DB (best-effort)
+  };
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="inline-flex items-center rounded-lg border bg-card p-0.5 text-xs font-medium">
           <button
-            onClick={() => setMode("full")}
+            onClick={() => choose("full")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors",
               mode === "full"
@@ -26,7 +31,7 @@ export function AutomationModeToggle() {
             <span className="sm:hidden">Auto</span>
           </button>
           <button
-            onClick={() => setMode("approval")}
+            onClick={() => choose("approval")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors",
               mode === "approval"

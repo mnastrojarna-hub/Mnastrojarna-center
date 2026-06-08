@@ -8,12 +8,14 @@ import { IntegrationSettingsEditor } from "@/components/integration-settings-edi
 import { MailboxManager } from "@/components/mailbox-manager";
 import { getAgentRules, getAllAgentRules } from "@/lib/ai/rules";
 import { getIntegrationSettingsMeta, getMailboxes } from "@/lib/data/settings-data";
+import { getAllModuleModes } from "@/lib/automation";
 
 export default async function SettingsPage() {
-  const [agentRules, settings, mailboxes] = await Promise.all([
+  const [agentRules, settings, mailboxes, moduleModes] = await Promise.all([
     getAllAgentRules(),
     getIntegrationSettingsMeta(),
     getMailboxes(),
+    getAllModuleModes(),
   ]);
 
   return (
@@ -46,7 +48,8 @@ export default async function SettingsPage() {
             <Mail className="h-4 w-4 text-muted-foreground" /> E-mailové schránky
           </CardTitle>
           <CardDescription>
-            Přidej libovolný počet schránek. Pošta se z nich stahuje a automaticky třídí AI.
+            Evidence schránek. Stahování pošty zatím probíhá přes globální přístup (IMAP/Microsoft 365)
+            zadaný výše v sekci API klíče.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -92,7 +95,7 @@ export default async function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AutomationSettings />
+          <AutomationSettings initial={moduleModes} />
         </CardContent>
       </Card>
     </div>
