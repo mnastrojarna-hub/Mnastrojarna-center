@@ -33,6 +33,13 @@ export default async function QuotesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {quotes.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    Zatím žádné nabídky. Vytvoř první přes AI ocenění výše.
+                  </TableCell>
+                </TableRow>
+              )}
               {quotes.map((q) => (
                 <TableRow key={q.id}>
                   <TableCell className="font-medium">{q.number}</TableCell>

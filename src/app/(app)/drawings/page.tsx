@@ -57,6 +57,13 @@ export default async function DrawingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {drawings.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                    Zatím žádné výkresy v archivu.
+                  </TableCell>
+                </TableRow>
+              )}
               {drawings.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell className="font-medium">{d.number}</TableCell>

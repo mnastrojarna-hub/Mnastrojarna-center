@@ -2,10 +2,11 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { commissions } from "@/lib/mock-data";
+import { getCommissions } from "@/lib/data/queries";
 import { formatCZK } from "@/lib/utils";
 
-export default function CommissionsPage() {
+export default async function CommissionsPage() {
+  const commissions = await getCommissions();
   const totalCommission = commissions.reduce((s, c) => s + c.commission, 0);
   const totalRevenue = commissions.reduce((s, c) => s + c.revenue, 0);
   const month = new Intl.DateTimeFormat("cs-CZ", { month: "long", year: "numeric" }).format(new Date());
@@ -52,6 +53,13 @@ export default function CommissionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {commissions.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                    Zatím žádné provize za toto období.
+                  </TableCell>
+                </TableRow>
+              )}
               {commissions.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.owner}</TableCell>

@@ -6,16 +6,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge, OrderStatusBadge } from "@/components/status-badge";
 import { AiConfidence } from "@/components/ai-confidence";
-import { commissions } from "@/lib/mock-data";
-import { getEmails, getOrders, getApprovalQueue, getQuotes } from "@/lib/data/queries";
+import { getEmails, getOrders, getApprovalQueue, getQuotes, getCommissions } from "@/lib/data/queries";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
 
 export default async function DashboardPage() {
-  const [emails, orders, approvals, quotes] = await Promise.all([
+  const [emails, orders, approvals, quotes, commissions] = await Promise.all([
     getEmails(),
     getOrders(),
     getApprovalQueue(),
     getQuotes(),
+    getCommissions(),
   ]);
 
   const recentEmails = emails.filter((e) => e.category !== "Spam").slice(0, 4);

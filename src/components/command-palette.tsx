@@ -6,8 +6,18 @@ import { Command } from "cmdk";
 import { Search, ArrowRight, FileText, Users, Factory, FileBox, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { allNavItems } from "@/lib/nav";
-import { customers, suppliers, drawings, quotes } from "@/lib/mock-data";
+import * as mock from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+
+interface SearchEntry { id: string; label: string; hint?: string }
+interface SearchData { customers: SearchEntry[]; suppliers: SearchEntry[]; drawings: SearchEntry[]; quotes: SearchEntry[] }
+
+const FALLBACK: SearchData = {
+  customers: mock.customers.map((c) => ({ id: c.id, label: c.name, hint: c.ico })),
+  suppliers: mock.suppliers.map((s) => ({ id: s.id, label: s.name, hint: s.country })),
+  drawings: mock.drawings.map((d) => ({ id: d.id, label: d.number, hint: `${d.material} · rev. ${d.revision}` })),
+  quotes: mock.quotes.map((q) => ({ id: q.id, label: q.number, hint: q.customer })),
+};
 
 interface CommandPaletteContextValue {
   open: boolean;
@@ -24,6 +34,8 @@ export function useCommandPalette() {
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false);
+  const [data, setData] = React.useState<SearchData>(FALLBACK);
+  const loaded = React.useRef(false);
   const router = useRouter();
 
   React.useEffect(() => {
@@ -36,6 +48,18 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
+
+  // Při prvním otevření načti živá data (operátorský režim → reálné záznamy)
+  React.useEffect(() => {
+    if (!open || loaded.current) return;
+    loaded.current = true;
+    fetch("/api/search")
+      .then((r) => r.json())
+      .then((d: SearchData) => {
+        if (d && (d.customers || d.suppliers || d.drawings || d.quotes)) setData(d);
+      })
+      .catch(() => {});
+  }, [open]);
 
   const go = (href: string) => {
     setOpen(false);
@@ -74,33 +98,33 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
               </Command.Group>
 
               <Command.Group heading="Zákazníci">
-                {customers.map((c) => (
-                  <Item key={c.id} onSelect={() => go("/customers")} icon={<Users />} hint={c.ico}>
-                    {c.name}
+                {data.customers.map((c) => (
+                  <Item key={c.id} onSelect={() => go("/customers")} icon={<Users />} hint={c.hint}>
+                    {c.label}
                   </Item>
                 ))}
               </Command.Group>
 
               <Command.Group heading="Výkresy">
-                {drawings.map((d) => (
-                  <Item key={d.id} onSelect={() => go("/drawings")} icon={<FileBox />} hint={`${d.material} · rev. ${d.revision}`}>
-                    {d.number}
+                {data.drawings.map((d) => (
+                  <Item key={d.id} onSelect={() => go("/drawings")} icon={<FileBox />} hint={d.hint}>
+                    {d.label}
                   </Item>
                 ))}
               </Command.Group>
 
               <Command.Group heading="Nabídky">
-                {quotes.map((q) => (
-                  <Item key={q.id} onSelect={() => go("/quotes")} icon={<FileText />} hint={q.customer}>
-                    {q.number}
+                {data.quotes.map((q) => (
+                  <Item key={q.id} onSelect={() => go("/quotes")} icon={<FileText />} hint={q.hint}>
+                    {q.label}
                   </Item>
                 ))}
               </Command.Group>
 
               <Command.Group heading="Dodavatelé">
-                {suppliers.map((s) => (
-                  <Item key={s.id} onSelect={() => go("/suppliers")} icon={<Factory />} hint={s.country}>
-                    {s.name}
+                {data.suppliers.map((s) => (
+                  <Item key={s.id} onSelect={() => go("/suppliers")} icon={<Factory />} hint={s.hint}>
+                    {s.label}
                   </Item>
                 ))}
               </Command.Group>

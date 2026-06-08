@@ -226,3 +226,35 @@ export async function getDrawings(): Promise<mock.DrawingItem[]> {
   if (real()) return [];
   return mock.drawings;
 }
+
+export async function getCommissions(): Promise<mock.CommissionRow[]> {
+  const db = await supa();
+  if (db) {
+    const period = new Date();
+    const first = new Date(period.getFullYear(), period.getMonth(), 1).toISOString().slice(0, 10);
+    const { data, error } = await db
+      .from("commission_entries")
+      .select("id, owner_id, revenue, margin, rate, commission, profiles(full_name)")
+      .gte("period", first);
+    warn("commissions", error);
+    if (!error && data && data.length) {
+      type CE = {
+        id: string; owner_id: string; revenue: number; margin: number; rate: number;
+        commission: number; profiles?: { full_name: string } | null;
+      };
+      // Agregace po obchodníkovi za aktuální období
+      const byOwner = new Map<string, mock.CommissionRow>();
+      for (const r of data as CE[]) {
+        const name = r.profiles?.full_name ?? "—";
+        const cur = byOwner.get(r.owner_id) ?? { id: r.owner_id, owner: name, revenue: 0, margin: 0, rate: Number(r.rate), commission: 0 };
+        cur.revenue += Number(r.revenue);
+        cur.commission += Number(r.commission);
+        cur.margin = Number(r.margin);
+        byOwner.set(r.owner_id, cur);
+      }
+      return [...byOwner.values()];
+    }
+  }
+  if (real()) return [];
+  return mock.commissions;
+}
