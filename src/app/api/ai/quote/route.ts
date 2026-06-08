@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { generateQuote, priceDrawing } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
+import { getPricingParams } from "@/lib/settings";
+import { findHistoricalQuote } from "@/lib/data/queries";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,14 +16,31 @@ export async function POST(req: Request) {
     // Volitelně nejdřív naceň technologem, pak postav nabídku
     let estimate;
     if (body.withPricing) {
-      const priceRules = await getAgentInstructions("pricing");
+      const [priceRules, params, historical] = await Promise.all([
+        getAgentInstructions("pricing"),
+        getPricingParams(),
+        findHistoricalQuote(body.drawingNumber),
+      ]);
       estimate = await priceDrawing({
         drawingNumber: body.drawingNumber,
+        partType: body.partType,
+        orderType: body.orderType,
         material: body.material,
-        dimensions: body.dimensions,
+        blankDimensions: body.blankDimensions ?? body.dimensions,
+        blankWeightKg: body.blankWeightKg,
+        finishedWeightKg: body.finishedWeightKg,
+        surfaceTreatment: body.surfaceTreatment,
+        heatTreatment: body.heatTreatment,
+        surfaceQualities: body.surfaceQualities,
+        machiningTechnologies: body.machiningTechnologies,
+        tolerancesBeforeHt: body.tolerancesBeforeHt,
+        tolerancesAfterHt: body.tolerancesAfterHt,
         quantity: Number(body.quantity) || 1,
+        customer,
         requirements: body.requirements,
         drawingText: inquiry,
+        params,
+        historical,
         rules: priceRules,
       });
     }

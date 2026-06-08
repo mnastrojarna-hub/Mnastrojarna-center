@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { priceDrawing, generateQuote } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
+import { getPricingParams } from "@/lib/settings";
+import { findHistoricalQuote } from "@/lib/data/queries";
 import { submitAiQuote } from "@/app/actions/ai-quote";
 
 export const runtime = "nodejs";
@@ -18,14 +20,31 @@ export async function POST(req: Request) {
       `Výkres ${body.drawingNumber ?? "—"}, materiál ${body.material ?? "—"}, ` +
       `${body.dimensions ?? "—"}, ${quantity} ks. ${body.requirements ?? ""}`;
 
-    // 1) Oceň jako technolog
+    // 1) Oceň jako technolog (s parametry + historickou cenou)
+    const [params, historical] = await Promise.all([
+      getPricingParams(),
+      findHistoricalQuote(body.drawingNumber),
+    ]);
     const estimate = await priceDrawing({
       drawingNumber: body.drawingNumber,
+      partType: body.partType,
+      orderType: body.orderType,
       material: body.material,
-      dimensions: body.dimensions,
+      blankDimensions: body.blankDimensions ?? body.dimensions,
+      blankWeightKg: body.blankWeightKg,
+      finishedWeightKg: body.finishedWeightKg,
+      surfaceTreatment: body.surfaceTreatment,
+      heatTreatment: body.heatTreatment,
+      surfaceQualities: body.surfaceQualities,
+      machiningTechnologies: body.machiningTechnologies,
+      tolerancesBeforeHt: body.tolerancesBeforeHt,
+      tolerancesAfterHt: body.tolerancesAfterHt,
       quantity,
+      customer,
       requirements: body.requirements,
       drawingText: inquiry,
+      params,
+      historical,
       rules: await getAgentInstructions("pricing"),
     });
 

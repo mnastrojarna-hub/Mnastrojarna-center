@@ -258,3 +258,32 @@ export async function getCommissions(): Promise<mock.CommissionRow[]> {
   if (real()) return [];
   return mock.commissions;
 }
+
+/** Najde nejnovější historickou nabídku pro dané číslo výkresu (pro reuse ceny + inflace). */
+export async function findHistoricalQuote(drawingNumber?: string): Promise<{ found: boolean; unitPrice?: number; note?: string }> {
+  if (!drawingNumber || !drawingNumber.trim()) return { found: false };
+  const db = await supa();
+  if (!db) return { found: false };
+  try {
+    const { data, error } = await db
+      .from("quote_items")
+      .select("quantity, unit_price, quotes(number, total, status, created_at), drawings!inner(drawing_number)")
+      .eq("drawings.drawing_number", drawingNumber.trim())
+      .order("created_at", { ascending: false, foreignTable: "quotes" })
+      .limit(1);
+    if (error || !data || !data.length) return { found: false };
+    const row = data[0] as {
+      quantity: number; unit_price: number | null;
+      quotes?: { number: string; total: number | null; status: string; created_at: string } | null;
+    };
+    const q = row.quotes;
+    const unit = row.unit_price ?? (q?.total && row.quantity ? Number(q.total) / row.quantity : undefined);
+    return {
+      found: true,
+      unitPrice: unit ? Math.round(unit * 100) / 100 : undefined,
+      note: q ? `nabídka ${q.number} z ${new Date(q.created_at).toLocaleDateString("cs-CZ")} (${q.status})` : undefined,
+    };
+  } catch {
+    return { found: false };
+  }
+}

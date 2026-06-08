@@ -158,20 +158,35 @@ export async function askAssistant(input: {
 
 // ── Oceňování dle výkresu (jako technolog) ──────────────────
 export interface PriceOperation {
-  name: string;
-  machine_minutes: number;
-  setup_minutes: number;
+  name: string;            // operace (frézování, soustružení, broušení, EDM…)
+  machine_minutes: number; // strojní čas / ks
+  setup_minutes: number;   // seřízení (na dávku)
+}
+export interface PricingParams {
+  hourlyRate?: number;       // Kč/h stroj
+  handlingRate?: number;     // Kč/h manipulace
+  marginPercent?: number;    // výchozí marže %
+  inflationPercent?: number; // roční inflace pro historické ceny
+  transportDefault?: number; // výchozí doprava
 }
 export interface PriceEstimate {
   material: string;
+  blank_weight_kg: number;          // váha polotovaru
+  removed_weight_kg: number;        // úběr materiálu
   operations: PriceOperation[];
+  handling_minutes: number;         // manipulace / ks
+  transport_cost: number;           // doprava na zakázku
   material_cost_per_piece: number;
+  surface_treatment_cost: number;   // povrchová úprava / ks
+  heat_treatment_cost: number;      // tepelné zpracování / ks
   cooperation_cost_per_piece: number;
   labor_rate_per_hour: number;
   margin_percent: number;
   unit_price: number;
   total_price: number;
   lead_time_days: number;
+  historical_used: boolean;         // použita historická cena + inflace
+  historical_note: string;
   confidence: number;
   reasoning: string;
   needs_clarification: string[];
@@ -179,85 +194,116 @@ export interface PriceEstimate {
 
 export async function priceDrawing(input: {
   drawingNumber?: string;
+  partType?: string;
+  orderType?: string;
   material?: string;
-  dimensions?: string;
+  blankDimensions?: string;
+  blankWeightKg?: number;
+  finishedWeightKg?: number;
+  surfaceTreatment?: string;
+  heatTreatment?: string;
+  surfaceQualities?: string[];
+  machiningTechnologies?: string[];
+  tolerancesBeforeHt?: Record<string, number>;
+  tolerancesAfterHt?: Record<string, number>;
   quantity: number;
+  customer?: string;
   requirements?: string;
   drawingText?: string;
+  params?: PricingParams;
+  historical?: { found: boolean; note?: string; unitPrice?: number };
   rules?: string;
 }): Promise<PriceEstimate> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
     return {
       material: input.material || "—",
-      operations: [],
-      material_cost_per_piece: 0,
-      cooperation_cost_per_piece: 0,
-      labor_rate_per_hour: 0,
-      margin_percent: 0,
-      unit_price: 0,
-      total_price: 0,
-      lead_time_days: 0,
+      blank_weight_kg: 0, removed_weight_kg: 0,
+      operations: [], handling_minutes: 0, transport_cost: 0,
+      material_cost_per_piece: 0, surface_treatment_cost: 0, heat_treatment_cost: 0,
+      cooperation_cost_per_piece: 0, labor_rate_per_hour: 0, margin_percent: 0,
+      unit_price: 0, total_price: 0, lead_time_days: 0,
+      historical_used: false, historical_note: "",
       confidence: 0,
       reasoning: "AI není nakonfigurováno — doplň Claude API klíč v Nastavení → Integrace.",
       needs_clarification: ["Claude API klíč"],
     };
   }
 
+  const numProp = { type: "number" };
   const schema = {
     type: "object",
     additionalProperties: false,
     properties: {
       material: { type: "string" },
+      blank_weight_kg: numProp,
+      removed_weight_kg: numProp,
       operations: {
         type: "array",
         items: {
           type: "object",
           additionalProperties: false,
-          properties: {
-            name: { type: "string" },
-            machine_minutes: { type: "number" },
-            setup_minutes: { type: "number" },
-          },
+          properties: { name: { type: "string" }, machine_minutes: numProp, setup_minutes: numProp },
           required: ["name", "machine_minutes", "setup_minutes"],
         },
       },
-      material_cost_per_piece: { type: "number" },
-      cooperation_cost_per_piece: { type: "number" },
-      labor_rate_per_hour: { type: "number" },
-      margin_percent: { type: "number" },
-      unit_price: { type: "number" },
-      total_price: { type: "number" },
+      handling_minutes: numProp,
+      transport_cost: numProp,
+      material_cost_per_piece: numProp,
+      surface_treatment_cost: numProp,
+      heat_treatment_cost: numProp,
+      cooperation_cost_per_piece: numProp,
+      labor_rate_per_hour: numProp,
+      margin_percent: numProp,
+      unit_price: numProp,
+      total_price: numProp,
       lead_time_days: { type: "integer" },
-      confidence: { type: "number" },
+      historical_used: { type: "boolean" },
+      historical_note: { type: "string" },
+      confidence: numProp,
       reasoning: { type: "string" },
       needs_clarification: { type: "array", items: { type: "string" } },
     },
     required: [
-      "material", "operations", "material_cost_per_piece", "cooperation_cost_per_piece",
-      "labor_rate_per_hour", "margin_percent", "unit_price", "total_price",
-      "lead_time_days", "confidence", "reasoning", "needs_clarification",
+      "material", "blank_weight_kg", "removed_weight_kg", "operations", "handling_minutes", "transport_cost",
+      "material_cost_per_piece", "surface_treatment_cost", "heat_treatment_cost", "cooperation_cost_per_piece",
+      "labor_rate_per_hour", "margin_percent", "unit_price", "total_price", "lead_time_days",
+      "historical_used", "historical_note", "confidence", "reasoning", "needs_clarification",
     ],
   };
 
+  const p = input.params ?? {};
+  const paramLines =
+    `PARAMETRY (použij je): hodinová sazba ${p.hourlyRate ?? 1200} Kč/h, manipulace ${p.handlingRate ?? 600} Kč/h, ` +
+    `výchozí marže ${p.marginPercent ?? 15} %, inflace ${p.inflationPercent ?? 5} %/rok, doprava ${p.transportDefault ?? 500} Kč.`;
+  const hist = input.historical?.found
+    ? `HISTORIE: tento výkres se už vyráběl — původní cena/ks ${input.historical.unitPrice ?? "?"} Kč (${input.historical.note ?? ""}). ` +
+      `Vyjdi z ní a navyš o inflaci; historical_used=true.`
+    : "HISTORIE: díl se dle dostupných dat dříve nevyráběl.";
+
   const message = await new Anthropic({ apiKey }).messages.create({
     model,
-    max_tokens: 2500,
+    max_tokens: 3500,
     thinking: { type: "adaptive" },
     output_config: { effort: "high", format: { type: "json_schema", schema } },
     system:
-      "Jsi zkušený technolog a kalkulant CNC nástrojárny Mnástrojárna. Oceň díl podle výkresu a zadání. " +
-      "Postupuj jako při reálné kalkulaci: materiál a polotovar, operace a jejich strojní/seřizovací čas, " +
-      "kooperace (kalení, povlakování), množstevní efekt, hodinová sazba, marže, cena za kus i celkem, dodací lhůta. " +
-      "Ceny v CZK. Buď realistický; u nejistot sniž confidence a doplň needs_clarification." +
+      "Jsi špičkový technolog a kalkulant CNC nástrojárny Mnástrojárna. Oceň díl jako při reálné kalkulaci a postupuj komplexně: " +
+      "z váhy polotovaru spočítej náklad na materiál, urči úběr, rozepiš technologické operace a jejich strojní i seřizovací čas, " +
+      "započítej manipulaci a dopravu, kooperace zvlášť (povrchová úprava, tepelné zpracování), zohledni počty přesných rozměrů " +
+      "(úzké tolerance a tepelka cenu zvyšují), množstevní efekt i konkrétního zákazníka. Pokud existuje historická cena, vyjdi z ní + inflace. " +
+      "Použij zadané PARAMETRY. Ceny v CZK. Buď realistický; u nejistot sniž confidence a doplň needs_clarification." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
         role: "user",
         content:
-          `Výkres: ${input.drawingNumber ?? "—"}\nMateriál: ${input.material ?? "neuvedeno"}\n` +
-          `Rozměry: ${input.dimensions ?? "neuvedeno"}\nMnožství: ${input.quantity} ks\n` +
-          `Požadavky: ${input.requirements ?? "—"}\n\n${input.drawingText ?? ""}`,
+          `Výkres: ${input.drawingNumber ?? "—"}\nTyp dílu: ${input.partType ?? "?"}\nTyp zakázky: ${input.orderType ?? "?"}\n` +
+          `Materiál: ${input.material ?? "neuvedeno"}\nPolotovar: ${input.blankDimensions ?? "?"} (váha ${input.blankWeightKg ?? "?"} kg)\n` +
+          `Váha hotového dílu: ${input.finishedWeightKg ?? "?"} kg\nPovrchová úprava: ${input.surfaceTreatment ?? "—"}\nTepelná úprava: ${input.heatTreatment ?? "—"}\n` +
+          `Jakosti povrchů: ${(input.surfaceQualities ?? []).join(", ") || "—"}\nTechnologie: ${(input.machiningTechnologies ?? []).join(", ") || "—"}\n` +
+          `Tolerance před tepelkou: ${JSON.stringify(input.tolerancesBeforeHt ?? {})}\nTolerance po tepelce: ${JSON.stringify(input.tolerancesAfterHt ?? {})}\n` +
+          `Množství: ${input.quantity} ks\nZákazník: ${input.customer ?? "—"}\nPožadavky: ${input.requirements ?? "—"}\n\n` +
+          `${paramLines}\n${hist}\n\n${input.drawingText ?? ""}`,
       },
     ],
   });
@@ -374,18 +420,39 @@ export async function generateConfirmation(input: {
 }
 
 // ── Čtení z přílohy (výkres / objednávka) přes Claude vision ─
+export interface ToleranceCounts {
+  t005: number; // ≤ 0,005 mm
+  t01: number;  // ≤ 0,01 mm
+  t04: number;  // ≤ 0,04 mm
+  t1: number;   // ≤ 0,1 mm
+}
 export interface ExtractedDocument {
   doc_type: "poptavka" | "objednavka" | "vykres" | "faktura" | "ostatni";
+  part_name: string;
+  part_type: "obrabeny_dil" | "plech" | "svarenec" | "vykovek" | "odlitek" | "jine";
+  order_type: "vyroba_dilu" | "nastroj_na_dil" | "uprava_dilu";
   drawing_number: string;
   revision: string;
   material: string;
-  dimensions: string;
+  blank_dimensions: string;     // rozměry polotovaru
+  blank_weight_kg: number;      // váha polotovaru
+  finished_weight_kg: number;   // váha hotového obrobku
+  removed_weight_kg: number;    // úběr (polotovar − hotový)
+  surface_treatment: string;    // povrchová úprava
+  heat_treatment: string;       // tepelná úprava
+  surface_qualities: string[];  // jakosti povrchů (Ra)
+  machining_technologies: string[];
+  tolerances_before_ht: ToleranceCounts; // počty přesných rozměrů před tepelkou
+  tolerances_after_ht: ToleranceCounts;  // po tepelce
   quantity: number;
   customer: string;
   requirements: string;
   summary: string;
   confidence: number;
+  needs_clarification: string[];
 }
+
+function emptyTol(): ToleranceCounts { return { t005: 0, t01: 0, t04: 0, t1: 0 }; }
 
 export async function extractFromDocument(input: {
   mediaType: string; // application/pdf | image/png | image/jpeg | image/webp
@@ -395,29 +462,57 @@ export async function extractFromDocument(input: {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
     return {
-      doc_type: "ostatni", drawing_number: "", revision: "", material: "",
-      dimensions: "", quantity: 0, customer: "", requirements: "",
+      doc_type: "ostatni", part_name: "", part_type: "jine", order_type: "vyroba_dilu",
+      drawing_number: "", revision: "", material: "", blank_dimensions: "",
+      blank_weight_kg: 0, finished_weight_kg: 0, removed_weight_kg: 0,
+      surface_treatment: "", heat_treatment: "", surface_qualities: [], machining_technologies: [],
+      tolerances_before_ht: emptyTol(), tolerances_after_ht: emptyTol(),
+      quantity: 0, customer: "", requirements: "",
       summary: "AI není nakonfigurováno — doplň Claude API klíč v Nastavení → Integrace.",
-      confidence: 0,
+      confidence: 0, needs_clarification: ["Claude API klíč"],
     };
   }
 
+  const tolSchema = {
+    type: "object", additionalProperties: false,
+    properties: { t005: { type: "integer" }, t01: { type: "integer" }, t04: { type: "integer" }, t1: { type: "integer" } },
+    required: ["t005", "t01", "t04", "t1"],
+  };
   const schema = {
     type: "object",
     additionalProperties: false,
     properties: {
       doc_type: { type: "string", enum: ["poptavka", "objednavka", "vykres", "faktura", "ostatni"] },
+      part_name: { type: "string" },
+      part_type: { type: "string", enum: ["obrabeny_dil", "plech", "svarenec", "vykovek", "odlitek", "jine"] },
+      order_type: { type: "string", enum: ["vyroba_dilu", "nastroj_na_dil", "uprava_dilu"] },
       drawing_number: { type: "string" },
       revision: { type: "string" },
       material: { type: "string" },
-      dimensions: { type: "string" },
+      blank_dimensions: { type: "string" },
+      blank_weight_kg: { type: "number" },
+      finished_weight_kg: { type: "number" },
+      removed_weight_kg: { type: "number" },
+      surface_treatment: { type: "string" },
+      heat_treatment: { type: "string" },
+      surface_qualities: { type: "array", items: { type: "string" } },
+      machining_technologies: { type: "array", items: { type: "string" } },
+      tolerances_before_ht: tolSchema,
+      tolerances_after_ht: tolSchema,
       quantity: { type: "integer" },
       customer: { type: "string" },
       requirements: { type: "string" },
       summary: { type: "string" },
       confidence: { type: "number" },
+      needs_clarification: { type: "array", items: { type: "string" } },
     },
-    required: ["doc_type", "drawing_number", "revision", "material", "dimensions", "quantity", "customer", "requirements", "summary", "confidence"],
+    required: [
+      "doc_type", "part_name", "part_type", "order_type", "drawing_number", "revision", "material",
+      "blank_dimensions", "blank_weight_kg", "finished_weight_kg", "removed_weight_kg",
+      "surface_treatment", "heat_treatment", "surface_qualities", "machining_technologies",
+      "tolerances_before_ht", "tolerances_after_ht", "quantity", "customer", "requirements",
+      "summary", "confidence", "needs_clarification",
+    ],
   };
 
   const isPdf = input.mediaType === "application/pdf";
@@ -428,17 +523,20 @@ export async function extractFromDocument(input: {
 
   const message = await new Anthropic({ apiKey }).messages.create({
     model,
-    max_tokens: 1500,
-    output_config: { effort: "medium", format: { type: "json_schema", schema } },
+    max_tokens: 3000,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high", format: { type: "json_schema", schema } },
     system:
-      "Jsi technik nástrojárny Mnástrojárna. Z přiloženého dokumentu (výkres, objednávka, poptávka) " +
-      "vytáhni strukturovaná data: typ dokumentu, číslo výkresu a revizi, materiál, rozměry, množství (ks), " +
-      "zákazníka a specifické požadavky (tolerance, drsnost, tepelné zpracování). Co nelze přečíst, nech prázdné a sniž confidence." +
+      "Jsi zkušený technik/technolog nástrojárny Mnástrojárna. Z přiloženého výkresu/dokumentu vytáhni KOMPLETNÍ technologická data: " +
+      "název dílu; typ dílu (obráběný díl/plech/svařenec/výkovek/odlitek); typ zakázky (výroba dílu / nástroj na výrobu dílu / pouze úprava dílu dodaného zákazníkem); " +
+      "číslo výkresu a revizi; materiál; rozměry a odhad váhy polotovaru; odhad váhy hotového dílu a úběr; povrchovou a tepelnou úpravu; jakosti povrchů (Ra); " +
+      "technologie obrábění; a POČTY přesných rozměrů rozdělené dle nejtěsnější tolerance do skupin ≤0,005 / ≤0,01 / ≤0,04 / ≤0,1 mm, a to ZVLÁŠŤ pro rozměry " +
+      "kontrolované před tepelným zpracováním a po něm; množství a zákazníka. Co nelze z výkresu přečíst, nech prázdné/0 a uveď v needs_clarification, sniž confidence. Nehádej." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
         role: "user",
-        content: [fileBlock, { type: "text", text: "Přečti dokument a vrať strukturovaná data dle schématu." }],
+        content: [fileBlock, { type: "text", text: "Přečti výkres jako technolog a vrať kompletní strukturovaná data dle schématu." }],
       },
     ],
   });

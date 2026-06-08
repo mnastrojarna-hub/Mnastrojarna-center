@@ -44,7 +44,7 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
         drawing_number: drawingNumber,
         revision,
         material: x.material?.trim() || null,
-        dimensions: x.dimensions?.trim() || null,
+        dimensions: x.blank_dimensions?.trim() || null,
         quantity: x.quantity || null,
         file_type: ext,
         storage_path: storagePath,

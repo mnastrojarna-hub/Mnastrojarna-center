@@ -82,3 +82,20 @@ export async function getGraphConfig() {
   ]);
   return { clientId, clientSecret, tenantId, user };
 }
+
+export async function getPricingParams() {
+  const [hourly, handling, margin, inflation, transport] = await Promise.all([
+    getSetting("hourly_rate_czk"),
+    getSetting("handling_rate_czk"),
+    getSetting("default_margin_percent"),
+    getSetting("inflation_percent"),
+    getSetting("transport_default_czk"),
+  ]);
+  return {
+    hourlyRate: Number(hourly || 1200),
+    handlingRate: Number(handling || 600),
+    marginPercent: Number(margin || 15),
+    inflationPercent: Number(inflation || 5),
+    transportDefault: Number(transport || 500),
+  };
+}
