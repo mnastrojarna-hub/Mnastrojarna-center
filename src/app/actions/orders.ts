@@ -45,3 +45,44 @@ export async function updateOrderStatus(
     return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
   }
 }
+
+const NEED = "Pro uložení doplň servisní klíč Supabase nebo se přihlas.";
+
+export async function createOrder(input: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
+  if (!input.title?.trim()) return { ok: false, error: "Zadej název zakázky." };
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
+  try {
+    const db = await createOperatorClient();
+
+    // Číslo zakázky
+    const { data: numData } = await db.rpc("next_doc_number", { p_prefix: "OBJ" });
+    const number = (numData as string) || `OBJ-${Date.now()}`;
+
+    // Volitelné dohledání zákazníka podle názvu
+    let customerId: string | null = null;
+    if (input.customer?.trim()) {
+      const { data: c } = await db.from("customers").select("id").ilike("name", input.customer.trim()).maybeSingle();
+      customerId = (c as { id: string } | null)?.id ?? null;
+    }
+
+    const { data, error } = await db
+      .from("orders")
+      .insert({
+        number,
+        title: input.title.trim(),
+        customer_id: customerId,
+        value: input.value ? Number(input.value) : null,
+        due_date: input.dueDate || null,
+        technology: input.technology?.trim() || null,
+        specific_requirements: input.requirements?.trim() || null,
+        status: "prijato",
+      } as never)
+      .select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data || data.length === 0) return { ok: false, error: NEED };
+    revalidatePath("/orders");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
+  }
+}

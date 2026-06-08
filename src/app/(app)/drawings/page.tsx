@@ -1,9 +1,8 @@
-import { Upload, FileBox, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { DrawingUpload } from "@/components/drawing-upload";
 import { getDrawings } from "@/lib/data/queries";
 import { formatDate } from "@/lib/utils";
 
@@ -20,26 +19,10 @@ export default async function DrawingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Archiv výkresů"
-        description="PDF / STEP / DXF. AI z výkresu vytáhne číslo, revizi, materiál, rozměry i tolerance."
-        actions={
-          <Button>
-            <Upload className="h-4 w-4" /> Nahrát výkres
-          </Button>
-        }
+        description="AI z nahraného výkresu vytáhne číslo, revizi, materiál, rozměry i množství a uloží do archivu."
       />
 
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <FileBox className="h-6 w-6" />
-          </div>
-          <div className="text-sm font-medium">Přetáhni výkresy sem</div>
-          <p className="max-w-sm text-xs text-muted-foreground">
-            <Sparkles className="inline h-3 w-3 text-primary" /> AI automaticky rozpozná metadata,
-            zkontroluje duplicity a založí revizi.
-          </p>
-        </CardContent>
-      </Card>
+      <DrawingUpload />
 
       <Card>
         <CardContent className="p-0">
