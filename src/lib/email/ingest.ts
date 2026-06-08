@@ -1,6 +1,6 @@
 import "server-only";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
-import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
+import { getAgentInstructions } from "@/lib/ai/corrections";
 import { getImapConfig, getGraphConfig } from "@/lib/settings";
 import { getModuleMode } from "@/lib/automation";
 import { sendMail, isSmtpConfigured } from "@/lib/email/send";
@@ -115,7 +115,7 @@ export async function fetchGraphEmails(cfg: GraphCfg, userPrincipal: string, lim
 async function ingestEmails(emails: RawEmail[]): Promise<number> {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) return 0;
   const db = createAdminClient();
-  const rules = buildRulesPrompt(await getAgentRules("email")); // slovní pravidla agenta
+  const rules = await getAgentInstructions("email"); // slovní pravidla agenta
   const replyMode = await getModuleMode("reply"); // 'full' = odeslat hned
   const smtpReady = await isSmtpConfigured();
   let count = 0;

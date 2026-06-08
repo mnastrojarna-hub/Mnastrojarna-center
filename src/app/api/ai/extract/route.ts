@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractFromDocument } from "@/lib/ai/claude";
-import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
+import { getAgentInstructions } from "@/lib/ai/corrections";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     }
 
     const dataBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
-    const rules = buildRulesPrompt(await getAgentRules("extraction"));
+    const rules = await getAgentInstructions("extraction");
     const extracted = await extractFromDocument({ mediaType, dataBase64, rules });
     return NextResponse.json({ extracted });
   } catch (err) {

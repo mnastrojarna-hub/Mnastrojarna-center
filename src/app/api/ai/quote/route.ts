@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateQuote, priceDrawing } from "@/lib/ai/claude";
-import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
+import { getAgentInstructions } from "@/lib/ai/corrections";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     // Volitelně nejdřív naceň technologem, pak postav nabídku
     let estimate;
     if (body.withPricing) {
-      const priceRules = buildRulesPrompt(await getAgentRules("pricing"));
+      const priceRules = await getAgentInstructions("pricing");
       estimate = await priceDrawing({
         drawingNumber: body.drawingNumber,
         material: body.material,
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const quoteRules = buildRulesPrompt(await getAgentRules("quote"));
+    const quoteRules = await getAgentInstructions("quote");
     const quote = await generateQuote({ customer, inquiry, estimate, rules: quoteRules });
     return NextResponse.json({ quote, estimate });
   } catch (err) {

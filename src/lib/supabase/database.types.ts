@@ -253,6 +253,18 @@ export interface IntegrationSetting {
   updated_at: string;
 }
 
+export interface Correction {
+  id: string;
+  agent_key: string;
+  field: string | null;
+  context: string | null;
+  ai_value: string | null;
+  corrected_value: string;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 type Tbl<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -280,6 +292,7 @@ export interface Database {
       knowledge_documents: Tbl<KnowledgeDocument>;
       ai_agent_rules: Tbl<AgentRules>;
       integration_settings: Tbl<IntegrationSetting>;
+      ai_corrections: Tbl<Correction>;
     };
     Views: Record<string, never>;
     Functions: {

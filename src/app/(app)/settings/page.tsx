@@ -6,16 +6,20 @@ import { AutomationSettings } from "@/components/automation-settings";
 import { AgentRulesEditor } from "@/components/agent-rules-editor";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
-import { getAgentRules, getAllAgentRules } from "@/lib/ai/rules";
+import { getAllAgentRules } from "@/lib/ai/rules";
+import { getRecentCorrections } from "@/lib/ai/corrections";
 import { getIntegrationSettingsMeta, getMailboxes } from "@/lib/data/settings-data";
 import { getAllModuleModes } from "@/lib/automation";
+import { CorrectionsList } from "@/components/corrections-list";
+import { GraduationCap } from "lucide-react";
 
 export default async function SettingsPage() {
-  const [agentRules, settings, mailboxes, moduleModes] = await Promise.all([
+  const [agentRules, settings, mailboxes, moduleModes, corrections] = await Promise.all([
     getAllAgentRules(),
     getIntegrationSettingsMeta(),
     getMailboxes(),
     getAllModuleModes(),
+    getRecentCorrections(),
   ]);
 
   return (
@@ -81,6 +85,21 @@ export default async function SettingsPage() {
               </TabsContent>
             ))}
           </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Naučené korekce */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <GraduationCap className="h-4 w-4 text-muted-foreground" /> Naučené korekce
+          </CardTitle>
+          <CardDescription>
+            Tvoje opravy výstupů AI. Vkládají se do promptů, takže AI stejnou chybu v plné automatice neudělá.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CorrectionsList corrections={corrections} />
         </CardContent>
       </Card>
 

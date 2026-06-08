@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { priceDrawing, generateQuote } from "@/lib/ai/claude";
-import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
+import { getAgentInstructions } from "@/lib/ai/corrections";
 import { submitAiQuote } from "@/app/actions/ai-quote";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       quantity,
       requirements: body.requirements,
       drawingText: inquiry,
-      rules: buildRulesPrompt(await getAgentRules("pricing")),
+      rules: await getAgentInstructions("pricing"),
     });
 
     // 2) Vygeneruj nabídku z kalkulace
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       customer,
       inquiry,
       estimate,
-      rules: buildRulesPrompt(await getAgentRules("quote")),
+      rules: await getAgentInstructions("quote"),
     });
 
     // 3) Ulož + PDF archiv + fronta schválení (+ odeslání při plné automatice)

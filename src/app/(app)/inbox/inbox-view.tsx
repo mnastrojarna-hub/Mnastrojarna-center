@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft } from "lucide-react";
+import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft, Wand2, Check } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { CategoryBadge } from "@/components/status-badge";
 import { AiConfidence } from "@/components/ai-confidence";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAutomation } from "@/components/automation-provider";
+import { recordCorrection } from "@/app/actions/corrections";
 import { type EmailItem } from "@/lib/mock-data";
 import { cn, relativeTime } from "@/lib/utils";
 
@@ -195,6 +197,8 @@ function EmailDetail({
           <AiConfidence value={email.aiConfidence} />
         </div>
 
+        <CategoryCorrector email={email} />
+
         <div className="mt-4 rounded-lg bg-muted/50 p-4 text-sm leading-relaxed text-muted-foreground">
           {email.preview}
         </div>
@@ -235,6 +239,92 @@ function EmailDetail({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const CORRECTABLE_CATEGORIES = categories.filter((c) => c !== "Vše");
+
+function CategoryCorrector({ email }: { email: EmailItem }) {
+  const [open, setOpen] = React.useState(false);
+  const [cat, setCat] = React.useState<string>(email.category);
+  const [note, setNote] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setCat(email.category);
+    setNote("");
+    setDone(false);
+    setOpen(false);
+    setError(null);
+  }, [email.id, email.category]);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    const res = await recordCorrection({
+      agentKey: "email",
+      field: "category",
+      context: `Předmět: ${email.subject} (od ${email.fromEmail})`,
+      aiValue: email.category,
+      correctedValue: cat,
+      note,
+    });
+    setSaving(false);
+    if (res.ok) {
+      setDone(true);
+      setOpen(false);
+    } else {
+      setError(res.error ?? "Chyba");
+    }
+  };
+
+  if (done) {
+    return (
+      <p className="mt-2 flex items-center gap-1 text-xs text-success">
+        <Check className="h-3.5 w-3.5" /> Korekce uložena — AI se z ní příště poučí.
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+      >
+        <Wand2 className="h-3.5 w-3.5" /> Opravit kategorii (AI se naučí)
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+      <div className="text-xs font-medium">Oprava kategorie — AI si zapamatuje</div>
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={cat}
+          onChange={(e) => setCat(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+        >
+          {CORRECTABLE_CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <Input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Pravidlo (např. faktury od TDK jdou vždy do Faktura)"
+          className="min-w-[200px] flex-1"
+        />
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex gap-2">
+        <Button size="sm" onClick={save} disabled={saving}>Uložit korekci</Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Zrušit</Button>
+      </div>
+    </div>
   );
 }
 

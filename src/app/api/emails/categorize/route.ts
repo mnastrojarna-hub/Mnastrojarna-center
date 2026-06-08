@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
-import { getAgentRules, buildRulesPrompt } from "@/lib/ai/rules";
+import { getAgentInstructions } from "@/lib/ai/corrections";
 
 /**
  * Analyzuje e-mail AI (kategorie, priorita, spam, shrnutí) a volitelně
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     if (!from || !subject) {
       return NextResponse.json({ error: "Chybí from/subject." }, { status: 400 });
     }
-    const rules = buildRulesPrompt(await getAgentRules("email"));
+    const rules = await getAgentInstructions("email");
     const analysis = await categorizeEmail({ from, subject, body: body ?? "", rules });
     let draft: string | undefined;
     if (withDraft && !analysis.is_spam && analysis.category !== "spam") {
