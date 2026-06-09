@@ -8,7 +8,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-y-auto scrollbar-thin px-4 pb-24 pt-5 sm:px-6 md:pb-8">
+        <main className="flex-1 overflow-y-auto scrollbar-thin px-4 pb-28 pt-5 sm:px-6 md:pb-14">
           <div className="mx-auto w-full max-w-7xl animate-fade-in">{children}</div>
         </main>
         <MobileNav />

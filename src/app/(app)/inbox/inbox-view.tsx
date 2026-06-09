@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft, Wand2, Check } from "lucide-react";
+import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft, Wand2, Check, Upload } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAutomation } from "@/components/automation-provider";
 import { recordCorrection } from "@/app/actions/corrections";
 import { type EmailItem } from "@/lib/mock-data";
+import { OutlookImport } from "@/components/outlook-import";
+import { debug } from "@/lib/debug/logger";
 import { cn, relativeTime } from "@/lib/utils";
 
 const categories = [
@@ -37,18 +39,23 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
   const [syncMsg, setSyncMsg] = React.useState<string | null>(null);
   const { mode } = useAutomation();
 
+  const [showImport, setShowImport] = React.useState(false);
+
   const sync = async () => {
     setSyncing(true);
     setSyncMsg(null);
+    debug.action("inbox-sync", "Spouštím synchronizaci schránky", { mode });
     try {
       const res = await fetch("/api/emails/sync", { method: "POST" });
       const data = await res.json();
+      debug.info("inbox-sync", "Odpověď synchronizace", { status: res.status, data });
       setSyncMsg(
         data.configured
           ? `Staženo ${data.fetched}, zpracováno ${data.ingested}.`
           : (data.message ?? "Schránka není nakonfigurována."),
       );
-    } catch {
+    } catch (err) {
+      debug.error("inbox-sync", "Synchronizace selhala", err);
       setSyncMsg("Synchronizace selhala.");
     } finally {
       setSyncing(false);
@@ -73,12 +80,23 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
         actions={
           <div className="flex items-center gap-2">
             {syncMsg && <span className="hidden text-xs text-muted-foreground sm:inline">{syncMsg}</span>}
+            <Button variant="outline" size="sm" onClick={() => setShowImport((s) => !s)}>
+              <Upload className="h-4 w-4" /> Import z Outlooku
+            </Button>
             <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} /> Synchronizovat
             </Button>
           </div>
         }
       />
+
+      {showImport && (
+        <Card>
+          <CardContent className="pt-5">
+            <OutlookImport />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-1.5">
         {categories.map((cat) => (

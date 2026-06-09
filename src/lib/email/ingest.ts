@@ -112,7 +112,7 @@ export async function fetchGraphEmails(cfg: GraphCfg, userPrincipal: string, lim
 }
 
 // ── Uložení s AI analýzou ───────────────────────────────────
-async function ingestEmails(emails: RawEmail[]): Promise<number> {
+export async function ingestEmails(emails: RawEmail[]): Promise<number> {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) return 0;
   const db = createAdminClient();
   const rules = await getAgentInstructions("email"); // slovní pravidla agenta
