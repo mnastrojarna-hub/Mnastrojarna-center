@@ -136,7 +136,22 @@ export interface CommissionRow {
 /** Počty pro odznaky v navigaci. */
 export interface BadgeCounts {
   inbox: number;
+  inquiries: number;
+  pricing: number;
   quotes: number;
+  confirmations: number;
   orders: number;
   approvals: number;
+}
+
+/** Záznam odeslané pošty (log odchozích akcí). */
+export interface SentItem {
+  id: string;
+  type: string; // český popisek
+  rawType: ApprovalType;
+  title: string;
+  target: string;
+  body: string;
+  sentAt: string;
+  auto: boolean; // true = odeslala plná automatika, false = schváleno člověkem
 }

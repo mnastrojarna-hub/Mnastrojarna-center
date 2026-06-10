@@ -231,25 +231,61 @@ export async function getCommissions(): Promise<CommissionRow[]> {
 
 /** Počty pro odznaky v navigaci — reálná čísla z DB. */
 export async function getBadgeCounts(): Promise<BadgeCounts> {
-  const empty: BadgeCounts = { inbox: 0, quotes: 0, orders: 0, approvals: 0 };
+  const empty: BadgeCounts = {
+    inbox: 0, inquiries: 0, pricing: 0, quotes: 0, confirmations: 0, orders: 0, approvals: 0,
+  };
   const db = await supa();
   if (!db) return empty;
   try {
-    const [inbox, quotes, orders, approvals] = await Promise.all([
+    const [inbox, inquiries, pricing, quotes, confirmations, orders, approvals] = await Promise.all([
       db.from("emails").select("id", { count: "exact", head: true }).eq("is_read", false).neq("category", "spam"),
-      db.from("quotes").select("id", { count: "exact", head: true }).in("status", ["navrh_ai", "ke_schvaleni"]),
+      db.from("emails").select("id", { count: "exact", head: true }).eq("is_read", false).eq("category", "poptavka"),
+      db.from("quotes").select("id", { count: "exact", head: true }).eq("status", "navrh_ai"),
+      db.from("quotes").select("id", { count: "exact", head: true }).eq("status", "ke_schvaleni"),
+      db.from("orders").select("id", { count: "exact", head: true }).eq("status", "prijato"),
       db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", "(dokonceno,zruseno)"),
       db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending"),
     ]);
     return {
       inbox: inbox.count ?? 0,
+      inquiries: inquiries.count ?? 0,
+      pricing: pricing.count ?? 0,
       quotes: quotes.count ?? 0,
+      confirmations: confirmations.count ?? 0,
       orders: orders.count ?? 0,
       approvals: approvals.count ?? 0,
     };
   } catch {
     return empty;
   }
+}
+
+/** Odeslaná pošta — log odchozích akcí (schválených i automatických). */
+export async function getSentLog(): Promise<import("@/lib/data/types").SentItem[]> {
+  const db = await supa();
+  if (!db) return [];
+  const { data, error } = await db
+    .from("approval_queue")
+    .select("*")
+    .in("status", ["approved", "auto_executed"])
+    .order("resolved_at", { ascending: false })
+    .limit(200);
+  warn("sent_log", error);
+  if (error || !data) return [];
+  return (data as (ApprovalItemRow & { resolved_at?: string | null; status?: string })[])
+    .filter((a) => ["email_reply", "quote", "supplier_request", "reminder"].includes(a.type))
+    .map((a) => ({
+      id: a.id,
+      rawType: a.type as ApprovalType,
+      type: approvalTypeLabel[a.type as ApprovalType] ?? a.type,
+      title: a.title,
+      target: a.target ?? "",
+      body: typeof (a.payload as { body?: unknown })?.body === "string"
+        ? (a.payload as { body: string }).body
+        : "",
+      sentAt: a.resolved_at ?? a.created_at,
+      auto: a.status === "auto_executed",
+    }));
 }
 
 /** Najde nejnovější historickou nabídku pro dané číslo výkresu (pro reuse ceny + inflace). */
