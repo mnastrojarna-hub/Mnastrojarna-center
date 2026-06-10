@@ -36,6 +36,22 @@ export async function getIntegrationSettingsMeta(): Promise<SettingMeta[]> {
   }
 }
 
+/** Všichni uživatelé (jen pro super admina — čte se admin klientem). */
+export async function getUsers() {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const db = await createOperatorClient();
+    const { data, error } = await db
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (error || !data) return [];
+    return data as import("@/lib/supabase/database.types").Profile[];
+  } catch {
+    return [];
+  }
+}
+
 export async function getMailboxes(): Promise<Mailbox[]> {
   if (!isSupabaseConfigured()) return [];
   try {

@@ -47,9 +47,9 @@ const ORDER_TYPE: Record<string, string> = {
 
 export function AiPricingPanel() {
   const [form, setForm] = React.useState({
-    drawingNumber: "VK-2291", material: "1.2379", dimensions: "120 × 80 × 25 mm",
-    quantity: "50", customer: "Strojmetal a.s.", customerEmail: "",
-    requirements: "Tolerance H7, kalení 58-60 HRC, povrch Ra 0,8",
+    drawingNumber: "", material: "", dimensions: "",
+    quantity: "", customer: "", customerEmail: "",
+    requirements: "",
   });
   const [extracted, setExtracted] = React.useState<Extracted | null>(null);
   const [estimate, setEstimate] = React.useState<Estimate | null>(null);
@@ -154,16 +154,16 @@ export function AiPricingPanel() {
         </CardTitle>
         <CardDescription>
           Nahraj výkres → AI vytáhne kompletní technologická data (typ dílu, polotovar, váhy, tolerance, úpravy) a ocení jako kalkulant.
-          Vše lze opravit, AI se z korekcí učí. Parametry (sazby, marže, inflace) laď v Nastavení → API klíče.
+          Vše lze opravit, AI se z korekcí učí. Parametry (sazby, marže, inflace) laď v Nacenění / Ladění & korekce.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Číslo výkresu"><Input value={form.drawingNumber} onChange={upd("drawingNumber")} /></Field>
-          <Field label="Materiál"><Input value={form.material} onChange={upd("material")} /></Field>
-          <Field label="Rozměry polotovaru"><Input value={form.dimensions} onChange={upd("dimensions")} /></Field>
-          <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" /></Field>
-          <Field label="Zákazník"><Input value={form.customer} onChange={upd("customer")} /></Field>
+          <Field label="Číslo výkresu"><Input value={form.drawingNumber} onChange={upd("drawingNumber")} placeholder="např. VK-1234" /></Field>
+          <Field label="Materiál"><Input value={form.material} onChange={upd("material")} placeholder="např. 1.2379" /></Field>
+          <Field label="Rozměry polotovaru"><Input value={form.dimensions} onChange={upd("dimensions")} placeholder="např. 120 × 80 × 25 mm" /></Field>
+          <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" placeholder="50" /></Field>
+          <Field label="Zákazník"><Input value={form.customer} onChange={upd("customer")} placeholder="Název firmy" /></Field>
           <Field label="E-mail zákazníka (pro odeslání)"><Input value={form.customerEmail} onChange={upd("customerEmail")} type="email" placeholder="nepovinné" /></Field>
         </div>
         <Field label="Specifické požadavky">

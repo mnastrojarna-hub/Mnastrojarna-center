@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const suggestions = [
-  "Najdi poslední cenu výkresu VK-2291.",
-  "Kdo dodával materiál 1.2343 nejlevněji?",
-  "Jaká byla poslední marže u TDK Precision?",
-  "Kolik vydělal M. Novák tento měsíc?",
+  "Najdi poslední cenu tohoto výkresu…",
+  "Kdo dodával tento materiál nejlevněji?",
+  "Jaká byla poslední marže u tohoto zákazníka?",
+  "Kolik je provizí za tento měsíc?",
 ];
 
 interface Msg {

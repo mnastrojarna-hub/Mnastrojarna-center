@@ -4,6 +4,7 @@ import { getAgentInstructions } from "@/lib/ai/corrections";
 import { getImapConfig, getGraphConfig } from "@/lib/settings";
 import { getModuleMode } from "@/lib/automation";
 import { sendMail, isSmtpConfigured } from "@/lib/email/send";
+import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { EmailCategory, MailboxConfig, PriorityLevel } from "@/lib/supabase/database.types";
 
@@ -143,15 +144,27 @@ async function ingestEmails(emails: RawEmail[], mailboxId?: string): Promise<num
   const smtpReady = await isSmtpConfigured();
   let count = 0;
 
+  // Párování odesílatele na zákazníka / dodavatele (přesná adresa → doména)
+  const [{ data: customerRows }, { data: supplierRows }] = await Promise.all([
+    db.from("customers").select("id, email"),
+    db.from("suppliers").select("id, email"),
+  ]);
+  const customers = (customerRows ?? []) as PartyRef[];
+  const suppliers = (supplierRows ?? []) as PartyRef[];
+
   for (const e of emails) {
     const analysis = await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body, rules });
     const hasDraft = !analysis.is_spam && analysis.category !== "spam";
+    const customerId = matchPartyByEmail(e.fromEmail, customers);
+    const supplierId = customerId ? undefined : matchPartyByEmail(e.fromEmail, suppliers);
 
     const { data: inserted, error } = await db
       .from("emails")
       .upsert(
         {
           mailbox_id: mailboxId ?? null,
+          customer_id: customerId ?? null,
+          supplier_id: supplierId ?? null,
           message_id: e.messageId,
           from_name: e.fromName,
           from_email: e.fromEmail,

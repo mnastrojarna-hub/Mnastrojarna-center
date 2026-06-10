@@ -10,6 +10,7 @@ import type {
   EmailItem, ApprovalItem, OrderItem, QuoteItem, CustomerItem, SupplierItem,
   DrawingItem, CommissionRow, BadgeCounts,
 } from "@/lib/data/types";
+import { periodStart } from "@/lib/data/periods";
 
 /**
  * Datová vrstva — VÝHRADNĚ reálná data ze Supabase.
@@ -201,11 +202,14 @@ export async function getDrawings(): Promise<DrawingItem[]> {
   }));
 }
 
-export async function getCommissions(): Promise<CommissionRow[]> {
+export type { CommissionPeriod } from "@/lib/data/periods";
+
+export async function getCommissions(
+  period: import("@/lib/data/periods").CommissionPeriod = "month",
+): Promise<CommissionRow[]> {
   const db = await supa();
   if (!db) return [];
-  const period = new Date();
-  const first = new Date(period.getFullYear(), period.getMonth(), 1).toISOString().slice(0, 10);
+  const first = periodStart(period);
   const { data, error } = await db
     .from("commission_entries")
     .select("id, owner_id, revenue, margin, rate, commission, profiles(full_name)")
@@ -286,6 +290,29 @@ export async function getSentLog(): Promise<import("@/lib/data/types").SentItem[
       sentAt: a.resolved_at ?? a.created_at,
       auto: a.status === "auto_executed",
     }));
+}
+
+/** Detail zákazníka s kompletní historií (CRM — nabídky, zakázky, komunikace, výkresy). */
+export async function getCustomerDetail(id: string) {
+  const db = await supa();
+  if (!db) return null;
+  const [customer, contacts, quotes, orders, emails, drawings] = await Promise.all([
+    db.from("customers").select("*, profiles(full_name)").eq("id", id).maybeSingle(),
+    db.from("customer_contacts").select("*").eq("customer_id", id),
+    db.from("quotes").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
+    db.from("orders").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
+    db.from("emails").select("id, from_name, from_email, subject, category, received_at").eq("customer_id", id).order("received_at", { ascending: false }).limit(50),
+    db.from("drawings").select("id, drawing_number, revision, material, created_at").eq("customer_id", id).order("created_at", { ascending: false }),
+  ]);
+  if (!customer.data) return null;
+  return {
+    customer: customer.data as Customer & WithOwner,
+    contacts: (contacts.data ?? []) as { id: string; name: string; email: string | null; phone: string | null; position: string | null }[],
+    quotes: (quotes.data ?? []) as Quote[],
+    orders: (orders.data ?? []) as Order[],
+    emails: (emails.data ?? []) as Pick<Email, "id" | "from_name" | "from_email" | "subject" | "category" | "received_at">[],
+    drawings: (drawings.data ?? []) as Pick<Drawing, "id" | "drawing_number" | "revision" | "material" | "created_at">[],
+  };
 }
 
 /** Najde nejnovější historickou nabídku pro dané číslo výkresu (pro reuse ceny + inflace). */

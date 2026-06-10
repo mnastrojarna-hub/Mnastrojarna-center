@@ -6,14 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
-import { getIntegrationSettingsMeta, getMailboxes } from "@/lib/data/settings-data";
+import { UserManager } from "@/components/user-manager";
+import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
+import { isCurrentUserSuperAdmin } from "@/lib/setup/guard";
 import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/config";
+import { Users } from "lucide-react";
 
 export default async function SettingsPage() {
-  const [settings, mailboxes] = await Promise.all([
+  const [settings, mailboxes, users, isSuperAdmin] = await Promise.all([
     getIntegrationSettingsMeta(),
     getMailboxes(),
+    getUsers(),
+    isCurrentUserSuperAdmin(),
   ]);
   const configured = isSupabaseConfigured();
   const serviceKey = hasServiceKey();
@@ -77,6 +82,22 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <IntegrationSettingsEditor settings={systemSettings} />
+        </CardContent>
+      </Card>
+
+      {/* Uživatelé a role */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="h-4 w-4 text-muted-foreground" /> Uživatelé a role
+          </CardTitle>
+          <CardDescription>
+            Super admin vidí vše. Obchodník jen své zákazníky, nabídky a provize.
+            Zaměstnanec jen přidělené úkoly. Provizní sazba se používá při výpočtu provizí.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <UserManager users={users} isSuperAdmin={isSuperAdmin} />
         </CardContent>
       </Card>
 
