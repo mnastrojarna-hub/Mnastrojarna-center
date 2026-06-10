@@ -45,8 +45,28 @@ export interface SetupStatus {
   signedInEmail: string | null;
   aiConfigured: boolean;
   mailboxCount: number;
+  /** Firemní údaje (vystavovatel dokladů) — pro krok onboardingu. */
+  company: Record<string, string>;
+  companyFilled: boolean;
   env: { canPersist: boolean; isVercel: boolean };
 }
+
+/** Klíče firemních údajů v nastavení (kategorie „firma"). */
+export const COMPANY_SETTING_KEYS = [
+  "company_name",
+  "company_street",
+  "company_city",
+  "company_zip",
+  "company_ico",
+  "company_dic",
+  "company_email",
+  "company_phone",
+  "company_web",
+  "company_bank_account",
+  "company_iban",
+  "company_bank_name",
+  "company_registration",
+] as const;
 
 /** Ověří existenci tabulek přes admin klienta (vyžaduje servisní klíč). */
 export async function checkSchemaTables(): Promise<SchemaCheck> {
@@ -92,6 +112,7 @@ export async function getSetupStatus(): Promise<SetupStatus> {
 
   let aiConfigured = false;
   let mailboxCount = 0;
+  const company: Record<string, string> = {};
   if (secretKeySet && schema.ok) {
     aiConfigured = Boolean(await getSetting("anthropic_api_key"));
     try {
@@ -101,6 +122,10 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     } catch {
       mailboxCount = 0;
     }
+    const values = await Promise.all(COMPANY_SETTING_KEYS.map((k) => getSetting(k)));
+    COMPANY_SETTING_KEYS.forEach((k, i) => {
+      company[k] = values[i] ?? "";
+    });
   } else if (process.env.ANTHROPIC_API_KEY) {
     aiConfigured = true;
   }
@@ -120,6 +145,8 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     signedInEmail,
     aiConfigured,
     mailboxCount,
+    company,
+    companyFilled: Boolean(company.company_name && company.company_ico),
     env: { canPersist: canPersistEnv(), isVercel: isVercel() },
   };
 }

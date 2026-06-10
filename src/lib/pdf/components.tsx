@@ -60,12 +60,15 @@ export function DocFooter() {
   );
 }
 
-export const SUPPLIER_PARTY: PartyInfo = {
-  name: COMPANY.name,
-  street: COMPANY.address.street,
-  zip: COMPANY.address.zip,
-  city: COMPANY.address.city,
-  country: COMPANY.address.country,
-  ico: COMPANY.ico,
-  dic: COMPANY.dic,
-};
+/** Vystavovatel dokladu — čte se až při generování (po refreshCompanyFromSettings). */
+export function supplierParty(): PartyInfo {
+  return {
+    name: COMPANY.name,
+    street: COMPANY.address.street,
+    zip: COMPANY.address.zip,
+    city: COMPANY.address.city,
+    country: COMPANY.address.country,
+    ico: COMPANY.ico,
+    dic: COMPANY.dic,
+  };
+}

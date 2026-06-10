@@ -2,13 +2,14 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { getCurrentUser } from "@/lib/data/current-user";
+import { getBadgeCounts } from "@/lib/data/queries";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
+  const [user, counts] = await Promise.all([getCurrentUser(), getBadgeCounts()]);
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar counts={counts} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar user={user} />
         <main className="flex-1 overflow-y-auto scrollbar-thin px-4 pb-24 pt-5 sm:px-6 md:pb-8">

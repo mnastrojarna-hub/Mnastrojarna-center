@@ -12,10 +12,10 @@ export default async function SetupPage() {
       <div className="mx-auto w-full max-w-3xl space-y-8">
         <div className="flex flex-col items-center gap-2 text-center">
           <Logo showSlogan />
-          <h1 className="mt-3 text-xl font-semibold">Průvodce nastavením</h1>
+          <h1 className="mt-3 text-xl font-semibold">Zprovoznění systému</h1>
           <p className="max-w-md text-sm text-muted-foreground">
-            Připojení Supabase, databáze, super admin a API klíče — všechno se nastavuje
-            přímo tady v aplikaci, bez editace souborů.
+            Šest kroků a jedeš naostro: databáze, přihlášení, firemní údaje, AI a pošta.
+            Všechno vyplníš přímo tady — žádné soubory, žádné programování.
           </p>
         </div>
         <SetupWizard status={status} />

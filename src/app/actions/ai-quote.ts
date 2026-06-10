@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { renderQuotePdf } from "@/lib/pdf/render";
-import { SUPPLIER_PARTY } from "@/lib/pdf/components";
+import { supplierParty } from "@/lib/pdf/components";
 import { sendMail } from "@/lib/email/send";
 import { COMPANY } from "@/lib/company";
+import { refreshCompanyFromSettings } from "@/lib/company-server";
 
 export interface QuoteItemInput {
   description: string;
@@ -35,6 +36,7 @@ export interface SubmitQuoteResult {
 }
 
 export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuoteResult> {
+  await refreshCompanyFromSettings();
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) {
     return { ok: false, error: "Pro uložení doplň Supabase URL + servisní klíč (Nastavení → Integrace)." };
   }
@@ -91,7 +93,7 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
         issueDate: new Date().toISOString().slice(0, 10),
         validUntil,
         currency: "CZK",
-        supplier: SUPPLIER_PARTY,
+        supplier: supplierParty(),
         customer: { name: input.customer },
         items: input.items.map((it) => ({
           description: it.description,

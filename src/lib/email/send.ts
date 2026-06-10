@@ -2,6 +2,7 @@ import "server-only";
 import nodemailer from "nodemailer";
 import { getSetting } from "@/lib/settings";
 import { COMPANY } from "@/lib/company";
+import { refreshCompanyFromSettings } from "@/lib/company-server";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { MailboxConfig } from "@/lib/supabase/database.types";
 
@@ -64,6 +65,7 @@ export async function sendMail(input: {
   text: string;
   attachments?: { filename: string; content: Buffer }[];
 }): Promise<SendResult> {
+  await refreshCompanyFromSettings();
   const s = await getSmtp();
   if (!s.host || !s.user || !s.password) {
     return {

@@ -27,10 +27,10 @@ export async function saveIntegrationSettings(
     );
     let changed = 0;
     for (const [key, val] of updates) {
+      // upsert: klíč nemusí být předem zaveden migrací (nové verze přidávají klíče)
       const { data, error } = await db
         .from("integration_settings")
-        .update({ value: val.trim() === "" ? null : val.trim() } as never)
-        .eq("key", key)
+        .upsert({ key, value: val.trim() === "" ? null : val.trim() } as never, { onConflict: "key" })
         .select("key");
       if (error) return { ok: false, error: error.message };
       changed += data?.length ?? 0;

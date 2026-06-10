@@ -111,9 +111,10 @@ export function SetupWizard({ status }: { status: SetupStatus }) {
   const step2Done = status.schema.ok;
   const step3Done = status.adminExists;
   const step4Done = status.signedIn;
-  const step5Done = status.aiConfigured;
+  const step5Done = status.companyFilled;
+  const step6Done = status.aiConfigured;
 
-  const activeStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : !step4Done ? 4 : 5;
+  const activeStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : !step4Done ? 4 : !step5Done ? 5 : 6;
 
   return (
     <div className="space-y-4">
@@ -121,11 +122,12 @@ export function SetupWizard({ status }: { status: SetupStatus }) {
       <SchemaStep status={status} done={step2Done} active={activeStep === 2} onChecked={() => router.refresh()} />
       <AdminStep status={status} done={step3Done} active={activeStep === 3} onCreated={() => router.refresh()} />
       <LoginStep status={status} done={step4Done} active={activeStep === 4} />
-      <IntegrationsStep status={status} done={step5Done} active={activeStep === 5} onSaved={() => router.refresh()} />
+      <CompanyStep status={status} done={step5Done} active={activeStep === 5} onSaved={() => router.refresh()} />
+      <IntegrationsStep status={status} done={step6Done} active={activeStep === 6} onSaved={() => router.refresh()} />
 
       {step1Done && step2Done && step3Done && step4Done && (
         <div className="flex justify-center pt-2">
-          <Button asChild size="lg">
+          <Button asChild size="lg" variant="success">
             <Link href="/dashboard">
               Přejít do aplikace <ArrowRight className="h-4 w-4" />
             </Link>
@@ -133,6 +135,89 @@ export function SetupWizard({ status }: { status: SetupStatus }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Krok 5: Firemní údaje (jdou na nabídky, faktury, dodací listy) ──
+
+const COMPANY_FIELDS: { key: string; label: string; placeholder?: string; span2?: boolean }[] = [
+  { key: "company_name", label: "Název firmy", placeholder: "MNástrojárna s.r.o.", span2: true },
+  { key: "company_street", label: "Ulice a č.p.", placeholder: "Varšavská 715/36" },
+  { key: "company_city", label: "Město", placeholder: "Praha 2" },
+  { key: "company_zip", label: "PSČ", placeholder: "120 00" },
+  { key: "company_ico", label: "IČO", placeholder: "04304080" },
+  { key: "company_dic", label: "DIČ", placeholder: "CZ04304080" },
+  { key: "company_email", label: "Firemní e-mail", placeholder: "obchod@mnastrojarna.cz" },
+  { key: "company_phone", label: "Telefon", placeholder: "+420 …" },
+  { key: "company_web", label: "Web", placeholder: "www.mnastrojarna.cz" },
+  { key: "company_bank_account", label: "Číslo účtu", placeholder: "123456789/0100" },
+  { key: "company_iban", label: "IBAN", placeholder: "CZ.." },
+  { key: "company_bank_name", label: "Banka", placeholder: "Komerční banka, a.s." },
+  { key: "company_registration", label: "Zápis v OR (spisová značka)", placeholder: "C 245678, Městský soud v Praze", span2: true },
+];
+
+function CompanyStep({
+  status,
+  done,
+  active,
+  onSaved,
+}: {
+  status: SetupStatus;
+  done: boolean;
+  active: boolean;
+  onSaved: () => void;
+}) {
+  const [values, setValues] = React.useState<Record<string, string>>(() => ({ ...status.company }));
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+
+  const save = async () => {
+    setBusy(true);
+    setMessage(null);
+    const res = await saveIntegrationSettings(values, []);
+    setMessage(
+      res.ok
+        ? { ok: true, text: "Firemní údaje uloženy — od teď se tisknou na všechny doklady." }
+        : { ok: false, text: res.error ?? "Chyba." },
+    );
+    if (res.ok) onSaved();
+    setBusy(false);
+  };
+
+  return (
+    <Card className={cn(!active && !done && "opacity-70")}>
+      <CardHeader className="pb-3">
+        <StepHeader index={5} title="Firemní údaje" done={done} active={active} />
+        <p className="pl-11 text-sm text-muted-foreground">
+          Tisknou se na nabídky, faktury a dodací listy. Bez nich nemají doklady náležitosti.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4 pl-[4.25rem] pr-6">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {COMPANY_FIELDS.map((f) => (
+            <div key={f.key} className={cn("space-y-1.5", f.span2 && "sm:col-span-2")}>
+              <label htmlFor={f.key} className="text-sm font-medium">{f.label}</label>
+              <Input
+                id={f.key}
+                value={values[f.key] ?? ""}
+                placeholder={f.placeholder}
+                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        {message && (
+          <p className={cn("text-sm", message.ok ? "text-success" : "text-destructive")}>{message.text}</p>
+        )}
+        <Button variant="success" onClick={save} disabled={busy || !status.supabase.secretKeySet}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          Uložit firemní údaje
+        </Button>
+        {!status.supabase.secretKeySet && (
+          <p className="text-xs text-muted-foreground">Vyžaduje dokončený krok 1 (servisní klíč).</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -478,7 +563,7 @@ function IntegrationsStep({
   return (
     <Card className={cn(!active && !done && "opacity-70")}>
       <CardHeader className="pb-3">
-        <StepHeader index={5} title="AI a e-mailové schránky" done={done} active={active} />
+        <StepHeader index={6} title="AI a e-mailové schránky" done={done} active={active} />
         <p className="pl-11 text-sm text-muted-foreground">
           Claude API klíč pro AI funkce. Schránky (IMAP/SMTP servery, porty, hesla) přidáš
           v <b>Nastavení → E-mailové schránky</b>{status.mailboxCount > 0 ? ` — máš jich ${status.mailboxCount}` : ""}.

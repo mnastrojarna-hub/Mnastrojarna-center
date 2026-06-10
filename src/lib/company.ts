@@ -1,6 +1,10 @@
 /**
  * Fakturační a firemní údaje vystavovatele dokladů — Mnástrojárna s.r.o.
  * Používá se na fakturách, dodacích listech, nabídkách (náležitosti dle českých zákonů).
+ *
+ * Hodnoty níže jsou výchozí; skutečné údaje se vyplňují v průvodci nastavením
+ * (Nastavení → Firemní údaje) a před každým generováním dokladu je přepíše
+ * refreshCompanyFromSettings() z lib/company-server.
  */
 
 export const COMPANY = {
@@ -50,7 +54,7 @@ export const COMPANY = {
     anthracite: "#272425",
     grey: "#6C6D6F",
   },
-} as const;
+};
 
 /** Sazby DPH v ČR. */
 export const VAT_RATES = {

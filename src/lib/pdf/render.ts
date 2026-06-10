@@ -3,7 +3,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { COMPANY, DEFAULT_VAT_RATE } from "@/lib/company";
 import { ensureFonts } from "./theme";
-import { SUPPLIER_PARTY } from "./components";
+import { supplierParty } from "./components";
 import { InvoiceDocument } from "./invoice";
 import { QuoteDocument } from "./quote";
 import { DeliveryNoteDocument } from "./delivery-note";
@@ -35,11 +35,14 @@ const DEMO_CUSTOMER = {
   dic: "CZ45274649",
 };
 
-const bank = {
-  accountNumber: COMPANY.bank.accountNumber || "123456789/0100",
-  iban: COMPANY.bank.iban || "CZ65 0100 0000 0001 2345 6789",
-  bankName: COMPANY.bank.bankName || "Komerční banka, a.s.",
-};
+// Bankovní spojení — POUZE skutečné údaje z Nastavení → Firemní údaje (žádné vymyšlené)
+function bank() {
+  return {
+    accountNumber: COMPANY.bank.accountNumber,
+    iban: COMPANY.bank.iban,
+    bankName: COMPANY.bank.bankName,
+  };
+}
 
 export function sampleInvoice(): InvoiceData {
   const today = new Date().toISOString().slice(0, 10);
@@ -52,9 +55,9 @@ export function sampleInvoice(): InvoiceData {
     dueDate: due,
     paymentMethod: "Bankovní převod",
     currency: "CZK",
-    supplier: SUPPLIER_PARTY,
+    supplier: supplierParty(),
     customer: DEMO_CUSTOMER,
-    bank,
+    bank: bank(),
     items: [
       { description: "Frézované díly dle výkresu VK-2291, materiál 1.2379", quantity: 50, unit: "ks", unitPrice: 1180, vatRate: DEFAULT_VAT_RATE },
       { description: "Tepelné zpracování — kalení", quantity: 50, unit: "ks", unitPrice: 95, vatRate: DEFAULT_VAT_RATE },
@@ -72,7 +75,7 @@ export function sampleQuote(): QuoteData {
     issueDate: today,
     validUntil: valid,
     currency: "CZK",
-    supplier: SUPPLIER_PARTY,
+    supplier: supplierParty(),
     customer: DEMO_CUSTOMER,
     items: [
       { description: "Frézované díly dle výkresu VK-2291, materiál 1.2379", quantity: 50, unit: "ks", unitPrice: 1180, vatRate: DEFAULT_VAT_RATE },
@@ -88,7 +91,7 @@ export function sampleDeliveryNote(): DeliveryNoteData {
     number: "DL-20260001",
     issueDate: today,
     orderNumber: "OBJ-4471",
-    supplier: SUPPLIER_PARTY,
+    supplier: supplierParty(),
     customer: DEMO_CUSTOMER,
     deliveryAddress: "Strojmetal a.s., Průmyslová 124, 250 88 Čelákovice",
     items: [
