@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Mail, KeyRound, Database, ArrowRight, SlidersHorizontal } from "lucide-react";
+import { Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
+import { OutlookImport } from "@/components/outlook-import";
 import { UserManager } from "@/components/user-manager";
 import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
 import { isCurrentUserSuperAdmin } from "@/lib/setup/guard";
@@ -115,6 +116,22 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <MailboxManager mailboxes={mailboxes} />
+        </CardContent>
+      </Card>
+
+      {/* Import e-mailů z Outlooku */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileUp className="h-4 w-4 text-muted-foreground" /> Import e-mailů z Outlooku
+          </CardTitle>
+          <CardDescription>
+            Nahraj kompletní e-maily exportované z Outlooku (.msg / .eml). AI je zpracuje stejně jako
+            staženou poštu — roztřídí, propojí se zákazníkem a připraví návrh odpovědi.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OutlookImport />
         </CardContent>
       </Card>
     </div>
