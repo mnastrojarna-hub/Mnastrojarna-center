@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { OrderStatusBadge, QuoteStatusBadge, CategoryBadge } from "@/components/status-badge";
+import { CustomerPricingProfile } from "@/components/customer-pricing-profile";
 import { getCustomerDetail } from "@/lib/data/queries";
 import { orderStatusLabel, quoteStatusLabel, emailCategoryLabel } from "@/lib/data/labels";
 import { formatCZK, formatDate, relativeTime } from "@/lib/utils";
@@ -55,6 +56,8 @@ export default async function CustomerDetailPage({
           <div className="mt-1 text-sm font-semibold">{customer.profiles?.full_name ?? "—"}</div>
         </CardContent></Card>
       </div>
+
+      <CustomerPricingProfile customer={customer} />
 
       {contacts.length > 0 && (
         <Card>
