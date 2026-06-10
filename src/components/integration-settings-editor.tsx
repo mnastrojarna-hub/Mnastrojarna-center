@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 
 const CATEGORY_LABEL: Record<string, string> = {
   ai: "AI — Claude (Anthropic)",
-  email: "E-mail — IMAP / Microsoft 365",
+  email: "E-mail — IMAP / Microsoft 365 (globální záloha; schránky níže mají přednost)",
+  firma: "Firemní údaje (tisknou se na doklady)",
+  pricing: "Naceňování — sazby a marže",
   obecne: "Obecné",
 };
 

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getOrders } from "@/lib/data/queries";
 import { renderInvoicePdf, renderDeliveryNotePdf } from "@/lib/pdf/render";
-import { SUPPLIER_PARTY } from "@/lib/pdf/components";
+import { supplierParty } from "@/lib/pdf/components";
 import { DEFAULT_VAT_RATE, COMPANY } from "@/lib/company";
+import { refreshCompanyFromSettings } from "@/lib/company-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -14,6 +15,7 @@ export async function GET(
   const { id } = await params;
   const type = new URL(req.url).searchParams.get("type") ?? "faktura";
 
+  await refreshCompanyFromSettings();
   const orders = await getOrders();
   const order = orders.find((o) => o.id === id);
   if (!order) return NextResponse.json({ error: "Zakázka nenalezena." }, { status: 404 });
@@ -27,7 +29,7 @@ export async function GET(
         number: `DL-${order.number}`,
         issueDate: today,
         orderNumber: order.number,
-        supplier: SUPPLIER_PARTY,
+        supplier: supplierParty(),
         customer: { name: order.customer },
         items: [{ description: `${order.title}${order.drawing ? ` (výkres ${order.drawing})` : ""}`, quantity: qty, unit: "ks" }],
         note: order.requirements ? `Specifikace: ${order.requirements}` : undefined,
@@ -44,12 +46,12 @@ export async function GET(
       dueDate: due,
       paymentMethod: "Bankovní převod",
       currency: "CZK",
-      supplier: SUPPLIER_PARTY,
+      supplier: supplierParty(),
       customer: { name: order.customer },
       bank: {
-        accountNumber: COMPANY.bank.accountNumber || "123456789/0100",
-        iban: COMPANY.bank.iban || "CZ65 0100 0000 0001 2345 6789",
-        bankName: COMPANY.bank.bankName || "Komerční banka, a.s.",
+        accountNumber: COMPANY.bank.accountNumber,
+        iban: COMPANY.bank.iban,
+        bankName: COMPANY.bank.bankName,
       },
       items: [
         {

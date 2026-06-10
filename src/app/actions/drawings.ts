@@ -33,6 +33,22 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
     const db = await createOperatorClient();
     const drawingNumber = x.drawing_number?.trim() || file.name.replace(/\.[^.]+$/, "");
     const revision = x.revision?.trim() || "A";
+
+    // Detekce duplicit: stejné číslo výkresu + revize už v archivu je
+    const { data: existing } = await db
+      .from("drawings")
+      .select("id, revision")
+      .eq("drawing_number", drawingNumber);
+    const sameRevision = (existing ?? []).some(
+      (d: { revision: string }) => d.revision.toLowerCase() === revision.toLowerCase(),
+    );
+    if (sameRevision) {
+      return {
+        ok: false,
+        error: `Duplicita: výkres ${drawingNumber} rev. ${revision} už v archivu je. Nová verze musí mít vyšší revizi.`,
+      };
+    }
+
     const storagePath = `vykresy/${drawingNumber}_${Date.now()}.${mediaType.split("/")[1] ?? "pdf"}`;
 
     await db.storage.from("documents").upload(storagePath, bytes, { contentType: mediaType, upsert: true });

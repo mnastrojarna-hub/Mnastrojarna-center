@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/status-badge";
 import { updateOrderStatus } from "@/app/actions/orders";
-import { type OrderItem, orderStatusOrder } from "@/lib/mock-data";
+import { type OrderItem, orderStatusOrder } from "@/lib/data/types";
 import { cn, formatCZK, formatDate } from "@/lib/utils";
 
 export function OrderBook({ orders }: { orders: OrderItem[] }) {

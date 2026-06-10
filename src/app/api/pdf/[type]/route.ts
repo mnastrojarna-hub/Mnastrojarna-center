@@ -3,6 +3,7 @@ import {
   renderInvoicePdf, renderQuotePdf, renderDeliveryNotePdf,
   sampleInvoice, sampleQuote, sampleDeliveryNote,
 } from "@/lib/pdf/render";
+import { refreshCompanyFromSettings } from "@/lib/company-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -12,6 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ type: string }> },
 ) {
   const { type } = await params;
+  await refreshCompanyFromSettings();
   try {
     let buffer: Buffer;
     let filename: string;

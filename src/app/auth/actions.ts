@@ -8,7 +8,7 @@ export async function signIn(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!isSupabaseConfigured()) {
-    redirect("/login?error=Supabase%20není%20nakonfigurováno");
+    redirect("/setup");
   }
 
   const supabase = await createClient();
