@@ -37,6 +37,14 @@ export interface Customer {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  // Cenový profil (migrace 0018 — Nacenění v2)
+  margin_percent?: number | null;
+  price_level?: "nizka" | "standard" | "premium" | null;
+  business_priority?: "nizka" | "stredni" | "vysoka" | "strategicky" | null;
+  payment_morale?: "vyborna" | "dobra" | "prumerna" | "spatna" | null;
+  risk_level?: "nizke" | "stredni" | "vysoke" | null;
+  annual_revenue_czk?: number | null;
+  repeat_customer?: boolean;
 }
 
 export interface CustomerContact {
@@ -280,6 +288,58 @@ export interface Correction {
   created_at: string;
 }
 
+// ── Nacenění v2 (migrace 0018) ──────────────────────────────
+export interface MaterialRow {
+  key: string;
+  label: string;
+  material_group: string;
+  density_kg_dm3: number;
+  price_per_kg: number;
+  machinability: number;
+  special: boolean;
+  availability: "bezna" | "omezena" | "specialni";
+  aliases: string[];
+  updated_at: string;
+}
+
+export interface MachineRateRow {
+  key: string;
+  label: string;
+  technology: string;
+  size: "maly" | "stredni" | "velky" | "portal";
+  rate_per_hour: number;
+  updated_at: string;
+}
+
+export interface PricingCalculation {
+  id: string;
+  drawing_number: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  material: string | null;
+  quantity: number;
+  inputs: Record<string, unknown>;
+  baseline: Record<string, unknown>;
+  estimate: Record<string, unknown>;
+  unit_price: number | null;
+  total_price: number | null;
+  margin_percent: number | null;
+  lead_time_days: number | null;
+  strategy_level: number | null;
+  confidence: number | null;
+  corrected: boolean;
+  user_unit_price: number | null;
+  user_lead_time_days: number | null;
+  user_margin_percent: number | null;
+  user_note: string | null;
+  corrected_at: string | null;
+  actual_minutes: number | null;
+  actual_cost: number | null;
+  quote_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 type Tbl<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -308,6 +368,9 @@ export interface Database {
       ai_agent_rules: Tbl<AgentRules>;
       integration_settings: Tbl<IntegrationSetting>;
       ai_corrections: Tbl<Correction>;
+      materials: Tbl<MaterialRow>;
+      machine_rates: Tbl<MachineRateRow>;
+      pricing_calculations: Tbl<PricingCalculation>;
     };
     Views: Record<string, never>;
     Functions: {

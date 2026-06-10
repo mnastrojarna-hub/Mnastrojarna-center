@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { priceDrawing, generateQuote } from "@/lib/ai/claude";
+import { generateQuote } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
-import { getPricingParams } from "@/lib/settings";
-import { findHistoricalQuote } from "@/lib/data/queries";
+import { runPricingFlow } from "@/lib/ai/pricing-flow";
 import { submitAiQuote } from "@/app/actions/ai-quote";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 120;
 
 /**
- * Celý tok jedním voláním: naceň (technolog) → nabídka → uložení + PDF archiv + fronta schválení (+ odeslání).
+ * Celý tok jedním voláním: naceň (baseline + AI technolog) → nabídka →
+ * uložení + PDF archiv + fronta schválení (+ odeslání).
  */
 export async function POST(req: Request) {
   try {
@@ -18,34 +18,13 @@ export async function POST(req: Request) {
     const quantity = Number(body.quantity) || 1;
     const inquiry =
       `Výkres ${body.drawingNumber ?? "—"}, materiál ${body.material ?? "—"}, ` +
-      `${body.dimensions ?? "—"}, ${quantity} ks. ${body.requirements ?? ""}`;
+      `${body.dimensions ?? body.blankDimensions ?? "—"}, ${quantity} ks. ${body.requirements ?? ""}`;
 
-    // 1) Oceň jako technolog (s parametry + historickou cenou)
-    const [params, historical] = await Promise.all([
-      getPricingParams(),
-      findHistoricalQuote(body.drawingNumber),
-    ]);
-    const estimate = await priceDrawing({
-      drawingNumber: body.drawingNumber,
-      partType: body.partType,
-      orderType: body.orderType,
-      material: body.material,
-      blankDimensions: body.blankDimensions ?? body.dimensions,
-      blankWeightKg: body.blankWeightKg,
-      finishedWeightKg: body.finishedWeightKg,
-      surfaceTreatment: body.surfaceTreatment,
-      heatTreatment: body.heatTreatment,
-      surfaceQualities: body.surfaceQualities,
-      machiningTechnologies: body.machiningTechnologies,
-      tolerancesBeforeHt: body.tolerancesBeforeHt,
-      tolerancesAfterHt: body.tolerancesAfterHt,
+    // 1) Naceň (deterministická baseline + AI rafinace + vyhlazení + uložení)
+    const { estimate, baseline, historical, calculationId } = await runPricingFlow({
+      ...body,
       quantity,
-      customer,
-      requirements: body.requirements,
       drawingText: inquiry,
-      params,
-      historical,
-      rules: await getAgentInstructions("pricing"),
     });
 
     // 2) Vygeneruj nabídku z kalkulace
@@ -70,7 +49,7 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ estimate, quote, result });
+    return NextResponse.json({ estimate, baseline, historical, calculationId, quote, result });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Chyba zpracování";
     return NextResponse.json({ error: msg }, { status: 500 });

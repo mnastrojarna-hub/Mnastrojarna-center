@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
+import { DEFAULT_PRICING_PARAMS, type PricingParams } from "@/lib/pricing/params";
 
 /**
  * Čtení konfigurace integrací: nejdřív z DB (integration_settings),
@@ -83,19 +84,45 @@ export async function getGraphConfig() {
   return { clientId, clientSecret, tenantId, user };
 }
 
-export async function getPricingParams() {
-  const [hourly, handling, margin, inflation, transport] = await Promise.all([
-    getSetting("hourly_rate_czk"),
-    getSetting("handling_rate_czk"),
-    getSetting("default_margin_percent"),
-    getSetting("inflation_percent"),
-    getSetting("transport_default_czk"),
+export async function getPricingParams(): Promise<PricingParams> {
+  const d = DEFAULT_PRICING_PARAMS;
+  const num = async (key: string, fallback: number) => {
+    const v = Number(await getSetting(key));
+    return Number.isFinite(v) && v !== 0 ? v : fallback;
+  };
+  const [
+    hourlyRate, handlingRate, programmingRate, setupRate, inspectionRate,
+    marginPercent, inflationPercent, transportDefault, materialTransport,
+    strategyLevel, utilizationPercent,
+    smallQtySurchargePct, specialMaterialSurchargePct, certificationSurchargePct, scarceMaterialSurchargePct,
+    maxPriceStepPct, expressSurchargePct, fastSurchargePct, country,
+  ] = await Promise.all([
+    num("hourly_rate_czk", d.hourlyRate),
+    num("handling_rate_czk", d.handlingRate),
+    num("programming_rate_czk", d.programmingRate),
+    num("setup_rate_czk", d.setupRate),
+    num("inspection_rate_czk", d.inspectionRate),
+    num("default_margin_percent", d.marginPercent),
+    num("inflation_percent", d.inflationPercent),
+    num("transport_default_czk", d.transportDefault),
+    num("material_transport_czk", d.materialTransport),
+    num("price_strategy_level", d.strategyLevel),
+    num("shop_utilization_percent", d.utilizationPercent),
+    num("small_qty_surcharge_pct", d.smallQtySurchargePct),
+    num("special_material_surcharge_pct", d.specialMaterialSurchargePct),
+    num("certification_surcharge_pct", d.certificationSurchargePct),
+    num("scarce_material_surcharge_pct", d.scarceMaterialSurchargePct),
+    num("max_price_step_pct", d.maxPriceStepPct),
+    num("express_surcharge_pct", d.expressSurchargePct),
+    num("fast_surcharge_pct", d.fastSurchargePct),
+    getSetting("production_country"),
   ]);
   return {
-    hourlyRate: Number(hourly || 1200),
-    handlingRate: Number(handling || 600),
-    marginPercent: Number(margin || 15),
-    inflationPercent: Number(inflation || 5),
-    transportDefault: Number(transport || 500),
+    hourlyRate, handlingRate, programmingRate, setupRate, inspectionRate,
+    marginPercent, inflationPercent, transportDefault, materialTransport,
+    strategyLevel, utilizationPercent,
+    smallQtySurchargePct, specialMaterialSurchargePct, certificationSurchargePct, scarceMaterialSurchargePct,
+    maxPriceStepPct, expressSurchargePct, fastSurchargePct,
+    countryCode: country || d.countryCode,
   };
 }
