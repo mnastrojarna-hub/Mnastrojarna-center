@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { canModifySetup } from "@/lib/setup/guard";
+import { logAudit } from "@/lib/audit";
 import type { MailboxProvider, MailboxConfig } from "@/lib/supabase/database.types";
 
 type Result = { ok: boolean; error?: string };
@@ -36,6 +37,7 @@ export async function saveIntegrationSettings(
       changed += data?.length ?? 0;
     }
     if (changed === 0) return { ok: false, error: hasServiceKey() ? "Nic se neuložilo." : NEED_OPERATOR };
+    await logAudit({ action: "settings_updated", entity: "integration_settings", diff: { keys: updates.map(([k]) => k) } });
     revalidatePath("/settings");
     revalidatePath("/setup");
     return { ok: true };
@@ -82,6 +84,7 @@ export async function addMailbox(payload: MailboxPayload): Promise<Result> {
       .select("id");
     if (error) return { ok: false, error: error.message };
     if (!data || data.length === 0) return { ok: false, error: NEED_OPERATOR };
+    await logAudit({ action: "mailbox_added", entity: "mailboxes", diff: { email: payload.email, provider: payload.provider } });
     revalidatePath("/settings");
     return { ok: true };
   } catch (err) {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { sendMail } from "@/lib/email/send";
 import { recordCorrection } from "@/app/actions/corrections";
+import { logAudit } from "@/lib/audit";
 import { OUTBOUND_APPROVAL_TYPES } from "@/lib/data/types";
 import type { ApprovalType } from "@/lib/supabase/database.types";
 
@@ -57,6 +58,12 @@ export async function resolveApproval(
           .update({ status: "approved", resolved_at: new Date().toISOString() } as never)
           .eq("id", id);
         if (error) return { ok: false, error: error.message };
+        await logAudit({
+          action: "email_sent",
+          entity: "approval_queue",
+          entityId: id,
+          diff: { to: row.target, title: row.title },
+        });
         revalidatePath("/dashboard");
         revalidatePath("/inbox");
         return { ok: true, sent: true };
@@ -68,6 +75,7 @@ export async function resolveApproval(
       .update({ status: action, resolved_at: new Date().toISOString() } as never)
       .eq("id", id);
     if (error) return { ok: false, error: error.message };
+    await logAudit({ action: `approval_${action}`, entity: "approval_queue", entityId: id });
     revalidatePath("/dashboard");
     revalidatePath("/inbox");
     return { ok: true };
@@ -121,6 +129,7 @@ export async function updateApprovalBody(input: {
       });
     }
 
+    await logAudit({ action: "approval_edited", entity: "approval_queue", entityId: input.id });
     revalidatePath("/dashboard");
     revalidatePath("/inbox");
     return { ok: true };

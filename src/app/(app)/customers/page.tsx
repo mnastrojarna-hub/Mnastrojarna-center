@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,11 @@ export default async function CustomersPage() {
               )}
               {customers.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/customers/${c.id}`} className="hover:text-primary hover:underline">
+                      {c.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{c.ico}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{c.country}</Badge>
