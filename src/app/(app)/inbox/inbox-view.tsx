@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft, Wand2, Check } from "lucide-react";
+import Link from "next/link";
+import { Mail, Sparkles, Reply, RefreshCw, ArrowLeft, Wand2, Check, Settings2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { AiConfidence } from "@/components/ai-confidence";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAutomation } from "@/components/automation-provider";
 import { recordCorrection } from "@/app/actions/corrections";
-import { type EmailItem } from "@/lib/mock-data";
+import { type EmailItem } from "@/lib/data/types";
 import { cn, relativeTime } from "@/lib/utils";
 
 const categories = [
@@ -99,7 +100,21 @@ export function InboxView({ emails }: { emails: EmailItem[] }) {
 
       <div className="grid gap-4 lg:grid-cols-5">
         <div className={cn("space-y-2 lg:col-span-2 lg:block", mobileDetail && "hidden")}>
-          {filtered.length === 0 && (
+          {emails.length === 0 ? (
+            <Card>
+              <CardContent className="space-y-3 py-8 text-center text-sm text-muted-foreground">
+                <Mail className="mx-auto h-8 w-8 opacity-40" />
+                <p className="font-medium text-foreground">Zatím tu nejsou žádné e-maily.</p>
+                <p>
+                  Přidej schránku (server, port, heslo) v Nastavení a pak klikni na
+                  tlačítko Synchronizovat vpravo nahoře.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/settings"><Settings2 className="h-4 w-4" /> Otevřít nastavení schránek</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : filtered.length === 0 && (
             <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Žádné e-maily v této kategorii.</CardContent></Card>
           )}
           {filtered.map((email) => (
@@ -203,14 +218,14 @@ function EmailDetail({
           {email.preview}
         </div>
 
-        <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-primary">
-            <Sparkles className="h-4 w-4" /> Analýza AI
+        <div className="mt-4 rounded-lg border border-success/30 bg-success/5 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-success">
+            <Sparkles className="h-4 w-4" /> Co AI zjistila
           </div>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            <li>• Rozpoznáno jako <b className="text-foreground">{email.category}</b> {email.customer && <>od <b className="text-foreground">{email.customer}</b></>}.</li>
-            <li>• Propojeno s výkresem a zákazníkem v CRM.</li>
-            <li>• Navržena akce: připravit odpověď a koncept nabídky.</li>
+            <li>• Zařazeno jako <b className="text-foreground">{email.category}</b>{email.customer && <> od <b className="text-foreground">{email.customer}</b></>}.</li>
+            {email.aiSummary && <li>• {email.aiSummary}</li>}
+            {email.hasDraft && <li>• Odpověď je připravena ve frontě ke schválení.</li>}
           </ul>
         </div>
 
@@ -219,22 +234,22 @@ function EmailDetail({
             <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               <Reply className="h-4 w-4 text-muted-foreground" /> Návrh odpovědi (AI)
             </div>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Dobrý den, děkujeme za Vaši poptávku. Potvrzujeme přijetí a do dvou pracovních dnů
-              Vám zašleme cenovou nabídku…
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {mode === "full" ? (
                 <Badge variant="success">
                   <Sparkles className="h-3 w-3" /> V plné automatice se odešle samo
                 </Badge>
               ) : (
-                <Badge variant="warning">Čeká na schválení ve frontě (Dashboard)</Badge>
+                <Badge variant="warning">Čeká na tvé schválení</Badge>
               )}
-              <span className="text-xs text-muted-foreground">
-                Schválení/odeslání a úpravy probíhají ve frontě ke schválení.
-              </span>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard">Zkontrolovat a odeslat na Přehledu</Link>
+              </Button>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Text si tam přečteš, můžeš ho upravit (AI se z úpravy poučí) a teprve červeným
+              tlačítkem se odešle.
+            </p>
           </div>
         )}
       </CardContent>
@@ -321,7 +336,7 @@ function CategoryCorrector({ email }: { email: EmailItem }) {
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">
-        <Button size="sm" onClick={save} disabled={saving}>Uložit korekci</Button>
+        <Button size="sm" variant="success" onClick={save} disabled={saving}>Uložit korekci (AI se naučí)</Button>
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Zrušit</Button>
       </div>
     </div>

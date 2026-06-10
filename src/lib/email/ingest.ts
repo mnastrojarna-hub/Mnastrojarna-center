@@ -4,8 +4,8 @@ import { getAgentInstructions } from "@/lib/ai/corrections";
 import { getImapConfig, getGraphConfig } from "@/lib/settings";
 import { getModuleMode } from "@/lib/automation";
 import { sendMail, isSmtpConfigured } from "@/lib/email/send";
-import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { EmailCategory, PriorityLevel } from "@/lib/supabase/database.types";
+import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import type { EmailCategory, MailboxConfig, PriorityLevel } from "@/lib/supabase/database.types";
 
 /**
  * Stahování a AI-analýza příchozí pošty.
@@ -111,8 +111,31 @@ export async function fetchGraphEmails(cfg: GraphCfg, userPrincipal: string, lim
   });
 }
 
+// ── Schránky s vlastní konfigurací (Nastavení → E-mailové schránky) ──
+interface MailboxRow {
+  id: string;
+  provider: "imap" | "outlook" | "gmail";
+  email: string;
+  config: MailboxConfig;
+}
+
+async function getActiveMailboxes(): Promise<MailboxRow[]> {
+  if (!isSupabaseConfigured() || !hasServiceKey()) return [];
+  try {
+    const db = createAdminClient();
+    const { data, error } = await db
+      .from("mailboxes")
+      .select("id, provider, email, config")
+      .eq("active", true);
+    if (error || !data) return [];
+    return data as MailboxRow[];
+  } catch {
+    return [];
+  }
+}
+
 // ── Uložení s AI analýzou ───────────────────────────────────
-async function ingestEmails(emails: RawEmail[]): Promise<number> {
+async function ingestEmails(emails: RawEmail[], mailboxId?: string): Promise<number> {
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) return 0;
   const db = createAdminClient();
   const rules = await getAgentInstructions("email"); // slovní pravidla agenta
@@ -128,6 +151,7 @@ async function ingestEmails(emails: RawEmail[]): Promise<number> {
       .from("emails")
       .upsert(
         {
+          mailbox_id: mailboxId ?? null,
           message_id: e.messageId,
           from_name: e.fromName,
           from_email: e.fromEmail,
@@ -195,6 +219,71 @@ async function ingestEmails(emails: RawEmail[]): Promise<number> {
 }
 
 export async function syncMailbox(limit = 20): Promise<SyncResult> {
+  // 1) Schránky s vlastní konfigurací (servery/porty/hesla per schránka)
+  const boxes = await getActiveMailboxes();
+  let fetched = 0;
+  let ingested = 0;
+  let used: SyncResult["source"] = "none";
+  const errors: string[] = [];
+
+  for (const box of boxes) {
+    const cfg = box.config ?? {};
+    try {
+      if (box.provider !== "outlook" && cfg.imap_host && cfg.imap_user && cfg.imap_password) {
+        const emails = await fetchImapEmails(
+          {
+            host: cfg.imap_host,
+            port: Number(cfg.imap_port || 993),
+            user: cfg.imap_user,
+            password: cfg.imap_password,
+          },
+          limit,
+        );
+        fetched += emails.length;
+        ingested += await ingestEmails(emails, box.id);
+        used = used === "graph" ? used : "imap";
+      } else if (
+        box.provider === "outlook" &&
+        cfg.ms_graph_client_id &&
+        cfg.ms_graph_client_secret &&
+        cfg.ms_graph_tenant_id
+      ) {
+        const emails = await fetchGraphEmails(
+          {
+            clientId: cfg.ms_graph_client_id,
+            clientSecret: cfg.ms_graph_client_secret,
+            tenantId: cfg.ms_graph_tenant_id,
+          },
+          box.email,
+          limit,
+        );
+        fetched += emails.length;
+        ingested += await ingestEmails(emails, box.id);
+        used = "graph";
+      } else {
+        continue; // schránka bez přístupových údajů → přeskočit (globální fallback níže)
+      }
+      const db = createAdminClient();
+      await db
+        .from("mailboxes")
+        .update({ last_sync_at: new Date().toISOString() } as never)
+        .eq("id", box.id);
+    } catch (err) {
+      errors.push(`${box.email}: ${err instanceof Error ? err.message : "chyba"}`);
+    }
+  }
+
+  if (used !== "none" || errors.length > 0) {
+    return {
+      source: used,
+      configured: true,
+      fetched,
+      ingested,
+      message: errors.length ? errors.join(" · ") : undefined,
+    };
+  }
+
+  // 2) Fallback: globální přístupové údaje (Nastavení → API klíče a integrace)
   const imap = await getImapConfig();
   const graph = await getGraphConfig();
   const graphReady = Boolean(graph.clientId && graph.clientSecret && graph.tenantId);
@@ -204,20 +293,21 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
     if (graphReady) {
       const user = graph.user || imap.user || "";
       const emails = await fetchGraphEmails(graph, user, limit);
-      const ingested = await ingestEmails(emails);
-      return { source: "graph", configured: true, fetched: emails.length, ingested };
+      const count = await ingestEmails(emails);
+      return { source: "graph", configured: true, fetched: emails.length, ingested: count };
     }
     if (imapReady) {
       const emails = await fetchImapEmails(imap, limit);
-      const ingested = await ingestEmails(emails);
-      return { source: "imap", configured: true, fetched: emails.length, ingested };
+      const count = await ingestEmails(emails);
+      return { source: "imap", configured: true, fetched: emails.length, ingested: count };
     }
     return {
       source: "none",
       configured: false,
       fetched: 0,
       ingested: 0,
-      message: "Žádná schránka není nakonfigurována. Přidej IMAP nebo Microsoft 365 v Nastavení → Integrace.",
+      message:
+        "Žádná schránka není nakonfigurována. Přidej schránku (servery, porty, heslo) v Nastavení → E-mailové schránky.",
     };
   } catch (err) {
     return {

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { navSections } from "@/lib/nav";
-import { badgeCounts } from "@/lib/mock-data";
+import type { BadgeCounts } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+export function Sidebar({ counts }: { counts?: Partial<BadgeCounts> }) {
   const pathname = usePathname();
+  const badgeCounts: Record<string, number | undefined> = counts ?? {};
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">

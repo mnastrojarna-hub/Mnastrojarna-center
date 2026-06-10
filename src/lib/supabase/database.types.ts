@@ -146,12 +146,27 @@ export interface OrderItem {
   position: number;
 }
 
+/** Připojení schránky — servery příchozí (IMAP) a odchozí (SMTP) pošty, příp. Graph. */
+export interface MailboxConfig {
+  imap_host?: string;
+  imap_port?: number;
+  imap_user?: string;
+  imap_password?: string;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  ms_graph_client_id?: string;
+  ms_graph_client_secret?: string;
+  ms_graph_tenant_id?: string;
+}
+
 export interface Mailbox {
   id: string;
   provider: MailboxProvider;
   email: string;
   display_name: string | null;
-  config: Record<string, unknown>;
+  config: MailboxConfig & Record<string, unknown>;
   active: boolean;
   last_sync_at: string | null;
   created_at: string;

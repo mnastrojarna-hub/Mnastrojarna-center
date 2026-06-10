@@ -10,7 +10,9 @@ export function ensureFonts() {
   Font.register({
     family: "Roboto",
     fonts: [
+      { src: path.join(dir, "Roboto-Light.ttf"), fontWeight: 300 },
       { src: path.join(dir, "Roboto-Regular.ttf"), fontWeight: "normal" },
+      { src: path.join(dir, "Roboto-Italic.ttf"), fontStyle: "italic" },
       { src: path.join(dir, "Roboto-Bold.ttf"), fontWeight: "bold" },
     ],
   });
@@ -31,10 +33,14 @@ export const styles = StyleSheet.create({
     lineHeight: 1.4,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  brandName: { fontSize: 17, fontWeight: "bold", color: BRAND.red, lineHeight: 1 },
-  brandSlogan: { fontSize: 8, color: BRAND.grey, marginTop: 3 },
-  docTitle: { fontSize: 20, fontWeight: "bold", textAlign: "right" },
-  docNumber: { fontSize: 11, color: BRAND.grey, textAlign: "right", marginTop: 2 },
+  // Wordmark dle logomanuálu: antracit bold + menší „s.r.o.", slogan šedý italic
+  brandName: { fontSize: 17, fontWeight: "bold", color: BRAND.anthracite, lineHeight: 1 },
+  brandSuffix: { fontSize: 9, fontWeight: "bold", color: BRAND.anthracite },
+  brandSlogan: { fontSize: 8, fontStyle: "italic", color: BRAND.grey, marginTop: 3 },
+  // Červená korporátní linka oddělující hlavičku
+  headerRule: { marginTop: 14, height: 2.5, backgroundColor: BRAND.red },
+  docTitle: { fontSize: 18, fontWeight: "bold", color: BRAND.anthracite, textAlign: "right", lineHeight: 1.2 },
+  docNumber: { fontSize: 11, color: BRAND.grey, textAlign: "right", marginTop: 6, lineHeight: 1 },
 
   partiesRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 24, gap: 24 },
   partyBox: { flex: 1 },

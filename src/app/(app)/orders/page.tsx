@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { OrderBook } from "@/components/order-book";
 import { QuickAddDialog } from "@/components/quick-add-dialog";
 import { createOrder } from "@/app/actions/orders";
-import { orderStatusOrder } from "@/lib/mock-data";
+import { orderStatusOrder } from "@/lib/data/types";
 import { getOrders } from "@/lib/data/queries";
 
 export default async function OrdersPage() {

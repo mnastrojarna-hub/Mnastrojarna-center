@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, FileText, ClipboardList, Sparkles } from "lucide-react";
+import { LayoutDashboard, Inbox, MessageSquareQuote, FileText, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { title: "Přehled", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Inbox", href: "/inbox", icon: Inbox },
+  { title: "Pošta", href: "/inbox", icon: Inbox },
+  { title: "Poptávky", href: "/inquiries", icon: MessageSquareQuote },
   { title: "Nabídky", href: "/quotes", icon: FileText },
-  { title: "Objednávky", href: "/orders", icon: ClipboardList },
-  { title: "AI", href: "/assistant", icon: Sparkles },
+  { title: "Zakázky", href: "/orders", icon: ClipboardList },
 ];
 
 export function MobileNav() {

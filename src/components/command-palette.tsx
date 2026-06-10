@@ -6,18 +6,13 @@ import { Command } from "cmdk";
 import { Search, ArrowRight, FileText, Users, Factory, FileBox, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { allNavItems } from "@/lib/nav";
-import * as mock from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface SearchEntry { id: string; label: string; hint?: string }
 interface SearchData { customers: SearchEntry[]; suppliers: SearchEntry[]; drawings: SearchEntry[]; quotes: SearchEntry[] }
 
-const FALLBACK: SearchData = {
-  customers: mock.customers.map((c) => ({ id: c.id, label: c.name, hint: c.ico })),
-  suppliers: mock.suppliers.map((s) => ({ id: s.id, label: s.name, hint: s.country })),
-  drawings: mock.drawings.map((d) => ({ id: d.id, label: d.number, hint: `${d.material} · rev. ${d.revision}` })),
-  quotes: mock.quotes.map((q) => ({ id: q.id, label: q.number, hint: q.customer })),
-};
+// Začínáme prázdně — při otevření se načtou reálná data z /api/search.
+const EMPTY: SearchData = { customers: [], suppliers: [], drawings: [], quotes: [] };
 
 interface CommandPaletteContextValue {
   open: boolean;
@@ -34,7 +29,7 @@ export function useCommandPalette() {
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false);
-  const [data, setData] = React.useState<SearchData>(FALLBACK);
+  const [data, setData] = React.useState<SearchData>(EMPTY);
   const loaded = React.useRef(false);
   const router = useRouter();
 

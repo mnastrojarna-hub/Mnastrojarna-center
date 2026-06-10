@@ -8,8 +8,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
+        // Neutrální výchozí tlačítko — červená je vyhrazena akcím, které něco odešlou ven
+        default: "bg-foreground text-background shadow-sm hover:bg-foreground/90",
+        /** ČERVENÁ = akce odešle něco ven (zákazníkovi / dodavateli). */
+        send: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        /** ZELENÁ = bezpečné potvrzení / informace, nic neopustí systém. */
         success: "bg-success text-success-foreground shadow-sm hover:bg-success/90",
         outline: "border border-border bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
