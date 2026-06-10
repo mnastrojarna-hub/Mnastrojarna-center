@@ -1,7 +1,10 @@
-import { Mail, KeyRound, ShieldCheck, BrainCircuit } from "lucide-react";
+import Link from "next/link";
+import { Mail, KeyRound, ShieldCheck, BrainCircuit, Database, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AutomationSettings } from "@/components/automation-settings";
 import { AgentRulesEditor } from "@/components/agent-rules-editor";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
@@ -12,6 +15,8 @@ import { getIntegrationSettingsMeta, getMailboxes } from "@/lib/data/settings-da
 import { getAllModuleModes } from "@/lib/automation";
 import { CorrectionsList } from "@/components/corrections-list";
 import { GraduationCap } from "lucide-react";
+import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
+import { getSupabaseEnv } from "@/lib/supabase/config";
 
 export default async function SettingsPage() {
   const [agentRules, settings, mailboxes, moduleModes, corrections] = await Promise.all([
@@ -21,6 +26,9 @@ export default async function SettingsPage() {
     getAllModuleModes(),
     getRecentCorrections(),
   ]);
+  const configured = isSupabaseConfigured();
+  const serviceKey = hasServiceKey();
+  const { url } = getSupabaseEnv();
 
   return (
     <div className="space-y-6">
@@ -28,6 +36,35 @@ export default async function SettingsPage() {
         title="Nastavení"
         description="Schránky, API klíče, pravidla AI a režim automatizace."
       />
+
+      {/* Připojení Supabase */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="h-4 w-4 text-muted-foreground" /> Připojení Supabase
+          </CardTitle>
+          <CardDescription>
+            Databáze, přihlašování a úložiště. Připojení se nastavuje v průvodci — funguje na
+            localhostu i na Vercelu.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-3">
+          <Badge variant={configured ? "success" : "destructive"}>
+            {configured ? "připojeno" : "nepřipojeno"}
+          </Badge>
+          <Badge variant={serviceKey ? "success" : "warning"}>
+            {serviceKey ? "servisní klíč nastaven" : "servisní klíč chybí"}
+          </Badge>
+          {configured && url && (
+            <span className="text-sm text-muted-foreground">{url}</span>
+          )}
+          <Button variant="outline" size="sm" asChild className="ml-auto">
+            <Link href="/setup">
+              Otevřít průvodce nastavením <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* API klíče a integrace */}
       <Card>
@@ -52,8 +89,9 @@ export default async function SettingsPage() {
             <Mail className="h-4 w-4 text-muted-foreground" /> E-mailové schránky
           </CardTitle>
           <CardDescription>
-            Evidence schránek. Stahování pošty zatím probíhá přes globální přístup (IMAP/Microsoft 365)
-            zadaný výše v sekci API klíče.
+            Každá schránka má vlastní servery příchozí (IMAP) a odchozí (SMTP) pošty, porty
+            a heslo. Připojení si můžeš rovnou otestovat. Bez vlastních serverů platí globální
+            klíče výše.
           </CardDescription>
         </CardHeader>
         <CardContent>

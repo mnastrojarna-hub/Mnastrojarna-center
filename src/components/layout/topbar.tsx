@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { signOut } from "@/app/auth/actions";
+import type { CurrentUser } from "@/lib/data/current-user";
 
-export function Topbar() {
+export function Topbar({ user }: { user: CurrentUser | null }) {
   const { setOpen } = useCommandPalette();
 
   return (
@@ -41,26 +42,32 @@ export function Topbar() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full outline-none">
+            <button className="flex items-center gap-2 rounded-full outline-none" aria-label="Uživatelské menu">
               <Avatar>
-                <AvatarFallback>MN</AvatarFallback>
+                <AvatarFallback>{user?.initials ?? "?"}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              <div className="font-medium text-foreground">Martin Novák</div>
-              <div className="text-xs font-normal text-muted-foreground">Super Admin</div>
+              <div className="font-medium text-foreground">{user?.fullName ?? "Nepřihlášen"}</div>
+              <div className="text-xs font-normal text-muted-foreground">
+                {user ? user.roleLabel : "Přihlas se pro plný přístup"}
+              </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link href="/settings">Nastavení</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link href="/settings">API klíče a schránky</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href="/setup">Průvodce nastavením</Link></DropdownMenuItem>
             <DropdownMenuSeparator />
-            <form action={signOut}>
-              <DropdownMenuItem asChild className="text-destructive focus:text-destructive">
-                <button type="submit" className="w-full cursor-pointer">Odhlásit se</button>
-              </DropdownMenuItem>
-            </form>
+            {user ? (
+              <form action={signOut}>
+                <DropdownMenuItem asChild className="text-destructive focus:text-destructive">
+                  <button type="submit" className="w-full cursor-pointer">Odhlásit se</button>
+                </DropdownMenuItem>
+              </form>
+            ) : (
+              <DropdownMenuItem asChild><Link href="/login">Přihlásit se</Link></DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
