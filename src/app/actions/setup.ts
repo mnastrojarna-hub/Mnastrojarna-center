@@ -58,7 +58,7 @@ export async function testSupabaseConnection(input: {
   }
 
   try {
-    const rest = await fetch(`${url}/rest/v1/`, {
+    const rest = await fetch(`${url}/auth/v1/settings`, {
       headers: { apikey: publishableKey },
       signal: AbortSignal.timeout(8000),
     });
