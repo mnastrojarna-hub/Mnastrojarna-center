@@ -1,0 +1,433 @@
+import { describe, it, expect } from "vitest";
+import {
+  jobInputToRow, validateJobInput, validateItems, diffJob, describeChanges, fieldEventMessage,
+  computeItemTotals, cleanDate, cleanNumber, cleanQuantity, cleanCurrency, cleanTags, isUuid,
+  jobItemToRow, quoteItemToRow, quoteInputToRow, quoteRevisionNumber, safeStorageName,
+  isValidJobFilePath, jobFilePath, rowToJobListItem, rowToJobDetail, rowToJobEvent, rowToJobFile,
+  resolveStageFilter, filterJobs, sortJobs, countJobStages, aiFilledColumns, stageEventMessage,
+  computeMargin, todayIso, matchesDeadline, fetchPaged, isGenericCaptureName, translateDbError, type JobRow,
+} from "./mapping";
+import type { JobListItem } from "./types";
+
+const UUID = "3f2b8c1e-1d2a-4c3b-9a8e-7f6d5c4b3a21";
+const UUID2 = "11111111-2222-4333-8444-555555555555";
+
+function listItem(over: Partial<JobListItem> = {}): JobListItem {
+  return {
+    id: over.id ?? UUID,
+    number: "Z-2026-001",
+    title: "Hřídel",
+    stage: "poptavka",
+    priority: "stredni",
+    customer: { id: UUID2, name: "Strojmetal s.r.o.", customerNumber: "ZK0001", ico: "12345678" },
+    customerOrderNumber: null,
+    customerInquiryNumber: null,
+    drawingNumbers: [],
+    itemCount: 0,
+    totalQuantity: 0,
+    value: null,
+    purchaseCost: null,
+    currency: "CZK",
+    inquiryDate: null,
+    orderDate: null,
+    customerRequiredDate: null,
+    dueDate: null,
+    expectedDeliveryDate: null,
+    supplierPromisedDate: null,
+    maxToleratedDate: null,
+    receivedAt: null,
+    deliveredAt: null,
+    owner: null,
+    assignee: null,
+    createdBy: null,
+    supplier: null,
+    quoteCount: 0,
+    fileCount: 0,
+    aiFilled: false,
+    source: "manual",
+    createdAt: "2026-10-01T10:00:00Z",
+    updatedAt: "2026-10-01T10:00:00Z",
+    stageChangedAt: null,
+    ...over,
+  };
+}
+
+describe("normalizace", () => {
+  it("cleanDate přijme jen platné RRRR-MM-DD", () => {
+    expect(cleanDate("2026-03-12")).toBe("2026-03-12");
+    expect(cleanDate("2026-03-12T10:00:00Z")).toBe("2026-03-12");
+    expect(cleanDate("2026-02-30")).toBeNull();
+    expect(cleanDate("12. 3. 2026")).toBeNull();
+    expect(cleanDate("")).toBeNull();
+    expect(cleanDate(20260312)).toBeNull();
+  });
+  it("cleanNumber zvládne české formáty a odmítne nesmysly", () => {
+    expect(cleanNumber("12 500,50")).toBe(12500.5);
+    expect(cleanNumber(42)).toBe(42);
+    expect(cleanNumber(Number.NaN)).toBeNull();
+    expect(cleanNumber(Infinity)).toBeNull();
+    expect(cleanNumber("abc")).toBeNull();
+    expect(cleanNumber("")).toBeNull();
+  });
+  it("cleanQuantity = 3 desetinná místa (kg, m), neplatné → 1", () => {
+    expect(cleanQuantity(3)).toBe(3);
+    expect(cleanQuantity(2.6)).toBe(2.6);
+    expect(cleanQuantity(1.23456)).toBe(1.235);
+    expect(cleanQuantity(0)).toBe(1);
+    expect(cleanQuantity(-5)).toBe(1);
+    expect(cleanQuantity(Number.NaN)).toBe(1);
+  });
+  it("měna a štítky", () => {
+    expect(cleanCurrency("eur")).toBe("EUR");
+    expect(cleanCurrency("")).toBe("CZK");
+    expect(cleanCurrency("koruny")).toBe("CZK");
+    expect(cleanTags([" a ", "a", "", "b"])).toEqual(["a", "b"]);
+  });
+  it("isUuid", () => {
+    expect(isUuid(UUID)).toBe(true);
+    expect(isUuid("x")).toBe(false);
+    expect(isUuid(null)).toBe(false);
+  });
+  it("todayIso vrací pražské datum", () => {
+    // 23:30 UTC 21. 10. = 01:30 v Praze 22. 10. (letní čas)
+    expect(todayIso(new Date("2026-10-21T23:30:00Z"))).toBe("2026-10-22");
+  });
+});
+
+describe("jobInputToRow", () => {
+  it("mapuje jen přítomné klíče", () => {
+    expect(jobInputToRow({ title: "  Hřídel  " })).toEqual({ title: "Hřídel" });
+    expect(jobInputToRow({})).toEqual({});
+  });
+  it("prázdný řetězec → null, neplatné datum → null", () => {
+    const row = jobInputToRow({ customerOrderNumber: "", dueDate: "2026-13-01", inquiryDate: "2026-01-05" });
+    expect(row).toEqual({ customer_order_number: null, due_date: null, inquiry_date: "2026-01-05" });
+  });
+  it("stav → status, osoby a čísla", () => {
+    const row = jobInputToRow({
+      stage: "nabidka", priority: "vysoka", ownerId: UUID, assigneeId: "", pricedById: null,
+      value: 1234.567, purchaseCost: Number.NaN, currency: "eur", tags: ["x"],
+    });
+    expect(row).toEqual({
+      status: "nabidka", priority: "vysoka", owner_id: UUID, assignee_id: null, priced_by: null,
+      value: 1234.57, purchase_cost: null, currency: "EUR", tags: ["x"],
+    });
+  });
+  it("customerName není sloupec", () => {
+    expect(jobInputToRow({ customerName: "ACME" })).toEqual({});
+  });
+  it("mapuje všechny termíny na správné sloupce", () => {
+    const row = jobInputToRow({
+      orderDate: "2026-01-01", customerRequiredDate: "2026-02-01", expectedDeliveryDate: "2026-02-02",
+      supplierPromisedDate: "2026-02-03", maxToleratedDate: "2026-02-10",
+    });
+    expect(row).toEqual({
+      order_date: "2026-01-01", customer_required_date: "2026-02-01", expected_delivery_date: "2026-02-02",
+      supplier_promised_date: "2026-02-03", max_tolerated_date: "2026-02-10",
+    });
+  });
+  it("neznámý stav se nemapuje", () => {
+    expect(jobInputToRow({ stage: "xxx" as never })).toEqual({});
+  });
+});
+
+describe("validateJobInput / validateItems", () => {
+  it("odhalí neplatné hodnoty", () => {
+    expect(validateJobInput({ stage: "xxx" as never })).toMatch(/stav/i);
+    expect(validateJobInput({ dueDate: "zítra" })).toMatch(/Potvrzený termín/);
+    expect(validateJobInput({ ownerId: "abc" })).toMatch(/Obchodník/);
+    expect(validateJobInput({ value: -5 })).toMatch(/rozsah/);
+    expect(validateJobInput({ customerContactEmail: "neni-email" })).toMatch(/e-mail/i);
+    expect(validateJobInput({ title: "x".repeat(400) })).toMatch(/dlouhé/);
+  });
+  it("platný vstup projde", () => {
+    expect(validateJobInput({ title: "A", dueDate: "", ownerId: null, value: null })).toBeNull();
+  });
+  it("položky", () => {
+    expect(validateItems([{ quantity: 1 }])).toBeNull();
+    expect(validateItems([{ quantity: 0 }])).toMatch(/množství/);
+    expect(validateItems([{ quantity: 1, unitPrice: -1 }])).toMatch(/cena/);
+    expect(validateItems([{ quantity: 1, vatRate: 150 }])).toMatch(/DPH/);
+    expect(validateItems("x")).toMatch(/seznam/);
+  });
+});
+
+describe("položky a součty", () => {
+  it("computeItemTotals", () => {
+    expect(computeItemTotals([])).toEqual({ value: null, purchaseCost: null });
+    expect(computeItemTotals([
+      { quantity: 3, unitPrice: 100.5, purchaseUnitPrice: 60 },
+      { quantity: 2, unitPrice: null },
+    ])).toEqual({ value: 301.5, purchaseCost: 180 });
+    expect(computeItemTotals([{ quantity: 2, purchaseUnitPrice: 10 }])).toEqual({ value: null, purchaseCost: 20 });
+  });
+  it("jobItemToRow a quoteItemToRow", () => {
+    expect(jobItemToRow({ quantity: 2, drawingNumber: " VK-1 ", unitPrice: 10 }, 0)).toEqual({
+      position: 0, drawing_number: "VK-1", revision: null, name: null, description: null, material: null,
+      quantity: 2, unit: "ks", unit_price: 10, purchase_unit_price: null, note: null,
+    });
+    expect(quoteItemToRow({ quantity: 1, vatRate: 12 }, 3)).toMatchObject({ position: 3, vat_rate: 12, unit: "ks" });
+    expect(quoteItemToRow({ quantity: 1 }, 0)).toMatchObject({ vat_rate: 21 });
+  });
+  it("quoteInputToRow", () => {
+    expect(quoteInputToRow({ title: " Nabídka ", validUntil: "2026-11-30", leadTimeDays: 14.4, status: "odeslano" }))
+      .toEqual({ title: "Nabídka", valid_until: "2026-11-30", lead_time_days: 14, status: "odeslano" });
+    expect(quoteInputToRow({ status: "nic" as never })).toEqual({});
+  });
+});
+
+describe("diffJob", () => {
+  it("vrátí jen skutečné změny s popisky", () => {
+    const before = { title: "A", due_date: "2026-03-01", value: 100, tags: ["x"], note: null };
+    const changes = diffJob(before, { title: "A", due_date: "2026-03-05", value: 100.001, tags: ["x"], note: null });
+    expect(changes).toEqual([
+      { field: "due_date", label: "Potvrzený termín zákazníkovi", from: "2026-03-01", to: "2026-03-05" },
+    ]);
+  });
+  it("null vs prázdno není změna, nová hodnota ano", () => {
+    expect(diffJob({ note: null }, { note: null })).toEqual([]);
+    expect(diffJob({}, { note: "x" })).toEqual([{ field: "note", label: "Interní poznámka", from: null, to: "x" }]);
+    expect(diffJob({ tags: ["a"] }, { tags: ["a", "b"] })).toHaveLength(1);
+  });
+  it("číselné řetězce z DB se porovnají jako čísla", () => {
+    expect(diffJob({ value: "100.00" }, { value: 100 })).toEqual([]);
+  });
+  it("text změn a citlivá pole", () => {
+    const changes = describeChanges(
+      diffJob({ owner_id: null, purchase_cost: 10 }, { owner_id: UUID, purchase_cost: 20 }),
+      { [UUID]: "Jan Novák" },
+    );
+    expect(changes[0]).toMatchObject({ fromText: "—", toText: "Jan Novák" });
+    expect(changes[1].sensitive).toBe(true);
+    expect(fieldEventMessage([changes[0]])).toBe("Obchodník: — → Jan Novák");
+    expect(fieldEventMessage([changes[1]])).toBe("Nákupní náklady: upraveno");
+    expect(fieldEventMessage(changes)).toMatch(/^Upraveno 2 polí/);
+  });
+});
+
+describe("nabídky a soubory", () => {
+  it("quoteRevisionNumber odřízne starou příponu", () => {
+    expect(quoteRevisionNumber("NAB-2026-031", 2)).toBe("NAB-2026-031-R2");
+    expect(quoteRevisionNumber("NAB-2026-031-R2", 3)).toBe("NAB-2026-031-R3");
+  });
+  it("safeStorageName", () => {
+    expect(safeStorageName("Výkres čep ř.2 (rev B).PDF")).toBe("Vykres-cep-r.2-rev-B.PDF");
+    expect(safeStorageName("../../etc/passwd")).toBe("etc-passwd");
+    expect(safeStorageName("....")).toBe("soubor");
+    expect(safeStorageName("model.step")).toBe("model.step");
+    expect(safeStorageName("bez přípony")).toBe("bez-pripony");
+  });
+  it("obecné názvy z fotoaparátu se neverzují", () => {
+    expect(isGenericCaptureName("image.jpg")).toBe(true);
+    expect(isGenericCaptureName("IMAGE.JPEG")).toBe(true);
+    expect(isGenericCaptureName("photo (2).heic")).toBe(true);
+    expect(isGenericCaptureName("foto_1.png")).toBe(true);
+    expect(isGenericCaptureName("VK-2291_rev_B.pdf")).toBe(false);
+    expect(isGenericCaptureName("IMG_4512.jpg")).toBe(false);
+    expect(isGenericCaptureName("image.pdf")).toBe(false);
+  });
+  it("chyby DB česky", () => {
+    expect(translateDbError('insert or update on table "orders" violates foreign key constraint "x"')).toMatch(/neexistuje/);
+    expect(translateDbError("duplicate key value violates unique constraint")).toMatch(/už existuje/);
+    expect(translateDbError("Něco jiného")).toBe("Něco jiného");
+  });
+  it("cesta souboru musí patřit zakázce", () => {
+    const p = jobFilePath(UUID, UUID2, "Žluťoučký kůň.jpg");
+    expect(p).toBe(`zakazky/${UUID}/${UUID2}-Zlutoucky-kun.jpg`);
+    expect(isValidJobFilePath(UUID, p)).toBe(true);
+    expect(isValidJobFilePath(UUID2, p)).toBe(false);
+    expect(isValidJobFilePath(UUID, `zakazky/${UUID}/../x`)).toBe(false);
+    expect(isValidJobFilePath(UUID, `zakazky/${UUID}/x.pdf`)).toBe(false);
+    expect(isValidJobFilePath(UUID, `/zakazky/${UUID}/${UUID2}-a.pdf`)).toBe(false);
+  });
+});
+
+describe("řádky → view-modely", () => {
+  const row: JobRow = {
+    id: UUID,
+    number: "Z-2026-007",
+    title: "Příruba",
+    status: "objednavka",
+    priority: "vysoka",
+    value: "1000.00",
+    purchase_cost: 600,
+    currency: "CZK",
+    created_at: "2026-10-01T10:00:00Z",
+    updated_at: "2026-10-02T10:00:00Z",
+    quote_id: "q2",
+    customer: [{ id: UUID2, name: "ACME", customer_number: "ZK0002", ico: "1", address: "Hlavní 1" }],
+    owner: { id: "u1", full_name: "", email: "jan@firma.cz" },
+    items: [
+      { id: "i2", position: 1, drawing_number: "VK-2", quantity: 3, unit_price: 100, purchase_unit_price: 50 },
+      { id: "i1", position: 0, drawing_number: "VK-1", quantity: 2, unit_price: 200, purchase_unit_price: 80 },
+      { id: "i3", position: 2, drawing_number: "VK-1", quantity: 1 },
+    ],
+    quotes: [{ id: "q1", archived: true }, { id: "q2", archived: false }],
+    files: [{ id: "f1", archived: false }],
+  };
+
+  it("seznam: odvozené hodnoty a skrytí nákupních cen", () => {
+    const item = rowToJobListItem(row, { margins: false });
+    expect(item.drawingNumbers).toEqual(["VK-1", "VK-2"]);
+    expect(item.itemCount).toBe(3);
+    expect(item.totalQuantity).toBe(6);
+    expect(item.value).toBe(1000);
+    expect(item.purchaseCost).toBeNull();
+    expect(item.quoteCount).toBe(1);
+    expect(item.fileCount).toBe(1);
+    expect(item.customer).toEqual({ id: UUID2, name: "ACME", customerNumber: "ZK0002", ico: "1" });
+    expect(item.owner).toEqual({ id: "u1", name: "jan@firma.cz" });
+    expect(item.stage).toBe("objednavka");
+    expect(rowToJobListItem(row, { margins: true }).purchaseCost).toBe(600);
+  });
+
+  it("detail: nabídky, soubory, události, marže", () => {
+    const quotes = [
+      { id: "q1", number: "NAB-1", status: "zamitnuto", created_at: "2026-10-01T00:00:00Z", archived: true, items: [] },
+      {
+        id: "q2", number: "NAB-1-R2", revision: 2, status: "prijato", created_at: "2026-10-03T00:00:00Z",
+        items: [{ id: "qi", position: 0, quantity: 1, unit_price: 5, purchase_unit_price: 3, vat_rate: 21 }],
+      },
+    ];
+    const files = [
+      { id: "f1", job_id: UUID, kind: "vykres", filename: "a.pdf", created_at: "2026-10-01T00:00:00Z", ai_extracted: { a: 1 } },
+      { id: "f0", job_id: UUID, kind: "nesmysl", filename: "b.pdf", created_at: "2026-10-02T00:00:00Z", archived: true },
+    ];
+    const events = [
+      { id: "e1", type: "created", message: "Zakázka založena", created_at: "2026-10-01T00:00:00Z" },
+      {
+        id: "e2", type: "field", message: "x", created_at: "2026-10-02T00:00:00Z",
+        data: { changes: [{ field: "purchase_cost", label: "Nákupní náklady", from: 1, to: 2, fromText: "1", toText: "2" }] },
+      },
+    ];
+    const hidden = rowToJobDetail(row, { quotes, files, events }, { margins: false });
+    expect(hidden.quotes.map((q) => q.id)).toEqual(["q2", "q1"]);
+    expect(hidden.quotes[0].accepted).toBe(true);
+    expect(hidden.quotes[0].items[0].purchaseUnitPrice).toBeNull();
+    expect(hidden.items.map((i) => i.id)).toEqual(["i1", "i2", "i3"]);
+    expect(hidden.items[0].purchaseUnitPrice).toBeNull();
+    expect(hidden.margin).toBeNull();
+    expect(hidden.purchaseCost).toBeNull();
+    expect(hidden.files.map((f) => f.id)).toEqual(["f0", "f1"]);
+    expect(hidden.files[0].kind).toBe("ostatni");
+    expect(hidden.files[1].hasAiData).toBe(true);
+    expect(hidden.events[0].id).toBe("e2");
+    expect(hidden.events[0].data.changes).toEqual([{ field: "purchase_cost", label: "Nákupní náklady", sensitive: true }]);
+    expect(hidden.customerDetail?.street).toBe("Hlavní 1");
+    expect(hidden.customerDetail?.country).toBe("CZ");
+    expect(hidden.quoteCount).toBe(1);
+
+    const shown = rowToJobDetail(row, { quotes, files, events }, { margins: true });
+    expect(shown.margin).toBe(0.4);
+    expect(shown.items[0].purchaseUnitPrice).toBe(80);
+    expect(shown.quotes[0].items[0].purchaseUnitPrice).toBe(3);
+    expect((shown.events[0].data.changes as unknown[])[0]).toMatchObject({ from: 1, to: 2 });
+  });
+
+  it("neznámý typ události a soubor bez AI dat", () => {
+    expect(rowToJobEvent({ id: "e", type: "xyz", message: "m", created_at: "x" }, { margins: true }).type).toBe("field");
+    expect(rowToJobFile({ id: "f", job_id: UUID, kind: "foto", filename: "a.jpg", created_at: "x", ai_extracted: {} }).hasAiData).toBe(false);
+  });
+
+  it("computeMargin", () => {
+    expect(computeMargin(1000, 750, { margins: true })).toBe(0.25);
+    expect(computeMargin(0, 10, { margins: true })).toBeNull();
+    expect(computeMargin(1000, null, { margins: true })).toBeNull();
+    expect(computeMargin(1000, 750, { margins: false })).toBeNull();
+  });
+});
+
+describe("filtry a řazení", () => {
+  const today = new Date("2026-10-22T09:00:00");
+  const a = listItem({ id: "a", number: "Z-2026-002", title: "Čep", customer: { id: "c", name: "Želva a.s.", customerNumber: null, ico: null }, dueDate: "2026-10-20", createdAt: "2026-10-02T00:00:00Z", value: 500, stage: "ve_vyrobe", drawingNumbers: ["VK-2291"] });
+  const b = listItem({ id: "b", number: "Z-2026-010", title: "Hřídel", customer: null, customerRequiredDate: "2026-10-25", createdAt: "2026-10-05T00:00:00Z", value: null, stage: "poptavka" });
+  const c = listItem({ id: "c", number: "Z-2026-001", title: "Příruba", customer: { id: "d", name: "ACME", customerNumber: null, ico: null }, createdAt: "2026-10-01T00:00:00Z", value: 1500, stage: "dokonceno", dueDate: "2026-09-01" });
+  const all = [a, b, c];
+
+  it("resolveStageFilter", () => {
+    expect(resolveStageFilter({})).toBeNull();
+    expect(resolveStageFilter({ group: "vse" })).toBeNull();
+    expect(resolveStageFilter({ group: "zrusene" })).toEqual(["zruseno"]);
+    expect(resolveStageFilter({ group: "zrusene", stages: ["nabidka", "nabidka"] })).toEqual(["nabidka"]);
+  });
+
+  it("fulltext bez diakritiky přes číslo, zákazníka a výkres", () => {
+    expect(filterJobs(all, { q: "zelva" }).map((j) => j.id)).toEqual(["a"]);
+    expect(filterJobs(all, { q: "vk 2291" }).map((j) => j.id)).toEqual(["a"]);
+    expect(filterJobs(all, { q: "Z-2026-01" }).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs(all, { q: "hridel" }).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs(all, { q: "   " })).toHaveLength(3);
+  });
+
+  it("termíny", () => {
+    expect(filterJobs(all, { deadline: "overdue" }, today).map((j) => j.id)).toEqual(["a"]);
+    expect(filterJobs(all, { deadline: "week" }, today).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs(all, { deadline: "month" }, today).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs([...all, listItem({ id: "x" })], { deadline: "no_date" }, today).map((j) => j.id)).toEqual(["x"]);
+    expect(matchesDeadline(c, "overdue", today)).toBe(false);
+  });
+
+  it("řazení", () => {
+    expect(sortJobs(all).map((j) => j.id)).toEqual(["b", "a", "c"]);
+    expect(sortJobs(all, "number", "asc").map((j) => j.id)).toEqual(["c", "a", "b"]);
+    expect(sortJobs(all, "deadline", "asc").map((j) => j.id)).toEqual(["c", "a", "b"]);
+    expect(sortJobs([b, listItem({ id: "n" }), a], "deadline", "desc").map((j) => j.id)).toEqual(["b", "a", "n"]);
+    expect(sortJobs(all, "customer", "asc").map((j) => j.id)).toEqual(["c", "a", "b"]);
+    expect(sortJobs(all, "value", "desc").map((j) => j.id)).toEqual(["c", "a", "b"]);
+    expect(sortJobs(all, "value", "asc").map((j) => j.id)).toEqual(["a", "c", "b"]);
+    expect(sortJobs(all, "stage", "asc").map((j) => j.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("countJobStages", () => {
+    const counts = countJobStages([
+      { status: "poptavka", customer_required_date: "2026-10-25" },
+      { status: "ve_vyrobe", due_date: "2026-10-20" },
+      { status: "ve_vyrobe", due_date: "2026-10-22" },
+      { status: "dokonceno", due_date: "2026-01-01" },
+      { status: "nesmysl" },
+    ], today);
+    expect(counts.total).toBe(5);
+    expect(counts.byStage.ve_vyrobe).toBe(2);
+    expect(counts.byStage.poptavka).toBe(2);
+    expect(counts.byStage.zruseno).toBe(0);
+    expect(counts.active).toBe(4);
+    expect(counts.overdue).toBe(2);
+    expect(counts.dueThisWeek).toBe(2);
+  });
+});
+
+describe("fetchPaged", () => {
+  it("stránkuje po 1000 a skončí na neúplné stránce", async () => {
+    const calls: [number, number][] = [];
+    const total = 2300;
+    const res = await fetchPaged<number>(async (from, to) => {
+      calls.push([from, to]);
+      const rows = Array.from({ length: Math.max(0, Math.min(to, total - 1) - from + 1) }, (_, i) => from + i);
+      return { data: rows, error: null };
+    }, 5000);
+    expect(res.data).toHaveLength(2300);
+    expect(calls).toEqual([[0, 999], [1000, 1999], [2000, 2999]]);
+  });
+  it("respektuje maximum a vrátí chybu", async () => {
+    const res = await fetchPaged<number>(async (from, to) => ({ data: Array.from({ length: to - from + 1 }, () => 1), error: null }), 1500);
+    expect(res.data).toHaveLength(1500);
+    const bad = await fetchPaged<number>(async () => ({ data: null, error: { message: "x" } }));
+    expect(bad).toEqual({ data: [], error: { message: "x" } });
+  });
+});
+
+describe("historie a AI učení", () => {
+  it("stageEventMessage", () => {
+    expect(stageEventMessage("nabidka", "objednavka")).toBe("Stav: Nabídka odeslaná → Objednávka");
+    expect(stageEventMessage("nabidka", "zruseno", "zákazník odřekl")).toBe("Stav: Nabídka odeslaná → Zrušeno — zákazník odřekl");
+  });
+  it("aiFilledColumns respektuje pořadí a už opravená pole", () => {
+    const set = aiFilledColumns([
+      { type: "field", data: { aiCorrected: ["due_date"] }, created_at: "2026-10-03" },
+      { type: "ai", data: { filledColumns: ["due_date", "title", 5] }, created_at: "2026-10-01" },
+      { type: "ai", data: { filledColumns: ["value"] }, created_at: "2026-10-04" },
+      { type: "comment", data: null, created_at: "2026-10-05" },
+    ]);
+    expect([...set].sort()).toEqual(["title", "value"]);
+  });
+});

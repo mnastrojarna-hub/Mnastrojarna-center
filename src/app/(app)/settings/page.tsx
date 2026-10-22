@@ -1,5 +1,8 @@
+import type { ComponentProps } from "react";
 import Link from "next/link";
-import { Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp } from "lucide-react";
+import {
+  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,25 +10,30 @@ import { Button } from "@/components/ui/button";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
 import { OutlookImport } from "@/components/outlook-import";
-import { UserManager } from "@/components/user-manager";
 import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
-import { isCurrentUserSuperAdmin } from "@/lib/setup/guard";
+import { requireFeature } from "@/lib/auth/session";
 import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/config";
-import { Users } from "lucide-react";
+
+export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [settings, mailboxes, users, isSuperAdmin] = await Promise.all([
+  // Data se čtou servisním klíčem → nejdřív oprávnění
+  await requireFeature("settings");
+  const [settings, mailboxes, users] = await Promise.all([
     getIntegrationSettingsMeta(),
     getMailboxes(),
     getUsers(),
-    isCurrentUserSuperAdmin(),
   ]);
   const configured = isSupabaseConfigured();
   const serviceKey = hasServiceKey();
   const { url } = getSupabaseEnv();
-  // Parametry kalkulace se ladí v Nacenění / Ladění & korekce — tady jen systém
-  const systemSettings = settings.filter((s) => s.category !== "pricing");
+  // Parametry kalkulace se ladí v Nacenění / Ladění & korekce, AI přístup v Uživatelích — tady jen systém
+  const systemSettings = settings.filter((s) => s.category !== "pricing" && s.category !== "ai_access");
+  // Vlastník schránky = uživatel, který vidí její poštu
+  const mailboxUsers = users.map((u) => ({ id: u.id, full_name: u.full_name || u.email || "Bez jména", email: u.email }));
+  // MailboxManager bere { mailboxes, users } (výběr vlastníka schránky); cast drží kompatibilitu i se starší signaturou
+  const mailboxProps = { mailboxes, users: mailboxUsers } as ComponentProps<typeof MailboxManager>;
 
   return (
     <div className="space-y-6">
@@ -86,21 +94,26 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Uživatelé a role */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Users className="h-4 w-4 text-muted-foreground" /> Uživatelé a role
-          </CardTitle>
-          <CardDescription>
-            Super admin vidí vše. Obchodník jen své zákazníky, nabídky a provize.
-            Zaměstnanec jen přidělené úkoly. Provizní sazba se používá při výpočtu provizí.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UserManager users={users} isSuperAdmin={isSuperAdmin} />
-        </CardContent>
-      </Card>
+      {/* Uživatelé — samostatná stránka */}
+      <Link href="/users" className="group block">
+        <Card className="transition-all group-hover:-translate-y-0.5 group-hover:border-rose-500/30 group-hover:shadow-md">
+          <CardContent className="flex items-center gap-4 p-5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
+              <Users className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">Uživatelé, role, hesla a AI přístup</div>
+              <div className="text-sm text-muted-foreground">
+                Přidání účtů, přiřazení schránek, obnova hesla a kdo smí používat AI čtení dokladů.
+              </div>
+            </div>
+            <Badge variant="outline" className="hidden gap-1 sm:inline-flex">
+              <Sparkles className="h-3 w-3 text-violet-500" /> {users.length} {users.length === 1 ? "uživatel" : users.length >= 2 && users.length <= 4 ? "uživatelé" : "uživatelů"}
+            </Badge>
+            <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* Schránky */}
       <Card>
@@ -115,7 +128,7 @@ export default async function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <MailboxManager mailboxes={mailboxes} />
+          <MailboxManager {...mailboxProps} />
         </CardContent>
       </Card>
 

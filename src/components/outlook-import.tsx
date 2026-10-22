@@ -44,7 +44,7 @@ export function OutlookImport() {
       const fail = res.files.length - ok;
       setSummary(
         res.message ??
-          `Zpracováno ${ok} souborů${fail ? `, ${fail} selhalo` : ""}. Uloženo a analyzováno AI: ${res.ingested}.`,
+          `Zpracováno ${ok} souborů${fail ? `, ${fail} selhalo` : ""}. Uloženo do pošty: ${res.ingested}${res.ai ? " (roztříděno AI)" : ""}.`,
       );
       debug.info("outlook-import", "Import dokončen", res);
       if (res.ingested > 0) router.refresh();
@@ -92,7 +92,7 @@ export function OutlookImport() {
         </div>
         <p className="max-w-md text-xs text-muted-foreground">
           <Sparkles className="inline h-3 w-3 text-primary" /> Přetáhni sem celé e-maily exportované z Outlooku.
-          AI je automaticky roztřídí, propojí se zákazníkem a připraví návrh odpovědi do fronty.
+          Uloží se do tvé pošty a propojí se zákazníkem; se zapnutou AI se navíc samy roztřídí.
         </p>
         <Button type="button" size="sm" variant="outline" disabled={busy} className="mt-1">
           <Upload className="h-4 w-4" /> Vybrat soubory

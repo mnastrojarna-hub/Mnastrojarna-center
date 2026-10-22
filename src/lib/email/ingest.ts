@@ -1,16 +1,23 @@
 import "server-only";
-import { categorizeEmail, draftReply } from "@/lib/ai/claude";
+import { categorizeEmail, draftReply, type EmailAnalysis } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
-import { getImapConfig, getGraphConfig } from "@/lib/settings";
+import { getImapConfig, getGraphConfig, getSetting, getAiConfig } from "@/lib/settings";
 import { getModuleMode } from "@/lib/automation";
 import { sendMail, isSmtpConfigured } from "@/lib/email/send";
 import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
+import { parseEmailFile } from "@/lib/email/parse";
+import {
+  isAiSwitchOn, filterMailboxesForSync, allowGlobalFallback, isDbEmailCategory, isPriorityLevel,
+} from "@/lib/email/visibility";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { EmailCategory, MailboxConfig, PriorityLevel } from "@/lib/supabase/database.types";
+import type { MailboxConfig } from "@/lib/supabase/database.types";
 
 /**
- * Stahování a AI-analýza příchozí pošty.
+ * Stahování a (volitelně) AI-analýza příchozí pošty.
  * Zdroje: IMAP (hosting90) a Microsoft Graph (Outlook / M365).
+ * Pošta patří vlastníkovi schránky (emails.owner_id = mailboxes.owner_id).
+ * AI běží jen se zapnutým hlavním vypínačem a klíčem — jinak se e-mail jen uloží.
+ * Už uložené zprávy se znovu nezpracovávají (žádné opakované AI volání ani návrhy).
  * Bez konfigurace vrací bezpečný stav (žádný pád).
  */
 
@@ -21,6 +28,8 @@ export interface RawEmail {
   subject: string;
   body: string;
   receivedAt: string;
+  /** Adresát (volitelné — IMAP/Graph ho znají). */
+  toEmail?: string;
 }
 
 export interface SyncResult {
@@ -28,11 +37,30 @@ export interface SyncResult {
   configured: boolean;
   fetched: number;
   ingested: number;
+  /** Kolik schránek se stáhlo. */
+  mailboxes?: number;
+  /** Proběhla AI analýza (hlavní vypínač + klíč). */
+  ai?: boolean;
   message?: string;
+}
+
+export interface SyncOptions {
+  /** Jen tyto schránky (bez filtru = všechny aktivní + globální přístupové údaje). */
+  mailboxIds?: string[];
+  /** Kolik nejnovějších zpráv stáhnout ze schránky (1–100, výchozí 20). */
+  limit?: number;
+}
+
+export interface IngestOptions {
+  /** Vlastník e-mailů (vlastník schránky / kdo importoval). */
+  ownerId?: string | null;
 }
 
 type ImapCfg = { host?: string; port: number; user?: string; password?: string };
 type GraphCfg = { clientId?: string; clientSecret?: string; tenantId?: string; user?: string };
+
+const MAX_SOURCE_BYTES = 512 * 1024; // celé zprávy s velkými přílohami nestahujeme
+const MAX_BODY = 12000;
 
 // ── IMAP (hosting90) ────────────────────────────────────────
 export async function fetchImapEmails(cfg: ImapCfg, limit = 20): Promise<RawEmail[]> {
@@ -52,17 +80,26 @@ export async function fetchImapEmails(cfg: ImapCfg, limit = 20): Promise<RawEmai
     try {
       const mailbox = client.mailbox;
       const total = typeof mailbox === "object" ? mailbox.exists : 0;
+      if (!total) return out;
       const start = Math.max(1, total - limit + 1);
-      for await (const msg of client.fetch(`${start}:*`, { envelope: true, source: true })) {
+      for await (const msg of client.fetch(`${start}:*`, { envelope: true, source: { maxLength: MAX_SOURCE_BYTES } })) {
         const env = msg.envelope;
         const fromAddr = env?.from?.[0];
+        const toAddr = env?.to?.[0];
+        // Tělo: dekódovaný MIME (text/plain, jinak HTML → text), ne surový zdroj s hlavičkami
+        let body = "";
+        if (msg.source) {
+          const parsed = parseEmailFile("zprava.eml", msg.source);
+          body = parsed.ok && parsed.email ? parsed.email.body : "";
+        }
         out.push({
           messageId: env?.messageId || String(msg.uid),
           fromName: fromAddr?.name || fromAddr?.address || "",
           fromEmail: fromAddr?.address || "",
           subject: env?.subject || "",
-          body: msg.source ? msg.source.toString("utf8").slice(0, 8000) : "",
+          body: body.slice(0, MAX_BODY),
           receivedAt: (env?.date || new Date()).toISOString(),
+          toEmail: toAddr?.address || undefined,
         });
       }
     } finally {
@@ -93,21 +130,26 @@ async function graphToken(cfg: GraphCfg): Promise<string> {
 
 export async function fetchGraphEmails(cfg: GraphCfg, userPrincipal: string, limit = 20): Promise<RawEmail[]> {
   const token = await graphToken(cfg);
+  // Jen Doručená pošta (ne odeslané); tělo jako prostý text
   const res = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userPrincipal)}/messages?$top=${limit}&$select=id,subject,from,bodyPreview,receivedDateTime`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userPrincipal)}/mailFolders/inbox/messages` +
+      `?$top=${limit}&$orderby=receivedDateTime desc&$select=id,subject,from,toRecipients,body,bodyPreview,receivedDateTime`,
+    { headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.body-content-type="text"' } },
   );
   if (!res.ok) throw new Error(`Graph messages chyba: ${res.status}`);
   const data = await res.json();
   return (data.value ?? []).map((m: Record<string, unknown>) => {
     const from = (m.from as { emailAddress?: { name?: string; address?: string } })?.emailAddress;
+    const to = (m.toRecipients as { emailAddress?: { address?: string } }[] | undefined)?.[0]?.emailAddress;
+    const body = (m.body as { content?: string } | undefined)?.content || (m.bodyPreview as string) || "";
     return {
       messageId: String(m.id),
       fromName: from?.name || "",
       fromEmail: from?.address || "",
       subject: (m.subject as string) || "",
-      body: (m.bodyPreview as string) || "",
+      body: body.slice(0, MAX_BODY),
       receivedAt: (m.receivedDateTime as string) || new Date().toISOString(),
+      toEmail: to?.address || undefined,
     } as RawEmail;
   });
 }
@@ -117,6 +159,7 @@ interface MailboxRow {
   id: string;
   provider: "imap" | "outlook" | "gmail";
   email: string;
+  owner_id: string | null;
   config: MailboxConfig;
 }
 
@@ -126,7 +169,7 @@ async function getActiveMailboxes(): Promise<MailboxRow[]> {
     const db = createAdminClient();
     const { data, error } = await db
       .from("mailboxes")
-      .select("id, provider, email, config")
+      .select("id, provider, email, owner_id, config")
       .eq("active", true);
     if (error || !data) return [];
     return data as MailboxRow[];
@@ -135,14 +178,64 @@ async function getActiveMailboxes(): Promise<MailboxRow[]> {
   }
 }
 
-// ── Uložení s AI analýzou ───────────────────────────────────
-export async function ingestEmails(emails: RawEmail[], mailboxId?: string): Promise<number> {
-  if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) return 0;
+/** Hlavní vypínač AI + klíč. Bez nich žádné AI volání. */
+export async function isMailAiEnabled(): Promise<boolean> {
+  try {
+    const [enabled, ai] = await Promise.all([getSetting("ai_enabled"), getAiConfig()]);
+    return isAiSwitchOn(enabled) && Boolean(ai.apiKey);
+  } catch {
+    return false;
+  }
+}
+
+type AdminDb = ReturnType<typeof createAdminClient>;
+
+/** message_id zpráv, které už v DB jsou (stejná schránka / bez schránky). */
+async function existingMessageIds(db: AdminDb, mailboxId: string | null, ids: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    let q = db.from("emails").select("message_id").in("message_id", chunk);
+    q = mailboxId ? q.eq("mailbox_id", mailboxId) : q.is("mailbox_id", null);
+    const { data, error } = await q;
+    if (error) {
+      console.error(`[mail:ingest] Kontrola duplicit selhala: ${error.message}`);
+      continue;
+    }
+    for (const r of (data ?? []) as { message_id: string | null }[]) if (r.message_id) out.add(r.message_id);
+  }
+  return out;
+}
+
+function clamp(n: unknown, min: number, max: number, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, v));
+}
+
+// ── Uložení (s AI analýzou, pokud je zapnutá) ───────────────
+export async function ingestEmails(
+  emails: RawEmail[],
+  mailboxId?: string | null,
+  opts: IngestOptions = {},
+): Promise<number> {
+  if (!isSupabaseConfigured() || !hasServiceKey() || emails.length === 0) return 0;
   const db = createAdminClient();
-  const rules = await getAgentInstructions("email"); // slovní pravidla agenta
-  const replyMode = await getModuleMode("reply"); // 'full' = odeslat hned
-  const smtpReady = await isSmtpConfigured();
-  let count = 0;
+  const box = mailboxId ?? null;
+
+  const existing = await existingMessageIds(db, box, emails.map((e) => e.messageId));
+  const fresh = emails.filter((e) => {
+    if (!e.messageId || existing.has(e.messageId)) return false;
+    existing.add(e.messageId); // duplicity i v rámci jedné dávky
+    return true;
+  });
+  if (fresh.length === 0) return 0;
+
+  const useAi = await isMailAiEnabled();
+  const rules = useAi ? await getAgentInstructions("email") : undefined; // slovní pravidla agenta
+  const replyMode = useAi ? await getModuleMode("reply") : "approval"; // 'full' = odeslat hned
+  const smtpReady = useAi && replyMode === "full" ? await isSmtpConfigured(box ? { mailboxId: box } : {}) : false;
 
   // Párování odesílatele na zákazníka / dodavatele (přesná adresa → doména)
   const [{ data: customerRows }, { data: supplierRows }] = await Promise.all([
@@ -151,10 +244,19 @@ export async function ingestEmails(emails: RawEmail[], mailboxId?: string): Prom
   ]);
   const customers = (customerRows ?? []) as PartyRef[];
   const suppliers = (supplierRows ?? []) as PartyRef[];
+  let count = 0;
 
-  for (const e of emails) {
-    const analysis = await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body, rules });
-    const hasDraft = !analysis.is_spam && analysis.category !== "spam";
+  for (const e of fresh) {
+    let analysis: EmailAnalysis | null = null;
+    if (useAi) {
+      try {
+        analysis = await categorizeEmail({ from: e.fromEmail, subject: e.subject, body: e.body, rules });
+      } catch (err) {
+        console.error(`[mail:ingest] AI kategorizace selhala: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    const category = analysis && isDbEmailCategory(analysis.category) ? analysis.category : "ostatni";
+    const isSpam = Boolean(analysis && (analysis.is_spam || category === "spam"));
     const customerId = matchPartyByEmail(e.fromEmail, customers);
     const supplierId = customerId ? undefined : matchPartyByEmail(e.fromEmail, suppliers);
 
@@ -162,35 +264,44 @@ export async function ingestEmails(emails: RawEmail[], mailboxId?: string): Prom
       .from("emails")
       .upsert(
         {
-          mailbox_id: mailboxId ?? null,
+          mailbox_id: box,
+          owner_id: opts.ownerId ?? null,
+          direction: "in",
           customer_id: customerId ?? null,
           supplier_id: supplierId ?? null,
           message_id: e.messageId,
           from_name: e.fromName,
           from_email: e.fromEmail,
+          to_email: e.toEmail ?? null,
           subject: e.subject,
           body_text: e.body,
-          snippet: e.body.slice(0, 200),
-          category: analysis.category as EmailCategory,
-          priority: analysis.priority as PriorityLevel,
-          importance: analysis.importance,
-          ai_confidence: analysis.confidence,
-          ai_summary: analysis.summary,
-          is_spam: analysis.is_spam,
-          has_draft: hasDraft,
+          snippet: e.body.replace(/\s+/g, " ").trim().slice(0, 200),
+          category: isSpam ? "spam" : category,
+          priority: analysis && isPriorityLevel(analysis.priority) ? analysis.priority : "stredni",
+          importance: analysis ? Math.round(clamp(analysis.importance, 0, 100, 50)) : null,
+          ai_confidence: analysis ? clamp(analysis.confidence, 0, 1, 0) : null,
+          ai_summary: analysis?.summary ?? null,
+          is_spam: isSpam,
+          has_draft: false,
           received_at: e.receivedAt,
         },
-        { onConflict: "mailbox_id,message_id", ignoreDuplicates: false },
+        { onConflict: "mailbox_id,message_id", ignoreDuplicates: true },
       )
       .select("id")
       .maybeSingle();
 
-    if (error || !inserted) continue;
+    if (error) {
+      console.error(`[mail:ingest] Uložení e-mailu selhalo: ${error.message}`);
+      continue;
+    }
+    if (!inserted) continue; // souběžně už uloženo
     count++;
 
-    // Návrh odpovědi: plná automatika = odeslat hned, jinak do fronty ke schválení
-    if (hasDraft) {
-      const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category: analysis.category, rules });
+    // Návrh odpovědi jen s AI a ne u spamu: plná automatika = odeslat hned, jinak fronta ke schválení
+    if (!analysis || isSpam) continue;
+    try {
+      const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category, rules });
+      if (!draft.trim()) continue;
 
       let sentAuto = false;
       if (replyMode === "full" && smtpReady && e.fromEmail) {
@@ -198,44 +309,46 @@ export async function ingestEmails(emails: RawEmail[], mailboxId?: string): Prom
           to: e.fromEmail,
           subject: `Re: ${e.subject}`,
           text: draft,
+          from: box ? { mailboxId: box } : undefined,
+          senderId: opts.ownerId ?? undefined,
         });
         sentAuto = res.sent;
       }
 
-      if (sentAuto) {
-        await db.from("emails").update({ has_draft: false } as never).eq("id", inserted.id);
-        await db.from("approval_queue").insert({
-          type: "email_reply",
-          title: `Automaticky odesláno: ${e.subject}`.slice(0, 120),
-          summary: analysis.summary,
-          payload: { body: draft },
-          target: e.fromEmail,
-          ai_confidence: analysis.confidence,
-          email_id: inserted.id,
-          status: "auto_executed",
-          resolved_at: new Date().toISOString(),
-        });
-      } else {
-        await db.from("approval_queue").insert({
-          type: "email_reply",
-          title: `Odpověď: ${e.subject}`.slice(0, 120),
-          summary: analysis.summary,
-          payload: { body: draft },
-          target: e.fromEmail,
-          ai_confidence: analysis.confidence,
-          email_id: inserted.id,
-        });
-      }
+      const confidence = clamp(analysis.confidence, 0, 1, 0);
+      await db.from("approval_queue").insert({
+        type: "email_reply",
+        title: `${sentAuto ? "Automaticky odesláno" : "Odpověď"}: ${e.subject}`.slice(0, 120),
+        summary: analysis.summary,
+        payload: { body: draft },
+        target: e.fromEmail,
+        ai_confidence: confidence,
+        email_id: inserted.id,
+        ...(sentAuto ? { status: "auto_executed", resolved_at: new Date().toISOString() } : {}),
+      });
+      if (!sentAuto) await db.from("emails").update({ has_draft: true }).eq("id", inserted.id);
+    } catch (err) {
+      console.error(`[mail:ingest] Návrh odpovědi selhal: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   return count;
 }
 
-export async function syncMailbox(limit = 20): Promise<SyncResult> {
+/**
+ * Synchronizace pošty. S `mailboxIds` jen vybrané schránky (bez globálního
+ * fallbacku); bez filtru všechny aktivní schránky + globální přístupové údaje.
+ * Kvůli zpětné kompatibilitě bere i číslo (= limit).
+ */
+export async function syncMailbox(opts: SyncOptions | number = {}): Promise<SyncResult> {
+  const o: SyncOptions = typeof opts === "number" ? { limit: opts } : opts;
+  const limit = Math.round(clamp(o.limit ?? 20, 1, 100, 20));
+  const ai = await isMailAiEnabled();
+
   // 1) Schránky s vlastní konfigurací (servery/porty/hesla per schránka)
-  const boxes = await getActiveMailboxes();
+  const boxes = filterMailboxesForSync(await getActiveMailboxes(), o.mailboxIds);
   let fetched = 0;
   let ingested = 0;
+  let synced = 0;
   let used: SyncResult["source"] = "none";
   const errors: string[] = [];
 
@@ -253,7 +366,7 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
           limit,
         );
         fetched += emails.length;
-        ingested += await ingestEmails(emails, box.id);
+        ingested += await ingestEmails(emails, box.id, { ownerId: box.owner_id });
         used = used === "graph" ? used : "imap";
       } else if (
         box.provider === "outlook" &&
@@ -271,15 +384,16 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
           limit,
         );
         fetched += emails.length;
-        ingested += await ingestEmails(emails, box.id);
+        ingested += await ingestEmails(emails, box.id, { ownerId: box.owner_id });
         used = "graph";
       } else {
         continue; // schránka bez přístupových údajů → přeskočit (globální fallback níže)
       }
+      synced++;
       const db = createAdminClient();
       await db
         .from("mailboxes")
-        .update({ last_sync_at: new Date().toISOString() } as never)
+        .update({ last_sync_at: new Date().toISOString() })
         .eq("id", box.id);
     } catch (err) {
       errors.push(`${box.email}: ${err instanceof Error ? err.message : "chyba"}`);
@@ -292,11 +406,28 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
       configured: true,
       fetched,
       ingested,
+      mailboxes: synced,
+      ai,
       message: errors.length ? errors.join(" · ") : undefined,
     };
   }
 
-  // 2) Fallback: globální přístupové údaje (Nastavení → API klíče a integrace)
+  // Vybrané schránky (uživatel bez super admina) — globální účet se nepoužije
+  if (!allowGlobalFallback(o)) {
+    return {
+      source: "none",
+      configured: false,
+      fetched: 0,
+      ingested: 0,
+      mailboxes: 0,
+      ai,
+      message: boxes.length
+        ? "Tvoje schránka nemá vyplněné přístupové údaje (server, uživatel, heslo) — požádej super admina."
+        : "Žádná z vybraných schránek není aktivní — požádej super admina.",
+    };
+  }
+
+  // 2) Fallback: globální přístupové údaje (Nastavení → API klíče a integrace) — bez vlastníka (jen super admin)
   const imap = await getImapConfig();
   const graph = await getGraphConfig();
   const graphReady = Boolean(graph.clientId && graph.clientSecret && graph.tenantId);
@@ -307,18 +438,20 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
       const user = graph.user || imap.user || "";
       const emails = await fetchGraphEmails(graph, user, limit);
       const count = await ingestEmails(emails);
-      return { source: "graph", configured: true, fetched: emails.length, ingested: count };
+      return { source: "graph", configured: true, fetched: emails.length, ingested: count, mailboxes: 1, ai };
     }
     if (imapReady) {
       const emails = await fetchImapEmails(imap, limit);
       const count = await ingestEmails(emails);
-      return { source: "imap", configured: true, fetched: emails.length, ingested: count };
+      return { source: "imap", configured: true, fetched: emails.length, ingested: count, mailboxes: 1, ai };
     }
     return {
       source: "none",
       configured: false,
       fetched: 0,
       ingested: 0,
+      mailboxes: 0,
+      ai,
       message:
         "Žádná schránka není nakonfigurována. Přidej schránku (servery, porty, heslo) v Nastavení → E-mailové schránky.",
     };
@@ -328,6 +461,7 @@ export async function syncMailbox(limit = 20): Promise<SyncResult> {
       configured: true,
       fetched: 0,
       ingested: 0,
+      ai,
       message: err instanceof Error ? err.message : "Chyba synchronizace",
     };
   }

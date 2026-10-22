@@ -9,7 +9,8 @@ export default defineConfig({
       "server-only": path.resolve(__dirname, "src/test/server-only-stub.ts"),
     },
   },
-    esbuild: { jsx: "automatic" } as never,
+  // Vitest 4 (Vite 8) překládá přes oxc — JSX v .tsx (PDF šablony, UI testy)
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     environment: "node",

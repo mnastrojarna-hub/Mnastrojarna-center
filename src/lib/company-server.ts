@@ -8,7 +8,7 @@ import { getSetting } from "@/lib/settings";
  * aby na výstupech byly skutečné údaje zadané v aplikaci.
  */
 export async function refreshCompanyFromSettings(): Promise<void> {
-  const [name, street, city, zip, ico, dic, email, phone, web, account, iban, bankName, registration] =
+  const [name, street, city, zip, ico, dic, email, phone, web, account, iban, bankName, registration, swift] =
     await Promise.all([
       getSetting("company_name"),
       getSetting("company_street"),
@@ -23,6 +23,7 @@ export async function refreshCompanyFromSettings(): Promise<void> {
       getSetting("company_iban"),
       getSetting("company_bank_name"),
       getSetting("company_registration"),
+      getSetting("company_swift"),
     ]);
 
   if (name) COMPANY.name = name;
@@ -38,4 +39,5 @@ export async function refreshCompanyFromSettings(): Promise<void> {
   if (iban) COMPANY.bank.iban = iban;
   if (bankName) COMPANY.bank.bankName = bankName;
   if (registration) COMPANY.registration = registration;
+  if (swift) COMPANY.bank.swift = swift;
 }
