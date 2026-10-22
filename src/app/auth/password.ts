@@ -267,7 +267,7 @@ export async function resetPasswordWithCode(
       // Vlastní kód není → zkus OTP ze Supabase e-mailu
       const otp = await resetWithSupabaseOtp(email, code, newPassword);
       if (otp.ok || all.length === 0) return otp;
-      return { ok: false, error: "Kód vypršel nebo už byl použit — vyžádej si nový." };
+      return { ok: false, error: "Kód nesouhlasí nebo vypršel — zkontroluj ho, případně si vyžádej nový." };
     }
 
     if (active.attempts >= RESET_MAX_ATTEMPTS) {

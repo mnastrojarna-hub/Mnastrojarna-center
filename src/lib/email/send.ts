@@ -73,6 +73,16 @@ async function getSmtp(pref: SmtpPreference = {}): Promise<SmtpConfig> {
   return { host, port: Number(port || 465), user, password };
 }
 
+const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+
+/**
+ * Adresa odesílatele: schránka → SMTP login (bývá to e-mail) → firemní e-mail.
+ * SMTP login nemusí být e-mail (např. „obchod"); server by pak zprávu odmítl.
+ */
+export function pickFromAddress(candidates: (string | null | undefined)[]): string | undefined {
+  return candidates.map((c) => c?.trim()).find((c): c is string => Boolean(c && EMAIL_RE.test(c)));
+}
+
 export async function isSmtpConfigured(pref: SmtpPreference = {}): Promise<boolean> {
   const s = await getSmtp(pref);
   return Boolean(s.host && s.user && s.password);
@@ -112,8 +122,12 @@ export async function sendMail(input: {
       secure: s.port === 465,
       auth: { user: s.user, pass: s.password },
     });
+    const fromAddress = pickFromAddress([s.from, s.user, COMPANY.email]);
+    if (!fromAddress) {
+      return { sent: false, reason: "Chybí e-mail odesílatele — vyplň firemní e-mail v Nastavení nebo e-mail schránky." };
+    }
     const info = await transport.sendMail({
-      from: `"${COMPANY.name}" <${s.from ?? s.user}>`,
+      from: `"${COMPANY.name}" <${fromAddress}>`,
       to: input.to,
       subject: input.subject,
       text: input.text,
@@ -137,7 +151,7 @@ export async function sendMail(input: {
           direction: "out",
           message_id: messageId ?? null,
           from_name: COMPANY.name,
-          from_email: s.from ?? s.user ?? null,
+          from_email: pickFromAddress([s.from, s.user, COMPANY.email]) ?? null,
           to_email: input.to,
           subject: input.subject,
           body_text: input.text,

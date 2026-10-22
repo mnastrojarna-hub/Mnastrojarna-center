@@ -70,13 +70,15 @@ const ADMIN_ONLY: Feature[] = [
   "mail_all", "dashboard", "ai_assistant", "ai_tuning", "knowledge", "drawings",
   "commissions_all", "users", "settings", "delete",
 ];
-/** Funkce, které reálně volají AI — vyžadují hlavní vypínač i klíč. */
-const AI_RUNTIME: Feature[] = ["ai_assistant", "ai_pricing", "ai_capture"];
+/** Funkce, které reálně volají AI — vyžadují hlavní vypínač i klíč (bez klíče se pracuje ručně). */
+const AI_RUNTIME: Feature[] = ["ai_pricing", "ai_capture"];
 
 export function can(subject: AccessSubject | null | undefined, feature: Feature, ctx: AccessContext): boolean {
   if (!subject || !subject.active) return false;
 
   if (AI_RUNTIME.includes(feature) && (!ctx.aiEnabled || !ctx.aiConfigured)) return false;
+  // Asistent: vypnutý hlavním vypínačem zmizí; bez klíče stránka vysvětlí, co doplnit.
+  if (feature === "ai_assistant" && !ctx.aiEnabled) return false;
 
   if (subject.role === "super_admin") return true;
 
