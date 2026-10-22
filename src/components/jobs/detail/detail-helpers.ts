@@ -739,8 +739,8 @@ export function tagTone(tag: string): string {
 }
 
 // ── Záložky ─────────────────────────────────────────────────
-export type DetailTab = "prehled" | "polozky" | "nabidky" | "dokumenty" | "historie";
-export const DETAIL_TABS: DetailTab[] = ["prehled", "polozky", "nabidky", "dokumenty", "historie"];
+export type DetailTab = "prehled" | "vyroba" | "polozky" | "nabidky" | "nakup" | "dokumenty" | "historie";
+export const DETAIL_TABS: DetailTab[] = ["prehled", "vyroba", "polozky", "nabidky", "nakup", "dokumenty", "historie"];
 
 export function isDetailTab(v: unknown): v is DetailTab {
   return typeof v === "string" && (DETAIL_TABS as string[]).includes(v);

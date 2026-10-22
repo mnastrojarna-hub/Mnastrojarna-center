@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { getJob, getJobFormOptions } from "@/lib/data/jobs";
+import { getJobProduction } from "@/lib/data/production";
+import { getJobPurchasing } from "@/lib/data/purchasing";
 import { JobDetailView } from "@/components/jobs/detail/job-detail-view";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,9 @@ export async function generateMetadata({ params }: Pick<Params, "params">): Prom
 export default async function JobDetailPage({ params, searchParams }: Params) {
   await requireFeature("orders");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const [job, options, access] = await Promise.all([loadJob(id), getJobFormOptions(), getAccess()]);
+  const [job, options, access, production, purchasing] = await Promise.all([
+    loadJob(id), getJobFormOptions(), getAccess(), getJobProduction(id), getJobPurchasing(id),
+  ]);
   if (!job) notFound();
 
   return (
@@ -35,6 +39,8 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
         aiCapture: access.can("ai_capture"),
       }}
       initialTab={typeof sp.tab === "string" ? sp.tab : undefined}
+      production={production}
+      purchasing={purchasing}
     />
   );
 }
