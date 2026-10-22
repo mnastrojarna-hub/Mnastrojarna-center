@@ -123,9 +123,19 @@ class DebugLogStore {
     };
   }
 
+  private notifyScheduled = false;
+
   private commit() {
     this.snapshot = this.entries.slice();
-    for (const l of this.listeners) l();
+    // Oznámení odložené mimo aktuální vykreslování: zápis do logu může přijít
+    // z history.replaceState uvnitř efektů Next.js (useInsertionEffect) a
+    // synchronní setState by spustil smyčku chyb „must not schedule updates".
+    if (this.notifyScheduled) return;
+    this.notifyScheduled = true;
+    setTimeout(() => {
+      this.notifyScheduled = false;
+      for (const l of this.listeners) l();
+    }, 0);
   }
 }
 

@@ -21,8 +21,9 @@ export CRON_SECRET="${CRON_SECRET:-e2e-cron-secret}"
 export AI_FAKE_CAPTURE="${AI_FAKE_CAPTURE:-$ROOT/src/lib/jobs/__fixtures__/capture/objednavka-strojmetal.json}"
 export NEXT_TELEMETRY_DISABLED=1
 
-cd "$APP_DIR"
 "$ROOT/tools/e2e/stop-app.sh" >/dev/null 2>&1 || true
+cd "$APP_DIR"
+pwd -P > "$ROOT/.local-supabase/app.dir"
 if [ "$MODE" = "--dev" ]; then
   nohup npx next dev -p "$PORT" > "$LOG_DIR/app.log" 2>&1 &
 else
