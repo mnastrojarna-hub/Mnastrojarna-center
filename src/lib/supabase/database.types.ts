@@ -240,6 +240,38 @@ export interface Order {
   // Inkaso (migrace 0021) — rozhoduje o měsíci pásmové provize
   paid_at: string | null;
   paid_amount: number | null;
+  // Výroba a konec toku (migrace 0022)
+  production_step: string | null;
+  production_location: string | null;
+  production_done: number;
+  production_total: number;
+  production_problem: boolean;
+  customer_note: string | null;
+  delivery_note_confirmed_at: string | null;
+  invoice_date: string | null;
+  invoice_due_date: string | null;
+}
+
+/** Výrobní operace zakázky (migrace 0022). */
+export interface JobOperationRow {
+  id: string;
+  job_id: string;
+  position: number;
+  kind: string;
+  title: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  in_house: boolean;
+  status: "ceka" | "probiha" | "hotovo" | "problem" | "preskoceno";
+  planned_start: string | null;
+  planned_end: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  note: string | null;
+  purchase_order_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OrderItem {
@@ -675,6 +707,7 @@ export interface Database {
       password_reset_codes: Tbl<PasswordResetCode>;
       commission_rules: Tbl<CommissionRule>;
       commission_statements: Tbl<CommissionStatement>;
+      job_operations: Tbl<JobOperationRow>;
       supplier_quotes: Tbl<SupplierQuoteRow>;
       supplier_quote_items: Tbl<SupplierQuoteItemRow>;
       purchase_orders: Tbl<PurchaseOrderRow>;
