@@ -22,6 +22,7 @@ export function NewJobDialog({
   size,
   className,
   defaultOpen = false,
+  autoOpen = false,
 }: {
   options: JobFormOptions;
   initial?: JobFormInitial;
@@ -30,11 +31,33 @@ export function NewJobDialog({
   size?: ButtonProps["size"];
   className?: string;
   defaultOpen?: boolean;
+  /** Otevřít po načtení a odebrat `?new=1` z adresy (⌘K „Nová zakázka"). */
+  autoOpen?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(defaultOpen);
   const [dirty, setDirty] = React.useState(false);
   const [navigating, setNavigating] = React.useState(false);
+  const opened = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!autoOpen) {
+      opened.current = false;
+      return;
+    }
+    if (opened.current) return;
+    opened.current = true;
+    setOpen(true);
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("new")) {
+        url.searchParams.delete("new");
+        router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+      }
+    } catch {
+      // adresa jen kosmetika
+    }
+  }, [autoOpen, router]);
 
   function requestClose() {
     if (navigating) return;

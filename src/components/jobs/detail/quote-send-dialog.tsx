@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { generateJobDocument, sendJobDocument, draftJobDocumentEmail } from "@/app/actions/job-documents";
-import { markJobQuoteSent } from "@/app/actions/jobs";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
 
@@ -132,11 +131,7 @@ export function QuoteSendDialog({
         setStep("form");
         return;
       }
-      // stav nabídky „odesláno" + posun zakázky do „Nabídka odeslaná"
-      if (quote.status !== "odeslano") {
-        const mark = await markJobQuoteSent(quote.id);
-        if (!mark.ok) notify("error", mark.error ?? "E-mail odešel, ale stav nabídky se nepodařilo změnit.");
-      }
+      // stav nabídky „odesláno" a posun zakázky dělá sendJobDocument (PDF nese quote_id)
       notify("success", `Nabídka ${quote.number} odeslána na ${to}.`);
       onOpenChange(false);
       refresh();

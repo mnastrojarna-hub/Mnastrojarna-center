@@ -67,6 +67,7 @@ export async function getEmails(): Promise<EmailItem[]> {
 }
 
 export async function getApprovalQueue(): Promise<ApprovalItem[]> {
+  if (!(await allowedAccess("dashboard"))) return [];
   const db = await supa();
   if (!db) return [];
   const { data, error } = await db

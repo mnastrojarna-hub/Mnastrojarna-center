@@ -32,6 +32,7 @@ export default async function OrdersPage({
   const sp = await searchParams;
   const params = parseBookParams(sp);
   const capture = firstParam(sp, "capture") === "1";
+  const newJob = firstParam(sp, "new") === "1";
   const pristupKey = firstParam(sp, "pristup");
   const pristup = pristupKey && Object.prototype.hasOwnProperty.call(FEATURE_LABELS, pristupKey)
     ? FEATURE_LABELS[pristupKey as Feature]
@@ -67,7 +68,7 @@ export default async function OrdersPage({
           actions={
             <>
               <CaptureButton autoOpen={capture} label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
-              <NewJobDialog options={options} initial={newJobInitial} className="flex-1 sm:flex-none" />
+              <NewJobDialog options={options} initial={newJobInitial} autoOpen={newJob} className="flex-1 sm:flex-none" />
             </>
           }
         />

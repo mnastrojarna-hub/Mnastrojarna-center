@@ -9,7 +9,7 @@ import type {
 import { STAGE_ORDER, CLOSED_STAGES, isJobStage, stageGroup, STAGES } from "@/lib/jobs/stages";
 import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { isOperationKind } from "@/lib/jobs/operations";
-import { effectiveDeadline, deadlineInfo, type DeadlineInput } from "@/lib/jobs/deadlines";
+import { effectiveDeadline, deadlineInfo, pragueToday, type DeadlineInput } from "@/lib/jobs/deadlines";
 import { fieldLabel, formatFieldValue, SENSITIVE_JOB_COLUMNS } from "@/lib/jobs/field-labels";
 
 /**
@@ -1024,7 +1024,7 @@ function deadlineInputOf(j: JobListItem): DeadlineInput {
 }
 
 /** Splňuje zakázka filtr termínu? */
-export function matchesDeadline(j: JobListItem, filter: JobFilters["deadline"], today: Date = new Date()): boolean {
+export function matchesDeadline(j: JobListItem, filter: JobFilters["deadline"], today: Date = pragueToday()): boolean {
   if (!filter) return true;
   const input = deadlineInputOf(j);
   if (filter === "no_date") return effectiveDeadline(input) === null;
@@ -1065,7 +1065,7 @@ export function matchesPayment(j: JobListItem, filter: JobPaymentFilter | undefi
 export function filterJobs(
   items: JobListItem[],
   filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment">,
-  today: Date = new Date(),
+  today: Date = pragueToday(),
 ): JobListItem[] {
   const tokens = searchNormalize(filters.q ?? "").split(/\s+/).filter(Boolean);
   const step = (filters.step ?? "").trim();
@@ -1137,7 +1137,7 @@ export function emptyStageCounts(): JobStageCounts {
 /** Počty pro chipy filtrů a přehled. */
 export function countJobStages(
   rows: { status: string; due_date?: string | null; customer_required_date?: string | null; max_tolerated_date?: string | null; supplier_promised_date?: string | null }[],
-  today: Date = new Date(),
+  today: Date = pragueToday(),
 ): JobStageCounts {
   const out = emptyStageCounts();
   for (const r of rows) {
