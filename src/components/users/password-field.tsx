@@ -71,7 +71,7 @@ export function PasswordField({
       <PasswordInput
         id={id}
         autoComplete="new-password"
-        placeholder="alespoň 8 znaků"
+        placeholder="alespoň 6 znaků — uživatel si ho při prvním přihlášení změní"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         visible={visible}

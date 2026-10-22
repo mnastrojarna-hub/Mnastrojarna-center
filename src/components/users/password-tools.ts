@@ -7,6 +7,20 @@ export const MIN_PASSWORD_LENGTH = 8;
 /** Supabase (bcrypt) ořezává hesla nad 72 bajtů. */
 export const MAX_PASSWORD_LENGTH = 72;
 
+/**
+ * Počáteční heslo, které nastaví super admin (např. „123456"). Může být kratší —
+ * uživatel si ho musí při prvním přihlášení změnit (profiles.password_change_required).
+ */
+export const MIN_INITIAL_PASSWORD_LENGTH = 6;
+
+export function initialPasswordProblem(password: string): string | null {
+  const pw = password ?? "";
+  if (pw.length < MIN_INITIAL_PASSWORD_LENGTH) return `Počáteční heslo musí mít alespoň ${MIN_INITIAL_PASSWORD_LENGTH} znaků.`;
+  if (new TextEncoder().encode(pw).length > MAX_PASSWORD_LENGTH) return "Heslo je příliš dlouhé (max. 72 znaků).";
+  if (pw.trim().length === 0) return "Heslo nesmí být jen z mezer.";
+  return null;
+}
+
 /** Vrátí českou chybu, nebo null když je heslo v pořádku. */
 export function passwordProblem(password: string, confirm?: string): string | null {
   const pw = password ?? "";

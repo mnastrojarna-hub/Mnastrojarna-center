@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/account/password-input";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 /** Změna vlastního hesla: současné + nové + potvrzení. */
 export function ChangePasswordForm({ email }: { email: string }) {
+  const router = useRouter();
   const [current, setCurrent] = React.useState("");
   const [next, setNext] = React.useState("");
   const [confirm, setConfirm] = React.useState("");
@@ -33,6 +35,7 @@ export function ChangePasswordForm({ email }: { email: string }) {
         setCurrent("");
         setNext("");
         setConfirm("");
+        router.refresh(); // zruší výzvu ke změně počátečního hesla
       }
     } catch {
       setStatus({ ok: false, text: "Spojení se nepovedlo — zkus to znovu." });

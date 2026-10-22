@@ -14,7 +14,7 @@ import { requestPasswordReset } from "@/app/auth/password";
 import {
   normalizeEmail, isPlausibleEmail, originFrom, resetWindowStart, RESET_MAX_REQUESTS,
 } from "@/lib/auth/reset-code";
-import { passwordProblem } from "@/components/users/password-tools";
+import { initialPasswordProblem } from "@/components/users/password-tools";
 import {
   userChangeProblem, deleteUserProblem, parseCommissionPercent, cleanText, cleanPhone, isUserRole,
   type GuardTarget,
@@ -108,7 +108,7 @@ export async function createUser(
 
   const email = normalizeEmail(input?.email);
   if (!isPlausibleEmail(email)) return { ok: false, error: "Zadej platný e-mail." };
-  const pwProblem = passwordProblem(String(input.password ?? ""));
+  const pwProblem = initialPasswordProblem(String(input.password ?? ""));
   if (pwProblem) return { ok: false, error: pwProblem };
   if (!isUserRole(input.role)) return { ok: false, error: "Vyber roli uživatele." };
   const name = cleanText(input.fullName, "Jméno", 120);
@@ -147,6 +147,8 @@ export async function createUser(
         commission_rate: commission.rate,
         ai_access: Boolean(input.aiAccess),
         active: true,
+        // heslo zadal admin → uživatel si ho při prvním přihlášení změní
+        password_change_required: true,
       },
       { onConflict: "id" },
     );
@@ -284,13 +286,15 @@ export async function updateUser(id: string, changes: UpdateUserChanges): Promis
 export async function setUserPassword(id: string, password: string): Promise<Result> {
   const g = await guard();
   if ("error" in g) return { ok: false, error: g.error };
-  const problem = passwordProblem(String(password ?? ""));
+  const problem = initialPasswordProblem(String(password ?? ""));
   if (problem) return { ok: false, error: problem };
   try {
     const target = await loadTarget(g.db, id);
     if (!target) return { ok: false, error: "Uživatel nenalezen." };
     const { error } = await g.db.auth.admin.updateUserById(id, { password });
     if (error) return { ok: false, error: authErrorCz(error.message) };
+    // heslo zná admin → při příštím přihlášení vynutit vlastní
+    await g.db.from("profiles").update({ password_change_required: true } as never).eq("id", id);
     // rozpracované kódy pro obnovu už nejsou potřeba
     await g.db
       .from("password_reset_codes")
