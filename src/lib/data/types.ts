@@ -28,6 +28,14 @@ export interface EmailItem {
   aiSummary?: string;
   unread: boolean;
   hasDraft: boolean;
+  // Pošta per uživatel (volitelné — starší volající je nepotřebují)
+  mailboxId?: string;
+  mailboxEmail?: string;
+  direction?: "in" | "out";
+  toEmail?: string;
+  /** Propojená zakázka (emails.order_id). */
+  jobId?: string;
+  jobNumber?: string;
 }
 
 export interface ApprovalItem {
@@ -150,4 +158,14 @@ export interface SentItem {
   body: string;
   sentAt: string;
   auto: boolean; // true = odeslala plná automatika, false = schváleno člověkem
+  // Pošta per uživatel (volitelné)
+  toEmail?: string;
+  jobId?: string;
+  jobNumber?: string;
+  mailboxEmail?: string;
+  senderName?: string;
+  /** mail = záznam odeslané pošty (emails), approval = starší log fronty schvalování. */
+  source?: "mail" | "approval";
+  /** Druh zprávy pro barevný odznak. */
+  kind?: "email" | "quote" | "reminder" | "supplier";
 }

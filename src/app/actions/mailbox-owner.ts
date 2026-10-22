@@ -22,8 +22,8 @@ export async function setMailboxOwner(
     const db = createAdminClient();
     const { error } = await db.from("mailboxes").update({ owner_id: ownerId } as never).eq("id", mailboxId);
     if (error) return { ok: false, error: error.message };
-    // Už stažená pošta schránky patří novému vlastníkovi
-    await db.from("emails").update({ owner_id: ownerId } as never).eq("mailbox_id", mailboxId);
+    // Přijatou poštu schránky převezme nový vlastník (odeslaná zůstává odesílateli)
+    await db.from("emails").update({ owner_id: ownerId } as never).eq("mailbox_id", mailboxId).eq("direction", "in");
     await logAudit({ action: "mailbox_owner_set", entity: "mailboxes", entityId: mailboxId, diff: { owner_id: ownerId } });
     revalidatePath("/settings");
     revalidatePath("/users");

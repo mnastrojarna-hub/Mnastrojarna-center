@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
+import { apiRequire } from "@/lib/auth/session";
 
 /**
  * Analyzuje e-mail AI (kategorie, priorita, spam, shrnutí) a volitelně
  * připraví návrh odpovědi. Volá se z ingest pipeline / fronty schvalování.
+ * Jen pro AI přehled (super admin).
  */
 export async function POST(req: Request) {
+  const auth = await apiRequire("dashboard");
+  if (auth instanceof NextResponse) return auth;
   try {
     const { from, subject, body, withDraft } = await req.json();
     if (!from || !subject) {

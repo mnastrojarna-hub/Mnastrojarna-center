@@ -52,13 +52,21 @@ export async function getUsers() {
   }
 }
 
+const SECRET_MAILBOX_KEYS = ["imap_password", "smtp_password", "ms_graph_client_secret"] as const;
+
+/** Schránky pro správu v Nastavení — BEZ hesel (upraví se jen zadáním nového). */
 export async function getMailboxes(): Promise<Mailbox[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     const db = await createOperatorClient();
     const { data, error } = await db.from("mailboxes").select("*").order("created_at", { ascending: false });
     if (error || !data) return [];
-    return data as Mailbox[];
+    // Hesla a tajné klíče schránek nikdy neposílat do prohlížeče
+    return (data as Mailbox[]).map((m) => {
+      const config = { ...(m.config ?? {}) } as Mailbox["config"];
+      for (const key of SECRET_MAILBOX_KEYS) delete config[key];
+      return { ...m, config };
+    });
   } catch {
     return [];
   }

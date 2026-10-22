@@ -1,16 +1,17 @@
 import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import {
-  emailCategoryLabel, priorityLabel, orderStatusLabel, quoteStatusLabel, approvalTypeLabel,
-} from "@/lib/data/labels";
+import { orderStatusLabel, quoteStatusLabel, approvalTypeLabel } from "@/lib/data/labels";
 import type {
-  Email, ApprovalItemRow, Order, Quote, Customer, Supplier, Drawing, ApprovalType,
+  Email, ApprovalItemRow, Order, Quote, Customer, Supplier, Drawing, ApprovalType, JobStage,
 } from "@/lib/supabase/database.types";
 import type {
   EmailItem, ApprovalItem, OrderItem, QuoteItem, CustomerItem, SupplierItem,
   DrawingItem, CommissionRow, BadgeCounts,
 } from "@/lib/data/types";
 import { periodStart } from "@/lib/data/periods";
+import { getAccess } from "@/lib/auth/session";
+import { CLOSED_STAGES } from "@/lib/jobs/stages";
+import { getEmails as getMailEmails, getSentMail, getUnreadCount } from "@/lib/data/mail";
 
 /**
  * Datová vrstva — VÝHRADNĚ reálná data ze Supabase.
@@ -34,31 +35,12 @@ function warn(scope: string, error: { message: string } | null) {
 type WithCustomer = { customers?: { name: string } | null };
 type WithOwner = { profiles?: { full_name: string } | null };
 
+/**
+ * Příchozí e-maily viditelné přihlášenému uživateli (každý svou schránku,
+ * super admin vše) — přehled, poptávky, potvrzení. Detail viz lib/data/mail.
+ */
 export async function getEmails(): Promise<EmailItem[]> {
-  const db = await supa();
-  if (!db) return [];
-  const { data, error } = await db
-    .from("emails")
-    .select("*, customers(name)")
-    .order("received_at", { ascending: false })
-    .limit(100);
-  warn("emails", error);
-  if (error || !data) return [];
-  return (data as (Email & WithCustomer)[]).map((e) => ({
-    id: e.id,
-    from: e.from_name ?? e.from_email ?? "—",
-    fromEmail: e.from_email ?? "",
-    subject: e.subject ?? "",
-    preview: e.snippet ?? e.body_text?.slice(0, 140) ?? "",
-    category: (e.category ? emailCategoryLabel[e.category] : "Ostatní") as EmailItem["category"],
-    priority: (e.priority ? priorityLabel[e.priority] : "Střední") as EmailItem["priority"],
-    customer: e.customers?.name,
-    receivedAt: e.received_at,
-    aiConfidence: e.ai_confidence ?? 0,
-    aiSummary: e.ai_summary ?? undefined,
-    unread: !e.is_read,
-    hasDraft: e.has_draft,
-  }));
+  return getMailEmails({ direction: "in" });
 }
 
 export async function getApprovalQueue(): Promise<ApprovalItem[]> {
@@ -233,7 +215,10 @@ export async function getCommissions(
   return [...byOwner.values()];
 }
 
-/** Počty pro odznaky v navigaci — reálná čísla z DB. */
+/**
+ * Počty pro odznaky v navigaci — reálná čísla z DB. Pošta = MOJE nepřečtené
+ * příchozí (bez spamu); tok = zakázky v daném stavu; fronta jen pro AI přehled.
+ */
 export async function getBadgeCounts(): Promise<BadgeCounts> {
   const empty: BadgeCounts = {
     inbox: 0, inquiries: 0, pricing: 0, quotes: 0, confirmations: 0, orders: 0, approvals: 0,
@@ -241,17 +226,22 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
   const db = await supa();
   if (!db) return empty;
   try {
+    const { can } = await getAccess();
+    const stageCount = (stage: JobStage) =>
+      db.from("orders").select("id", { count: "exact", head: true }).eq("status", stage);
     const [inbox, inquiries, pricing, quotes, confirmations, orders, approvals] = await Promise.all([
-      db.from("emails").select("id", { count: "exact", head: true }).eq("is_read", false).neq("category", "spam"),
-      db.from("emails").select("id", { count: "exact", head: true }).eq("is_read", false).eq("category", "poptavka"),
-      db.from("quotes").select("id", { count: "exact", head: true }).eq("status", "navrh_ai"),
-      db.from("quotes").select("id", { count: "exact", head: true }).eq("status", "ke_schvaleni"),
-      db.from("orders").select("id", { count: "exact", head: true }).eq("status", "prijato"),
-      db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", "(dokonceno,zruseno)"),
-      db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      getUnreadCount(),
+      stageCount("poptavka"),
+      stageCount("naceneni"),
+      db.from("quotes").select("id", { count: "exact", head: true }).eq("status", "ke_schvaleni").eq("archived", false),
+      stageCount("objednavka"),
+      db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", `(${CLOSED_STAGES.join(",")})`),
+      can("dashboard")
+        ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
+        : Promise.resolve({ count: 0 }),
     ]);
     return {
-      inbox: inbox.count ?? 0,
+      inbox,
       inquiries: inquiries.count ?? 0,
       pricing: pricing.count ?? 0,
       quotes: quotes.count ?? 0,
@@ -264,32 +254,12 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
   }
 }
 
-/** Odeslaná pošta — log odchozích akcí (schválených i automatických). */
+/**
+ * Odeslaná pošta viditelná uživateli (vlastní odchozí e-maily; super admin vše
+ * včetně staršího logu fronty schvalování).
+ */
 export async function getSentLog(): Promise<import("@/lib/data/types").SentItem[]> {
-  const db = await supa();
-  if (!db) return [];
-  const { data, error } = await db
-    .from("approval_queue")
-    .select("*")
-    .in("status", ["approved", "auto_executed"])
-    .order("resolved_at", { ascending: false })
-    .limit(200);
-  warn("sent_log", error);
-  if (error || !data) return [];
-  return (data as (ApprovalItemRow & { resolved_at?: string | null; status?: string })[])
-    .filter((a) => ["email_reply", "quote", "supplier_request", "reminder"].includes(a.type))
-    .map((a) => ({
-      id: a.id,
-      rawType: a.type as ApprovalType,
-      type: approvalTypeLabel[a.type as ApprovalType] ?? a.type,
-      title: a.title,
-      target: a.target ?? "",
-      body: typeof (a.payload as { body?: unknown })?.body === "string"
-        ? (a.payload as { body: string }).body
-        : "",
-      sentAt: a.resolved_at ?? a.created_at,
-      auto: a.status === "auto_executed",
-    }));
+  return getSentMail();
 }
 
 /** Detail zákazníka s kompletní historií (CRM — nabídky, zakázky, komunikace, výkresy). */
