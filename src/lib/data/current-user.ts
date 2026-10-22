@@ -16,6 +16,8 @@ export interface CurrentUser {
   active: boolean;
   /** Profil v DB existuje (jinak jde o účet bez profilu → neaktivní). */
   hasProfile: boolean;
+  /** Počáteční heslo od admina — musí si nastavit vlastní. */
+  mustChangePassword: boolean;
 }
 
 export function initialsOf(name: string, email: string): string {
@@ -40,21 +42,25 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     let aiAccess = false;
     let active = false;
     let hasProfile = false;
+    let mustChangePassword = false;
 
     // Profil: servisním klíčem, jinak vlastní session (RLS povoluje číst sám sebe).
     const db = hasServiceKey() ? createAdminClient() : supabase;
     const { data } = await db
       .from("profiles")
-      .select("full_name, role, ai_access, active")
+      .select("full_name, role, ai_access, active, password_change_required")
       .eq("id", user.id)
       .maybeSingle();
-    const profile = data as { full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean } | null;
+    const profile = data as {
+      full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean; password_change_required?: boolean;
+    } | null;
     if (profile) {
       hasProfile = true;
       if (profile.full_name) fullName = profile.full_name;
       if (profile.role) role = profile.role;
       aiAccess = Boolean(profile.ai_access);
       active = profile.active !== false;
+      mustChangePassword = Boolean(profile.password_change_required);
     }
 
     const email = user.email ?? "";
@@ -68,6 +74,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       aiAccess,
       active: hasProfile && active,
       hasProfile,
+      mustChangePassword,
     };
   } catch {
     return null;

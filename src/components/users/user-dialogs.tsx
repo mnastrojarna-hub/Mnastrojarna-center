@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { updateUser, setUserPassword, deleteUser } from "@/app/actions/users";
 import { RolePicker } from "@/components/users/role-picker";
 import { PasswordField } from "@/components/users/password-field";
-import { passwordProblem } from "@/components/users/password-tools";
+import { initialPasswordProblem } from "@/components/users/password-tools";
 import { UserAvatar } from "@/components/users/user-avatar";
 import type { ManagedUser } from "@/components/users/types";
 import type { UserRole } from "@/lib/supabase/database.types";
@@ -191,7 +191,7 @@ export function SetPasswordDialog({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const problem = passwordProblem(password);
+    const problem = initialPasswordProblem(password);
     if (problem) return setError(problem);
     setBusy(true);
     setError(null);

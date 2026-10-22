@@ -93,7 +93,7 @@ export default async function AccountPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="zmena-hesla" className={user.mustChangePassword ? "scroll-mt-20 ring-2 ring-amber-400" : "scroll-mt-20"}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <SectionIcon icon={KeyRound} tone="bg-amber-500/10 text-amber-600 dark:text-amber-400" /> Heslo

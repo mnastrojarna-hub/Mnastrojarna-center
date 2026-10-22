@@ -16,7 +16,11 @@ export type JobStage =
 export type OrderStatus = JobStage;
 export type JobFileKind =
   | "poptavka" | "naceneni" | "nabidka" | "objednavka" | "potvrzeni" | "vykres" | "model_3d"
-  | "dodaci_list" | "faktura" | "foto" | "korespondence" | "ostatni";
+  | "dodaci_list" | "faktura" | "foto" | "korespondence" | "ostatni"
+  /** Naše objednávka vydaná dodavateli (migrace 0020). */
+  | "objednavka_vydana";
+export type PurchaseOrderStatus = "navrh" | "vystavena" | "odeslana" | "potvrzena" | "dodana" | "zrusena";
+export type CommissionStatus = "predbezna" | "k_vyplate" | "vyplaceno";
 export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
 export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder";
@@ -35,6 +39,8 @@ export interface Profile {
   phone: string | null;
   position: string | null;
   last_seen_at: string | null;
+  /** Počáteční heslo od admina → při prvním přihlášení vynutit změnu (migrace 0021). */
+  password_change_required: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -231,6 +237,41 @@ export interface Order {
   email_id: string | null;
   ai_filled: boolean;
   ai_confidence: number | null;
+  // Inkaso (migrace 0021) — rozhoduje o měsíci pásmové provize
+  paid_at: string | null;
+  paid_amount: number | null;
+  // Výroba a konec toku (migrace 0022)
+  production_step: string | null;
+  production_location: string | null;
+  production_done: number;
+  production_total: number;
+  production_problem: boolean;
+  customer_note: string | null;
+  delivery_note_confirmed_at: string | null;
+  invoice_date: string | null;
+  invoice_due_date: string | null;
+}
+
+/** Výrobní operace zakázky (migrace 0022). */
+export interface JobOperationRow {
+  id: string;
+  job_id: string;
+  position: number;
+  kind: string;
+  title: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  in_house: boolean;
+  status: "ceka" | "probiha" | "hotovo" | "problem" | "preskoceno";
+  planned_start: string | null;
+  planned_end: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  note: string | null;
+  purchase_order_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OrderItem {
@@ -401,10 +442,139 @@ export interface CommissionEntry {
   order_id: string | null;
   period: string;
   revenue: number;
+  /** Podíl zisku na obratu (0.25 = 25 %). */
   margin: number;
   rate: number;
   commission: number;
   created_at: string;
+  // migrace 0020 — provize ze zisku, přepočet v DB
+  cost: number;
+  profit: number;
+  base: CommissionBase;
+  status: CommissionStatus;
+  cost_known: boolean;
+  updated_at: string;
+  // migrace 0021 — pásmová provize z inkasa
+  collected: boolean;
+  estimated_commission: number | null;
+}
+
+/** margin = ze zisku, revenue = z obratu, margin_tiered = pásmově ze zisku dle měsíčního obratu. */
+export type CommissionBase = "margin" | "revenue" | "margin_tiered";
+
+export interface CommissionTier {
+  from: number;
+  to: number | null;
+  rate: number;
+}
+
+/** Měsíční vyúčtování provize obchodníka (migrace 0021). */
+export interface CommissionStatement {
+  id: string;
+  owner_id: string;
+  period: string;
+  rule_name: string | null;
+  basis: "ordered" | "collected";
+  revenue: number;
+  cost: number;
+  profit: number;
+  commission: number;
+  bands: (CommissionTier & { revenue: number; profit: number; commission: number })[];
+  jobs_count: number;
+  unknown_cost_jobs: number;
+  due_date: string | null;
+  status: "otevrena" | "k_vyplate" | "vyplaceno";
+  paid_at: string | null;
+  updated_at: string;
+}
+
+export interface CommissionRule {
+  id: string;
+  owner_id: string;
+  rate: number;
+  base: CommissionBase;
+  valid_from: string;
+  note: string | null;
+  created_at: string;
+  // migrace 0021 — smlouva obchodníka
+  name: string | null;
+  tiers: CommissionTier[] | null;
+  /** ordered = podle objednávek, collected = podle inkasa v měsíci. */
+  basis: "ordered" | "collected";
+  payout_days: number;
+}
+
+/** Nabídka dodavatele k zakázce (migrace 0020). */
+export interface SupplierQuoteRow {
+  id: string;
+  job_id: string;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  number: string | null;
+  quote_date: string | null;
+  valid_until: string | null;
+  lead_time_days: number | null;
+  delivery_date: string | null;
+  currency: string;
+  total: number | null;
+  selected: boolean;
+  note: string | null;
+  file_id: string | null;
+  source: "manual" | "foto" | "email" | "ai";
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierQuoteItemRow {
+  id: string;
+  supplier_quote_id: string;
+  position: number;
+  drawing_number: string | null;
+  name: string | null;
+  material: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number | null;
+  note: string | null;
+}
+
+/** Objednávka vydaná dodavateli (migrace 0020). */
+export interface PurchaseOrderRow {
+  id: string;
+  job_id: string;
+  supplier_id: string | null;
+  supplier_quote_id: string | null;
+  number: string | null;
+  status: PurchaseOrderStatus;
+  order_date: string;
+  required_date: string | null;
+  confirmed_date: string | null;
+  currency: string;
+  total: number;
+  delivery_terms: string | null;
+  payment_terms: string | null;
+  delivery_address: string | null;
+  note: string | null;
+  supplier_reference: string | null;
+  file_id: string | null;
+  created_by: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseOrderItemRow {
+  id: string;
+  purchase_order_id: string;
+  position: number;
+  drawing_number: string | null;
+  name: string | null;
+  material: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number | null;
+  note: string | null;
 }
 
 export interface KnowledgeDocument {
@@ -535,12 +705,21 @@ export interface Database {
       job_events: Tbl<JobEventRow>;
       ai_training_examples: Tbl<AiTrainingExample>;
       password_reset_codes: Tbl<PasswordResetCode>;
+      commission_rules: Tbl<CommissionRule>;
+      commission_statements: Tbl<CommissionStatement>;
+      job_operations: Tbl<JobOperationRow>;
+      supplier_quotes: Tbl<SupplierQuoteRow>;
+      supplier_quote_items: Tbl<SupplierQuoteItemRow>;
+      purchase_orders: Tbl<PurchaseOrderRow>;
+      purchase_order_items: Tbl<PurchaseOrderItemRow>;
     };
     Views: Record<string, never>;
     Functions: {
       next_doc_number: { Args: { p_prefix: string }; Returns: string };
       next_job_number: { Args: Record<string, never>; Returns: string };
       next_customer_number: { Args: Record<string, never>; Returns: string };
+      next_purchase_order_number: { Args: Record<string, never>; Returns: string };
+      recompute_job_commission: { Args: { p_job: string }; Returns: undefined };
     };
     Enums: {
       user_role: UserRole;

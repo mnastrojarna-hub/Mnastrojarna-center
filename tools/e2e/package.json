@@ -1,0 +1,9 @@
+{
+  "name": "mnastrojarna-e2e",
+  "private": true,
+  "type": "module",
+  "description": "E2E testy aplikace proti lokálnímu Supabase stacku (tools/local-supabase)",
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

@@ -1,0 +1,917 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { checkFeature } from "@/lib/auth/session";
+import type { CurrentUser } from "@/lib/data/current-user";
+import { logAudit } from "@/lib/audit";
+import { COMPANY } from "@/lib/company";
+import { refreshCompanyFromSettings } from "@/lib/company-server";
+import { getSetting } from "@/lib/settings";
+import { sendMail } from "@/lib/email/send";
+import { getJob } from "@/lib/data/jobs";
+import {
+  fetchProfileContact, fetchPurchaseOrder, fetchPurchaseOrders, fetchSupplierQuote, fetchSupplierQuotes, fetchSupplierRef,
+} from "@/lib/data/purchasing";
+import { registerJobFile } from "@/app/actions/job-files";
+import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { isForward, isJobStage, stageRank } from "@/lib/jobs/stages";
+import {
+  cleanDate, cleanText, describeChanges, diffJob, fieldEventMessage, isUuid, jobFilePath, stageEventMessage,
+  todayIso, translateDbError, type JobChange,
+} from "@/lib/jobs/mapping";
+import {
+  PURCHASE_ORDER_STATUS_META, buildPurchaseOrderDraft, canChangePurchaseOrderStatus, cleanPurchaseItems,
+  defaultDeliveryAddress, isPurchaseOrderEditable, isPurchaseOrderStatus, issueStageHint, parseEmailList,
+  purchaseOrderEmail, purchaseOrderFileName, resolveQuoteDeliveryDate, resolveSupplierQuoteTotal, rowsTotal,
+  rowToCommissionView, supplierQuoteInputToRow, validatePurchaseOrderDraft,
+  type CommissionDbRow, type PurchaseItemRowInput,
+} from "@/lib/jobs/purchasing";
+import type {
+  JobCommissionView, PurchaseItem, PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseOrderMail,
+  PurchaseOrderPatch, PurchaseOrderView, SupplierQuoteInput, SupplierQuoteView,
+} from "@/lib/jobs/purchasing-types";
+import { renderPurchaseOrderPdf } from "@/lib/pdf/render-purchase";
+import { buildPurchaseOrderDoc } from "@/lib/pdf/purchase-docs";
+import { czDate } from "@/lib/pdf/types";
+import type { JobStage, PurchaseOrderStatus } from "@/lib/supabase/database.types";
+import type { ActionResult } from "@/lib/jobs/types";
+
+/**
+ * Nákup zakázky: nabídky dodavatelů (vítězná), objednávky vydané (OV-2026-004)
+ * s PDF a odesláním e-mailem, obchodník zakázky. Provizi NEpočítáme tady —
+ * přepočítá ji DB trigger při každé změně objednávek / zakázky / sazby.
+ * Vše jen s právem „margins" (super admin + obchodník). Do historie zakázky
+ * (vidí ji všechny role) nikdy nejdou nákupní ceny.
+ */
+
+interface Ctx {
+  db: JobsDb;
+  user: CurrentUser;
+}
+
+type Row = Record<string, unknown>;
+
+const BUCKET = "job-files";
+const JOB_NOT_FOUND = "Zakázka nenalezena.";
+const QUOTE_NOT_FOUND = "Nabídka dodavatele nenalezena.";
+const PO_NOT_FOUND = "Objednávka nenalezena.";
+
+async function begin(): Promise<Ctx | { error: string }> {
+  if (!isSupabaseConfigured()) return { error: "Supabase není nakonfigurováno." };
+  const access = await checkFeature("margins");
+  if ("error" in access) return { error: access.error };
+  const db = await createOperatorClient();
+  return { db, user: access.user };
+}
+
+function fail(err: unknown): { ok: false; error: string } {
+  if (typeof err === "string") return { ok: false, error: translateDbError(err) };
+  return { ok: false, error: err instanceof Error ? translateDbError(err.message) : "Neočekávaná chyba." };
+}
+
+function revalidatePurchasing(jobId?: string | null) {
+  revalidatePath("/orders");
+  revalidatePath("/commissions");
+  revalidatePath("/documents");
+  revalidatePath("/");
+  if (jobId) revalidatePath(`/orders/${jobId}`);
+}
+
+async function loadJob(db: JobsDb, id: string, columns: string): Promise<Row | null> {
+  const { data, error } = await db.from("orders").select(columns).eq("id", id).maybeSingle();
+  if (error) console.error(`[purchasing] Načtení zakázky selhalo: ${error.message}`);
+  return (data as Row | null) ?? null;
+}
+
+/** Změny zakázky do historie — citlivé hodnoty (nákupní cena) bez čísel. */
+async function logJobChanges(c: Ctx, jobId: string, changes: JobChange[], refs: Record<string, string>, extra: Row = {}) {
+  if (!changes.length) return;
+  const views = describeChanges(changes, refs).map((v) =>
+    v.sensitive ? { field: v.field, label: v.label, from: null, to: null, fromText: "", toText: "", sensitive: true } : v,
+  );
+  await logJobEvent(c.db, {
+    jobId, type: "field", message: fieldEventMessage(views), data: { changes: views, ...extra }, actorId: c.user.id,
+  });
+}
+
+/** Úprava zakázky (jen skutečné změny) + záznam do historie. */
+async function patchJob(c: Ctx, jobId: string, before: Row, patch: Row, refs: Record<string, string> = {}, extra: Row = {}): Promise<string | null> {
+  const changes = diffJob(before, patch);
+  if (!changes.length) return null;
+  const update: Row = {};
+  for (const ch of changes) update[ch.field] = patch[ch.field];
+  const { error } = await c.db.from("orders").update(update as never).eq("id", jobId);
+  if (error) return error.message;
+  await logJobChanges(c, jobId, changes, refs, extra);
+  return null;
+}
+
+function itemRows(items: PurchaseItem[]): PurchaseItemRowInput[] {
+  return items.map((it, i) => ({
+    position: i,
+    drawing_number: it.drawingNumber,
+    name: it.name,
+    material: it.material,
+    quantity: it.quantity,
+    unit: it.unit,
+    unit_price: it.unitPrice,
+    note: it.note,
+  }));
+}
+
+function quoteLabel(name: string, number: string | null | undefined): string {
+  return `${name || "dodavatele"}${number ? ` č. ${number}` : ""}`;
+}
+
+async function supplierName(db: JobsDb, id: string | null | undefined): Promise<string | null> {
+  if (!isUuid(id)) return null;
+  const { data } = await db.from("suppliers").select("id, name").eq("id", id).maybeSingle();
+  return (data as { name: string } | null)?.name ?? null;
+}
+
+async function fileBelongsToJob(db: JobsDb, fileId: string, jobId: string): Promise<boolean> {
+  const { data } = await db.from("job_files").select("id").eq("id", fileId).eq("job_id", jobId).maybeSingle();
+  return Boolean(data);
+}
+
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+/** Dodavatel podle názvu (bez ohledu na velikost písmen), jinak se založí do adresáře. */
+async function findOrCreateSupplier(c: Ctx, name: string): Promise<{ id: string; created: boolean } | { error: string }> {
+  const { data: found } = await c.db.from("suppliers").select("id, name").ilike("name", escapeLike(name)).limit(1);
+  const hit = ((found ?? []) as { id: string }[])[0];
+  if (hit) return { id: hit.id, created: false };
+  const { data, error } = await c.db.from("suppliers").insert({ name } as never).select("id").single();
+  if (error || !data) return { error: error?.message ?? "Dodavatele se nepodařilo založit." };
+  await logAudit({ action: "supplier_created", entity: "suppliers", entityId: (data as { id: string }).id, diff: { name, via: "purchase_order" } });
+  return { id: (data as { id: string }).id, created: true };
+}
+
+async function replaceItems(
+  db: JobsDb,
+  table: "supplier_quote_items" | "purchase_order_items",
+  fk: "supplier_quote_id" | "purchase_order_id",
+  parentId: string,
+  rows: PurchaseItemRowInput[],
+): Promise<string | null> {
+  const { error: delErr } = await db.from(table).delete().eq(fk, parentId);
+  if (delErr) return delErr.message;
+  if (!rows.length) return null;
+  const { error } = await db.from(table).insert(rows.map((r) => ({ ...r, [fk]: parentId })) as never);
+  return error ? error.message : null;
+}
+
+async function ourDeliveryAddress(): Promise<string> {
+  await refreshCompanyFromSettings();
+  const custom = (await getSetting("company_delivery_address"))?.trim();
+  return custom || defaultDeliveryAddress(COMPANY);
+}
+
+// ── Nabídky dodavatelů ──────────────────────────────────────
+export async function createSupplierQuote(jobId: string, input: SupplierQuoteInput): Promise<ActionResult<{ id: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
+  const conv = supplierQuoteInputToRow(input, { today: todayIso() });
+  if ("error" in conv) return fail(conv.error);
+  const items = cleanPurchaseItems(input?.items, { allowEmpty: true });
+  if ("error" in items) return fail(items.error);
+  const total = resolveSupplierQuoteTotal(input.total, items.rows);
+  if (!items.rows.length && total === null) return fail("Zadej položky nebo celkovou cenu nabídky.");
+
+  try {
+    const { db, user } = c;
+    const job = await loadJob(db, jobId, "id, number");
+    if (!job) return fail(JOB_NOT_FOUND);
+    const row = conv.row;
+    let name = (row.supplier_name as string | null) ?? "";
+    if (row.supplier_id) {
+      const found = await supplierName(db, row.supplier_id as string);
+      if (!found) return fail("Dodavatel nenalezen.");
+      name = found;
+    }
+    if (row.file_id && !(await fileBelongsToJob(db, row.file_id as string, jobId))) return fail("Dokument nepatří k této zakázce.");
+
+    const { data: created, error } = await db
+      .from("supplier_quotes")
+      .insert({ ...row, job_id: jobId, total, selected: false, created_by: user.id } as never)
+      .select("id")
+      .single();
+    if (error || !created) return fail(error?.message ?? "Nabídku se nepodařilo uložit.");
+    const id = (created as { id: string }).id;
+    const itemErr = await replaceItems(db, "supplier_quote_items", "supplier_quote_id", id, items.rows);
+    if (itemErr) {
+      await db.from("supplier_quotes").delete().eq("id", id);
+      return fail(itemErr);
+    }
+
+    const delivery = row.delivery_date as string | null;
+    await logJobEvent(db, {
+      jobId, type: "quote",
+      message: `Přidána nabídka dodavatele ${quoteLabel(name, row.number as string | null)}${delivery ? ` — termín dodání ${czDate(delivery)}` : ""}`,
+      data: { supplierQuoteId: id, supplierId: row.supplier_id ?? null, number: row.number ?? null, itemCount: items.rows.length, source: row.source },
+      actorId: user.id,
+    });
+    revalidatePurchasing(jobId);
+    return { ok: true, id };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function updateSupplierQuote(id: string, input: Partial<SupplierQuoteInput>): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(QUOTE_NOT_FOUND);
+  const conv = supplierQuoteInputToRow(input, { partial: true });
+  if ("error" in conv) return fail(conv.error);
+  let newRows: PurchaseItemRowInput[] | null = null;
+  if (input.items !== undefined) {
+    const items = cleanPurchaseItems(input.items, { allowEmpty: true });
+    if ("error" in items) return fail(items.error);
+    newRows = items.rows;
+  }
+
+  try {
+    const { db, user } = c;
+    const quote = await fetchSupplierQuote(db, id);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const row = conv.row;
+    if (row.supplier_id && !(await supplierName(db, row.supplier_id as string))) return fail("Dodavatel nenalezen.");
+    if (row.file_id && !(await fileBelongsToJob(db, row.file_id as string, quote.jobId))) return fail("Dokument nepatří k této zakázce.");
+    if (input.deliveryDate !== undefined && !row.delivery_date) {
+      // vymazaný termín → dopočet z dodací lhůty
+      row.delivery_date = resolveQuoteDeliveryDate({
+        leadTimeDays: "lead_time_days" in row ? row.lead_time_days : quote.leadTimeDays,
+        quoteDate: "quote_date" in row ? row.quote_date : quote.quoteDate,
+      });
+    }
+    if (input.total !== undefined || newRows) {
+      row.total = resolveSupplierQuoteTotal(input.total, newRows ?? itemRows(quote.items));
+    }
+    if ("supplier_id" in row && !row.supplier_id) {
+      // odpojení od adresáře → zůstane volný název (zadaný, jinak dosavadní)
+      const keep = "supplier_name" in row ? (row.supplier_name as string | null) : quote.supplierName || null;
+      if (!keep) return fail("Vyber dodavatele nebo vyplň jeho název.");
+      row.supplier_name = keep;
+    } else if (!("supplier_id" in row) && "supplier_name" in row && !row.supplier_name && !quote.supplier) {
+      return fail("Vyber dodavatele nebo vyplň jeho název.");
+    }
+
+    if (Object.keys(row).length) {
+      const { error } = await db.from("supplier_quotes").update(row as never).eq("id", id);
+      if (error) return fail(error.message);
+    }
+    if (newRows) {
+      const itemErr = await replaceItems(db, "supplier_quote_items", "supplier_quote_id", id, newRows);
+      if (itemErr) return fail(itemErr);
+    }
+
+    // vítězná nabídka → plánovaný nákup zakázky drží krok
+    if (quote.selected && "total" in row && row.total !== null && row.total !== quote.total) {
+      const job = await loadJob(db, quote.jobId, "id, purchase_cost");
+      if (job) {
+        const err = await patchJob(c, quote.jobId, job, { purchase_cost: row.total }, {}, { supplierQuoteId: id });
+        if (err) return fail(err);
+      }
+    }
+
+    const supplierIdNow = "supplier_id" in row ? (row.supplier_id as string | null) : quote.supplier?.id ?? null;
+    const name = (await supplierName(db, supplierIdNow)) ?? ((row.supplier_name as string | null | undefined) || quote.supplierName);
+    const parts: string[] = [];
+    if (newRows) parts.push(`položky (${newRows.length})`);
+    if ("delivery_date" in row) parts.push(row.delivery_date ? `termín ${czDate(row.delivery_date as string)}` : "termín");
+    if ("total" in row) parts.push("cena");
+    const other = Object.keys(row).filter((k) => !["delivery_date", "total"].includes(k)).length;
+    if (other) parts.push("údaje nabídky");
+    await logJobEvent(db, {
+      jobId: quote.jobId, type: "quote",
+      message: `Upravena nabídka dodavatele ${quoteLabel(name, (row.number as string | undefined) ?? quote.number)}${parts.length ? `: ${parts.join(", ")}` : ""}`,
+      data: { supplierQuoteId: id, action: "updated", fields: Object.keys(row), ...(newRows ? { itemCount: newRows.length } : {}) },
+      actorId: user.id,
+    });
+    revalidatePurchasing(quote.jobId);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function deleteSupplierQuote(id: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await fetchSupplierQuote(db, id);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const { error } = await db.from("supplier_quotes").delete().eq("id", id);
+    if (error) return fail(error.message);
+    await logAudit({
+      action: "supplier_quote_deleted", entity: "supplier_quotes", entityId: id,
+      diff: { jobId: quote.jobId, supplier: quote.supplierName, number: quote.number, selected: quote.selected, total: quote.total },
+    });
+    await logJobEvent(db, {
+      jobId: quote.jobId, type: "quote",
+      message: `Smazána nabídka dodavatele ${quoteLabel(quote.supplierName, quote.number)}${quote.selected ? " (byla vítězná)" : ""}`,
+      data: { supplierQuoteId: id, action: "deleted" },
+      actorId: user.id,
+    });
+    revalidatePurchasing(quote.jobId);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Vítězná nabídka dodavatele: ostatní nabídky zakázky odznačí a do zakázky propíše
+ * dodavatele (když chybí), plánovaný nákup (= cena nabídky) a slíbený termín (když chybí).
+ */
+export async function selectWinningSupplierQuote(id: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await fetchSupplierQuote(db, id);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const job = await loadJob(db, quote.jobId, "id, supplier_id, purchase_cost, supplier_promised_date");
+    if (!job) return fail(JOB_NOT_FOUND);
+
+    if (!quote.selected) {
+      const { error: unErr } = await db
+        .from("supplier_quotes")
+        .update({ selected: false } as never)
+        .eq("job_id", quote.jobId)
+        .eq("selected", true)
+        .neq("id", id);
+      if (unErr) return fail(unErr.message);
+      const { error } = await db.from("supplier_quotes").update({ selected: true } as never).eq("id", id);
+      if (error) return fail(error.message);
+      await logJobEvent(db, {
+        jobId: quote.jobId, type: "quote",
+        message: `Vybrána vítězná nabídka dodavatele ${quoteLabel(quote.supplierName, quote.number)}`,
+        data: { supplierQuoteId: id, action: "selected", supplierId: quote.supplier?.id ?? null },
+        actorId: user.id,
+      });
+    }
+
+    const patch: Row = {};
+    if (!job.supplier_id && quote.supplier) patch.supplier_id = quote.supplier.id;
+    if (quote.total !== null) patch.purchase_cost = quote.total;
+    if (!job.supplier_promised_date && quote.deliveryDate) patch.supplier_promised_date = quote.deliveryDate;
+    const refs: Record<string, string> = quote.supplier ? { [quote.supplier.id]: quote.supplier.name } : {};
+    const err = await patchJob(c, quote.jobId, job, patch, refs, { supplierQuoteId: id });
+    if (err) return fail(err);
+
+    revalidatePurchasing(quote.jobId);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function unselectSupplierQuote(id: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const quote = await fetchSupplierQuote(c.db, id);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    if (!quote.selected) return { ok: true };
+    const { error } = await c.db.from("supplier_quotes").update({ selected: false } as never).eq("id", id);
+    if (error) return fail(error.message);
+    await logJobEvent(c.db, {
+      jobId: quote.jobId, type: "quote",
+      message: `Zrušen výběr vítězné nabídky dodavatele ${quoteLabel(quote.supplierName, quote.number)}`,
+      data: { supplierQuoteId: id, action: "unselected" },
+      actorId: c.user.id,
+    });
+    revalidatePurchasing(quote.jobId);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Objednávka vydaná ───────────────────────────────────────
+/**
+ * Návrh objednávky (neuloží se): dodavatel + položky z vítězné / zvolené nabídky
+ * dodavatele, jinak ze zakázky (nákupní ceny), termín, naše dodací adresa, podmínky.
+ */
+export async function draftPurchaseOrder(
+  jobId: string,
+  opts: { supplierQuoteId?: string; supplierId?: string } = {},
+): Promise<ActionResult<{ draft: PurchaseOrderDraft }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
+  if (opts.supplierQuoteId && !isUuid(opts.supplierQuoteId)) return fail(QUOTE_NOT_FOUND);
+  if (opts.supplierId && !isUuid(opts.supplierId)) return fail("Dodavatel nenalezen.");
+  try {
+    const job = await getJob(jobId);
+    if (!job) return fail(JOB_NOT_FOUND);
+    const quotes = await fetchSupplierQuotes(c.db, jobId);
+
+    let quote: SupplierQuoteView | null = null;
+    if (opts.supplierQuoteId) {
+      quote = quotes.find((q) => q.id === opts.supplierQuoteId) ?? null;
+      if (!quote) return fail("Nabídka dodavatele nepatří k této zakázce.");
+    } else {
+      const selected = quotes.find((q) => q.selected);
+      if (selected && (!opts.supplierId || selected.supplier?.id === opts.supplierId)) quote = selected;
+      else if (opts.supplierId) quote = quotes.find((q) => q.supplier?.id === opts.supplierId) ?? null;
+    }
+
+    const supplierId = opts.supplierId ?? quote?.supplier?.id ?? (quote ? null : job.supplier?.id ?? null);
+    const supplier = await fetchSupplierRef(c.db, supplierId);
+    if (opts.supplierId && !supplier) return fail("Dodavatel nenalezen.");
+
+    const draft = buildPurchaseOrderDraft({ job, quote, supplier, deliveryAddress: await ourDeliveryAddress() });
+    return { ok: true, draft };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Vygeneruje PDF objednávky a uloží ho do Dokumentů zakázky (nová verze při replaceFileId). */
+async function storePurchaseOrderPdf(c: Ctx, po: PurchaseOrderView, replaceFileId?: string | null): Promise<{ fileId: string } | { error: string }> {
+  const job = await getJob(po.jobId);
+  if (!job) return { error: JOB_NOT_FOUND };
+  const contact = await fetchProfileContact(c.db, po.createdBy?.id ?? c.user.id);
+  const data = await buildPurchaseOrderDoc(job, po, po.supplier, {
+    preparedBy: contact.name ?? po.createdBy?.name ?? c.user.fullName,
+    contactEmail: contact.email,
+    contactPhone: contact.phone,
+  });
+  const buffer = await renderPurchaseOrderPdf(data);
+  const filename = purchaseOrderFileName(po.number);
+  const path = jobFilePath(po.jobId, crypto.randomUUID(), filename);
+  const { error: upErr } = await c.db.storage.from(BUCKET).upload(path, buffer, { contentType: "application/pdf", upsert: false });
+  if (upErr) return { error: `Uložení PDF selhalo: ${upErr.message}` };
+
+  const reg = await registerJobFile({
+    jobId: po.jobId,
+    path,
+    filename,
+    mimeType: "application/pdf",
+    size: buffer.length,
+    kind: "objednavka_vydana",
+    title: `Objednávka ${po.number}${po.supplier ? ` — ${po.supplier.name}` : ""}`,
+    replaceFileId: replaceFileId ?? undefined,
+  });
+  if (!reg.ok || !reg.file) {
+    await c.db.storage.from(BUCKET).remove([path]);
+    return { error: reg.error ?? "PDF se nepodařilo zařadit do dokumentů." };
+  }
+  const { error } = await c.db.from("purchase_orders").update({ file_id: reg.file.id } as never).eq("id", po.id);
+  if (error) return { error: error.message };
+  return { fileId: reg.file.id };
+}
+
+/**
+ * Vystaví objednávku dodavateli: číslo OV-RRRR-NNN, položky, PDF do Dokumentů zakázky,
+ * do zakázky dodavatele a číslo objednávky (když chybí). Stav zakázky se NEmění —
+ * vrací jen doporučení (hint / suggestStage). Provize se přepočte v DB.
+ */
+export async function issuePurchaseOrder(
+  jobId: string,
+  draft: PurchaseOrderDraftInput,
+): Promise<ActionResult<{ id: string; number: string; fileId: string | null; pdfError?: string; hint?: string; suggestStage?: JobStage | null }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
+  const valid = validatePurchaseOrderDraft(draft);
+  if ("error" in valid) return fail(valid.error);
+  const v = valid.value;
+
+  try {
+    const { db, user } = c;
+    const job = await loadJob(db, jobId, "id, number, status, supplier_id, supplier_order_number");
+    if (!job) return fail(JOB_NOT_FOUND);
+
+    let supplierId = v.supplierId;
+    let supplierCreated = false;
+    if (supplierId) {
+      if (!(await supplierName(db, supplierId))) return fail("Dodavatel nenalezen.");
+    } else if (v.supplierName) {
+      const found = await findOrCreateSupplier(c, v.supplierName);
+      if ("error" in found) return fail(found.error);
+      supplierId = found.id;
+      supplierCreated = found.created;
+    }
+    const name = (await supplierName(db, supplierId)) ?? v.supplierName ?? "dodavatel";
+
+    let quote: SupplierQuoteView | null = null;
+    if (v.supplierQuoteId) {
+      quote = await fetchSupplierQuote(db, v.supplierQuoteId);
+      if (!quote || quote.jobId !== jobId) return fail("Nabídka dodavatele nepatří k této zakázce.");
+    }
+
+    const { data: number, error: numErr } = await db.rpc("next_purchase_order_number");
+    if (numErr || !number) return fail(numErr?.message ?? "Nepodařilo se přidělit číslo objednávky.");
+    const poNumber = String(number);
+
+    const { data: created, error } = await db
+      .from("purchase_orders")
+      .insert({
+        job_id: jobId,
+        supplier_id: supplierId,
+        supplier_quote_id: v.supplierQuoteId,
+        number: poNumber,
+        status: "vystavena",
+        order_date: v.orderDate,
+        required_date: v.requiredDate,
+        currency: v.currency,
+        total: v.total,
+        delivery_terms: v.deliveryTerms,
+        payment_terms: v.paymentTerms,
+        delivery_address: v.deliveryAddress,
+        note: v.note,
+        created_by: user.id,
+      } as never)
+      .select("id")
+      .single();
+    if (error || !created) return fail(error?.message ?? "Objednávku se nepodařilo uložit.");
+    const id = (created as { id: string }).id;
+    const itemErr = await replaceItems(db, "purchase_order_items", "purchase_order_id", id, v.items);
+    if (itemErr) {
+      await db.from("purchase_orders").delete().eq("id", id);
+      return fail(itemErr);
+    }
+
+    await logJobEvent(db, {
+      jobId, type: "field",
+      message: `Vystavena objednávka ${poNumber} dodavateli ${name}${v.requiredDate ? ` — požadovaný termín ${czDate(v.requiredDate)}` : ""}`,
+      data: {
+        purchaseOrderId: id, number: poNumber, supplierId, itemCount: v.items.length,
+        requiredDate: v.requiredDate, supplierQuoteId: v.supplierQuoteId, ...(supplierCreated ? { supplierCreated: true } : {}),
+      },
+      actorId: user.id,
+    });
+
+    // zakázka: dodavatel a číslo objednávky u dodavatele, pokud ještě nejsou
+    const patch: Row = {};
+    if (!job.supplier_id && supplierId) patch.supplier_id = supplierId;
+    if (!cleanText(job.supplier_order_number)) patch.supplier_order_number = poNumber;
+    const jobErr = await patchJob(c, jobId, job, patch, supplierId ? { [supplierId]: name } : {}, { purchaseOrderId: id });
+    if (jobErr) console.error(`[purchasing] Úprava zakázky po vystavení objednávky selhala: ${jobErr}`);
+
+    // objednávka z nabídky bez vybraného vítěze → nabídka je vítězná
+    if (quote && !quote.selected) {
+      const { data: sel } = await db.from("supplier_quotes").select("id").eq("job_id", jobId).eq("selected", true).limit(1);
+      if (!((sel ?? []) as unknown[]).length) {
+        const { error: selErr } = await db.from("supplier_quotes").update({ selected: true } as never).eq("id", quote.id);
+        if (!selErr) {
+          await logJobEvent(db, {
+            jobId, type: "quote",
+            message: `Nabídka dodavatele ${quoteLabel(quote.supplierName, quote.number)} označena jako vítězná (vystavena objednávka ${poNumber})`,
+            data: { supplierQuoteId: quote.id, action: "selected", purchaseOrderId: id },
+            actorId: user.id,
+          });
+        }
+      }
+    }
+
+    await logAudit({
+      action: "purchase_order_issued", entity: "purchase_orders", entityId: id,
+      diff: { jobId, number: poNumber, supplierId, total: v.total, itemCount: v.items.length },
+    });
+
+    // PDF — selhání nevrací objednávku zpět (lze přegenerovat)
+    let fileId: string | null = null;
+    let pdfError: string | undefined;
+    try {
+      const po = await fetchPurchaseOrder(db, id);
+      const stored = po ? await storePurchaseOrderPdf(c, po) : { error: PO_NOT_FOUND };
+      if ("error" in stored) pdfError = stored.error;
+      else fileId = stored.fileId;
+    } catch (e) {
+      pdfError = e instanceof Error ? e.message : "Generování PDF selhalo.";
+    }
+    if (pdfError) console.error(`[purchasing] PDF objednávky ${poNumber}: ${pdfError}`);
+
+    const hint = isJobStage(job.status) ? issueStageHint(job.status) : null;
+    revalidatePurchasing(jobId);
+    return {
+      ok: true, id, number: poNumber, fileId,
+      ...(pdfError ? { pdfError } : {}),
+      ...(hint ? { hint: hint.message, suggestStage: hint.suggestStage } : {}),
+    };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+function statusLabel(s: PurchaseOrderStatus): string {
+  return PURCHASE_ORDER_STATUS_META[s]?.label ?? s;
+}
+
+/**
+ * Úprava objednávky vydané: termíny, podmínky, poznámka, stav. Položky jen dokud
+ * neodešla. Potvrzení → potvrzený termín do zakázky (slíbený termín dodavatele);
+ * Dodána (všechny aktivní objednávky) → zakázka do stavu „Dodáno k nám".
+ */
+export async function updatePurchaseOrder(
+  id: string,
+  patch: PurchaseOrderPatch,
+): Promise<ActionResult<{ hint?: string; fileId?: string | null; stage?: JobStage }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(PO_NOT_FOUND);
+  if (!patch || typeof patch !== "object") return fail("Chybí změny.");
+  if (patch.status !== undefined && !isPurchaseOrderStatus(patch.status)) return fail("Neznámý stav objednávky.");
+
+  try {
+    const { db, user } = c;
+    const po = await fetchPurchaseOrder(db, id);
+    if (!po) return fail(PO_NOT_FOUND);
+
+    const row: Row = {};
+    for (const [key, col, max] of [
+      ["deliveryTerms", "delivery_terms", 500], ["paymentTerms", "payment_terms", 500],
+      ["deliveryAddress", "delivery_address", 1000], ["note", "note", 4000], ["supplierReference", "supplier_reference", 200],
+    ] as const) {
+      if (patch[key] !== undefined) row[col] = cleanText(patch[key], max);
+    }
+    for (const [key, col] of [["requiredDate", "required_date"], ["orderDate", "order_date"], ["confirmedDate", "confirmed_date"]] as const) {
+      const val = patch[key];
+      if (val === undefined) continue;
+      const d = cleanDate(val);
+      if (val !== "" && val !== null && !d) return fail("Neplatné datum.");
+      if (col === "order_date" && !d) return fail("Datum objednávky je povinné.");
+      row[col] = d;
+    }
+    if (patch.currency !== undefined) {
+      const cur = String(patch.currency).trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(cur)) return fail("Neplatná měna.");
+      row.currency = cur;
+    }
+    const required = "required_date" in row ? (row.required_date as string | null) : po.requiredDate;
+    const orderDate = "order_date" in row ? (row.order_date as string) : po.orderDate;
+    if (required && required < orderDate) return fail("Požadovaný termín dodání je před datem objednávky.");
+
+    let newRows: PurchaseItemRowInput[] | null = null;
+    if (patch.items !== undefined) {
+      if (!isPurchaseOrderEditable(po.status)) {
+        return fail("Objednávka už odešla dodavateli — položky nelze měnit. Zruš ji a vystav novou.");
+      }
+      const items = cleanPurchaseItems(patch.items);
+      if ("error" in items) return fail(items.error);
+      newRows = items.rows;
+      row.total = rowsTotal(newRows);
+    }
+
+    const from = po.status;
+    const to = patch.status ?? from;
+    if (to !== from) {
+      if (!canChangePurchaseOrderStatus(from, to)) return fail(`Stav nelze změnit z „${statusLabel(from)}" na „${statusLabel(to)}".`);
+      row.status = to;
+      if (to === "odeslana" && !po.sentAt) row.sent_at = new Date().toISOString();
+      if (to === "potvrzena" && !("confirmed_date" in row) && !po.confirmedDate && po.requiredDate) {
+        // bez zadaného termínu dodavatel potvrdil požadovaný
+        row.confirmed_date = po.requiredDate;
+      }
+    }
+
+    if (!Object.keys(row).length && !newRows) return { ok: true };
+    if (Object.keys(row).length) {
+      const { error } = await db.from("purchase_orders").update(row as never).eq("id", id);
+      if (error) return fail(error.message);
+    }
+    if (newRows) {
+      const itemErr = await replaceItems(db, "purchase_order_items", "purchase_order_id", id, newRows);
+      if (itemErr) return fail(itemErr);
+    }
+
+    const supplier = po.supplier?.name ?? "dodavatel";
+    const confirmed = "confirmed_date" in row ? (row.confirmed_date as string | null) : po.confirmedDate;
+    const parts: string[] = [];
+    if (to !== from) parts.push(`${statusLabel(from)} → ${statusLabel(to)}`);
+    if ("confirmed_date" in row) parts.push(confirmed ? `potvrzený termín ${czDate(confirmed)}` : "potvrzený termín smazán");
+    if ("supplier_reference" in row && row.supplier_reference) parts.push(`potvrzení č. ${row.supplier_reference as string}`);
+    if ("required_date" in row) parts.push(row.required_date ? `požadovaný termín ${czDate(row.required_date as string)}` : "požadovaný termín smazán");
+    if (newRows) parts.push(`položky (${newRows.length})`);
+    const rest = Object.keys(row).filter((k) => !["status", "sent_at", "confirmed_date", "supplier_reference", "required_date", "total"].includes(k));
+    if (rest.length) parts.push("podmínky / poznámka");
+    await logJobEvent(db, {
+      jobId: po.jobId, type: "field",
+      message: `Objednávka ${po.number} (${supplier}): ${parts.join(", ") || "upravena"}`,
+      data: {
+        purchaseOrderId: id, number: po.number, fields: Object.keys(row).filter((k) => k !== "total"),
+        ...(to !== from ? { statusFrom: from, statusTo: to } : {}),
+      },
+      actorId: user.id,
+    });
+
+    // dopady do zakázky
+    let hint: string | undefined;
+    let stage: JobStage | undefined;
+    const job = await loadJob(db, po.jobId, "id, status, supplier_promised_date");
+    if (job) {
+      if (to === "potvrzena" && confirmed) {
+        const err = await patchJob(c, po.jobId, job, { supplier_promised_date: confirmed }, {}, { purchaseOrderId: id });
+        if (err) return fail(err);
+      }
+      if (to === "dodana" && from !== "dodana" && isJobStage(job.status) && isForward(job.status, "dodano_k_nam")) {
+        const all = await fetchPurchaseOrders(db, po.jobId);
+        const pending = all.filter((o) => o.id !== id && o.status !== "zrusena" && o.status !== "dodana");
+        if (!pending.length) {
+          const { error } = await db.from("orders").update({ status: "dodano_k_nam" } as never).eq("id", po.jobId);
+          if (error) return fail(error.message);
+          await logJobEvent(db, {
+            jobId: po.jobId, type: "stage",
+            message: stageEventMessage(job.status, "dodano_k_nam", `objednávka ${po.number} dodána`),
+            data: { from: job.status, to: "dodano_k_nam", purchaseOrderId: id }, actorId: user.id,
+          });
+          stage = "dodano_k_nam";
+          hint = "Zakázka přesunuta do stavu Dodáno k nám.";
+        } else {
+          hint = `Čeká se ještě na ${pending.length} ${pending.length === 1 ? "objednávku" : pending.length < 5 ? "objednávky" : "objednávek"} — stav zakázky zůstává.`;
+        }
+      } else if (to === "dodana" && isJobStage(job.status) && stageRank(job.status) < 0) {
+        hint = "Zakázka je ve zvláštním stavu — posuň ji ručně.";
+      }
+    }
+
+    // PDF přegenerovat, dokud objednávka neodešla a změnil se její obsah
+    let fileId: string | null | undefined;
+    const contentChanged = Boolean(newRows) || Object.keys(row).some((k) => !["status", "sent_at"].includes(k));
+    if (po.fileId && contentChanged && isPurchaseOrderEditable(to)) {
+      const fresh = await fetchPurchaseOrder(db, id);
+      const stored = fresh ? await storePurchaseOrderPdf(c, fresh, po.fileId) : { error: PO_NOT_FOUND };
+      if ("error" in stored) hint = [hint, `PDF se nepodařilo přegenerovat: ${stored.error}`].filter(Boolean).join(" ");
+      else fileId = stored.fileId;
+    }
+
+    await logAudit({
+      action: "purchase_order_updated", entity: "purchase_orders", entityId: id,
+      diff: { jobId: po.jobId, number: po.number, ...row, ...(newRows ? { itemCount: newRows.length } : {}) },
+    });
+    revalidatePurchasing(po.jobId);
+    return { ok: true, ...(hint ? { hint } : {}), ...(fileId !== undefined ? { fileId } : {}), ...(stage ? { stage } : {}) };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Nové PDF objednávky (další verze v Dokumentech zakázky). */
+export async function regeneratePurchaseOrderPdf(id: string): Promise<ActionResult<{ fileId: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(PO_NOT_FOUND);
+  try {
+    const po = await fetchPurchaseOrder(c.db, id);
+    if (!po) return fail(PO_NOT_FOUND);
+    const stored = await storePurchaseOrderPdf(c, po, po.fileId);
+    if ("error" in stored) return fail(stored.error);
+    revalidatePurchasing(po.jobId);
+    return { ok: true, fileId: stored.fileId };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Návrh e-mailu s objednávkou: adresát z adresáře dodavatelů, předmět, zdvořilý text, podpis. */
+export async function draftPurchaseOrderEmail(
+  id: string,
+): Promise<ActionResult<{ to: string; subject: string; body: string; attachmentName: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(PO_NOT_FOUND);
+  try {
+    const po = await fetchPurchaseOrder(c.db, id);
+    if (!po) return fail(PO_NOT_FOUND);
+    await refreshCompanyFromSettings();
+    const me = await fetchProfileContact(c.db, c.user.id);
+    const mail = purchaseOrderEmail({
+      number: po.number,
+      companyName: COMPANY.name,
+      supplierQuoteNumber: po.supplierQuote?.number,
+      requiredDate: po.confirmedDate ?? po.requiredDate,
+      senderName: me.name ?? c.user.fullName,
+      senderEmail: me.email ?? c.user.email,
+      senderPhone: me.phone ?? COMPANY.phone,
+      companyWeb: COMPANY.web,
+    });
+    return { ok: true, to: po.supplier?.email ?? "", ...mail, attachmentName: purchaseOrderFileName(po.number) };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Odešle objednávku dodavateli e-mailem z mé schránky (PDF v příloze), stav → Odeslána. */
+export async function sendPurchaseOrder(id: string, mail: PurchaseOrderMail): Promise<ActionResult<{ sent: boolean; emailId?: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(PO_NOT_FOUND);
+  if (!mail || typeof mail !== "object") return fail("Chybí e-mail.");
+  const to = parseEmailList(mail.to);
+  if (!to || !to.length) return fail("Zadej platný e-mail dodavatele.");
+  const cc = parseEmailList(mail.cc);
+  if (!cc) return fail("Neplatná adresa v kopii.");
+  const subject = cleanText(mail.subject, 300);
+  if (!subject) return fail("Chybí předmět e-mailu.");
+  const body = cleanText(mail.body, 20_000);
+  if (!body) return fail("Chybí text e-mailu.");
+
+  try {
+    const { db, user } = c;
+    let po = await fetchPurchaseOrder(db, id);
+    if (!po) return fail(PO_NOT_FOUND);
+    if (po.status === "zrusena") return fail("Zrušenou objednávku nelze odeslat.");
+
+    if (!po.fileId) {
+      const stored = await storePurchaseOrderPdf(c, po);
+      if ("error" in stored) return fail(stored.error);
+      po = { ...po, fileId: stored.fileId };
+    }
+    const { data: file } = await db.from("job_files").select("id, filename, storage_path").eq("id", po.fileId as string).maybeSingle();
+    const f = file as { filename: string; storage_path: string | null } | null;
+    if (!f?.storage_path) return fail("PDF objednávky nenalezeno — přegeneruj ho.");
+    const { data: blob, error: dlErr } = await db.storage.from(BUCKET).download(f.storage_path);
+    if (dlErr || !blob) return fail(`PDF objednávky se nepodařilo načíst: ${dlErr?.message ?? "prázdný soubor"}`);
+    const content = Buffer.from(await blob.arrayBuffer());
+
+    const copies = cc.filter((x) => !to.some((t) => t.toLowerCase() === x.toLowerCase()));
+    const recipients = [...to, ...copies];
+    const res = await sendMail({
+      to: to.join(", "),
+      cc: copies.length ? copies.join(", ") : undefined,
+      subject,
+      text: body,
+      attachments: [{ filename: f.filename || purchaseOrderFileName(po.number), content, contentType: "application/pdf" }],
+      from: { ownerId: user.id },
+      jobId: po.jobId,
+      senderId: user.id,
+    });
+    if (!res.sent) return fail(res.reason ?? "E-mail se nepodařilo odeslat.");
+
+    const update: Row = { sent_at: new Date().toISOString() };
+    if (po.status === "navrh" || po.status === "vystavena") update.status = "odeslana";
+    const { error } = await db.from("purchase_orders").update(update as never).eq("id", id);
+    if (error) console.error(`[purchasing] Stav objednávky po odeslání se nepodařilo uložit: ${error.message}`);
+
+    await logJobEvent(db, {
+      jobId: po.jobId, type: "email",
+      message: `Objednávka ${po.number} odeslána dodavateli ${po.supplier?.name ?? ""} (${recipients.join(", ")})`.replace("  ", " "),
+      data: { purchaseOrderId: id, number: po.number, to: recipients, emailId: res.emailId ?? null, fileId: po.fileId },
+      actorId: user.id,
+    });
+    await logAudit({
+      action: "purchase_order_sent", entity: "purchase_orders", entityId: id,
+      diff: { jobId: po.jobId, number: po.number, to: recipients, emailId: res.emailId ?? null },
+    });
+    revalidatePurchasing(po.jobId);
+    revalidatePath("/sent");
+    return { ok: true, sent: true, ...(res.emailId ? { emailId: res.emailId } : {}) };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Obchodník zakázky (provize) ─────────────────────────────
+/**
+ * Přidělí zakázku obchodníkovi (orders.owner_id). Provizi dle jeho smlouvy
+ * přepočte DB trigger; vrací aktuální záznam provize.
+ */
+export async function assignJobOwner(
+  jobId: string,
+  ownerId: string | null,
+): Promise<ActionResult<{ commission: JobCommissionView | null }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
+  if (ownerId !== null && ownerId !== "" && !isUuid(ownerId)) return fail("Uživatel nenalezen.");
+  const owner = ownerId || null;
+  try {
+    const { db } = c;
+    const job = await loadJob(db, jobId, "id, number, owner_id");
+    if (!job) return fail(JOB_NOT_FOUND);
+    const refs: Record<string, string> = {};
+    for (const pid of [job.owner_id, owner]) {
+      if (!isUuid(pid)) continue;
+      const { data: p } = await db.from("profiles").select("id, full_name, email, active").eq("id", pid).maybeSingle();
+      const prof = p as { id: string; full_name: string | null; email: string | null; active: boolean } | null;
+      if (pid === owner && (!prof || prof.active === false)) return fail("Uživatel nenalezen nebo není aktivní.");
+      if (prof) refs[prof.id] = (prof.full_name ?? "").trim() || (prof.email ?? "").trim() || prof.id;
+    }
+
+    const err = await patchJob(c, jobId, job, { owner_id: owner }, refs);
+    if (err) return fail(err);
+    if (job.owner_id !== owner) {
+      await logAudit({ action: "job_owner_assigned", entity: "orders", entityId: jobId, diff: { from: job.owner_id ?? null, to: owner } });
+    }
+
+    const { data: comm } = await db.from("commission_entries").select("*").eq("order_id", jobId).maybeSingle();
+    const row = comm as CommissionDbRow | null;
+    revalidatePurchasing(jobId);
+    return { ok: true, commission: row ? rowToCommissionView(row, refs[row.owner_id] ?? "") : null };
+  } catch (err) {
+    return fail(err);
+  }
+}

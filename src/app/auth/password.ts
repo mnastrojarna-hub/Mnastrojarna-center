@@ -100,6 +100,16 @@ async function sendSupabaseRecovery(email: string): Promise<{ ok: boolean; error
   }
 }
 
+/** Uživatel si nastavil vlastní heslo → zrušit vynucenou změnu (best-effort). */
+async function clearPasswordChangeRequired(userId: string): Promise<void> {
+  if (!hasServiceKey()) return;
+  try {
+    await createAdminClient().from("profiles").update({ password_change_required: false } as never).eq("id", userId);
+  } catch {
+    // příznak nesmí shodit změnu hesla
+  }
+}
+
 /**
  * Krok 1: pošle 6místný kód na e-mail. Odpověď neprozradí, zda účet existuje.
  * Bez SMTP spadne na e-mail ze Supabase (channel „supabase").
@@ -227,6 +237,7 @@ async function resetWithSupabaseOtp(
 
   const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
   if (updateError) return { ok: false, error: translateAuthError(updateError.message) };
+  await clearPasswordChangeRequired(userId);
   await logAudit({ action: "password_reset", entity: "profiles", entityId: userId, diff: { channel: "supabase_otp" } });
   return { ok: true, signedIn: true };
 }
@@ -267,7 +278,7 @@ export async function resetPasswordWithCode(
       // Vlastní kód není → zkus OTP ze Supabase e-mailu
       const otp = await resetWithSupabaseOtp(email, code, newPassword);
       if (otp.ok || all.length === 0) return otp;
-      return { ok: false, error: "Kód vypršel nebo už byl použit — vyžádej si nový." };
+      return { ok: false, error: "Kód nesouhlasí nebo vypršel — zkontroluj ho, případně si vyžádej nový." };
     }
 
     if (active.attempts >= RESET_MAX_ATTEMPTS) {
@@ -324,6 +335,7 @@ export async function resetPasswordWithCode(
     const { data: authUser } = await db.auth.admin.getUserById(active.user_id);
     const loginEmail = (authUser?.user?.email as string | undefined) ?? email;
     const signedIn = await signInAfterReset(loginEmail, newPassword, active.user_id);
+    await clearPasswordChangeRequired(active.user_id);
     await logAudit({ action: "password_reset", entity: "profiles", entityId: active.user_id, diff: { channel: "code" } });
     return { ok: true, signedIn };
   } catch {
@@ -344,6 +356,7 @@ export async function updatePasswordAfterRecovery(newPassword: string): Promise<
     if (!user) return { ok: false, error: "Odkaz vypršel — vyžádej si nový kód na stránce Zapomenuté heslo." };
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { ok: false, error: translateAuthError(error.message) };
+    await clearPasswordChangeRequired(user.id);
     await logAudit({ action: "password_reset", entity: "profiles", entityId: user.id, diff: { channel: "supabase_link" } });
     return { ok: true };
   } catch {
@@ -386,6 +399,7 @@ export async function changeOwnPassword(
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) return { ok: false, error: translateAuthError(error.message) };
     }
+    await clearPasswordChangeRequired(user.id);
     await logAudit({ action: "password_changed", entity: "profiles", entityId: user.id });
     return { ok: true };
   } catch {

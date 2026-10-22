@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { createUser } from "@/app/actions/users";
 import { RolePicker } from "@/components/users/role-picker";
 import { PasswordField, CopyButton } from "@/components/users/password-field";
-import { passwordProblem } from "@/components/users/password-tools";
+import { initialPasswordProblem } from "@/components/users/password-tools";
 import type { MailboxOption } from "@/components/users/types";
 import type { UserRole } from "@/lib/supabase/database.types";
 
@@ -80,7 +80,7 @@ export function AddUserDialog({
     setError(null);
     if (!form.fullName.trim()) return setError("Vyplň jméno a příjmení.");
     if (!form.email.trim()) return setError("Vyplň e-mail.");
-    const pw = passwordProblem(form.password);
+    const pw = initialPasswordProblem(form.password);
     if (pw) return setError(pw);
 
     setBusy(true);
