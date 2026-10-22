@@ -9,7 +9,7 @@ if [ -f "$ROOT/.local-supabase/app.pid" ]; then
   rm -f "$ROOT/.local-supabase/app.pid"
 fi
 # next start spouští proces „next-server" (lsof/ss ho v kontejneru nemusí vidět) → podle cwd
-for pid in $(pgrep -x next-server 2>/dev/null) $(pgrep -f "next (start|dev) -p $PORT" 2>/dev/null); do
+for pid in $(pgrep -f "^next-server" 2>/dev/null) $(pgrep -f "next (start|dev) -p $PORT" 2>/dev/null); do
   cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
   if [ -n "$APP_DIR" ] && [ "$cwd" = "$APP_DIR" ]; then kill "$pid" 2>/dev/null || true; fi
 done
