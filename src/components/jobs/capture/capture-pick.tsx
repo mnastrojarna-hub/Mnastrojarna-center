@@ -151,12 +151,12 @@ export function CapturePick({
         </p>
 
         <div className="mt-6 flex w-full max-w-sm flex-col gap-2 sm:max-w-md sm:flex-row">
-          <Button asChild size="lg" className="h-12 flex-1 cursor-pointer bg-rose-600 text-base text-white shadow-md shadow-rose-600/25 hover:bg-rose-700">
+          <Button asChild size="lg" className="h-12 w-full shrink-0 cursor-pointer sm:w-auto sm:flex-1 bg-rose-600 text-base text-white shadow-md shadow-rose-600/25 hover:bg-rose-700">
             <label htmlFor={cameraId} {...keyOpen(cameraRef)}>
               <Camera className="!size-5" /> Vyfotit
             </label>
           </Button>
-          <Button asChild size="lg" variant="outline" className="h-12 flex-1 cursor-pointer text-base">
+          <Button asChild size="lg" variant="outline" className="h-12 w-full shrink-0 cursor-pointer sm:w-auto sm:flex-1 text-base">
             <label htmlFor={filesId} {...keyOpen(filesRef)}>
               <Images className="!size-5 text-sky-600 dark:text-sky-400" /> Vybrat soubory
             </label>

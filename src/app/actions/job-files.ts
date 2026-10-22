@@ -106,6 +106,10 @@ export async function registerJobFile(input: {
   replaceFileId?: string;
   aiExtracted?: Record<string, unknown> | null;
   aiConfidence?: number | null;
+  /** Bez vlastní události v historii (volající zapíše jednu souhrnnou — např. foto dokladu). */
+  silent?: boolean;
+  /** Bez automatické nové verze podle stejného názvu (stránky dokladu, „scan.pdf" ze skeneru). */
+  noAutoVersion?: boolean;
 }): Promise<ActionResult<{ file: JobFile }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -153,7 +157,7 @@ export async function registerJobFile(input: {
       }
     }
     const kind: JobFileKind = input.kind ?? (replaced && isJobFileKind(replaced.kind) ? replaced.kind : guessFileKind(filename, mimeType ?? undefined));
-    if (!replaced && !isGenericCaptureName(filename)) {
+    if (!replaced && !input.noAutoVersion && !isGenericCaptureName(filename)) {
       // stejný druh + stejný název → automaticky nová verze (ne u „image.jpg" z fotoaparátu)
       const { data: same } = await db
         .from("job_files")
@@ -200,12 +204,14 @@ export async function registerJobFile(input: {
       if (upErr) console.error(`[job-files] Archivace předchozí verze selhala: ${upErr.message}`);
     }
 
-    await logJobEvent(db, {
-      jobId, type: "file",
-      message: `Nahrán dokument: ${kindLabel(kind)} — ${filename}${version > 1 ? ` (v${version})` : ""}`,
-      data: { fileId: row.id, kind, filename, version, ...(replaced ? { replacedFileId: replaced.id } : {}) },
-      actorId: user.id,
-    });
+    if (!input.silent) {
+      await logJobEvent(db, {
+        jobId, type: "file",
+        message: `Nahrán dokument: ${kindLabel(kind)} — ${filename}${version > 1 ? ` (v${version})` : ""}`,
+        data: { fileId: row.id, kind, filename, version, ...(replaced ? { replacedFileId: replaced.id } : {}) },
+        actorId: user.id,
+      });
+    }
     revalidateFiles(jobId);
     return { ok: true, file: rowToJobFile(row) };
   } catch (err) {

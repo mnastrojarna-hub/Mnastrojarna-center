@@ -31,10 +31,15 @@ export async function uploadCapturePage(file: File): Promise<{ ok: true; ref: Ca
     const { error } = await createClient().storage
       .from(prep.bucket)
       .uploadToSignedUrl(prep.path, prep.token, body, { contentType, upsert: false });
-    if (error) return { ok: false, error: `Nahrání selhalo: ${error.message}` };
+    if (error) {
+      console.error(`[capture] Nahrání ${filename} selhalo: ${error.message}`);
+      return { ok: false, error: "Nahrání selhalo — zkontroluj připojení a zkus to znovu." };
+    }
     return { ok: true, ref: { path: prep.path, filename, mimeType: contentType, size: body.size } };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Nahrání selhalo." };
+    // technický detail jen do logu, uživateli srozumitelná česká hláška
+    console.error(`[capture] Nahrání ${file.name} selhalo: ${err instanceof Error ? err.message : String(err)}`);
+    return { ok: false, error: "Nahrání selhalo — zkontroluj připojení a zkus to znovu." };
   }
 }
 

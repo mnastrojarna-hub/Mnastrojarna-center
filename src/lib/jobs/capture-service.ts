@@ -771,6 +771,9 @@ async function applyWithSession(
       note: i === 0 && state.docNote ? state.docNote : undefined,
       aiExtracted: i === 0 && aiUsed ? (doc as unknown as Record<string, unknown>) : null,
       aiConfidence: i === 0 && aiUsed ? doc.confidence : null,
+      // stránky jednoho dokladu: žádné automatické verze podle názvu, historie = jedna souhrnná událost níže
+      silent: true,
+      noAutoVersion: true,
     });
     if (!reg.ok || !reg.file) {
       warnings.push(`Stránku ${f.filename} se nepodařilo uložit (${reg.error ?? "neznámá chyba"}).`);

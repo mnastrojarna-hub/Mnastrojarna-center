@@ -235,7 +235,9 @@ function TargetSection({
       ? "Našla jsem zakázku, ke které doklad patří. Když nesedí, vyber jinou."
       : existing.length
         ? "Jistou shodu jsem nenašla — možná patří k některé z těchto, nebo založ novou."
-        : "Žádná podobná zakázka v knize není — založí se nová.";
+        : model.aiUsed
+          ? "Žádná podobná zakázka v knize není — založí se nová."
+          : "Vyber zakázku, ke které doklad patří, nebo založ novou.";
 
   return (
     <Section icon={Link2} tone="sky" title="Ke které zakázce?" hint={hint}>
