@@ -5,6 +5,10 @@ import { AccessBridge } from "@/components/access-provider";
 import { requireUser, getAccess } from "@/lib/auth/session";
 import { getBadgeCounts } from "@/lib/data/queries";
 
+// Každý požadavek ověřuje přihlášení a oprávnění — nikdy statické předrenderování
+// (bez env při buildu by se jinak stránky aplikace „zapekly" jako statické).
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Login-first: bez aktivního účtu se do aplikace nedostane nikdo.
   const user = await requireUser();
