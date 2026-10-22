@@ -51,10 +51,12 @@ export function installDebugCapture(): void {
     (e: ErrorEvent | Event) => {
       const ev = e as ErrorEvent;
       if (ev.error || ev.message) {
+        // Skripty vložené prohlížečem / rozšířením (peněženky, překladače…) nejsou chyby aplikace
+        const foreign = isForeignScriptError(ev);
         add({
-          level: "error",
-          source: "window.error",
-          message: ev.message || "Neodchycená chyba",
+          level: foreign ? "warn" : "error",
+          source: foreign ? "mimo-aplikaci" : "window.error",
+          message: foreign ? `Mimo aplikaci (rozšíření / vložený skript prohlížeče): ${ev.message || "chyba"}` : ev.message || "Neodchycená chyba",
           details: detailFromValue({
             message: ev.message,
             filename: ev.filename,
@@ -106,7 +108,7 @@ export function installDebugCapture(): void {
           source: "fetch",
           message: `${method} ${shortUrl(url)} → ${res.status} ${res.statusText} (${ms} ms)`,
           details: detailFromValue({
-            request: { method, url, headers: headersToObject(init?.headers), body: bodyPreview(init?.body) },
+            request: requestPreview(method, url, init),
             response: { status: res.status, statusText: res.statusText, ok: res.ok, headers: headersToObject(res.headers), redirected: res.redirected, type: res.type },
             durationMs: ms,
           }),
@@ -114,11 +116,15 @@ export function installDebugCapture(): void {
         return res;
       } catch (err) {
         const ms = Math.round(performance.now() - started);
+        // zrušený požadavek (přechod na jinou stránku, zrušené předběžné načtení) není chyba
+        const aborted = (err as Error)?.name === "AbortError";
         add({
-          level: "error",
+          level: aborted ? "network" : "error",
           source: "fetch",
-          message: `${method} ${shortUrl(url)} → SÍŤOVÁ CHYBA (${ms} ms): ${(err as Error)?.message}`,
-          details: detailFromValue({ request: { method, url, headers: headersToObject(init?.headers), body: bodyPreview(init?.body) }, error: err, durationMs: ms }),
+          message: aborted
+            ? `${method} ${shortUrl(url)} → zrušeno (${ms} ms)`
+            : `${method} ${shortUrl(url)} → SÍŤOVÁ CHYBA (${ms} ms): ${(err as Error)?.message}`,
+          details: detailFromValue({ request: requestPreview(method, url, init), error: err, durationMs: ms }),
           stack: (err as Error)?.stack,
         });
         throw err;
@@ -147,7 +153,7 @@ export function installDebugCapture(): void {
             level: ok ? "network" : "error",
             source: "xhr",
             message: `${meta.method} ${shortUrl(meta.url)} → ${this.status || "ERR"} (${ms} ms)`,
-            details: detailFromValue({ method: meta.method, url: meta.url, status: this.status, statusText: this.statusText, durationMs: ms, body: bodyPreview(body) }),
+            details: detailFromValue({ method: meta.method, url: redactUrl(meta.url), status: this.status, statusText: this.statusText, durationMs: ms, body: bodyPreview(body, false) }),
           });
         });
       }
@@ -189,12 +195,20 @@ export function installDebugCapture(): void {
 }
 
 // ── pomocné ─────────────────────────────────────────────────
+/** „Script error." bez souboru = cizí (cross-origin) skript; window.ethereum apod. = rozšíření. */
+export function isForeignScriptError(ev: { message?: string; filename?: string; error?: unknown }): boolean {
+  const msg = ev.message ?? "";
+  if (/^Script error\.?$/i.test(msg.trim()) && !ev.filename) return true;
+  if (/window\.ethereum|ethereum\.|__firefox__|webkit\.messageHandlers|__gCrWeb|solana|tronWeb/i.test(msg)) return true;
+  return /^(chrome|moz|safari(-web)?)-extension:/i.test(ev.filename ?? "");
+}
+
 function shortUrl(url: string): string {
   try {
     const u = new URL(url, window.location.href);
-    return u.pathname + u.search;
+    return redactUrl(u.pathname + u.search);
   } catch {
-    return url;
+    return redactUrl(url);
   }
 }
 
@@ -211,6 +225,10 @@ function headersToObject(headers?: HeadersInit | Headers): Record<string, string
   return out;
 }
 
+/** Klíče, jejichž hodnoty se do logu nikdy nedostanou (hesla, kódy, tokeny…). */
+const SENSITIVE_KEY = /pass|heslo|token|secret|key|code|k[oó]d|otp|pin|auth|cookie|session|signature|iban|card/i;
+const HIDDEN = "[skryto]";
+
 /** Skryje citlivé hodnoty (tokeny, hesla) v hlavičkách. */
 function redact(key: string, value: string): string {
   if (/auth|cookie|token|secret|key|password/i.test(key)) {
@@ -219,17 +237,51 @@ function redact(key: string, value: string): string {
   return value;
 }
 
-function bodyPreview(body: unknown): string | undefined {
+/** Parametry URL s tokeny (podepsané odkazy úložiště, kódy) → skryté. */
+export function redactUrl(url: string): string {
+  return url.replace(/([?&][^=&#]*(?:token|code|key|sig|secret|pass)[^=&#]*=)[^&#]*/gi, `$1${HIDDEN}`);
+}
+
+function redactDeep(value: unknown, depth = 0): unknown {
+  if (depth > 6 || value == null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((v) => redactDeep(v, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = SENSITIVE_KEY.test(k) ? HIDDEN : redactDeep(v, depth + 1);
+  }
+  return out;
+}
+
+function requestPreview(method: string, url: string, init?: RequestInit) {
+  const headers = headersToObject(init?.headers);
+  // Server action nese argumenty po pozicích (např. nové heslo) — obsah se nikdy neloguje.
+  const isAction = Boolean(headers && Object.keys(headers).some((k) => k.toLowerCase() === "next-action"));
+  return { method, url: redactUrl(url), headers, body: bodyPreview(init?.body, isAction) };
+}
+
+/** Náhled těla požadavku bez citlivých údajů. */
+export function bodyPreview(body: unknown, isAction: boolean): string | undefined {
   if (body == null) return undefined;
-  if (typeof body === "string") return body.slice(0, 2000);
   if (typeof FormData !== "undefined" && body instanceof FormData) {
     const parts: string[] = [];
-    body.forEach((v, k) => parts.push(`${k}=${v instanceof File ? `[File ${v.name} ${v.size}B]` : String(v).slice(0, 200)}`));
+    body.forEach((v, k) => {
+      const shown = v instanceof File ? `[File ${v.name} ${v.size}B]` : SENSITIVE_KEY.test(k) ? HIDDEN : String(v).slice(0, 200);
+      parts.push(`${k}=${shown}`);
+    });
     return `FormData{ ${parts.join(", ")} }`;
   }
   if (typeof Blob !== "undefined" && body instanceof Blob) return `[Blob ${body.size}B ${body.type}]`;
+  if (typeof body === "string") {
+    if (isAction) return `[server action — ${body.length} znaků, obsah skrytý]`;
+    try {
+      return JSON.stringify(redactDeep(JSON.parse(body))).slice(0, 2000);
+    } catch {
+      return body.replace(/((?:^|&)[^=&]*(?:pass|heslo|token|secret|code|key)[^=&]*=)[^&]*/gi, `$1${HIDDEN}`).slice(0, 2000);
+    }
+  }
+  if (isAction) return "[server action — obsah skrytý]";
   try {
-    return JSON.stringify(body).slice(0, 2000);
+    return JSON.stringify(redactDeep(body)).slice(0, 2000);
   } catch {
     return String(body).slice(0, 2000);
   }

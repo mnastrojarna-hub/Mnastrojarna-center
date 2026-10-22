@@ -11,6 +11,22 @@ import { cn } from "@/lib/utils";
 
 /** Fotky a PDF (na mobilu fotoaparát, na počítači výběr / přetažení / vložení ze schránky). */
 export const CAPTURE_ACCEPT = "image/*,application/pdf,.pdf,.heic,.heif";
+/** Fotoaparát: jen obrázky — s PDF v `accept` Android místo fotoaparátu otevře výběr souboru. */
+export const CAMERA_ACCEPT = "image/*";
+
+/** Popisek otevírající výběr souboru: klepnutí řeší prohlížeč (label for), klávesnice Enter / mezerník. */
+function keyOpen(ref: React.RefObject<HTMLInputElement | null>) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        ref.current?.click();
+      }
+    },
+  };
+}
 
 function filesFrom(list: FileList | null | undefined): File[] {
   return list ? Array.from(list).filter((f) => f.size > 0) : [];
@@ -41,6 +57,9 @@ export function CapturePick({
 }) {
   const cameraRef = React.useRef<HTMLInputElement>(null);
   const filesRef = React.useRef<HTMLInputElement>(null);
+  const uid = React.useId();
+  const cameraId = `${uid}-camera`;
+  const filesId = `${uid}-files`;
   const [dragOver, setDragOver] = React.useState(false);
 
   // vložení obrázku ze schránky (Ctrl+V na počítači)
@@ -58,12 +77,17 @@ export function CapturePick({
 
   const inputs = (
     <>
+      {/* Pole jsou vizuálně skrytá (ne display:none) a otevírá je <label for> — nativní klepnutí
+          funguje i tam, kde prohlížeč blokuje programové input.click() (iOS, vestavěné prohlížeče). */}
       <input
         ref={cameraRef}
+        id={cameraId}
         type="file"
-        accept={CAPTURE_ACCEPT}
+        accept={CAMERA_ACCEPT}
         capture="environment"
-        className="hidden"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
         data-testid="capture-camera-input"
         onChange={(e) => {
           onAddFiles(filesFrom(e.target.files));
@@ -72,10 +96,13 @@ export function CapturePick({
       />
       <input
         ref={filesRef}
+        id={filesId}
         type="file"
         accept={CAPTURE_ACCEPT}
         multiple
-        className="hidden"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
         data-testid="capture-files-input"
         onChange={(e) => {
           onAddFiles(filesFrom(e.target.files));
@@ -124,16 +151,15 @@ export function CapturePick({
         </p>
 
         <div className="mt-6 flex w-full max-w-sm flex-col gap-2 sm:max-w-md sm:flex-row">
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => cameraRef.current?.click()}
-            className="h-12 flex-1 bg-rose-600 text-base text-white shadow-md shadow-rose-600/25 hover:bg-rose-700"
-          >
-            <Camera className="!size-5" /> Vyfotit
+          <Button asChild size="lg" className="h-12 flex-1 cursor-pointer bg-rose-600 text-base text-white shadow-md shadow-rose-600/25 hover:bg-rose-700">
+            <label htmlFor={cameraId} {...keyOpen(cameraRef)}>
+              <Camera className="!size-5" /> Vyfotit
+            </label>
           </Button>
-          <Button type="button" size="lg" variant="outline" onClick={() => filesRef.current?.click()} className="h-12 flex-1 text-base">
-            <Images className="!size-5 text-sky-600 dark:text-sky-400" /> Vybrat soubory
+          <Button asChild size="lg" variant="outline" className="h-12 flex-1 cursor-pointer text-base">
+            <label htmlFor={filesId} {...keyOpen(filesRef)}>
+              <Images className="!size-5 text-sky-600 dark:text-sky-400" /> Vybrat soubory
+            </label>
           </Button>
         </div>
         <p className="mt-3 hidden text-xs text-muted-foreground sm:block">
@@ -213,20 +239,20 @@ export function CapturePick({
           </li>
         ))}
         <li className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => cameraRef.current?.click()}
-            className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-rose-300 bg-rose-50/60 p-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
+          <label
+            htmlFor={cameraId}
+            {...keyOpen(cameraRef)}
+            className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-rose-300 bg-rose-50/60 p-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
           >
             <Camera className="h-6 w-6" /> Vyfotit další stránku
-          </button>
-          <button
-            type="button"
-            onClick={() => filesRef.current?.click()}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed p-2.5 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
+          </label>
+          <label
+            htmlFor={filesId}
+            {...keyOpen(filesRef)}
+            className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed p-2.5 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Plus className="h-4 w-4" /> Vybrat soubory
-          </button>
+          </label>
         </li>
       </ol>
     </div>
