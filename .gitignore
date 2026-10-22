@@ -32,3 +32,4 @@ yarn-error.log*
 
 # runtime konfigurace z průvodce nastavením
 /data/
+.local-supabase/
