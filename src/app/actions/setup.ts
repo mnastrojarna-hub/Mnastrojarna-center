@@ -173,7 +173,8 @@ export async function createSuperAdmin(input: {
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName, role: "super_admin" },
+    user_metadata: { full_name: fullName },
+    app_metadata: { role: "super_admin", invited: true },
   });
 
   let userId: string | undefined = created?.user?.id;
@@ -194,7 +195,7 @@ export async function createSuperAdmin(input: {
   if (userId) {
     await db
       .from("profiles")
-      .upsert({ id: userId, email, full_name: fullName, role: "super_admin" } as never);
+      .upsert({ id: userId, email, full_name: fullName, role: "super_admin", active: true } as never);
   }
 
   // Přihlášení (nastaví session cookies)

@@ -1,0 +1,11 @@
+{
+  "name": "local-supabase-tools",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lokální Supabase-kompatibilní stack pro E2E testy (bez Dockeru)",
+  "type": "module",
+  "dependencies": {
+    "mailparser": "^3.12.3",
+    "smtp-server": "^3.21.0"
+  }
+}

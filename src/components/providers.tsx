@@ -6,13 +6,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AutomationProvider } from "@/components/automation-provider";
 import { CommandPaletteProvider } from "@/components/command-palette";
 import { DebugBar } from "@/components/debug/debug-bar";
+import { AccessProvider } from "@/components/access-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <NextThemesProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
       <AutomationProvider>
         <TooltipProvider delayDuration={200}>
-          <CommandPaletteProvider>{children}</CommandPaletteProvider>
+          <AccessProvider>
+            <CommandPaletteProvider>{children}</CommandPaletteProvider>
+          </AccessProvider>
           {/* Trvalá debug lišta dole — na všech stránkách, pro report a kopírování chyb */}
           <DebugBar />
         </TooltipProvider>

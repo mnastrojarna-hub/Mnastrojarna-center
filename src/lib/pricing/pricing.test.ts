@@ -260,7 +260,8 @@ describe("engine (kompletní kalkulace)", () => {
   it("historie drží cenu v pásmu (vyhlazení)", () => {
     const r = calculatePrice({
       ...base,
-      history: [{ unitPrice: 100, date: "2026-05-01" }],
+      // dnešní datum → bez inflačního přepočtu (test nesmí záviset na tom, kdy běží)
+      history: [{ unitPrice: 100, date: new Date().toISOString().slice(0, 10) }],
     });
     expect(r.smoothing?.adjusted).toBe(true);
     expect(r.unitPrice).toBeLessThanOrEqual(100 * 1.16);

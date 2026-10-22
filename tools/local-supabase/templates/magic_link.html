@@ -1,0 +1,6 @@
+<!-- Šablona GoTrue pro lokální stack (magic_link) — obsahuje OTP token i odkaz. -->
+<h2>Přihlašovací odkaz</h2>
+<p>Přihlašovací kód: <strong>{{ .Token }}</strong></p>
+<p><a href="{{ .ConfirmationURL }}">Pokračovat</a></p>
+<p>TOKEN={{ .Token }}</p>
+<p>URL={{ .ConfirmationURL }}</p>

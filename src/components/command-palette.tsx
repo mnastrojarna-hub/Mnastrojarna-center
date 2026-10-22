@@ -6,6 +6,7 @@ import { Command } from "cmdk";
 import { Search, ArrowRight, FileText, Users, Factory, FileBox, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { allNavItems } from "@/lib/nav";
+import { useAccess } from "@/components/access-provider";
 import { cn } from "@/lib/utils";
 
 interface SearchEntry { id: string; label: string; hint?: string }
@@ -32,6 +33,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
   const [data, setData] = React.useState<SearchData>(EMPTY);
   const loaded = React.useRef(false);
   const router = useRouter();
+  const access = useAccess();
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -85,7 +87,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
               </Command.Empty>
 
               <Command.Group heading="Navigace">
-                {allNavItems.map((item) => (
+                {allNavItems.filter((item) => access.can(item.feature)).map((item) => (
                   <Item key={item.href} onSelect={() => go(item.href)} icon={<item.icon />}>
                     {item.title}
                   </Item>
