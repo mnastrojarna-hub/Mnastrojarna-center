@@ -7,6 +7,7 @@ import { supplierParty } from "@/lib/pdf/components";
 import { sendMail } from "@/lib/email/send";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
+import { checkFeature } from "@/lib/auth/session";
 
 export interface QuoteItemInput {
   description: string;
@@ -36,6 +37,8 @@ export interface SubmitQuoteResult {
 }
 
 export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuoteResult> {
+  const auth = await checkFeature("ai_pricing");
+  if ("error" in auth) return { ok: false, error: auth.error };
   await refreshCompanyFromSettings();
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SECRET_KEY) {
     return { ok: false, error: "Pro uložení doplň Supabase URL + servisní klíč (Nastavení → Integrace)." };
@@ -68,6 +71,8 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
         ai_generated: true,
         note: input.coverEmail,
         sent_at: null,
+        created_by: auth.user.id,
+        owner_id: auth.user.id,
       } as never)
       .select("id")
       .single();

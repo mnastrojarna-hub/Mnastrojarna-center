@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiRequire } from "@/lib/auth/session";
 import { generateQuote } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
 import { runPricingFlow } from "@/lib/ai/pricing-flow";
@@ -12,6 +13,8 @@ export const maxDuration = 120;
  * uložení + PDF archiv + fronta schválení (+ odeslání).
  */
 export async function POST(req: Request) {
+  const auth = await apiRequire("ai_pricing");
+  if (auth instanceof NextResponse) return auth;
   try {
     const body = await req.json();
     const customer = String(body.customer ?? "");

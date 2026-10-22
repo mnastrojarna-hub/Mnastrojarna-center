@@ -62,6 +62,56 @@ Publishable a URL jsou bezpečné pro prohlížeč. Servisní klíč (`sb_secret
 
 ---
 
+## Přihlašování (Supabase Auth) — povinné nastavení po nasazení
+
+Dashboard → projekt → **Authentication**:
+
+1. **URL Configuration**
+   - **Site URL** = veřejná adresa aplikace (`<APP_URL>`, např. `https://mnastrojarna.vercel.app`).
+   - **Redirect URLs** → přidej `<APP_URL>/auth/callback` (a pro lokální vývoj `http://localhost:3000/auth/callback`).
+     Bez toho nefunguje odkaz z e-mailu pro obnovu hesla.
+   - Stejnou adresu nastav v proměnné `NEXT_PUBLIC_APP_URL` na Vercelu.
+2. **Vypni veřejnou registraci** — *Authentication → Sign In / Providers → Email*:
+   **„Allow new users to sign up" = OFF**. Nové účty zakládá **super admin** v aplikaci
+   (Uživatelé → Nový uživatel, počáteční heslo, vynucená změna po prvním přihlášení).
+   Účet bez profilu v aplikaci je stejně neaktivní a nic neuvidí.
+3. **(Volitelné) Šablona e-mailu pro obnovu hesla** — *Authentication → Emails → Reset Password*.
+   Aplikace posílá vlastní 6místný kód přes SMTP firemní schránky. Když SMTP chybí, použije se e-mail
+   Supabase — aby fungoval i kód (ne jen odkaz), doplň do šablony `{{ .Token }}`, např.:
+
+   ```html
+   <h2>Obnovení hesla — Mnástrojárna</h2>
+   <p>Tvůj kód: <strong>{{ .Token }}</strong> (platí 15 minut)</p>
+   <p>Nebo klikni: <a href="{{ .ConfirmationURL }}">nastavit nové heslo</a></p>
+   ```
+
+## Úložiště souborů
+
+Bucket **`job-files`** (doklady, fotky, výkresy a 3D modely zakázek) **vytváří migrace**
+`supabase/migrations/20261022090000_kniha_zakazek.sql` — ručně nic nezakládej. Je soukromý; aplikace
+nahrává přes podepsané URL a soubory vydává jen přihlášeným (`/api/jobs/files/<id>`). Starší bucket
+`documents` (archiv výkresů, PDF) zakládá migrace `…_documents_storage.sql`.
+
+## Automatické stahování pošty (cron)
+
+1. Na Vercelu nastav proměnnou **`CRON_SECRET`** (libovolný dlouhý náhodný řetězec).
+2. Plánovač volá **`GET <APP_URL>/api/cron/sync-mail`** s hlavičkou `Authorization: Bearer <CRON_SECRET>`.
+   - Vercel Cron posílá hlavičku sám, stačí v `vercel.json`:
+     ```json
+     { "crons": [{ "path": "/api/cron/sync-mail", "schedule": "*/10 * * * *" }] }
+     ```
+     (na plánu Hobby jde jen 1× denně — pak použij externí plánovač, např. cron-job.org, se stejnou hlavičkou).
+   - Bez `CRON_SECRET` endpoint odpoví 503 a nic nestahuje; se špatným tajemstvím 401.
+3. Uživatelé si poštu mohou kdykoli stáhnout i ručně tlačítkem v Přijaté poště.
+
+## Bezpečnost dat
+
+Aplikace čte a zapisuje servisním klíčem (`SUPABASE_SECRET_KEY`, obchází RLS) a oprávnění kontroluje sama
+v každé stránce, server action i API route (`src/lib/auth/session.ts`). RLS politiky v migracích zůstávají
+jako druhá vrstva pro přímý přístup s publishable klíčem. Servisní klíč nikdy nedávej do `NEXT_PUBLIC_*`.
+
+---
+
 ## Alternativa — nativní GitHub integrace Supabase
 
 Místo Action lze v dashboardu zapnout **Project Settings → Integrations → GitHub** a propojit

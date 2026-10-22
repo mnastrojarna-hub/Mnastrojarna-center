@@ -1,64 +1,140 @@
 # CNC Sales OS — Mnástrojárna
 
-AI asistovaná obchodní a e-mailová kancelář pro nástrojárnu — CRM + ERP + e-mailový klient + dokumentový systém + AI asistent v jedné moderní SaaS aplikaci.
+AI asistovaná kancelář nástrojárny a kooperací: **Kniha zakázek** jako jediná pracovní plocha
+pro všechny, k ní pošta, zákazníci, dodavatelé, doklady (PDF), provize a AI, která čte vyfocené
+doklady a učí se z ručních oprav.
 
-> Kompletní vize a specifikace: viz [`CLAUDE.md`](./CLAUDE.md)
+> Vize a specifikace: [`CLAUDE.md`](./CLAUDE.md) · Návod pro uživatele: [`docs/kniha-zakazek.md`](./docs/kniha-zakazek.md)
+> · Supabase a nasazení: [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md)
+
+## Co aplikace dělá
+
+- **Kniha zakázek** (`/orders`, výchozí stránka po přihlášení) — jedna zakázka = jeden řádek
+  (Z-2026-001). Záložky **Objednávky** (výchozí: objednávka → potvrzeno → ve výrobě → dodáno k nám
+  → na skladě → montáž → dodáno zákazníkovi → vyfakturováno, + pozastaveno / reklamace),
+  **Poptávky & nabídky** (předobjednávková fáze), Dokončené, Nerealizované & zrušené, Vše.
+  Každý stav má svou barvu (`src/lib/jobs/stages.ts`), filtry podle stavu, termínu, obchodníka,
+  zákazníka, výroby a platby; řádky i tabule (kanban).
+- **Karta zakázky** — zákazník (+ naše číslo zákazníka), číslo objednávky a poptávky zákazníka,
+  všechny termíny (poptávka, objednávka, požadovaný, potvrzený, předpokládaný, slíbený dodavatelem,
+  max. tolerovaný), lidé (obchodník, zadal, zpracovává, nacenil, schválil), položky, **více nabídek**
+  s verzemi a archivem, dokumenty s verzemi, výroba, nákup & marže, historie změn.
+- **📷 Vyfotit doklad** — fotka / PDF → AI pozná druh dokladu a vystavitele (poptávka zákazníka,
+  naše nabídka, nabídka dodavatele, objednávka zákazníka, naše potvrzení, dodací list, faktura…),
+  přečte údaje, spáruje zakázku a zákazníka (nového založí), posune stav **jen dopředu** a ukáže
+  **kontrolní formulář** před uložením. Bez AI oprávnění stejný postup s ručním vyplněním.
+- **+ Nová zakázka** — kompletní ruční formulář; vše jde upravit i dodatečně (s historií).
+- **Doklady (PDF)** — nabídka, potvrzení objednávky, dodací list, faktura, objednávka dodavateli;
+  odeslání e-mailem z aplikace.
+- **Pošta** — Outlook (Graph) / IMAP+SMTP (hosting90); AI třídí kategorie, každý vidí svou
+  schránku, super admin všechny; zakázka z e-mailu jedním klikem.
+- **Zákazníci** (`/customers`) a **Dodavatelé** (`/suppliers`) — pro všechny: číslo zákazníka
+  (ZK0001, přiděluje DB), IČO/DIČ, adresy, kontaktní osoby, splatnost, naše číslo dodavatele
+  u zákazníka; dodavatelé s technologiemi, materiály, certifikacemi, lhůtou a hodnocením.
+- **Provize** — obchodník vidí jen svoje, super admin všechny (smlouvy, pásma, vyúčtování).
+- **Super admin navíc**: AI přehled (fronta schvalování, AI pošta, rozložení zakázek), AI asistent,
+  znalostní DB (historie cen), archiv výkresů, ladění AI (pravidla, korekce, automatika),
+  nastavení, uživatelé.
+- **Hledání ⌘K** — zakázky (číslo, název, zákazník, č. objednávky zákazníka, výkres), zákazníci,
+  dodavatelé, nabídky, výkresy (jen s právem) + rychlé akce.
+
+### Role a oprávnění
+
+| Funkce | Super admin | Obchodník | Zaměstnanec |
+| --- | --- | --- | --- |
+| Kniha zakázek, tok (poptávky → potvrzení), dokumenty | ✅ | ✅ | ✅ |
+| Zákazníci, dodavatelé | ✅ | ✅ | ✅ |
+| Pošta | všech | vlastní | vlastní |
+| Nákupní ceny a marže | ✅ | ✅ | ❌ |
+| Provize | všech | vlastní | ❌ |
+| AI čtení dokladů | ✅ | dle povolení | dle povolení |
+| AI přehled, asistent, znalostní DB, výkresy, ladění AI, AI nacenění | ✅ | ❌ | ❌ |
+| Nastavení, uživatelé, mazání | ✅ | ❌ | ❌ |
+
+Zdroj pravdy: `src/lib/auth/permissions.ts` (`can(subject, feature, ctx)`). Data se na serveru čtou
+**servisním klíčem** (obchází RLS), proto **každá stránka, server action i API route** kontroluje
+oprávnění sama (`requireFeature` / `checkFeature` / `apiRequire` v `src/lib/auth/session.ts`).
+Nacenění dělá člověk — AI se zatím jen učí (`ai_pricing` je jen pro super admina).
+
+### AI a učení
+
+- Čtení dokladů: `src/lib/ai/document-reader.ts` (Claude, obrázky i PDF). Každý uložený doklad
+  (AI vyplnila / člověk opravil / člověk vyplnil) se uloží do `ai_training_examples` a nejnovější
+  příklady jdou do promptu jako vzor. Opravy výstupů AI → `ai_corrections` (Ladění & korekce).
+- Hlavní vypínač AI a „AI čtení pro všechny" je v Nastavení → AI přístup; per uživatel
+  v Uživatelé. Bez Claude API klíče aplikace funguje ručně.
 
 ## Stack
 
 | Vrstva | Technologie |
 | --- | --- |
-| Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, ShadCN-style UI |
-| Backend | Supabase (PostgreSQL + pgvector, Auth, Storage, Realtime, Edge Functions) |
-| AI | Claude API (Anthropic, `claude-opus-4-8`) + embeddings/pgvector (RAG) |
+| Frontend | Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS, shadcn-style UI |
+| Backend | Supabase (PostgreSQL + pgvector, Auth, Storage, RLS) + Next.js Server Actions / API routes |
+| AI | Claude API (Anthropic) |
 | E-mail | Microsoft 365 / Outlook (Graph API), IMAP/SMTP (hosting90) |
-| Nasazení | Vercel + Supabase (deploy migrací přes git, viz `SUPABASE_SETUP.md`) |
+| Nasazení | Vercel + Supabase (migrace v `supabase/migrations/`, viz `SUPABASE_SETUP.md`) |
 
-## Filozofie ovládání
-
-**AI dělá vše automaticky, člověk pouze koriguje.** Každá automatizovaná akce běží v jednom ze dvou režimů — **Plná automatika (100 %)** nebo **Se schválením**. Přepíná se globálně (horní lišta) i per-modul (Nastavení).
-
-## Co je hotové
-
-**Frontend / UX**
-- App shell: sidebar, topbar, command palette (⌘K), dark/light mode, responzivní + mobilní nav
-- Moduly: Dashboard, AI Inbox, Nabídky, Objednávky, Zákazníci, Dodavatelé, Archiv výkresů, Znalostní DB, AI Asistent, Provize, Nastavení
-- Branding dle logomanuálu (červená `#E03930`, antracit, šedá; font Roboto; logo frézy)
-- Fronta ke schválení, AI confidence indikátory, přepínač režimu automatizace
-
-**Backend (Supabase)**
-- 20 tabulek (profiles+role, CRM, dodavatelé, výkresy+pgvector, nabídky/objednávky, e-maily, automatizace, fronta schvalování, provize, znalostní DB, audit log)
-- RLS politiky dle rolí (super_admin / obchodnik / zamestnanec), RAG funkce `match_drawings` / `match_knowledge`, číslování dokladů
-- Migrace ověřené na PG16 + pgvector; `supabase/seed.sql` pro lokální dev
-- Datová vrstva s fallbackem na demo data (appka běží i bez živé DB)
-
-**AI (Claude)**
-- Kategorizace e-mailů, návrhy odpovědí, firemní asistent (`src/lib/ai/claude.ts`)
-- API: `/api/assistant`, `/api/emails/categorize`, `/api/emails/sync`
-
-**E-mail ingest**
-- IMAP (hosting90) + Microsoft Graph (Outlook) → AI analýza → uložení + fronta ke schválení
-
-**Auth**
-- Supabase Auth (login `/login`, server actions, middleware pro session)
-
-## Spuštění (lokálně)
+## Spuštění
 
 ```bash
-cp .env.example .env.local   # doplň klíče (Supabase už předvyplněno v .env.local)
+cp .env.example .env.local   # doplň klíče
 npm install
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://localhost:3000 → /login → /orders
 ```
 
-## Co je potřeba doplnit pro plný provoz (secrets)
+První spuštění bez databáze otevře průvodce `/setup` (Supabase, AI klíč, firma, první super admin).
 
-| Kde | Co | Proč |
+### Proměnné prostředí
+
+| Proměnná | Povinná | K čemu |
 | --- | --- | --- |
-| `.env.local` / Vercel | `ANTHROPIC_API_KEY` | živá AI (jinak fallback) |
-| `.env.local` / Vercel | `SUPABASE_SECRET_KEY` | serverový zápis (ingest pošty) |
-| `.env.local` / Vercel | `IMAP_*` nebo `MS_GRAPH_*` | stahování pošty |
-| GitHub Secrets | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_ID` | automatický deploy migrací — viz `SUPABASE_SETUP.md` |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ano | připojení k Supabase |
+| `SUPABASE_SECRET_KEY` | ano | serverový přístup (jen server / Vercel, nikdy do klienta) |
+| `NEXT_PUBLIC_APP_URL` | ano | veřejná adresa aplikace (odkazy v e-mailech, `/auth/callback`) |
+| `ANTHROPIC_API_KEY` (+ `ANTHROPIC_MODEL`) | ne | AI čtení dokladů, třídění pošty, asistent (lze zadat i v Nastavení) |
+| `IMAP_*`, `SMTP_*` nebo `MS_GRAPH_*` | ne | pošta (lze zadat i per schránka v Nastavení) |
+| `CRON_SECRET` | ne | periodické stahování pošty přes `/api/cron/sync-mail` |
+
+### Obnova hesla
+
+`/forgot-password` → 6místný kód e-mailem (platnost 15 min, omezení pokusů), pak nové heslo.
+S nastaveným SMTP posílá kód aplikace; bez SMTP použije e-mail Supabase (odkaz přes
+`/auth/callback`, nebo kód `{{ .Token }}`, pokud ho šablona obsahuje — viz `SUPABASE_SETUP.md`).
+Veřejná registrace je vypnutá — účty zakládá super admin (počáteční heslo, vynucená změna).
+
+## Lokální vývoj s lokálním Supabase (bez Dockeru)
+
+```bash
+tools/local-supabase/start.sh             # PostgREST + GoTrue + Storage + PG16, aplikuje migrace
+node tools/local-supabase/seed-users.mjs  # admin@local.test / Admin123!, obchod@local.test / Obchod123!,
+                                          # dilna@local.test / Dilna123!
+tools/local-supabase/psql.sh -f tools/e2e/seed-demo.sql   # demo data (zakázky ve všech stavech)
+set -a; source .local-supabase/env; set +a; npm run dev
+```
+
+Podrobnosti (porty, mail catcher na `:54324`, reset): `tools/local-supabase/README.md`.
+
+### Testy
+
+```bash
+npm run typecheck && npm run lint && npm test     # vitest (logika, mapování, vykreslení komponent)
+tools/e2e/run-app.sh                              # build + start proti lokálnímu Supabase (port 3100)
+node tools/e2e/tests/01-auth-users-mail.mjs       # E2E (Playwright): přihlášení, role, ochrana API…
+tools/e2e/stop-app.sh
+```
+
+E2E běží s `AI_FAKE_CAPTURE` (fixture místo volání Claude), takže nepotřebují API klíč.
+
+## Struktura
+
+- `src/app/(app)/*` — stránky aplikace (layout vynucuje přihlášení)
+- `src/app/actions/*` — server actions (každá kontroluje oprávnění)
+- `src/app/api/*` — API routes (vyhledávání, AI, PDF, soubory zakázek, cron)
+- `src/lib/jobs/*` — jádro Knihy zakázek (stavy, termíny, mapování, párování, čtení dokladů)
+- `src/lib/data/*` — datová vrstva (server-only)
+- `src/components/jobs/*` — kniha, karta zakázky, foto-capture; `src/components/customers|suppliers/*` — adresář
+- `supabase/migrations/*` — schéma DB (RLS, číslování, triggery, úložiště `job-files`)
 
 ## Skripty
 
-- `npm run dev` — vývoj · `npm run build` — produkční build · `npm run typecheck` · `npm run lint`
+`npm run dev` · `npm run build` · `npm start` · `npm run typecheck` · `npm run lint` · `npm test`

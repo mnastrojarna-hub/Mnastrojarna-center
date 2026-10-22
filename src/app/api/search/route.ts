@@ -1,24 +1,88 @@
 import { NextResponse } from "next/server";
-import { getCustomers, getSuppliers, getDrawings, getQuotes } from "@/lib/data/queries";
+import { apiRequire, getAccess } from "@/lib/auth/session";
+import { getCustomers, getSuppliers, getDrawings } from "@/lib/data/queries";
+import { listJobs, listQuotes } from "@/lib/data/jobs";
+import { searchNormalize } from "@/lib/jobs/mapping";
+import type { JobStage } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-/** Data pro globální vyhledávání (⌘K). Operátorský režim → živá data, jinak demo. */
+/** Jedna položka globálního hledání (⌘K). keywords = normalizovaný text pro hledání. */
+interface SearchEntry {
+  id: string;
+  label: string;
+  hint?: string;
+  href: string;
+  keywords: string;
+  stage?: JobStage;
+}
+
+function kw(...parts: (string | null | undefined)[]): string {
+  return searchNormalize(parts.filter(Boolean).join(" "));
+}
+
+/**
+ * Data pro globální vyhledávání — jen to, co uživatel smí vidět:
+ * zakázky a nabídky s Knihou zakázek, výkresy jen s archivem výkresů.
+ */
 export async function GET() {
+  const auth = await apiRequire();
+  if (auth instanceof NextResponse) return auth;
+  const { can } = await getAccess();
+  const empty = Promise.resolve([] as never[]);
   try {
-    const [customers, suppliers, drawings, quotes] = await Promise.all([
-      getCustomers(),
-      getSuppliers(),
-      getDrawings(),
-      getQuotes(),
+    const [jobs, customers, suppliers, quotes, drawings] = await Promise.all([
+      can("orders") ? listJobs({ sort: "updated", dir: "desc", limit: 1500 }) : empty,
+      can("customers") ? getCustomers() : empty,
+      can("suppliers") ? getSuppliers() : empty,
+      can("orders") ? listQuotes() : empty,
+      can("drawings") ? getDrawings() : empty,
     ]);
-    return NextResponse.json({
-      customers: customers.map((c) => ({ id: c.id, label: c.name, hint: c.ico })),
-      suppliers: suppliers.map((s) => ({ id: s.id, label: s.name, hint: s.country })),
-      drawings: drawings.map((d) => ({ id: d.id, label: d.number, hint: `${d.material} · rev. ${d.revision}` })),
-      quotes: quotes.map((q) => ({ id: q.id, label: q.number, hint: q.customer })),
-    });
+    const out: Record<"jobs" | "customers" | "suppliers" | "quotes" | "drawings", SearchEntry[]> = {
+      jobs: jobs.map((j) => ({
+        id: j.id,
+        label: `${j.number} · ${j.title || "bez názvu"}`,
+        hint: [j.customer?.name, j.customerOrderNumber ? `obj. ${j.customerOrderNumber}` : null].filter(Boolean).join(" · "),
+        href: `/orders/${j.id}`,
+        stage: j.stage,
+        keywords: kw(
+          j.number, j.title, j.customer?.name, j.customer?.customerNumber, j.customerOrderNumber,
+          j.customerInquiryNumber, j.invoiceNumber, ...j.drawingNumbers,
+        ),
+      })),
+      customers: customers.map((c) => ({
+        id: c.id,
+        label: c.name,
+        hint: [c.customerNumber, c.ico ? `IČO ${c.ico}` : null, c.city].filter(Boolean).join(" · "),
+        href: `/customers/${c.id}`,
+        keywords: kw(c.name, c.customerNumber, c.ico, c.dic, c.city, c.contactPerson, c.email),
+      })),
+      suppliers: suppliers.map((s) => ({
+        id: s.id,
+        label: s.name,
+        hint: s.technologies.slice(0, 3).join(", ") || s.country,
+        href: `/suppliers?q=${encodeURIComponent(s.name)}`,
+        keywords: kw(s.name, s.ico, s.contactPerson, s.email, ...s.technologies, ...s.materials),
+      })),
+      quotes: quotes.map((q) => ({
+        id: q.id,
+        label: q.number,
+        hint: [q.customer?.name, q.job?.number].filter(Boolean).join(" · "),
+        href: q.job ? `/orders/${q.job.id}` : "/quotes",
+        stage: q.job?.stage,
+        keywords: kw(q.number, q.title, q.customer?.name, q.job?.number, q.job?.title, ...q.items.map((it) => it.drawingNumber)),
+      })),
+      drawings: drawings.map((d) => ({
+        id: d.id,
+        label: d.number,
+        hint: [d.material !== "—" ? d.material : null, `rev. ${d.revision}`, d.customer !== "—" ? d.customer : null].filter(Boolean).join(" · "),
+        href: "/drawings",
+        keywords: kw(d.number, d.material, d.customer, d.revision),
+      })),
+    };
+    return NextResponse.json(out, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return NextResponse.json({ customers: [], suppliers: [], drawings: [], quotes: [] });
+    return NextResponse.json({ jobs: [], customers: [], suppliers: [], quotes: [], drawings: [] });
   }
 }
