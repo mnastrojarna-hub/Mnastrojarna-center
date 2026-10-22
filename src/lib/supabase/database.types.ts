@@ -39,6 +39,8 @@ export interface Profile {
   phone: string | null;
   position: string | null;
   last_seen_at: string | null;
+  /** Počáteční heslo od admina → při prvním přihlášení vynutit změnu (migrace 0021). */
+  password_change_required: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -235,6 +237,9 @@ export interface Order {
   email_id: string | null;
   ai_filled: boolean;
   ai_confidence: number | null;
+  // Inkaso (migrace 0021) — rozhoduje o měsíci pásmové provize
+  paid_at: string | null;
+  paid_amount: number | null;
 }
 
 export interface OrderItem {
@@ -413,9 +418,41 @@ export interface CommissionEntry {
   // migrace 0020 — provize ze zisku, přepočet v DB
   cost: number;
   profit: number;
-  base: "margin" | "revenue";
+  base: CommissionBase;
   status: CommissionStatus;
   cost_known: boolean;
+  updated_at: string;
+  // migrace 0021 — pásmová provize z inkasa
+  collected: boolean;
+  estimated_commission: number | null;
+}
+
+/** margin = ze zisku, revenue = z obratu, margin_tiered = pásmově ze zisku dle měsíčního obratu. */
+export type CommissionBase = "margin" | "revenue" | "margin_tiered";
+
+export interface CommissionTier {
+  from: number;
+  to: number | null;
+  rate: number;
+}
+
+/** Měsíční vyúčtování provize obchodníka (migrace 0021). */
+export interface CommissionStatement {
+  id: string;
+  owner_id: string;
+  period: string;
+  rule_name: string | null;
+  basis: "ordered" | "collected";
+  revenue: number;
+  cost: number;
+  profit: number;
+  commission: number;
+  bands: (CommissionTier & { revenue: number; profit: number; commission: number })[];
+  jobs_count: number;
+  unknown_cost_jobs: number;
+  due_date: string | null;
+  status: "otevrena" | "k_vyplate" | "vyplaceno";
+  paid_at: string | null;
   updated_at: string;
 }
 
@@ -423,10 +460,16 @@ export interface CommissionRule {
   id: string;
   owner_id: string;
   rate: number;
-  base: "margin" | "revenue";
+  base: CommissionBase;
   valid_from: string;
   note: string | null;
   created_at: string;
+  // migrace 0021 — smlouva obchodníka
+  name: string | null;
+  tiers: CommissionTier[] | null;
+  /** ordered = podle objednávek, collected = podle inkasa v měsíci. */
+  basis: "ordered" | "collected";
+  payout_days: number;
 }
 
 /** Nabídka dodavatele k zakázce (migrace 0020). */
@@ -631,6 +674,7 @@ export interface Database {
       ai_training_examples: Tbl<AiTrainingExample>;
       password_reset_codes: Tbl<PasswordResetCode>;
       commission_rules: Tbl<CommissionRule>;
+      commission_statements: Tbl<CommissionStatement>;
       supplier_quotes: Tbl<SupplierQuoteRow>;
       supplier_quote_items: Tbl<SupplierQuoteItemRow>;
       purchase_orders: Tbl<PurchaseOrderRow>;

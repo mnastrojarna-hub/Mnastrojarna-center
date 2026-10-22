@@ -90,6 +90,8 @@ export async function isSmtpConfigured(pref: SmtpPreference = {}): Promise<boole
 
 export async function sendMail(input: {
   to: string;
+  /** Kopie (více adres oddělených čárkou). */
+  cc?: string;
   subject: string;
   text: string;
   /** Volitelná HTML verze (brandovaný e-mail). */
@@ -129,6 +131,7 @@ export async function sendMail(input: {
     const info = await transport.sendMail({
       from: `"${COMPANY.name}" <${fromAddress}>`,
       to: input.to,
+      cc: input.cc?.trim() || undefined,
       subject: input.subject,
       text: input.text,
       html: input.html,
@@ -153,6 +156,7 @@ export async function sendMail(input: {
           from_name: COMPANY.name,
           from_email: pickFromAddress([s.from, s.user, COMPANY.email]) ?? null,
           to_email: input.to,
+          cc_email: input.cc?.trim() || null,
           subject: input.subject,
           body_text: input.text,
           body_html: input.html ?? null,
