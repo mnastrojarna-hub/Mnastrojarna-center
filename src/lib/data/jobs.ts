@@ -71,7 +71,9 @@ export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]>
     if (error) return [];
 
     const items = data.map((r) => rowToJobListItem(r, s.view));
-    const filtered = filterJobs(items, { q: filters.q, deadline: filters.deadline });
+    const filtered = filterJobs(items, {
+      q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
+    });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
     return limit ? sorted.slice(0, limit) : sorted;

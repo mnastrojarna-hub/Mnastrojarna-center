@@ -17,6 +17,8 @@ import {
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
 import { listJobs, getJobStageCounts, getJobFormOptions } from "@/lib/data/jobs";
+import { listOperationLocations } from "@/lib/data/production";
+import { paymentStateOf } from "@/lib/jobs/mapping";
 
 /** Kolik řádků vykreslit najednou (víc = zpřesnit hledání). */
 const ROW_LIMIT = 300;
@@ -37,14 +39,17 @@ export default async function OrdersPage({
 
   const { can } = await getAccess();
   const margins = can("margins");
-  const [jobs, counts, options, running] = await Promise.all([
+  // objednávky v běhu: hodnota (jen s právem na marže) a faktury po splatnosti
+  const [jobs, counts, options, running, production] = await Promise.all([
     listJobs(bookParamsToFilters(params)),
     getJobStageCounts(),
     getJobFormOptions(),
-    margins ? listJobs({ stages: ORDER_STAGES }) : Promise.resolve(null),
+    listJobs({ stages: ORDER_STAGES }),
+    listOperationLocations(),
   ]);
 
   const today = todayInPrague();
+  const overdueInvoices = running.filter((j) => paymentStateOf(j, today) === "po_splatnosti").length;
   const filtered = isFiltered(params);
   const defaultStage = defaultStageFor(params.segment);
   const newJobInitial = { stage: defaultStage, ownerId: user.id };
@@ -67,12 +72,12 @@ export default async function OrdersPage({
           }
         />
 
-        <KpiStrip kpis={bookKpis(counts)} runningValue={running ? sumValue(running) : null} />
+        <KpiStrip kpis={bookKpis(counts)} runningValue={margins ? sumValue(running) : null} overdueInvoices={overdueInvoices} />
 
         <section aria-label="Filtry knihy" className="space-y-3 rounded-2xl border bg-card p-2.5 shadow-sm sm:p-3">
           <SegmentTabs counts={segmentCounts(counts.byStage)} />
           <StageChips byStage={counts.byStage} />
-          <BookToolbar options={options} />
+          <BookToolbar options={options} production={production} />
         </section>
 
         <BookPending className="space-y-2">

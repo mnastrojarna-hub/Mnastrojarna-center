@@ -2,26 +2,29 @@
 
 import * as React from "react";
 import {
-  ArrowDownWideNarrow, ArrowUpNarrowWide, Building2, CalendarClock, Columns3, Filter, Loader2, Rows3, Search,
-  UserRound, Wrench, X,
+  ArrowDownWideNarrow, ArrowUpNarrowWide, Building2, CalendarClock, CircleCheckBig, Columns3, Factory, Filter, Loader2,
+  MapPin, ReceiptText, Rows3, Search, UserRound, Wrench, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/jobs/book/native-select";
 import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { useBookNav } from "@/components/jobs/book/book-nav";
 import {
-  BOOK_SORTS, DEADLINE_FILTERS, RESET_FILTERS, activeFilterCount, MAX_QUERY, type BookView,
+  BOOK_SORTS, DEADLINE_FILTERS, PAYMENT_FILTERS, RESET_FILTERS, activeFilterCount, MAX_QUERY, type BookView,
 } from "@/components/jobs/book/book-params";
 import { useAccess } from "@/components/access-provider";
-import type { JobDeadlineFilter, JobFormOptions, JobSort } from "@/lib/jobs/types";
+import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
+import type { ProductionFilterCounts } from "@/lib/jobs/production-types";
+import type { JobDeadlineFilter, JobFormOptions, JobPaymentFilter, JobSort } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 
 /**
  * Lišta knihy: hledání (s prodlevou, do URL), filtry obchodník / zpracovává /
- * zákazník / termín, řazení a přepínač Řádky | Tabule. Na mobilu jsou filtry
- * schované pod tlačítkem „Filtry" (s počtem aktivních).
+ * zákazník / termín / výroba (operace, kde) / platba, řazení a přepínač
+ * Řádky | Tabule. Na mobilu jsou filtry schované pod tlačítkem „Filtry"
+ * (s počtem aktivních).
  */
-export function BookToolbar({ options }: { options: JobFormOptions }) {
+export function BookToolbar({ options, production }: { options: JobFormOptions; production?: ProductionFilterCounts | null }) {
   const { params, navigate, pending } = useBookNav();
   const { userId } = useAccess();
   const [showFilters, setShowFilters] = React.useState(false);
@@ -182,6 +185,22 @@ export function BookToolbar({ options }: { options: JobFormOptions }) {
           ))}
         </NativeSelect>
 
+        <ProductionFilters production={production ?? null} />
+
+        <NativeSelect
+          aria-label="Platba"
+          icon={params.payment === "zaplaceno" ? <CircleCheckBig className="!text-green-600" /> : <ReceiptText className={params.payment === "po_splatnosti" ? "!text-red-600" : undefined} />}
+          value={params.payment ?? ""}
+          active={params.payment !== null}
+          onChange={(e) => navigate({ payment: (e.target.value || null) as JobPaymentFilter | null })}
+          wrapperClassName="lg:w-40"
+        >
+          <option value="">Platba: vše</option>
+          {PAYMENT_FILTERS.map((p) => (
+            <option key={p.key} value={p.key}>{p.label}</option>
+          ))}
+        </NativeSelect>
+
         <div className="flex items-center gap-1 sm:col-span-2 lg:col-span-1">
           <NativeSelect
             aria-label="Řazení"
@@ -220,6 +239,54 @@ export function BookToolbar({ options }: { options: JobFormOptions }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Výroba: aktuální operace (barva druhu) a kde se zakázka nachází — s počty aktivních zakázek. */
+function ProductionFilters({ production }: { production: ProductionFilterCounts | null }) {
+  const { params, navigate } = useBookNav();
+  const steps = production?.steps ?? [];
+  const locations = production?.locations ?? [];
+  const kind = isOperationKind(params.step) ? OPERATION_KINDS[params.step] : null;
+  const StepIcon = kind?.icon ?? (params.step === "hotovo" ? CircleCheckBig : Factory);
+  const stepKnown = !params.step || steps.some((s) => s.key === params.step);
+  const locKnown = !params.location || locations.some((l) => l.name === params.location);
+  if (!steps.length && !locations.length && !params.step && !params.location) return null;
+
+  return (
+    <>
+      <NativeSelect
+        aria-label="Výroba: operace"
+        icon={<StepIcon className={cn(kind?.text, params.step === "hotovo" && "!text-green-600")} />}
+        value={params.step}
+        active={params.step !== ""}
+        onChange={(e) => navigate({ step: e.target.value })}
+        wrapperClassName="lg:w-48"
+      >
+        <option value="">Výroba: všechny operace</option>
+        {!stepKnown && <option value={params.step}>{kind?.label ?? (params.step === "hotovo" ? "Výroba hotová" : params.step)} (0)</option>}
+        {steps.map((s) => (
+          <option key={s.key} value={s.key}>{s.label} ({s.count})</option>
+        ))}
+      </NativeSelect>
+
+      {(locations.length > 0 || params.location) && (
+        <NativeSelect
+          aria-label="Kde: firma"
+          icon={<MapPin className={params.location ? "!text-sky-600" : undefined} />}
+          value={params.location}
+          active={params.location !== ""}
+          onChange={(e) => navigate({ location: e.target.value })}
+          wrapperClassName="lg:w-44"
+        >
+          <option value="">Kde: kdekoli</option>
+          {!locKnown && <option value={params.location}>{params.location} (0)</option>}
+          {locations.map((l) => (
+            <option key={l.name} value={l.name}>{l.name} ({l.count})</option>
+          ))}
+        </NativeSelect>
+      )}
+    </>
   );
 }
 

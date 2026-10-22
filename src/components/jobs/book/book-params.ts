@@ -1,6 +1,7 @@
 import type { JobStage } from "@/lib/supabase/database.types";
-import type { JobDeadlineFilter, JobFilters, JobListItem, JobSort } from "@/lib/jobs/types";
+import type { JobDeadlineFilter, JobFilters, JobListItem, JobPaymentFilter, JobSort } from "@/lib/jobs/types";
 import { STAGE_ORDER, isJobStage } from "@/lib/jobs/stages";
+import { isOperationKind } from "@/lib/jobs/operations";
 
 /**
  * Kniha zakázek — parametry URL ↔ filtry, segmenty (záložky), řazení,
@@ -90,6 +91,21 @@ export const DEADLINE_FILTERS: { key: JobDeadlineFilter; label: string }[] = [
   { key: "no_date", label: "Bez termínu" },
 ];
 
+export const PAYMENT_FILTERS: { key: JobPaymentFilter; label: string }[] = [
+  { key: "po_splatnosti", label: "Po splatnosti" },
+  { key: "nezaplaceno", label: "Nezaplaceno" },
+  { key: "zaplaceno", label: "Zaplaceno" },
+];
+
+function isPaymentFilter(v: unknown): v is JobPaymentFilter {
+  return typeof v === "string" && PAYMENT_FILTERS.some((p) => p.key === v);
+}
+
+/** Aktuální výrobní operace: druh operace nebo „hotovo" (výroba hotová). */
+export function isProductionStepKey(v: unknown): v is string {
+  return v === "hotovo" || isOperationKind(v);
+}
+
 function isSort(v: unknown): v is JobSort {
   return typeof v === "string" && BOOK_SORTS.some((s) => s.key === v);
 }
@@ -111,6 +127,11 @@ export interface BookParams {
   /** Zákazník (uuid) nebo "". */
   customer: string;
   deadline: JobDeadlineFilter | null;
+  /** Výroba: aktuální operace (druh / „hotovo") nebo "". */
+  step: string;
+  /** Kde se zakázka nachází (firma / „U nás") nebo "". */
+  location: string;
+  payment: JobPaymentFilter | null;
   sort: JobSort;
   dir: SortDir;
   view: BookView;
@@ -124,6 +145,7 @@ export type RawSearchParams =
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_QUERY = 200;
+export const MAX_LOCATION = 300;
 
 /** První hodnota parametru (Next předává string | string[]). */
 export function firstParam(sp: RawSearchParams, key: string): string | undefined {
@@ -153,6 +175,9 @@ export const DEFAULT_PARAMS: BookParams = {
   assignee: "",
   customer: "",
   deadline: null,
+  step: "",
+  location: "",
+  payment: null,
   sort: DEFAULT_SORT,
   dir: defaultDirFor(DEFAULT_SORT),
   view: "radky",
@@ -168,6 +193,8 @@ export function parseBookParams(sp: RawSearchParams): BookParams {
   const dirRaw = firstParam(sp, "dir");
   const dir: SortDir = dirRaw === "asc" || dirRaw === "desc" ? dirRaw : defaultDirFor(sort);
   const deadlineRaw = firstParam(sp, "deadline");
+  const stepRaw = (firstParam(sp, "step") ?? "").trim();
+  const paymentRaw = firstParam(sp, "payment");
   return {
     segment,
     stages,
@@ -176,6 +203,9 @@ export function parseBookParams(sp: RawSearchParams): BookParams {
     assignee: cleanId(firstParam(sp, "assignee")),
     customer: cleanId(firstParam(sp, "customer")),
     deadline: isDeadlineFilter(deadlineRaw) ? deadlineRaw : null,
+    step: isProductionStepKey(stepRaw) ? stepRaw : "",
+    location: (firstParam(sp, "location") ?? "").trim().slice(0, MAX_LOCATION),
+    payment: isPaymentFilter(paymentRaw) ? paymentRaw : null,
     sort,
     dir,
     view: firstParam(sp, "view") === "tabule" ? "tabule" : "radky",
@@ -194,6 +224,10 @@ export function bookQuery(p: BookParams): string {
   if (cleanId(p.assignee)) out.set("assignee", cleanId(p.assignee));
   if (cleanId(p.customer)) out.set("customer", cleanId(p.customer));
   if (p.deadline && isDeadlineFilter(p.deadline)) out.set("deadline", p.deadline);
+  if (isProductionStepKey(p.step)) out.set("step", p.step);
+  const location = (p.location ?? "").trim().slice(0, MAX_LOCATION);
+  if (location) out.set("location", location);
+  if (p.payment && isPaymentFilter(p.payment)) out.set("payment", p.payment);
   const sort = isSort(p.sort) ? p.sort : DEFAULT_SORT;
   if (sort !== DEFAULT_SORT) out.set("sort", sort);
   if (p.dir !== defaultDirFor(sort)) out.set("dir", p.dir);
@@ -225,11 +259,15 @@ export function toggleStagePatch(p: BookParams, stage: JobStage): BookPatch {
 }
 
 /** „Zrušit filtry" — záložka, řazení a pohled zůstávají. */
-export const RESET_FILTERS: BookPatch = { stages: [], q: "", owner: "", assignee: "", customer: "", deadline: null };
+export const RESET_FILTERS: BookPatch = {
+  stages: [], q: "", owner: "", assignee: "", customer: "", deadline: null, step: "", location: "", payment: null,
+};
 
 export function activeFilterCount(p: BookParams): number {
-  return [p.stages.length > 0, p.q.trim() !== "", p.owner !== "", p.assignee !== "", p.customer !== "", p.deadline !== null]
-    .filter(Boolean).length;
+  return [
+    p.stages.length > 0, p.q.trim() !== "", p.owner !== "", p.assignee !== "", p.customer !== "", p.deadline !== null,
+    Boolean(p.step), Boolean((p.location ?? "").trim()), Boolean(p.payment),
+  ].filter(Boolean).length;
 }
 
 export function isFiltered(p: BookParams): boolean {
@@ -258,6 +296,9 @@ export function bookParamsToFilters(p: BookParams): JobFilters {
   if (p.assignee) filters.assigneeId = p.assignee;
   if (p.customer) filters.customerId = p.customer;
   if (p.deadline) filters.deadline = p.deadline;
+  if (isProductionStepKey(p.step)) filters.step = p.step;
+  if ((p.location ?? "").trim()) filters.location = p.location.trim();
+  if (p.payment) filters.payment = p.payment;
   return filters;
 }
 
@@ -296,7 +337,9 @@ export const KPI_PATCHES = {
   inquiries: { segment: "poptavky", stages: [], deadline: null },
   problems: { segment: "objednavky", stages: [...PROBLEM_STAGES], deadline: null },
   value: { segment: "objednavky", stages: [], deadline: null, sort: "value", dir: "desc" },
-} satisfies Record<keyof BookKpis | "value", BookPatch>;
+  /** Faktury po splatnosti — přes celou knihu. */
+  overdueInvoices: { segment: "vse", stages: [], deadline: null, payment: "po_splatnosti" },
+} satisfies Record<keyof BookKpis | "value" | "overdueInvoices", BookPatch>;
 
 /** Součet hodnot zakázek (bez prázdných). */
 export function sumValue(jobs: readonly Pick<JobListItem, "value">[]): number {

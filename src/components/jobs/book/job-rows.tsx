@@ -2,7 +2,8 @@ import Link from "next/link";
 import { StageSelect, NextStageButton } from "@/components/jobs/stage-select";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import {
-  CustomerDocNumber, DeadlineBlock, DrawingChips, JobCounters, JobValue, PeopleStack, PriorityMark, SourceMark,
+  CustomerDocNumber, CustomerNoteMark, DeadlineBlock, DrawingChips, JobCounters, JobValue, PaymentMark, PeopleStack,
+  PriorityMark, ProductionLine, SourceMark,
 } from "@/components/jobs/book/job-cells";
 import { nextStage, stageMeta } from "@/lib/jobs/stages";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -83,6 +84,7 @@ function JobRow({ job, today }: { job: JobListItem; today: string }) {
             </Link>
             <PriorityMark priority={job.priority} />
             <SourceMark source={job.source} aiFilled={job.aiFilled} />
+            <CustomerNoteMark note={job.customerNote} />
           </span>
           <CustomerDocNumber job={job} className="hidden lg:inline-flex" />
         </div>
@@ -111,14 +113,16 @@ function JobRow({ job, today }: { job: JobListItem; today: string }) {
             <DrawingChips numbers={job.drawingNumbers} />
           </div>
           <CustomerDocNumber job={job} className="mt-1.5 lg:hidden" />
+          <ProductionLine job={job} className="mt-2 lg:hidden" />
         </div>
 
         {/* stav */}
         <div className="relative z-10 order-2 flex shrink-0 flex-col items-end gap-0.5 lg:order-none lg:justify-self-end [grid-area:stage] xl:items-start xl:justify-self-start">
           <StageSelect jobId={job.id} stage={job.stage} size="sm" />
-          {job.stageChangedAt && (
+          {job.stageChangedAt && !job.productionStep && (
             <span className="hidden text-[11px] text-muted-foreground xl:block">{relativeTime(job.stageChangedAt)}</span>
           )}
+          <ProductionLine job={job} compact className="hidden w-full max-w-[11rem] lg:flex" />
         </div>
 
         {/* termín */}
@@ -135,6 +139,7 @@ function JobRow({ job, today }: { job: JobListItem; today: string }) {
         <div className="order-5 flex shrink-0 flex-col items-end gap-0.5 lg:order-none [grid-area:val]">
           <JobValue job={job} />
           <JobCounters job={job} />
+          <PaymentMark job={job} today={today} />
         </div>
 
         {/* rychlé akce */}

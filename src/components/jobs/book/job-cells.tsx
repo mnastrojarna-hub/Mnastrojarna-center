@@ -1,5 +1,12 @@
-import { AlertTriangle, Camera, Flame, Mail, Paperclip, FileText, Sparkles, Upload, Truck, CalendarClock } from "lucide-react";
+import Link from "next/link";
+import {
+  AlertTriangle, Camera, Flame, Mail, Paperclip, FileText, Sparkles, Upload, Truck, CalendarClock, CircleCheckBig,
+  Handshake, ReceiptText,
+} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { OPERATION_KINDS, isOperationKind, productionLabel } from "@/lib/jobs/operations";
+import { ProductionMiniBar } from "@/components/jobs/production/production-mini";
+import { PAYMENT_MARK_TONE, listPaymentMark } from "@/components/jobs/production/production-helpers";
 import { deadlineInfo, DEADLINE_BADGE, type DeadlineInfo } from "@/lib/jobs/deadlines";
 import { avatarTone, countLabel, dateFromIso, initials, shortDate } from "@/components/jobs/book/book-params";
 import type { JobListItem, PersonRef } from "@/lib/jobs/types";
@@ -240,5 +247,70 @@ export function JobCounters({ job, className }: { job: Pick<JobListItem, "fileCo
         </span>
       )}
     </span>
+  );
+}
+
+/**
+ * Kde je výroba: mini pruh hotovo/celkem + ikona aktuální operace a místo
+ * („Tepelné zpracování · TepKal"), červená tečka při problému. Odkaz na záložku Výroba.
+ */
+export function ProductionLine({ job, compact, className }: { job: JobListItem; compact?: boolean; className?: string }) {
+  const step = job.productionStep ?? null;
+  const total = job.productionTotal ?? 0;
+  const done = job.productionDone ?? 0;
+  if (!step && !total) return null;
+  const problem = Boolean(job.productionProblem);
+  const finished = step === "hotovo";
+  const kind = isOperationKind(step) ? OPERATION_KINDS[step] : null;
+  const full = productionLabel(step, job.productionLocation ?? null) ?? "Výroba";
+  const text = finished ? "Výroba hotová" : kind ? `${compact ? kind.short : kind.label}${job.productionLocation ? ` · ${job.productionLocation}` : ""}` : full;
+  const Icon = finished ? CircleCheckBig : kind?.icon ?? CircleCheckBig;
+  return (
+    <Link
+      href={`/orders/${job.id}?tab=vyroba`}
+      draggable={false}
+      title={`Výroba: ${full} — hotovo ${done} z ${total}${problem ? " · PROBLÉM" : ""}`}
+      aria-label={`Výroba: ${full}, hotovo ${done} z ${total}${problem ? ", problém" : ""}`}
+      className={cn("relative z-10 flex min-w-0 max-w-full flex-col gap-1 rounded-md outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring", className)}
+    >
+      <span className="flex items-center gap-1.5">
+        <ProductionMiniBar done={done} total={total} step={step} problem={problem} className="min-w-0 flex-1" />
+        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground">{done}/{total}</span>
+      </span>
+      <span className={cn("flex min-w-0 items-center gap-1 text-[11px] font-medium", finished ? "text-green-700 dark:text-green-400" : "text-foreground/80")}>
+        {problem && <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />}
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", finished ? "text-green-600 dark:text-green-400" : kind?.text)} />
+        <span className="min-w-0 truncate">{text}</span>
+      </span>
+    </Link>
+  );
+}
+
+/** Faktura: „splatná 21. 11." / červeně „po splatnosti" / zeleně „zaplaceno". */
+export function PaymentMark({ job, today, className }: { job: JobListItem; today: string; className?: string }) {
+  const m = listPaymentMark(job, today);
+  if (!m) return null;
+  const Icon = m.tone === "paid" ? CircleCheckBig : ReceiptText;
+  return (
+    <span
+      title={m.title}
+      className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold leading-none", PAYMENT_MARK_TONE[m.tone], className)}
+    >
+      <Icon className="h-3 w-3" /> {m.text}
+    </span>
+  );
+}
+
+/** Domluvy se zákazníkem (co není v objednávce) — oranžová ikona s bublinou. */
+export function CustomerNoteMark({ note }: { note: string | null | undefined }) {
+  const text = (note ?? "").trim();
+  if (!text) return null;
+  const short = text.length > 400 ? `${text.slice(0, 399)}…` : text;
+  return (
+    <Tip label={`Domluvy se zákazníkem: ${short}`}>
+      <span role="img" aria-label="Domluvy se zákazníkem" className="relative z-10 inline-flex text-amber-500 dark:text-amber-400">
+        <Handshake className="h-4 w-4" />
+      </span>
+    </Tip>
   );
 }

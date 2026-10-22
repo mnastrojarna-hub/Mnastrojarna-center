@@ -4,7 +4,7 @@ import {
   isPatchActive, activeFilterCount, isFiltered, segmentCounts, bookKpis, boardStages, groupByStage,
   moveJobStage, todayInPrague, dateFromIso, shortDate, initials, avatarTone, AVATAR_TONES, countLabel,
   normalizeStages, segmentOfStage, defaultStageFor, firstParam, sumValue, DEFAULT_PARAMS, RESET_FILTERS,
-  KPI_PATCHES, ORDER_STAGES, INQUIRY_STAGES, BOOK_SEGMENTS, type BookParams,
+  KPI_PATCHES, ORDER_STAGES, INQUIRY_STAGES, BOOK_SEGMENTS, PAYMENT_FILTERS, isProductionStepKey, type BookParams,
 } from "./book-params";
 import { STAGE_ORDER } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
@@ -149,6 +149,49 @@ describe("bookParamsToFilters", () => {
       ...DEFAULT_PARAMS, segment: "poptavky", stages: ["nabidka"], q: " PO ", owner: UUID, assignee: UUID, customer: UUID, deadline: "no_date",
     });
     expect(f).toMatchObject({ stages: ["nabidka"], q: "PO", ownerId: UUID, assigneeId: UUID, customerId: UUID, deadline: "no_date" });
+  });
+});
+
+describe("výroba a platba", () => {
+  it("čte operaci, místo a platbu z URL, neplatné zahodí", () => {
+    const p = parseBookParams({ step: "tepelne_zpracovani", location: "  TepKal s.r.o. ", payment: "po_splatnosti" });
+    expect(p.step).toBe("tepelne_zpracovani");
+    expect(p.location).toBe("TepKal s.r.o.");
+    expect(p.payment).toBe("po_splatnosti");
+    expect(parseBookParams({ step: "hotovo" }).step).toBe("hotovo");
+    const bad = parseBookParams({ step: "drop", payment: "zitra", location: "x".repeat(400) });
+    expect(bad.step).toBe("");
+    expect(bad.payment).toBeNull();
+    expect(bad.location).toHaveLength(300);
+    expect(isProductionStepKey("frezovani")).toBe(true);
+    expect(isProductionStepKey("")).toBe(false);
+    expect(PAYMENT_FILTERS.map((f) => f.key)).toEqual(["po_splatnosti", "nezaplaceno", "zaplaceno"]);
+  });
+
+  it("adresa je idempotentní i s diakritikou a mezerami", () => {
+    const s: BookParams = { ...DEFAULT_PARAMS, step: "brouseni", location: "Brusírna & syn, s.r.o.", payment: "nezaplaceno" };
+    const once = bookQuery(s);
+    expect(once).toContain("step=brouseni");
+    expect(once).toContain("payment=nezaplaceno");
+    expect(parseBookParams(new URLSearchParams(once)).location).toBe("Brusírna & syn, s.r.o.");
+    expect(bookQuery(parseBookParams(new URLSearchParams(once)))).toBe(once);
+  });
+
+  it("filtry, počet aktivních a reset", () => {
+    const p: BookParams = { ...DEFAULT_PARAMS, step: "soustruzeni", location: "U nás", payment: "zaplaceno" };
+    expect(activeFilterCount(p)).toBe(3);
+    expect(bookParamsToFilters(p)).toMatchObject({ step: "soustruzeni", location: "U nás", payment: "zaplaceno" });
+    expect(bookParamsToFilters(DEFAULT_PARAMS).step).toBeUndefined();
+    const reset = applyBookPatch(p, RESET_FILTERS);
+    expect([reset.step, reset.location, reset.payment]).toEqual(["", "", null]);
+  });
+
+  it("dlaždice Po splatnosti = filtr platby přes celou knihu", () => {
+    const next = applyBookPatch(DEFAULT_PARAMS, KPI_PATCHES.overdueInvoices);
+    expect(next.segment).toBe("vse");
+    expect(next.payment).toBe("po_splatnosti");
+    expect(isPatchActive(next, KPI_PATCHES.overdueInvoices)).toBe(true);
+    expect(isPatchActive(DEFAULT_PARAMS, KPI_PATCHES.overdueInvoices)).toBe(false);
   });
 });
 

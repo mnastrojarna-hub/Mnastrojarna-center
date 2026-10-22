@@ -4,10 +4,11 @@ import type {
 import type {
   JobInput, JobItemInput, JobQuoteItemInput, JobQuoteInput, JobListItem, JobDetail, JobItem,
   JobQuote, JobQuoteItem, JobFile, JobEvent, JobEventType, JobFilters, JobCustomerDetail,
-  JobCustomerRef, PersonRef, JobSort,
+  JobCustomerRef, PersonRef, JobSort, JobPaymentFilter,
 } from "@/lib/jobs/types";
 import { STAGE_ORDER, CLOSED_STAGES, isJobStage, stageGroup, STAGES } from "@/lib/jobs/stages";
 import { isJobFileKind } from "@/lib/jobs/file-kinds";
+import { isOperationKind } from "@/lib/jobs/operations";
 import { effectiveDeadline, deadlineInfo, type DeadlineInput } from "@/lib/jobs/deadlines";
 import { fieldLabel, formatFieldValue, SENSITIVE_JOB_COLUMNS } from "@/lib/jobs/field-labels";
 
@@ -470,6 +471,8 @@ export const JOB_LIST_SELECT = [
   "value, purchase_cost, currency, inquiry_date, order_date, customer_required_date, due_date",
   "expected_delivery_date, supplier_promised_date, max_tolerated_date, received_at, delivered_at",
   "owner_id, assignee_id, created_by, supplier_id, ai_filled, source, created_at, updated_at, stage_changed_at",
+  "production_step, production_location, production_done, production_total, production_problem",
+  "customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
   "customer:customers!customer_id(id, name, customer_number, ico)",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
@@ -585,6 +588,16 @@ export interface JobRow {
   created_at: string;
   updated_at?: string | null;
   stage_changed_at?: string | null;
+  // výroba a konec toku
+  production_step?: string | null;
+  production_location?: string | null;
+  production_done?: number | string | null;
+  production_total?: number | string | null;
+  production_problem?: boolean | null;
+  customer_note?: string | null;
+  delivery_note_confirmed_at?: string | null;
+  invoice_due_date?: string | null;
+  paid_at?: string | null;
   // detail
   note?: string | null;
   tags?: string[] | null;
@@ -776,6 +789,16 @@ export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
     stageChangedAt: row.stage_changed_at ?? null,
+    productionStep: row.production_step === "hotovo" || isOperationKind(row.production_step) ? row.production_step : null,
+    productionLocation: cleanText(row.production_location, 300),
+    productionDone: Math.max(0, Math.round(num(row.production_done) ?? 0)),
+    productionTotal: Math.max(0, Math.round(num(row.production_total) ?? 0)),
+    productionProblem: Boolean(row.production_problem),
+    customerNote: cleanText(row.customer_note, 10_000),
+    deliveryNoteConfirmedAt: cleanDate(row.delivery_note_confirmed_at),
+    invoiceNumber: cleanText(row.invoice_number, 120),
+    invoiceDueDate: cleanDate(row.invoice_due_date),
+    paidAt: cleanDate(row.paid_at),
   };
 }
 
@@ -1015,14 +1038,47 @@ export function matchesDeadline(j: JobListItem, filter: JobFilters["deadline"], 
   return true;
 }
 
-/** Fulltext (všechna slova musí sedět, bez diakritiky) + termín. */
-export function filterJobs(items: JobListItem[], filters: Pick<JobFilters, "q" | "deadline">, today: Date = new Date()): JobListItem[] {
+/** Stav úhrady naší faktury; null = zatím bez faktury (nebo zakázka neproběhla). */
+export type JobPaymentState = "zaplaceno" | "po_splatnosti" | "nezaplaceno";
+
+export function paymentStateOf(
+  j: Pick<JobListItem, "stage" | "paidAt" | "invoiceDueDate" | "invoiceNumber">,
+  today: string = todayIso(),
+): JobPaymentState | null {
+  if (j.stage === "nerealizovano" || j.stage === "zruseno") return null;
+  // dokončená zakázka = zaplacená (trigger doplní paid_at)
+  if (cleanDate(j.paidAt) || j.stage === "dokonceno") return "zaplaceno";
+  const due = cleanDate(j.invoiceDueDate);
+  if (!due && !cleanText(j.invoiceNumber) && j.stage !== "fakturovano") return null;
+  return due && due < today ? "po_splatnosti" : "nezaplaceno";
+}
+
+/** Splňuje zakázka filtr platby? „nezaplaceno" zahrnuje i faktury po splatnosti. */
+export function matchesPayment(j: JobListItem, filter: JobPaymentFilter | undefined, today: string = todayIso()): boolean {
+  if (!filter) return true;
+  const state = paymentStateOf(j, today);
+  if (filter === "nezaplaceno") return state === "nezaplaceno" || state === "po_splatnosti";
+  return state === filter;
+}
+
+/** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
+export function filterJobs(
+  items: JobListItem[],
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment">,
+  today: Date = new Date(),
+): JobListItem[] {
   const tokens = searchNormalize(filters.q ?? "").split(/\s+/).filter(Boolean);
+  const step = (filters.step ?? "").trim();
+  const location = searchNormalize((filters.location ?? "").trim());
+  const todayDay = todayIso(today);
   return items.filter((j) => {
     if (tokens.length) {
       const h = haystack(j);
       if (!tokens.every((t) => h.includes(t))) return false;
     }
+    if (step && j.productionStep !== step) return false;
+    if (location && searchNormalize((j.productionLocation ?? "").trim()) !== location) return false;
+    if (!matchesPayment(j, filters.payment, todayDay)) return false;
     return matchesDeadline(j, filters.deadline, today);
   });
 }
