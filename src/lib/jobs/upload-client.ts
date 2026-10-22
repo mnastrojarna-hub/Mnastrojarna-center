@@ -1,0 +1,163 @@
+import { createJobFileUpload, registerJobFile } from "@/app/actions/job-files";
+import { createClient } from "@/lib/supabase/client";
+import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
+import type { JobFileKind } from "@/lib/supabase/database.types";
+import type { JobFile } from "@/lib/jobs/types";
+
+/**
+ * Nahrání dokumentu zakázky z prohlížeče: velké fotky se nejdřív zmenší,
+ * soubor jde přímo do Supabase Storage (podepsaná URL), pak se zaregistruje.
+ */
+
+export type UploadPhase = "zmenseni" | "nahravani" | "ukladani";
+
+export interface UploadJobFileOptions {
+  jobId: string;
+  kind?: JobFileKind;
+  title?: string;
+  quoteId?: string;
+  replaceFileId?: string;
+  note?: string;
+  onPhase?: (phase: UploadPhase) => void;
+}
+
+export interface UploadJobFileResult {
+  ok: boolean;
+  error?: string;
+  file?: JobFile;
+}
+
+export const DOWNSCALE_MAX_SIDE = 2400;
+export const DOWNSCALE_MIN_BYTES = 1.5 * 1024 * 1024;
+const JPEG_QUALITY = 0.85;
+
+/** Fotka, kterou má smysl zmenšovat (gif/svg ne). */
+export function isDownscalableImage(type: string): boolean {
+  const t = (type || "").toLowerCase();
+  return t.startsWith("image/") && t !== "image/gif" && t !== "image/svg+xml";
+}
+
+/** Cílové rozměry (delší strana max. maxSide, poměr zachován). */
+export function fitWithin(width: number, height: number, maxSide = DOWNSCALE_MAX_SIDE): { width: number; height: number } {
+  const longest = Math.max(width, height);
+  if (!longest || longest <= maxSide) return { width, height };
+  const scale = maxSide / longest;
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+/** foto.HEIC → foto.jpg */
+export function jpegName(filename: string): string {
+  const base = filename.replace(/\.[^./\\]+$/, "") || "foto";
+  return `${base}.jpg`;
+}
+
+async function canvasToJpeg(bitmap: ImageBitmap, width: number, height: number): Promise<Blob | null> {
+  if (typeof OffscreenCanvas !== "undefined") {
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff"; // průhlednost PNG → bílé pozadí
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return canvas.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY });
+  }
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", JPEG_QUALITY));
+}
+
+/**
+ * Zmenší velkou fotku (> 1,5 MB nebo delší strana > 2400 px) na JPEG 0,85.
+ * Když prohlížeč obrázek neumí dekódovat (např. HEIC), vrátí originál.
+ */
+export async function downscaleImage(file: File): Promise<Blob> {
+  if (!isDownscalableImage(file.type) || typeof createImageBitmap !== "function") return file;
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const longest = Math.max(bitmap.width, bitmap.height);
+    if (file.size <= DOWNSCALE_MIN_BYTES && longest <= DOWNSCALE_MAX_SIDE) return file;
+    const { width, height } = fitWithin(bitmap.width, bitmap.height);
+    const blob = await canvasToJpeg(bitmap, width, height);
+    if (!blob) return file;
+    // zmenšení nepomohlo (už malý soubor bez nutnosti zmenšit rozměry)
+    if (blob.size >= file.size && longest <= DOWNSCALE_MAX_SIDE) return file;
+    return blob;
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close();
+  }
+}
+
+export async function uploadJobFile(file: File, opts: UploadJobFileOptions): Promise<UploadJobFileResult> {
+  try {
+    let body: Blob = file;
+    let filename = file.name || "soubor";
+    let contentType = file.type || "application/octet-stream";
+
+    if (isDownscalableImage(file.type)) {
+      opts.onPhase?.("zmenseni");
+      const small = await downscaleImage(file);
+      if (small !== file) {
+        body = small;
+        filename = jpegName(filename);
+        contentType = "image/jpeg";
+      }
+    }
+    if (body.size > JOB_FILE_MAX_BYTES) {
+      return { ok: false, error: `Soubor ${file.name} je příliš velký (max. ${Math.round(JOB_FILE_MAX_BYTES / 1024 / 1024)} MB).` };
+    }
+
+    opts.onPhase?.("nahravani");
+    const prep = await createJobFileUpload({ jobId: opts.jobId, filename, size: body.size, mimeType: contentType });
+    if (!prep.ok || !prep.path || !prep.token || !prep.bucket) {
+      return { ok: false, error: prep.error ?? "Nahrání se nepodařilo připravit." };
+    }
+    const supabase = createClient();
+    const { error: upErr } = await supabase.storage
+      .from(prep.bucket)
+      .uploadToSignedUrl(prep.path, prep.token, body, { contentType, upsert: false });
+    if (upErr) return { ok: false, error: `Nahrání selhalo: ${upErr.message}` };
+
+    opts.onPhase?.("ukladani");
+    const reg = await registerJobFile({
+      jobId: opts.jobId,
+      path: prep.path,
+      filename,
+      mimeType: contentType,
+      size: body.size,
+      kind: opts.kind,
+      title: opts.title,
+      quoteId: opts.quoteId,
+      note: opts.note,
+      replaceFileId: opts.replaceFileId,
+    });
+    if (!reg.ok || !reg.file) return { ok: false, error: reg.error ?? "Dokument se nepodařilo uložit." };
+    return { ok: true, file: reg.file };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Nahrání selhalo." };
+  }
+}
+
+/** Více souborů postupně (mobilní data — ne paralelně). */
+export async function uploadJobFiles(
+  files: File[],
+  opts: UploadJobFileOptions & { onFile?: (index: number, file: File) => void },
+): Promise<(UploadJobFileResult & { name: string })[]> {
+  const results: (UploadJobFileResult & { name: string })[] = [];
+  for (let i = 0; i < files.length; i++) {
+    opts.onFile?.(i, files[i]);
+    // replaceFileId dává smysl jen pro jeden soubor
+    const res = await uploadJobFile(files[i], files.length > 1 ? { ...opts, replaceFileId: undefined } : opts);
+    results.push({ ...res, name: files[i].name });
+  }
+  return results;
+}

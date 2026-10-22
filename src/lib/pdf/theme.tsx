@@ -16,87 +16,230 @@ export function ensureFonts() {
       { src: path.join(dir, "Roboto-Bold.ttf"), fontWeight: "bold" },
     ],
   });
-  Font.registerHyphenationCallback((word) => [word]); // bez dělení slov
+  Font.registerHyphenationCallback(splitLongWord);
   registered = true;
+}
+
+/**
+ * Slova se nedělí; jen extrémně dlouhé tokeny (kódy, čísla výkresů, URL) dostanou
+ * místa zlomu po 8 znacích, aby nepřetekly do vedlejšího sloupce tabulky.
+ */
+export function splitLongWord(word: string): string[] {
+  if (word.length <= 20) return [word];
+  const parts: string[] = [];
+  for (let i = 0; i < word.length; i += 8) parts.push(word.slice(i, i + 8));
+  return parts;
 }
 
 export const BRAND = COMPANY.colors;
 
+/** Paleta dokladů — brand + jemné odstíny (čitelné i v černobílém tisku). */
+export const C = {
+  red: BRAND.red,
+  ink: BRAND.anthracite,
+  grey: BRAND.grey,
+  muted: "#8E8F92",
+  line: "#E3E3E6",
+  hair: "#EDEDEF",
+  tint: "#F6F6F7",
+  zebra: "#FAFAFB",
+  redTint: "#FDF1F0",
+  redLine: "#F6C9C5",
+  white: "#FFFFFF",
+};
+
+/** Okraje stránky A4 (pt). */
+export const PAGE = { top: 40, side: 44, bottom: 70 };
+
 export const styles = StyleSheet.create({
   page: {
-    paddingTop: 36,
-    paddingBottom: 56,
-    paddingHorizontal: 40,
+    paddingTop: PAGE.top,
+    paddingBottom: PAGE.bottom,
+    paddingHorizontal: PAGE.side,
     fontFamily: "Roboto",
-    fontSize: 9,
-    color: BRAND.anthracite,
-    lineHeight: 1.4,
+    fontSize: 8.8,
+    color: C.ink,
   },
+  // lineHeight NESMÍ být na Page (rozbije texty s render — čísla stran), proto obal obsahu.
+  // Bezjednotkový lineHeight se násobí fontSize TOHOTO stylu (výchozí 18) → vždy uvádět i fontSize.
+  body: { fontSize: 8.8, lineHeight: 1.4 },
+
+  // ── Hlavička ──
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  brandRow: { flexDirection: "row", alignItems: "center" },
   // Wordmark dle logomanuálu: antracit bold + menší „s.r.o.", slogan šedý italic
-  brandName: { fontSize: 17, fontWeight: "bold", color: BRAND.anthracite, lineHeight: 1 },
-  brandSuffix: { fontSize: 9, fontWeight: "bold", color: BRAND.anthracite },
-  brandSlogan: { fontSize: 8, fontStyle: "italic", color: BRAND.grey, marginTop: 3 },
-  // Červená korporátní linka oddělující hlavičku
-  headerRule: { marginTop: 14, height: 2.5, backgroundColor: BRAND.red },
-  docTitle: { fontSize: 18, fontWeight: "bold", color: BRAND.anthracite, textAlign: "right", lineHeight: 1.2 },
-  docNumber: { fontSize: 11, color: BRAND.grey, textAlign: "right", marginTop: 6, lineHeight: 1 },
+  brandName: { fontSize: 19, fontWeight: "bold", color: C.ink, lineHeight: 1, letterSpacing: -0.2 },
+  brandSuffix: { fontSize: 9, fontWeight: "bold", color: C.ink },
+  brandSlogan: { fontSize: 8.2, fontStyle: "italic", color: C.grey, marginTop: 3, marginLeft: 1 },
+  docKicker: {
+    fontSize: 7,
+    lineHeight: 1.2,
+    fontWeight: "bold",
+    color: C.red,
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    textAlign: "right",
+  },
+  docTitle: { fontSize: 20, fontWeight: "bold", color: C.ink, textAlign: "right", lineHeight: 1.15, marginTop: 3 },
+  docNumber: { fontSize: 10.5, color: C.grey, textAlign: "right", marginTop: 2 },
+  docNumberStrong: { color: C.ink, fontWeight: "bold" },
+  ruleRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 12 },
+  ruleAccent: { width: 64, height: 2.5, backgroundColor: C.red },
+  ruleLine: { flexGrow: 1, height: 0.75, backgroundColor: C.line },
 
-  partiesRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 24, gap: 24 },
-  partyBox: { flex: 1 },
-  partyLabel: { fontSize: 8, color: BRAND.grey, textTransform: "uppercase", marginBottom: 4, letterSpacing: 1 },
-  partyName: { fontSize: 11, fontWeight: "bold" },
+  // ── Pruh s klíčovými údaji ──
+  meta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 12,
+    backgroundColor: C.tint,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  metaCell: { paddingVertical: 5, paddingHorizontal: 6 },
+  metaLabel: { fontSize: 6.6, lineHeight: 1.25, color: C.muted, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 2.5 },
+  metaValue: { fontSize: 9.2, lineHeight: 1.3, fontWeight: "bold", color: C.ink },
 
-  metaRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 18, gap: 24 },
-  metaBox: { flex: 1, padding: 10, backgroundColor: "#F7F7F8", borderRadius: 4 },
-  metaLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
-  metaKey: { color: BRAND.grey },
-  metaVal: { fontWeight: "bold" },
+  // ── Strany ──
+  parties: { flexDirection: "row", marginTop: 16 },
+  party: { flex: 1 },
+  partyLabelRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
+  partyDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: C.red, marginRight: 5 },
+  partyLabel: { fontSize: 6.8, lineHeight: 1.2, color: C.muted, textTransform: "uppercase", letterSpacing: 1, fontWeight: "bold" },
+  partyName: { fontSize: 11, fontWeight: "bold", color: C.ink, marginBottom: 2, lineHeight: 1.25 },
+  partyLine: { color: C.ink },
+  partyFacts: { marginTop: 5 },
+  factRow: { flexDirection: "row" },
+  factKey: { color: C.muted, width: 62 },
+  factVal: { color: C.ink, flex: 1 },
+  partySmall: { fontSize: 7.4, color: C.grey, marginTop: 4, lineHeight: 1.35 },
 
-  table: { marginTop: 22, borderTopWidth: 1, borderColor: "#E5E5E7" },
+  // ── Úvodní text ──
+  subject: { fontSize: 12, lineHeight: 1.3, fontWeight: "bold", color: C.ink, marginTop: 16 },
+  intro: { fontSize: 9, color: C.ink, marginTop: 6, lineHeight: 1.5 },
+
+  // ── Tabulka položek ──
+  table: { marginTop: 14 },
   th: {
     flexDirection: "row",
-    backgroundColor: BRAND.anthracite,
-    color: "#fff",
     paddingVertical: 6,
-    paddingHorizontal: 6,
-    fontSize: 8,
-    textTransform: "uppercase",
+    paddingHorizontal: 4,
+    borderBottomWidth: 1.2,
+    borderColor: C.ink,
   },
-  tr: { flexDirection: "row", paddingVertical: 6, paddingHorizontal: 6, borderBottomWidth: 1, borderColor: "#EEE" },
-  cDesc: { flex: 4 },
-  cQty: { flex: 1.2, textAlign: "right" },
-  cUnit: { flex: 1, textAlign: "center" },
-  cPrice: { flex: 1.6, textAlign: "right" },
-  cVat: { flex: 1, textAlign: "right" },
-  cTotal: { flex: 1.8, textAlign: "right" },
-
-  totals: { marginTop: 14, alignSelf: "flex-end", width: 240 },
-  totalLine: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
-  totalGrand: {
+  thText: { fontSize: 6.8, lineHeight: 1.25, fontWeight: "bold", color: C.grey, textTransform: "uppercase", letterSpacing: 0.6 },
+  tr: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 2,
-    borderColor: BRAND.red,
+    fontSize: 8.8,
+    lineHeight: 1.32,
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    borderBottomWidth: 0.6,
+    borderColor: C.hair,
   },
-  totalGrandLabel: { fontSize: 12, fontWeight: "bold" },
-  totalGrandValue: { fontSize: 12, fontWeight: "bold", color: BRAND.red },
+  trZebra: { backgroundColor: C.zebra },
+  cellNum: { color: C.muted, fontSize: 8 },
+  cellDrawing: { fontWeight: "bold", color: C.ink },
+  cellRev: { fontSize: 7.2, lineHeight: 1.3, color: C.grey, marginTop: 1 },
+  cellDesc: { color: C.ink },
+  cellSub: { fontSize: 7.4, lineHeight: 1.3, color: C.grey, marginTop: 1.5 },
+  cellNote: { fontSize: 7.4, lineHeight: 1.3, color: C.grey, fontStyle: "italic", marginTop: 1.5 },
+  cellRight: { textAlign: "right" },
+  cellUnit: { color: C.grey },
+  cellStrong: { fontWeight: "bold", textAlign: "right" },
+  cellMuted: { color: C.grey, textAlign: "right" },
+  checkBox: { width: 9, height: 9, borderWidth: 0.9, borderColor: C.muted, borderRadius: 1.5, alignSelf: "center" },
 
+  // ── Součty ──
+  summaryRow: { flexDirection: "row", marginTop: 14, alignItems: "flex-start" },
+  totalsCard: {
+    width: 228,
+    marginLeft: "auto",
+    backgroundColor: C.tint,
+    borderRadius: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  totalLine: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.6 },
+  totalKey: { color: C.grey },
+  totalVal: { color: C.ink },
+  totalDivider: { height: 0.75, backgroundColor: C.line, marginVertical: 6 },
+  totalGrandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
+  totalGrandLabel: { fontSize: 9.5, fontWeight: "bold", color: C.ink, paddingBottom: 1.5 },
+  totalGrandValue: { fontSize: 15, fontWeight: "bold", color: C.red, lineHeight: 1.1 },
+  totalHint: { fontSize: 6.8, lineHeight: 1.3, color: C.muted, textAlign: "right", marginTop: 3 },
+
+  // ── Podmínky / poznámky ──
+  sectionTitle: {
+    fontSize: 6.8,
+    lineHeight: 1.2,
+    fontWeight: "bold",
+    color: C.muted,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+  termRow: { flexDirection: "row", paddingVertical: 2.4, borderBottomWidth: 0.5, borderColor: C.hair },
+  termKey: { width: 100, color: C.grey },
+  termVal: { flex: 1, color: C.ink, fontWeight: "bold" },
+  noteBox: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderLeftWidth: 2.5,
+    borderColor: C.red,
+    backgroundColor: C.redTint,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+  },
+  noteText: { fontSize: 8.4, color: C.ink, lineHeight: 1.5 },
+  closing: { marginTop: 12, fontSize: 9, color: C.ink, lineHeight: 1.5 },
+  legal: { marginTop: 10, fontSize: 7.2, color: C.muted, lineHeight: 1.45 },
+
+  // ── Podpisy ──
+  signRow: { flexDirection: "row", marginTop: 18 },
+  signBox: { flex: 1 },
+  signTitle: { fontSize: 6.8, lineHeight: 1.2, fontWeight: "bold", color: C.muted, textTransform: "uppercase", letterSpacing: 1 },
+  signName: { fontSize: 9, lineHeight: 1.3, fontWeight: "bold", color: C.ink, marginTop: 3 },
+  signArea: { height: 34, borderBottomWidth: 0.9, borderColor: C.ink, marginTop: 4 },
+  signCaption: { fontSize: 7, lineHeight: 1.3, color: C.muted, marginTop: 3 },
+  stampBox: {
+    height: 58,
+    borderWidth: 0.9,
+    borderStyle: "dashed",
+    borderColor: C.muted,
+    borderRadius: 6,
+    marginTop: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stampText: { fontSize: 7, lineHeight: 1.2, color: C.muted, textTransform: "uppercase", letterSpacing: 1 },
+
+  // ── Patička ──
   footer: {
     position: "absolute",
-    bottom: 24,
-    left: 40,
-    right: 40,
+    bottom: 22,
+    left: PAGE.side,
+    right: PAGE.side,
+    borderTopWidth: 0.75,
+    borderColor: C.line,
+    paddingTop: 7,
+    flexDirection: "row",
+    fontSize: 6.7,
+    color: C.grey,
+  },
+  footerCol: { flex: 1, paddingRight: 8, fontSize: 6.7, lineHeight: 1.45 },
+  footerStrong: { fontWeight: "bold", color: C.ink },
+  footerPage: { width: 58, textAlign: "right", color: C.grey },
+  runningHeader: {
+    position: "absolute",
+    top: 18,
+    left: PAGE.side,
+    right: PAGE.side,
     flexDirection: "row",
     justifyContent: "space-between",
     fontSize: 7,
-    color: BRAND.grey,
-    borderTopWidth: 1,
-    borderColor: "#E5E5E7",
-    paddingTop: 6,
+    color: C.muted,
   },
-  note: { marginTop: 16, fontSize: 8, color: BRAND.grey },
-  sectionTitle: { fontSize: 9, fontWeight: "bold", marginTop: 16, marginBottom: 4 },
 });

@@ -1,0 +1,51 @@
+{
+  "docKind": "dodaci_list",
+  "issuer": "dodavatel",
+  "documentNumber": "DL-2026-0877",
+  "documentDate": "2026-10-20",
+  "customer": {
+    "name": "", "ico": "", "dic": "", "street": "", "city": "", "zip": "", "country": "",
+    "email": "", "phone": "", "contactPerson": ""
+  },
+  "supplier": {
+    "name": "Kovoobrábění Hrubý s.r.o.",
+    "ico": "25874411",
+    "dic": "CZ25874411",
+    "street": "Dělnická 455",
+    "city": "Kralupy nad Vltavou",
+    "zip": "278 01",
+    "country": "CZ",
+    "email": "objednavky@hruby-cnc.cz",
+    "phone": "+420 315 700 120",
+    "contactPerson": "Pavel Hrubý"
+  },
+  "customerOrderNumber": "OBJ-2026-045",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "PR-7075-20",
+      "revision": "A",
+      "name": "Příruba",
+      "description": "",
+      "material": "AL 7075-T6",
+      "quantity": 200,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "",
+  "paymentTerms": "",
+  "deliveryTerms": "Osobní odběr",
+  "note": "Razítko a podpis převzetí: 20. 10. 2026, J. Malá",
+  "summary": "Dodací list DL-2026-0877 od Kovoobrábění Hrubý s.r.o. — dodáno 200 ks přírub PR-7075-20 k naší objednávce OBJ-2026-045.",
+  "confidence": 0.9,
+  "needsClarification": []
+}

@@ -1,0 +1,895 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { checkFeature, getAccess } from "@/lib/auth/session";
+import type { Feature } from "@/lib/auth/permissions";
+import type { CurrentUser } from "@/lib/data/current-user";
+import { logAudit } from "@/lib/audit";
+import { recordCorrection } from "@/app/actions/corrections";
+import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { findOrCreateCustomer } from "@/lib/jobs/customers";
+import { isJobStage, isForward } from "@/lib/jobs/stages";
+import { JOB_PERSON_COLUMNS, formatFieldValue } from "@/lib/jobs/field-labels";
+import {
+  jobInputToRow, validateJobInput, validateItems, jobItemToRow, quoteItemToRow, quoteInputToRow,
+  computeItemTotals, diffJob, describeChanges, fieldEventMessage, stageEventMessage, aiFilledColumns,
+  quoteRevisionNumber, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
+  translateDbError, type JobChange,
+} from "@/lib/jobs/mapping";
+import type { JobStage, JobSource } from "@/lib/supabase/database.types";
+import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
+
+/**
+ * Akce Knihy zakázek: zakázka, položky, stav, komentáře a nabídky.
+ * Data jdou servisním klíčem → oprávnění hlídá každá akce sama (checkFeature).
+ * Každá změna se zapíše do historie zakázky (job_events).
+ */
+
+interface Ctx {
+  db: JobsDb;
+  user: CurrentUser;
+  margins: boolean;
+}
+
+const NOT_FOUND = "Zakázka nenalezena.";
+const QUOTE_NOT_FOUND = "Nabídka nenalezena.";
+
+async function begin(feature: Feature = "orders"): Promise<Ctx | { error: string }> {
+  if (!isSupabaseConfigured()) return { error: "Supabase není nakonfigurováno." };
+  const access = await checkFeature(feature);
+  if ("error" in access) return { error: access.error };
+  const { can } = await getAccess();
+  const db = await createOperatorClient();
+  return { db, user: access.user, margins: can("margins") };
+}
+
+function fail(err: unknown): { ok: false; error: string } {
+  if (typeof err === "string") return { ok: false, error: translateDbError(err) };
+  return { ok: false, error: err instanceof Error ? translateDbError(err.message) : "Neočekávaná chyba." };
+}
+
+const FLOW_PATHS = ["/orders", "/inquiries", "/pricing", "/quotes", "/confirmations", "/documents", "/"];
+
+function revalidateJob(jobId?: string | null) {
+  for (const p of FLOW_PATHS) revalidatePath(p);
+  revalidatePath("/customers", "layout");
+  if (jobId) revalidatePath(`/orders/${jobId}`);
+}
+
+type Row = Record<string, unknown>;
+
+async function loadJob(db: JobsDb, id: string, columns = "*"): Promise<Row | null> {
+  const { data, error } = await db.from("orders").select(columns).eq("id", id).maybeSingle();
+  if (error) console.error(`[jobs] Načtení zakázky selhalo: ${error.message}`);
+  return (data as Row | null) ?? null;
+}
+
+function clamp01(v: unknown): number | null {
+  const n = cleanNumber(v);
+  if (n === null) return null;
+  return Math.round(Math.min(1, Math.max(0, n)) * 1000) / 1000;
+}
+
+/** Jména pro id ve změnách (osoby, zákazník, dodavatel) — do textu historie. */
+async function refNames(db: JobsDb, changes: JobChange[]): Promise<Record<string, string>> {
+  const people = new Set<string>();
+  const customers = new Set<string>();
+  const suppliers = new Set<string>();
+  for (const c of changes) {
+    const target = JOB_PERSON_COLUMNS.includes(c.field) ? people
+      : c.field === "customer_id" ? customers
+      : c.field === "supplier_id" ? suppliers
+      : null;
+    if (!target) continue;
+    for (const v of [c.from, c.to]) if (isUuid(v)) target.add(v);
+  }
+  const out: Record<string, string> = {};
+  try {
+    const [p, cu, su] = await Promise.all([
+      people.size ? db.from("profiles").select("id, full_name, email").in("id", [...people]) : Promise.resolve({ data: [] }),
+      customers.size ? db.from("customers").select("id, name").in("id", [...customers]) : Promise.resolve({ data: [] }),
+      suppliers.size ? db.from("suppliers").select("id, name").in("id", [...suppliers]) : Promise.resolve({ data: [] }),
+    ]);
+    for (const r of (p.data ?? []) as { id: string; full_name: string | null; email: string | null }[]) {
+      out[r.id] = (r.full_name ?? "").trim() || (r.email ?? "").trim() || r.id;
+    }
+    for (const r of [...((cu.data ?? []) as { id: string; name: string }[]), ...((su.data ?? []) as { id: string; name: string }[])]) {
+      out[r.id] = r.name;
+    }
+  } catch {
+    // jména jsou jen pro čitelnost historie
+  }
+  return out;
+}
+
+/** Hodnota pro AI korekci — surová (datum RRRR-MM-DD), u id jméno. */
+function rawValue(v: unknown, refs: Record<string, string>): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return refs[v] ?? v;
+  if (Array.isArray(v)) return v.map(String).join(", ");
+  return String(v);
+}
+
+/** Změna stavu + záznam do historie (sdílí setJobStage i nabídky). */
+async function applyStage(
+  db: JobsDb, jobId: string, from: JobStage | null, to: JobStage, actorId: string, note?: string | null,
+): Promise<string | null> {
+  const { error } = await db.from("orders").update({ status: to } as never).eq("id", jobId);
+  if (error) return error.message;
+  await logJobEvent(db, {
+    jobId, type: "stage", message: stageEventMessage(from, to, note),
+    data: { from, to, ...(cleanText(note, 500) ? { note: cleanText(note, 500) } : {}) }, actorId,
+  });
+  return null;
+}
+
+// ── Zakázka ─────────────────────────────────────────────────
+export async function createJob(
+  input: JobInput & { items?: JobItemInput[] },
+  opts: { source?: JobSource; emailId?: string; aiFilled?: boolean; aiConfidence?: number } = {},
+): Promise<ActionResult<{ id: string; number: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!input || typeof input !== "object") return fail("Chybí údaje zakázky.");
+  const invalid = validateJobInput(input);
+  if (invalid) return fail(invalid);
+  const items = input.items ?? [];
+  const badItems = validateItems(items);
+  if (badItems) return fail(badItems);
+  if (opts.source !== undefined && !isJobSource(opts.source)) return fail("Neznámý zdroj zakázky.");
+  if (opts.emailId !== undefined && opts.emailId !== null && !isUuid(opts.emailId)) return fail("Neplatný e-mail.");
+
+  try {
+    const { db, user, margins } = c;
+    const stage: JobStage = input.stage ?? "poptavka";
+    const row = jobInputToRow({ ...input, stage });
+    if (!margins) delete row.purchase_cost;
+
+    // zákazník: vybraný, nebo dohledat / založit podle názvu
+    let customerCreated = false;
+    if (!row.customer_id) {
+      const name = cleanText(input.customerName, 300);
+      if (name) {
+        const found = await findOrCreateCustomer(db, { name, ownerId: (row.owner_id as string | null) ?? user.id });
+        if (!found) return fail("Zákazníka se nepodařilo dohledat ani založit.");
+        row.customer_id = found.id;
+        customerCreated = found.created;
+      }
+    }
+
+    const itemRows = items.map((it, i) => {
+      const r = jobItemToRow(it, i);
+      if (!margins) r.purchase_unit_price = null;
+      return r;
+    });
+    const totals = computeItemTotals(items.map((it) => ({
+      quantity: it.quantity, unitPrice: it.unitPrice, purchaseUnitPrice: margins ? it.purchaseUnitPrice : null,
+    })));
+    if (input.value === undefined && totals.value !== null) row.value = totals.value;
+    if (margins && input.purchaseCost === undefined && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
+
+    if (!row.title) {
+      row.title = cleanText(items[0]?.name, 300) ?? cleanText(items[0]?.drawingNumber, 300) ?? "Nová zakázka";
+    }
+    if (stage === "poptavka" && !row.inquiry_date) row.inquiry_date = todayIso();
+
+    const { data: number, error: numErr } = await db.rpc("next_job_number");
+    if (numErr || typeof number !== "string" || !number) {
+      return fail(numErr?.message ?? "Nepodařilo se přidělit číslo zakázky.");
+    }
+
+    const source: JobSource = opts.source ?? "manual";
+    const insert = {
+      ...row,
+      number,
+      status: stage,
+      owner_id: (row.owner_id as string | null | undefined) ?? user.id,
+      created_by: user.id,
+      source,
+      email_id: opts.emailId ?? null,
+      ai_filled: Boolean(opts.aiFilled),
+      ai_confidence: clamp01(opts.aiConfidence),
+    };
+    const { data: created, error } = await db.from("orders").insert(insert as never).select("id, number").single();
+    if (error || !created) return fail(error?.message ?? "Zakázku se nepodařilo založit.");
+    const jobId = (created as { id: string }).id;
+
+    if (itemRows.length) {
+      const { error: itemErr } = await db
+        .from("order_items")
+        .insert(itemRows.map((r) => ({ ...r, order_id: jobId })) as never);
+      if (itemErr) {
+        await db.from("orders").delete().eq("id", jobId);
+        return fail(`Položky se nepodařilo uložit: ${itemErr.message}`);
+      }
+    }
+
+    await logJobEvent(db, {
+      jobId, type: "created", message: "Zakázka založena",
+      data: { source, items: itemRows.length, customerCreated, ...(opts.emailId ? { emailId: opts.emailId } : {}) },
+      actorId: user.id,
+    });
+    await logAudit({ action: "job_created", entity: "orders", entityId: jobId, diff: { number, source } });
+    revalidateJob(jobId);
+    return { ok: true, id: jobId, number };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function updateJob(id: string, patch: JobInput): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(NOT_FOUND);
+  if (!patch || typeof patch !== "object") return fail("Chybí změny.");
+  const invalid = validateJobInput(patch);
+  if (invalid) return fail(invalid);
+
+  try {
+    const { db, user, margins } = c;
+    const before = await loadJob(db, id);
+    if (!before) return fail(NOT_FOUND);
+
+    const { stage, ...rest } = patch;
+    const row = jobInputToRow(rest);
+    delete row.status;
+    if (!margins) delete row.purchase_cost;
+
+    if (rest.customerId === undefined) {
+      const name = cleanText(rest.customerName, 300);
+      if (name) {
+        const found = await findOrCreateCustomer(db, { name, ownerId: (before.owner_id as string | null) ?? user.id });
+        if (!found) return fail("Zákazníka se nepodařilo dohledat ani založit.");
+        row.customer_id = found.id;
+      }
+    }
+
+    const changes = diffJob(before, row);
+    const fromStage = isJobStage(before.status) ? before.status : null;
+    const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
+    if (!changes.length && !stageTo) return { ok: true };
+
+    if (changes.length) {
+      const update: Row = {};
+      for (const ch of changes) update[ch.field] = row[ch.field];
+      const { error } = await db.from("orders").update(update as never).eq("id", id);
+      if (error) return fail(error.message);
+
+      // AI se učí: oprava pole, které vyplnila AI (události „ai" s data.filledColumns)
+      let aiCorrected: string[] = [];
+      if (before.ai_filled === true) {
+        const { data: evs } = await db.from("job_events").select("type, data, created_at").eq("job_id", id).in("type", ["ai", "field"]);
+        const filled = aiFilledColumns((evs ?? []) as { type: string; data: unknown; created_at: string }[]);
+        aiCorrected = changes.filter((ch) => filled.has(ch.field)).map((ch) => ch.field);
+      }
+
+      const refs = await refNames(db, changes);
+      const views = describeChanges(changes, refs);
+      await logJobEvent(db, {
+        jobId: id, type: "field", message: fieldEventMessage(views),
+        data: { changes: views, ...(aiCorrected.length ? { aiCorrected } : {}) },
+        actorId: user.id,
+      });
+
+      for (const field of aiCorrected) {
+        const v = views.find((x) => x.field === field);
+        if (!v) continue;
+        try {
+          await recordCorrection({
+            agentKey: "capture",
+            field: v.label,
+            context: `Zakázka ${String(before.number ?? "")} — ${String(before.title ?? "")}`.slice(0, 500),
+            aiValue: rawValue(v.from, refs) || formatFieldValue(field, v.from),
+            correctedValue: rawValue(v.to, refs) || "(prázdné)",
+          });
+        } catch {
+          // učení AI nesmí shodit uložení
+        }
+      }
+    }
+
+    if (stageTo) {
+      const err = await applyStage(db, id, fromStage, stageTo, user.id);
+      if (err) return fail(err);
+    }
+
+    revalidateJob(id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function setJobStage(id: string, stage: JobStage, note?: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(NOT_FOUND);
+  if (!isJobStage(stage)) return fail("Neznámý stav zakázky.");
+  try {
+    const job = await loadJob(c.db, id, "id, status");
+    if (!job) return fail(NOT_FOUND);
+    const from = isJobStage(job.status) ? job.status : null;
+    if (from === stage) return { ok: true };
+    const err = await applyStage(c.db, id, from, stage, c.user.id, note);
+    if (err) return fail(err);
+    revalidateJob(id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function deleteJob(id: string): Promise<ActionResult> {
+  const c = await begin("delete");
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(NOT_FOUND);
+  try {
+    const { db } = c;
+    const job = await loadJob(db, id, "id, number, title, customer_id");
+    if (!job) return fail(NOT_FOUND);
+
+    const { data: files } = await db.from("job_files").select("storage_path").eq("job_id", id);
+    const paths = ((files ?? []) as { storage_path: string }[]).map((f) => f.storage_path).filter(Boolean);
+
+    // nabídky zakázky patří k ní (položky se smažou kaskádou)
+    const { data: quotes, error: qErr } = await db.from("quotes").delete().eq("job_id", id).select("id");
+    if (qErr) return fail(qErr.message);
+
+    const { error } = await db.from("orders").delete().eq("id", id);
+    if (error) return fail(error.message);
+
+    if (paths.length) {
+      try {
+        const { error: stErr } = await db.storage.from("job-files").remove(paths);
+        if (stErr) console.error(`[jobs] Mazání souborů z úložiště selhalo: ${stErr.message}`);
+      } catch (e) {
+        console.error(`[jobs] Mazání souborů z úložiště selhalo: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    await logAudit({
+      action: "job_deleted", entity: "orders", entityId: id,
+      diff: { number: job.number, title: job.title, files: paths.length, quotes: (quotes ?? []).length },
+    });
+    revalidateJob(id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Položky a komentáře ─────────────────────────────────────
+export async function saveJobItems(jobId: string, items: JobItemInput[]): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(NOT_FOUND);
+  const bad = validateItems(items);
+  if (bad) return fail(bad);
+
+  try {
+    const { db, user, margins } = c;
+    const job = await loadJob(db, jobId, "id, value");
+    if (!job) return fail(NOT_FOUND);
+
+    const { data: oldData, error: oldErr } = await db
+      .from("order_items")
+      .select("id, drawing_id, purchase_unit_price")
+      .eq("order_id", jobId);
+    if (oldErr) return fail(oldErr.message);
+    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null }[]).map((r) => [r.id, r]));
+
+    const rows = items.map((it, i): Row => {
+      const r = jobItemToRow(it, i);
+      const prev = it.id && isUuid(it.id) ? old.get(it.id) : undefined;
+      // bez práva na marže se nákupní cena nesmí ztratit ani přepsat
+      if (!margins) r.purchase_unit_price = prev?.purchase_unit_price ?? null;
+      if (prev?.drawing_id) r.drawing_id = prev.drawing_id;
+      return { ...r, order_id: jobId };
+    });
+
+    // nejdřív vložit nové, pak smazat staré — při chybě se nic neztratí
+    let insertedIds: string[] = [];
+    if (rows.length) {
+      const { data: ins, error: insErr } = await db.from("order_items").insert(rows as never).select("id");
+      if (insErr) return fail(insErr.message);
+      insertedIds = ((ins ?? []) as { id: string }[]).map((r) => r.id);
+    }
+    if (old.size) {
+      const { error: delErr } = await db.from("order_items").delete().in("id", [...old.keys()]);
+      if (delErr) {
+        if (insertedIds.length) await db.from("order_items").delete().in("id", insertedIds);
+        return fail(delErr.message);
+      }
+    }
+
+    const totals = computeItemTotals(rows.map((r) => ({
+      quantity: r.quantity as number,
+      unitPrice: r.unit_price as number | null,
+      purchaseUnitPrice: r.purchase_unit_price as number | null,
+    })));
+    const update: Row = {};
+    if (rows.some((r) => r.unit_price !== null)) update.value = totals.value;
+    if (margins && rows.some((r) => r.purchase_unit_price !== null)) update.purchase_cost = totals.purchaseCost;
+    if (Object.keys(update).length) {
+      const { error: upErr } = await db.from("orders").update(update as never).eq("id", jobId);
+      if (upErr) return fail(upErr.message);
+    }
+
+    await logJobEvent(db, {
+      jobId, type: "field",
+      message: `Položky upraveny (${rows.length})`,
+      data: { items: rows.length, ...(update.value !== undefined ? { value: update.value } : {}) },
+      actorId: user.id,
+    });
+    revalidateJob(jobId);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function addJobComment(jobId: string, text: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(NOT_FOUND);
+  const message = cleanText(text, 5000);
+  if (!message) return fail("Napiš text komentáře.");
+  try {
+    const job = await loadJob(c.db, jobId, "id");
+    if (!job) return fail(NOT_FOUND);
+    const { error } = await c.db.from("job_events").insert({
+      job_id: jobId, type: "comment", message, data: {}, actor_id: c.user.id,
+    } as never);
+    if (error) return fail(error.message);
+    revalidatePath(`/orders/${jobId}`);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+// ── Nabídky zakázky ─────────────────────────────────────────
+type QuoteRowFull = Row & {
+  id: string;
+  number: string | null;
+  job_id: string | null;
+  status: string;
+  revision: number | null;
+  approved_by: string | null;
+  total: number | string | null;
+  items?: Row[] | null;
+};
+
+async function loadQuote(db: JobsDb, quoteId: string): Promise<QuoteRowFull | null> {
+  const { data, error } = await db.from("quotes").select("*, items:quote_items!quote_id(*)").eq("id", quoteId).maybeSingle();
+  if (error) console.error(`[jobs] Načtení nabídky selhalo: ${error.message}`);
+  return (data as QuoteRowFull | null) ?? null;
+}
+
+function validateQuoteInput(input: Partial<JobQuoteInput>, requireItems: boolean): string | null {
+  if (!input || typeof input !== "object") return "Chybí údaje nabídky.";
+  if (requireItems || input.items !== undefined) {
+    const bad = validateItems(input.items ?? []);
+    if (bad) return bad;
+  }
+  if (input.status !== undefined && !isQuoteStatus(input.status)) return "Neznámý stav nabídky.";
+  if (input.validUntil && cleanDate(input.validUntil) === null) return "Neplatné datum platnosti nabídky (čekám RRRR-MM-DD).";
+  if (input.leadTimeDays !== undefined && input.leadTimeDays !== null) {
+    const n = cleanNumber(input.leadTimeDays);
+    if (n === null || n < 0 || n > 3650) return "Neplatná dodací lhůta.";
+  }
+  return null;
+}
+
+async function maxRevision(db: JobsDb, jobId: string): Promise<number> {
+  const { data } = await db.from("quotes").select("revision").eq("job_id", jobId);
+  return ((data ?? []) as { revision: number | null }[]).reduce((m, r) => Math.max(m, r.revision ?? 1), 0);
+}
+
+function quoteLabel(q: { number: string | null }): string {
+  return q.number ? `Nabídka ${q.number}` : "Nabídka";
+}
+
+/** Podpis položek pro zjištění, zda se nabídka po schválení změnila. */
+function itemsSignature(rows: Row[]): string {
+  return JSON.stringify(
+    [...rows]
+      .sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0))
+      .map((r) => [r.drawing_number ?? null, r.name ?? null, r.description ?? null, r.material ?? null,
+        cleanNumber(r.quantity), r.unit ?? "ks", cleanNumber(r.unit_price), cleanNumber(r.vat_rate)]),
+  );
+}
+
+function revalidateQuote(jobId: string | null) {
+  revalidateJob(jobId);
+}
+
+export async function createJobQuote(jobId: string, input: JobQuoteInput): Promise<ActionResult<{ id: string; number: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail(NOT_FOUND);
+  const invalid = validateQuoteInput(input, true);
+  if (invalid) return fail(invalid);
+
+  try {
+    const { db, user, margins } = c;
+    const job = await loadJob(db, jobId, "id, number, customer_id, priced_by");
+    if (!job) return fail(NOT_FOUND);
+
+    const revision = (await maxRevision(db, jobId)) + 1;
+    const { data: number, error: numErr } = await db.rpc("next_doc_number", { p_prefix: "NAB" });
+    if (numErr || typeof number !== "string" || !number) return fail(numErr?.message ?? "Nepodařilo se přidělit číslo nabídky.");
+
+    const itemRows = input.items.map((it, i) => {
+      const r = quoteItemToRow(it, i);
+      if (!margins) r.purchase_unit_price = null;
+      return r;
+    });
+    const totals = computeItemTotals(itemRows.map((r) => ({ quantity: r.quantity as number, unitPrice: r.unit_price as number | null })));
+    const header = quoteInputToRow(input);
+    const insert = {
+      ...header,
+      number,
+      job_id: jobId,
+      customer_id: job.customer_id ?? null,
+      status: header.status ?? "ke_schvaleni",
+      currency: header.currency ?? "CZK",
+      total: totals.value,
+      revision,
+      created_by: user.id,
+      owner_id: user.id,
+      ai_generated: false,
+      archived: false,
+    };
+    const { data: created, error } = await db.from("quotes").insert(insert as never).select("id").single();
+    if (error || !created) return fail(error?.message ?? "Nabídku se nepodařilo založit.");
+    const quoteId = (created as { id: string }).id;
+
+    if (itemRows.length) {
+      const { error: itemErr } = await db.from("quote_items").insert(itemRows.map((r) => ({ ...r, quote_id: quoteId })) as never);
+      if (itemErr) {
+        await db.from("quotes").delete().eq("id", quoteId);
+        return fail(`Položky nabídky se nepodařilo uložit: ${itemErr.message}`);
+      }
+    }
+    // kdo nacenil = autor první nacenené nabídky
+    if (totals.value !== null && !job.priced_by) {
+      await db.from("orders").update({ priced_by: user.id } as never).eq("id", jobId);
+    }
+
+    await logJobEvent(db, {
+      jobId, type: "quote",
+      message: `${quoteLabel({ number })} vytvořena${revision > 1 ? ` (verze ${revision})` : ""}`,
+      data: { quoteId, number, revision, total: totals.value, action: "created" },
+      actorId: user.id,
+    });
+    revalidateQuote(jobId);
+    return { ok: true, id: quoteId, number };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  const invalid = validateQuoteInput(input, false);
+  if (invalid) return fail(invalid);
+
+  try {
+    const { db, user, margins } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const oldItems = [...(quote.items ?? [])].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
+
+    const update: Row = quoteInputToRow(input);
+    let itemRows: Row[] | null = null;
+    if (Array.isArray(input.items)) {
+      itemRows = input.items.map((it, i) => {
+        const r = quoteItemToRow(it, i);
+        if (!margins) {
+          // nákupní cenu zachovat u stejné položky (pozice + výkres)
+          const prev = oldItems[i];
+          r.purchase_unit_price = prev && (prev.drawing_number ?? null) === r.drawing_number
+            ? cleanNumber(prev.purchase_unit_price) : null;
+        }
+        return { ...r, quote_id: quoteId };
+      });
+      update.total = computeItemTotals(itemRows.map((r) => ({ quantity: r.quantity as number, unitPrice: r.unit_price as number | null }))).value;
+    }
+
+    const contentChanged = itemRows !== null && itemsSignature(itemRows) !== itemsSignature(oldItems);
+    const resetApproval = Boolean(quote.approved_by) && contentChanged;
+    if (resetApproval) {
+      update.approved_by = null;
+      update.approved_at = null;
+    }
+
+    if (itemRows) {
+      let insertedIds: string[] = [];
+      if (itemRows.length) {
+        const { data: ins, error: insErr } = await db.from("quote_items").insert(itemRows as never).select("id");
+        if (insErr) return fail(insErr.message);
+        insertedIds = ((ins ?? []) as { id: string }[]).map((r) => r.id);
+      }
+      const oldIds = oldItems.map((r) => r.id).filter(isUuid);
+      if (oldIds.length) {
+        const { error: delErr } = await db.from("quote_items").delete().in("id", oldIds);
+        if (delErr) {
+          if (insertedIds.length) await db.from("quote_items").delete().in("id", insertedIds);
+          return fail(delErr.message);
+        }
+      }
+    }
+    if (Object.keys(update).length) {
+      const { error } = await db.from("quotes").update(update as never).eq("id", quoteId);
+      if (error) return fail(error.message);
+    }
+
+    if (quote.job_id) {
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote",
+        message: `${quoteLabel(quote)} upravena${resetApproval ? " (schválení zrušeno — nutno znovu schválit)" : ""}`,
+        data: { quoteId, number: quote.number, action: "updated", total: update.total ?? null, approvalReset: resetApproval },
+        actorId: user.id,
+      });
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function approveJobQuote(quoteId: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const now = new Date().toISOString();
+    const update: Row = { approved_by: user.id, approved_at: now };
+    if (quote.status === "navrh_ai") update.status = "ke_schvaleni";
+    const { error } = await db.from("quotes").update(update as never).eq("id", quoteId);
+    if (error) return fail(error.message);
+    if (quote.job_id) {
+      await db.from("orders").update({ approved_by: user.id, approved_at: now } as never).eq("id", quote.job_id);
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} schválena`,
+        data: { quoteId, number: quote.number, action: "approved" }, actorId: user.id,
+      });
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function markJobQuoteSent(quoteId: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const { error } = await db.from("quotes").update({ status: "odeslano", sent_at: new Date().toISOString() } as never).eq("id", quoteId);
+    if (error) return fail(error.message);
+    if (quote.job_id) {
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} odeslána zákazníkovi`,
+        data: { quoteId, number: quote.number, action: "sent" }, actorId: user.id,
+      });
+      const job = await loadJob(db, quote.job_id, "id, status");
+      const from = job && isJobStage(job.status) ? job.status : null;
+      if (from && isForward(from, "nabidka")) {
+        const err = await applyStage(db, quote.job_id, from, "nabidka", user.id);
+        if (err) return fail(err);
+      }
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    if (!quote.job_id) return fail("Nabídka není přiřazená k žádné zakázce.");
+    const job = await loadJob(db, quote.job_id, "id, status, value");
+    if (!job) return fail(NOT_FOUND);
+
+    const { error } = await db.from("quotes").update({ status: "prijato" } as never).eq("id", quoteId);
+    if (error) return fail(error.message);
+
+    const total = cleanNumber(quote.total);
+    const jobUpdate: Row = { quote_id: quoteId };
+    if (total !== null) jobUpdate.value = total;
+    const { error: jobErr } = await db.from("orders").update(jobUpdate as never).eq("id", quote.job_id);
+    if (jobErr) return fail(jobErr.message);
+
+    const valueText = total !== null ? ` — hodnota zakázky ${formatFieldValue("value", total)}` : "";
+    await logJobEvent(db, {
+      jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} přijata zákazníkem${valueText}`,
+      data: { quoteId, number: quote.number, action: "accepted", total, previousValue: cleanNumber(job.value) },
+      actorId: user.id,
+    });
+
+    const from = isJobStage(job.status) ? job.status : null;
+    if (from && isForward(from, "objednavka")) {
+      const err = await applyStage(db, quote.job_id, from, "objednavka", user.id);
+      if (err) return fail(err);
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function rejectJobQuote(quoteId: string, reason?: string): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const why = cleanText(reason, 2000);
+    const { error } = await db.from("quotes").update({ status: "zamitnuto", rejected_reason: why } as never).eq("id", quoteId);
+    if (error) return fail(error.message);
+    if (quote.job_id) {
+      // zamítnutá nabídka už nemůže být ta přijatá
+      await db.from("orders").update({ quote_id: null } as never).eq("id", quote.job_id).eq("quote_id", quoteId);
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} zamítnuta${why ? ` — ${why}` : ""}`,
+        data: { quoteId, number: quote.number, action: "rejected", reason: why }, actorId: user.id,
+      });
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult<{ id: string; number: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+
+    let rev = (quote.job_id ? await maxRevision(db, quote.job_id) : (quote.revision ?? 1)) + 1;
+    const copy = {
+      title: quote.title ?? null,
+      currency: quote.currency ?? "CZK",
+      total: quote.total ?? null,
+      valid_until: quote.valid_until ?? null,
+      lead_time_days: quote.lead_time_days ?? null,
+      delivery_terms: quote.delivery_terms ?? null,
+      payment_terms: quote.payment_terms ?? null,
+      note: quote.note ?? null,
+      job_id: quote.job_id,
+      customer_id: quote.customer_id ?? null,
+      status: "ke_schvaleni",
+      created_by: user.id,
+      owner_id: user.id,
+      ai_generated: false,
+      archived: false,
+    };
+
+    let createdId: string | null = null;
+    let number = "";
+    for (let attempt = 0; attempt < 5 && !createdId; attempt++, rev++) {
+      if (quote.number) {
+        number = quoteRevisionNumber(quote.number, rev);
+      } else {
+        const { data: n, error: nErr } = await db.rpc("next_doc_number", { p_prefix: "NAB" });
+        if (nErr || typeof n !== "string") return fail(nErr?.message ?? "Nepodařilo se přidělit číslo nabídky.");
+        number = n;
+      }
+      const { data, error } = await db.from("quotes").insert({ ...copy, number, revision: rev } as never).select("id").single();
+      if (!error && data) {
+        createdId = (data as { id: string }).id;
+        break;
+      }
+      // 23505 = číslo už existuje → zkusit další verzi
+      if (error && (error as { code?: string }).code !== "23505") return fail(error.message);
+    }
+    if (!createdId) return fail("Nepodařilo se vytvořit novou verzi nabídky.");
+    const finalRev = rev;
+
+    const items = (quote.items ?? []).map((r) => ({
+      ...Object.fromEntries(Object.entries(r).filter(([k]) => k !== "id" && k !== "quote_id")),
+      quote_id: createdId,
+    }));
+    if (items.length) {
+      const { error: itemErr } = await db.from("quote_items").insert(items as never);
+      if (itemErr) {
+        await db.from("quotes").delete().eq("id", createdId);
+        return fail(`Položky nové verze se nepodařilo uložit: ${itemErr.message}`);
+      }
+    }
+    await db.from("quotes").update({ archived: true } as never).eq("id", quoteId);
+
+    if (quote.job_id) {
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote",
+        message: `Nová verze nabídky ${number} (verze ${finalRev}) — ${quote.number ?? "původní"} archivována`,
+        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision" },
+        actorId: user.id,
+      });
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true, id: createdId, number };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function setJobQuoteArchived(quoteId: string, archived: boolean): Promise<ActionResult> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    const { error } = await db.from("quotes").update({ archived: Boolean(archived) } as never).eq("id", quoteId);
+    if (error) return fail(error.message);
+    if (quote.job_id) {
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote",
+        message: `${quoteLabel(quote)} ${archived ? "archivována" : "obnovena z archivu"}`,
+        data: { quoteId, number: quote.number, action: archived ? "archived" : "unarchived" }, actorId: user.id,
+      });
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function deleteJobQuote(quoteId: string): Promise<ActionResult> {
+  const c = await begin("delete");
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const { db, user } = c;
+    const quote = await loadQuote(db, quoteId);
+    if (!quote) return fail(QUOTE_NOT_FOUND);
+    // orders.quote_id se vynuluje samo (on delete set null)
+    const { error } = await db.from("quotes").delete().eq("id", quoteId);
+    if (error) return fail(error.message);
+    await logAudit({
+      action: "quote_deleted", entity: "quotes", entityId: quoteId,
+      diff: { number: quote.number, jobId: quote.job_id, total: quote.total },
+    });
+    if (quote.job_id) {
+      await logJobEvent(db, {
+        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} smazána`,
+        data: { quoteId, number: quote.number, action: "deleted" }, actorId: user.id,
+      });
+    }
+    revalidateQuote(quote.job_id);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}

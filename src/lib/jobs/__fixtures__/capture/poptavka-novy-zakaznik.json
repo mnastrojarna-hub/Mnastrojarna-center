@@ -1,0 +1,62 @@
+{
+  "docKind": "poptavka",
+  "issuer": "zakaznik",
+  "documentNumber": "RFQ-26-0412",
+  "documentDate": "2026-10-22",
+  "customer": {
+    "name": "Hydraulika Morava s.r.o.",
+    "ico": "08542311",
+    "dic": "CZ08542311",
+    "street": "Tovární 1402/12",
+    "city": "Prostějov",
+    "zip": "796 01",
+    "country": "CZ",
+    "email": "horakova@hydraulika-morava.cz",
+    "phone": "+420 582 333 410",
+    "contactPerson": "Lenka Horáková"
+  },
+  "supplier": {
+    "name": "", "ico": "", "dic": "", "street": "", "city": "", "zip": "", "country": "",
+    "email": "", "phone": "", "contactPerson": ""
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "RFQ-26-0412",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "2026-12-15",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "HM-1050-03",
+      "revision": "C",
+      "name": "Těleso ventilu",
+      "description": "Soustružení + frézování, závity M12x1,5",
+      "material": "11SMnPb30",
+      "quantity": 400,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "HM-1050-07",
+      "revision": "A",
+      "name": "Víko",
+      "description": "",
+      "material": "EN AW-6082",
+      "quantity": 400,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Poptávka RFQ-26-0412 od nového zákazníka Hydraulika Morava s.r.o. na těleso ventilu a víko, 400 ks, termín do 15. 12. 2026.",
+  "confidence": 0.88,
+  "needsClarification": ["Množství u položky HM-1050-07 je ručně přepsané — ověřit, zda 400 ks"]
+}

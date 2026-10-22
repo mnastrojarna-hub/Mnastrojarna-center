@@ -1,85 +1,127 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertCircle, Settings2 } from "lucide-react";
-import { Logo } from "@/components/logo";
-import { Card, CardContent } from "@/components/ui/card";
+import { AlertCircle, CheckCircle2, Settings2, LogIn, LogOut, Mail } from "lucide-react";
+import { AuthShell, AuthNotice } from "@/components/account/auth-shell";
+import { PasswordInput } from "@/components/account/password-input";
+import { SubmitButton } from "@/components/account/submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { signIn } from "@/app/auth/actions";
-import { isSupabaseConfigured, createClient } from "@/lib/supabase/server";
+import { signIn, signOut } from "@/app/auth/actions";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth/session";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, reset } = await searchParams;
   const configured = isSupabaseConfigured();
 
-  if (configured) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) redirect("/orders");
-  }
+  // Aktivní přihlášený uživatel rovnou do Knihy zakázek. Neaktivní zůstane
+  // tady (jinak by se točil mezi /login a /orders) a může se odhlásit.
+  const user = configured ? await getSessionUser() : null;
+  if (user?.active) redirect("/orders");
+  const inactiveSession = Boolean(user && !user.active);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <Logo showSlogan />
-          <p className="mt-2 text-sm text-muted-foreground">
-            Přihlas se do CNC Sales OS
+    <AuthShell
+      title={configured ? "Vítej zpátky" : "Vítej v CNC Sales OS"}
+      subtitle={configured ? "Přihlas se do Knihy zakázek." : "Nejdřív připojíme databázi — zabere to pár minut."}
+      showHints
+    >
+      {!configured ? (
+        <div className="space-y-4">
+          <AuthNotice tone="warning" icon={AlertCircle}>
+            Systém ještě není připojen k Supabase. Projdi krátkým průvodcem nastavením — vše se nastavuje
+            přímo v aplikaci.
+          </AuthNotice>
+          <Button asChild className="w-full" size="lg">
+            <Link href="/setup">
+              <Settings2 className="h-4 w-4" /> Spustit průvodce nastavením
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {reset === "1" && (
+            <AuthNotice tone="success" icon={CheckCircle2}>
+              Heslo bylo změněno — přihlas se novým heslem.
+            </AuthNotice>
+          )}
+          {error && (
+            <AuthNotice tone="error" icon={AlertCircle}>
+              {error}
+            </AuthNotice>
+          )}
+          {inactiveSession && (
+            <form action={signOut}>
+              <AuthNotice tone="warning" icon={AlertCircle}>
+                <div className="space-y-2">
+                  <p>
+                    Jsi přihlášen(a) jako <strong>{user?.email}</strong>, ale účet zatím není aktivní.
+                    Požádej super admina o aktivaci, nebo se přihlas jiným účtem.
+                  </p>
+                  <Button type="submit" variant="outline" size="sm">
+                    <LogOut className="h-4 w-4" /> Odhlásit se
+                  </Button>
+                </div>
+              </AuthNotice>
+            </form>
+          )}
+
+          <form action={signIn} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium">E-mail</label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  placeholder="jmeno@mnastrojarna.cz"
+                  className="h-11 pl-9 text-base sm:text-sm"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="password" className="text-sm font-medium">Heslo</label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Zapomenuté heslo?
+                </Link>
+              </div>
+              <PasswordInput
+                id="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="h-11 text-base sm:text-sm"
+                required
+              />
+            </div>
+            <SubmitButton className="h-11 w-full text-base" pendingText="Přihlašuji…">
+              <LogIn className="h-4 w-4" /> Přihlásit se
+            </SubmitButton>
+          </form>
+
+          <p className="text-center text-xs text-muted-foreground">
+            Účet ti založí super admin. Nemáš ho ještě? Ozvi se mu.
           </p>
         </div>
+      )}
 
-        {!configured ? (
-          <Card>
-            <CardContent className="space-y-4 p-6">
-              <div className="flex items-start gap-2 rounded-lg bg-warning/10 p-3 text-sm">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                <span>
-                  Systém ještě není připojen k Supabase. Projdi krátkým průvodcem nastavením —
-                  vše se nastavuje přímo v aplikaci.
-                </span>
-              </div>
-              <Button asChild className="w-full">
-                <Link href="/setup">
-                  <Settings2 className="h-4 w-4" /> Spustit průvodce nastavením
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="p-6">
-              {error && (
-                <div className="mb-4 flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-              <form action={signIn} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="email" className="text-sm font-medium">E-mail</label>
-                  <Input id="email" name="email" type="email" placeholder="obchod@nastrojarna.cz" required />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="password" className="text-sm font-medium">Heslo</label>
-                  <Input id="password" name="password" type="password" placeholder="••••••••" required />
-                </div>
-                <Button type="submit" className="w-full">Přihlásit se</Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
-        <p className="text-center text-xs text-muted-foreground">
-          První spuštění nebo změna připojení?{" "}
-          <Link href="/setup" className="text-primary hover:underline">Průvodce nastavením</Link>
-        </p>
-      </div>
-    </div>
+      <p className="border-t pt-4 text-center text-xs text-muted-foreground">
+        První spuštění nebo změna připojení?{" "}
+        <Link href="/setup" className="font-medium text-primary hover:underline">Průvodce nastavením</Link>
+      </p>
+    </AuthShell>
   );
 }

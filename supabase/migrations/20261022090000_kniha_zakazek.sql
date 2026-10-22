@@ -168,6 +168,8 @@ alter table order_items add column if not exists unit                text not nu
 alter table order_items add column if not exists purchase_unit_price numeric(14,2);
 alter table order_items add column if not exists note                text;
 alter table order_items add column if not exists created_at          timestamptz not null default now();
+-- Množství i v kg / m (materiál, kooperace) — ne jen celé kusy
+alter table order_items alter column quantity type numeric(12,3);
 create index if not exists idx_order_items_drawing on order_items(drawing_number);
 
 -- ── 5) Nabídky — více nabídek (verzí) na zakázku ────────────
@@ -194,6 +196,7 @@ alter table quote_items add column if not exists unit                text not nu
 alter table quote_items add column if not exists vat_rate            numeric(5,2) not null default 21;
 alter table quote_items add column if not exists purchase_unit_price numeric(14,2);
 alter table quote_items add column if not exists note                text;
+alter table quote_items alter column quantity type numeric(12,3);
 
 -- ── 6) Zákazníci a dodavatelé — čísla a adresy pro doklady ──
 alter table customers add column if not exists customer_number             text;  -- naše číslo zákazníka (ZK0001)
@@ -317,6 +320,7 @@ alter table profiles add column if not exists position     text;   -- funkce (te
 alter table profiles add column if not exists last_seen_at timestamptz;
 
 insert into integration_settings (key, category, label, is_secret, value) values
+  ('company_swift',      'firma',     'BIC / SWIFT banky',                                 false, null),
   ('ai_enabled',         'ai_access', 'AI zapnuto (hlavní vypínač)',                       false, 'true'),
   ('ai_capture_for_all', 'ai_access', 'AI čtení dokladů z fotky pro všechny uživatele',     false, 'false')
 on conflict (key) do nothing;
