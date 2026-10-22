@@ -44,6 +44,12 @@ async function loadFromDb(): Promise<Record<string, string>> {
   }
 }
 
+/** Po uložení nastavení — další čtení jde rovnou do DB. */
+export function invalidateSettingsCache(): void {
+  cache = null;
+  cacheAt = 0;
+}
+
 /** Vrátí hodnotu nastavení (DB má přednost před env). */
 export async function getSetting(key: string): Promise<string | undefined> {
   const now = Date.now();

@@ -1,0 +1,318 @@
+// View-modely Knihy zakázek (UI ↔ datová vrstva). Plní se výhradně z DB (tabulka orders a spol.).
+import type {
+  JobStage, JobFileKind, JobSource, PriorityLevel, QuoteStatus,
+} from "@/lib/supabase/database.types";
+import type { StageGroupKey } from "@/lib/jobs/stages";
+
+export interface PersonRef {
+  id: string;
+  name: string;
+}
+
+export interface JobCustomerRef {
+  id: string;
+  name: string;
+  customerNumber: string | null;
+  ico: string | null;
+}
+
+/** Jeden řádek Knihy zakázek. */
+export interface JobListItem {
+  id: string;
+  /** Naše pořadové číslo zakázky (Z-2026-001). */
+  number: string;
+  title: string;
+  stage: JobStage;
+  priority: PriorityLevel;
+  customer: JobCustomerRef | null;
+  customerOrderNumber: string | null;
+  customerInquiryNumber: string | null;
+  drawingNumbers: string[];
+  itemCount: number;
+  totalQuantity: number;
+  /** Prodejní hodnota bez DPH. */
+  value: number | null;
+  /** Nákupní náklady — null, pokud uživatel nemá právo vidět marže. */
+  purchaseCost: number | null;
+  currency: string;
+  inquiryDate: string | null;
+  orderDate: string | null;
+  /** Požadovaný termín zákazníkem. */
+  customerRequiredDate: string | null;
+  /** Potvrzený termín dodání zákazníkovi (sloupec due_date). */
+  dueDate: string | null;
+  /** Předpokládaný termín dodání. */
+  expectedDeliveryDate: string | null;
+  /** Slíbený termín od dodavatele. */
+  supplierPromisedDate: string | null;
+  /** Maximální tolerovaný termín. */
+  maxToleratedDate: string | null;
+  receivedAt: string | null;
+  deliveredAt: string | null;
+  /** Obchodník (odpovědná osoba). */
+  owner: PersonRef | null;
+  /** Kdo zakázku zpracovává. */
+  assignee: PersonRef | null;
+  /** Kdo zakázku zadal. */
+  createdBy: PersonRef | null;
+  supplier: { id: string; name: string } | null;
+  quoteCount: number;
+  fileCount: number;
+  aiFilled: boolean;
+  source: JobSource;
+  createdAt: string;
+  updatedAt: string;
+  stageChangedAt: string | null;
+}
+
+export interface JobItem {
+  id: string;
+  position: number;
+  drawingNumber: string | null;
+  revision: string | null;
+  name: string | null;
+  description: string | null;
+  material: string | null;
+  quantity: number;
+  unit: string;
+  /** Prodejní cena / MJ bez DPH. */
+  unitPrice: number | null;
+  /** Nákupní cena / MJ — null bez práva na marže. */
+  purchaseUnitPrice: number | null;
+  note: string | null;
+}
+
+export interface JobQuoteItem {
+  id: string;
+  position: number;
+  drawingNumber: string | null;
+  name: string | null;
+  description: string | null;
+  material: string | null;
+  quantity: number;
+  unit: string;
+  unitPrice: number | null;
+  vatRate: number;
+  purchaseUnitPrice: number | null;
+  note: string | null;
+}
+
+/** Nabídka zakázky — zakázka jich může mít víc (verze, varianty). */
+export interface JobQuote {
+  id: string;
+  number: string;
+  revision: number;
+  title: string | null;
+  status: QuoteStatus;
+  /** Celkem bez DPH. */
+  total: number | null;
+  currency: string;
+  validUntil: string | null;
+  leadTimeDays: number | null;
+  deliveryTerms: string | null;
+  paymentTerms: string | null;
+  note: string | null;
+  /** Kdo nabídku zadal. */
+  createdBy: PersonRef | null;
+  /** Kdo nabídku schválil. */
+  approvedBy: PersonRef | null;
+  approvedAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  /** Nahrazena novější verzí. */
+  archived: boolean;
+  aiGenerated: boolean;
+  /** Zákazník tuto nabídku přijal (orders.quote_id). */
+  accepted: boolean;
+  items: JobQuoteItem[];
+}
+
+export interface JobFile {
+  id: string;
+  kind: JobFileKind;
+  title: string | null;
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  version: number;
+  archived: boolean;
+  replacedBy: string | null;
+  quoteId: string | null;
+  uploadedBy: PersonRef | null;
+  createdAt: string;
+  aiConfidence: number | null;
+  note: string | null;
+  /** AI z dokladu něco přečetla (ai_extracted není prázdné). */
+  hasAiData: boolean;
+}
+
+export type JobEventType =
+  | "created" | "stage" | "field" | "file" | "quote" | "comment" | "ai" | "email";
+
+export interface JobEvent {
+  id: string;
+  type: JobEventType;
+  message: string;
+  data: Record<string, unknown>;
+  actor: PersonRef | null;
+  createdAt: string;
+}
+
+/** Údaje zákazníka pro doklady (PDF) a detail zakázky. */
+export interface JobCustomerDetail {
+  id: string;
+  name: string;
+  customerNumber: string | null;
+  supplierNumberAtCustomer: string | null;
+  ico: string | null;
+  dic: string | null;
+  street: string | null;
+  city: string | null;
+  zip: string | null;
+  country: string;
+  email: string | null;
+  phone: string | null;
+  contactPerson: string | null;
+  deliveryAddress: string | null;
+  paymentTermsDays: number | null;
+}
+
+/** Kompletní karta zakázky. */
+export interface JobDetail extends JobListItem {
+  note: string | null;
+  tags: string[];
+  technology: string | null;
+  manufacturingLocation: string | null;
+  specificRequirements: string | null;
+  deliveryMethod: string | null;
+  supplierOrderNumber: string | null;
+  invoiceNumber: string | null;
+  deliveryNoteNumber: string | null;
+  customerContact: string | null;
+  customerContactEmail: string | null;
+  customerContactPhone: string | null;
+  pricedBy: PersonRef | null;
+  approvedBy: PersonRef | null;
+  approvedAt: string | null;
+  confirmedAt: string | null;
+  productionStartedAt: string | null;
+  shippedAt: string | null;
+  invoicedAt: string | null;
+  emailId: string | null;
+  aiConfidence: number | null;
+  /** Přijatá nabídka (orders.quote_id). */
+  acceptedQuoteId: string | null;
+  /** Marže jako podíl (0.25 = 25 %) — null bez práva na marže nebo bez dat. */
+  margin: number | null;
+  customerDetail: JobCustomerDetail | null;
+  items: JobItem[];
+  quotes: JobQuote[];
+  files: JobFile[];
+  events: JobEvent[];
+}
+
+export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date";
+export type JobSort = "number" | "created" | "deadline" | "customer" | "value" | "stage" | "updated";
+
+export interface JobFilters {
+  group?: StageGroupKey;
+  /** Má přednost před group, pokud je neprázdné. */
+  stages?: JobStage[];
+  /** Fulltext: číslo zakázky, název, zákazník, č. objednávky/poptávky zákazníka, číslo výkresu. */
+  q?: string;
+  ownerId?: string;
+  assigneeId?: string;
+  customerId?: string;
+  supplierId?: string;
+  deadline?: JobDeadlineFilter;
+  sort?: JobSort;
+  dir?: "asc" | "desc";
+  limit?: number;
+}
+
+/** Vstup pro založení / úpravu zakázky. Prázdný řetězec = vymazat hodnotu. */
+export interface JobInput {
+  title?: string;
+  stage?: JobStage;
+  priority?: PriorityLevel;
+  customerId?: string | null;
+  /** Při zakládání: když chybí customerId, dohledá se / založí zákazník tohoto jména. */
+  customerName?: string;
+  customerOrderNumber?: string;
+  customerInquiryNumber?: string;
+  customerContact?: string;
+  customerContactEmail?: string;
+  customerContactPhone?: string;
+  inquiryDate?: string;
+  orderDate?: string;
+  customerRequiredDate?: string;
+  dueDate?: string;
+  expectedDeliveryDate?: string;
+  supplierPromisedDate?: string;
+  maxToleratedDate?: string;
+  ownerId?: string | null;
+  assigneeId?: string | null;
+  pricedById?: string | null;
+  supplierId?: string | null;
+  supplierOrderNumber?: string;
+  value?: number | null;
+  purchaseCost?: number | null;
+  currency?: string;
+  technology?: string;
+  manufacturingLocation?: string;
+  specificRequirements?: string;
+  deliveryMethod?: string;
+  note?: string;
+  tags?: string[];
+  invoiceNumber?: string;
+  deliveryNoteNumber?: string;
+}
+
+export interface JobItemInput {
+  id?: string;
+  drawingNumber?: string;
+  revision?: string;
+  name?: string;
+  description?: string;
+  material?: string;
+  quantity: number;
+  unit?: string;
+  unitPrice?: number | null;
+  purchaseUnitPrice?: number | null;
+  note?: string;
+}
+
+export interface JobQuoteItemInput {
+  drawingNumber?: string;
+  name?: string;
+  description?: string;
+  material?: string;
+  quantity: number;
+  unit?: string;
+  unitPrice?: number | null;
+  vatRate?: number;
+  purchaseUnitPrice?: number | null;
+  note?: string;
+}
+
+export interface JobQuoteInput {
+  title?: string;
+  status?: QuoteStatus;
+  validUntil?: string;
+  leadTimeDays?: number | null;
+  deliveryTerms?: string;
+  paymentTerms?: string;
+  note?: string;
+  currency?: string;
+  items: JobQuoteItemInput[];
+}
+
+/** Výběrové seznamy pro formuláře zakázky. */
+export interface JobFormOptions {
+  users: (PersonRef & { role: string })[];
+  customers: { id: string; name: string; customerNumber: string | null; ico: string | null }[];
+  suppliers: { id: string; name: string }[];
+}
+
+/** Jednotný výsledek akcí (styl kódu: { ok, error? } + data). */
+export type ActionResult<T extends object = object> = { ok: boolean; error?: string } & Partial<T>;

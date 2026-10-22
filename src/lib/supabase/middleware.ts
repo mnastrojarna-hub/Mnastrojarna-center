@@ -2,24 +2,36 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv, isSupabaseConfigured } from "./config";
 
-/** Veřejné cesty — dostupné bez přihlášení. */
-const PUBLIC_PATHS = ["/login", "/setup"];
+/** Veřejné stránky — dostupné bez přihlášení (přihlášení, obnova hesla, průvodce nastavením). */
+const PUBLIC_PATHS = ["/login", "/setup", "/forgot-password", "/reset-password", "/auth"];
 
-function isPublicPath(pathname: string): boolean {
-  if (pathname.startsWith("/api")) return true; // API mají vlastní ochranu (servisní klíč / RLS)
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+/**
+ * API bez přihlášení: průvodce nastavením (před vytvořením admina) a cron
+ * (chráněný vlastním CRON_SECRET uvnitř route). Vše ostatní pod /api vyžaduje session.
+ */
+const PUBLIC_API = ["/api/setup", "/api/cron"];
+
+function matches(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function isPublicPath(pathname: string): boolean {
+  return matches(pathname, PUBLIC_PATHS) || matches(pathname, PUBLIC_API);
 }
 
 /**
  * Obnova Supabase session v Next.js middleware (auth cookies)
- * + povinné přihlášení: bez session se vše kromě /login a /setup přesměruje.
+ * + povinné přihlášení: bez session se stránky přesměrují na /login a API vrací 401.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+  const isApi = pathname.startsWith("/api");
 
   // Bez platné konfigurace (prázdné / placeholder / neplatná URL) → průvodce nastavením.
+  // API nechá projít — bez DB stejně vrací bezpečné prázdné výsledky.
   if (!isSupabaseConfigured()) {
-    if (isPublicPath(request.nextUrl.pathname)) return supabaseResponse;
+    if (isApi || isPublicPath(pathname)) return supabaseResponse;
     const url = request.nextUrl.clone();
     url.pathname = "/setup";
     url.search = "";
@@ -42,12 +54,19 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    user = null;
+  }
 
-  // Login-first: nepřihlášený uživatel smí jen na veřejné cesty.
-  if (!user && !isPublicPath(request.nextUrl.pathname)) {
+  if (!user && !isPublicPath(pathname)) {
+    if (isApi) {
+      return NextResponse.json({ error: "Nepřihlášen — přihlas se znovu." }, { status: 401 });
+    }
+    // Login-first: nepřihlášený uživatel smí jen na veřejné cesty.
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

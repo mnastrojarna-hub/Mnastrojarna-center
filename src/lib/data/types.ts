@@ -1,5 +1,6 @@
 // View-modely pro UI (české popisky). Plní se výhradně reálnými daty ze Supabase.
 import type { ApprovalType } from "@/lib/supabase/database.types";
+import { MAIN_FLOW, STAGES } from "@/lib/jobs/stages";
 
 export type EmailCategory =
   | "Poptávka"
@@ -56,7 +57,8 @@ export interface OrderItem {
   number: string;
   customer: string;
   title: string;
-  status: "Přijato" | "Nacenění" | "Objednáno" | "Ve výrobě" | "Expedováno" | "Dokončeno";
+  /** Český popisek stavu (viz lib/jobs/stages). */
+  status: string;
   value: number;
   dueDate: string;
   owner: string;
@@ -70,14 +72,8 @@ export interface OrderItem {
   customerEmail?: string;
 }
 
-export const orderStatusOrder: OrderItem["status"][] = [
-  "Přijato",
-  "Nacenění",
-  "Objednáno",
-  "Ve výrobě",
-  "Expedováno",
-  "Dokončeno",
-];
+/** @deprecated Starý výrobní tok — Kniha zakázek používá lib/jobs/stages (MAIN_FLOW). */
+export const orderStatusOrder: string[] = MAIN_FLOW.map((s) => STAGES[s].label);
 
 export interface QuoteItem {
   id: string;

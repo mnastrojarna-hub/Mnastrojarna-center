@@ -7,7 +7,17 @@ export type EmailCategory =
   | "faktura" | "upominka" | "reklamace" | "technicka_dokumentace" | "spam" | "ostatni";
 export type PriorityLevel = "nizka" | "stredni" | "vysoka";
 export type QuoteStatus = "navrh_ai" | "ke_schvaleni" | "odeslano" | "prijato" | "zamitnuto";
-export type OrderStatus = "prijato" | "naceneni" | "objednano" | "ve_vyrobe" | "expedovano" | "dokonceno" | "zruseno";
+/** Stav zakázky v Knize zakázek (migrace 0019 — nahrazuje původní order_status). */
+export type JobStage =
+  | "poptavka" | "naceneni" | "nabidka" | "objednavka" | "potvrzeno" | "ve_vyrobe"
+  | "dodano_k_nam" | "na_sklade" | "montaz" | "dodano_zakaznikovi" | "fakturovano" | "dokonceno"
+  | "pozastaveno" | "reklamace" | "nerealizovano" | "zruseno";
+/** @deprecated Zakázka používá JobStage — alias kvůli starším importům. */
+export type OrderStatus = JobStage;
+export type JobFileKind =
+  | "poptavka" | "naceneni" | "nabidka" | "objednavka" | "potvrzeni" | "vykres" | "model_3d"
+  | "dodaci_list" | "faktura" | "foto" | "korespondence" | "ostatni";
+export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
 export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "edited" | "auto_executed";
@@ -20,6 +30,11 @@ export interface Profile {
   role: UserRole;
   commission_rate: number;
   active: boolean;
+  // migrace 0019
+  ai_access: boolean;
+  phone: string | null;
+  position: string | null;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +52,16 @@ export interface Customer {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  // Kniha zakázek (migrace 0019)
+  customer_number: string | null;
+  supplier_number_at_customer: string | null;
+  street: string | null;
+  city: string | null;
+  zip: string | null;
+  contact_person: string | null;
+  website: string | null;
+  payment_terms_days: number | null;
+  delivery_address: string | null;
   // Cenový profil (migrace 0018 — Nacenění v2)
   margin_percent?: number | null;
   price_level?: "nizka" | "standard" | "premium" | null;
@@ -70,6 +95,12 @@ export interface Supplier {
   lead_days: number | null;
   rating: number | null;
   note: string | null;
+  // migrace 0019
+  ico: string | null;
+  dic: string | null;
+  contact_person: string | null;
+  website: string | null;
+  address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -105,6 +136,24 @@ export interface Quote {
   owner_id: string | null;
   created_at: string;
   updated_at: string;
+  // Životní cyklus (migrace 0011)
+  inquiry_received_at?: string | null;
+  confirmed_at?: string | null;
+  sent_at?: string | null;
+  feedback?: string | null;
+  rejected_reason?: string | null;
+  // Více nabídek na zakázku (migrace 0019)
+  job_id: string | null;
+  revision: number;
+  title: string | null;
+  created_by: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  lead_time_days: number | null;
+  delivery_terms: string | null;
+  payment_terms: string | null;
+  archived: boolean;
+  storage_path: string | null;
 }
 
 export interface QuoteItem {
@@ -115,14 +164,23 @@ export interface QuoteItem {
   quantity: number;
   unit_price: number | null;
   position: number;
+  // migrace 0019
+  drawing_number: string | null;
+  name: string | null;
+  material: string | null;
+  unit: string;
+  vat_rate: number;
+  purchase_unit_price: number | null;
+  note: string | null;
 }
 
+/** Zakázka (řádek Knihy zakázek). Tabulka se jmenuje orders kvůli historii. */
 export interface Order {
   id: string;
   number: string | null;
   customer_id: string | null;
   quote_id: string | null;
-  status: OrderStatus;
+  status: JobStage;
   title: string | null;
   value: number | null;
   margin: number | null;
@@ -142,6 +200,37 @@ export interface Order {
   shipped_at?: string | null;
   delivered_at?: string | null;
   delivery_method?: string | null;
+  // Kniha zakázek (migrace 0019)
+  customer_order_number: string | null;
+  customer_inquiry_number: string | null;
+  customer_contact: string | null;
+  customer_contact_email: string | null;
+  customer_contact_phone: string | null;
+  inquiry_date: string | null;
+  order_date: string | null;
+  customer_required_date: string | null;
+  expected_delivery_date: string | null;
+  supplier_promised_date: string | null;
+  max_tolerated_date: string | null;
+  received_at: string | null;
+  invoiced_at: string | null;
+  stage_changed_at: string;
+  created_by: string | null;
+  assignee_id: string | null;
+  priced_by: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  purchase_cost: number | null;
+  supplier_order_number: string | null;
+  invoice_number: string | null;
+  delivery_note_number: string | null;
+  priority: PriorityLevel;
+  note: string | null;
+  tags: string[];
+  source: JobSource;
+  email_id: string | null;
+  ai_filled: boolean;
+  ai_confidence: number | null;
 }
 
 export interface OrderItem {
@@ -152,6 +241,72 @@ export interface OrderItem {
   quantity: number;
   unit_price: number | null;
   position: number;
+  // migrace 0019
+  drawing_number: string | null;
+  revision: string | null;
+  name: string | null;
+  material: string | null;
+  unit: string;
+  purchase_unit_price: number | null;
+  note: string | null;
+  created_at: string;
+}
+
+/** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
+export interface JobFileRow {
+  id: string;
+  job_id: string;
+  kind: JobFileKind;
+  title: string | null;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  storage_path: string;
+  version: number;
+  archived: boolean;
+  replaced_by: string | null;
+  quote_id: string | null;
+  drawing_id: string | null;
+  ai_extracted: Record<string, unknown> | null;
+  ai_confidence: number | null;
+  note: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
+/** Záznam historie zakázky. */
+export interface JobEventRow {
+  id: string;
+  job_id: string;
+  type: string;
+  message: string;
+  data: Record<string, unknown>;
+  actor_id: string | null;
+  created_at: string;
+}
+
+export interface AiTrainingExample {
+  id: string;
+  kind: string;
+  job_id: string | null;
+  job_file_id: string | null;
+  doc_kind: string | null;
+  source: "ai" | "manual" | "corrected";
+  extracted: Record<string, unknown> | null;
+  final: Record<string, unknown> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PasswordResetCode {
+  id: string;
+  user_id: string;
+  email: string;
+  code_hash: string;
+  expires_at: string;
+  attempts: number;
+  used_at: string | null;
+  created_at: string;
 }
 
 /** Připojení schránky — servery příchozí (IMAP) a odchozí (SMTP) pošty, příp. Graph. */
@@ -178,6 +333,8 @@ export interface Mailbox {
   active: boolean;
   last_sync_at: string | null;
   created_at: string;
+  /** Vlastník schránky — jen on (a super admin) vidí její poštu (migrace 0019). */
+  owner_id: string | null;
 }
 
 export interface Email {
@@ -207,6 +364,9 @@ export interface Email {
   has_draft: boolean;
   received_at: string;
   created_at: string;
+  // migrace 0019
+  direction: "in" | "out";
+  cc_email: string | null;
 }
 
 export interface AutomationSetting {
@@ -371,15 +531,22 @@ export interface Database {
       materials: Tbl<MaterialRow>;
       machine_rates: Tbl<MachineRateRow>;
       pricing_calculations: Tbl<PricingCalculation>;
+      job_files: Tbl<JobFileRow>;
+      job_events: Tbl<JobEventRow>;
+      ai_training_examples: Tbl<AiTrainingExample>;
+      password_reset_codes: Tbl<PasswordResetCode>;
     };
     Views: Record<string, never>;
     Functions: {
       next_doc_number: { Args: { p_prefix: string }; Returns: string };
+      next_job_number: { Args: Record<string, never>; Returns: string };
+      next_customer_number: { Args: Record<string, never>; Returns: string };
     };
     Enums: {
       user_role: UserRole;
       email_category: EmailCategory;
-      order_status: OrderStatus;
+      job_stage: JobStage;
+      job_file_kind: JobFileKind;
       quote_status: QuoteStatus;
     };
   };

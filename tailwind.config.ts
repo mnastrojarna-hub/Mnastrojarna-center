@@ -6,6 +6,8 @@ const config: Config = {
     "./src/pages/**/*.{ts,tsx}",
     "./src/components/**/*.{ts,tsx}",
     "./src/app/**/*.{ts,tsx}",
+    // Barvy stavů zakázek a druhů dokumentů jsou definované v lib
+    "./src/lib/**/*.{ts,tsx}",
   ],
   theme: {
     container: {

@@ -1,7 +1,8 @@
 // Překlad enum kódů z DB na české popisky pro UI.
 import type {
-  EmailCategory, PriorityLevel, OrderStatus, QuoteStatus, ApprovalType,
+  EmailCategory, PriorityLevel, JobStage, QuoteStatus, ApprovalType,
 } from "@/lib/supabase/database.types";
+import { STAGES, STAGE_ORDER } from "@/lib/jobs/stages";
 
 export const emailCategoryLabel: Record<EmailCategory, string> = {
   poptavka: "Poptávka",
@@ -22,15 +23,10 @@ export const priorityLabel: Record<PriorityLevel, string> = {
   vysoka: "Vysoká",
 };
 
-export const orderStatusLabel: Record<OrderStatus, string> = {
-  prijato: "Přijato",
-  naceneni: "Nacenění",
-  objednano: "Objednáno",
-  ve_vyrobe: "Ve výrobě",
-  expedovano: "Expedováno",
-  dokonceno: "Dokončeno",
-  zruseno: "Zrušeno",
-};
+/** Popisky stavů zakázky (zdroj pravdy: lib/jobs/stages). */
+export const orderStatusLabel: Record<JobStage, string> = Object.fromEntries(
+  STAGE_ORDER.map((s) => [s, STAGES[s].label]),
+) as Record<JobStage, string>;
 
 export const quoteStatusLabel: Record<QuoteStatus, string> = {
   navrh_ai: "Návrh AI",

@@ -1,0 +1,135 @@
+// Kontrakt pro „Vyfoť doklad → AI vyplní zakázku" (čtení dokladu, párování, výsledek).
+import type { JobStage, JobFileKind } from "@/lib/supabase/database.types";
+
+/** Druh obchodního dokladu rozpoznaný na fotce / v PDF. */
+export type CaptureDocKind =
+  | "poptavka" | "nabidka" | "objednavka" | "potvrzeni" | "dodaci_list" | "faktura" | "vykres" | "ostatni";
+
+/** Kdo doklad vystavil (rozhoduje o významu čísel a o posunu stavu). */
+export type DocIssuer = "zakaznik" | "my" | "dodavatel" | "neznamy";
+
+export interface ExtractedParty {
+  name: string;
+  ico: string;
+  dic: string;
+  street: string;
+  city: string;
+  zip: string;
+  country: string;
+  email: string;
+  phone: string;
+  contactPerson: string;
+}
+
+export interface ExtractedItem {
+  drawingNumber: string;
+  revision: string;
+  name: string;
+  description: string;
+  material: string;
+  quantity: number;
+  unit: string;
+  /** Cena / MJ bez DPH (0 = neuvedeno). */
+  unitPrice: number;
+  /** Termín u položky (RRRR-MM-DD, prázdné = neuvedeno). */
+  deliveryDate: string;
+}
+
+/** Výstup AI čtení dokladu. Prázdný řetězec / 0 = na dokladu neuvedeno. */
+export interface ExtractedBusinessDoc {
+  docKind: CaptureDocKind;
+  issuer: DocIssuer;
+  /** Číslo dokladu dle vystavitele. */
+  documentNumber: string;
+  /** Datum dokladu RRRR-MM-DD. */
+  documentDate: string;
+  /** Odběratel = náš zákazník. */
+  customer: ExtractedParty;
+  /** Dodavatel / kooperant (u dokladů od dodavatele). */
+  supplier: ExtractedParty;
+  customerOrderNumber: string;
+  customerInquiryNumber: string;
+  /** Naše číslo nabídky, na které se doklad odkazuje (NAB-2026-031). */
+  ourQuoteNumber: string;
+  /** Naše číslo zakázky (Z-2026-014). */
+  ourJobNumber: string;
+  ourOrderConfirmationNumber: string;
+  /** „Číslo dodavatele" — pod jakým číslem nás zákazník vede. */
+  supplierNumberAtCustomer: string;
+  /** Požadovaný termín dodání (zákazník). */
+  requiredDeliveryDate: string;
+  /** Slíbený / potvrzený termín (my nebo dodavatel). */
+  promisedDeliveryDate: string;
+  items: ExtractedItem[];
+  totalWithoutVat: number;
+  currency: string;
+  paymentTerms: string;
+  deliveryTerms: string;
+  note: string;
+  summary: string;
+  confidence: number;
+  needsClarification: string[];
+}
+
+/** Kandidát párování (zobrazí se uživateli jako „možná patří k…"). */
+export interface CaptureAlternative {
+  jobId: string;
+  jobNumber: string;
+  title: string;
+  customerName: string | null;
+  score: number;
+  reason: string;
+}
+
+/** Výsledek nahrání dokladu do Knihy zakázek. */
+export interface CaptureResult {
+  ok: boolean;
+  error?: string;
+  jobId?: string;
+  jobNumber?: string;
+  /** Nově založená zakázka (nic nesedělo). */
+  created: boolean;
+  /** Lidsky čitelný důvod párování („podle čísla nabídky NAB-2026-031"). */
+  matchedBy?: string;
+  matchScore?: number;
+  customerId?: string;
+  customerName?: string;
+  customerCreated?: boolean;
+  fileId?: string;
+  fileKind?: JobFileKind;
+  docKind?: CaptureDocKind;
+  /** false = AI pro uživatele není povolené / nastavené → vyplní se ručně. */
+  aiUsed: boolean;
+  /** Doplněná pole (české popisky). */
+  filled: string[];
+  stageFrom?: JobStage;
+  stageTo?: JobStage;
+  itemsAdded?: number;
+  confidence?: number;
+  summary?: string;
+  needsClarification?: string[];
+  alternatives?: CaptureAlternative[];
+}
+
+/** Mapování druhu dokladu na druh souboru zakázky. */
+export const DOC_KIND_TO_FILE_KIND: Record<CaptureDocKind, JobFileKind> = {
+  poptavka: "poptavka",
+  nabidka: "nabidka",
+  objednavka: "objednavka",
+  potvrzeni: "potvrzeni",
+  dodaci_list: "dodaci_list",
+  faktura: "faktura",
+  vykres: "vykres",
+  ostatni: "ostatni",
+};
+
+export const DOC_KIND_LABEL: Record<CaptureDocKind, string> = {
+  poptavka: "Poptávka",
+  nabidka: "Nabídka",
+  objednavka: "Objednávka",
+  potvrzeni: "Potvrzení objednávky",
+  dodaci_list: "Dodací list",
+  faktura: "Faktura",
+  vykres: "Výkres",
+  ostatni: "Jiný doklad",
+};
