@@ -7,6 +7,7 @@ import { recordCorrection } from "@/app/actions/corrections";
 import { logAudit } from "@/lib/audit";
 import { OUTBOUND_APPROVAL_TYPES } from "@/lib/data/types";
 import type { ApprovalType } from "@/lib/supabase/database.types";
+import { checkFeature } from "@/lib/auth/session";
 
 type Result = { ok: boolean; error?: string; sent?: boolean };
 
@@ -26,6 +27,10 @@ export async function resolveApproval(
   id: string,
   action: "approved" | "rejected",
 ): Promise<Result> {
+  const auth = await checkFeature("dashboard");
+  if ("error" in auth) return { ok: false, error: auth.error };
+  if (action !== "approved" && action !== "rejected") return { ok: false, error: "Neplatná akce." };
+  if (typeof id !== "string" || !id) return { ok: false, error: "Chybí položka fronty." };
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "Supabase není nakonfigurováno." };
   }
@@ -96,10 +101,12 @@ export async function updateApprovalBody(input: {
   originalBody: string;
   context: string;
 }): Promise<Result> {
+  const auth = await checkFeature("dashboard");
+  if ("error" in auth) return { ok: false, error: auth.error };
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "Supabase není nakonfigurováno." };
   }
-  if (!input.body.trim()) return { ok: false, error: "Text nesmí být prázdný." };
+  if (typeof input?.body !== "string" || !input.body.trim()) return { ok: false, error: "Text nesmí být prázdný." };
   try {
     const supabase = await createOperatorClient();
     const { data } = await supabase

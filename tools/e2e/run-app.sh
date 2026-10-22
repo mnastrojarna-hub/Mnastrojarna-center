@@ -1,7 +1,8 @@
 #!/bin/bash
 # Spustí aplikaci proti lokálnímu Supabase stacku pro E2E testy.
-#   tools/e2e/run-app.sh [adresář aplikace] [--dev]
+#   tools/e2e/run-app.sh [adresář aplikace] [--dev | --start]
 # Výchozí: produkční build + `next start` na portu 3100 (blíž Vercelu než dev server).
+# --start: bez buildu (použije existující .next v adresáři aplikace).
 # Zastavení: tools/e2e/stop-app.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -26,6 +27,8 @@ cd "$APP_DIR"
 pwd -P > "$ROOT/.local-supabase/app.dir"
 if [ "$MODE" = "--dev" ]; then
   nohup npx next dev -p "$PORT" > "$LOG_DIR/app.log" 2>&1 &
+elif [ "$MODE" = "--start" ] && [ -f .next/BUILD_ID ]; then
+  nohup npx next start -p "$PORT" > "$LOG_DIR/app.log" 2>&1 &
 else
   echo "[e2e] build…"
   npx next build > "$LOG_DIR/app-build.log" 2>&1 || { tail -40 "$LOG_DIR/app-build.log"; exit 1; }

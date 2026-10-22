@@ -1,13 +1,16 @@
 "use client";
 
-import { AlarmClock, AlertTriangle, Banknote, CalendarClock, MessageSquareQuote, ShoppingCart, type LucideIcon } from "lucide-react";
+import {
+  AlarmClock, AlertTriangle, Banknote, CalendarClock, MessageSquareQuote, ReceiptText, ShoppingCart, type LucideIcon,
+} from "lucide-react";
 import { BookLink, useBookNav } from "@/components/jobs/book/book-nav";
 import { KPI_PATCHES, isPatchActive, type BookKpis, type BookPatch } from "@/components/jobs/book/book-params";
 import { cn, formatCZK } from "@/lib/utils";
 
 /**
  * Barevné dlaždice nad knihou — kliknutí rovnou nastaví filtr.
- * Hodnota objednávek v běhu jen pro role s právem na marže.
+ * Hodnota objednávek v běhu jen pro role s právem na marže; faktury po
+ * splatnosti, když je stránka spočítá.
  */
 
 interface Tile {
@@ -53,7 +56,14 @@ const TONES = {
   },
 } as const;
 
-export function KpiStrip({ kpis, runningValue }: { kpis: BookKpis; runningValue: number | null }) {
+export function KpiStrip({
+  kpis, runningValue, overdueInvoices = null,
+}: {
+  kpis: BookKpis;
+  runningValue: number | null;
+  /** Počet nezaplacených faktur po splatnosti (null = nezobrazovat). */
+  overdueInvoices?: number | null;
+}) {
   const { params } = useBookNav();
 
   const tiles: Tile[] = [
@@ -83,6 +93,13 @@ export function KpiStrip({ kpis, runningValue }: { kpis: BookKpis; runningValue:
       icon: AlertTriangle, patch: KPI_PATCHES.problems, tone: TONES.pink,
     },
   ];
+  if (overdueInvoices !== null) {
+    tiles.push({
+      key: "overdueInvoices", label: "Po splatnosti", value: String(overdueInvoices),
+      hint: overdueInvoices ? "faktury čekají na peníze" : "vše zaplaceno včas",
+      icon: ReceiptText, patch: KPI_PATCHES.overdueInvoices, tone: overdueInvoices ? TONES.red : TONES.calm,
+    });
+  }
   if (runningValue !== null) {
     tiles.push({
       key: "value", label: "Hodnota v běhu", value: formatCZK(runningValue),
@@ -94,7 +111,7 @@ export function KpiStrip({ kpis, runningValue }: { kpis: BookKpis; runningValue:
     <div
       className={cn(
         "-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 scrollbar-thin sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0",
-        tiles.length > 5 ? "min-[1400px]:grid-cols-6" : "xl:grid-cols-5",
+        tiles.length > 6 ? "sm:grid-cols-4 min-[1700px]:grid-cols-7" : tiles.length > 5 ? "min-[1400px]:grid-cols-6" : "xl:grid-cols-5",
       )}
     >
       {tiles.map((t) => {

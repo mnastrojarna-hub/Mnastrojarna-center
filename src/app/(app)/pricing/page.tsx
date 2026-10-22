@@ -1,160 +1,177 @@
 import Link from "next/link";
-import { ArrowRight, Calculator, SlidersHorizontal, BrainCircuit } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { QuoteStatusBadge } from "@/components/status-badge";
-import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
-import { getQuotes } from "@/lib/data/queries";
-import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
+import { ArrowRight, BrainCircuit, Calculator, Inbox, SlidersHorizontal } from "lucide-react";
+import { requireFeature, getAccess } from "@/lib/auth/session";
+import { getJob, listJobs } from "@/lib/data/jobs";
 import { getRecentPricingCalculations } from "@/lib/data/pricing-data";
+import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
+import type { JobDetail } from "@/lib/jobs/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AiPricingPanel } from "@/components/ai-pricing-panel";
+import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
+import { CaptureButton } from "@/components/jobs/capture/capture-button";
+import { BookLink, FlowEmpty, FlowHeader, FlowHint, FlowSection } from "@/components/flow/flow-header";
+import { PricingBoard } from "@/components/flow/pricing-board";
+import { toPricingJob } from "@/components/flow/flow-data";
+import { bookHref, todayPrague } from "@/components/flow/flow-utils";
 import { formatCZK, relativeTime } from "@/lib/utils";
 
-export default async function PricingPage() {
-  const [quotes, settings, calculations] = await Promise.all([
-    getQuotes(),
-    getIntegrationSettingsMeta(),
-    getRecentPricingCalculations(15),
+export const dynamic = "force-dynamic";
+
+/** Kolik zakázek načíst i s položkami (zbytek je v knize). */
+const MAX_JOBS = 40;
+
+/** Nacenění — ruční ceny k poptávkám; z ceny jedním klikem nabídka. AI se jen učí. */
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const user = await requireFeature("workflow");
+  const sp = await searchParams;
+  const { can } = await getAccess();
+  const margins = can("margins");
+  const ai = can("ai_pricing");
+  const settings = can("settings");
+
+  const list = await listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" });
+  const wanted = typeof sp.job === "string" ? sp.job : null;
+  // vyžádaná zakázka vždy mezi načtenými
+  const ids = list.map((j) => j.id);
+  const pick = [...(wanted && ids.includes(wanted) ? [wanted] : []), ...ids.filter((id) => id !== wanted)].slice(0, MAX_JOBS);
+  const [details, calculations, params] = await Promise.all([
+    Promise.all(pick.map((id) => getJob(id))),
+    ai ? getRecentPricingCalculations(15) : Promise.resolve([]),
+    ai && settings ? getIntegrationSettingsMeta() : Promise.resolve([]),
   ]);
-  const waiting = quotes.filter((q) => q.status === "Návrh AI" || q.status === "Ke schválení");
-  const pricingParams = settings.filter((s) => s.category === "pricing");
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const jobs = (details.filter(Boolean) as JobDetail[])
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+    .map(toPricingJob);
+  const pricingParams = params.filter((s) => s.category === "pricing");
+  const today = todayPrague();
+  const me = { id: user.id, name: user.fullName || user.email };
+  const unpriced = jobs.filter((j) => !j.items.length || j.items.some((i) => i.unitPrice === null)).length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <div className="space-y-5">
+      <FlowHeader
+        tone="amber"
+        icon={Calculator}
         title="Nacenění"
-        description="AI nacení v plném rozsahu: polotovar, materiál, operace s časy, složitost, sériovost, strategie 1–10, termín i ochrana proti cenovým výkyvům. Ty kontroluješ a koriguješ — systém se učí."
+        count={list.length}
+        description={
+          <>Doplň ceny k poptávkám — u každé položky prodejní cenu{margins ? ", nákup a hned uvidíš marži" : ""}. Z hotové ceny vytvoříš jedním klikem nabídku pro zákazníka.</>
+        }
+        step="naceneni"
         actions={
-          <Button asChild variant="outline" size="sm">
-            <Link href="/quotes">Pokračovat na Nabídky <ArrowRight className="h-3.5 w-3.5" /></Link>
-          </Button>
+          <>
+            <CaptureButton label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
+            <Button asChild variant="outline" className="flex-1 sm:flex-none">
+              <Link href="/quotes">Nabídky <ArrowRight className="h-4 w-4" /></Link>
+            </Button>
+            <BookLink href={bookHref("poptavky", ["poptavka", "naceneni"])} className="w-full sm:w-auto" />
+          </>
         }
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Číslo</TableHead>
-                <TableHead>Zákazník</TableHead>
-                <TableHead>Výkres</TableHead>
-                <TableHead className="text-right">Kusů</TableHead>
-                <TableHead>Stav</TableHead>
-                <TableHead className="text-right">Cena</TableHead>
-                <TableHead>Vytvořeno</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {waiting.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
-                    <Calculator className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                    Nic nečeká na nacenění. Nové návrhy sem padají automaticky z poptávek.
-                  </TableCell>
-                </TableRow>
-              )}
-              {waiting.map((q) => (
-                <TableRow key={q.id}>
-                  <TableCell className="font-medium">{q.number}</TableCell>
-                  <TableCell>{q.customer}</TableCell>
-                  <TableCell className="text-muted-foreground">{q.drawing}</TableCell>
-                  <TableCell className="text-right">{q.qty}</TableCell>
-                  <TableCell><QuoteStatusBadge status={q.status} /></TableCell>
-                  <TableCell className="text-right font-medium">
-                    {q.value ? formatCZK(q.value) : <span className="text-warning">doplnit</span>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{relativeTime(q.createdAt)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button asChild variant="ghost" size="sm">
-                      <Link href="/quotes">Nacenit</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <FlowHint>
+        <strong>Nacenění dělá člověk — AI se z tvých cen učí.</strong> Klikni na zakázku, vyplň ceny za kus
+        {margins ? " (a nákupní ceny — marži vidíš jen ty a vedení)" : ""} a dej <em>Uložit nacenění</em>, nebo rovnou{" "}
+        <em>Vytvořit nabídku z ceny</em>. Zakázka se tím přesune do stavu Nacenění a zapíše se, kdo nacenil.
+      </FlowHint>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BrainCircuit className="h-4 w-4 text-muted-foreground" /> Historie kalkulací (samoučení)
-          </CardTitle>
-          <CardDescription>
-            Každé nacenění se ukládá. Korigované kalkulace mají při dalším nacenění stejného dílu přednost
-            a drží cenu v pásmu (ochrana proti výkyvům).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Výkres</TableHead>
-                <TableHead>Zákazník</TableHead>
-                <TableHead>Materiál</TableHead>
-                <TableHead className="text-right">Kusů</TableHead>
-                <TableHead className="text-right">Cena / ks</TableHead>
-                <TableHead className="text-right">Marže</TableHead>
-                <TableHead className="text-right">Termín</TableHead>
-                <TableHead>Stav</TableHead>
-                <TableHead>Kdy</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {calculations.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
-                    Zatím žádné kalkulace — první nacenění se sem uloží automaticky.
-                  </TableCell>
-                </TableRow>
-              )}
-              {calculations.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.drawing_number || "—"}</TableCell>
-                  <TableCell>{c.customer_name || "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.material || "—"}</TableCell>
-                  <TableCell className="text-right">{c.quantity}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {c.corrected && c.user_unit_price
-                      ? <>{formatCZK(Number(c.user_unit_price))} <span className="text-xs text-muted-foreground line-through">{c.unit_price ? formatCZK(Number(c.unit_price)) : ""}</span></>
-                      : c.unit_price ? formatCZK(Number(c.unit_price)) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">{c.user_margin_percent ?? c.margin_percent ?? "—"} %</TableCell>
-                  <TableCell className="text-right">{c.user_lead_time_days ?? c.lead_time_days ?? "—"} d</TableCell>
-                  <TableCell>
-                    {c.corrected
-                      ? <Badge variant="warning">korigováno</Badge>
-                      : <Badge variant="secondary">AI {c.confidence != null ? `${Math.round(Number(c.confidence) * 100)} %` : ""}</Badge>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{relativeTime(c.created_at)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <FlowSection
+        icon={Calculator}
+        iconClass="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+        title="K nacenění"
+        description={unpriced ? `${unpriced} ${unpriced === 1 ? "zakázka ještě nemá" : unpriced < 5 ? "zakázky ještě nemají" : "zakázek ještě nemá"} všechny ceny.` : "Vše naceněno — vytvoř nabídky a pošli je zákazníkům."}
+        count={list.length}
+      >
+        {jobs.length === 0 ? (
+          <FlowEmpty
+            icon={Inbox}
+            iconClass="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"
+            title="Nic nečeká na nacenění"
+            actions={
+              <Button asChild variant="outline">
+                <Link href="/inquiries">Na Poptávky</Link>
+              </Button>
+            }
+          >
+            Sem se dostane každá nová poptávka. Až nějaká přijde (e-mailem, z fotky nebo ručně), uvidíš ji tady s položkami k vyplnění cen.
+          </FlowEmpty>
+        ) : (
+          <>
+            <PricingBoard jobs={jobs} me={me} margins={margins} today={today} initialOpenId={wanted} />
+            {list.length > jobs.length && (
+              <p className="text-center text-xs text-muted-foreground">
+                Zobrazeno {jobs.length} z {list.length} — další najdeš v{" "}
+                <Link href={bookHref("poptavky", ["poptavka", "naceneni"])} className="font-medium text-primary hover:underline">Knize zakázek</Link>.
+              </p>
+            )}
+          </>
+        )}
+      </FlowSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Parametry kalkulace
-          </CardTitle>
-          <CardDescription>
-            Sazby (stroj, programování, seřizování, kontrola, manipulace), marže, cenová strategie 1–10, vytížení výroby,
-            přirážky materiálu, limit cenového skoku a termínové přirážky. Změna platí okamžitě pro další nacenění.
-            Pravidla technologa a naučené korekce najdeš v{" "}
-            <Link href="/tuning" className="text-primary hover:underline">Ladění &amp; korekce</Link>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <IntegrationSettingsEditor settings={pricingParams} />
-        </CardContent>
-      </Card>
+      {ai && (
+        <details className="group rounded-2xl border bg-card shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-2.5 p-4 [&::-webkit-details-marker]:hidden">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+              <BrainCircuit className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">AI návrh ceny (zatím jen pro ladění)</span>
+              <span className="block text-xs text-muted-foreground">Vidí jen super admin. Zákazníkům se nic neposílá — slouží k porovnání s ručními cenami.</span>
+            </span>
+            <ArrowRight className="h-4 w-4 text-muted-foreground transition group-open:rotate-90" />
+          </summary>
+          <div className="space-y-5 border-t p-4">
+            <AiPricingPanel />
+
+            <div className="space-y-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <BrainCircuit className="h-4 w-4 text-violet-500" /> Historie kalkulací (samoučení)
+              </h3>
+              {calculations.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Zatím žádné AI kalkulace.</p>
+              ) : (
+                <ul className="divide-y rounded-xl border">
+                  {calculations.map((c) => (
+                    <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-sm">
+                      <span className="font-mono font-medium">{c.drawing_number || "—"}</span>
+                      <span className="text-muted-foreground">{c.customer_name || "—"}</span>
+                      <span className="text-muted-foreground">{c.material || ""}</span>
+                      <span className="tabular-nums">{c.quantity} ks</span>
+                      <span className="ml-auto font-semibold tabular-nums">
+                        {c.corrected && c.user_unit_price
+                          ? formatCZK(Number(c.user_unit_price))
+                          : c.unit_price ? formatCZK(Number(c.unit_price)) : "—"}
+                        <span className="font-normal text-muted-foreground"> / ks</span>
+                      </span>
+                      {c.corrected ? <Badge variant="warning">korigováno</Badge> : <Badge variant="secondary">AI</Badge>}
+                      <span className="text-xs text-muted-foreground">{relativeTime(c.created_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {settings && pricingParams.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <SlidersHorizontal className="h-4 w-4 text-violet-500" /> Parametry AI kalkulace
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Sazby, marže, strategie a přirážky pro AI návrh. Pravidla technologa najdeš v{" "}
+                  <Link href="/tuning" className="text-primary hover:underline">Ladění &amp; korekce</Link>.
+                </p>
+                <IntegrationSettingsEditor settings={pricingParams} />
+              </div>
+            )}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

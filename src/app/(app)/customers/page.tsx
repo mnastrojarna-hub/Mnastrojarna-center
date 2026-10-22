@@ -1,85 +1,28 @@
-import Link from "next/link";
+import { Camera } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { QuickAddDialog } from "@/components/quick-add-dialog";
-import { createCustomer } from "@/app/actions/crm";
+import { CustomersBrowser } from "@/components/customers/customers-browser";
+import { CustomerDialog } from "@/components/customers/customer-dialog";
+import { requireFeature } from "@/lib/auth/session";
 import { getCustomers } from "@/lib/data/queries";
-import { formatCZK } from "@/lib/utils";
+import { getJobFormOptions } from "@/lib/data/jobs";
 
 export default async function CustomersPage() {
-  const customers = await getCustomers();
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Zákazníci (CRM)"
-        description="Firmy, kontakty a celá historie komunikace na jednom místě."
-        actions={
-          <QuickAddDialog
-            triggerLabel="Nový zákazník"
-            title="Nový zákazník"
-            action={createCustomer}
-            fields={[
-              { name: "name", label: "Název firmy", required: true, placeholder: "Strojmetal a.s." },
-              { name: "ico", label: "IČO", placeholder: "45274649" },
-              { name: "dic", label: "DIČ", placeholder: "CZ45274649" },
-              { name: "country", label: "Země", placeholder: "CZ" },
-              { name: "email", label: "E-mail", type: "email", placeholder: "nakup@firma.cz" },
-              { name: "phone", label: "Telefon" },
-            ]}
-          />
-        }
-      />
+  const user = await requireFeature("customers");
+  const [customers, options] = await Promise.all([getCustomers(), getJobFormOptions()]);
+  const owners = options.users.map((u) => ({ id: u.id, name: u.name, role: u.role }));
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Firma</TableHead>
-                <TableHead>IČO</TableHead>
-                <TableHead>Země</TableHead>
-                <TableHead>Kontakt</TableHead>
-                <TableHead className="text-right">Objednávky</TableHead>
-                <TableHead className="text-right">Obrat</TableHead>
-                <TableHead>Obchodník</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customers.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                    Zatím žádní zákazníci. Přidej prvního přes tlačítko Nový zákazník.
-                  </TableCell>
-                </TableRow>
-              )}
-              {customers.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/customers/${c.id}`} className="hover:text-primary hover:underline">
-                      {c.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{c.ico}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{c.country}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div>{c.contact}</div>
-                    {c.email && c.email !== c.contact && (
-                      <div className="text-xs text-muted-foreground">{c.email}</div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">{c.orders}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCZK(c.revenue)}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.owner}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Zákazníci"
+        description="Adresář firem — čísla zákazníků, kontakty a celá historie zakázek. Vidí a upravuje celý tým."
+        actions={<CustomerDialog owners={owners} defaultOwnerId={user.id} className="flex-1 sm:flex-none" />}
+      />
+      <p className="flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-500/10 dark:text-rose-300">
+        <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Tip: nového zákazníka nemusíš zakládat ručně — vyfoť jeho objednávku v Knize zakázek a AI ho založí i s IČO a adresou.
+      </p>
+      <CustomersBrowser customers={customers} owners={owners} userId={user.id} />
     </div>
   );
 }

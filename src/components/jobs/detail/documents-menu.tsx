@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, FileText, BadgeCheck, Truck, ReceiptText, Loader2, FileOutput, type LucideIcon } from "lucide-react";
+import { ChevronDown, FileText, BadgeCheck, Truck, ReceiptText, Loader2, FileOutput, AlertTriangle, type LucideIcon } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -11,6 +11,7 @@ import type { JobQuote } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
 import { primaryQuote } from "./detail-helpers";
+import { ConfirmDialog } from "./confirm-dialog";
 
 const DOCS: { kind: JobDocumentKind; label: string; hint: string; icon: LucideIcon; tone: string }[] = [
   { kind: "nabidka", label: "Nabídka", hint: "PDF z aktuální nabídky", icon: FileText, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
@@ -33,29 +34,56 @@ export function DocumentsMenu({
 }) {
   const { jobId, notify, refresh } = useJobDetail();
   const [busy, setBusy] = React.useState<JobDocumentKind | null>(null);
+  // potvrzení / faktura s neoceněnými položkami → „Přesto vystavit"
+  const [unpriced, setUnpriced] = React.useState<{ kind: JobDocumentKind; message: string } | null>(null);
   const quote = primaryQuote(quotes, acceptedQuoteId);
 
-  async function generate(kind: JobDocumentKind) {
-    if (busy) return;
+  /** Vrací chybu (pro dialog „Přesto vystavit") nebo null. */
+  async function generate(kind: JobDocumentKind, force = false): Promise<string | null> {
+    if (busy) return null;
     setBusy(kind);
     try {
-      const res = await generateJobDocument(jobId, kind, kind === "nabidka" && quote ? { quoteId: quote.id } : undefined);
+      const opts = { ...(kind === "nabidka" && quote ? { quoteId: quote.id } : {}), ...(force ? { force: true } : {}) };
+      const res = await generateJobDocument(jobId, kind, Object.keys(opts).length ? opts : undefined);
       if (!res.ok || !res.fileId) {
-        notify("error", res.error ?? "Doklad se nepodařilo vytvořit.");
-        return;
+        const message = res.error ?? "Doklad se nepodařilo vytvořit.";
+        if (!force && (res.unpriced ?? 0) > 0) {
+          setUnpriced({ kind, message });
+          return null;
+        }
+        if (force) return message;
+        notify("error", message);
+        return null;
       }
       notify("success", `${DOCS.find((d) => d.kind === kind)?.label ?? "Doklad"} ${res.number ?? ""} je hotový a uložený v Dokumentech.`.replace(/\s+/g, " "), {
         label: "Otevřít PDF", href: `/api/jobs/files/${res.fileId}`, external: true,
       });
       refresh();
+      return null;
     } catch {
+      if (force) return "Spojení se nepovedlo — zkus to znovu.";
       notify("error", "Spojení se nepovedlo — zkus to znovu.");
+      return null;
     } finally {
       setBusy(null);
     }
   }
 
   return (
+    <>
+    <ConfirmDialog
+      open={Boolean(unpriced)}
+      onOpenChange={(o) => { if (!o) setUnpriced(null); }}
+      icon={AlertTriangle}
+      tone="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+      title="Doklad má položky bez ceny"
+      confirmLabel="Přesto vystavit"
+      onConfirm={async () => (unpriced ? generate(unpriced.kind, true) : null)}
+    >
+      <p className="text-sm text-muted-foreground">
+        {unpriced?.message} Doplň ceny v záložce Položky, nebo doklad vystav i tak (neoceněné položky budou bez ceny).
+      </p>
+    </ConfirmDialog>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant={variant} size={size} className={className} disabled={Boolean(busy)} aria-label="Doklady (PDF)" title="Vytvořit PDF doklad">
@@ -91,5 +119,6 @@ export function DocumentsMenu({
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }

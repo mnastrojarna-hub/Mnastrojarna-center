@@ -284,6 +284,14 @@ const EMPTY_SNAPSHOT: JobSnapshot = {
   supplier: null, supplierOrderNumber: null, invoiceNumber: null, deliveryNoteNumber: null,
 };
 
+/**
+ * Všechny údaje zakázky, které z dokladu plynou (bez ohledu na to, co zakázka už má) —
+ * pro kontrolní formulář: „na dokladu je jiný termín, než má zakázka".
+ */
+export function docFieldValues(doc: ExtractedBusinessDoc): JobInput {
+  return planJobUpdate(EMPTY_SNAPSHOT, doc).patch;
+}
+
 const KIND_TITLE: Record<CaptureDocKind, string> = {
   poptavka: "Poptávka", nabidka: "Nabídka", objednavka: "Objednávka", potvrzeni: "Potvrzení objednávky",
   dodaci_list: "Dodací list", faktura: "Faktura", vykres: "Výkres", ostatni: "Doklad",

@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Building2, UserRound, Mail, Phone, Hash, FileDigit, Users, Factory, Truck, StickyNote, Tag, Calculator, Percent,
   ShoppingCart, ReceiptText, MessageSquareQuote, Banknote, Wrench, MapPin, ClipboardList, X, Plus, Loader2,
-  CalendarDays, BadgeCheck, PenLine, ExternalLink, type LucideIcon,
+  CalendarDays, BadgeCheck, PenLine, ExternalLink, Handshake, type LucideIcon,
 } from "lucide-react";
 import type { JobDetail } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { useJobDetail } from "./detail-context";
 import { JobField, InlineSelect, PersonChip, type SelectOption } from "./inline-field";
 import { SearchSelect, type SearchOption } from "./search-select";
 import { formatPercent, longDate, parseTags, tagTone } from "./detail-helpers";
+import { openProductionTab } from "@/components/jobs/production/production-chip";
 
 function InfoCard({
   icon: Icon, tone, title, subtitle, children, className,
@@ -156,6 +157,27 @@ export function OverviewTab({ job }: { job: JobDetail }) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {job.customerNote && (
+        <section
+          aria-label="Domluvy se zákazníkem"
+          className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/[0.07] md:col-span-2 xl:col-span-3"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
+            <Handshake className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <h3 className="text-sm font-semibold">
+                Domluvy se zákazníkem <span className="font-normal text-amber-800/80 dark:text-amber-300/80">— co není v objednávce</span>
+              </h3>
+              <a href="?tab=vyroba" onClick={openProductionTab} className="text-xs font-medium text-amber-800 hover:underline dark:text-amber-300">
+                Upravit
+              </a>
+            </div>
+            <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed">{job.customerNote}</p>
+          </div>
+        </section>
+      )}
       <InfoCard icon={Building2} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title="Zákazník & kontakt" subtitle="Komu zakázku děláme">
         <SearchSelect
           label="Zákazník"

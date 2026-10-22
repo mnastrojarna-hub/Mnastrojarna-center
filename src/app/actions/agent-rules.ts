@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
+import { checkFeature } from "@/lib/auth/session";
 
 export interface SaveRulesInput {
   agentKey: string;
@@ -13,6 +14,10 @@ export interface SaveRulesInput {
 export async function saveAgentRules(
   input: SaveRulesInput,
 ): Promise<{ ok: boolean; error?: string }> {
+  const auth = await checkFeature("ai_tuning");
+  if ("error" in auth) return { ok: false, error: auth.error };
+  if (typeof input?.agentKey !== "string" || !input.agentKey.trim()) return { ok: false, error: "Chybí agent." };
+  if (!Array.isArray(input.always) || !Array.isArray(input.never)) return { ok: false, error: "Neplatná pravidla." };
   const always = input.always.map((s) => s.trim()).filter(Boolean);
   const never = input.never.map((s) => s.trim()).filter(Boolean);
 
@@ -42,6 +47,7 @@ export async function saveAgentRules(
       };
     }
     revalidatePath("/settings");
+    revalidatePath("/tuning");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };

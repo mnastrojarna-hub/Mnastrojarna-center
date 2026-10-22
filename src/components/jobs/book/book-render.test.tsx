@@ -129,6 +129,60 @@ describe("Kniha zakázek — vykreslení", () => {
     expect(html).toContain("Jak číst barvy");
   });
 
+  it("výroba, platba a domluvy v řádku i na kartě tabule", () => {
+    const heat = job({
+      id: "j3", stage: "ve_vyrobe", productionStep: "tepelne_zpracovani", productionLocation: "TepKal s.r.o.",
+      productionDone: 1, productionTotal: 4, productionProblem: true, customerNote: "Balit po 10 ks do VCI.",
+    });
+    const late = job({ id: "j4", number: "Z-2026-110", stage: "fakturovano", invoiceNumber: "FV-9", invoiceDueDate: "2026-10-15" });
+    const soon = job({ id: "j5", number: "Z-2026-111", stage: "fakturovano", invoiceDueDate: "2026-11-21" });
+    const paid = job({ id: "j6", number: "Z-2026-112", stage: "dokonceno", paidAt: "2026-10-03", productionStep: "hotovo", productionDone: 2, productionTotal: 2 });
+    const html = render(<JobRows jobs={[heat, late, soon, paid]} today="2026-10-22" />);
+    expect(html).toContain('href="/orders/j3?tab=vyroba"');
+    expect(html).toContain("Tepelné zpracování · TepKal s.r.o."); // mobil: celý název
+    expect(html).toContain("Kalení · TepKal s.r.o."); // desktop: krátký
+    expect(html).toContain("1/4");
+    expect(html).toContain("problém");
+    expect(html).toContain('aria-label="Domluvy se zákazníkem"');
+    expect(html).toContain("po splatnosti");
+    expect(html).toContain("Faktura FV-9 — 7 dní po splatnosti");
+    expect(html).toContain("splatná 21. 11.");
+    expect(html).toContain("zaplaceno");
+    expect(html).toContain("Výroba hotová");
+    const board = render(<JobBoard jobs={[heat]} stages={["ve_vyrobe"]} today="2026-10-22" />);
+    expect(board).toContain("Kalení · TepKal s.r.o.");
+    expect(board).toContain('aria-label="Domluvy se zákazníkem"');
+  });
+
+  it("filtry výroby a platby + dlaždice Po splatnosti", () => {
+    const counts = { byStage, overdue: 0, dueThisWeek: 0, active: 13, total: 16 };
+    const production = {
+      steps: [{ key: "tepelne_zpracovani", label: "Tepelné zpracování", count: 3 }, { key: "hotovo", label: "Výroba hotová", count: 1 }],
+      locations: [{ name: "TepKal s.r.o.", count: 2 }, { name: "U nás", count: 1 }],
+    };
+    const html = render(
+      <>
+        <KpiStrip kpis={bookKpis(counts)} runningValue={null} overdueInvoices={2} />
+        <BookToolbar options={OPTIONS} production={production} />
+      </>,
+      { ...DEFAULT_PARAMS, step: "tepelne_zpracovani", payment: "po_splatnosti" },
+    );
+    expect(html).toContain("Po splatnosti");
+    expect(html).toContain("faktury čekají na peníze");
+    expect(html).toContain("payment=po_splatnosti");
+    expect(html).toContain("Výroba: všechny operace");
+    expect(html).toContain("Tepelné zpracování (3)");
+    expect(html).toContain("Výroba hotová (1)");
+    expect(html).toContain("Kde: kdekoli");
+    expect(html).toContain("TepKal s.r.o. (2)");
+    expect(html).toContain("Platba: vše");
+    expect(html).toContain("Nezaplaceno");
+    // bez dat výroby se filtry operace / místa neukazují
+    const plain = render(<BookToolbar options={OPTIONS} />);
+    expect(plain).not.toContain("Výroba: všechny operace");
+    expect(plain).toContain("Platba: vše");
+  });
+
   it("formulář: nákupní cena jen s právem na marže", () => {
     const init = { items: [{ drawingNumber: "VK-1", quantity: 2 }] };
     accessState.features = ["orders"];

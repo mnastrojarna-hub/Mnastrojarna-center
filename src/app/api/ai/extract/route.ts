@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractFromDocument } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
+import { apiRequire, getAccess } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -8,6 +9,11 @@ export const maxDuration = 60;
 const ALLOWED = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 
 export async function POST(req: Request) {
+  // čtení výkresu / dokladu: AI nacenění (super admin) nebo AI čtení dokladů
+  const auth = await apiRequire();
+  if (auth instanceof NextResponse) return auth;
+  const { can } = await getAccess();
+  if (!can("ai_pricing") && !can("ai_capture")) return NextResponse.json({ error: "Bez oprávnění." }, { status: 403 });
   let form: FormData;
   try {
     form = await req.formData();

@@ -1,72 +1,91 @@
+import { Box, FileBox, FileImage, FileText, PencilRuler, Search, SearchX } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { DrawingUpload } from "@/components/drawing-upload";
+import { FriendlyEmpty } from "@/components/customers/friendly-empty";
+import { requireFeature } from "@/lib/auth/session";
 import { getDrawings } from "@/lib/data/queries";
-import { formatDate } from "@/lib/utils";
+import { searchNormalize } from "@/lib/jobs/mapping";
+import type { DrawingItem } from "@/lib/data/types";
+import { cn, formatDate } from "@/lib/utils";
 
-const typeVariant: Record<string, "default" | "secondary" | "success" | "warning"> = {
-  PDF: "warning",
-  STEP: "default",
-  DXF: "secondary",
-  IMG: "success",
+const TYPE_STYLE: Record<DrawingItem["fileType"], { label: string; icon: typeof FileText; badge: string }> = {
+  PDF: { label: "PDF", icon: FileText, badge: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
+  STEP: { label: "STEP", icon: Box, badge: "bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300" },
+  DXF: { label: "DXF", icon: PencilRuler, badge: "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300" },
+  IMG: { label: "Obrázek", icon: FileImage, badge: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300" },
 };
 
-export default async function DrawingsPage() {
-  const drawings = await getDrawings();
+function typeStyle(t: string) {
+  return TYPE_STYLE[t as DrawingItem["fileType"]] ?? TYPE_STYLE.PDF;
+}
+
+export default async function DrawingsPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+  await requireFeature("drawings");
+  const sp = await searchParams;
+  const q = (typeof sp.q === "string" ? sp.q : "").slice(0, 120);
+  const all = await getDrawings();
+  const tokens = searchNormalize(q).split(/\s+/).filter(Boolean);
+  const drawings = tokens.length
+    ? all.filter((d) => {
+        const h = searchNormalize([d.number, d.revision, d.customer, d.material, d.dimensions].join(" "));
+        return tokens.every((t) => h.includes(t));
+      })
+    : all;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Archiv výkresů"
-        description="AI z nahraného výkresu vytáhne číslo, revizi, materiál, rozměry i množství a uloží do archivu."
+        description="Nahraj výkres — AI z něj vytáhne číslo, revizi, materiál, rozměry i množství. Stejné číslo a revize se pozná jako duplicita."
       />
 
       <DrawingUpload />
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Číslo výkresu</TableHead>
-                <TableHead>Rev.</TableHead>
-                <TableHead>Zákazník</TableHead>
-                <TableHead>Materiál</TableHead>
-                <TableHead>Rozměry</TableHead>
-                <TableHead className="text-right">Ks</TableHead>
-                <TableHead>Typ</TableHead>
-                <TableHead>Nahráno</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {drawings.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                    Zatím žádné výkresy v archivu.
-                  </TableCell>
-                </TableRow>
-              )}
-              {drawings.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.number}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{d.revision}</Badge>
-                  </TableCell>
-                  <TableCell>{d.customer}</TableCell>
-                  <TableCell className="text-muted-foreground">{d.material}</TableCell>
-                  <TableCell className="text-muted-foreground">{d.dimensions}</TableCell>
-                  <TableCell className="text-right">{d.qty}</TableCell>
-                  <TableCell>
-                    <Badge variant={typeVariant[d.fileType] ?? "secondary"}>{d.fileType}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(d.uploadedAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <section className="space-y-3 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+        <form action="/drawings" className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" defaultValue={q} placeholder="Hledej číslo výkresu, zákazníka, materiál…" className="h-10 pl-9" />
+        </form>
+
+        {all.length === 0 ? (
+          <FriendlyEmpty icon={<FileBox />} tone="bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" title="Archiv je zatím prázdný">
+            Nahraj první výkres nahoře (PDF nebo fotka). Výkresy přiložené k zakázkám najdeš i přímo na kartě zakázky v záložce Dokumenty.
+          </FriendlyEmpty>
+        ) : drawings.length === 0 ? (
+          <FriendlyEmpty compact icon={<SearchX />} tone="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" title={`Nic pro „${q}“`}>
+            Zkus kratší část čísla výkresu nebo jméno zákazníka.
+          </FriendlyEmpty>
+        ) : (
+          <>
+            <p className="px-1 text-xs text-muted-foreground">{drawings.length} z {all.length} výkresů</p>
+            <ul className="divide-y rounded-xl border">
+              {drawings.map((d) => {
+                const t = typeStyle(d.fileType);
+                return (
+                  <li key={d.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", t.badge)} title={t.label}>
+                      <t.icon className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-semibold">{d.number}</span>
+                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">rev. {d.revision}</span>
+                        <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", t.badge)}>{t.label}</span>
+                      </div>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[d.customer !== "—" ? d.customer : null, d.material !== "—" ? d.material : null, d.dimensions !== "—" ? d.dimensions : null, d.qty ? `${d.qty} ks` : null]
+                          .filter(Boolean).join(" · ") || "bez údajů"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{formatDate(d.uploadedAt)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </section>
     </div>
   );
 }

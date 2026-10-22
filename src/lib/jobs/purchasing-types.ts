@@ -113,17 +113,25 @@ export interface JobCommissionView {
   profit: number;
   /** Podíl zisku na obratu (0.25 = 25 %). */
   margin: number;
-  /** Sazba provize (0.1 = 10 %). */
+  /** Sazba provize (0.1 = 10 %). U pásmové provize podíl přidělené provize na zisku. */
   rate: number;
-  /** Základ provize: margin = ze zisku, revenue = z obratu. */
-  base: "margin" | "revenue";
+  /**
+   * Základ provize: margin = ze zisku, revenue = z obratu,
+   * margin_tiered = pásmově ze zisku dle měsíčního inkasa (smlouva obchodního zástupce).
+   */
+  base: "margin" | "revenue" | "margin_tiered";
+  /** Provize zakázky; u pásmové jen po inkasu (podíl na měsíčním vyúčtování). */
   commission: number;
   status: CommissionStatus;
   /** false = nákupní cena neznámá → provize ze zisku zatím 0. */
   costKnown: boolean;
-  /** Měsíc, do kterého provize patří (RRRR-MM-01). */
+  /** Měsíc, do kterého provize patří (RRRR-MM-01) — u pásmové měsíc inkasa. */
   period: string;
   updatedAt: string | null;
+  /** Zakázka je inkasovaná (zaplacená zákazníkem). */
+  collected?: boolean;
+  /** Pásmová provize: odhad pro neinkasovanou zakázku dle aktuálního pásma (finální až po inkasu). */
+  estimatedCommission?: number | null;
 }
 
 /** Odkud se bere náklad zakázky. */

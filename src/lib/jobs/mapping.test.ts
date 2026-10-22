@@ -6,6 +6,7 @@ import {
   isValidJobFilePath, jobFilePath, rowToJobListItem, rowToJobDetail, rowToJobEvent, rowToJobFile,
   resolveStageFilter, filterJobs, sortJobs, countJobStages, aiFilledColumns, stageEventMessage,
   computeMargin, todayIso, matchesDeadline, fetchPaged, isGenericCaptureName, translateDbError, type JobRow,
+  paymentStateOf, matchesPayment, JOB_LIST_SELECT,
 } from "./mapping";
 import type { JobListItem } from "./types";
 
@@ -393,6 +394,72 @@ describe("filtry a řazení", () => {
     expect(counts.active).toBe(4);
     expect(counts.overdue).toBe(2);
     expect(counts.dueThisWeek).toBe(2);
+  });
+});
+
+describe("výroba a platba v knize", () => {
+  const today = new Date("2026-10-22T09:00:00");
+
+  it("seznam nese souhrn výroby, domluvy a fakturu", () => {
+    expect(JOB_LIST_SELECT).toContain("production_step");
+    expect(JOB_LIST_SELECT).toContain("invoice_due_date");
+    expect(JOB_LIST_SELECT).toContain("paid_at");
+    const item = rowToJobListItem({
+      id: UUID, number: "Z-1", title: "x", status: "ve_vyrobe", created_at: "2026-10-01T10:00:00Z",
+      production_step: "tepelne_zpracovani", production_location: " TepKal s.r.o. ", production_done: "2",
+      production_total: 5, production_problem: true, customer_note: "  balit po 10 ks ", delivery_note_confirmed_at: "2026-10-20",
+      invoice_number: "FV-7", invoice_due_date: "2026-11-05", paid_at: null,
+    }, { margins: false });
+    expect(item.productionStep).toBe("tepelne_zpracovani");
+    expect(item.productionLocation).toBe("TepKal s.r.o.");
+    expect(item.productionDone).toBe(2);
+    expect(item.productionTotal).toBe(5);
+    expect(item.productionProblem).toBe(true);
+    expect(item.customerNote).toBe("balit po 10 ks");
+    expect(item.deliveryNoteConfirmedAt).toBe("2026-10-20");
+    expect(item.invoiceNumber).toBe("FV-7");
+    expect(item.invoiceDueDate).toBe("2026-11-05");
+    expect(item.paidAt).toBeNull();
+  });
+
+  it("neznámý krok výroby a prázdné hodnoty", () => {
+    const base = { id: UUID, number: "Z-1", title: "x", status: "objednavka", created_at: "2026-10-01T10:00:00Z" };
+    const none = rowToJobListItem(base, { margins: true });
+    expect(none.productionStep).toBeNull();
+    expect(none.productionTotal).toBe(0);
+    expect(none.productionProblem).toBe(false);
+    expect(none.customerNote).toBeNull();
+    expect(rowToJobListItem({ ...base, production_step: "hack" }, { margins: true }).productionStep).toBeNull();
+    expect(rowToJobListItem({ ...base, production_step: "hotovo" }, { margins: true }).productionStep).toBe("hotovo");
+  });
+
+  it("stav úhrady", () => {
+    expect(paymentStateOf(listItem({ stage: "objednavka" }), "2026-10-22")).toBeNull();
+    expect(paymentStateOf(listItem({ stage: "fakturovano", invoiceDueDate: "2026-10-21" }), "2026-10-22")).toBe("po_splatnosti");
+    expect(paymentStateOf(listItem({ stage: "fakturovano", invoiceDueDate: "2026-10-22" }), "2026-10-22")).toBe("nezaplaceno");
+    expect(paymentStateOf(listItem({ stage: "fakturovano" }), "2026-10-22")).toBe("nezaplaceno");
+    expect(paymentStateOf(listItem({ stage: "dodano_zakaznikovi", invoiceNumber: "FV-1" }), "2026-10-22")).toBe("nezaplaceno");
+    expect(paymentStateOf(listItem({ stage: "fakturovano", invoiceDueDate: "2026-10-01", paidAt: "2026-10-10" }), "2026-10-22")).toBe("zaplaceno");
+    expect(paymentStateOf(listItem({ stage: "dokonceno" }), "2026-10-22")).toBe("zaplaceno");
+    expect(paymentStateOf(listItem({ stage: "zruseno", invoiceDueDate: "2026-10-01" }), "2026-10-22")).toBeNull();
+  });
+
+  it("filtry: operace, místo a platba", () => {
+    const heat = listItem({ id: "h", stage: "ve_vyrobe", productionStep: "tepelne_zpracovani", productionLocation: "TepKal s.r.o." });
+    const turn = listItem({ id: "t", stage: "ve_vyrobe", productionStep: "soustruzeni", productionLocation: "U nás" });
+    const late = listItem({ id: "l", stage: "fakturovano", invoiceDueDate: "2026-10-01" });
+    const open = listItem({ id: "o", stage: "fakturovano", invoiceDueDate: "2026-11-30" });
+    const paid = listItem({ id: "p", stage: "dokonceno", paidAt: "2026-10-02" });
+    const all = [heat, turn, late, open, paid];
+    expect(filterJobs(all, { step: "tepelne_zpracovani" }, today).map((j) => j.id)).toEqual(["h"]);
+    expect(filterJobs(all, { location: "tepkal S.R.O." }, today).map((j) => j.id)).toEqual(["h"]);
+    expect(filterJobs(all, { location: "U nas" }, today).map((j) => j.id)).toEqual(["t"]);
+    expect(filterJobs(all, { step: "soustruzeni", location: "TepKal s.r.o." }, today)).toHaveLength(0);
+    expect(filterJobs(all, { payment: "po_splatnosti" }, today).map((j) => j.id)).toEqual(["l"]);
+    expect(filterJobs(all, { payment: "nezaplaceno" }, today).map((j) => j.id)).toEqual(["l", "o"]);
+    expect(filterJobs(all, { payment: "zaplaceno" }, today).map((j) => j.id)).toEqual(["p"]);
+    expect(filterJobs(all, { step: "", location: "  " }, today)).toHaveLength(5);
+    expect(matchesPayment(heat, undefined)).toBe(true);
   });
 });
 

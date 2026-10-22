@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
-  KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock,
+  KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 import { updateUser, sendUserResetCode } from "@/app/actions/users";
 import { setMailboxOwner } from "@/app/actions/mailbox-owner";
 import { EditUserDialog, SetPasswordDialog, DeleteUserDialog } from "@/components/users/user-dialogs";
+import { CommissionContractDialog, contractSummary } from "@/components/users/commission-contract-dialog";
 import { UserAvatar } from "@/components/users/user-avatar";
 import { mailboxLabel } from "@/components/users/add-user-dialog";
 import { ROLE_STYLES } from "@/components/users/user-style";
@@ -63,6 +64,21 @@ export function UserManagement({
 
   const refresh = React.useCallback(() => router.refresh(), [router]);
   const owners = React.useMemo(() => new Map(users.map((u) => [u.id, u.fullName])), [users]);
+
+  // /users?smlouva=<id> (odkaz ze stránky Provize) → rovnou otevřít smlouvu
+  const [contractFor, setContractFor] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const id = url.searchParams.get("smlouva");
+      if (!id) return;
+      setContractFor(id);
+      url.searchParams.delete("smlouva");
+      window.history.replaceState(window.history.state, "", url.toString());
+    } catch {
+      // adresa je jen pohodlí
+    }
+  }, []);
 
   const stats = React.useMemo(
     () => ({
@@ -166,6 +182,8 @@ export function UserManagement({
                 aiForAll={aiForAll}
                 notify={notify}
                 refresh={refresh}
+                openContract={contractFor === u.id}
+                onContractOpened={() => setContractFor(null)}
               />
             ))}
           </ul>
@@ -204,6 +222,8 @@ function UserRow({
   aiForAll,
   notify,
   refresh,
+  openContract = false,
+  onContractOpened,
 }: {
   user: ManagedUser;
   isSelf: boolean;
@@ -212,9 +232,21 @@ function UserRow({
   aiForAll: boolean;
   notify: Notify;
   refresh: () => void;
+  /** Otevřít rovnou smlouvu a provize (odkaz ze stránky Provize). */
+  openContract?: boolean;
+  onContractOpened?: () => void;
 }) {
   const [busy, setBusy] = React.useState<string | null>(null);
-  const [dialog, setDialog] = React.useState<null | "edit" | "password" | "delete">(null);
+  const [dialog, setDialog] = React.useState<null | "edit" | "password" | "delete" | "contract">(null);
+  React.useEffect(() => {
+    if (!openContract) return;
+    setDialog("contract");
+    onContractOpened?.();
+  }, [openContract, onContractOpened]);
+  const hasContract = (user.commissionRules?.length ?? 0) > 0;
+  const contract = contractSummary(user);
+  const contractShort = contractSummary(user, { short: true });
+  const canHaveContract = user.role === "obchodnik" || user.role === "super_admin";
   // optimistické přepínače
   const [active, setActive] = React.useState(user.active);
   const [aiAccess, setAiAccess] = React.useState(user.aiAccess);
@@ -326,6 +358,11 @@ function UserRow({
             <DropdownMenuItem onSelect={() => setDialog("edit")}>
               <Pencil /> Upravit
             </DropdownMenuItem>
+            {(canHaveContract || hasContract) && (
+              <DropdownMenuItem onSelect={() => setDialog("contract")}>
+                <FileSignature /> Smlouva a provize
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={() => setDialog("password")}>
               <KeyRound /> Nastavit nové heslo
             </DropdownMenuItem>
@@ -357,11 +394,28 @@ function UserRow({
       <div className="col-span-2 flex flex-wrap items-center gap-2 md:col-span-1 md:flex-col md:items-start md:gap-1">
         <Badge className={cn("gap-1", ROLE_STYLES[user.role].badge)}>
           <RoleIcon className="h-3 w-3" /> {ROLE_LABELS[user.role]}
-          {user.role === "obchodnik" && user.commissionPercent > 0 && (
+          {user.role === "obchodnik" && user.commissionPercent > 0 && !hasContract && (
             <span className="opacity-70">· {String(user.commissionPercent).replace(".", ",")} %</span>
           )}
         </Badge>
-        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        {(canHaveContract || hasContract) && (contract || user.role === "obchodnik") && (
+          <button
+            type="button"
+            onClick={() => setDialog("contract")}
+            className={cn(
+              "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition hover:shadow-sm",
+              hasContract
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300"
+                : "border-dashed text-muted-foreground hover:bg-accent",
+            )}
+            title={`Smlouva a provize${contract ? ` — ${contract}` : ""}`}
+          >
+            <FileSignature className="h-3 w-3 shrink-0" />
+            <span className="truncate">{hasContract ? contractShort : contract ? `${contract} · bez smlouvy` : "Nastavit provizi"}</span>
+          </button>
+        )}
+        {/* relativní čas se mezi serverem a prohlížečem může lišit o minutu */}
+        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" suppressHydrationWarning>
           <Clock className="h-3 w-3" />
           {user.lastSeenAt ? `přihlášen ${relativeTime(user.lastSeenAt)}` : "zatím nepřihlášen"}
         </span>
@@ -467,6 +521,13 @@ function UserRow({
         open={dialog === "password"}
         onOpenChange={(o) => setDialog(o ? "password" : null)}
         notify={notify}
+      />
+      <CommissionContractDialog
+        user={user}
+        open={dialog === "contract"}
+        onOpenChange={(o) => setDialog(o ? "contract" : null)}
+        notify={notify}
+        onSaved={refresh}
       />
       <DeleteUserDialog
         user={user}

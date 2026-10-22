@@ -63,6 +63,25 @@ export interface JobListItem {
   createdAt: string;
   updatedAt: string;
   stageChangedAt: string | null;
+  // ── Výroba a konec toku (orders.production_*, udržuje DB trigger) ──
+  /** Druh aktuální výrobní operace, „hotovo" = vše hotové, null = bez postupu. */
+  productionStep?: string | null;
+  /** Kde se zakázka právě nachází („TepKal s.r.o.", „U nás"). */
+  productionLocation?: string | null;
+  productionDone?: number;
+  /** Počet operací bez přeskočených. */
+  productionTotal?: number;
+  /** Některá operace hlásí problém. */
+  productionProblem?: boolean;
+  /** Domluvy se zákazníkem (co není v objednávce). */
+  customerNote?: string | null;
+  /** Datum vrácení potvrzeného dodacího listu. */
+  deliveryNoteConfirmedAt?: string | null;
+  invoiceNumber?: string | null;
+  /** Splatnost naší faktury (RRRR-MM-DD). */
+  invoiceDueDate?: string | null;
+  /** Zaplaceno (RRRR-MM-DD). */
+  paidAt?: string | null;
 }
 
 export interface JobItem {
@@ -212,6 +231,8 @@ export interface JobDetail extends JobListItem {
 }
 
 export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date";
+/** Platba faktury: po splatnosti / nezaplaceno (vč. po splatnosti) / zaplaceno. */
+export type JobPaymentFilter = "po_splatnosti" | "nezaplaceno" | "zaplaceno";
 export type JobSort = "number" | "created" | "deadline" | "customer" | "value" | "stage" | "updated";
 
 export interface JobFilters {
@@ -225,6 +246,11 @@ export interface JobFilters {
   customerId?: string;
   supplierId?: string;
   deadline?: JobDeadlineFilter;
+  /** Aktuální výrobní operace (druh nebo „hotovo"). */
+  step?: string;
+  /** Kde se zakázka právě nachází (název firmy / „U nás"). */
+  location?: string;
+  payment?: JobPaymentFilter;
   sort?: JobSort;
   dir?: "asc" | "desc";
   limit?: number;

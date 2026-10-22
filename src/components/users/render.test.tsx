@@ -10,6 +10,9 @@ vi.mock("@/app/actions/users", () => ({
   createUser: vi.fn(), updateUser: vi.fn(), setUserPassword: vi.fn(), deleteUser: vi.fn(), sendUserResetCode: vi.fn(),
 }));
 vi.mock("@/app/actions/mailbox-owner", () => ({ setMailboxOwner: vi.fn() }));
+vi.mock("@/app/actions/commission-rules", () => ({
+  listCommissionRules: vi.fn(), saveCommissionRule: vi.fn(), deleteCommissionRule: vi.fn(), markStatementPaid: vi.fn(),
+}));
 vi.mock("@/app/actions/ai-access", () => ({ saveAiAccessSettings: vi.fn() }));
 vi.mock("@/app/auth/password", () => ({
   requestPasswordReset: vi.fn(), resetPasswordWithCode: vi.fn(), updatePasswordAfterRecovery: vi.fn(),
@@ -65,6 +68,20 @@ describe("správa uživatelů — render", () => {
     expect(html).toContain("neaktivní");
     expect(html).toContain("8,5 %");
     expect(html).toContain("ty");
+  });
+  it("smlouva a provize v řádku uživatele", () => {
+    const withRule: ManagedUser[] = [{
+      ...users[1], id: "u-vit", fullName: "Vít Volný", commissionPercent: 0,
+      commissionRules: [{
+        id: "r1", ownerId: "u-vit", name: "Dodatek", base: "margin_tiered", basis: "collected", rate: 0,
+        tiers: [{ from: 0, to: 500000, rate: 0 }, { from: 500000, to: 1000000, rate: 0.1 }, { from: 1000000, to: 2000000, rate: 0.15 }, { from: 2000000, to: null, rate: 0.2 }],
+        validFrom: "2000-01-01", payoutDays: 20, note: null, createdAt: "2026-10-22T00:00:00Z",
+      }],
+    }, users[1]];
+    const html = render(<UserManagement users={withRule} mailboxes={mailboxes} currentUserId="u-admin" aiForAll={false} />);
+    expect(html).toContain("Pásmová provize · 0/10/15/20 %");
+    expect(html).toContain("8,5 % ze zisku · bez smlouvy");
+    expect(html).toContain("Smlouva a provize");
   });
   it("prázdný seznam", () => {
     const html = render(<UserManagement users={[]} mailboxes={[]} currentUserId="x" aiForAll />);

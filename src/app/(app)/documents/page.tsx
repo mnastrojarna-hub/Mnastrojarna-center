@@ -1,68 +1,108 @@
-import { FileText, ReceiptText, Truck, Eye, Archive } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, ReceiptText, Truck, type LucideIcon } from "lucide-react";
+import { requireFeature } from "@/lib/auth/session";
+import { listJobFiles, listJobs } from "@/lib/data/jobs";
+import { CLOSED_STAGES } from "@/lib/jobs/stages";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { CaptureButton } from "@/components/jobs/capture/capture-button";
+import { BookLink, FlowHeader, FlowHint, FlowSection } from "@/components/flow/flow-header";
+import { DocumentsBrowser } from "@/components/flow/documents-browser";
+import { IssueDocumentPanel } from "@/components/flow/issue-document-panel";
+import { toFlowFile, toIssueJob } from "@/components/flow/flow-data";
+import { bookHref, todayPrague } from "@/components/flow/flow-utils";
 
-const docs = [
-  { type: "faktura", title: "Faktura — daňový doklad", desc: "Náležitosti dle zák. 235/2004 Sb. (DUZP, VS, rekapitulace DPH).", icon: ReceiptText },
-  { type: "nabidka", title: "Cenová nabídka", desc: "Branded nabídka s položkami a DPH.", icon: FileText },
-  { type: "dodaci-list", title: "Dodací list", desc: "Dodací list s podpisovými poli.", icon: Truck },
+export const dynamic = "force-dynamic";
+
+const SAMPLES: { type: string; title: string; desc: string; icon: LucideIcon; tone: string }[] = [
+  { type: "nabidka", title: "Cenová nabídka", desc: "Položky, platnost, dodací lhůta, kdo vypracoval a schválil.", icon: FileText, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
+  { type: "potvrzeni", title: "Potvrzení objednávky", desc: "Potvrzený termín dodání, číslo objednávky zákazníka.", icon: BadgeCheck, tone: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  { type: "dodaci-list", title: "Dodací list", desc: "Položky a množství s podpisovými poli, bez cen.", icon: Truck, tone: "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300" },
+  { type: "faktura", title: "Faktura — daňový doklad", desc: "DUZP, VS, rekapitulace DPH a QR platba.", icon: ReceiptText, tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
 ];
 
-export default function DocumentsPage() {
+/** Dokumenty — vše, co je u zakázek (doklady, výkresy, 3D modely, fotky) + vystavení dokladu. */
+export default async function DocumentsPage() {
+  await requireFeature("documents");
+  const [files, jobs] = await Promise.all([
+    listJobFiles({ includeArchived: true, limit: 2000 }),
+    listJobs({ sort: "updated", dir: "desc" }),
+  ]);
+  const flowFiles = files.map(toFlowFile);
+  const current = flowFiles.filter((f) => !f.archived).length;
+  // aktivní zakázky nahoře, uzavřené na konci výběru
+  const issueJobs = [...jobs]
+    .sort((a, b) => Number(CLOSED_STAGES.includes(a.stage)) - Number(CLOSED_STAGES.includes(b.stage)))
+    .map(toIssueJob);
+  const today = todayPrague();
+
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <div className="space-y-5">
+      <FlowHeader
+        tone="emerald"
+        icon={FolderOpen}
         title="Dokumenty"
-        description="Generování a archiv firemních dokladů v PDF — s logem a brandem MNástrojárna."
+        count={current}
+        description={
+          <>Všechny dokumenty ze všech zakázek na jednom místě — poptávky, nabídky, objednávky, potvrzení, výkresy, 3D modely, fotky, dodací listy i faktury. Každý dokument patří k jedné zakázce; starší verze jsou v archivu.</>
+        }
+        actions={
+          <>
+            <CaptureButton label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
+            <Button asChild variant="outline" className="flex-1 sm:flex-none">
+              <a href="#vystavit"><FileOutput className="h-4 w-4 text-emerald-600" /> Vystavit doklad</a>
+            </Button>
+            <BookLink href={bookHref("vse")} className="w-full sm:w-auto" />
+          </>
+        }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {docs.map((d) => (
-          <Card key={d.type}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <d.icon className="h-5 w-5" />
-                </div>
-                <CardTitle className="text-base">{d.title}</CardTitle>
-              </div>
-              <CardDescription className="pt-1">{d.desc}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex gap-2">
-              <Button asChild size="sm">
-                <a href={`/api/pdf/${d.type}`} target="_blank" rel="noopener noreferrer">
-                  <Eye className="h-4 w-4" /> Náhled PDF
-                </a>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <a href={`/api/pdf/${d.type}`} download>
-                  Stáhnout
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <FlowHint>
+        <strong>Tip:</strong> klikni na barevný druh nahoře a uvidíš jen faktury, jen výkresy… Číslo zakázky u dokumentu tě
+        vezme rovnou do její karty. Nový doklad z mobilu? Stačí <em>Vyfotit doklad</em> — AI ho přečte a zařadí ke správné zakázce.
+      </FlowHint>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Archive className="h-4 w-4 text-muted-foreground" /> Archiv vystavených dokladů
-          </CardTitle>
-          <CardDescription>
-            Každý vystavený doklad se ukládá do archivu (tabulka <code>documents</code> + Supabase Storage)
-            a je dohledatelný u zákazníka i zakázky.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            <span>Zatím žádné vystavené doklady — vytvoř fakturu z dokončené zakázky.</span>
-            <Badge variant="muted">0 dokladů</Badge>
-          </div>
-        </CardContent>
-      </Card>
+      <DocumentsBrowser files={flowFiles} today={today} />
+
+      <FlowSection
+        id="vystavit"
+        className="scroll-mt-20"
+        icon={FileOutput}
+        iconClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+        title="Vystavit doklad ze zakázky"
+        description="Nabídka, potvrzení, dodací list nebo faktura — údaje se vezmou ze zakázky, PDF se uloží k ní a můžeš ho rovnou poslat."
+      >
+        <IssueDocumentPanel jobs={issueJobs} />
+      </FlowSection>
+
+      <details className="group rounded-2xl border bg-card shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 p-4 [&::-webkit-details-marker]:hidden">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Eye className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Vzory dokladů</span>
+            <span className="block text-xs text-muted-foreground">Jak vypadají naše doklady s firemními údaji z Nastavení (ukázková data).</span>
+          </span>
+          <span className="text-xs text-muted-foreground group-open:hidden">Rozbalit</span>
+        </summary>
+        <div className="grid gap-3 border-t p-4 sm:grid-cols-2 lg:grid-cols-4">
+          {SAMPLES.map((d) => (
+            <div key={d.type} className="flex flex-col gap-2 rounded-xl border p-3">
+              <div className="flex items-center gap-2">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${d.tone}`}>
+                  <d.icon className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-semibold">{d.title}</span>
+              </div>
+              <p className="flex-1 text-xs text-muted-foreground">{d.desc}</p>
+              <Button asChild size="sm" variant="outline">
+                <a href={`/api/pdf/${d.type}`} target="_blank" rel="noopener noreferrer">
+                  <Eye className="h-4 w-4" /> Náhled vzoru
+                </a>
+              </Button>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

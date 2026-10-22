@@ -46,11 +46,21 @@ export function dayNumber(value: string | Date): number {
   return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY);
 }
 
+/**
+ * Dnešek podle pražského kalendáře jako Date (místní poledne) — server běží
+ * v UTC, kolem půlnoci by jinak „po termínu" ujelo o den proti prohlížeči.
+ */
+export function pragueToday(now: Date = new Date()): Date {
+  const iso = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(now);
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+
 export function effectiveDeadline(j: DeadlineInput): string | null {
   return j.dueDate || j.customerRequiredDate || null;
 }
 
-export function deadlineInfo(j: DeadlineInput, today: Date = new Date()): DeadlineInfo {
+export function deadlineInfo(j: DeadlineInput, today: Date = pragueToday()): DeadlineInfo {
   const date = effectiveDeadline(j);
   const supplierRisk = Boolean(
     date && j.supplierPromisedDate && dayNumber(j.supplierPromisedDate) > dayNumber(date) &&

@@ -1,4 +1,5 @@
 import type { UserRole } from "@/lib/supabase/database.types";
+import type { CommissionRuleView } from "@/components/commissions/model";
 
 /** Uživatel ve správě uživatelů (jen pro super admina). */
 export interface ManagedUser {
@@ -14,6 +15,8 @@ export interface ManagedUser {
   commissionPercent: number;
   lastSeenAt: string | null;
   createdAt: string;
+  /** Smlouvy o provizi (historie, nejnovější první); prázdné = sazba z profilu. */
+  commissionRules?: CommissionRuleView[];
 }
 
 /** Schránka k přiřazení uživateli. */

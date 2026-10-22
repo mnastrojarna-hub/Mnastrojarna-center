@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, GripVertical, Inbox, X } from "lucide-react";
 import { StageSelect } from "@/components/jobs/stage-select";
 import {
-  CustomerDocNumber, DeadlineBlock, JobCounters, JobValue, PeopleStack, PriorityMark, SourceMark, formatMoney,
+  CustomerDocNumber, CustomerNoteMark, DeadlineBlock, JobCounters, JobValue, PaymentMark, PeopleStack, PriorityMark,
+  ProductionLine, SourceMark, formatMoney,
 } from "@/components/jobs/book/job-cells";
 import { groupByStage, moveJobStage } from "@/components/jobs/book/book-params";
 import { setJobStage } from "@/app/actions/jobs";
@@ -210,16 +211,19 @@ function BoardCard({
         </Link>
         <PriorityMark priority={job.priority} />
         <SourceMark source={job.source} aiFilled={job.aiFilled} />
+        <CustomerNoteMark note={job.customerNote} />
         <GripVertical className="ml-auto h-3.5 w-3.5 text-muted-foreground/50" aria-hidden />
       </div>
       <p className="mt-1 truncate text-sm font-semibold">{job.customer?.name ?? <span className="italic text-muted-foreground">Bez zákazníka</span>}</p>
       <p className="truncate text-xs text-muted-foreground">{job.title || "Bez názvu"}</p>
       <CustomerDocNumber job={job} className="mt-1.5" />
+      <ProductionLine job={job} compact className="mt-2" />
       <div className="mt-2 flex items-end justify-between gap-2">
         <DeadlineBlock job={job} today={today} compact />
         <div className="flex flex-col items-end gap-0.5">
           <JobValue job={job} className="text-xs" />
           <JobCounters job={job} />
+          <PaymentMark job={job} today={today} />
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">

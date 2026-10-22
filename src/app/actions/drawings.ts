@@ -4,12 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { extractFromDocument } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
+import { checkFeature } from "@/lib/auth/session";
 
 type Result = { ok: boolean; error?: string; number?: string };
 
 const ALLOWED = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 
 export async function uploadDrawing(form: FormData): Promise<Result> {
+  const auth = await checkFeature("drawings");
+  if ("error" in auth) return { ok: false, error: auth.error };
   if (!isSupabaseConfigured() || !hasServiceKey()) {
     return { ok: false, error: "Pro upload doplň servisní klíč Supabase (Nastavení → Integrace)." };
   }
@@ -65,6 +68,7 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
         file_type: ext,
         storage_path: storagePath,
         ai_metadata: { requirements: x.requirements, summary: x.summary, confidence: x.confidence },
+        uploaded_by: auth.user.id,
       } as never)
       .select("id");
     if (error) return { ok: false, error: error.message };

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { correctPricingCalculation } from "@/lib/data/pricing-data";
 import { recordCorrection } from "@/app/actions/corrections";
+import { checkFeature } from "@/lib/auth/session";
 
 export type PricingFeedbackResult = { ok: boolean; error?: string };
 
@@ -22,6 +23,8 @@ export async function submitPricingFeedback(input: {
   userMarginPercent?: number;
   note?: string;
 }): Promise<PricingFeedbackResult> {
+  const auth = await checkFeature("ai_pricing");
+  if ("error" in auth) return { ok: false, error: auth.error };
   const changes: string[] = [];
   if (input.userUnitPrice != null) changes.push(`cena/ks ${input.userUnitPrice} Kč (AI: ${input.aiUnitPrice ?? "?"} Kč)`);
   if (input.userMarginPercent != null) changes.push(`marže ${input.userMarginPercent} % (AI: ${input.aiMarginPercent ?? "?"} %)`);

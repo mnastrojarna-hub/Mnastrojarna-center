@@ -25,6 +25,7 @@ import { UploadButton } from "./upload-controls";
 import { DocumentsMenu } from "./documents-menu";
 import { ConfirmDialog } from "./confirm-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty } from "./detail-helpers";
+import { ProductionHeaderBadges } from "@/components/jobs/production/production-chip";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 export function JobToolbar({ job }: { job: JobDetail }) {
@@ -254,6 +255,7 @@ export function JobHeader({ job }: { job: JobDetail }) {
               <StageSelect jobId={job.id} stage={job.stage} />
               <NextStageButton jobId={job.id} stage={job.stage} />
             </div>
+            <ProductionHeaderBadges job={job} className="lg:justify-end" />
             <p className="max-w-xs text-xs text-muted-foreground lg:text-right">{m.description}</p>
             <PrioritySwitch value={job.priority} />
           </div>

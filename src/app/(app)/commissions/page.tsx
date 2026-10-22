@@ -1,106 +1,35 @@
-import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { getCommissions, type CommissionPeriod } from "@/lib/data/queries";
-import { formatCZK, cn } from "@/lib/utils";
+import type { Metadata } from "next";
+import { AlertCircle } from "lucide-react";
+import { requireFeature } from "@/lib/auth/session";
+import { getCommissionOverview } from "@/lib/data/commissions";
+import { CommissionsView } from "@/components/commissions/commissions-view";
+import { parsePeriodParam } from "@/components/commissions/model";
 
-const PERIODS: { value: CommissionPeriod; label: string }[] = [
-  { value: "month", label: "Měsíc" },
-  { value: "quarter", label: "Kvartál" },
-  { value: "year", label: "Rok" },
-];
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Provize" };
 
-export default async function CommissionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ period?: string }>;
-}) {
-  const { period: raw } = await searchParams;
-  const period: CommissionPeriod = raw === "quarter" || raw === "year" ? raw : "month";
-  const commissions = await getCommissions(period);
-  const totalCommission = commissions.reduce((s, c) => s + c.commission, 0);
-  const totalRevenue = commissions.reduce((s, c) => s + c.revenue, 0);
+type Search = Promise<Record<string, string | string[] | undefined>>;
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Provize obchodníků"
-        description="Obrat, marže a provize se počítají automaticky dle smlouvy každého obchodníka."
-        actions={
-          <div className="flex gap-1.5">
-            {PERIODS.map((p) => (
-              <Link
-                key={p.value}
-                href={`/commissions?period=${p.value}`}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  period === p.value
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                )}
-              >
-                {p.label}
-              </Link>
-            ))}
-          </div>
-        }
-      />
+/**
+ * Provize: obchodník vidí jen svou smlouvu a svá vyúčtování (getCommissionOverview
+ * bez „commissions_all" vrací jen jeho data), super admin všechny — přepínač
+ * obchodníka a výplata. Vše počítá DB, stránka jen zobrazuje.
+ */
+export default async function CommissionsPage({ searchParams }: { searchParams: Search }) {
+  await requireFeature("commissions");
+  const sp = await searchParams;
+  const ownerParam = typeof sp.obchodnik === "string" ? sp.obchodnik : null;
+  const month = parsePeriodParam(typeof sp.mesic === "string" ? sp.mesic : null);
+  const overview = await getCommissionOverview({ ownerId: ownerParam, months: 12 });
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-muted-foreground">Celkový obrat</div>
-            <div className="mt-1.5 text-2xl font-semibold">{formatCZK(totalRevenue)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-muted-foreground">Provize celkem</div>
-            <div className="mt-1.5 text-2xl font-semibold text-success">{formatCZK(totalCommission)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs font-medium text-muted-foreground">Obchodníků</div>
-            <div className="mt-1.5 text-2xl font-semibold">{commissions.length}</div>
-          </CardContent>
-        </Card>
+  if (!overview) {
+    return (
+      <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>Provize se nepodařilo načíst — zkontroluj připojení k databázi (Supabase).</span>
       </div>
+    );
+  }
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Obchodník</TableHead>
-                <TableHead className="text-right">Obrat</TableHead>
-                <TableHead className="text-right">Marže</TableHead>
-                <TableHead className="text-right">Sazba</TableHead>
-                <TableHead className="text-right">Provize</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {commissions.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                    Zatím žádné provize za toto období.
-                  </TableCell>
-                </TableRow>
-              )}
-              {commissions.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.owner}</TableCell>
-                  <TableCell className="text-right">{formatCZK(c.revenue)}</TableCell>
-                  <TableCell className="text-right">{Math.round(c.margin * 100)} %</TableCell>
-                  <TableCell className="text-right">{(c.rate * 100).toFixed(1)} %</TableCell>
-                  <TableCell className="text-right font-semibold text-success">{formatCZK(c.commission)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <CommissionsView overview={overview} initialMonth={month} />;
 }

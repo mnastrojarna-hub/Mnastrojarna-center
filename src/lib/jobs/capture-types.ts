@@ -143,6 +143,18 @@ export interface CaptureResult {
   summary?: string;
   needsClarification?: string[];
   alternatives?: CaptureAlternative[];
+  /** Vystavitel dokladu (po kontrole člověkem). */
+  issuer?: DocIssuer;
+  /** Popisek druhu dokladu („Objednávka zákazníka"). */
+  docLabel?: string;
+  /** Všechny uložené stránky dokladu (první = hlavní dokument). */
+  fileIds?: string[];
+  /** Doplněné existující položky. */
+  itemsMerged?: number;
+  /** Uloženo bez kontroly (režim plné automatiky). */
+  autoApplied?: boolean;
+  /** Dílčí problémy, které uložení neshodily (např. nepřiložená stránka). */
+  warnings?: string[];
 }
 
 /** Mapování druhu dokladu na druh souboru zakázky. */
