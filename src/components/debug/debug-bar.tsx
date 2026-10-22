@@ -160,7 +160,8 @@ export function DebugBar() {
   if (!mounted) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-16 z-[60] flex flex-col items-stretch md:bottom-0">
+    // Mobil: malá plovoucí pilulka nad spodní navigací (nepřekrývá ji); desktop: lišta přes celou šířku
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[60] flex flex-col items-end md:bottom-0 md:items-stretch">
       {/* Vyskakovací panel */}
       {open && (
         <div className="pointer-events-auto mx-auto flex h-[min(60vh,520px)] w-full max-w-screen-2xl flex-col overflow-hidden border-t border-border bg-card/98 shadow-2xl backdrop-blur-md">
@@ -258,11 +259,12 @@ export function DebugBar() {
       {/* Trvalá spodní lišta */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="pointer-events-auto flex h-9 w-full items-center gap-2 border-t border-border bg-card/95 px-3 text-left text-xs backdrop-blur-md"
+        className="pointer-events-auto mb-2 mr-3 flex h-8 items-center gap-1.5 rounded-full border border-border bg-card/95 px-2.5 text-left text-xs shadow-lg backdrop-blur-md md:m-0 md:h-9 md:w-full md:gap-2 md:rounded-none md:border-x-0 md:border-b-0 md:px-3 md:shadow-none"
         title="Debug log (Ctrl+`)"
+        aria-label="Debug log"
       >
         <Bug className={cn("h-4 w-4 shrink-0", errorCount > 0 ? "text-destructive" : "text-primary")} />
-        <span className="font-semibold">Debug</span>
+        <span className="hidden font-semibold md:inline">Debug</span>
         {errorCount > 0 && (
           <span className="flex items-center gap-1 rounded bg-destructive/15 px-1.5 py-0.5 font-medium text-destructive">
             <AlertOctagon className="h-3 w-3" /> {errorCount}
@@ -273,10 +275,10 @@ export function DebugBar() {
             <AlertTriangle className="h-3 w-3" /> {warnCount}
           </span>
         )}
-        <span className="truncate text-muted-foreground">
+        <span className="hidden truncate text-muted-foreground md:inline">
           {entries.length === 0 ? "Žádné události zatím." : entries[entries.length - 1].message}
         </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1 text-muted-foreground">
+        <span className="ml-auto hidden shrink-0 items-center gap-1 text-muted-foreground md:flex">
           <span className="tabular-nums">{entries.length}</span>
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </span>
