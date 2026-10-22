@@ -16,7 +16,11 @@ export type JobStage =
 export type OrderStatus = JobStage;
 export type JobFileKind =
   | "poptavka" | "naceneni" | "nabidka" | "objednavka" | "potvrzeni" | "vykres" | "model_3d"
-  | "dodaci_list" | "faktura" | "foto" | "korespondence" | "ostatni";
+  | "dodaci_list" | "faktura" | "foto" | "korespondence" | "ostatni"
+  /** Naše objednávka vydaná dodavateli (migrace 0020). */
+  | "objednavka_vydana";
+export type PurchaseOrderStatus = "navrh" | "vystavena" | "odeslana" | "potvrzena" | "dodana" | "zrusena";
+export type CommissionStatus = "predbezna" | "k_vyplate" | "vyplaceno";
 export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
 export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder";
@@ -401,10 +405,101 @@ export interface CommissionEntry {
   order_id: string | null;
   period: string;
   revenue: number;
+  /** Podíl zisku na obratu (0.25 = 25 %). */
   margin: number;
   rate: number;
   commission: number;
   created_at: string;
+  // migrace 0020 — provize ze zisku, přepočet v DB
+  cost: number;
+  profit: number;
+  base: "margin" | "revenue";
+  status: CommissionStatus;
+  cost_known: boolean;
+  updated_at: string;
+}
+
+export interface CommissionRule {
+  id: string;
+  owner_id: string;
+  rate: number;
+  base: "margin" | "revenue";
+  valid_from: string;
+  note: string | null;
+  created_at: string;
+}
+
+/** Nabídka dodavatele k zakázce (migrace 0020). */
+export interface SupplierQuoteRow {
+  id: string;
+  job_id: string;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  number: string | null;
+  quote_date: string | null;
+  valid_until: string | null;
+  lead_time_days: number | null;
+  delivery_date: string | null;
+  currency: string;
+  total: number | null;
+  selected: boolean;
+  note: string | null;
+  file_id: string | null;
+  source: "manual" | "foto" | "email" | "ai";
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierQuoteItemRow {
+  id: string;
+  supplier_quote_id: string;
+  position: number;
+  drawing_number: string | null;
+  name: string | null;
+  material: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number | null;
+  note: string | null;
+}
+
+/** Objednávka vydaná dodavateli (migrace 0020). */
+export interface PurchaseOrderRow {
+  id: string;
+  job_id: string;
+  supplier_id: string | null;
+  supplier_quote_id: string | null;
+  number: string | null;
+  status: PurchaseOrderStatus;
+  order_date: string;
+  required_date: string | null;
+  confirmed_date: string | null;
+  currency: string;
+  total: number;
+  delivery_terms: string | null;
+  payment_terms: string | null;
+  delivery_address: string | null;
+  note: string | null;
+  supplier_reference: string | null;
+  file_id: string | null;
+  created_by: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseOrderItemRow {
+  id: string;
+  purchase_order_id: string;
+  position: number;
+  drawing_number: string | null;
+  name: string | null;
+  material: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number | null;
+  note: string | null;
 }
 
 export interface KnowledgeDocument {
@@ -535,12 +630,19 @@ export interface Database {
       job_events: Tbl<JobEventRow>;
       ai_training_examples: Tbl<AiTrainingExample>;
       password_reset_codes: Tbl<PasswordResetCode>;
+      commission_rules: Tbl<CommissionRule>;
+      supplier_quotes: Tbl<SupplierQuoteRow>;
+      supplier_quote_items: Tbl<SupplierQuoteItemRow>;
+      purchase_orders: Tbl<PurchaseOrderRow>;
+      purchase_order_items: Tbl<PurchaseOrderItemRow>;
     };
     Views: Record<string, never>;
     Functions: {
       next_doc_number: { Args: { p_prefix: string }; Returns: string };
       next_job_number: { Args: Record<string, never>; Returns: string };
       next_customer_number: { Args: Record<string, never>; Returns: string };
+      next_purchase_order_number: { Args: Record<string, never>; Returns: string };
+      recompute_job_commission: { Args: { p_job: string }; Returns: undefined };
     };
     Enums: {
       user_role: UserRole;

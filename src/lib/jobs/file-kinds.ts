@@ -1,6 +1,6 @@
 import {
   MessageSquareQuote, Calculator, FileText, ShoppingCart, BadgeCheck, PencilRuler, Box, Truck,
-  ReceiptText, Camera, Mail, Paperclip, type LucideIcon,
+  ReceiptText, Camera, Mail, Paperclip, PackagePlus, type LucideIcon,
 } from "lucide-react";
 import type { JobFileKind } from "@/lib/supabase/database.types";
 
@@ -18,6 +18,7 @@ export const FILE_KINDS: Record<JobFileKind, FileKindMeta> = {
   naceneni: { key: "naceneni", label: "Nacenění", icon: Calculator, badge: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300", text: "text-amber-600 dark:text-amber-400" },
   nabidka: { key: "nabidka", label: "Nabídka", icon: FileText, badge: "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300", text: "text-violet-600 dark:text-violet-400" },
   objednavka: { key: "objednavka", label: "Objednávka", icon: ShoppingCart, badge: "bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300", text: "text-orange-600 dark:text-orange-400" },
+  objednavka_vydana: { key: "objednavka_vydana", label: "Objednávka dodavateli", icon: PackagePlus, badge: "bg-lime-100 text-lime-800 dark:bg-lime-500/15 dark:text-lime-300", text: "text-lime-700 dark:text-lime-400" },
   potvrzeni: { key: "potvrzeni", label: "Potvrzení", icon: BadgeCheck, badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300", text: "text-indigo-600 dark:text-indigo-400" },
   vykres: { key: "vykres", label: "Výkres", icon: PencilRuler, badge: "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300", text: "text-blue-600 dark:text-blue-400" },
   model_3d: { key: "model_3d", label: "3D model", icon: Box, badge: "bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300", text: "text-purple-600 dark:text-purple-400" },
@@ -29,7 +30,7 @@ export const FILE_KINDS: Record<JobFileKind, FileKindMeta> = {
 };
 
 export const FILE_KIND_ORDER: JobFileKind[] = [
-  "poptavka", "naceneni", "nabidka", "objednavka", "potvrzeni", "vykres", "model_3d",
+  "poptavka", "naceneni", "nabidka", "objednavka", "potvrzeni", "objednavka_vydana", "vykres", "model_3d",
   "dodaci_list", "faktura", "foto", "korespondence", "ostatni",
 ];
 
