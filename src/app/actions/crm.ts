@@ -58,3 +58,42 @@ export async function createSupplier(input: Record<string, string>): Promise<Res
     return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
   }
 }
+
+/** Zákaznický cenový profil (Nacenění v2) — marže, hladina, priorita, morálka, riziko. */
+export async function updateCustomerPricingProfile(input: {
+  id: string;
+  marginPercent?: string;
+  priceLevel?: string;
+  businessPriority?: string;
+  paymentMorale?: string;
+  riskLevel?: string;
+  annualRevenueCzk?: string;
+  repeatCustomer?: boolean;
+}): Promise<Result> {
+  if (!input.id) return { ok: false, error: "Chybí zákazník." };
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
+  const numOrNull = (v?: string) => {
+    const n = Number(v);
+    return v?.trim() && Number.isFinite(n) ? n : null;
+  };
+  try {
+    const db = await createOperatorClient();
+    const { error } = await db
+      .from("customers")
+      .update({
+        margin_percent: numOrNull(input.marginPercent),
+        price_level: input.priceLevel || null,
+        business_priority: input.businessPriority || null,
+        payment_morale: input.paymentMorale || null,
+        risk_level: input.riskLevel || null,
+        annual_revenue_czk: numOrNull(input.annualRevenueCzk),
+        repeat_customer: Boolean(input.repeatCustomer),
+      } as never)
+      .eq("id", input.id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath(`/customers/${input.id}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
+  }
+}
