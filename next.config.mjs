@@ -27,6 +27,8 @@ const nextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   // Zahrnout fonty do serverless funkce generující PDF + SQL migrace pro průvodce
   outputFileTracingIncludes: {
+    // PDF se generuje i v akcích zakázek (uložení do dokumentů, odeslání nabídky)
+    "/**": ["./public/fonts/**"],
     "/api/pdf/**": ["./public/fonts/**"],
     "/api/setup/**": ["./supabase/migrations/**"],
   },

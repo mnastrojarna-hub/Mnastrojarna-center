@@ -71,6 +71,40 @@ export interface ExtractedBusinessDoc {
   needsClarification: string[];
 }
 
+/** Zakázka jako kandidát pro párování dokladu (načítá datová vrstva, páruje čistá logika). */
+export interface JobMatchCandidate {
+  id: string;
+  number: string;
+  title: string;
+  stage: JobStage;
+  createdAt: string;
+  customerId: string | null;
+  customerName: string | null;
+  customerIco: string | null;
+  customerDic: string | null;
+  /** E-maily zákazníka a kontaktů (pro párování podle domény). */
+  customerEmails: string[];
+  customerOrderNumber: string | null;
+  customerInquiryNumber: string | null;
+  /** Čísla všech nabídek zakázky (i archivovaných verzí). */
+  quoteNumbers: string[];
+  /** Čísla výkresů z položek zakázky a nabídek. */
+  drawingNumbers: string[];
+}
+
+/** Zákazník jako kandidát pro párování. */
+export interface CustomerMatchCandidate {
+  id: string;
+  name: string;
+  ico: string | null;
+  dic: string | null;
+  email: string | null;
+  /** E-maily kontaktních osob. */
+  contactEmails: string[];
+  customerNumber: string | null;
+  supplierNumberAtCustomer: string | null;
+}
+
 /** Kandidát párování (zobrazí se uživateli jako „možná patří k…"). */
 export interface CaptureAlternative {
   jobId: string;
