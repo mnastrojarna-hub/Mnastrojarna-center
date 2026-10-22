@@ -1,6 +1,8 @@
 import "server-only";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { commissionToPercent } from "@/components/users/user-rules";
+import { fetchCommissionRules } from "@/lib/data/commissions";
+import type { CommissionRuleView } from "@/components/commissions/model";
 import type { Mailbox, Profile } from "@/lib/supabase/database.types";
 import type { ManagedUser, MailboxOption, UsersPageData } from "@/components/users/types";
 
@@ -14,7 +16,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
   }
   try {
     const db = createAdminClient();
-    const [profilesRes, mailboxesRes] = await Promise.all([
+    const [profilesRes, mailboxesRes, rules] = await Promise.all([
       db
         .from("profiles")
         .select("id, email, full_name, role, active, ai_access, phone, position, commission_rate, last_seen_at, created_at")
@@ -23,6 +25,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
         .from("mailboxes")
         .select("id, email, display_name, owner_id, active, provider")
         .order("email", { ascending: true }),
+      fetchCommissionRules(db, null, { withAuthors: true }).catch((): CommissionRuleView[] => []),
     ]);
     if (profilesRes.error) return { users: [], mailboxes: [], ready: true, error: profilesRes.error.message };
 
@@ -38,6 +41,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       commissionPercent: commissionToPercent(p.commission_rate),
       lastSeenAt: p.last_seen_at ?? null,
       createdAt: p.created_at,
+      commissionRules: rules.filter((r) => r.ownerId === p.id),
     }));
 
     const mailboxes: MailboxOption[] = ((mailboxesRes.data ?? []) as Mailbox[]).map((m) => ({

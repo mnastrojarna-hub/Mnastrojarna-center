@@ -17,6 +17,7 @@ import {
   FileText,
   PackageCheck,
   UserCog,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -62,6 +63,7 @@ export const navSections: NavSection[] = [
       { title: "Nacenění", href: "/pricing", icon: Calculator, feature: "workflow", badgeKey: "pricing", description: "Zakázky čekající na cenu", color: "text-amber-500" },
       { title: "Nabídky", href: "/quotes", icon: FileText, feature: "workflow", badgeKey: "quotes", description: "Všechny nabídky — kdo zadal, kdo schválil", color: "text-violet-500" },
       { title: "Potvrzení objednávek", href: "/confirmations", icon: PackageCheck, feature: "workflow", badgeKey: "confirmations", description: "Objednávky k potvrzení", color: "text-orange-500" },
+      { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "margins", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
       { title: "Dokumenty", href: "/documents", icon: ReceiptText, feature: "documents", description: "Faktury, nabídky, dodací listy, výkresy", color: "text-emerald-500" },
     ],
   },

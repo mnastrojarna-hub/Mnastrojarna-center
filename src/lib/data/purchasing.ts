@@ -4,7 +4,7 @@ import { getAccess } from "@/lib/auth/session";
 import type { JobsDb } from "@/lib/jobs/events";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type {
-  JobPurchasing, PurchaseOrderListItem, PurchaseOrderView, PurchaseSupplierRef, SupplierQuoteView,
+  JobCommissionView, JobPurchasing, PurchaseOrderListItem, PurchaseOrderView, PurchaseSupplierRef, SupplierQuoteView,
 } from "@/lib/jobs/purchasing-types";
 import { cleanNumber, fetchPaged, isUuid, one, personRef, type PersonEmbed } from "@/lib/jobs/mapping";
 import {
@@ -86,6 +86,23 @@ export async function fetchSupplierRef(db: JobsDb, id: string | null | undefined
   return rowToSupplierRef(data as SupplierEmbedRow | null);
 }
 
+/** Řádek commission_entries včetně sloupců pásmové provize (migrace 0021). */
+type CommissionFullRow = CommissionDbRow & {
+  collected?: boolean | null;
+  estimated_commission?: number | string | null;
+};
+
+/** View provize zakázky vč. pásmové provize z inkasa (základ, inkaso, odhad). */
+export function toJobCommissionView(row: CommissionFullRow, ownerName: string): JobCommissionView {
+  const view = rowToCommissionView(row, ownerName);
+  return {
+    ...view,
+    base: row.base === "margin_tiered" ? "margin_tiered" : view.base,
+    collected: Boolean(row.collected),
+    estimatedCommission: cleanNumber(row.estimated_commission),
+  };
+}
+
 // ── Veřejné funkce (s kontrolou práva „margins") ────────────
 interface JobMoneyRow {
   id: string;
@@ -117,15 +134,15 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
     if (!job) return null;
 
     const owner = personRef(job.owner);
-    const comm = commRes.data as CommissionDbRow | null;
-    let commission = null;
+    const comm = commRes.data as CommissionFullRow | null;
+    let commission: JobCommissionView | null = null;
     if (comm) {
       let ownerName = owner && owner.id === comm.owner_id ? owner.name : "";
       if (!ownerName) {
         const { data: p } = await s.db.from("profiles").select("id, full_name, email").eq("id", comm.owner_id).maybeSingle();
         ownerName = personRef(p as PersonEmbed | null)?.name ?? "Neznámý obchodník";
       }
-      commission = rowToCommissionView(comm, ownerName);
+      commission = toJobCommissionView(comm, ownerName);
     }
 
     return {
