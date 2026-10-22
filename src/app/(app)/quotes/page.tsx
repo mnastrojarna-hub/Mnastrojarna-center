@@ -1,68 +1,73 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { QuoteStatusBadge } from "@/components/status-badge";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { getQuotes } from "@/lib/data/queries";
-import { AiPricingPanel } from "@/components/ai-pricing-panel";
-import { formatCZK, formatDate } from "@/lib/utils";
+import { ArrowRight, BrainCircuit, FileText } from "lucide-react";
+import { requireFeature, getAccess } from "@/lib/auth/session";
+import { listQuotes } from "@/lib/data/jobs";
+import { Button } from "@/components/ui/button";
+import { CaptureButton } from "@/components/jobs/capture/capture-button";
+import { BookLink, FlowHeader, FlowHint } from "@/components/flow/flow-header";
+import { QuotesBoard } from "@/components/flow/quotes-board";
+import { toFlowQuote } from "@/components/flow/flow-data";
+import { bookHref, isQuoteExpired, todayPrague } from "@/components/flow/flow-utils";
 
+export const dynamic = "force-dynamic";
+
+/** Nabídky — všechny nabídky všech zakázek: kdo zadal, kdo schválil, kdy odešla, platnost. */
 export default async function QuotesPage() {
-  const quotes = await getQuotes();
+  await requireFeature("workflow");
+  const { can } = await getAccess();
+  const quotes = (await listQuotes({ includeArchived: true })).map(toFlowQuote);
+  const today = todayPrague();
+  const active = quotes.filter((q) => !q.archived);
+  const toApprove = active.filter((q) => (q.status === "ke_schvaleni" || q.status === "navrh_ai") && !q.approvedBy).length;
+  const waiting = active.filter((q) => q.status === "odeslano").length;
+  const expired = active.filter((q) => isQuoteExpired(q, today)).length;
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Poptávky & Nabídky"
-        description="AI z poptávky (i z přílohy) ocení a vytvoří nabídku — ty doplníš/schválíš."
+    <div className="space-y-5">
+      <FlowHeader
+        tone="violet"
+        icon={FileText}
+        title="Nabídky"
+        count={active.length}
+        description={
+          <>
+            Každá nabídka zákazníkovi na jednom místě — kdo ji připravil, kdo schválil, kdy odešla a do kdy platí.
+            {toApprove || waiting || expired ? " " : ""}
+            {toApprove ? <><strong>{toApprove}</strong> čeká na schválení. </> : null}
+            {waiting ? <><strong>{waiting}</strong> čeká na odpověď zákazníka. </> : null}
+            {expired ? <><strong className="text-red-600 dark:text-red-400">{expired}</strong> už po platnosti.</> : null}
+          </>
+        }
+        step="nabidka"
+        actions={
+          <>
+            <CaptureButton label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
+            <Button asChild variant="outline" className="flex-1 sm:flex-none">
+              <Link href="/pricing">Nacenit poptávku</Link>
+            </Button>
+            <BookLink href={bookHref("poptavky", ["nabidka"])} className="w-full sm:w-auto" />
+          </>
+        }
       />
 
-      <AiPricingPanel />
+      <FlowHint>
+        <strong>Postup:</strong> nabídku <em>Schválit</em> → <em>Odeslat</em> (PDF se vytvoří samo a odejde z tvé schránky) →
+        až zákazník odpoví, klikni <em>Přijata</em> (zakázka se posune do Objednávek) nebo <em>Zamítl</em>.
+        Starší verze nabídek jsou v archivu.
+      </FlowHint>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Číslo</TableHead>
-                <TableHead>Zákazník</TableHead>
-                <TableHead>Výkres</TableHead>
-                <TableHead className="text-right">Ks</TableHead>
-                <TableHead>Stav</TableHead>
-                <TableHead className="text-right">Hodnota</TableHead>
-                <TableHead>Vytvořeno</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {quotes.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                    Zatím žádné nabídky. Vytvoř první přes AI ocenění výše.
-                  </TableCell>
-                </TableRow>
-              )}
-              {quotes.map((q) => (
-                <TableRow key={q.id}>
-                  <TableCell className="font-medium">{q.number}</TableCell>
-                  <TableCell>{q.customer}</TableCell>
-                  <TableCell>
-                    <Link href="/drawings" className="text-primary hover:underline">
-                      {q.drawing}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-right">{q.qty}</TableCell>
-                  <TableCell>
-                    <QuoteStatusBadge status={q.status} />
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {q.value ? formatCZK(q.value) : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(q.createdAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <QuotesBoard quotes={quotes} today={today} />
+
+      {can("ai_pricing") && (
+        <Link
+          href="/pricing"
+          className="flex items-center gap-2.5 rounded-xl border border-dashed p-3 text-sm text-muted-foreground transition hover:bg-accent"
+        >
+          <BrainCircuit className="h-4 w-4 text-violet-500" />
+          <span className="flex-1">AI návrh ceny (jen pro ladění) je v Nacenění — sekce dole.</span>
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      )}
     </div>
   );
 }

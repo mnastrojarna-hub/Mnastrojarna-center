@@ -6,7 +6,8 @@ import type { JobStage, JobFileKind, QuoteStatus } from "@/lib/supabase/database
 import type {
   JobListItem, JobDetail, JobFilters, JobFormOptions, JobQuote, JobFile,
 } from "@/lib/jobs/types";
-import type { JobMatchCandidate, CustomerMatchCandidate } from "@/lib/jobs/capture-types";
+import type { CustomerMatchCandidate } from "@/lib/jobs/capture-types";
+import type { JobMatchCandidateExt } from "@/lib/jobs/matching";
 import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { isJobStage } from "@/lib/jobs/stages";
 import {
@@ -271,6 +272,8 @@ interface MatchJobRow {
   customer_order_number: string | null;
   customer_inquiry_number: string | null;
   customer_contact_email: string | null;
+  supplier_id?: string | null;
+  supplier_order_number?: string | null;
   customer?: {
     id: string; name: string; ico: string | null; dic: string | null; email: string | null;
     contacts?: { email: string | null }[] | null;
@@ -301,7 +304,8 @@ function uniqueStrings(values: (string | null | undefined)[], lower = false): st
   return out;
 }
 
-export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate[]; customers: CustomerMatchCandidate[] }> {
+/** Kandidáti pro párování dokladu: zakázky (vč. dodavatele a naší objednávky u něj) a zákazníci. */
+export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidateExt[]; customers: CustomerMatchCandidate[] }> {
   const empty = { jobs: [], customers: [] };
   const s = await session("orders");
   if (!s) return empty;
@@ -309,7 +313,7 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
     const since = new Date();
     since.setFullYear(since.getFullYear() - 2);
     const [jobsRes, customersRes] = await Promise.all([
-      fetchPaged<MatchJobRow>((from, to) => s.db.from("orders").select(MATCH_JOB_SELECT)
+      fetchPaged<MatchJobRow>((from, to) => s.db.from("orders").select(`${MATCH_JOB_SELECT}, supplier_id, supplier_order_number`)
         .neq("status", "zruseno")
         .gte("created_at", since.toISOString())
         .order("created_at", { ascending: false })
@@ -321,7 +325,7 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
     warn("match:jobs", jobsRes.error);
     warn("match:customers", customersRes.error);
 
-    const jobs: JobMatchCandidate[] = jobsRes.data.map((r) => {
+    const jobs: JobMatchCandidateExt[] = jobsRes.data.map((r) => {
       const c = one(r.customer);
       return {
         id: r.id,
@@ -336,6 +340,8 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
         customerEmails: uniqueStrings([c?.email, ...(c?.contacts ?? []).map((x) => x.email), r.customer_contact_email], true),
         customerOrderNumber: r.customer_order_number ?? null,
         customerInquiryNumber: r.customer_inquiry_number ?? null,
+        supplierId: r.supplier_id ?? null,
+        supplierOrderNumber: r.supplier_order_number ?? null,
         quoteNumbers: uniqueStrings((r.quotes ?? []).map((q) => q.number)),
         drawingNumbers: uniqueStrings([
           ...(r.items ?? []).map((i) => i.drawing_number),
