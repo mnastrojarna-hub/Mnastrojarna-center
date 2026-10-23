@@ -1,7 +1,8 @@
 // View-modely Knihy zakázek (UI ↔ datová vrstva). Plní se výhradně z DB (tabulka orders a spol.).
 import type {
-  ActorKind, ChangeVia, InquiryStatus, JobStage, JobFileKind, JobSource, PriorityLevel, QuoteState, QuoteStatus,
+  ActorKind, ChangeVia, InquiryStatus, JobStage, JobFileKind, JobSource, PriorityLevel, PurchaseOrderStatus, QuoteState, QuoteStatus,
 } from "@/lib/supabase/database.types";
+import type { DeadlineState } from "@/lib/jobs/operations";
 import type { StageGroupKey } from "@/lib/jobs/stages";
 import type { ChangeStamp, FlowFacts, JobStamps, QuoteFacts } from "@/lib/jobs/flow-status";
 
@@ -74,6 +75,23 @@ export interface JobListItem {
   productionTotal?: number;
   /** Některá operace hlásí problém. */
   productionProblem?: boolean;
+  // ── Předání do výroby: souhrn aktuálního kroku (orders.production_*, udržuje DB) ──
+  /** „Krok n/m": pořadí aktuálního kroku mezi nepřeskočenými. */
+  productionStepNo?: number | null;
+  /** Pořadí mezi kroky stejného druhu („Výroba 2"). */
+  productionStepKindNo?: number | null;
+  productionStepTitle?: string | null;
+  /** Termín aktuálního kroku (RRRR-MM-DD). */
+  productionDue?: string | null;
+  /** Aktuální krok končí konečným termínem (zákazník). */
+  productionDueFinal?: boolean | null;
+  productionDueState?: DeadlineState | null;
+  /** Stav objednávky dodavateli u aktuálního kroku. */
+  productionPoStatus?: PurchaseOrderStatus | null;
+  /** Nejzazší termín otevřených kroků. */
+  productionEnd?: string | null;
+  /** Termín kroku s konečným termínem. */
+  productionFinalEnd?: string | null;
   /** Domluvy se zákazníkem (co není v objednávce). */
   customerNote?: string | null;
   /** Datum vrácení potvrzeného dodacího listu. */

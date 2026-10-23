@@ -170,10 +170,12 @@ export interface JobCommissionView {
   collected?: boolean;
   /** Pásmová provize: odhad pro neinkasovanou zakázku dle aktuálního pásma (finální až po inkasu). */
   estimatedCommission?: number | null;
+  /** Objednávky dodavatelům s položkou bez ceny — provize čeká na nákupní cenu (commission_entries.cost_pending_po). */
+  pendingPurchaseOrders?: string[];
 }
 
-/** Odkud se bere náklad zakázky. */
-export type PurchaseCostSource = "objednavky" | "odhad" | null;
+/** Odkud se bere náklad zakázky; „neuplna" = objednávka dodavateli má položku bez ceny (náklad neznámý). */
+export type PurchaseCostSource = "objednavky" | "odhad" | "neuplna" | null;
 
 export interface JobPurchasingTotals {
   /** Objednávka zákazníka bez DPH (orders.value). */
@@ -188,6 +190,12 @@ export interface JobPurchasingTotals {
   profit: number | null;
   /** Podíl zisku na obratu. */
   margin: number | null;
+  /** Jen u „neuplna": dosavadní součet objednávek (bez položek bez ceny). */
+  incompleteCost?: number;
+  /** Jen u „neuplna": počet položek bez ceny. */
+  unpricedItems?: number;
+  /** Jen u „neuplna": čísla objednávek s položkou bez ceny. */
+  unpricedPurchaseOrders?: string[];
 }
 
 /** Nákupní strana zakázky — jen pro roli s právem „margins". */
@@ -219,6 +227,8 @@ export interface PurchaseItemInput {
   unit?: string;
   unitPrice?: number | null;
   note?: string;
+  /** Díl zakázky (order_items.id) — jen u objednávky dodavateli. */
+  orderItemId?: string | null;
 }
 
 export interface SupplierQuoteInput {

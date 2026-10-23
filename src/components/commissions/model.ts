@@ -130,6 +130,22 @@ export interface CommissionEntryView {
   status: CommissionStatus;
   costKnown: boolean;
   collected: boolean;
+  /** Objednávky dodavatelům s položkou bez ceny — provize čeká na nákupní cenu (prázdné = nic nečeká). */
+  costPendingPo?: string[];
+}
+
+/**
+ * Provize zakázky čeká na nákupní cenu: náklad není známý a provize se počítá ze zisku.
+ * Taková provize se NEukazuje jako 0 Kč a nepočítá se do výplaty — dopočítá se sama po doplnění cen.
+ */
+export function commissionPending(e: Pick<CommissionEntryView, "costKnown" | "base">): boolean {
+  return !e.costKnown && e.base !== "revenue";
+}
+
+/** „čeká na nákupní cenu (OV-2026-012)" */
+export function commissionPendingText(e: Pick<CommissionEntryView, "costPendingPo">): string {
+  const po = (e.costPendingPo ?? []).filter(Boolean);
+  return po.length ? `čeká na nákupní cenu (${po.join(", ")})` : "čeká na nákupní cenu";
 }
 
 export interface CommissionOwnerView {

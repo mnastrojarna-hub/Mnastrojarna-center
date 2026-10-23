@@ -118,6 +118,11 @@ describe("marže a provize", () => {
     expect(simple).toMatchObject({ amount: 1_800, estimate: false, title: "Předběžná provize", status: "predbezna" });
     expect(sp(simple.detail)).toBe("10 % ze zisku · 10/2026 · finální po fakturaci");
     expect(commissionDisplay(commission({ costKnown: false, commission: 0 }), { hasOwner: true })).toMatchObject({ amount: null, tone: "amber" });
+    expect(commissionDisplay(commission({ costKnown: false, commission: 0, pendingPurchaseOrders: ["OV-2026-012"] }), { hasOwner: true }).detail)
+      .toContain("čeká na nákupní cenu (OV-2026-012)");
+    expect(marginHero({ revenue: 48_000, purchaseOrdersTotal: 8_000, plannedCost: null, cost: null, costSource: "neuplna", profit: null, margin: null,
+      incompleteCost: 8_000, unpricedItems: 1, unpricedPurchaseOrders: ["OV-2026-012"] }))
+      .toMatchObject({ cost: null, missingCost: true, tone: "amber", costLabel: "neúplná — objednávka OV-2026-012 má položku bez ceny" });
     const est = commissionDisplay(commission({ base: "margin_tiered", rate: 0, commission: 0, estimatedCommission: 1_800, collected: false }), { hasOwner: true });
     expect(est).toMatchObject({ amount: 1_800, estimate: true, title: "Pásmová provize z inkasa · předběžná", tone: "amber" });
     expect(sp(est.detail)).toContain("Odhad 1 800 Kč dle aktuálního pásma");

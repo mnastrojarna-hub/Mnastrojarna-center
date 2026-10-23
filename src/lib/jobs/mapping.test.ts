@@ -230,6 +230,9 @@ describe("nabídky a soubory", () => {
   it("chyby DB česky", () => {
     expect(translateDbError('insert or update on table "orders" violates foreign key constraint "x"')).toMatch(/neexistuje/);
     expect(translateDbError("duplicate key value violates unique constraint")).toMatch(/už existuje/);
+    expect(translateDbError('duplicate key value violates unique constraint "uq_job_operations_final"'))
+      .toBe("Konečný termín (zákazník) může mít jen poslední krok výroby.");
+    expect(translateDbError('duplicate key value violates unique constraint "uq_approval_queue_po_pending"')).toBe("Objednávka už čeká na odeslání.");
     expect(translateDbError("Něco jiného")).toBe("Něco jiného");
   });
   it("cesta souboru musí patřit zakázce", () => {
@@ -420,6 +423,25 @@ describe("výroba a platba v knize", () => {
     expect(item.invoiceNumber).toBe("FV-7");
     expect(item.invoiceDueDate).toBe("2026-11-05");
     expect(item.paidAt).toBeNull();
+  });
+
+  it("souhrn aktuálního kroku z předání do výroby (Krok n/m, termín, stav termínu, objednávka)", () => {
+    expect(JOB_LIST_SELECT).toContain("production_step_no");
+    expect(JOB_LIST_SELECT).toContain("production_po_status");
+    const item = rowToJobListItem({
+      id: UUID, number: "Z-1", title: "x", status: "ve_vyrobe", created_at: "2026-10-01T10:00:00Z", production_step: "vyroba",
+      production_step_no: "2", production_step_kind_no: 2, production_step_title: " ", production_due: "2026-11-12", production_due_final: false,
+      production_due_state: "odhad", production_po_status: "vystavena", production_end: "2026-11-20", production_final_end: "2026-11-20",
+    }, { margins: false });
+    expect(item).toMatchObject({
+      productionStepNo: 2, productionStepKindNo: 2, productionStepTitle: null, productionDue: "2026-11-12", productionDueFinal: false,
+      productionDueState: "odhad", productionPoStatus: "vystavena", productionEnd: "2026-11-20", productionFinalEnd: "2026-11-20",
+    });
+    const bad = rowToJobListItem({ id: UUID, number: "Z-1", title: "x", status: "ve_vyrobe", created_at: "2026-10-01T10:00:00Z",
+      production_step_no: null, production_due_state: "hack", production_po_status: "hack" }, { margins: false });
+    expect(bad).toMatchObject({ productionStepNo: null, productionDueState: null, productionPoStatus: null });
+    // řádek bez nových sloupců (starší select) pole nemá
+    expect("productionStepNo" in rowToJobListItem({ id: UUID, number: "Z-1", title: "x", status: "ve_vyrobe", created_at: "2026-10-01T10:00:00Z" }, { margins: false })).toBe(false);
   });
 
   it("neznámý krok výroby a prázdné hodnoty", () => {

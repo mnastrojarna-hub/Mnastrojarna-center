@@ -63,6 +63,38 @@ describe("Provize — render", () => {
     expect(html).toContain("Označit jako vyplacené");
   });
 
+  it("zakázka bez nákupní ceny: „čeká na nákupní cenu (OV-…)“ místo 0 Kč, do výplaty se nepočítá", () => {
+    const pending = entry({
+      id: "p1", job: { id: "j3", number: "Z-2026-130", title: "Příruby", stage: "ve_vyrobe", customerName: "Kovo a.s.", paidAt: null },
+      base: "margin_tiered", collected: true, status: "k_vyplate", costKnown: false, commission: 0, profit: 0, costPendingPo: ["OV-2026-012"],
+    });
+    const html = clean(renderToString(
+      <StatementCard statement={statement({ status: "otevrena", unknownCostJobs: 1, commission: 23_333.33 })} entries={[entry(), pending]} today="2026-10-22" />,
+    ));
+    expect(html).toContain("čeká na nákupní cenu (OV-2026-012)");
+    expect(html).toContain("1 zakázka čeká na nákupní cenu — provize se jí zatím nepočítá ani nevyplácí");
+    // řádek zakázky s čekající provizí nemá „0 Kč" jako provizi ani štítek „K výplatě"
+    const row = html.slice(html.indexOf("Z-2026-130"));
+    expect(row.slice(0, row.indexOf("</li>"))).not.toContain(">0 Kč<");
+    expect(row.slice(0, row.indexOf("</li>"))).not.toContain("K výplatě");
+    // tři tvary: 5 zakázek čeká
+    const five = Array.from({ length: 5 }, (_, k) => ({ ...pending, id: `p${k}`, job: { ...pending.job!, id: `j${k + 10}`, number: `Z-2026-14${k}` } }));
+    expect(clean(renderToString(<StatementCard statement={statement({ unknownCostJobs: 5 })} entries={five} today="2026-10-22" />)))
+      .toContain("5 zakázek čeká na nákupní cenu — provize se jim");
+    // provize z obratu nezávisí na nákladu → ukazuje se normálně
+    const rev = clean(renderToString(
+      <StatementCard statement={statement()} entries={[entry({ ...pending, base: "revenue", commission: 1_500 })]} today="2026-10-22" />,
+    ));
+    expect(rev).not.toContain("čeká na nákupní cenu");
+    expect(rev).toContain("1 500 Kč");
+    // provize z obratu bez nákladu: banner jen o zisku, ne „nevyplácí"
+    const revUnknown = clean(renderToString(
+      <StatementCard statement={statement({ unknownCostJobs: 1 })} entries={[entry({ ...pending, base: "revenue", commission: 1_500 })]} today="2026-10-22" />,
+    ));
+    expect(revUnknown).toContain("1 zakázka nemá nákupní cenu — jejich zisk se zatím nepočítá");
+    expect(revUnknown).not.toContain("nevyplácí");
+  });
+
   it("smazaná zakázka s vyplacenou provizí = jeden souhrnný řádek historie", () => {
     const html = clean(renderToString(
       <StatementCard

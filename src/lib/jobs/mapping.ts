@@ -453,6 +453,8 @@ export function isGenericCaptureName(filename: string): boolean {
 /** Chyby Postgres/PostgREST → čeština pro uživatele. */
 export function translateDbError(message: string): string {
   const m = message.toLowerCase();
+  if (m.includes("uq_job_operations_final")) return "Konečný termín (zákazník) může mít jen poslední krok výroby.";
+  if (m.includes("uq_approval_queue_po_pending")) return "Objednávka už čeká na odeslání.";
   if (m.includes("foreign key")) return "Vybraný záznam (zákazník, dodavatel, uživatel nebo nabídka) neexistuje.";
   if (m.includes("duplicate key") || m.includes("unique constraint")) return "Záznam s tímto číslem už existuje.";
   if (m.includes("invalid input syntax for type uuid")) return "Neplatný identifikátor záznamu.";
@@ -486,6 +488,12 @@ const FLOW_LIST_COLUMNS = [
   "order_status_changed_by, order_status_changed_via, lost_at, lost_by, flow_proposal_at, flow_proposal_by",
 ].join(", ");
 
+/** Souhrn aktuálního kroku výroby (předání do výroby, migrace 20261023150000). */
+const PRODUCTION_LIST_COLUMNS = [
+  "production_step_no, production_step_kind_no, production_step_title, production_due, production_due_final",
+  "production_due_state, production_po_status, production_end, production_final_end",
+].join(", ");
+
 /** Embedy pro fakta toku: operace (počet), objednávky dodavatelům, nabídky dodavatelů bez ceny. */
 const FLOW_EMBEDS = [
   "ops:job_operations!job_id(count)",
@@ -499,6 +507,7 @@ export const JOB_LIST_SELECT = [
   "expected_delivery_date, supplier_promised_date, max_tolerated_date, received_at, delivered_at",
   "owner_id, assignee_id, created_by, supplier_id, ai_filled, source, created_at, updated_at, stage_changed_at",
   "production_step, production_location, production_done, production_total, production_problem",
+  PRODUCTION_LIST_COLUMNS,
   "customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
   FLOW_LIST_COLUMNS,
   "customer:customers!customer_id(id, name, customer_number, ico)",
@@ -641,6 +650,15 @@ export interface JobRow {
   production_done?: number | string | null;
   production_total?: number | string | null;
   production_problem?: boolean | null;
+  production_step_no?: number | string | null;
+  production_step_kind_no?: number | string | null;
+  production_step_title?: string | null;
+  production_due?: string | null;
+  production_due_final?: boolean | null;
+  production_due_state?: string | null;
+  production_po_status?: string | null;
+  production_end?: string | null;
+  production_final_end?: string | null;
   customer_note?: string | null;
   delivery_note_confirmed_at?: string | null;
   invoice_due_date?: string | null;
@@ -885,6 +903,30 @@ function paymentFacts(
   };
 }
 
+const DEADLINE_STATES = ["odhad", "dohodnuto", "pozadovano", "potvrzeno", "zmena_ceka", "plan"] as const;
+const PO_STATUSES = ["navrh", "vystavena", "odeslana", "potvrzena", "dodana", "zrusena"] as const;
+
+/** Souhrn aktuálního kroku výroby z orders.production_* (Kniha: „Krok 2/3 · …"). */
+function productionSummaryOfRow(row: JobRow): Partial<JobListItem> {
+  const int = (v: unknown) => {
+    const n = num(v);
+    return n === null ? null : Math.round(n);
+  };
+  const state = row.production_due_state;
+  const po = row.production_po_status;
+  return {
+    productionStepNo: int(row.production_step_no),
+    productionStepKindNo: int(row.production_step_kind_no),
+    productionStepTitle: cleanText(row.production_step_title, 300),
+    productionDue: cleanDate(row.production_due),
+    productionDueFinal: row.production_due_final ?? null,
+    productionDueState: (DEADLINE_STATES as readonly string[]).includes(state ?? "") ? (state as (typeof DEADLINE_STATES)[number]) : null,
+    productionPoStatus: (PO_STATUSES as readonly string[]).includes(po ?? "") ? (po as (typeof PO_STATUSES)[number]) : null,
+    productionEnd: cleanDate(row.production_end),
+    productionFinalEnd: cleanDate(row.production_final_end),
+  };
+}
+
 export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
   const items = byPosition(row.items);
   const drawingNumbers: string[] = [];
@@ -935,6 +977,7 @@ export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
     productionDone: Math.max(0, Math.round(num(row.production_done) ?? 0)),
     productionTotal: Math.max(0, Math.round(num(row.production_total) ?? 0)),
     productionProblem: Boolean(row.production_problem),
+    ...("production_step_no" in row ? productionSummaryOfRow(row) : {}),
     customerNote: cleanText(row.customer_note, 10_000),
     deliveryNoteConfirmedAt: cleanDate(row.delivery_note_confirmed_at),
     invoiceNumber: cleanText(row.invoice_number, 120),

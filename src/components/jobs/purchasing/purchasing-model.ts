@@ -344,6 +344,12 @@ export interface MarginHero {
   missingRevenue: boolean;
 }
 
+/** „objednávka OV-2026-012 má položku bez ceny" (bez čísel jen obecně). */
+function pendingText(numbers: string[] | undefined): string {
+  if (!numbers?.length) return "objednávka má položku bez ceny";
+  return numbers.length === 1 ? `objednávka ${numbers[0]} má položku bez ceny` : `objednávky ${numbers.join(", ")} mají položky bez ceny`;
+}
+
 export function marginHero(t: JobPurchasingTotals): MarginHero {
   const missingRevenue = t.revenue === null || t.revenue <= 0;
   const missingCost = t.cost === null;
@@ -354,7 +360,8 @@ export function marginHero(t: JobPurchasingTotals): MarginHero {
   return {
     revenue: t.revenue,
     cost: t.cost,
-    costLabel: t.costSource === "objednavky" ? "objednávky dodavatelům" : t.costSource === "odhad" ? "odhad (plánovaný nákup)" : "zatím neznámý",
+    costLabel: t.costSource === "objednavky" ? "objednávky dodavatelům" : t.costSource === "odhad" ? "odhad (plánovaný nákup)"
+      : t.costSource === "neuplna" ? `neúplná — ${pendingText(t.unpricedPurchaseOrders)}` : "zatím neznámý",
     profit: t.profit,
     margin: t.margin,
     tone,
@@ -407,7 +414,9 @@ export function commissionDisplay(
     if (!c.costKnown) {
       return {
         amount: null, estimate: true, title: "Pásmová provize z inkasa",
-        detail: "Předběžná — doplň nákupní cenu, ať jde odhadnout zisk. Finální částka až po inkasu.",
+        detail: c.pendingPurchaseOrders?.length
+          ? `Čeká na nákupní cenu (${c.pendingPurchaseOrders.join(", ")}) — po doplnění cen se odhad dopočítá sám. Finální částka až po inkasu.`
+          : "Předběžná — doplň nákupní cenu, ať jde odhadnout zisk. Finální částka až po inkasu.",
         status: "predbezna", tone: "amber",
       };
     }
@@ -424,7 +433,10 @@ export function commissionDisplay(
   if (!c.costKnown && c.base !== "revenue") {
     return {
       amount: null, estimate: false, title: STATUS_TITLES[c.status],
-      detail: `${how} — dopočítá se po doplnění nákupní ceny.`, status: c.status, tone: "amber",
+      detail: c.pendingPurchaseOrders?.length
+        ? `${how} — čeká na nákupní cenu (${c.pendingPurchaseOrders.join(", ")}); dopočítá se sama po doplnění cen.`
+        : `${how} — dopočítá se po doplnění nákupní ceny.`,
+      status: c.status, tone: "amber",
     };
   }
   return {

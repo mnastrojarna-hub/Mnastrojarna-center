@@ -347,6 +347,25 @@ export interface Order {
   partial_delivery_note: string | null;
   partial_delivery_at: string | null;
   partial_delivery_by: string | null;
+  // Předání do výroby — souhrn aktuálního kroku pro Knihu (migrace 20261023150000, udržuje DB)
+  /** Pořadí aktuálního kroku mezi nepřeskočenými („Krok n/m"). */
+  production_step_no?: number | null;
+  /** Pořadí aktuálního kroku mezi kroky stejného druhu („Výroba 2"). */
+  production_step_kind_no?: number | null;
+  production_step_title?: string | null;
+  /** Termín aktuálního kroku. */
+  production_due?: string | null;
+  /** Aktuální krok končí konečným termínem (zákazník). */
+  production_due_final?: boolean | null;
+  production_due_state?: DeadlineStateDb | null;
+  /** Stav objednávky dodavateli u aktuálního kroku. */
+  production_po_status?: PurchaseOrderStatus | null;
+  /** Nejzazší termín otevřených kroků. */
+  production_end?: string | null;
+  /** Termín kroku s konečným termínem. */
+  production_final_end?: string | null;
+  production_finished_at?: string | null;
+  production_finished_by?: string | null;
 }
 
 /** Výrobní operace zakázky (migrace 0022). */
@@ -375,6 +394,43 @@ export interface JobOperationRow {
   status_changed_by?: string | null;
   status_changed_via?: ChangeVia | null;
   updated_by?: string | null;
+  // Předání do výroby (migrace 20261023150000)
+  order_item_ids?: string[] | null;
+  ends_at_customer_date?: boolean;
+  deadline_state?: DeadlineStateDb | null;
+  deadline_source?: string | null;
+  deadline_changed_at?: string | null;
+  deadline_changed_by?: string | null;
+  deadline_changed_via?: string | null;
+  who_source?: string | null;
+  who_changed_at?: string | null;
+  who_changed_by?: string | null;
+  who_changed_via?: string | null;
+  supplier_quote_id?: string | null;
+  po_mode?: "vystavit" | "existujici" | "neobjednavat" | "pri_predani" | null;
+  po_none_reason?: string | null;
+  handoff_id?: string | null;
+}
+
+/** Stav termínu kroku výroby (job_operations.deadline_state). */
+export type DeadlineStateDb = "odhad" | "dohodnuto" | "pozadovano" | "potvrzeno" | "zmena_ceka" | "plan";
+
+/** Předání do výroby (idempotence RPC production_apply, vrácení předání; migrace 20261023150000). */
+export interface ProductionHandoffRow {
+  id: string;
+  job_id: string;
+  token: string;
+  kind: "predani" | "doplneni" | "dalsi_krok" | "ukonceni" | "plan" | "zaznam" | "zpet";
+  stage_from: JobStage | null;
+  stage_to: JobStage | null;
+  result: Json | null;
+  note: string | null;
+  undone_at: string | null;
+  undone_by: string | null;
+  undone_handoff_id: string | null;
+  created_by: string | null;
+  created_via: string | null;
+  created_at: string;
 }
 
 export interface OrderItem {
@@ -651,6 +707,8 @@ export interface CommissionEntry {
   // migrace 0021 — pásmová provize z inkasa
   collected: boolean;
   estimated_commission: number | null;
+  /** Čísla objednávek dodavatelům s položkou bez ceny — provize čeká na nákupní cenu (migrace 20261023150000). */
+  cost_pending_po?: string[] | null;
 }
 
 /** margin = ze zisku, revenue = z obratu, margin_tiered = pásmově ze zisku dle měsíčního obratu. */
@@ -725,6 +783,8 @@ export interface SupplierQuoteRow {
   selected_at: string | null;
   selected_by: string | null;
   updated_by: string | null;
+  /** Na co je nabídka (druhy kroků výroby; migrace 20261023150000). */
+  operation_kinds?: string[] | null;
 }
 
 export interface SupplierQuoteItemRow {
@@ -777,6 +837,12 @@ export interface PurchaseOrderRow {
   cancelled_by: string | null;
   cancel_reason: string | null;
   updated_by: string | null;
+  // Předání do výroby (migrace 20261023150000)
+  /** Verze objednávky (změna po odeslání = +1). */
+  revision?: number;
+  handoff_id?: string | null;
+  /** Ze které schránky objednávka odešla. */
+  sent_mailbox_id?: string | null;
 }
 
 export interface PurchaseOrderItemRow {
@@ -974,6 +1040,7 @@ export interface Database {
       capture_apply_steps: Tbl<CaptureApplyStepRow>;
       job_payments: Tbl<JobPaymentRow>;
       job_order_revisions: Tbl<JobOrderRevisionRow>;
+      production_handoffs: Tbl<ProductionHandoffRow>;
     };
     Views: {
       job_flow_v: { Row: JobFlowRow; Relationships: [] };
@@ -987,6 +1054,14 @@ export interface Database {
       capture_try_lock: { Args: { p_capture: string; p_user: string; p_token: string; p_ttl_seconds: number }; Returns: boolean };
       capture_unlock: { Args: { p_capture: string; p_token: string }; Returns: undefined };
       app_whoami: { Args: Record<string, never>; Returns: Record<string, unknown> };
+      production_apply: {
+        Args: { p_job: string; p_token: string; p_kind: string; p_expected_stage: JobStage; p_expected_route: string; p_payload: Json };
+        Returns: Json;
+      };
+      production_plan_ready: { Args: { p_job: string }; Returns: boolean };
+      /** Dopočet starých dat předání do výroby (idempotentní; jen servisní role). */
+      production_handoff_backfill: { Args: Record<string, never>; Returns: undefined };
+      production_route_version: { Args: { p_job: string }; Returns: string };
       flow_counts: {
         Args: { p_owner?: string | null; p_closed_days?: number };
         Returns: { flow_phase: string; flow_key: string; n: number }[];
