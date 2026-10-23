@@ -1,10 +1,24 @@
 /**
  * Dodací lhůta z textu nabídky / dodacích podmínek (čistá logika, sdílí server i klient).
- * „4 týdny od objednání", „6–8 týdnů", „30 pracovních dnů", „Lieferzeit 4 Wochen", „4 weeks ARO",
- * „3 měsíce", „ihned / skladem" → počet dní + druh dní + od čeho se počítá. „dle dohody" = nic.
- * ZÁSADA: KLADNÝ seznam a asymetrie rizika — špatný termín je horší než žádný (bez termínu systém ukáže
- * „doplň termín"). Dva režimy: „delivery-field" (text, o kterém víme, že je o dodání — dovolí holou dobu,
- * ne klauzuli o jiné podmínce) a „free-text" (poznámka, popis, shrnutí — číslo jen u výslovného dodacího slova).
+ * UZAVŘENÁ GRAMATIKA (rozhodnutí po třech kolech ověřování: otevřené hledání vzorů v textu nekonverguje).
+ * Text se rozdělí na klauzule (. ; – nový řádek, závorky, čárka mimo desetinné číslo) a lhůta se vezme jen
+ * z klauzule, která CELÁ odpovídá gramatice:
+ *   KLAUZULE := [ÚVOD] KOTVA [ODDĚLOVAČ] [CCA] DOBA [OD] KONEC
+ *   KOTVA    := dodací lhůta | lhůta dodání | termín dodání | dodání | dodáme | expedice | expedujeme |
+ *               výroba a dodání | Lieferzeit | Liefertermin | Lieferfrist | Lieferung | delivery (time) | lead time |
+ *               shipment | ship
+ *   DOBA     := N | N–M (horní mez) + jednotka (dny / pracovní dny / týdny / měsíce, DE, EN, zkratky Wo., měs.);
+ *               jednotné číslo („týden", „v 48 týdnu", „Woche", „week") jen u 1; víc než 26 týdnů / 6 měsíců = nic
+ *   OD       := od (obdržení|přijetí)? (závazné|písemné)? objednávky | od objednání | od potvrzení … | od dodání
+ *               výkresů / podkladů … | nach Auftragseingang … | after PO … | ARO
+ * Okamžitá dodávka: KOTVA [ODDĚLOVAČ] ihned / skladem / ab Lager / from stock … → 0–3 pracovní dny.
+ * Holá doba („4 týdny od objednávky") jen v dodacím poli, a to jen když je to CELÉ pole (bez dodací
+ * parity EXW / DAP … + místa a štítku „Dodací podmínky:"). Uzavřené pravidlo pro klauzuli HNED ZA lhůtou:
+ * závorka = nic („4 týdny (po zaplacení zálohy)", „2 týdny (vzorky), 6 týdnů (série)"); v téže větě (čárka,
+ * pomlčka, středník) začíná-li podmínkou / rozsahem / posunem začátku / alternativou (resp., nebo, po, od, ab,
+ * after, from, upon, pro, u, jinak, sonst, otherwise, whichever…) = nic; na dalším řádku / za tečkou jen posun
+ * začátku / alternativa (od, po, ab, after, resp., jinak…) = nic. Cokoli jiného = null (žádné náhradní heuristiky).
+ * Špatný termín je horší než žádný: termín odvozený z TEXTU se navíc vždy ukáže ke kontrole (order-deadline).
  * addLeadTime: pracovní dny bez víkendů a českých státních svátků (Velikonoce vlastním výpočtem),
  * kalendářní dny / měsíce prostým přičtením. isRealisticDueDate: termín v budoucnosti, po datu objednávky.
  */
@@ -12,6 +26,8 @@ import type { ExtractedLeadTime } from "@/lib/jobs/capture-types";
 
 export type LeadUnit = "kalendarni" | "pracovni";
 export type LeadFrom = "objednavka" | "potvrzeni" | "podklady" | null;
+/** Odkud lhůta je: quotes.lead_time_days (náš systém), strukturované pole AI, text (gramatika). */
+export type LeadSource = "system" | "ai" | "text";
 
 export interface LeadTime {
   /** Počet dní (u rozpětí horní mez; u měsíců orientačně měsíce × 30). */
@@ -19,37 +35,136 @@ export interface LeadTime {
   unit: LeadUnit;
   /** Od čeho se lhůta počítá (null = neuvedeno → od objednání). */
   from: LeadFrom;
-  /** Nalezený úsek textu („do 4 týdnů od objednání"). */
+  /** Zdrojový text (gramatická klauzule / text pole AI / „28 dní"). */
   text: string;
   /** Rozpětí ve dnech [od, do] („6–8 týdnů", „ihned" = 0–3 prac. dny). */
   range?: [number, number];
   /** Lhůta v kalendářních měsících (přičítá se po měsících). */
   months?: number;
+  /** Odkud lhůta je (parseLeadTime = "text"). */
+  source?: LeadSource;
+  /** Termín z této lhůty musí zkontrolovat člověk (z textu / AI nesedí s textem) — nikdy plná automatika. */
+  review?: boolean;
+  /** Jen u pole AI: text pole nechybí a gramatika z něj čte stejnou hodnotu („agrees"), jinou / žádnou („conflict"), text chybí („none"). */
+  evidence?: "agrees" | "conflict" | "none";
 }
 
-/** Bez diakritiky, malými písmeny (délka zachována — indexy sedí na původní text). */
+// ── Normalizace ─────────────────────────────────────────────
+const MARKS = /[̀-ͯ]/g;
+
+/** Bez diakritiky, malými písmeny, ZNAK PO ZNAKU (délka zachována — indexy sedí na původní text). */
 function fold(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const f = c.normalize("NFD").replace(MARKS, "").toLowerCase();
+    if (f.length === 1) out += f;
+    else {
+      const l = c.toLowerCase();
+      out += l.length === 1 ? l : c;
+    }
+  }
+  return out;
 }
 
+function normalizeText(text: string | null | undefined): string {
+  return (text ?? "").normalize("NFC").replace(/[^\S\n]+/g, " ").replace(/ ?\n\s*/g, "\n").trim();
+}
+
+// ── Gramatika (nad textem bez diakritiky, malými písmeny) ───
+const R = "(?![a-z0-9])";
 const WORD_NUMBERS: Record<string, number> = {
-  jeden: 1, jedna: 1, jednoho: 1, jednu: 1, dva: 2, dve: 2, dvou: 2, tri: 3, trech: 3, ctyri: 4, ctyr: 4, pet: 5, sest: 6,
-  sedm: 7, osm: 8, devet: 9, deset: 10, dvanact: 12, peti: 5, sesti: 6, sedmi: 7, osmi: 8, deviti: 9, deseti: 10,
-  ein: 1, eine: 1, einen: 1, zwei: 2, drei: 3, vier: 4, funf: 5, fuenf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10,
+  jeden: 1, jedna: 1, jednoho: 1, jednu: 1, dva: 2, dve: 2, dvou: 2, tri: 3, trech: 3, ctyri: 4, ctyr: 4, pet: 5, peti: 5, sest: 6, sesti: 6,
+  sedm: 7, sedmi: 7, osm: 8, osmi: 8, devet: 9, deviti: 9, deset: 10, deseti: 10, dvanact: 12, dvanacti: 12,
+  ein: 1, eine: 1, einen: 1, einer: 1, zwei: 2, drei: 3, vier: 4, funf: 5, fuenf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10, zwolf: 12, zwoelf: 12,
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12,
 };
+const NUM = String.raw`(?:\d{1,3}(?:[.,]\d{1,2})?(?!\d)|(?:${Object.keys(WORD_NUMBERS).sort((a, b) => b.length - a.length).join("|")})${R})`;
+const UNIT = [
+  String.raw`pracovni(?:ch|m)?\s+(?:dny|dni|dnu|den|dne|dnech)`, String.raw`prac\.\s*(?:dny|dni|dnu|den)`,
+  String.raw`arbeitstag(?:e|en)?`, String.raw`werktag(?:e|en)?`, String.raw`(?:working|business|work)\s+days?`,
+  String.raw`kalendarni(?:ch|m)?\s+(?:dny|dni|dnu|den|dnech)`,
+  String.raw`tyd(?:en|ny|nu|ne|nech)`, String.raw`tyd\.`, String.raw`wochen?`, String.raw`wo\.?`, String.raw`weeks?`, String.raw`wks?\.?`,
+  String.raw`mesic(?:e|u|i|ich)?`, String.raw`mes\.`, String.raw`monat(?:e|en)?`, String.raw`mon\.`, String.raw`months?`,
+  String.raw`dny|dni|dnu|den|dne|dnech`, String.raw`tag(?:e|en)?`, String.raw`days?`,
+].join("|");
 
-const NUM = String.raw`(\d{1,3}(?:[.,]\d)?|${Object.keys(WORD_NUMBERS).sort((a, b) => b.length - a.length).join("|")})`;
-/** „6–8", „6 - 8", „6 až 8", „6 bis 8", „6 to 8". */
-const RANGE = String.raw`${NUM}(?:\s*(?:-|–|—|az|bis|to|or|nebo|\/)\s*${NUM})?`;
+const sticky = (src: string) => new RegExp(src, "y");
+const WS = sticky(String.raw`\s*`);
+/** Úvodní přívlastek kotvy („naše / standardní / předpokládaná dodací lhůta", „unsere Lieferzeit", „the lead time"). */
+const LEAD_IN = sticky(String.raw`\s*(?:nase|nasi|standardni|obvykla|obvykly|obvykle|bezna|predpokladana|predpokladany|predpokladane|aktualni|orientacni|celkova|unsere|die|der|voraussichtliche|aktuelle|ubliche|uebliche|normale|our|the|estimated|standard|current|typical|expected)\s+`);
+const ANCHOR_SRC = String.raw`(?:vyroba\s+a\s+dodani|dodaci\s+lhut(?:a|y|e|u|ou)|dodaci\s+dob(?:a|y|e|u|ou)|dodaci\s+termin(?:u|em|y)?|lhut(?:a|y|e|u|ou)\s+dodani|lhut(?:a|y|e|u|ou)\s+dodavk(?:y|ou)|termin(?:u|em)?\s+dodani|termin(?:u|em)?\s+dodavk(?:y|ou)|dodani|dodavk(?:a|y|ou)|dodame|expedice|expedujeme|lieferzeit(?:en)?|liefertermin(?:e)?|lieferfrist(?:en)?|lieferung(?:en)?|delivery\s+lead[\s-]?times?|delivery\s+time|delivery|lead[\s-]?times?|shipment|ships?)`;
+const ANCHOR = sticky(String.raw`\s*${ANCHOR_SRC}${R}`);
+const ANCHOR_ANY = new RegExp(String.raw`(?<![a-z0-9])${ANCHOR_SRC}${R}`);
+/** Odrážka seznamu na začátku řádku („- Dodací lhůta…", „• …", „1) …", „2. …"). */
+const BULLET = sticky(String.raw`\s*(?:[-–—•*·▪●]|\d{1,2}[.)])\s+(?=[a-z])`);
+/**
+ * Klauzule, která začíná jinou obchodní podmínkou (platnost, splatnost, záruka, skonto, záloha, reklamace,
+ * uskladnění…) — její doba („Platnost nabídky 30 dní") není další dodací lhůta.
+ */
+const OTHER_LABEL = new RegExp(String.raw`^\s*(?:(?:[-–—•*·▪●]|\d{1,2}[.)])\s+)?(?:(?:cenov[aea]\s+)?nabid(?:ka|ky|ce)\s+(?:plati|je\s+platn|je\s+zavazn|platn)|ceny\s+plat|platnost|plati${R}|platn[aeyi]${R}|splatnost|platb[ayu]|platebni|uhrad|zaruk|zarucni|garanc|garantie|reklamac|skont|zaloh|uskladn|skladovan|validity|valid${R}|offer\s+(?:is\s+)?valid|quotation\s+(?:is\s+)?valid|prices?\s+(?:are\s+)?valid|payment|warranty|guarantee|storage|angebot\s+(?:gilt|ist\s+gultig|gultig)|gultig|preise\s+gelten|zahlung|gewahrleistung|lagerung|bindefrist)`);
+const SEP_PUNCT = sticky(String.raw`\s*[:=\-–—]`);
+const VERB = sticky(String.raw`\s*(?:je|cini|betragt|ist|is|are)${R}`);
+const PREP = sticky(String.raw`\s*(?:innerhalb(?:\s+von)?|within|binnen|behem|do|za|ve|v|in)${R}`);
+const APPROX = sticky(String.raw`\s*(?:cca\.?|ca\.?|circa|zirka|ungefahr|etwa|approx\.?|approximately|about|max\.?|maximalne|nejpozdeji|spatestens)(?![a-z0-9])`);
+const IMMEDIATE = sticky(String.raw`\s*(?:ihned|okamzite|skladem|ze\s+skladu|sofort|ab\s+lager|from\s+stock|ex\s+stock|immediately)${R}`);
+const DURATION = sticky(String.raw`\s*(${NUM})(?:\s*(?:-|–|—|az|bis|to)\s*(${NUM}))?\s*(${UNIT})(?![a-z0-9])`);
+const END = sticky(String.raw`[\s.!]*$`);
+/**
+ * Jednotné číslo jednotky („týden", „v 48 týdnu", „Woche", „week", „den", „Tag", „měsíc", „Monat") je doba jen
+ * u 1 (nebo desetinného čísla: „1,5 týdne") — „48 týden" / „48 Woche" je kalendářní týden bez tečky.
+ */
+const SINGULAR_UNIT = /^(?:(?:pracovni|kalendarni)m?\s+(?:den|dne)|prac\.\s*den|arbeitstag|werktag|(?:working|business|work)\s+day|tyden|tydnu|tydne|woche|week|mesic|mesici|monat|month|den|dne|tag|day)$/;
+/** Strop lhůty z textu: víc než 26 týdnů / 6 měsíců = spíš něco jiného (kalendářní týden, rok…) → nic. */
+const TEXT_MAX_DAYS = 182;
+
+/** OD — od čeho lhůta běží (jen objednávka, potvrzení objednávky, podklady / výkresy). */
+const FROM_RULES: [string, Exclude<LeadFrom, null>][] = [
+  [String.raw`(?:od|po)\s+potvrzeni(?:\s+(?:vasi\s+)?objednavky)?`, "potvrzeni"],
+  [String.raw`(?:nach|ab)\s+(?:(?:erhalt|eingang)\s+der\s+)?(?:auftragsbestatigung|auftragsbestaetigung|bestellbestatigung|bestellbestaetigung)`, "potvrzeni"],
+  [String.raw`(?:after|from)\s+(?:receipt\s+of\s+)?(?:the\s+|your\s+)?order\s+confirmation`, "potvrzeni"],
+  [String.raw`(?:od|po)\s+(?:obdrzeni|dodani|schvaleni|prijeti|doruceni)\s+(?:(?:kompletnich|kompletni|technicke|vykresove)\s+)?(?:vykresu|podkladu|dokumentace|dat)`, "podklady"],
+  [String.raw`nach\s+(?:freigabe|erhalt)\s+der\s+(?:zeichnungen|unterlagen)`, "podklady"],
+  [String.raw`after\s+(?:(?:receipt|approval)\s+of\s+)?(?:the\s+)?drawings`, "podklady"],
+  [String.raw`od\s+(?:data\s+)?(?:(?:obdrzeni|prijeti|doruceni)\s+)?(?:(?:zavazne|pisemne)\s+)?(?:vasi\s+)?objednavky`, "objednavka"],
+  [String.raw`od\s+objednani`, "objednavka"],
+  [String.raw`po\s+(?:obdrzeni|prijeti|doruceni)\s+(?:(?:zavazne|pisemne)\s+)?(?:vasi\s+)?objednavky`, "objednavka"],
+  [String.raw`(?:nach|ab)\s+(?:(?:erhalt|eingang)\s+(?:der|ihrer)\s+)?bestellung`, "objednavka"],
+  [String.raw`(?:nach|ab)\s+(?:auftragseingang|auftragserteilung|bestelleingang)`, "objednavka"],
+  [String.raw`(?:after|from)\s+(?:receipt\s+of\s+)?(?:the\s+|your\s+)?(?:purchase\s+order|po|order)`, "objednavka"],
+  [String.raw`aro`, "objednavka"],
+];
+const FROM_STICKY = FROM_RULES.map(([src, from]) => [sticky(String.raw`\s+${src}${R}`), from] as const);
+/** Všechny gramatické „OD" v textu (pro záporný filtr textu AI: „od potvrzení objednávky" není „potvrdíme"). */
+const FROM_ANY = new RegExp(String.raw`(?<![a-z0-9])(?:${FROM_RULES.map(([s]) => s).join("|")})${R}`, "g");
 
 /**
- * Jednotky (bez diakritiky). Pořadí: pracovní dny před dny. Zkratky „Wo.", „měs.", „Mon." i bez tečky
- * (na konci textu tečku odřízne dělení na klauzule).
+ * Následující klauzule, která podmiňuje / mění lhůtu („resp. od uhrazení zálohy", „nejdříve však po…",
+ * „whichever is later", „subject to…", „(+/- 1 týden)") → celá lhůta neplatí.
  */
-const UNIT_RE = String.raw`(pracovni(?:ch|m)?\s+(?:dn[iuy]|dnech|den)|prac\.?\s*(?:dn[iuy]|dnu|d\.?)|pd\b|arbeitstag(?:e|en)?|werktag(?:e|en)?|business\s+days?|working\s+days?|work\s+days?|kalendarni(?:ch)?\s+(?:dn[iuy]|dnu|den)|dn[iuy]\b|dnu\b|den\b|dnech\b|tag(?:e|en)?\b|days?\b|d\b|tydn[uyi]?\b|tydnech\b|tyden\b|tyd\.?|tydny\b|wochen?\b|wo\b\.?|weeks?\b|wks?\b|w\b|mesic(?:e|u|i|ich)?\b|mes\b\.?|monat(?:e|en)?\b|months?\b|mon\b\.?|mo\b)`;
+const QUALIFIER = /^\s*(?:[+±]|(?:resp\.?|respektive|nebo|popr\.?|popripade|pripadne|ale|avsak|vsak|nejdrive|pokud|jestlize|pod\s+podminkou|za\s+predpokladu|s\s+vyhradou|v\s+zavislosti|dle|podle|or|oder|bzw\.?|beziehungsweise|jedoch|sofern|falls|fruhestens|fruehestens|vorbehaltlich|unter\s+vorbehalt|vorausgesetzt|abhangig|je\s+nach|nach|whichever|but|however|unless|if|provided|subject\s+to|depending|according)(?![a-z0-9]))/;
+/**
+ * Klauzule hned za lhůtou (i na dalším řádku / za tečkou), která posouvá začátek nebo je alternativa
+ * („od obdržení zálohy", „po zaplacení", „ab Zahlungseingang", „after receipt of…", „jinak 4 týdny") → nic.
+ * „Ab Werk" je dodací parita, ne začátek lhůty.
+ */
+const NEXT_START = /^\s*(?:[+±]|(?:resp\.?|respektive|nebo|popr\.?|popripade|pripadne|nejdrive|or|oder|bzw\.?|beziehungsweise|fruhestens|fruehestens|whichever|od|ab(?!\s+werk)|from|po|after|upon|following|nach|jinak|sonst|otherwise|ansonsten|else|vorbehaltlich|subject\s+to|s\s+vyhradou|pod\s+podminkou|za\s+predpokladu)(?![a-z0-9]))/;
+/** Předchozí klauzule téže věty (za čárkou / pomlčkou), která omezuje platnost („Po zaplacení zálohy, dodání 4 týdny", „Pro vzorky, …"). */
+const SCOPE_BEFORE = /^\s*(?:po|pri|u|pro|v\s+pripade|pokud|jestlize|after|upon|following|for|if|in\s+case|unless|nach|bei|fur|falls|sofern|im\s+falle)(?![a-z0-9])/;
 
-const LEAD_RE = new RegExp(String.raw`(?<![\p{L}\d])${RANGE}\s*(?:-\s*)?${UNIT_RE}`, "giu");
+const INCOTERM = String.raw`(?:incoterms?(?:\s*20\d\d)?\s*:?\s*)?(?:exw|fca|fas|fob|cfr|cif|cpt|cip|dap|dpu|ddp|dat|ddu)${R}`;
+const FIELD_LABEL = /^\s*(?:dodaci\s+podminky|lieferbedingungen|delivery\s+terms|terms\s+of\s+delivery)\s*:\s*/;
+const INCO_HEAD = new RegExp(String.raw`^\s*${INCOTERM}[^,;\n]*[,;]\s*`);
+const INCO_TAIL = new RegExp(String.raw`\s*[,;]\s*${INCOTERM}[^,;\n]*$`);
+
+/** Kurzor: s = text bez diakritiky (malými), raw = původní text se stejnými indexy. */
+interface Cur { s: string; i: number; raw: string }
+function eat(c: Cur, re: RegExp): RegExpExecArray | null {
+  re.lastIndex = c.i;
+  const m = re.exec(c.s);
+  if (m) c.i = re.lastIndex;
+  return m;
+}
 
 function num(s: string | undefined): number | null {
   if (!s) return null;
@@ -60,271 +175,253 @@ function num(s: string | undefined): number | null {
 }
 
 type UnitKind = "pracovni" | "den" | "tyden" | "mesic";
-
 function unitKind(u: string): UnitKind {
-  if (/^(pracovni|prac|pd|arbeitstag|werktag|business|working|work)/.test(u)) return "pracovni";
-  if (/^(tyd|woch|wo\.?$|week|wk|w$)/.test(u)) return "tyden";
-  if (/^(mesic|mes\.?$|monat|month|mon\.?$|mo$)/.test(u)) return "mesic";
+  if (/^(pracovni|prac\.|arbeitstag|werktag|working|business|work\s)/.test(u)) return "pracovni";
+  if (/^(tyd|woch|wo|week|wk)/.test(u)) return "tyden";
+  if (/^(mesic|mes\.|monat|mon\.|month)/.test(u)) return "mesic";
   return "den";
 }
 
-/** Od čeho se lhůta počítá — hledá se v okolí nalezené lhůty (za ní, pak celý text). */
-function fromOf(text: string): LeadFrom {
-  if (/(potvrz|order confirmation|confirmation of order|auftragsbestatigung|bestellbestatigung|\boc\b)/.test(text)) return "potvrzeni";
-  if (/(podklad|vykres|dat\b|dokumentac|zeichnung|unterlagen|drawings?|documents?|approval|schvalen|freigabe)/.test(text)) return "podklady";
-  if (/(objedn|zakazk|\baro\b|after (?:receipt of )?(?:the |your )?(?:po|purchase order)\b|after receipt of (?:the )?order|receipt of your order|your order|from (?:the )?order|after order|upon order|of order|auftragseingang|auftragserteilung|bestellung|nach auftrag|ab auftrag|order date)/.test(text)) return "objednavka";
+/** „tydnu" bez diakritiky je i „týdnů" (2. pád mn. č.) — jednotné „týdnu" jen s „ý" a bez kroužku. */
+function isSingularUnit(folded: string, raw: string): boolean {
+  const u = folded.replace(/\s+/g, " ");
+  if (!SINGULAR_UNIT.test(u)) return false;
+  return u !== "tydnu" || raw.toLowerCase() === "týdnu";
+}
+
+type Parsed = Omit<LeadTime, "text" | "source" | "review" | "evidence">;
+
+/** [VERB] [CCA] [PŘEDLOŽKA] [CCA] — „je cca", „do cca", „cca do", „beträgt ca.", „innerhalb von". */
+function modifiers(c: Cur): void {
+  eat(c, VERB);
+  eat(c, APPROX);
+  if (eat(c, PREP)) eat(c, APPROX);
+}
+
+/** DOBA [OD] KONEC od kurzoru. */
+function durationTail(c: Cur): Parsed | null {
+  const m = eat(c, DURATION);
+  if (!m) return null;
+  const a = num(m[1]);
+  const b = num(m[2]);
+  if (a === null || (m[2] !== undefined && b === null)) return null;
+  const lo = b !== null ? Math.min(a, b) : a;
+  const hi = b !== null ? Math.max(a, b) : a;
+  if (!(hi > 0)) return null;
+  if (isSingularUnit(m[3], c.raw.slice(c.i - m[3].length, c.i)) && hi !== 1 && Number.isInteger(hi)) return null;
+  let from: LeadFrom = null;
+  for (const [re, f] of FROM_STICKY) {
+    if (eat(c, re)) {
+      from = f;
+      break;
+    }
+  }
+  if (!eat(c, END)) return null;
+  const kind = unitKind(m[3]);
+  const mult = kind === "tyden" ? 7 : kind === "mesic" ? 30 : 1;
+  const lead: Parsed = { days: Math.round(hi * mult), unit: kind === "pracovni" ? "pracovni" : "kalendarni", from };
+  if (b !== null && lo !== hi) lead.range = [Math.round(lo * mult), Math.round(hi * mult)];
+  if (kind === "mesic") lead.months = hi;
+  if (lead.days > TEXT_MAX_DAYS) return null;
+  return lead;
+}
+
+/** KLAUZULE := [ÚVOD] KOTVA [ODDĚLOVAČ] [CCA] DOBA [OD] KONEC | KOTVA [ODDĚLOVAČ] IHNED KONEC. */
+function anchoredClause(f: string, raw: string): Parsed | null {
+  const c: Cur = { s: f, i: 0, raw };
+  eat(c, WS);
+  eat(c, BULLET);
+  for (let k = 0; k < 2 && eat(c, LEAD_IN); k++);
+  if (!eat(c, ANCHOR)) return null;
+  eat(c, SEP_PUNCT);
+  const after = c.i;
+  eat(c, VERB);
+  if (eat(c, IMMEDIATE) && eat(c, END)) return { days: 3, unit: "pracovni", from: null, range: [0, 3] };
+  c.i = after;
+  modifiers(c);
+  return durationTail(c);
+}
+
+/** Holá doba v dodacím poli: [CCA] [PŘEDLOŽKA] DOBA [OD] — celé pole. */
+function bareField(f: string, raw: string): Parsed | null {
+  const c: Cur = { s: f, i: 0, raw };
+  eat(c, WS);
+  eat(c, APPROX);
+  if (eat(c, PREP)) eat(c, APPROX);
+  return durationTail(c);
+}
+
+/** Čím klauzule končí: čárka / pomlčka / středník („soft"), otevírací závorka, zavírací závorka, tečka / nový řádek („hard"), konec textu. */
+type Boundary = "soft" | "open" | "close" | "hard" | "end";
+
+/** Kdekoli v textu doba (číslo / číslovka + jednotka). */
+const DURATION_ANY = new RegExp(String.raw`(?<![a-z0-9])${NUM}\s*(?:${UNIT})${R}`);
+
+const IMMEDIATE_ANY = new RegExp(String.raw`(?<![a-z0-9])(?:ihned|okamzite|skladem|ze\s+skladu|sofort|ab\s+lager|from\s+stock|ex\s+stock|immediately)${R}`);
+const NUM_START = new RegExp(String.raw`^\s*${NUM}`);
+
+/** Klauzule je CELÁ jen gramatické OD („ab Auftragseingang", „od obdržení objednávky") → od čeho, jinak null. */
+function fromOnly(f: string): LeadFrom {
+  const c: Cur = { s: ` ${f}`, i: 0, raw: ` ${f}` };
+  for (const [re, from] of FROM_STICKY) {
+    c.i = 0;
+    if (eat(c, re) && eat(c, END)) return from;
+  }
   return null;
 }
 
-// ── Od čeho lhůta běží — kladný seznam ──────────────────────
-/** Předložka za číslem („4 týdny od…", „4 Wochen nach…", „4 weeks after…"), volitelně v závorce. */
-const FROM_PREP_WORD = /^\s*\(?\s*(?:od|ode|po|nach|after|ab|from|upon|following)\s+/;
-/** Povolená slova mezi předložkou a tím, od čeho lhůta běží („od obdržení závazné objednávky", „after receipt of your PO"). */
-const FROM_FILL = String.raw`(?:data|datum|date|dne|dnem|der|dem|des|den|the|a|an|your|our|ihrer|ihres|ihre|ihrem|unserer|vasi|vasich|nasi|obdrzeni|prijeti|doruceni|dodani|zaslani|predani|vystaveni|zadani|schvaleni|odsouhlaseni|uvolneni|erhalt|eingang|zugang|freigabe|receipt|receiving|approval|release|of|zavazne|zavaznou|platne|platnou|pisemne|valid|binding|firm|written|official|verbindlichen|verbindliche|verbindlicher|schriftlichen|schriftliche|gultigen|gueltigen|kompletnich|kompletni|uplnych|finalnich|technickych|schvalenych|complete|final|approved|technical|vollstandigen|vollstaendigen|technischen|freigegebenen)`;
-/** Od čeho smí lhůta běžet: objednávka, potvrzení objednávky, podklady / výkresy (nic jiného). */
-const FROM_KEY = String.raw`(potvrz\w*|order\s+confirmation|confirmation(?:\s+of\s+(?:the\s+|your\s+)?order)?|auftragsbestatigung\w*|bestellbestatigung\w*|oc\b|objedn\w*|zakazk\w*|purchase\s+order|order(?:\s+(?:date|placement))?\b|po\b|auftrag\w*|bestell\w*|podklad\w*|vykres\w*|dat\b|dokumentac\w*|zeichnung\w*|unterlagen|drawings?\b|documents?\b|documentation)`;
-const FROM_HEAD = new RegExp(String.raw`^\s*\(?\s*(?:od|ode|po|nach|after|ab|from|upon|following)\s+(?:${FROM_FILL}\s+){0,4}${FROM_KEY}`);
-
-function keyFrom(k: string): Exclude<LeadFrom, null> {
-  if (/^(potvrz|order\s+confirmation|confirmation|auftragsbest|bestellbest|oc$)/.test(k)) return "potvrzeni";
-  if (/^(podklad|vykres|dat$|dokumentac|zeichnung|unterlagen|drawing|document)/.test(k)) return "podklady";
-  return "objednavka";
+interface Span {
+  start: number;
+  end: number;
+  /** Klauzule navazuje na předchozí v téže větě (oddělena čárkou / pomlčkou / středníkem). */
+  soft: boolean;
+  /** Čím klauzule končí. */
+  after: Boundary;
 }
 
-/**
- * Za číslem stojí předložka („od / po / nach / after…") — od čeho lhůta běží. Kladný seznam: jen objednávka,
- * potvrzení, podklady (+ „ab Werk / ab Lager" = místo, ne začátek → bez „od čeho"). Cokoli jiného (záloha,
- * platba, materiál, dokončení výroby, dodání zboží…) = undefined → lhůtu nebrat.
- */
-function fromHead(after: string): LeadFrom | undefined {
-  if (/^\s*\(?\s*ab\s+(?:werk|lager)\b/.test(after)) return null;
-  const m = FROM_HEAD.exec(after);
-  if (!m) return undefined;
-  // „od objednávky a uhrazení zálohy", „after PO and receipt of material" → podmínka navíc = nebrat
-  const next = after.slice(m[0].length).split(/\s+/).filter(Boolean).slice(0, 4).join(" ");
-  if (OTHER_RE.test(next) || /(materi|zbozi|vyrob|fertig|product|manufact|zahl)/.test(next)) return undefined;
-  return keyFrom(m[1]);
-}
-
-/** Text, který lhůtu neurčuje („dle dohody", „po dohodě", „nach Vereinbarung", „to be agreed"). */
-const BY_AGREEMENT = /(dle|podle|po)\s+dohod|k\s+dohodn|nach\s+(vereinbarung|absprache)|to\s+be\s+agreed|by\s+agreement|tba\b|tbd\b|upon\s+request|na\s+dotaz/;
-
-/** „dle dohody", „nach Absprache", „to be agreed"… (lhůtu neurčuje). */
-export function isByAgreement(text: string): boolean {
-  return BY_AGREEMENT.test(fold(text));
-}
-/** Okamžitá dodávka: „ihned", „skladem", „ab Lager", „sofort", „from stock", „immediately". */
-const IMMEDIATE = /(ihned|okamzite|skladem|ze\s+skladu|ab\s+lager|sofort|lagerware|from\s+stock|ex\s+stock|in\s+stock|immediately|immediate)/g;
-
-// ── Kladný seznam ───────────────────────────────────────────
-/**
- * Slova JINÝCH podmínek (bez diakritiky) — klauzule s nimi lhůtou není: platnost / závaznost nabídky, splatnost,
- * platba, úhrada, záloha, faktura, záruka, reklamace, skonto, sleva, storno; DE Gültigkeit, Bindungsfrist, gilt,
- * freibleibend, Zahlung, fällig, Rechnung, Anzahlung, Gewährleistung, Mängelrüge; EN valid, payment, due, net,
- * invoice, deposit, warranty, guarantee. „závazná / platná objednávka", „valid PO", „gültige Bestellung" jinou
- * podmínkou NEJSOU (přívlastek objednávky).
- */
-const ORDER_NEXT = String.raw`(?!\w*\s+(?:objedn|zakazk|order|po\b|purchase|bestell|auftrag))`;
-const OTHER_TERMS = String.raw`splatn|platnost|platn[aeiouy]${ORDER_NEXT}|plati\b|platebn|platb|doplat|uhrad|uhraz|zaplac|pripis|faktur|zaloh|zaruk|zaruc|garanc|garant|guarant|warrant|gewahrleist|gewaehrleist|reklam|zavazn${ORDER_NEXT}|vazan[aoy]?\b|skont|sleva|slevu|rabatt|discount|zahlung|zahlbar|anzahlung|vorauszahl|rechnung|vorkasse|faellig|fallig|bindefrist|bindungsfrist|freibleib|gultig${ORDER_NEXT}|gueltig${ORDER_NEXT}|\bgilt\b|\bgelten\b|beanstand|mangelr|maengelr|payment|payable|\bpay\b|\bpaid\b|invoice|deposit|prepay|\bdue\b|valid${ORDER_NEXT}|\bnet(?:to)?\b|storn|cancel|kundig|kuendig`;
-const OTHER_RE = new RegExp(OTHER_TERMS);
-/** Před číslem (bez dodacího slova těsně u čísla) = lhůta něčeho jiného: vzorky, podklady, výkresy, materiál. */
-const BEFORE_ONLY_RE = /(vzor|muster|sample|prototyp|podklad|unterlagen|vykres|zeichnung|drawing|material|dokumentac|documentation)/;
-/** Začátek / alternativa před číslem: zahájení výroby, Produktionsbeginn, production start, expres, příplatek. */
-const START_RE = /(zahaj|zacat|zacne|zacina|(?<!\p{L})start|beginn|(?<!\p{L})expres|express|(?<!\p{L})eil|(?<!\p{L})rush(?!\p{L})|priplat|aufpreis|zuschlag|surcharge)/u;
-/** Alternativa ZA číslem („dodání do 2 týdnů za příplatek", „2 Wochen gegen Eilzuschlag"). */
-const ALT_AFTER_RE = /(priplat|aufpreis|zuschlag|surcharge|(?<!\p{L})expres|express|(?<!\p{L})eil|(?<!\p{L})rush(?!\p{L}))/u;
-/** „dle výkresu", „nach Zeichnung", „according to drawing" — odkaz na výkres, ne lhůta výkresu. */
-const PER_DOC = /(?:dle|podle|nach|gem(?:ass|aess)?\.?|according\s+to|as\s+per|per)\s+\S+/g;
-/** Prefix klauzule, za kterým číslo není dodací lhůta: vzorky / podklady / materiál, zahájení, expres. */
-function sideBefore(prefix: string): boolean {
-  return BEFORE_ONLY_RE.test(prefix.replace(PER_DOC, " ")) || START_RE.test(prefix);
-}
-/** Frekvence dílčích dodávek („každé 2 týdny", „alle 2 Wochen", „every 2 weeks", „1x za", „po 500 ks"). */
-const FREQ_BEFORE = /(kazd\w*|\d+\s*x\b|(?<!\p{L})po\s+\d+\s*(?:ks|kus\w*|stk|stuck|pcs|pieces)\b|interval\w*|rhythmus|turnus|(?<!\p{L})(?:alle|every|jede[nrsm]?)\s*$)/u;
-const FREQ_AFTER = /^\s*(?:tydne|mesicne|denne|wochentlich|monatlich|taglich|weekly|monthly|daily)(?!\p{L})/u;
-/** Jakékoli slovo o dodání / výrobě (pro dodací pole: klauzule s ním není pokračováním jiné podmínky). */
-const DELIVERY_RE = /(dodan|dodac|dodav|dodam|dodat|dodej|vyrob|expedic|odesl|liefer|deliver|lead\s*time|\baro\b|shipping|shipment|versand|fertigung|production|manufactur)/;
-
-/**
- * Výslovná dodací slova (kladný seznam). „lhůta" / „termín" / „Frist" samy o sobě dodací slovo NEJSOU —
- * jen s kvalifikací dodání / dodací / expedice / výroba / Liefer… / delivery / lead time.
- */
-const ANCHOR = String.raw`(?:dodaci\s+(?:lhut[aeyu]?|dob[auy]|termin)|vyrobni\s+(?:lhut[aeyu]?|dob[auy]|cas)|dodani|dodavk[aeuy]|dodavame|dodame|expedice|expedujeme|expedovat|odeslani|vyroba|vyrobu|vyroby|vyrobime|lieferzeit(?:en)?|lieferfrist|liefertermin|lieferdauer|lieferung|liefern(?:\s+wir)?|versand|fertigungszeit|produktionszeit|herstellungszeit|fertigung|delivery(?:\s+(?:time|period|lead\s*time|date))?|lead[\s-]*times?|shipment|shipping|ships?|production\s+time|manufacturing\s+time|turnaround(?:\s+time)?)`;
-/** Výplňová slova mezi dodacím slovem a číslem („dodání do", „Lieferzeit ca.", „delivery within"). */
-const FILLER = String.raw`(?:do|za|v|ve|cca|ca|zirka|circa|asi|priblizne|zhruba|max|maximalne|nejpozdeji|nejdele|behem|je|cini|bude|probehne|terminu|lhute|dobe|in|within|is|are|takes|will\s+be|approx|approximately|about|around|up\s+to|innerhalb(?:\s+von)?|binnen|von|bis(?:\s+zu)?|zu|etwa|rund|betragt|ist|sind|erfolgt|erfolgen|spatestens|derzeit|aktuell|currently|standardne|obvykle|typicky|typically|normalne|normalerweise|usually|dilu|dilcu|dilce|zbozi|kusu|vyrobku|zakazky|serie|teile|ware|parts|goods)`;
-/** Text před číslem končí dodacím slovem (+ výplň): „dodací lhůta: ", „dodání do ", „Lieferzeit ca. ". */
-const ANCHORED_BEFORE = new RegExp(String.raw`(?<!\p{L})${ANCHOR}\s*(?:[:=]|[-–—])?\s*(?:${FILLER}\.?\s*:?\s+){0,3}$`, "u");
-const ANCHOR_END = new RegExp(String.raw`(?<!\p{L})${ANCHOR}\s*$`, "u");
-/** Dodací slovo hned ZA číslem („4 týdny dodání"). */
-const ANCHOR_AFTER = /^\s*(?:dodani|dodaci\s+(?:lhut|dob)\w*|expedice|lieferzeit|lieferfrist|delivery|lead[\s-]*time)\b/;
-/** Za číslem předložka + od čeho se počítá („od objednání", „nach Auftragseingang", „after PO", „ARO"). */
-const FROM_PREP = /^\s*(?:\(?\s*(?:od|ode|po|nach|after|ab|from|upon|following)\s|aro\b)/;
-/** Jiná podmínka ZA číslem („30 Tage netto", „24 měsíců záruka", „od data vystavení faktury", „10 Tage 2 % Skonto"). */
-const AFTER_OTHER = new RegExp(String.raw`^\s*(?:(?:od|ode|po|nach|after|ab|from|upon|of|ze|z|bei|pri|with|following|within)\s+(?:(?:data|datum|date|dne|der|dem|des|the|a|an|vystaveni|obdrzeni|prijeti|doruceni|erhalt|eingang|receipt|of)\s+){0,3}|(?:[\d.,]+\s*%?\s+){1,2})?(?:${OTHER_TERMS})`);
-
-/**
- * Výslovné dodání (ne výroba / expedice / „X od objednávky"): taková lhůta má přednost před lhůtou výroby.
- * Expedice / Versand / shipping běží často až PO výrobě („Výroba 3 týdny, expedice 2 dny") — výslovné není.
- */
-const EXPLICIT_DELIVERY = /^(?:dodac|dodan|dodavk|dodavame|dodame|liefer|deliver|lead|turnaround)/;
-
-interface Clause { start: number; end: number; sentence: number }
-
-/**
- * Klauzule textu: hranice . (konec věty — tečka + mezera + velké písmeno / konec), ; , (ne desetinná čárka),
- * pomlčka mezi mezerami (ne v rozpětí „6 – 8" a ne za dodacím slovem „Dodací lhůta – 4 týdny") a nový řádek.
- * sentence = pořadí věty (. ; nový řádek), čárka a pomlčka větu nedělí.
- */
-function clausesOf(raw: string, f: string): Clause[] {
-  const out: Clause[] = [];
+/** Klauzule: . (konec věty), ; ! ? nový řádek, závorky, čárka (ne desetinná), pomlčka mezi mezerami (ne rozpětí, ne za kotvou). */
+function clausesOf(raw: string, f: string): Span[] {
+  const out: Span[] = [];
   let start = 0;
-  let sentence = 0;
-  const cut = (at: number, newSentence: boolean) => {
-    if (at > start) out.push({ start, end: at, sentence });
+  let soft = false;
+  const cut = (at: number, kind: Boundary) => {
+    const last = out[out.length - 1];
+    if (f.slice(start, at).trim()) out.push({ start, end: at, soft, after: kind });
+    else if (last && last.after === "close" && kind !== "close") last.after = kind; // „(vzorky), 6 týdnů" — čárka za závorkou
     start = at + 1;
-    if (newSentence) sentence++;
+    soft = kind === "soft";
   };
   for (let i = 0; i < f.length; i++) {
     const ch = f[i];
-    if (ch === "\n" || ch === ";") cut(i, true);
-    else if (ch === "." && (i + 1 >= f.length || /^\s+\p{Lu}/u.test(raw.slice(i + 1, i + 3)))) cut(i, true);
-    else if (ch === "," && !/\d/.test(f[i + 1] ?? "")) cut(i, false);
+    if (ch === "(" || ch === "[") cut(i, "open");
+    else if (ch === ")" || ch === "]") cut(i, "close");
+    else if (ch === ";") cut(i, "soft");
+    else if ("\n!?".includes(ch)) cut(i, "hard");
+    else if (ch === "." && (i + 1 >= f.length || /^\s+(?:\p{Lu}|\n)/u.test(raw.slice(i + 1, i + 3)))) cut(i, "hard");
+    else if (ch === "," && !(/\d/.test(f[i - 1] ?? "") && /\d/.test(f[i + 1] ?? ""))) cut(i, "soft");
     else if ((ch === "–" || ch === "—" || ch === "-") && f[i - 1] === " " && f[i + 1] === " ") {
       const left = f.slice(start, i);
       const range = /\d\s*$/.test(left) && /^\s*\d/.test(f.slice(i + 1));
-      if (!range && !ANCHOR_END.test(left)) cut(i, false);
+      const c: Cur = { s: left, i: 0, raw: left };
+      eat(c, WS);
+      for (let k = 0; k < 2 && eat(c, LEAD_IN); k++);
+      const afterAnchor = Boolean(eat(c, ANCHOR)) && !left.slice(c.i).trim();
+      if (!range && !afterAnchor) cut(i, "soft");
     }
   }
-  if (f.length > start) out.push({ start, end: f.length, sentence });
+  if (f.slice(start).trim()) out.push({ start, end: f.length, soft, after: "end" });
   return out;
 }
 
-/** Dodací pole: holá doba v klauzuli, která navazuje na jinou podmínku téže věty („Platba převodem, 14 dní"). */
-function continuesOther(f: string, clauses: Clause[], ci: number): boolean {
-  if (DELIVERY_RE.test(f.slice(clauses[ci].start, clauses[ci].end))) return false;
-  for (let j = ci - 1; j >= 0 && clauses[j].sentence === clauses[ci].sentence; j--) {
-    const t = f.slice(clauses[j].start, clauses[j].end);
-    if (DELIVERY_RE.test(t)) return false;
-    if (OTHER_RE.test(t)) return true;
-  }
-  return false;
-}
-
-/** „3D model", „2D výkres", „3D CAD" — číslo + „d" je technické označení, ne lhůta. */
-const TECH_AFTER = /^\s*[-/]?\s*(model|vykres|cad|data|dat\b|tisk|print|sken|scan|step|stp\b|dxf|dwg|pdf|soubor|zeichnung|drawing|file|format|geometri|mereni|measur|konstrukc)/;
+const done = (p: Parsed, text: string): LeadTime => ({ ...p, text: text.trim(), source: "text" });
 
 /**
- * Režim čtení: „delivery-field" = text, o kterém víme, že je o dodání (deliveryLeadTime.text, deliveryTerms
- * z AI, quotes.delivery_terms); „free-text" = poznámka, popis položky, shrnutí.
+ * Režim čtení: „delivery-field" = text, o kterém víme, že je o dodání (deliveryTerms, quotes.delivery_terms,
+ * text pole AI) — navíc dovolí holou dobu, je-li to celé pole; „free-text" = poznámka, popis položky, shrnutí.
  */
 export type LeadParseMode = "delivery-field" | "free-text";
 
 /**
- * Dodací lhůta z textu (česky, německy, anglicky), null = žádná / „dle dohody" / nejistá.
- * Číslo se vezme, když (1) k němu přímo patří výslovné dodací slovo („dodací lhůta X", „dodání do X",
- * „Lieferzeit ca. X", „delivery within X", „X dodání"), nebo (2) za ním stojí, od čeho běží („X týdnů od
- * objednání", „X Wochen nach Auftragseingang", „X weeks ARO") a před ním v klauzuli není jiná podmínka,
- * nebo (3) jen v dodacím poli: holá doba („4 týdny", „6–8 Wochen") v klauzuli bez jiné podmínky, která
- * nenavazuje na jinou podmínku téže věty a text není „dle dohody". Vždy NIC: jiná podmínka hned za číslem
- * („24 měsíců záruka", „30 Tage netto"), lhůta běžící OD dodání zboží („do 14 dnů od dodání").
- * Rozpětí → horní mez (range zachová obě). Bez slova „pracovní" = kalendářní dny.
+ * Dodací lhůta z textu (česky, německy, anglicky) podle uzavřené gramatiky, jinak null. Rozpětí → horní mez
+ * (range zachová obě). Bez slova „pracovní" = kalendářní dny. Dvě gramatické klauzule s různou lhůtou = null.
  */
 export function parseLeadTime(text: string | null | undefined, opts: { mode?: LeadParseMode } = {}): LeadTime | null {
   const mode = opts.mode ?? "delivery-field";
-  let raw = (text ?? "").normalize("NFC").replace(/[^\S\n]+/g, " ").replace(/ ?\n[\s]*/g, "\n").trim();
+  const raw = normalizeText(text);
   if (!raw) return null;
   const f = fold(raw);
-  if (f.length !== raw.length) raw = f; // indexy musí sedět na původní text
-  const agreed = BY_AGREEMENT.test(f);
+  if (mode === "delivery-field") {
+    let s = 0;
+    let e = f.length;
+    const label = FIELD_LABEL.exec(f);
+    if (label) s += label[0].length;
+    const head = INCO_HEAD.exec(f.slice(s));
+    if (head) s += head[0].length;
+    const tail = INCO_TAIL.exec(f.slice(s));
+    if (tail) e = s + tail.index;
+    const bare = s < e ? bareField(f.slice(s, e), raw.slice(s, e)) : null;
+    if (bare) return done(bare, raw.slice(s, e));
+  }
   const clauses = clausesOf(raw, f);
-  let explicitLead: LeadTime | null = null;
-  let fallback: LeadTime | null = null;
-  let otherMax = 0;
-  for (let ci = 0; ci < clauses.length; ci++) {
-    const c = clauses[ci];
-    const seg = f.slice(c.start, c.end);
-    LEAD_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = LEAD_RE.exec(seg))) {
-      const start = m.index;
-      const end = m.index + m[0].length;
-      const a = num(m[1]);
-      const b = num(m[2]);
-      if (a === null) continue;
-      const lo = b !== null ? Math.min(a, b) : a;
-      const hi = b !== null ? Math.max(a, b) : a;
-      if (!(hi > 0)) continue;
-      const kind = unitKind(m[3]);
-      // „d" / „w" / „mo" samotné jen hned za číslicí (30d, 4w) — jinak to bývá něco jiného
-      if (/^(d|w|mo)$/.test(m[3]) && !/\d\s?$/.test(seg.slice(start, end - m[3].length))) continue;
-      // „2D / 3D" (velké D, malé „2d/3d" bez mezery, nebo za ním model / výkres / CAD…) není lhůta
-      const flat = (hi === 2 || hi === 3) && (raw[c.start + end - 1] === "D" || /^[23]d$/.test(m[0]));
-      const after = seg.slice(end);
-      if (m[3] === "d" && (flat || TECH_AFTER.test(after.slice(0, 20)))) continue;
-      // vždy nic: jiná podmínka za číslem, frekvence dodávek („každé 2 týdny", „2 Wochen wöchentlich"),
-      // alternativa za příplatek / expres
-      if (AFTER_OTHER.test(after) || FREQ_AFTER.test(after) || ALT_AFTER_RE.test(after)) continue;
-      const prefix = seg.slice(0, start);
-      if (FREQ_BEFORE.test(prefix)) continue;
-      // za číslem předložka (od / po / nach / after…): lhůta jen od objednávky / potvrzení / podkladů (kladný
-      // seznam) — od zálohy, platby, materiálu, dokončení výroby, dodání zboží… = nic
-      let fromAfter: LeadFrom;
-      if (FROM_PREP_WORD.test(after)) {
-        const h = fromHead(after);
-        if (h === undefined) continue;
-        fromAfter = h;
-      } else fromAfter = fromOf(after.slice(0, 60));
-      const anchored = ANCHORED_BEFORE.exec(prefix);
-      // „Vzorky: dodání 2 týdny", „Zahájení výroby do 5 dnů", „Expresní příplatek za dodání do 2 týdnů" = nic
-      if (anchored && sideBefore(prefix.slice(0, anchored.index))) continue;
-      const otherBefore = OTHER_RE.test(prefix) || sideBefore(prefix);
-      const anchorAfter = otherBefore ? null : ANCHOR_AFTER.exec(after);
-      const strict = Boolean(anchored) || Boolean(anchorAfter) || (!otherBefore && FROM_PREP.test(after) && fromAfter !== null);
-      const bare = mode === "delivery-field" && !agreed && !OTHER_RE.test(seg) && !sideBefore(prefix) && !continuesOther(f, clauses, ci);
-      if (!strict && !bare) continue;
-      // výslovné dodání („dodací lhůta", „dodání", „Lieferzeit", „delivery") vyhraje nad výrobou / expedicí /
-      // „X od objednávky" / holou dobou
-      const explicit = Boolean(anchored && EXPLICIT_DELIVERY.test(anchored[0])) || Boolean(anchorAfter && EXPLICIT_DELIVERY.test(anchorAfter[0].trim()));
-      const from = fromAfter ?? fromOf(prefix.slice(-25));
-      let snippet = raw.slice(c.start + start, c.start + end);
-      if (from) {
-        const tail = raw.slice(c.start + end, c.end).slice(0, 50);
-        const stop = tail.search(/[()]|\s(?:a|und|and|platnost|splatnost|cena|price|preis)\s/i);
-        snippet += stop >= 0 ? tail.slice(0, stop) : tail;
-      }
-      const mult = kind === "tyden" ? 7 : kind === "mesic" ? 30 : 1;
-      const lead: LeadTime = {
-        days: Math.round(hi * mult), unit: kind === "pracovni" ? "pracovni" : "kalendarni", from, text: snippet.trim(),
-      };
-      if (b !== null && lo !== hi) lead.range = [Math.round(lo * mult), Math.round(hi * mult)];
-      if (kind === "mesic") lead.months = hi;
-      if (lead.days > 3 * 365) continue;
-      if (explicit) explicitLead ??= lead;
-      else {
-        fallback ??= lead;
-        otherMax = Math.max(otherMax, lead.days);
+  let found: LeadTime | null = null;
+  /** Klauzule, které tvoří přečtenou lhůtu (kotva + doba, případně OD na další klauzuli). */
+  const used = new Set<number>();
+  for (let k = 0; k < clauses.length; k++) {
+    const c = clauses[k];
+    const p = anchoredClause(f.slice(c.start, c.end), raw.slice(c.start, c.end));
+    if (!p) continue;
+    used.add(k);
+    // hned za lhůtou závorka („4 týdny (po zaplacení zálohy)", „2 týdny (vzorky), 6 týdnů (série)", „1 týden (expres)") → nic
+    if (c.after === "open") return null;
+    const next = clauses[k + 1];
+    let withNext = false;
+    if (next) {
+      const nt = f.slice(next.start, next.end);
+      const onlyFrom = p.from === null ? fromOnly(nt) : null;
+      if (onlyFrom) {
+        // „Lieferzeit: 4 Wochen⏎ab Auftragseingang", „Dodací lhůta 4 týdny, od obdržení objednávky" = OD na další klauzuli
+        p.from = onlyFrom;
+        withNext = true;
+        used.add(k + 1);
+      } else if (c.after === "soft" || c.after === "close") {
+        // v téže větě (čárka / pomlčka / středník): podmínka, rozsah i posun začátku („…, resp. od zálohy",
+        // „…, po obdržení zálohy", „…, ab Zahlungseingang", „…, jinak 4 týdny", „…; pro sérii 6 týdnů") → nic
+        // … i další doba („4 týdny – 6 týdnů" = rozpětí s jednotkou dvakrát, „2 týdny, 6 týdnů (série)")
+        if (QUALIFIER.test(nt) || SCOPE_BEFORE.test(nt) || NEXT_START.test(nt) || NUM_START.test(nt)) return null;
+        withNext = c.after === "soft";
+      } else if (NEXT_START.test(nt)) {
+        return null; // další řádek / věta „od obdržení zálohy", „resp. …"
+      } else if ((QUALIFIER.test(nt) || SCOPE_BEFORE.test(nt)) && DURATION_ANY.test(nt)) {
+        return null; // další řádek s vlastní dobou pro jiný rozsah: „U zakázek nad 1000 ks 6 týdnů"
       }
     }
+    // „Po zaplacení zálohy, dodání 4 týdny", „Pro vzorky, dodací lhůta 2 týdny", „Pro vzorky:⏎Dodací lhůta…" → nic
+    const prev = clauses[k - 1];
+    if (prev) {
+      const pt = f.slice(prev.start, prev.end);
+      if ((c.soft || /:\s*$/.test(pt)) && SCOPE_BEFORE.test(pt)) return null;
+    }
+    if (found) {
+      if (found.days !== p.days || found.unit !== p.unit) return null;
+      continue;
+    }
+    // text pro kontrolu: klauzule + navazující klauzule téže věty („Dodací lhůta 4 týdny, balení v ceně")
+    found = done(p, raw.slice(c.start, next && withNext ? next.end : c.end));
   }
-  // výslovná dodací lhůta kratší než jiná lhůta v textu („Výroba 6 týdnů, dodání 2 týdny") = nejistota → nic
-  if (explicitLead) return otherMax > explicitLead.days ? null : explicitLead;
-  if (fallback) return fallback;
-  if (agreed) return null;
-  for (const c of clauses) {
-    const seg = f.slice(c.start, c.end);
-    IMMEDIATE.lastIndex = 0;
-    const im = IMMEDIATE.exec(seg);
-    if (!im) continue;
-    // dodací pole: klauzule bez jiné podmínky („Platba ihned" není dodání); volný text jen u dodacího slova
-    const ok = mode === "delivery-field" ? !OTHER_RE.test(seg) : ANCHORED_BEFORE.test(seg.slice(0, im.index));
-    if (ok) return { days: 3, unit: "pracovni", from: null, text: raw.slice(c.start + im.index, c.start + im.index + im[0].length), range: [0, 3] };
+  if (!found) return null;
+  // Uzavřené pravidlo: jiná klauzule téhož textu s vlastní dobou, která není jinou obchodní podmínkou
+  // („…, série 6 týdnů", „Výroba 4 týdny, expedice 2 dny", „kalené díly 6 týdnů", „položka 2 – 8 týdnů") =
+  // lhůta není jednoznačná → nic (člověk doplní). „Platnost nabídky 30 dní, dodací lhůta 4 týdny" platí dál.
+  for (let k = 0; k < clauses.length; k++) {
+    if (used.has(k)) continue;
+    const t = f.slice(clauses[k].start, clauses[k].end);
+    if ((DURATION_ANY.test(t) || IMMEDIATE_ANY.test(t)) && !OTHER_LABEL.test(t)) return null;
   }
-  return null;
+  return found;
 }
 
 /**
- * Dodací lhůta nabídky je, ale nedá se použít (běží od zálohy / materiálu, nebo hodnota AI odporuje vlastnímu
- * textu) — u TÉŽE nabídky se pak nečtou ani dodací podmínky, poznámka a shrnutí („doplň termín").
+ * Text vůbec mluví o lhůtě (číslo, dodací kotva, číslovka)? „EXW Vimperk" ne — takový dodací text nevyžaduje,
+ * aby ho gramatika přečetla stejně jako pole AI.
+ */
+export function hasLeadCue(text: string | null | undefined): boolean {
+  const f = fold(normalizeText(text));
+  return /\d/.test(f) || ANCHOR_ANY.test(f) || DURATION_ANY.test(f);
+}
+
+/**
+ * Volný text (poznámka, shrnutí, popis položky) mluví o dodací lhůtě: dodací kotva i doba v něm („…, dodací
+ * lhůta 4 týdny po obdržení zálohy"). Užší než hasLeadCue — „zkouška 5 dnů" ani „120 ks" ne.
+ */
+export function mentionsLead(text: string | null | undefined): boolean {
+  const f = fold(normalizeText(text));
+  return ANCHOR_ANY.test(f) && (DURATION_ANY.test(f) || IMMEDIATE_ANY.test(f));
+}
+
+// ── Strukturované pole AI ───────────────────────────────────
+/**
+ * Dodací lhůta nabídky je, ale nedá se použít (AI: běží od něčeho jiného, nebo její text je jiná podmínka) —
+ * u TÉŽE nabídky se pak nečtou ani dodací podmínky, poznámka a shrnutí („doplň termín").
  */
 export interface LeadBlocked {
   blocked: true;
@@ -335,45 +432,61 @@ export function isLeadBlocked(x: unknown): x is LeadBlocked {
   return typeof x === "object" && x !== null && (x as { blocked?: unknown }).blocked === true;
 }
 
-const LEAD_ONE = new RegExp(LEAD_RE.source, "iu");
+/**
+ * ZÁPORNÝ filtr — jen pro text strukturovaného pole AI (gramatika žádné záporné seznamy nemá): potvrzení
+ * termínu, platnost, splatnost / platba, záruka, záloha, uskladnění, avízo, „před / předem", frekvence,
+ * zahájení, vzorky, prodloužení. Gramatická „OD" („od potvrzení objednávky", „nach Auftragsbestätigung")
+ * se předem vyjmou.
+ */
+const NEGATIVE = new RegExp([
+  "potvr[dz]", "confirm", "bestatig", "bestaetig",
+  "platn", String.raw`(?<![a-z])plati(?![a-z])`, "platb", "plateb", String.raw`(?<![a-z])valid`, "gultig", "gueltig", "bindefrist",
+  "splatn", "payment", String.raw`(?<![a-z])pay(?![a-z])`, "zahlung", String.raw`(?<![a-z])netto(?![a-z])`, "skont", "zaplac", "uhrad", "uhraz",
+  "zaruk", "zaruc", "garant", "guarant", "warrant", "gewahrleist", "gewaehrleist",
+  "zaloh", String.raw`(?<![a-z])advance`, "anzahlung", "vorauszahl", "deposit",
+  "uskladn", "storage", "lagerung", String.raw`(?<![a-z])aviz`, String.raw`(?<![a-z])avis`, "notif",
+  String.raw`(?<![a-z])pred(?:em)?(?![a-z])`, String.raw`(?<![a-z])vor(?![a-z])`, String.raw`(?<![a-z])prior(?![a-z])`,
+  "kazd", String.raw`(?<![a-z])alle(?![a-z])`, String.raw`(?<![a-z])every(?![a-z])`, String.raw`(?<![a-z])jednou(?![a-z])`,
+  "rhythmus", String.raw`(?<![a-z])takt`, "cycle", "interval",
+  "zahajeni", String.raw`(?<![a-z])start`, "beginn", "vzor(?:k|ek)", "muster", "sample", "prodluz", "verlang", "extend",
+].join("|"));
 
-/** V textu je počet + jednotka, za nímž stojí předložka „od / po / nach / after…" (lhůta od něčeho). */
-function leadRunsFrom(ft: string): boolean {
-  const m = LEAD_ONE.exec(ft);
-  return Boolean(m && FROM_PREP_WORD.test(ft.slice(m.index + m[0].length)));
+/** Text pole AI je jiná podmínka než dodací lhůta (záporný filtr). */
+export function rejectsLeadText(text: string): boolean {
+  const f = fold(normalizeText(text)).replace(FROM_ANY, " ");
+  return NEGATIVE.test(f);
 }
 
+const AI_UNIT: Record<string, { mult: number; unit: LeadUnit; months?: boolean }> = {
+  dny: { mult: 1, unit: "kalendarni" }, pracovni_dny: { mult: 1, unit: "pracovni" }, tydny: { mult: 7, unit: "kalendarni" }, mesice: { mult: 30, unit: "kalendarni", months: true },
+};
+
 /**
- * Strukturovaná dodací lhůta z AI (deliveryLeadTime) → lhůta. „jine" (běží od něčeho jiného než objednávka /
- * potvrzení / podklady) = blok. Text, který je zjevně jiná podmínka (platnost, splatnost, záruka…), = nic
- * (pole se ignoruje), leda jde o lhůtu od objednávky / potvrzení / podkladů a text dává stejnou hodnotu.
- * Hodnota v rozporu s vlastním textem pole (čteným jako dodací pole), nebo text s lhůtou, kterou nelze
- * potvrdit (od zálohy…), = blok. Bez hodnoty se čte text. Rozpětí převezme z textu („6–8 týdnů").
+ * Strukturovaná dodací lhůta z AI (deliveryLeadTime) → lhůta. „jine" = blok (stop). Text pole, který záporný
+ * filtr odmítne, = blok (stop, nečte se ani zbytek nabídky). Přijato: hodnota > 0, známá jednotka a „od"
+ * objednávka / potvrzení / podklady — nebo „od" neuvedeno a text, který gramatika přijme. Jinak null (čte se
+ * zbytek nabídky). evidence: text pole gramatika čte stejně („agrees"), jinak („conflict"), text chybí („none").
  */
 export function leadOfExtracted(x: ExtractedLeadTime | null | undefined): LeadTime | LeadBlocked | null {
   if (!x) return null;
-  const text = (x.text ?? "").replace(/\s+/g, " ").trim();
-  const block = (): LeadBlocked => ({ blocked: true, text });
-  if (x.from === "jine") return block();
-  const ft = fold(text);
+  const text = normalizeText(x.text).replace(/\s+/g, " ");
+  if (x.from === "jine") return { blocked: true, text };
+  if (text && rejectsLeadText(text)) return { blocked: true, text };
   const parsed = text ? parseLeadTime(text, { mode: "delivery-field" }) : null;
   const v = Number(x.value);
-  const valid = Number.isFinite(v) && v > 0;
-  const mult = x.unit === "tydny" ? 7 : x.unit === "mesice" ? 30 : 1;
-  const days = valid ? Math.round(v * mult) : 0;
-  const unit: LeadUnit = x.unit === "pracovni_dny" ? "pracovni" : "kalendarni";
-  const agrees = Boolean(parsed && parsed.days === days && parsed.unit === unit);
-  if (text && OTHER_RE.test(ft) && !DELIVERY_RE.test(ft) && !(x.from && agrees)) {
-    // „4 týdny od připsání zálohy" = lhůta od něčeho jiného → blok; „Platnost nabídky 30 dní" = pole se ignoruje
-    return leadRunsFrom(ft) ? block() : null;
-  }
-  if (!valid) return parsed ?? (text && LEAD_ONE.test(ft) ? block() : null);
+  const u = AI_UNIT[x.unit];
+  if (!u || !Number.isFinite(v) || !(v > 0)) return null;
+  if (x.from == null && !parsed) return null;
+  if (x.from != null && !["objednavka", "potvrzeni", "podklady"].includes(x.from)) return null;
+  const days = Math.round(v * u.mult);
   if (days > 3 * 365) return null;
-  // rozpor hodnoty a textu / text s lhůtou, kterou kladný seznam nepotvrdí = nejistota
-  if (text && !agrees && (parsed || LEAD_ONE.test(ft))) return block();
-  const lead: LeadTime = { days, unit, from: x.from ?? parsed?.from ?? null, text: "" };
-  if (x.unit === "mesice") lead.months = v;
-  if (parsed && agrees && parsed.range) lead.range = parsed.range;
+  const agrees = Boolean(parsed && parsed.days === days && parsed.unit === u.unit);
+  const lead: LeadTime = {
+    days, unit: u.unit, from: (x.from as LeadFrom) ?? parsed?.from ?? null, text: "", source: "ai",
+    evidence: !text ? "none" : agrees ? "agrees" : "conflict",
+  };
+  if (u.months) lead.months = v;
+  if (agrees && parsed?.range) lead.range = parsed.range;
   lead.text = text || leadAmountText(lead);
   return lead;
 }

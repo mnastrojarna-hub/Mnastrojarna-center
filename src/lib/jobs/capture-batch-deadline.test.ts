@@ -118,7 +118,7 @@ describe("orderDeadline (čistá logika)", () => {
 });
 
 describe("dávka: termín zakázky z nabídky", () => {
-  it("objednávka bez termínu + nabídka 4 týdny → požadovaný i potvrzený termín se zdrojem + info", () => {
+  it("objednávka bez termínu + nabídka 4 týdny (jen v textu) → požadovaný i potvrzený termín se zdrojem + ke kontrole (warn)", () => {
     const po = rd("objednavka_zakaznik", { doc: order() });
     const nab = rd("nabidka_my", { doc: quote() });
     const r = reconcile([po, nab]);
@@ -129,8 +129,9 @@ describe("dávka: termín zakázky z nabídky", () => {
     expect(r.review.fieldSources.customerRequiredDate).toEqual({ docId: nab.id, label: "z nabídky NAB-6 (4 týdny od objednání → 18. 11. 2026)" });
     expect(r.review.fieldSources.dueDate?.label).toMatch(/z nabídky NAB-6/);
     const w = r.warnings.find((x) => x.code === "deadline_from_quote")!;
-    expect(w).toMatchObject({ severity: "info", groupKey: "g1" });
-    expect(w.message).toBe("Objednávka nemá reálný termín (chybí) — převzat z nabídky NAB-6 (4 týdny od objednání → 18. 11. 2026).");
+    // termín odvozený z textu nabídky = vždy ke kontrole člověkem (nikdy plná automatika)
+    expect(w).toMatchObject({ severity: "warn", groupKey: "g1" });
+    expect(w.message).toBe("Objednávka nemá reálný termín (chybí) — převzat z nabídky NAB-6 (4 týdny od objednání → 18. 11. 2026). Termín odvozen z textu nabídky „Dodací lhůta 4 týdny od objednání“ — zkontroluj.");
   });
   it("termín = datum objednávky / v minulosti → z nabídky", () => {
     for (const due of ["2026-10-21", "2026-10-22"]) {

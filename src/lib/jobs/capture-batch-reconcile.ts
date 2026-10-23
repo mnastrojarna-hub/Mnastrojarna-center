@@ -1130,7 +1130,8 @@ export function groupDeadlineOf(
   if (result.proposal) {
     const p = result.proposal;
     source = { docId: p.docId ?? primaryId ?? "", label: p.label };
-    warnings.push(makeWarning("deadline_from_quote", p.past ? "warn" : "info", ids(p.docId), deadlineMessage(result) ?? p.label, [], gk));
+    // termín odvozený z textu (nebo AI nesedí s textem) = warn → ke kontrole, nikdy plná automatika (canAutoApplyBatch)
+    warnings.push(makeWarning("deadline_from_quote", p.past || p.review ? "warn" : "info", ids(p.docId), deadlineMessage(result) ?? p.label, [], gk));
   } else if (result.differs) {
     warnings.push(makeWarning("deadline_from_quote", "info", ids(quotes[0]?.docId ?? null), result.differs, [], gk));
   } else if (!result.realistic && result.reason && result.reason !== "missing") {

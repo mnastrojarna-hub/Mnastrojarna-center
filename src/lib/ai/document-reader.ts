@@ -225,7 +225,9 @@ export function systemPrompt(): string {
       "splatnost, platební lhůta, skonto, záloha, záruka ani reklamační lhůta — ty patří do paymentTerms / note. Lhůta běžící " +
       "od něčeho jiného (uhrazení / připsání zálohy či platby, obdržení materiálu, dokončení výroby) → from jine. Zahájení " +
       "výroby, vzorky / Erstmuster, expresní dodání za příplatek ani frekvence dílčích dodávek („každé 2 týdny“) dodací " +
-      "lhůtou NEJSOU — u vzorků a série ber lhůtu série. Bez dodací lhůty (nebo „dle dohody“) value 0, " +
+      "lhůtou NEJSOU — u vzorků a série ber lhůtu série. Lhůta, do které termín teprve POTVRDÍME („Termín dodání " +
+      "potvrdíme do 3 dnů od objednávky“, „Liefertermin wird … bestätigt“), avízo předem, uskladnění, prodloužení lhůty " +
+      "ani „X dní před montáží“ dodací lhůtou také nejsou (value 0). Bez dodací lhůty (nebo „dle dohody“) value 0, " +
       "from neuvedeno, text prázdný. Konkrétní datum dodání patří do promisedDeliveryDate, ne sem.",
 
     "POLOŽKY: každý řádek dokladu = jedna položka — drawingNumber (číslo výkresu / artiklu), revision (index, rev.), " +
