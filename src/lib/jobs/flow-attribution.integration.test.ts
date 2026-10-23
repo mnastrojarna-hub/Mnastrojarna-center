@@ -235,9 +235,10 @@ describe.skipIf(!LOCAL_ENABLED)("atribuce změn ↔ lokální Supabase", () => {
     expect(j).toMatchObject({ confirmation_issued_revision: 1, confirmation_issued_by: sales });
     const { data: f } = await svc.from("job_files").select("issuer, order_revision").eq("job_id", id).eq("filename", "my.pdf").single();
     expect(f).toMatchObject({ issuer: "my", order_revision: 1 });
-    // session nesmí označit soubor jako „náš vystavený doklad“
+    // session nesmí označit soubor jako „náš vystavený doklad“ (#25 157000: přes REST jen ze svého capture/<uid>/)
     const s = await localSession(DEMO.sales.email, DEMO.sales.password);
-    await s.from("job_files").insert({ job_id: id, kind: "potvrzeni", filename: "fake.pdf", storage_path: `zakazky/${id}/fake.pdf`, origin: "generated" });
+    const ins = await s.from("job_files").insert({ job_id: id, kind: "potvrzeni", filename: "fake.pdf", storage_path: `capture/${sales}/fake-${id}.pdf`, origin: "generated" });
+    expect(ins.error).toBeNull();
     const { data: fake } = await svc.from("job_files").select("origin").eq("job_id", id).eq("filename", "fake.pdf").single();
     expect((fake as { origin: string }).origin).toBe("upload");
   });

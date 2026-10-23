@@ -4,13 +4,16 @@ import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LOCAL_ENABLED, DEMO, localAdmin, localAnon, localSession, localSql, profileId } from "@/test/local-supabase";
 import { userActor } from "@/lib/supabase/actor-headers";
+import { isMineJob, type MineJobFacts } from "@/lib/auth/flow-scope";
+import { isPriceDocument } from "@/lib/auth/price-visibility";
 
 /**
  * #25 „Role a viditelnost" — pravidla v DB (migrace 20261023155000) proti skutečnému PostgREST
  * lokálního Supabase: schvalování nabídek ne-adminů super adminem (R0–R7, položky, vrácení),
  * backfill a idempotence migrace, fronta ke schválení, soubory a úložiště, obchodník zakázky,
  * jednorázové „AI focení pro všechny", poslední definice quotes_flow_before.
- * (Body 1–3 a 6 — parita „moje", počty, pošta — doplňuje 25-B.)
+ * 25-B (druhý blok): parita „moje" SQL ↔ TS, vynucení session, počty a odznaky, pošta (RLS), parita
+ * nákupních dokladů a pojistky migrace 20261023157000 (dokumenty přes REST, „Schválil" u zakázky, fronta).
  * Vlastní data Z-E2E-ROLE-* / NAB-E2E-ROLE-*, vše po sobě smaže.
  *   set -a; . .local-supabase/env; set +a; LOCAL_SUPABASE=1 npx vitest run src/lib/auth/roles-visibility.integration.test.ts
  */
@@ -630,5 +633,515 @@ describe.skipIf(!LOCAL_ENABLED)("#25 role a viditelnost — pravidla v DB", () =
     expect(localSql("select prosrc from pg_proc where proname = 'is_obchodnik_or_admin'")).toContain("active");
     expect(localSql("select flow_state_label('quote_state', 'ke_schvaleni')")).toBe("Neschválená");
     expect(localSql("select count(*) from pg_trigger where tgname in ('trg_quote_items_admin_approval', 'trg_orders_owner_guard')")).toBe("2");
+  });
+});
+
+// ═══ 25-B: „moje" (parita SQL ↔ TS, vynucení session, počty), pošta, nákupní doklady, pojistky 157000 ═══
+describe.skipIf(!LOCAL_ENABLED)("#25 „moje“ obchodního toku a pojistky 20261023157000", () => {
+  let svc: SupabaseClient;
+  let admin: SupabaseClient;
+  let sales: SupabaseClient;
+  let worker: SupabaseClient;
+  let temp: SupabaseClient;
+  let adminId = "";
+  let salesId = "";
+  let workerId = "";
+  let tempId = "";
+  const TEMP_EMAIL = `e2e-role-moje-${TAG}@local.test`;
+  const TEMP_PASSWORD = "Docasne123!";
+  const SALES_BOX = "d5000000-0000-0000-0000-000000000001";
+  const WORKER_BOX = "d5000000-0000-0000-0000-000000000002";
+  const jobs: string[] = [];
+  const emailIds: string[] = [];
+  const boxes: string[] = [];
+  const queueRows: string[] = [];
+  const pos: string[] = [];
+  const sqs: string[] = [];
+  const stored: string[] = [];
+  const custs: string[] = [];
+  let k = 0;
+  const app = (id: string) => localAdmin(userActor({ id }));
+
+  async function job(patch: Row = {}): Promise<string> {
+    k += 1;
+    const { data, error } = await svc.from("orders").insert({
+      number: `${PREFIX}-M${k}`, title: "E2E moje", source: "manual", status: "poptavka", inquiry_date: "2026-10-20", ...patch,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    jobs.push((data as { id: string }).id);
+    return (data as { id: string }).id;
+  }
+  async function email(patch: Row): Promise<string> {
+    const { data, error } = await svc.from("emails").insert({ subject: `E2E moje ${TAG}`, from_email: "x@example.test", direction: "in", ...patch }).select("id").single();
+    if (error) throw new Error(error.message);
+    emailIds.push((data as { id: string }).id);
+    return (data as { id: string }).id;
+  }
+  async function mailbox(owner: string | null): Promise<string> {
+    const { data, error } = await svc.from("mailboxes").insert({
+      provider: "imap", email: `e2e-moje-${TAG}-${boxes.length}@local.test`, owner_id: owner, active: false, config: {},
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    boxes.push((data as { id: string }).id);
+    return (data as { id: string }).id;
+  }
+  async function quote(db: SupabaseClient, jobId: string, patch: Row = {}): Promise<string> {
+    k += 1;
+    const { data, error } = await db.from("quotes").insert({
+      number: `NAB-E2E-MOJE-${TAG}-${k}`, job_id: jobId, status: "ke_schvaleni", total: 1000, revision: 1, valid_until: "2099-01-01", ...patch,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    return (data as { id: string }).id;
+  }
+
+  /** Fakta pro TS isMineJob přímo z DB (servisní klíč). */
+  async function factsOf(ids: string[]): Promise<Map<string, MineJobFacts>> {
+    const { data: orders } = await svc.from("orders").select("id, owner_id, assignee_id, created_by, email_id").in("id", ids);
+    const rows = (orders ?? []) as { id: string; owner_id: string | null; assignee_id: string | null; created_by: string | null; email_id: string | null }[];
+    const linked = rows.map((r) => r.email_id).filter((v): v is string => Boolean(v));
+    const [byOrder, byId, qs] = await Promise.all([
+      svc.from("emails").select("id, order_id, owner_id, mailbox_id").in("order_id", ids),
+      linked.length ? svc.from("emails").select("id, order_id, owner_id, mailbox_id").in("id", linked) : Promise.resolve({ data: [] }),
+      svc.from("quotes").select("job_id, created_by, owner_id, approval_requested_by").in("job_id", ids),
+    ]);
+    type E = { id: string; order_id: string | null; owner_id: string | null; mailbox_id: string | null };
+    const mails = [...((byOrder.data ?? []) as E[]), ...((byId.data ?? []) as E[])];
+    const out = new Map<string, MineJobFacts>();
+    for (const r of rows) {
+      out.set(r.id, {
+        ownerId: r.owner_id, assigneeId: r.assignee_id, createdBy: r.created_by,
+        emails: mails.filter((e) => e.order_id === r.id || e.id === r.email_id).map((e) => ({ ownerId: e.owner_id, mailboxId: e.mailbox_id })),
+        quotePeople: ((qs.data ?? []) as Row[]).filter((q) => q.job_id === r.id)
+          .flatMap((q) => [q.created_by, q.owner_id, q.approval_requested_by] as (string | null)[]),
+      });
+    }
+    return out;
+  }
+  async function boxesOf(user: string): Promise<string[]> {
+    const { data } = await svc.from("mailboxes").select("id").eq("owner_id", user);
+    return ((data ?? []) as { id: string }[]).map((m) => m.id);
+  }
+  async function sqlMine(db: SupabaseClient, user: string, within: string[]): Promise<string[]> {
+    const { data, error } = await db.rpc("flow_mine_job_id_list", { p_user: user });
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as string[]).filter((id) => within.includes(id)).sort();
+  }
+  async function tsMine(user: string, within: string[]): Promise<string[]> {
+    const facts = await factsOf(within);
+    const viewer = { userId: user, mailboxIds: await boxesOf(user) };
+    return within.filter((id) => facts.has(id) && isMineJob(facts.get(id)!, viewer)).sort();
+  }
+
+  let fx: Record<string, string> = {};
+
+  beforeAll(async () => {
+    svc = localAdmin();
+    [adminId, salesId, workerId] = await Promise.all([
+      profileId(svc, DEMO.admin.email), profileId(svc, DEMO.sales.email), profileId(svc, DEMO.worker.email),
+    ]);
+    const { data: created, error } = await svc.auth.admin.createUser({
+      email: TEMP_EMAIL, password: TEMP_PASSWORD, email_confirm: true, user_metadata: { full_name: "Dočasný Obchodník" },
+    });
+    if (error) throw new Error(error.message);
+    tempId = created.user!.id;
+    localSql(`update profiles set role = 'obchodnik', active = true, full_name = 'Dočasný Obchodník' where id = '${tempId}'`);
+    [admin, sales, worker, temp] = await Promise.all([
+      localSession(DEMO.admin.email, DEMO.admin.password),
+      localSession(DEMO.sales.email, DEMO.sales.password),
+      localSession(DEMO.worker.email, DEMO.worker.password),
+      localSession(TEMP_EMAIL, TEMP_PASSWORD),
+    ]);
+
+    // fixtury „moje“ dočasného obchodníka T (a–f), cizí, přeřazená schránka, e-mail bez schránky
+    const myBox = await mailbox(tempId);
+    const freeBox = await mailbox(null);
+    fx.a = await job({ owner_id: tempId });
+    fx.b = await job({ owner_id: adminId, assignee_id: tempId });
+    fx.c = await job({ owner_id: adminId, created_by: tempId });
+    const eD = await email({ mailbox_id: myBox, owner_id: null });
+    fx.d = await job({ owner_id: adminId, email_id: eD });
+    fx.e = await job({ owner_id: adminId });
+    await email({ mailbox_id: null, owner_id: tempId, order_id: fx.e, direction: "out" });
+    fx.f = await job({ owner_id: adminId });
+    await quote(app(tempId), fx.f);
+    fx.none = await job({ owner_id: adminId });
+    await email({ mailbox_id: WORKER_BOX, owner_id: workerId, order_id: fx.none });
+    await quote(svc, fx.none, { created_by: adminId });
+    fx.reassigned = await job({ owner_id: adminId });
+    await email({ mailbox_id: freeBox, owner_id: tempId, order_id: fx.reassigned });
+    fx.nomailbox = await job({ owner_id: null });
+    await email({ mailbox_id: null, owner_id: null, order_id: fx.nomailbox });
+    fx.freeBox = freeBox;
+  }, 90_000);
+
+  afterAll(async () => {
+    if (!svc) return;
+    if (queueRows.length) await svc.from("approval_queue").delete().in("id", queueRows);
+    if (pos.length) await svc.from("purchase_orders").delete().in("id", pos);
+    if (sqs.length) await svc.from("supplier_quotes").delete().in("id", sqs);
+    if (emailIds.length) await svc.from("emails").delete().in("id", emailIds);
+    if (jobs.length) {
+      await svc.from("job_files").delete().in("job_id", jobs);
+      await svc.from("job_events").delete().in("job_id", jobs);
+      await svc.from("quotes").delete().in("job_id", jobs);
+      await svc.from("orders").delete().in("id", jobs);
+    }
+    if (stored.length) await svc.storage.from("job-files").remove(stored);
+    if (custs.length) await svc.from("customers").delete().in("id", custs);
+    if (boxes.length) await svc.from("mailboxes").delete().in("id", boxes);
+    if (tempId) await svc.auth.admin.deleteUser(tempId).catch(() => undefined);
+  }, 60_000);
+
+  // ── 1) Parita „moje“ ────────────────────────────────────────
+  it("parita: SQL flow_mine_job_ids = TS isMineJob (a–f, nic, cizí schránka, přeřazená schránka, e-mail bez schránky)", async () => {
+    const within = Object.entries(fx).filter(([key]) => key !== "freeBox").map(([, v]) => v);
+    const { data: demo } = await svc.from("orders").select("id")
+      .gte("id", "d0000000-0000-0000-0000-000000000000").lte("id", "d0000000-0000-0000-0000-0000000000ff");
+    const withDemo = [...within, ...((demo ?? []) as { id: string }[]).map((r) => r.id)];
+    for (const user of [adminId, salesId, workerId, tempId]) {
+      expect(await sqlMine(svc, user, withDemo), user).toEqual(await tsMine(user, withDemo));
+      // pole (bez limitu řádků) = množina z flow_mine_job_ids
+      const { data: set } = await svc.rpc("flow_mine_job_ids", { p_user: user });
+      expect(((set ?? []) as string[]).filter((id) => withDemo.includes(id)).sort(), user).toEqual(await sqlMine(svc, user, withDemo));
+    }
+    expect(await sqlMine(svc, tempId, within)).toEqual([fx.a, fx.b, fx.c, fx.d, fx.e, fx.f, fx.reassigned].sort());
+    expect(await sqlMine(svc, workerId, within)).toEqual([fx.none]);
+
+    // přeřazení schránky: nový vlastník přebírá zakázky z příchozí pošty, starý drží své (e-mail přiřazený jemu)
+    await svc.from("mailboxes").update({ owner_id: workerId }).eq("id", fx.freeBox);
+    try {
+      expect(await sqlMine(svc, workerId, within)).toEqual([fx.none, fx.reassigned].sort());
+      expect(await tsMine(workerId, within)).toEqual([fx.none, fx.reassigned].sort());
+      expect(await sqlMine(svc, tempId, within)).toContain(fx.reassigned);
+    } finally {
+      await svc.from("mailboxes").update({ owner_id: null }).eq("id", fx.freeBox);
+    }
+  }, 60_000);
+
+  it("parita nákupních dokladů: SQL job_file_is_price_doc / job_file_price_ids = TS isPriceDocument (i sdílená cesta)", async () => {
+    const jobId = await job({ owner_id: adminId });
+    const base = `${jobId}/e2e-moje-${TAG}`;
+    const matrix: Row[] = [
+      { kind: "objednavka_vydana", issuer: "my", origin: "generated" },
+      { kind: "naceneni", issuer: "dodavatel", origin: "capture" },
+      { kind: "vykres", issuer: "dodavatel", origin: "upload" },
+      { kind: "model_3d", issuer: "dodavatel", origin: "upload" },
+      { kind: "nabidka", issuer: null, origin: "upload" },
+      { kind: "nabidka", issuer: "my", origin: "generated" },
+      { kind: "potvrzeni", issuer: null, origin: "generated" },
+      { kind: "faktura", issuer: null, origin: "email" },
+      { kind: "poptavka", issuer: null, origin: "upload" },
+      { kind: "ostatni", issuer: "my", origin: "upload" },
+      { kind: "ostatni", issuer: "my", origin: "upload" },
+      { kind: "foto", issuer: "zakaznik", origin: "capture" },
+    ];
+    const { data, error } = await svc.from("job_files").insert(matrix.map((m, i) => ({
+      job_id: jobId, filename: `f${i}.pdf`, storage_path: `${base}-${i}.pdf`, ...m,
+    }))).select("id, kind, issuer, origin, storage_path, filename");
+    if (error) throw new Error(error.message);
+    const files = (data ?? []) as { id: string; kind: string; issuer: string | null; origin: string | null; storage_path: string; filename: string }[];
+    const byName = (n: string) => files.find((f) => f.filename === n)!;
+    // f9 navázaný na objednávku dodavateli, f10 na nabídku dodavatele
+    const po = await svc.from("purchase_orders").insert({ job_id: jobId, file_id: byName("f9.pdf").id, number: `OV-E2E-${TAG}` }).select("id").single();
+    if (po.error) throw new Error(po.error.message);
+    pos.push((po.data as { id: string }).id);
+    const sq = await svc.from("supplier_quotes").insert({ job_id: jobId, file_id: byName("f10.pdf").id, supplier_name: "E2E dodavatel" }).select("id").single();
+    if (sq.error) throw new Error(sq.error.message);
+    sqs.push((sq.data as { id: string }).id);
+    const linked = new Set([byName("f9.pdf").id, byName("f10.pdf").id]);
+    for (const f of files) {
+      const { data: v } = await svc.rpc("job_file_is_price_doc", { p_id: f.id, p_kind: f.kind, p_issuer: f.issuer, p_origin: f.origin });
+      expect(v, `${f.filename} ${f.kind}/${f.issuer}/${f.origin}`).toBe(isPriceDocument(f, linked));
+    }
+    // výkres se stejnou cestou jako nabídka dodavatele (f1) = nákupní (cestou), jinak ne
+    const twin = await svc.from("job_files").insert({ job_id: jobId, kind: "vykres", filename: "twin.pdf", storage_path: byName("f1.pdf").storage_path }).select("id").single();
+    if (twin.error) throw new Error(twin.error.message);
+    const twinId = (twin.data as { id: string }).id;
+    const { data: priceIds, error: pErr } = await svc.rpc("job_file_price_ids", { p_ids: [...files.map((f) => f.id), twinId] });
+    expect(pErr).toBeNull();
+    const expected = [...files.filter((f) => isPriceDocument(f, linked)).map((f) => f.id), twinId].sort();
+    expect(((priceIds ?? []) as string[]).sort()).toEqual(expected);
+    // REST session funkci nemá (jen server)
+    expect((await sales.rpc("job_file_price_ids", { p_ids: [twinId] })).error).not.toBeNull();
+  }, 60_000);
+
+  // ── 2) Vynucení session ────────────────────────────────────
+  it("session: flow_mine_job_ids vždy pro sebe (podvržené p_user nepomůže); neaktivní účet nic; flow_counts(p_mine) pro sebe", async () => {
+    const within = [fx.a, fx.b, fx.c, fx.d, fx.e, fx.f, fx.none, fx.reassigned, fx.nomailbox];
+    expect(await sqlMine(temp, adminId, within)).toEqual(await sqlMine(svc, tempId, within));
+    expect(await sqlMine(sales, tempId, within)).toEqual(await sqlMine(svc, salesId, within));
+    const { data: setOwn } = await temp.rpc("flow_mine_job_ids", { p_user: adminId });
+    expect(((setOwn ?? []) as string[]).filter((id) => within.includes(id)).sort()).toEqual(await sqlMine(svc, tempId, within));
+
+    const counts = async (db: SupabaseClient, mine: string | null) => {
+      const { data, error } = await db.rpc("flow_counts", mine === undefined ? {} : { p_mine: mine });
+      if (error) throw new Error(error.message);
+      return Object.fromEntries(((data ?? []) as { flow_phase: string; flow_key: string; n: number }[]).map((r) => [`${r.flow_phase}.${r.flow_key}`, r.n]));
+    };
+    expect(await counts(temp, adminId)).toEqual(await counts(svc, tempId));
+
+    localSql(`update profiles set active = false where id = '${tempId}'`);
+    try {
+      expect(await sqlMine(temp, tempId, within)).toEqual([]);
+      const { data: none } = await temp.rpc("flow_mine_job_ids", { p_user: tempId });
+      expect(((none ?? []) as string[]).filter((id) => within.includes(id))).toEqual([]);
+    } finally {
+      localSql(`update profiles set active = true where id = '${tempId}'`);
+    }
+  }, 60_000);
+
+  // ── 3) Počty ───────────────────────────────────────────────
+  it("počty: flow_counts(p_mine) = počty z „moje“ seznamů; null = všichni; odznaky bez uzavřených zakázek a s vrácenými zvlášť", async () => {
+    const mine = await sqlMine(svc, tempId, [...jobs]);
+    // fixtury obchodníka T jsou jeho jediné zakázky → přesné počty
+    const { data: view } = await svc.from("job_flow_v").select("id, inquiry_key, pricing_key, order_key").in("id", mine);
+    const expected: Record<string, number> = {};
+    for (const r of (view ?? []) as Row[]) {
+      for (const [ph, col] of [["inquiry", "inquiry_key"], ["pricing", "pricing_key"], ["order", "order_key"]] as const) {
+        if (r[col]) expected[`${ph}.${r[col]}`] = (expected[`${ph}.${r[col]}`] ?? 0) + 1;
+      }
+    }
+    const { data: qs } = await svc.from("quotes").select("id, state, job_id, created_by, owner_id, approval_requested_by")
+      .or(`job_id.in.(${mine.join(",")}),created_by.eq.${tempId},owner_id.eq.${tempId},approval_requested_by.eq.${tempId}`);
+    for (const q of (qs ?? []) as Row[]) expected[`quote.${q.state}`] = (expected[`quote.${q.state}`] ?? 0) + 1;
+    const { data: rows } = await svc.rpc("flow_counts", { p_mine: tempId });
+    const got: Record<string, number> = {};
+    for (const r of (rows ?? []) as { flow_phase: string; flow_key: string; n: number }[]) {
+      if (["inquiry", "pricing", "order", "quote"].includes(r.flow_phase)) got[`${r.flow_phase}.${r.flow_key}`] = r.n;
+    }
+    expect(got).toEqual(expected);
+    // p_mine null = výchozí (všichni)
+    const all = await svc.rpc("flow_counts", {});
+    const allNull = await svc.rpc("flow_counts", { p_mine: null });
+    const norm = (d: unknown) => JSON.stringify(((d ?? []) as { flow_phase: string; flow_key: string; n: number }[])
+      .map((r) => `${r.flow_phase}.${r.flow_key}=${r.n}`).sort());
+    expect(norm(allNull.data)).toBe(norm(all.data));
+
+    // odznaky: neschválená (1), schválená k odeslání (1), vrácená (1); archivní a na uzavřené zakázce se nepočítají
+    const badge = async () => ((await svc.rpc("flow_badge_counts", { p_mine: tempId })).data as Row[])[0];
+    const before = await badge();
+    const pending = await quote(app(tempId), fx.a);
+    const ready = await quote(app(tempId), fx.a);
+    const returned = await quote(app(tempId), fx.a);
+    const archived = await quote(app(tempId), fx.a);
+    const closedJob = await job({ owner_id: tempId, status: "dokonceno" });
+    const onClosed = await quote(app(tempId), closedJob);
+    for (const id of [ready, onClosed]) expect((await admin.from("quotes").update({ approved_by: adminId }).eq("id", id).select("id")).error).toBeNull();
+    expect((await admin.from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: "doplň" }).eq("id", returned).select("id")).error).toBeNull();
+    await svc.from("quotes").update({ archived: true }).eq("id", archived);
+    const after = await badge();
+    expect(Number(after.quotes_pending) - Number(before.quotes_pending)).toBe(1);
+    expect(Number(after.quotes_pending_manual) - Number(before.quotes_pending_manual)).toBe(1);
+    expect(Number(after.quotes_ready) - Number(before.quotes_ready)).toBe(1);
+    expect(Number(after.quotes_returned) - Number(before.quotes_returned)).toBe(1);
+    expect(pending).toBeTruthy();
+    // poptávky v odznaku = otevřené poptávky „moje“
+    const { data: open } = await svc.from("orders").select("id").in("id", await sqlMine(svc, tempId, [...jobs]))
+      .in("inquiry_status", ["prijata", "v_reseni", "ceka_na_podklady"]).in("status", ["poptavka", "naceneni"]);
+    expect(Number(after.inquiries)).toBe((open ?? []).length);
+  }, 90_000);
+
+  // ── 6) Pošta (RLS) ─────────────────────────────────────────
+  it("pošta: obchodník čte e-mail své schránky i bez vlastníka, ne dílnu; mailboxes.config ne; deaktivovaný nic", async () => {
+    const mine = await email({ mailbox_id: SALES_BOX, owner_id: null });
+    const foreign = await email({ mailbox_id: WORKER_BOX, owner_id: workerId });
+    const s = await sales.from("emails").select("id").in("id", [mine, foreign]);
+    expect(((s.data ?? []) as { id: string }[]).map((r) => r.id)).toEqual([mine]);
+    const w = await worker.from("emails").select("id").in("id", [mine, foreign]);
+    expect(((w.data ?? []) as { id: string }[]).map((r) => r.id)).toEqual([foreign]);
+    // stav schránky: jen vlastní
+    const st = await sales.from("mailbox_status").select("mailbox_id");
+    expect(((st.data ?? []) as { mailbox_id: string }[]).every((r) => r.mailbox_id === SALES_BOX)).toBe(true);
+    // přístupové údaje schránek jen super admin
+    const mb = await sales.from("mailboxes").select("id, config");
+    expect(mb.data ?? []).toEqual([]);
+
+    const tempBox = boxes[0];
+    const own = await email({ mailbox_id: tempBox, owner_id: null });
+    expect(((await temp.from("emails").select("id").eq("id", own)).data ?? []).length).toBe(1);
+    localSql(`update profiles set active = false where id = '${tempId}'`);
+    try {
+      expect(((await temp.from("emails").select("id").in("id", [own, mine])).data ?? []).length).toBe(0);
+    } finally {
+      localSql(`update profiles set active = true where id = '${tempId}'`);
+    }
+  });
+
+  // ── Pojistky 20261023157000 ────────────────────────────────
+  it("(a) dokument přes REST jen ze svého capture/<uid>/ a s cestou, kterou nemá jiný dokument", async () => {
+    const jobId = await job({ owner_id: salesId });
+    const priceRow = await svc.from("job_files").insert({
+      job_id: jobId, kind: "naceneni", issuer: "dodavatel", filename: "nab.pdf", storage_path: `capture/${salesId}/e2e-moje-${TAG}-nab.pdf`,
+    }).select("id").single();
+    if (priceRow.error) throw new Error(priceRow.error.message);
+    // mimo capture/<uid>/
+    const outside = await worker.from("job_files").insert({ job_id: jobId, kind: "vykres", filename: "v.pdf", storage_path: `${jobId}/cizi-${TAG}.pdf` }).select("id");
+    expect(outside.error?.code).toBe("42501");
+    // cizí capture
+    const other = await worker.from("job_files").insert({ job_id: jobId, kind: "vykres", filename: "v.pdf", storage_path: `capture/${salesId}/x-${TAG}.pdf` }).select("id");
+    expect(other.error?.code).toBe("42501");
+    // podvržený „výkres“ na cestu nákupního dokladu
+    const twin = await sales.from("job_files").insert({ job_id: jobId, kind: "vykres", filename: "v.pdf", storage_path: `capture/${salesId}/e2e-moje-${TAG}-nab.pdf` }).select("id");
+    expect(twin.error?.code).toBe("42501");
+    expect(twin.error?.message).toBe("Tento soubor už patří jinému dokumentu.");
+    // vlastní nová fotka projde
+    const ok = await worker.from("job_files").insert({ job_id: jobId, kind: "foto", filename: "f.jpg", storage_path: `capture/${workerId}/e2e-moje-${TAG}-f.jpg` }).select("id");
+    expect(ok.error).toBeNull();
+  });
+
+  it("(b) „Schválil“ u zakázky (orders.approved_by/at) zapisuje jen super admin", async () => {
+    const jobId = await job({ owner_id: salesId });
+    const s = await sales.from("orders").update({ approved_by: salesId, approved_at: new Date().toISOString() }).eq("id", jobId).select("id");
+    expect(s.error?.code).toBe("42501");
+    expect(s.error?.message).toBe("Schválení nabídky u zakázky zapisuje jen super admin.");
+    expect((await worker.from("orders").update({ approved_at: "2026-01-01T00:00:00Z" }).eq("id", jobId).select("id")).error?.code).toBe("42501");
+    expect((await app(salesId).from("orders").update({ approved_by: adminId }).eq("id", jobId).select("id")).error?.code).toBe("42501");
+    // jiné sloupce dál smí
+    expect((await sales.from("orders").update({ assignee_id: workerId }).eq("id", jobId).select("id")).error).toBeNull();
+    // super admin (REST i server s autorem) smí
+    expect((await admin.from("orders").update({ approved_by: adminId, approved_at: new Date().toISOString() }).eq("id", jobId).select("id")).error).toBeNull();
+    expect((await app(adminId).from("orders").update({ approved_by: null, approved_at: null }).eq("id", jobId).select("id")).error).toBeNull();
+    // založení zakázky ne-adminem s „Schválil“ → vynulováno
+    k += 1;
+    const ins = await app(salesId).from("orders").insert({
+      number: `${PREFIX}-M${k}`, title: "E2E moje", source: "manual", status: "poptavka", owner_id: salesId,
+      approved_by: adminId, approved_at: new Date().toISOString(),
+    }).select("id, approved_by, approved_at").single();
+    expect(ins.error).toBeNull();
+    jobs.push((ins.data as { id: string }).id);
+    expect(ins.data).toMatchObject({ approved_by: null, approved_at: null });
+  });
+
+  it("(c) odmítnutí vlastního řádku fronty přes REST: čas vyřízení dává DB (nejde antedatovat)", async () => {
+    const { data, error } = await svc.from("approval_queue").insert({
+      type: "email_reply", title: `E2E moje ${TAG}`, payload: {}, owner_id: salesId,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    const row = (data as { id: string }).id;
+    queueRows.push(row);
+    const started = Date.now();
+    const up = await sales.from("approval_queue").update({ status: "rejected", resolved_at: "2001-01-01T00:00:00Z" }).eq("id", row).select("id");
+    expect(up.error).toBeNull();
+    const { data: after } = await svc.from("approval_queue").select("status, resolved_at, resolved_by").eq("id", row).single();
+    expect(after).toMatchObject({ status: "rejected", resolved_by: salesId });
+    expect(Date.parse(String((after as Row).resolved_at))).toBeGreaterThan(started - 60_000);
+    // bez změny stavu čas vyřízení zůstane
+    await sales.from("approval_queue").update({ resolved_at: "2001-01-01T00:00:00Z" }).eq("id", row);
+    const { data: kept } = await svc.from("approval_queue").select("resolved_at").eq("id", row).single();
+    expect((kept as Row).resolved_at).toBe((after as Row).resolved_at);
+  });
+
+  it("(d) úložiště: PDF neschválené / před schválením vzniklé naší nabídky přes REST jen super admin; cizí cestu nejde ověřit", async () => {
+    const jobId = await job({ owner_id: salesId });
+    const qid = await quote(app(salesId), jobId);
+    expect(await svc.from("quotes").select("state, admin_approval_required").eq("id", qid).single().then((r) => r.data))
+      .toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+    const pdf = async (name: string): Promise<string> => {
+      const p = `zakazky/${jobId}/e2e-moje-${TAG}-${name}.pdf`;
+      const up = await svc.storage.from("job-files").upload(p, Buffer.from("%PDF-1.4 e2e"), { contentType: "application/pdf" });
+      if (up.error) throw new Error(up.error.message);
+      stored.push(p);
+      const ins = await svc.from("job_files").insert({
+        job_id: jobId, kind: "nabidka", issuer: "my", origin: "generated", quote_id: qid, filename: `${name}.pdf`, storage_path: p,
+      }).select("id");
+      if (ins.error) throw new Error(ins.error.message);
+      return p;
+    };
+    const read = async (db: SupabaseClient, p: string) => (await db.storage.from("job-files").download(p)).error === null;
+    const before = await pdf("neschvalena");
+    expect(await read(sales, before)).toBe(false);
+    expect(await read(worker, before)).toBe(false);
+    expect(await read(admin, before)).toBe(true);
+    // schválení: PDF vzniklé před ním zůstane zamčené, nové projde
+    expect((await admin.from("quotes").update({ approved_by: adminId }).eq("id", qid).select("id")).error).toBeNull();
+    await new Promise((r) => setTimeout(r, 20));
+    const after = await pdf("schvalena");
+    expect(await read(sales, before)).toBe(false);
+    expect(await read(sales, after)).toBe(true);
+    expect(await read(worker, after)).toBe(true);
+    expect(await read(admin, before)).toBe(true);
+    // cizí cestu přihlášený neověří (jen vlastní capture/<uid>/), server ano
+    expect((await worker.rpc("job_file_path_in_use", { p_path: after })).data).toBe(false);
+    expect((await svc.rpc("job_file_path_in_use", { p_path: after })).data).toBe(true);
+  });
+
+  it("(e) obchodník nové zakázky: ne-admin jen sebe / nikoho / obchodníka zákazníka; obchodníka zákazníka mění jen super admin", async () => {
+    const cust = async (owner: string | null, db: SupabaseClient = svc) => {
+      k += 1;
+      const r = await db.from("customers").insert({ name: `E2E moje ${TAG} zákazník ${k}`, owner_id: owner }).select("id").single();
+      if (!r.error) custs.push((r.data as { id: string }).id);
+      return r;
+    };
+    const adminCust = ((await cust(adminId)).data as { id: string }).id;
+    const order = async (db: SupabaseClient, patch: Row) => {
+      k += 1;
+      const r = await db.from("orders").insert({ number: `${PREFIX}-M${k}`, title: "E2E moje", source: "manual", status: "poptavka", ...patch }).select("id").single();
+      if (!r.error) jobs.push((r.data as { id: string }).id);
+      return r;
+    };
+    // REST i server s autorem: cizí obchodník → 42501
+    const foreign = await order(sales, { owner_id: adminId });
+    expect(foreign.error?.code).toBe("42501");
+    expect(foreign.error?.message).toBe("Obchodníka zakázky mění jen super admin.");
+    expect((await order(app(workerId), { owner_id: salesId })).error?.code).toBe("42501");
+    // obchodník zákazníka, sám sebe, nikdo → ok; super admin cokoli
+    expect((await order(sales, { owner_id: adminId, customer_id: adminCust })).error).toBeNull();
+    expect((await order(app(workerId), { owner_id: adminId, customer_id: adminCust })).error).toBeNull();
+    expect((await order(sales, { owner_id: salesId })).error).toBeNull();
+    expect((await order(worker, { owner_id: null })).error).toBeNull();
+    expect((await order(admin, { owner_id: salesId })).error).toBeNull();
+    expect((await order(app(adminId), { owner_id: workerId })).error).toBeNull();
+
+    // obchodník zákazníka: ne-admin ho nezmění (REST ani server s autorem), ostatní údaje ano
+    const up = await sales.from("customers").update({ owner_id: salesId }).eq("id", adminCust).select("id");
+    expect(up.error?.code).toBe("42501");
+    expect(up.error?.message).toBe("Obchodníka zákazníka mění jen super admin.");
+    expect((await app(salesId).from("customers").update({ owner_id: salesId }).eq("id", adminCust).select("id")).error?.code).toBe("42501");
+    expect((await sales.from("customers").update({ note: "E2E pozn." }).eq("id", adminCust).select("id")).error).toBeNull();
+    // REST založí jen se sebou / bez obchodníka
+    expect((await cust(adminId, sales)).error?.code).toBe("42501");
+    expect((await cust(salesId, sales)).error).toBeNull();
+    expect((await cust(null, worker)).error).toBeNull();
+    // super admin smí
+    expect((await admin.from("customers").update({ owner_id: salesId }).eq("id", adminCust).select("id")).error).toBeNull();
+    expect((await svc.from("customers").select("owner_id").eq("id", adminCust).single()).data).toMatchObject({ owner_id: salesId });
+  });
+
+  it("(f) odznak „Nabídky“: k odeslání jen co viewer smí odeslat (TS quoteSendBlock); vrácené jen vlastní", async () => {
+    const { quoteSendBlock } = await import("@/lib/jobs/flow-status");
+    const badgeOf = async (u: string) => ((await svc.rpc("flow_badge_counts", { p_mine: u })).data as Row[])[0];
+    const diff = (a: Row, b: Row, key: string) => Number(a[key]) - Number(b[key]);
+    // zakázka obchodníka, kterou založil zaměstnanec → „moje" obou
+    const jobId = await job({ owner_id: salesId, created_by: workerId });
+    const w0 = await badgeOf(workerId);
+    const s0 = await badgeOf(salesId);
+    const bySales = await quote(app(salesId), jobId);
+    const byWorker = await quote(app(workerId), jobId);
+    const returned = await quote(app(salesId), jobId);
+    for (const qid of [bySales, byWorker]) {
+      expect((await admin.from("quotes").update({ approved_by: adminId }).eq("id", qid).select("id")).error).toBeNull();
+    }
+    expect((await admin.from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: "doplň" }).eq("id", returned).select("id")).error).toBeNull();
+    const w1 = await badgeOf(workerId);
+    const s1 = await badgeOf(salesId);
+    // zaměstnanec odešle jen svou schválenou; obchodník (nákupní ceny) obě
+    expect(diff(w1, w0, "quotes_ready")).toBe(1);
+    expect(diff(s1, s0, "quotes_ready")).toBe(2);
+    // vrácenou opraví autor → jen jeho odznak
+    expect(diff(w1, w0, "quotes_returned")).toBe(0);
+    expect(diff(s1, s0, "quotes_returned")).toBe(1);
+    // TS dvojče: stejné nabídky podle quoteSendBlock pro zaměstnance
+    const workerCan = (f: string) => ["orders", "workflow", "documents"].includes(f);
+    const { data: rows } = await svc.from("quotes").select("id, state, archived, created_by, admin_approval_required, approval_required, approved_by, sent_at")
+      .in("id", [bySales, byWorker]);
+    const sendable = ((rows ?? []) as Row[]).filter((r) => quoteSendBlock({
+      state: r.state as never, archived: Boolean(r.archived), createdBy: r.created_by as string,
+      adminApprovalRequired: r.admin_approval_required === true, approvalRequired: r.approval_required === true,
+      approvedBy: r.approved_by as string | null, sentAt: r.sent_at as string | null,
+    }, { can: workerCan as never, userId: workerId, jobOwnerId: salesId, jobAssigneeId: null }) === null);
+    expect(sendable.map((r) => r.id)).toEqual([byWorker]);
+    // Zpracovává: zaměstnanec pak smí odeslat i schválenou nabídku obchodníka
+    await svc.from("orders").update({ assignee_id: workerId }).eq("id", jobId);
+    expect(diff(await badgeOf(workerId), w0, "quotes_ready")).toBe(2);
   });
 });

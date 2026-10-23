@@ -13,6 +13,8 @@ import {
   rowToPurchaseOrderView, rowToSupplierQuoteView, rowToSupplierRef,
   type CommissionDbRow, type PurchaseOrderDbRow, type SupplierEmbedRow, type SupplierQuoteDbRow,
 } from "@/lib/jobs/purchasing";
+import type { FlowScope } from "@/lib/auth/flow-scope";
+import { maskPurchaseOrderListItem } from "@/lib/auth/price-visibility";
 
 /**
  * Datová vrstva nákupu zakázky (nabídky dodavatelů, objednávky vydané, provize).
@@ -34,6 +36,24 @@ async function session() {
     if (!access.user || !access.user.active || !access.can("margins")) return null;
     const db = await createOperatorClient();
     return { db, access };
+  } catch (err) {
+    console.error(`[data:purchasing] ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
+/**
+ * #25: přehled „Objednávky dodavatelům" vidí každý s obchodním tokem (workflow) — bez práva na
+ * nákupní ceny (margins) jen maskovaně (bez cen, volného textu, PDF a akcí). Detail objednávky,
+ * nákup zakázky a akce dál jen s margins (session výše).
+ */
+async function listSession() {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const access = await getAccess();
+    if (!access.user || !access.user.active || !(access.can("workflow") || access.can("margins"))) return null;
+    const db = await createOperatorClient();
+    return { db, access, margins: access.can("margins") };
   } catch (err) {
     console.error(`[data:purchasing] ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -145,7 +165,9 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
     const owner = personRef(job.owner);
     const comm = commRes.data as CommissionFullRow | null;
     let commission: JobCommissionView | null = null;
-    if (comm) {
+    // #25: provizi zakázky vidí jen její obchodník (komu patří) a kdo vidí provize všech (super admin)
+    const commissionHidden = Boolean(comm) && !s.access.can("commissions_all") && comm!.owner_id !== s.access.user!.id;
+    if (comm && !commissionHidden) {
       let ownerName = owner && owner.id === comm.owner_id ? owner.name : "";
       if (!ownerName) {
         const { data: p } = await s.db.from("profiles").select("id, full_name, email").eq("id", comm.owner_id).maybeSingle();
@@ -166,6 +188,7 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
       supplierQuotes: quotes,
       purchaseOrders: orders,
       commission,
+      ...(commissionHidden ? { commissionHidden: true } : {}),
       owner,
       pendingCaptured,
       totals: purchasingTotals({
@@ -193,11 +216,23 @@ export async function getPurchaseOrder(id: string): Promise<PurchaseOrderView | 
   }
 }
 
-/** Přehled „Objednávky dodavatelům" napříč zakázkami (nejnovější první). */
+type PageResult = PromiseLike<{ data: PurchaseOrderDbRow[] | null; error: { message: string } | null }>;
+type PoQuery = { in: (c: string, v: string[]) => PoQuery; or: (f: string) => PoQuery; range: (a: number, b: number) => PageResult };
+
+/**
+ * Přehled „Objednávky dodavatelům" napříč zakázkami (nejnovější první).
+ * scope (#25) = jen „moje" (moje zakázky ∪ objednávky, které jsem vytvořil / odeslal / odešly z mé schránky);
+ * bez práva na nákupní ceny se řádky maskují (maskPurchaseOrderListItem).
+ */
 export async function listPurchaseOrders(
   opts: { status?: PurchaseOrderStatus[]; supplierId?: string; jobId?: string; q?: string; limit?: number } = {},
+  scopeOpts: { scope?: FlowScope | null } = {},
 ): Promise<PurchaseOrderListItem[]> {
-  const s = await session();
+  const scoped = "scope" in scopeOpts;
+  const scope = scopeOpts.scope ?? null;
+  if (scoped && (!scope || (!scope.all && (scope.error || !isUuid(scope.userId))))) return [];
+  const mine = scoped && scope && !scope.all ? scope : null;
+  const s = await listSession();
   if (!s) return [];
   try {
     if (opts.supplierId && !isUuid(opts.supplierId)) return [];
@@ -208,15 +243,37 @@ export async function listPurchaseOrders(
       if (statuses.length) query = query.in("status", statuses);
       if (opts.supplierId) query = query.eq("supplier_id", opts.supplierId);
       if (opts.jobId) query = query.eq("job_id", opts.jobId);
-      return query.order("created_at", { ascending: false }).order("id");
+      return query.order("created_at", { ascending: false }).order("id") as unknown as PoQuery;
     };
-    const { data, error } = await fetchPaged<PurchaseOrderDbRow>(
-      (from, to) => build().range(from, to) as unknown as PromiseLike<{ data: PurchaseOrderDbRow[] | null; error: { message: string } | null }>,
-      MAX_ROWS,
-    );
-    warn("list", error);
-    if (error) return [];
-    const items = filterPurchaseOrders(data.map(rowToPurchaseOrderListItem), opts.q);
+    let rows: PurchaseOrderDbRow[];
+    if (mine) {
+      // rozsah vtlačený do dotazu (zakázky po dávkách + osoby / moje schránky), sloučeno podle id
+      const byId = new Map<string, PurchaseOrderDbRow>();
+      const ids = [...mine.jobIds];
+      for (let i = 0; i < ids.length; i += 200) {
+        const part = ids.slice(i, i + 200);
+        const r = await fetchPaged<PurchaseOrderDbRow>((from, to) => build().in("job_id", part).range(from, to), MAX_ROWS);
+        warn("list", r.error);
+        if (r.error) return [];
+        for (const row of r.data) byId.set(row.id, row);
+      }
+      const boxes = mine.mailboxIds.filter((b) => isUuid(b));
+      const people = [`created_by.eq.${mine.userId}`, `sent_by.eq.${mine.userId}`, ...(boxes.length ? [`sent_mailbox_id.in.(${boxes.join(",")})`] : [])];
+      const r = await fetchPaged<PurchaseOrderDbRow>((from, to) => build().or(people.join(",")).range(from, to), MAX_ROWS);
+      warn("list", r.error);
+      if (r.error) return [];
+      for (const row of r.data) byId.set(row.id, row);
+      rows = [...byId.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || a.id.localeCompare(b.id));
+    } else {
+      const r = await fetchPaged<PurchaseOrderDbRow>((from, to) => build().range(from, to), MAX_ROWS);
+      warn("list", r.error);
+      if (r.error) return [];
+      rows = r.data;
+    }
+    const mapped = rows.map(rowToPurchaseOrderListItem);
+    // bez práva na nákupní ceny: hledá se jen v tom, co je vidět (maska dřív než filtr)
+    const visible = s.margins ? mapped : mapped.map(maskPurchaseOrderListItem);
+    const items = filterPurchaseOrders(visible, opts.q);
     const limit = opts.limit && opts.limit > 0 ? Math.floor(opts.limit) : undefined;
     return limit ? items.slice(0, limit) : items;
   } catch (err) {

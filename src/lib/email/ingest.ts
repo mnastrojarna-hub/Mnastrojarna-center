@@ -353,6 +353,8 @@ export async function ingestEmailsProgress(
         target: e.fromEmail,
         ai_confidence: confidence,
         email_id: inserted.id,
+        // #25: návrh odpovědi patří vlastníkovi schránky (fronta je vidět jen jemu a super adminovi)
+        owner_id: opts.ownerId ?? null,
         ...(sentAuto ? { status: "auto_executed", resolved_at: new Date().toISOString() } : {}),
       });
       if (!sentAuto) await db.from("emails").update({ has_draft: true }).eq("id", inserted.id);

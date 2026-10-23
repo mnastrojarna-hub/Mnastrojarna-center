@@ -1,9 +1,11 @@
 import { BadgeCheck, Mail, PackageCheck, ShoppingCart } from "lucide-react";
 import { requireFeature, getAccess } from "@/lib/auth/session";
-import { getJob, listJobs } from "@/lib/data/jobs";
+import { getJob, listJobOrderRefs, listJobs } from "@/lib/data/jobs";
 import { getEmails } from "@/lib/data/queries";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowJobStates, getLatestOrderRevisions, listFlowStateJobIds } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
+import { mineParam } from "@/lib/auth/flow-scope";
 import type { EmailItem } from "@/lib/data/types";
 import type { JobDetail } from "@/lib/jobs/types";
 import { CONFIRM_QUEUE, FLOW_ACTIONS, ORDER_TAB_CHIPS, chipsForTab, stateMeta } from "@/lib/jobs/flow-status";
@@ -40,15 +42,23 @@ export default async function ConfirmationsPage({
   const { can } = await getAccess();
   const mail = can("mail");
   const selected = parseStateParam(sp[STATE_PARAM], ALL_KEYS, CONFIRM_QUEUE);
-  const [counts, ids, all, emails] = await Promise.all([
-    getFlowCounts(),
+  // #25: obchodní tok jen „moje" (super admin všichni, nebo „Jen moje")
+  const scope = await getFlowScope(await flowWhoFrom(sp));
+  const [counts, ids, all, allEmails, orderRefs] = await Promise.all([
+    getFlowCounts({ mine: mineParam(scope) }),
     listFlowStateJobIds([
       { phase: "order", keys: selected.filter((k) => ORDER_KEYS.includes(k)) },
       { phase: "fulfilment", keys: selected.filter((k) => !ORDER_KEYS.includes(k)) },
-    ]),
-    listJobs({ sort: "deadline", dir: "asc" }),
+    ], { scope }),
+    listJobs({ sort: "deadline", dir: "asc" }, { scope }),
     mail ? getEmails() : Promise.resolve([] as EmailItem[]),
+    // párování pošty „Přiřadit k Z-…" proti VŠEM zakázkám (Kniha) — jinak duplicitní zakázka k cizí
+    mail ? listJobOrderRefs() : Promise.resolve([]),
   ]);
+  // pošta je už podle schránek; super admin v „Jen moje" jen své schránky
+  const emails = scope && scope.canToggle && !scope.all
+    ? allEmails.filter((e) => Boolean(e.mailboxId && scope.mailboxIds.includes(e.mailboxId)))
+    : allEmails;
   // bez podrobných stavů (DB je nemá) aspoň objednávky podle hlavního stavu
   const jobs = ids ? all.filter((j) => ids.has(j.id)) : all.filter((j) => j.stage === "objednavka");
   const states = await getFlowJobStates(jobs.map((j) => j.id));
@@ -68,7 +78,7 @@ export default async function ConfirmationsPage({
     ? "K potvrzení"
     : selected.map((k) => stateMeta(ORDER_KEYS.includes(k) ? "order" : "fulfilment", k)?.label ?? k).join(", ");
   const today = todayPrague();
-  const inbox = withJobMatches(toFlowEmails(emails, ["Objednávka", "Potvrzení objednávky"]), all);
+  const inbox = withJobMatches(toFlowEmails(emails, ["Objednávka", "Potvrzení objednávky"]), orderRefs);
   const waiting = inbox.filter((e) => !e.jobId).length;
 
   return (

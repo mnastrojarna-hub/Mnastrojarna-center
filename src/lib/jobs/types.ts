@@ -1,6 +1,7 @@
 // View-modely Knihy zakázek (UI ↔ datová vrstva). Plní se výhradně z DB (tabulka orders a spol.).
 import type {
-  ActorKind, ChangeVia, InquiryStatus, JobStage, JobFileKind, JobSource, PriorityLevel, PurchaseOrderStatus, QuoteState, QuoteStatus,
+  ActorKind, ChangeVia, DocIssuerKey, InquiryStatus, JobStage, JobFileKind, JobFileOrigin, JobSource, PriorityLevel,
+  PurchaseOrderStatus, QuoteState, QuoteStatus,
 } from "@/lib/supabase/database.types";
 import type { DeadlineState } from "@/lib/jobs/operations";
 import type { StageGroupKey } from "@/lib/jobs/stages";
@@ -218,7 +219,19 @@ export interface JobFile {
   note: string | null;
   /** AI z dokladu něco přečetla (ai_extracted není prázdné). */
   hasAiData: boolean;
+  /** Kdo doklad vystavil (my / zákazník / dodavatel). */
+  issuer?: DocIssuerKey | null;
+  /** Odkud dokument je (vystavený, nahraný, foto, e-mail, import). */
+  origin?: JobFileOrigin | null;
+  /**
+   * #25: obsah zamčený pro tohoto uživatele (řádek je vidět, náhled / stažení / odeslání ne):
+   * price = nákupní doklad bez práva na marže; unapproved / stale = PDF naší nabídky čekající
+   * na schválení / vystavené před posledním schválením.
+   */
+  locked?: FileLock;
 }
+
+export type FileLock = "price" | "unapproved" | "stale" | null;
 
 export type JobEventType =
   | "created" | "stage" | "status" | "field" | "file" | "quote" | "comment" | "ai" | "email";

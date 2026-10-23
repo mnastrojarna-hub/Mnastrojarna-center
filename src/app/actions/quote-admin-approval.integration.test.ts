@@ -7,7 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * jen přihlášení a revalidace). Nabídka obchodníka / zaměstnance = „Neschválená" → schválí jen super
  * admin (otisk obsahu, optimistický zámek), vrácení k přepracování, PDF k odeslání až po schválení,
  * odeslání jen vystaveného PDF po posledním schválení, upozornění super adminům (1× za 30 min).
- * (Části „moje", nákupní doklady a obchodník zakázky doplňuje 25-B.) Vlastní zakázky Z-E2E-QAPPR-*.
+ * 25-B: „moje" (nabídky, dokumenty, objednávky dodavatelům), zámky obsahu dokumentů, odznaky a fronta
+ * „Ke schválení", obchodník zakázky, provize cizí zakázky, zakázka z e-mailu. Vlastní zakázky Z-E2E-QAPPR-*.
  *   set -a; . .local-supabase/env; set +a; LOCAL_SUPABASE=1 npx vitest run src/app/actions/quote-admin-approval.integration.test.ts
  */
 
@@ -71,6 +72,7 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
   let jobs: Jobs;
   let docs: Docs;
   const jobIds: string[] = [];
+  const customerIds: string[] = [];
   let n = 0;
   const startedAt = new Date(Date.now() - 1000).toISOString();
 
@@ -157,6 +159,10 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
       await svc.from("orders").delete().in("id", jobIds);
       await svc.from("audit_log").delete().in("entity_id", jobIds);
       await svc.from("audit_log").delete().in("diff->>jobId", jobIds);
+    }
+    if (customerIds.length) {
+      await svc.from("audit_log").delete().in("entity_id", customerIds);
+      await svc.from("customers").delete().in("id", customerIds);
     }
     await svc.from("audit_log").delete().eq("action", "quote_approval_notice").gte("created_at", startedAt);
   }, 60_000);
@@ -455,4 +461,389 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
       .toBe("Odeslanou nabídku nejde upravit — vytvoř novou verzi.");
     expect(await jobs.acceptJobQuote(quote.id)).toMatchObject({ ok: true });
   }, 90_000);
+
+  // ═══ 25-B: „moje", nákupní doklady, obchodník zakázky ═══
+  const PRICE_VIEW = "Nákupní doklad vidí obchodník a super admin.";
+  const PRICE_SEND = "Nákupní doklad posílá obchodník nebo super admin.";
+
+  async function storedFile(jobId: string, patch: Row): Promise<string> {
+    n += 1;
+    const storage = `${jobId}/e2e-qappr-${TAG}-${n}.pdf`;
+    const up = await svc.storage.from("job-files").upload(storage, new Blob([Buffer.from("%PDF-1.4 e2e")], { type: "application/pdf" }), { contentType: "application/pdf", upsert: true });
+    if (up.error) throw new Error(up.error.message);
+    const { data, error } = await svc.from("job_files").insert({
+      job_id: jobId, filename: `f-${n}.pdf`, mime_type: "application/pdf", storage_path: storage, origin: "upload", note: `poznámka tajné ${n}`, ...patch,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    return (data as { id: string }).id;
+  }
+
+  it("„moje“: nabídky, dokumenty a objednávky dodavatelům zaměstnance jen jeho; ceny objednávek maskované; nákupní doklad zamčený", async () => {
+    const data = await import("@/lib/data/jobs");
+    const purchasing = await import("@/lib/data/purchasing");
+    const scopeMod = await import("@/lib/data/flow-scope");
+    const filesAct = await import("@/app/actions/job-files");
+    const mineJob = await newJob({ owner_id: id("admin"), assignee_id: id("worker") });
+    const otherJob = await newJob({ owner_id: id("admin") });
+    as("admin");
+    const qMine = await createQuote(mineJob);
+    const qOther = await createQuote(otherJob);
+    const draw = await storedFile(mineJob, { kind: "vykres", issuer: "zakaznik" });
+    const foreign = await storedFile(otherJob, { kind: "vykres", issuer: "zakaznik" });
+    const uploadedByWorker = await storedFile(otherJob, { kind: "foto", uploaded_by: id("worker") });
+    const price = await storedFile(mineJob, { kind: "naceneni", issuer: "dodavatel" });
+    const poPdf = await storedFile(mineJob, { kind: "objednavka_vydana", issuer: "my", origin: "generated" });
+    const poIds: string[] = [];
+    const mkPo = async (jobId: string, createdBy: string) => {
+      n += 1;
+      const { data: po, error } = await svc.from("purchase_orders").insert({
+        job_id: jobId, number: `OV-E2E-${TAG}-${n}`, created_by: createdBy, note: "sleva tajné", payment_terms: "tajné splatnost",
+        file_id: jobId === mineJob ? poPdf : null,
+      }).select("id").single();
+      if (error) throw new Error(error.message);
+      const poId = (po as { id: string }).id;
+      poIds.push(poId);
+      await svc.from("purchase_order_items").insert({ purchase_order_id: poId, position: 0, name: "Kalení", quantity: 1, unit: "ks", unit_price: 12345 });
+      return poId;
+    };
+    try {
+      const poMine = await mkPo(mineJob, id("admin"));
+      const poCreated = await mkPo(otherJob, id("worker"));
+      const poForeign = await mkPo(otherJob, id("admin"));
+
+      as("worker");
+      const scope = await scopeMod.getFlowScope();
+      expect(scope).toMatchObject({ all: false, error: false, userId: id("worker") });
+      expect(scope!.jobIds.has(mineJob)).toBe(true);
+      expect(scope!.jobIds.has(otherJob)).toBe(false);
+
+      const quotes = (await data.listQuotes({}, { scope })).map((x) => x.id);
+      expect(quotes).toContain(qMine.id);
+      expect(quotes).not.toContain(qOther.id);
+      // bez rozsahu (Kniha, ⌘K na serveru) všechny
+      expect((await data.listQuotes()).map((x) => x.id)).toEqual(expect.arrayContaining([qMine.id, qOther.id]));
+      // null rozsah = bez přístupu → nic (fail closed)
+      expect(await data.listQuotes({}, { scope: null })).toEqual([]);
+      // zakázky stránek toku a jejich stavy jen „moje"; Kniha (bez rozsahu) všechny
+      const jobList = (await data.listJobs({}, { scope })).map((j) => j.id);
+      expect(jobList).toContain(mineJob);
+      expect(jobList).not.toContain(otherJob);
+      expect((await data.listJobs({ q: PREFIX })).map((j) => j.id)).toEqual(expect.arrayContaining([mineJob, otherJob]));
+      expect(await data.listJobs({}, { scope: { ...scope!, error: true } })).toEqual([]);
+      const pages = await import("@/lib/data/flow-pages");
+      const states = await pages.listFlowStateJobIds([{ phase: "inquiry", keys: ["prijata", "v_reseni", "ceka_na_podklady", "zpracovana"] }], { scope });
+      expect(states?.has(otherJob)).toBe(false);
+
+      const files = await data.listJobFiles({ includeArchived: true, limit: 2000 }, { scope });
+      const ids = files.map((f) => f.id);
+      expect(ids).toEqual(expect.arrayContaining([draw, uploadedByWorker, price, poPdf]));
+      expect(ids).not.toContain(foreign);
+      const locked = files.find((f) => f.id === price)!;
+      expect(locked).toMatchObject({ locked: "price", note: null, hasAiData: false, kind: "naceneni" });
+      expect(files.find((f) => f.id === poPdf)?.locked).toBe("price");
+      expect(files.find((f) => f.id === draw)?.locked ?? null).toBeNull();
+      // detail zakázky: řádek zůstane, obsah zamčený
+      expect((await data.getJob(mineJob))?.files.find((f) => f.id === price)?.locked).toBe("price");
+
+      const pos = await purchasing.listPurchaseOrders({}, { scope });
+      expect(pos.map((p) => p.id).sort()).toEqual([poMine, poCreated].sort());
+      expect(pos.every((p) => p.pricesHidden === true && p.total === 0 && p.fileId === null)).toBe(true);
+      const json = JSON.stringify(pos);
+      expect(json).not.toContain("12345");
+      expect(json).not.toContain("tajné");
+      expect(poForeign).toBeTruthy();
+
+      // obsah nákupního dokladu: náhled, stažení, odeslání ne
+      expect((await filesAct.getJobFileUrl(price)).error).toBe(PRICE_VIEW);
+      expect((await filesAct.getJobFileUrl(draw)).ok).toBe(true);
+      expect((await docs.draftJobDocumentEmail(mineJob, poPdf)).error).toBe(PRICE_SEND);
+      expect((await docs.sendJobDocument(mineJob, poPdf, { to: MAIL_TO, subject: "Objednávka", body: "Dobrý den" })).error).toBe(PRICE_SEND);
+      // úpravy: druh vystaveného dokladu nikdo; nákupní druh jen s marží; nákupní doklad ani archivovat
+      expect((await filesAct.updateJobFile(draw, { kind: "nabidka" })).error).toBe("Druh nákupního dokladu mění obchodník nebo super admin.");
+      expect((await filesAct.setJobFileArchived(price, true)).error).toBe(PRICE_VIEW);
+      expect((await filesAct.updateJobFile(draw, { title: "Výkres hřídele" })).ok).toBe(true);
+
+      as("sales");
+      expect((await filesAct.getJobFileUrl(price)).ok).toBe(true);
+      expect((await filesAct.updateJobFile(poPdf, { kind: "ostatni" })).error).toBe("Druh vystaveného dokladu nejde změnit.");
+      const salesScope = await scopeMod.getFlowScope();
+      const salesPos = await purchasing.listPurchaseOrders({}, { scope: salesScope });
+      // obchodník: jen svoje (tyto tři jsou zakázky admina / dílny), bez maskování
+      expect(salesPos.map((p) => p.id)).not.toEqual(expect.arrayContaining([poMine]));
+      expect(salesPos.every((p) => !p.pricesHidden)).toBe(true);
+
+      as("admin");
+      const adminScope = await scopeMod.getFlowScope();
+      expect(adminScope).toMatchObject({ all: true, canToggle: true });
+      expect((await purchasing.listPurchaseOrders({}, { scope: adminScope })).map((p) => p.id)).toEqual(expect.arrayContaining([poMine, poCreated, poForeign]));
+      const adminMine = await scopeMod.getFlowScope("moje");
+      expect(adminMine).toMatchObject({ all: false, who: "moje", canToggle: true });
+      expect(adminMine!.jobIds.has(otherJob)).toBe(true);
+    } finally {
+      await svc.from("purchase_orders").delete().in("id", poIds);
+    }
+  }, 120_000);
+
+  it("PDF naší nabídky: čekající na schválení / před posledním schválením zamčené (super admin smí)", async () => {
+    const filesAct = await import("@/app/actions/job-files");
+    const data = await import("@/lib/data/jobs");
+    const jobId = await newJob();
+    as("sales");
+    const quote = await createQuote(jobId);
+    as("admin");
+    expect((await flow.setQuoteState(quote.id, "schvalena")).ok).toBe(true);
+    as("sales");
+    const pdf = await docs.generateJobDocument(jobId, "nabidka", { quoteId: quote.id });
+    expect(pdf.ok, pdf.error).toBe(true);
+    expect((await filesAct.getJobFileUrl(pdf.fileId!)).ok).toBe(true);
+    // úprava obchodníka → schválení zrušeno → PDF „neschválené“
+    expect((await jobs.updateJobQuote(quote.id, await quoteInput(quote.id, { leadTimeDays: 40 }))).ok).toBe(true);
+    expect((await filesAct.getJobFileUrl(pdf.fileId!)).error).toBe("Nabídka čeká na schválení super admina — stáhni náhled s vodoznakem (‚PDF náhled‘).");
+    expect((await data.getJob(jobId))?.files.find((f) => f.id === pdf.fileId)?.locked).toBe("unapproved");
+    // znovu schválená → staré PDF „před schválením“
+    as("admin");
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await flow.setQuoteState(quote.id, "schvalena")).ok).toBe(true);
+    expect((await filesAct.getJobFileUrl(pdf.fileId!)).ok).toBe(true);
+    as("sales");
+    expect((await filesAct.getJobFileUrl(pdf.fileId!)).error).toBe("Toto PDF nabídky vzniklo před posledním schválením — vystav nové.");
+    expect((await data.getJob(jobId))?.files.find((f) => f.id === pdf.fileId)?.locked).toBe("stale");
+  }, 90_000);
+
+  it("odznaky menu podle role; fronta „Ke schválení“ jen super admin, vždy všech", async () => {
+    const queries = await import("@/lib/data/queries");
+    const jobId = await newJob();
+    as("sales");
+    const quote = await createQuote(jobId);
+    const salesBadge = await badge("sales");
+    const sb = await queries.getBadgeCounts();
+    expect(sb.quotes).toBe(Number(salesBadge.quotes_ready) + Number(salesBadge.quotes_returned));
+    expect(sb.inquiries).toBe(Number(salesBadge.inquiries));
+    expect(sb).toMatchObject({ pricing: 0, approvals: 0 });
+    expect(await queries.listPendingQuoteApprovals()).toEqual([]);
+
+    as("admin");
+    const adminBadge = await badge("admin");
+    const ab = await queries.getBadgeCounts();
+    expect(ab.quotes).toBe(Number(adminBadge.quotes_pending));
+    expect(ab.pricing).toBe(Number(adminBadge.pricing));
+    const { count: queued } = await svc.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending");
+    // AI přehled = fronta AI (ruční nabídky kolegů hlásí odznak „Nabídky", dokud je panel nevypíše — 25-C)
+    expect(ab.approvals).toBe(queued ?? 0);
+    expect(Number(adminBadge.quotes_pending_manual)).toBeGreaterThanOrEqual(1);
+    const pending = await queries.listPendingQuoteApprovals();
+    expect(pending.find((p) => p.quoteId === quote.id)).toMatchObject({
+      number: quote.number, jobId, authorName: who.users.sales.fullName, unpriced: false, total: 2000,
+    });
+    // vrácená nabídka z fronty zmizí
+    expect((await flow.returnQuoteToAuthor(quote.id, "doplň výkres")).ok).toBe(true);
+    expect((await queries.listPendingQuoteApprovals()).some((p) => p.quoteId === quote.id)).toBe(false);
+  }, 60_000);
+
+  it("obchodník zakázky: jen super admin ho mění; nový ne-admin jen sebe / obchodníka zákazníka; provize cizí zakázky skrytá", async () => {
+    const purchasingAct = await import("@/app/actions/purchasing");
+    const purchasing = await import("@/lib/data/purchasing");
+    const jobId = await newJob({ owner_id: id("admin"), value: 10000 });
+    as("sales");
+    expect((await jobs.updateJob(jobId, { ownerId: id("sales") })).error).toBe("Obchodníka zakázky mění jen super admin.");
+    expect((await purchasingAct.assignJobOwner(jobId, id("sales"))).error).toBe("Obchodníka zakázky mění jen super admin.");
+    expect((await jobs.updateJob(jobId, { assigneeId: id("sales") })).ok).toBe(true);
+    // nová zakázka: cizí obchodník ne, obchodník zákazníka ano
+    expect((await jobs.createJob({ title: `E2E ${TAG} cizí`, ownerId: id("admin") })).error).toBe("Obchodníka zakázky mění jen super admin.");
+    as("worker");
+    const viaCustomer = await jobs.createJob({ title: `E2E ${TAG} zákazník`, customerId: CUSTOMER, ownerId: id("sales") });
+    expect(viaCustomer.ok, viaCustomer.error).toBe(true);
+    jobIds.push(viaCustomer.id!);
+    expect((await svc.from("orders").select("owner_id, created_by").eq("id", viaCustomer.id!).single()).data).toMatchObject({ owner_id: id("sales"), created_by: id("worker") });
+    as("admin");
+    expect((await jobs.updateJob(jobId, { ownerId: id("sales") })).ok).toBe(true);
+    expect((await svc.from("orders").select("owner_id").eq("id", jobId).single()).data).toMatchObject({ owner_id: id("sales") });
+
+    // provize: cizí (admina) obchodník nevidí, super admin ano
+    const other = await newJob({ owner_id: id("admin"), value: 5000 });
+    const { data: ce, error } = await svc.from("commission_entries").insert({
+      owner_id: id("admin"), order_id: other, period: "2026-10-01", revenue: 5000, commission: 500, rate: 0.1,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    try {
+      as("sales");
+      const view = await purchasing.getJobPurchasing(other);
+      expect(view).toMatchObject({ commission: null, commissionHidden: true });
+      as("admin");
+      const adminView = await purchasing.getJobPurchasing(other);
+      expect(adminView?.commission?.ownerId).toBe(id("admin"));
+      expect(adminView?.commissionHidden).toBeUndefined();
+    } finally {
+      await svc.from("commission_entries").delete().eq("id", (ce as { id: string }).id);
+    }
+  }, 60_000);
+
+  it("nová zakázka: obchodník se hlídá před zápisem; bez volby obchodník zákazníka, zaměstnanec zpracovává; obchodníka zákazníka mění jen super admin", async () => {
+    const crm = await import("@/app/actions/crm");
+    const { EMPTY_CUSTOMER_FORM } = await import("@/components/customers/model");
+    const name = (i: number) => `E2E QAPPR ${TAG} zákazník ${i}`;
+    const byName = async (nm: string) => ((await svc.from("customers").select("id, owner_id").eq("name", nm)).data ?? []) as { id: string; owner_id: string | null }[];
+    const order = async (jobId: string) => (await svc.from("orders").select("owner_id, assignee_id, created_by").eq("id", jobId).single()).data;
+    const ok = (r: { ok: boolean; error?: string; id?: string }) => {
+      expect(r.ok, r.error).toBe(true);
+      jobIds.push(r.id!);
+      return r.id!;
+    };
+
+    // cizí obchodník + nový zákazník → odmítnuto a zákazník NEVZNIKNE (dřív zůstal s cizím obchodníkem)
+    as("sales");
+    expect((await jobs.createJob({ title: `E2E ${TAG} o1`, customerName: name(1), ownerId: id("admin") })).error)
+      .toBe("Obchodníka zakázky mění jen super admin.");
+    expect(await byName(name(1))).toEqual([]);
+    // obchodník bez volby: nový zákazník i zakázka jeho
+    const s1 = ok(await jobs.createJob({ title: `E2E ${TAG} o2`, customerName: name(2) }));
+    const c2 = await byName(name(2));
+    customerIds.push(...c2.map((c) => c.id));
+    expect(c2).toMatchObject([{ owner_id: id("sales") }]);
+    expect(await order(s1)).toMatchObject({ owner_id: id("sales"), created_by: id("sales") });
+    // bez volby u zákazníka jiného obchodníka → Obchodník = obchodník zákazníka (jako e-mail a fotka)
+    const adminCust = ((await svc.from("customers").insert({ name: name(3), owner_id: id("admin") }).select("id").single()).data as { id: string }).id;
+    customerIds.push(adminCust);
+    const s2 = ok(await jobs.createJob({ title: `E2E ${TAG} o3`, customerId: adminCust }));
+    expect(await order(s2)).toMatchObject({ owner_id: id("admin"), created_by: id("sales") });
+
+    // zaměstnanec bez volby: nový zákazník bez obchodníka, zakázku zpracovává on (není Obchodník)
+    as("worker");
+    const w1 = ok(await jobs.createJob({ title: `E2E ${TAG} o4`, customerName: name(4) }));
+    const c4 = await byName(name(4));
+    customerIds.push(...c4.map((c) => c.id));
+    expect(c4).toMatchObject([{ owner_id: null }]);
+    expect(await order(w1)).toMatchObject({ owner_id: null, assignee_id: id("worker"), created_by: id("worker") });
+    const w2 = ok(await jobs.createJob({ title: `E2E ${TAG} o5`, customerId: adminCust }));
+    expect(await order(w2)).toMatchObject({ owner_id: id("admin"), assignee_id: id("worker") });
+
+    // obchodník zákazníka (komu připadnou jeho další zakázky): cizího vybere jen super admin, ne-admin ho nezmění
+    as("sales");
+    expect((await crm.createCustomer({ ...EMPTY_CUSTOMER_FORM, name: name(5), ownerId: id("admin") })).error)
+      .toBe("Obchodníka zákazníka mění jen super admin.");
+    expect(await byName(name(5))).toEqual([]);
+    const own = await crm.createCustomer({ ...EMPTY_CUSTOMER_FORM, name: name(6), ownerId: id("sales") });
+    expect(own.ok, own.error).toBe(true);
+    customerIds.push(own.id!);
+    expect((await crm.updateCustomer(adminCust, { ...EMPTY_CUSTOMER_FORM, name: name(3), ownerId: id("sales") })).error)
+      .toBe("Obchodníka zákazníka mění jen super admin.");
+    expect((await crm.updateCustomer(adminCust, { ...EMPTY_CUSTOMER_FORM, name: name(3), ownerId: id("admin"), note: "pozn." })).ok).toBe(true);
+    // obchodník zákazníka zůstal → zakázku s jiným (cizím) obchodníkem dál nezaloží
+    expect((await jobs.createJob({ title: `E2E ${TAG} o6`, customerId: adminCust, ownerId: id("worker") })).error)
+      .toBe("Obchodníka zakázky mění jen super admin.");
+    expect((await jobs.createJob({ title: `E2E ${TAG} o7`, customerId: own.id!, ownerId: id("admin") })).error)
+      .toBe("Obchodníka zakázky mění jen super admin.");
+    as("admin");
+    expect((await crm.updateCustomer(own.id!, { ...EMPTY_CUSTOMER_FORM, name: name(6), ownerId: id("admin") })).ok).toBe(true);
+    expect((await svc.from("customers").select("owner_id").eq("id", own.id!).single()).data).toMatchObject({ owner_id: id("admin") });
+  }, 60_000);
+
+  it("přílohy e-mailu v Dokumentech: vystavitel podle e-mailu — faktura dodavatele zamčená, poptávka zákazníka ne", async () => {
+    const mail = await import("@/app/actions/mail");
+    const filesAct = await import("@/app/actions/job-files");
+    const { data: sup } = await svc.from("suppliers").select("id").limit(1).single();
+    const supplierId = (sup as { id: string }).id;
+    const stored: string[] = [];
+    const mails: string[] = [];
+    const mk = async (patch: Row, filename: string) => {
+      const { data, error } = await svc.from("emails").insert({
+        mailbox_id: "d5000000-0000-0000-0000-000000000001", owner_id: id("sales"), direction: "in", subject: `Příloha E2E ${TAG}`,
+        from_email: "x@example.test", received_at: new Date().toISOString(), ...patch,
+      }).select("id").single();
+      if (error) throw new Error(error.message);
+      const emailId = (data as { id: string }).id;
+      mails.push(emailId);
+      const path = `e2e-qappr/${TAG}/${crypto.randomUUID()}-${filename}`;
+      const up = await svc.storage.from("documents").upload(path, Buffer.from("%PDF-1.4 e2e"), { contentType: "application/pdf" });
+      if (up.error) throw new Error(up.error.message);
+      stored.push(path);
+      const att = await svc.from("email_attachments").insert({ email_id: emailId, filename, mime_type: "application/pdf", size_bytes: 12, storage_path: path });
+      if (att.error) throw new Error(att.error.message);
+      return emailId;
+    };
+    const jobId = await newJob();
+    const invoice = await mk({ category: "faktura", supplier_id: supplierId, customer_id: null }, "FV-2026-0042.pdf");
+    const rfq = await mk({ category: "poptavka", customer_id: CUSTOMER }, "Angebotsanfrage_AeroParts.pdf");
+    try {
+      as("sales");
+      expect((await mail.linkEmailToJob(invoice, jobId)).ok).toBe(true);
+      expect((await mail.linkEmailToJob(rfq, jobId)).ok).toBe(true);
+      const { data: files } = await svc.from("job_files").select("id, filename, kind, issuer, origin").eq("job_id", jobId);
+      const f = new Map(((files ?? []) as Row[]).map((r) => [String(r.filename), r]));
+      expect(f.get("FV-2026-0042.pdf")).toMatchObject({ issuer: "dodavatel", origin: "email" });
+      expect(f.get("Angebotsanfrage_AeroParts.pdf")).toMatchObject({ kind: "nabidka", issuer: "zakaznik", origin: "email" });
+      as("worker");
+      expect((await filesAct.getJobFileUrl(String(f.get("FV-2026-0042.pdf")!.id))).error).toBe("Nákupní doklad vidí obchodník a super admin.");
+      const open = await filesAct.getJobFileUrl(String(f.get("Angebotsanfrage_AeroParts.pdf")!.id));
+      expect(open.ok, open.error).toBe(true);
+    } finally {
+      await svc.from("emails").delete().in("id", mails);
+      await svc.storage.from("documents").remove(stored);
+    }
+  }, 60_000);
+
+  it("registerJobFile: zaměstnanec nákupní doklad nenahradí (ani automatickou verzí) a cizí cestu nepřevezme; obchodník ano", async () => {
+    const filesAct = await import("@/app/actions/job-files");
+    const { jobFilePath } = await import("@/lib/jobs/mapping");
+    const jobId = await newJob();
+    const p = (nm: string) => jobFilePath(jobId, crypto.randomUUID(), nm);
+    const fileRow = async (fileId: string) => (await svc.from("job_files").select("archived, replaced_by, version").eq("id", fileId).single()).data;
+    as("admin");
+    const pricePath = p("nabidka-dodavatele.pdf");
+    const price = await filesAct.registerJobFile({
+      jobId, path: pricePath, filename: "nabidka-dodavatele.pdf", kind: "naceneni", issuer: "dodavatel", note: "nákupní cena 123",
+    });
+    expect(price.ok, price.error).toBe(true);
+    const priceId = price.file!.id;
+
+    as("worker");
+    expect((await filesAct.registerJobFile({ jobId, path: p("nahrada.pdf"), filename: "nahrada.pdf", replaceFileId: priceId })).error)
+      .toBe("Nákupní doklad vidí obchodník a super admin.");
+    // stejný název + druh → samostatný dokument (v1), nákupní doklad zůstane nedotčený
+    const same = await filesAct.registerJobFile({ jobId, path: p("nabidka-dodavatele.pdf"), filename: "nabidka-dodavatele.pdf", kind: "naceneni" });
+    expect(same.ok, same.error).toBe(true);
+    expect(await fileRow(same.file!.id)).toMatchObject({ version: 1 });
+    expect(await fileRow(priceId)).toMatchObject({ archived: false, replaced_by: null });
+    // cesta cizího dokumentu → žádný řádek (ani nemaskovaná poznámka)
+    const taken = await filesAct.registerJobFile({ jobId, path: pricePath, filename: "x.pdf" });
+    expect(taken.error).toBe("Tento soubor už patří jinému dokumentu.");
+    expect(taken.file).toBeUndefined();
+
+    // obchodník (nákupní ceny) nahradit smí
+    as("sales");
+    const rep = await filesAct.registerJobFile({ jobId, path: p("nabidka-v2.pdf"), filename: "nabidka-v2.pdf", replaceFileId: priceId });
+    expect(rep.ok, rep.error).toBe(true);
+    expect(await fileRow(rep.file!.id)).toMatchObject({ version: 2 });
+    expect(await fileRow(priceId)).toMatchObject({ archived: true, replaced_by: rep.file!.id });
+  }, 60_000);
+
+  it("zakázka z e-mailu patří vlastníkovi schránky (obchodník = Obchodník, dílna = Zpracovává)", async () => {
+    const mail = await import("@/app/actions/mail");
+    const mk = async (mailbox: string, owner: string) => {
+      const { data, error } = await svc.from("emails").insert({
+        mailbox_id: mailbox, owner_id: owner, direction: "in", subject: `Poptávka E2E ${TAG}`, from_email: "nakup@strojmetal.cz",
+        customer_id: CUSTOMER, category: "poptavka", received_at: new Date().toISOString(),
+      }).select("id").single();
+      if (error) throw new Error(error.message);
+      return (data as { id: string }).id;
+    };
+    const fromSales = await mk("d5000000-0000-0000-0000-000000000001", id("sales"));
+    const fromWorker = await mk("d5000000-0000-0000-0000-000000000002", id("worker"));
+    try {
+      as("admin");
+      const a = await mail.createJobFromEmail(fromSales);
+      expect(a.ok, a.error).toBe(true);
+      jobIds.push(a.id!);
+      expect((await svc.from("orders").select("owner_id, assignee_id, created_by").eq("id", a.id!).single()).data)
+        .toMatchObject({ owner_id: id("sales"), assignee_id: null, created_by: id("admin") });
+      const w = await mail.createJobFromEmail(fromWorker);
+      expect(w.ok, w.error).toBe(true);
+      jobIds.push(w.id!);
+      const { data: cust } = await svc.from("customers").select("owner_id").eq("id", CUSTOMER).single();
+      expect((await svc.from("orders").select("owner_id, assignee_id, created_by").eq("id", w.id!).single()).data)
+        .toMatchObject({ owner_id: (cust as { owner_id: string | null }).owner_id ?? id("admin"), assignee_id: id("worker"), created_by: id("admin") });
+    } finally {
+      await svc.from("emails").delete().in("id", [fromSales, fromWorker]);
+    }
+  }, 60_000);
 });

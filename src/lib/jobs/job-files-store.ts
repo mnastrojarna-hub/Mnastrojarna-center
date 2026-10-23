@@ -46,7 +46,16 @@ export interface RegisterJobFileInput {
   issuer?: DocIssuerKey | null;
   /** Revize objednávky, kterou náš doklad (potvrzení) pokrývá. */
   orderRevision?: number | null;
+  /**
+   * #25: smí volající tento dokument nahradit novou verzí? Text = ne (výslovné nahrazení selže s tímto
+   * textem, automatická verze podle názvu se nevytvoří — vznikne samostatný dokument). Bez volby = smí.
+   */
+  replaceBlock?: (file: FileRow) => Promise<string | null> | string | null;
+  /** #25: opakovaná registrace téže cesty vrátí existující záznam jen tomu, kdo ho nahrál (akce z prohlížeče). */
+  dupOnlyOwn?: boolean;
 }
+
+const PATH_TAKEN = "Tento soubor už patří jinému dokumentu.";
 
 const ORIGINS: JobFileOrigin[] = ["generated", "upload", "capture", "email", "import"];
 const ISSUERS: DocIssuerKey[] = ["my", "zakaznik", "dodavatel"];
@@ -117,7 +126,10 @@ export async function registerJobFileCore(
 
     // opakovaná registrace stejného souboru → vrátit existující záznam
     const { data: dup } = await db.from("job_files").select(JOB_FILE_SELECT).eq("storage_path", input.path).maybeSingle();
-    if (dup) return { ok: true, file: rowToJobFile(dup as FileRow) };
+    if (dup) {
+      if (input.dupOnlyOwn && ((dup as FileRow).uploaded_by ?? null) !== userId) return fail(PATH_TAKEN);
+      return { ok: true, file: rowToJobFile(dup as FileRow) };
+    }
 
     if (input.quoteId) {
       const { data: q } = await db.from("quotes").select("id").eq("id", input.quoteId).eq("job_id", jobId).maybeSingle();
@@ -139,6 +151,8 @@ export async function registerJobFileCore(
         if (!next || next.job_id !== jobId) break;
         replaced = next;
       }
+      const blocked = input.replaceBlock ? await input.replaceBlock(replaced) : null;
+      if (blocked) return fail(blocked);
     }
     const kind: JobFileKind = input.kind ?? (replaced && isJobFileKind(replaced.kind) ? replaced.kind : guessFileKind(filename, mimeType ?? undefined));
     if (!replaced && !input.noAutoVersion && !isGenericCaptureName(filename)) {
@@ -153,6 +167,8 @@ export async function registerJobFileCore(
         .order("version", { ascending: false })
         .limit(1);
       replaced = ((same ?? []) as FileRow[])[0] ?? null;
+      // nesmí-li ho nahradit (nákupní doklad), vznikne samostatný dokument — předchozí zůstane beze změny
+      if (replaced && input.replaceBlock && (await input.replaceBlock(replaced))) replaced = null;
     }
 
     const version = replaced ? (replaced.version ?? 1) + 1 : 1;
@@ -184,7 +200,10 @@ export async function registerJobFileCore(
     if (error || !created) {
       // souběžná registrace téže cesty → vrátit tu první
       const { data: again } = await db.from("job_files").select(JOB_FILE_SELECT).eq("storage_path", input.path).maybeSingle();
-      if (again) return { ok: true, file: rowToJobFile(again as FileRow) };
+      if (again) {
+        if (input.dupOnlyOwn && ((again as FileRow).uploaded_by ?? null) !== userId) return fail(PATH_TAKEN);
+        return { ok: true, file: rowToJobFile(again as FileRow) };
+      }
       return fail(error?.message ?? "Dokument se nepodařilo uložit.");
     }
     const created1 = created as FileRow;

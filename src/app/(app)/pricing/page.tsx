@@ -6,6 +6,8 @@ import { getRecentPricingCalculations } from "@/lib/data/pricing-data";
 import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowJobStates, listFlowStateJobIds } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
+import { mineParam } from "@/lib/auth/flow-scope";
 import { PRICING_ORDER, chipsForTab } from "@/lib/jobs/flow-status";
 import { ToastProvider } from "@/components/jobs/detail/toast";
 import { FlowStateFilter } from "@/components/flow/flow-state-filter";
@@ -33,8 +35,10 @@ export default async function PricingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireFeature("workflow");
+  // #25: Nacenění zatím jen super admin (ostatní → Kniha s vysvětlením „pristup=pricing")
+  const user = await requireFeature("pricing");
   const sp = await searchParams;
+  const scope = await getFlowScope(await flowWhoFrom(sp));
   const { can } = await getAccess();
   const margins = can("margins");
   const ai = can("ai_pricing");
@@ -43,9 +47,9 @@ export default async function PricingPage({
   const selected = parseStateParam(sp[STATE_PARAM], PRICING_ORDER, PRICING_ORDER);
   const filtered = selected.length < PRICING_ORDER.length;
   const [all, counts, stateIds] = await Promise.all([
-    listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" }),
-    getFlowCounts(),
-    filtered ? listFlowStateJobIds([{ phase: "pricing", keys: selected }]) : Promise.resolve(null),
+    listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" }, { scope }),
+    getFlowCounts({ mine: mineParam(scope) }),
+    filtered ? listFlowStateJobIds([{ phase: "pricing", keys: selected }], { scope }) : Promise.resolve(null),
   ]);
   const wanted = typeof sp.job === "string" ? sp.job : null;
   const list = stateIds ? all.filter((j) => stateIds.has(j.id) || j.id === wanted) : all;

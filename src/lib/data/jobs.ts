@@ -18,6 +18,8 @@ import {
   sortJobs, countJobStages, emptyStageCounts, isUuid, one, searchNormalize, isQuoteStatus, fetchPaged,
   type JobRow, type QuoteRow, type FileRow, type EventRow, type JobStageCounts, type ViewOptions,
 } from "@/lib/jobs/mapping";
+import type { FlowScope } from "@/lib/auth/flow-scope";
+import { fileLocks } from "@/lib/jobs/job-file-access";
 
 /**
  * Datová vrstva Knihy zakázek — čte servisním klíčem (obchází RLS),
@@ -49,8 +51,91 @@ async function session(...features: Feature[]) {
   }
 }
 
+/** Rozsah „moje" obchodního toku (#25). */
+export interface ScopeOptions {
+  /** Bez rozsahu = vše (Kniha zakázek, detail zákazníka). null = bez přístupu → nic. */
+  scope?: FlowScope | null;
+}
+
+/** Id po dávkách pro .in(…) (délka URL). */
+const SCOPE_CHUNK = 200;
+
+function chunkIds(ids: Iterable<string>): string[][] {
+  const list = [...ids];
+  const out: string[][] = [];
+  for (let i = 0; i < list.length; i += SCOPE_CHUNK) out.push(list.slice(i, i + SCOPE_CHUNK));
+  return out;
+}
+
+/** Rozsah zúžený na „moje": null = vše (bez rozsahu / super admin „Všichni"), false = nic (bez přístupu, chyba). */
+function narrowScope(opts: ScopeOptions): FlowScope | null | false {
+  if (!("scope" in opts)) return null;
+  const scope = opts.scope;
+  if (!scope) return false;
+  if (scope.all) return null;
+  if (scope.error || !scope.userId) return false;
+  return scope;
+}
+
+/**
+ * Stránkované načtení s rozsahem „moje" vtlačeným do dotazu (zakázky po dávkách id + volitelný
+ * dotaz přes sloupce osob), sloučené podle id — bez tichého oříznutí po MAX_ROWS.
+ */
+async function fetchScoped<T extends { id: string }>(
+  build: () => unknown,
+  scope: FlowScope,
+  opts: { jobColumn: string; personFilter?: string | null; max: number; order: (rows: T[]) => T[] },
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const byId = new Map<string, T>();
+  type Q = { in: (c: string, v: string[]) => Q; or: (f: string) => Q; range: (a: number, b: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }> };
+  for (const part of chunkIds(scope.jobIds)) {
+    const { data, error } = await fetchPaged<T>((from, to) => (build() as unknown as Q).in(opts.jobColumn, part).range(from, to), opts.max);
+    if (error) return { data: [], error };
+    for (const r of data) byId.set(r.id, r);
+  }
+  if (opts.personFilter) {
+    const { data, error } = await fetchPaged<T>((from, to) => (build() as unknown as Q).or(opts.personFilter!).range(from, to), opts.max);
+    if (error) return { data: [], error };
+    for (const r of data) byId.set(r.id, r);
+  }
+  return { data: opts.order([...byId.values()]).slice(0, opts.max), error: null };
+}
+
+/**
+ * Zámky obsahu dokumentů (#25 §4.2): zamčený řádek zůstane (druh, název, datum, kdo nahrál),
+ * poznámka a příznak AI dat zmizí. Chyba ověření = zamčeno (fail closed, viz job-file-access).
+ */
+async function withLocks<F extends JobFile>(db: JobsSessionDb, files: F[], access: Parameters<typeof fileLocks>[2]): Promise<F[]> {
+  if (!files.length) return files;
+  const locks = await fileLocks(db, files.map((f) => ({
+    id: f.id, kind: f.kind, issuer: f.issuer ?? null, origin: f.origin ?? null, quoteId: f.quoteId, createdAt: f.createdAt,
+  })), access);
+  if (!locks.size) return files;
+  return files.map((f) => {
+    const locked = locks.get(f.id) ?? null;
+    return locked ? { ...f, locked, note: null, hasAiData: false } : f;
+  });
+}
+
+type JobsSessionDb = Parameters<typeof fileLocks>[0];
+
+/** PostgREST .or(): některý ze sloupců = uživatel (id je ověřené uuid). */
+function personOr(columns: string[], userId: string): string | null {
+  if (!isUuid(userId)) return null;
+  return columns.map((c) => `${c}.eq.${userId}`).join(",");
+}
+
+/** Nejnovější první (created_at desc, id) — stejně jako dotazy bez rozsahu. */
+function newestFirst<T extends { id: string; created_at?: string | null }>(rows: T[]): T[] {
+  return rows.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")) || a.id.localeCompare(b.id));
+}
+
 // ── Kniha zakázek ───────────────────────────────────────────
-export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]> {
+/** Zakázky Knihy; s opts.scope jen „moje" obchodního toku (stránky toku), bez něj všechny (Kniha). */
+export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}): Promise<JobListItem[]> {
+  const narrowed = narrowScope(opts);
+  if (narrowed === false) return [];
+  if (narrowed && narrowed.jobIds.size === 0) return [];
   const s = await session("orders");
   if (!s) return [];
   try {
@@ -72,7 +157,9 @@ export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]>
       }
       return query.order("created_at", { ascending: false }).order("id");
     };
-    const { data, error } = await fetchPaged<JobRow>((from, to) => build().range(from, to), MAX_ROWS);
+    const { data, error } = narrowed
+      ? await fetchScoped<JobRow>(build, narrowed, { jobColumn: "id", max: MAX_ROWS, order: (r) => newestFirst(r as (JobRow & { created_at?: string })[]) })
+      : await fetchPaged<JobRow>((from, to) => build().range(from, to), MAX_ROWS);
     warn("list", error);
     if (error) return [];
 
@@ -86,6 +173,29 @@ export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]>
     return limit ? sorted.slice(0, limit) : sorted;
   } catch (err) {
     console.error(`[data:jobs:list] ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+}
+
+/**
+ * Čísla objednávek zákazníka VŠECH zakázek (Kniha je vidí každý) — párování pošty „Přiřadit k Z-…"
+ * na stránkách toku nesmí hledat jen v „moje", jinak by objednávka k cizí zakázce založila duplicitní.
+ */
+export async function listJobOrderRefs(): Promise<Pick<JobListItem, "id" | "number" | "customerOrderNumber">[]> {
+  const s = await session("orders");
+  if (!s) return [];
+  try {
+    const { data, error } = await fetchPaged<{ id: string; number: string; customer_order_number: string | null }>(
+      (from, to) => s.db.from("orders").select("id, number, customer_order_number")
+        .not("customer_order_number", "is", null)
+        .order("created_at", { ascending: false }).order("id").range(from, to),
+      MAX_ROWS,
+    );
+    warn("order-refs", error);
+    if (error) return [];
+    return data.map((r) => ({ id: r.id, number: r.number, customerOrderNumber: r.customer_order_number }));
+  } catch (err) {
+    console.error(`[data:jobs:order-refs] ${err instanceof Error ? err.message : String(err)}`);
     return [];
   }
 }
@@ -111,7 +221,7 @@ export async function getJob(id: string): Promise<JobDetail | null> {
     warn("detail:files", filesRes.error);
     warn("detail:events", eventsRes.error);
     if (jobRes.error || !jobRes.data) return null;
-    return rowToJobDetail(
+    const detail = rowToJobDetail(
       jobRes.data as JobRow,
       {
         quotes: (quotesRes.data ?? []) as QuoteRow[],
@@ -120,6 +230,7 @@ export async function getJob(id: string): Promise<JobDetail | null> {
       },
       s.view,
     );
+    return { ...detail, files: await withLocks(s.db, detail.files, s.access) };
   } catch (err) {
     console.error(`[data:jobs:detail] ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -182,9 +293,13 @@ export type QuoteListItem = JobQuote & {
   customer: { id: string; name: string } | null;
 };
 
+/** Nabídky; s scope jen „moje" (moje zakázky ∪ nabídky, které jsem vytvořil / jsem jejich obchodník / žádal). */
 export async function listQuotes(
   opts: { status?: QuoteStatus[]; state?: QuoteState[]; includeArchived?: boolean; q?: string } = {},
+  scopeOpts: ScopeOptions = {},
 ): Promise<QuoteListItem[]> {
+  const narrowed = narrowScope(scopeOpts);
+  if (narrowed === false) return [];
   const s = await session("workflow", "orders");
   if (!s) return [];
   try {
@@ -197,7 +312,12 @@ export async function listQuotes(
       if (!opts.includeArchived) query = query.eq("archived", false);
       return query.order("created_at", { ascending: false }).order("id");
     };
-    const { data, error } = await fetchPaged<QuoteRow>((from, to) => build().range(from, to), MAX_ROWS);
+    const { data, error } = narrowed
+      ? await fetchScoped<QuoteRow>(build, narrowed, {
+        jobColumn: "job_id", max: MAX_ROWS, order: (r) => newestFirst(r as (QuoteRow & { created_at?: string })[]),
+        personFilter: personOr(["created_by", "owner_id", "approval_requested_by"], narrowed.userId),
+      })
+      : await fetchPaged<QuoteRow>((from, to) => build().range(from, to), MAX_ROWS);
     warn("quotes", error);
     if (error) return [];
 
@@ -229,9 +349,13 @@ export type JobFileListItem = JobFile & {
   job: { id: string; number: string; title: string; customerName: string | null };
 };
 
+/** Dokumenty napříč zakázkami; s scope jen „moje" (moje zakázky ∪ co jsem nahrál). Obsah se zamyká (§4.2). */
 export async function listJobFiles(
   opts: { kinds?: JobFileKind[]; includeArchived?: boolean; q?: string; limit?: number } = {},
+  scopeOpts: ScopeOptions = {},
 ): Promise<JobFileListItem[]> {
+  const narrowed = narrowScope(scopeOpts);
+  if (narrowed === false) return [];
   const s = await session("documents", "orders");
   if (!s) return [];
   try {
@@ -245,27 +369,39 @@ export async function listJobFiles(
       return query.order("created_at", { ascending: false }).order("id");
     };
     // s hledáním se filtruje v JS → načíst víc řádků
-    const { data, error } = await fetchPaged<FileRow>((from, to) => build().range(from, to), tokens.length ? MAX_ROWS : limit);
+    const max = tokens.length ? MAX_ROWS : limit;
+    // rozsah PŘED limitem (jinak by limit snědly cizí dokumenty)
+    const { data, error } = narrowed
+      ? await fetchScoped<FileRow>(build, narrowed, {
+        jobColumn: "job_id", max, order: newestFirst, personFilter: personOr(["uploaded_by"], narrowed.userId),
+      })
+      : await fetchPaged<FileRow>((from, to) => build().range(from, to), max);
     warn("files", error);
     if (error) return [];
 
-    const out: JobFileListItem[] = [];
+    let items: JobFileListItem[] = [];
     for (const row of data) {
       const job = one(row.job);
       if (!job) continue;
       const customerName = one(job.customer)?.name ?? null;
-      const item: JobFileListItem = {
+      items.push({
         ...rowToJobFile(row),
         job: { id: job.id, number: job.number ?? "—", title: job.title ?? "", customerName },
-      };
+      });
+    }
+    // hledání bez práva na marže: zámky dřív (poznámka zamčeného dokladu se nesmí dát vyhledat)
+    const lockFirst = tokens.length > 0 && !s.view.margins;
+    if (lockFirst) items = await withLocks(s.db, items, s.access);
+    const out: JobFileListItem[] = [];
+    for (const item of items) {
       if (tokens.length) {
-        const h = searchNormalize([item.filename, item.title, item.note, item.job.number, item.job.title, customerName].filter(Boolean).join(" "));
+        const h = searchNormalize([item.filename, item.title, item.note, item.job.number, item.job.title, item.job.customerName].filter(Boolean).join(" "));
         if (!tokens.every((t) => h.includes(t))) continue;
       }
       out.push(item);
       if (out.length >= limit) break;
     }
-    return out;
+    return lockFirst ? out : await withLocks(s.db, out, s.access);
   } catch (err) {
     console.error(`[data:jobs:files] ${err instanceof Error ? err.message : String(err)}`);
     return [];

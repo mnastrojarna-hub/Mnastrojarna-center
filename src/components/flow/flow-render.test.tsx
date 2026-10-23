@@ -31,6 +31,14 @@ vi.mock("@/components/ai-pricing-panel", () => ({ AiPricingPanel: () => <div>AI-
 vi.mock("@/components/integration-settings-editor", () => ({ IntegrationSettingsEditor: () => <div>PARAMS-EDITOR</div> }));
 
 const user = { id: "u1", email: "obchod@local.test", fullName: "Petr Obchodník", role: "obchodnik", active: true };
+// #25: rozsah „moje" stránek toku (data jsou mockovaná níže, rozsah se jim jen předá)
+vi.mock("@/lib/data/flow-scope", () => ({
+  flowWhoFrom: async () => null,
+  getFlowScope: async () => ({
+    userId: "u1", all: false, who: "moje", canToggle: false, jobIds: new Set(["j1", "j2", "j4", "j5"]),
+    mailboxIds: [], mailboxEmails: [], error: false,
+  }),
+}));
 vi.mock("@/lib/auth/session", () => ({
   requireFeature: async () => user,
   requireUser: async () => user,
@@ -115,6 +123,8 @@ const data = {
       ? detail({ id: "j4", number: "Z-2026-104", stage: "objednavka", customerOrderNumber: "PO-4500021877" })
       : detail({ id, number: id === "j2" ? "Z-2026-102" : "Z-2026-101", stage: id === "j2" ? "naceneni" : "poptavka" }),
   ),
+  // #25: párování pošty proti všem zakázkám (Potvrzení objednávek)
+  listJobOrderRefs: vi.fn(async () => [{ id: "j4", number: "Z-2026-104", customerOrderNumber: "PO-4500021877" }]),
   getJobFormOptions: vi.fn(async () => ({ users: [], customers: [{ id: "c1", name: "Strojmetal a.s.", customerNumber: "ZK0007", ico: null }], suppliers: [] })),
   listQuotes: vi.fn(async () => [
     { ...quote(), job: { id: "j3", number: "Z-2026-103", title: "Hřídel", stage: "nabidka" as const }, customer: { id: "c3", name: "Beneš CNC s.r.o." } },

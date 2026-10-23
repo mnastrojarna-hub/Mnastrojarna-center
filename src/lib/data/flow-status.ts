@@ -43,15 +43,22 @@ function person(v: unknown): PersonRef | null {
 }
 
 // ── Počty chipů ─────────────────────────────────────────────
-/** „fáze.klíč“ → počet (rpc flow_counts; uzavřené stavy jen za posledních closedDays dní). */
-export async function getFlowCounts(opts: { ownerId?: string | null; closedDays?: number } = {}): Promise<Record<string, number>> {
+/**
+ * „fáze.klíč“ → počet (rpc flow_counts; uzavřené stavy jen za posledních closedDays dní).
+ * mine (#25) = jen „moje" zakázky a nabídky toho uživatele (mineParam(scope)); null / bez = všichni.
+ */
+export async function getFlowCounts(
+  opts: { ownerId?: string | null; closedDays?: number; mine?: string | null } = {},
+): Promise<Record<string, number>> {
   const s = await session("orders", "workflow");
   if (!s) return {};
   if (opts.ownerId && !UUID_RE.test(opts.ownerId)) return {};
+  if (opts.mine && !UUID_RE.test(opts.mine)) return {};
   try {
     const { data, error } = await s.db.rpc("flow_counts", {
       p_owner: opts.ownerId ?? null,
       p_closed_days: opts.closedDays ?? 30,
+      p_mine: opts.mine ?? null,
     });
     warn("counts", error);
     const out: Record<string, number> = {};

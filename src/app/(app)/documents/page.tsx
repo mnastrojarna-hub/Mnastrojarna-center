@@ -2,6 +2,7 @@ import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, ReceiptText, Truck, 
 import { requireFeature } from "@/lib/auth/session";
 import { listJobFiles, listJobs } from "@/lib/data/jobs";
 import { getFileFlowInfo } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
 import { Button } from "@/components/ui/button";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
@@ -21,11 +22,15 @@ const SAMPLES: { type: string; title: string; desc: string; icon: LucideIcon; to
 ];
 
 /** Dokumenty — vše, co je u zakázek (doklady, výkresy, 3D modely, fotky) + vystavení dokladu. */
-export default async function DocumentsPage() {
+export default async function DocumentsPage(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireFeature("documents");
+  // #25: dokumenty jen „moje" (super admin všichni, nebo „Jen moje"); obsah nákupních dokladů zamčený
+  const scope = await getFlowScope(await flowWhoFrom((await props?.searchParams) ?? {}));
   const [files, jobs] = await Promise.all([
-    listJobFiles({ includeArchived: true, limit: 2000 }),
-    listJobs({ sort: "updated", dir: "desc" }),
+    listJobFiles({ includeArchived: true, limit: 2000 }, { scope }),
+    listJobs({ sort: "updated", dir: "desc" }, { scope }),
   ]);
   const info = await getFileFlowInfo(files.map((f) => f.id));
   const flowFiles = files.map((f) => toFlowFile(f, info[f.id] ?? null));

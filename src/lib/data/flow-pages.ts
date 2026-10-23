@@ -13,6 +13,7 @@ import {
   type OrderRevisionView,
 } from "@/components/flow/flow-state";
 import type { FlowProposal } from "@/lib/supabase/database.types";
+import { inScope, type FlowScope } from "@/lib/auth/flow-scope";
 
 /**
  * Data stránek obchodního toku: podrobné stavy, další krok a „kdo · kdy“ pro řádky
@@ -146,8 +147,14 @@ export type FlowListPhase = keyof typeof VIEW_COLUMN;
  * 30 dní podle změny hlavního stavu — stejně jako počty chipů (flow_counts).
  * null = podrobné stavy nejsou k dispozici (chyba DB) → stránka použije hlavní stav.
  */
-export async function listFlowStateJobIds(filter: { phase: FlowListPhase; keys: string[] }[]): Promise<Set<string> | null> {
+export async function listFlowStateJobIds(
+  filter: { phase: FlowListPhase; keys: string[] }[],
+  opts: { scope?: FlowScope | null } = {},
+): Promise<Set<string> | null> {
   const out = new Set<string>();
+  // #25: s rozsahem jen „moje" (bez přístupu / chyba rozsahu = nic)
+  if ("scope" in opts && (!opts.scope || (!opts.scope.all && opts.scope.error))) return new Set();
+  const mine = opts.scope && !opts.scope.all ? opts.scope : null;
   const s = await session();
   if (!s) return null;
   const now = Date.now();
@@ -156,13 +163,20 @@ export async function listFlowStateJobIds(filter: { phase: FlowListPhase; keys: 
       const keys = f.keys.filter((k) => /^[a-z_]{1,40}$/.test(k));
       if (!keys.length) continue;
       const col = VIEW_COLUMN[f.phase];
-      const { data, error } = await s.db.from("job_flow_v").select(`id, stage_changed_at, ${col}`).in(col, keys).limit(5000);
-      warn("ids", error);
-      if (error) return null;
-      for (const r of (data ?? []) as Row[]) {
-        const key = String(r[col]);
-        if (CLOSED_JOB_KEYS.includes(key) && !withinClosedWindow(r.stage_changed_at as string | null, now)) continue;
-        out.add(String(r.id));
+      // „moje": id vtlačená do dotazu po dávkách (žádné oříznutí cizími řádky)
+      const parts: (string[] | null)[] = mine ? chunks([...mine.jobIds], 200) : [null];
+      for (const part of parts) {
+        let q = s.db.from("job_flow_v").select(`id, stage_changed_at, ${col}`).in(col, keys);
+        if (part) q = q.in("id", part);
+        const { data, error } = await q.limit(5000);
+        warn("ids", error);
+        if (error) return null;
+        for (const r of (data ?? []) as Row[]) {
+          const key = String(r[col]);
+          if (CLOSED_JOB_KEYS.includes(key) && !withinClosedWindow(r.stage_changed_at as string | null, now)) continue;
+          if (mine && !inScope(mine, String(r.id))) continue;
+          out.add(String(r.id));
+        }
       }
     }
   } catch (err) {

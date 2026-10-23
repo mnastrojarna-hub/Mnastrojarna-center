@@ -42,6 +42,9 @@ export default async function DashboardPage() {
     getFlowDashboard(),
     getResolvedApprovals(5),
   ]);
+  // #25: dlaždice = co panel níže opravdu vypíše (fronta AI); ruční nabídky kolegů přičte až panel
+  // „Nabídky ke schválení" (25-C, listPendingQuoteApprovals) — do té doby jsou v Nabídkách
+  const waitingApproval = approvals.length;
 
   const kpis = bookKpis(counts);
   const mail = emails.filter((e) => e.category !== "Spam");
@@ -57,7 +60,7 @@ export default async function DashboardPage() {
     },
     { label: "Termín do 7 dní", value: kpis.dueSoon, hint: "připrav dodání", icon: CalendarClock, href: "/orders?segment=vse&deadline=week", tone: TONE.amber },
     { label: "Poptávky & nabídky", value: kpis.inquiries, hint: "před objednávkou", icon: MessageSquareQuote, href: "/orders?segment=poptavky", tone: TONE.sky },
-    { label: "Čeká na schválení", value: approvals.length, hint: approvals.length ? "jedním klikem níže" : "fronta je prázdná", icon: ListChecks, href: "#fronta", tone: TONE.fuchsia },
+    { label: "Čeká na schválení", value: waitingApproval, hint: waitingApproval ? "jedním klikem níže" : "fronta je prázdná", icon: ListChecks, href: "#fronta", tone: TONE.fuchsia },
     { label: "Nepřečtená pošta", value: unread, hint: `${aiSorted} roztřídila AI`, icon: Inbox, href: "/inbox", tone: TONE.blue },
   ];
 

@@ -910,6 +910,8 @@ export async function assignJobOwner(
 ): Promise<ActionResult<{ commission: JobCommissionView | null }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
+  // #25: obchodníka zakázky (a tím komu patří provize) mění jen super admin
+  if (c.user.role !== "super_admin") return fail("Obchodníka zakázky mění jen super admin.");
   if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
   if (ownerId !== null && ownerId !== "" && !isUuid(ownerId)) return fail("Uživatel nenalezen.");
   const owner = ownerId || null;

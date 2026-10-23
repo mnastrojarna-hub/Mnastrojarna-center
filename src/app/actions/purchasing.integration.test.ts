@@ -57,12 +57,15 @@ vi.mock("@/lib/supabase/server", async () => {
   };
 });
 
+/** Role přihlášeného (#25: obchodníka zakázky mění jen super admin — test přepne roli). */
+const who = vi.hoisted(() => ({ role: "obchodnik" as "obchodnik" | "super_admin" }));
+
 vi.mock("@/lib/auth/session", () => {
   const user = {
     id: "156c7996-b488-4c53-a3f5-e51dd004f4ad",
     email: "obchod@local.test",
     fullName: "Petr Obchodník",
-    role: "obchodnik",
+    get role() { return who.role; },
     initials: "PO",
     roleLabel: "Obchodník",
     aiAccess: true,
@@ -284,13 +287,21 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
   }, 60_000);
 
   it("obchodník zakázky → provize jiného obchodníka; nabídku lze smazat", async () => {
-    const r = await a.assignJobOwner(JOB, adminId);
-    expect(r.ok).toBe(true);
-    expect(r.commission?.ownerId).toBe(adminId);
-    expect((await commission()).owner_id).toBe(adminId);
-    const back = await a.assignJobOwner(JOB, OWNER);
-    expect(back.commission).toMatchObject({ ownerId: OWNER, ownerName: "Petr Obchodník", rate: 0.1 });
-    expect((await a.assignJobOwner(JOB, "00000000-0000-0000-0000-000000000000")).error).toMatch(/Uživatel nenalezen/);
+    // #25: obchodníka zakázky (komu patří provize) mění jen super admin
+    expect((await a.assignJobOwner(JOB, adminId)).error).toBe("Obchodníka zakázky mění jen super admin.");
+    expect((await commission()).owner_id).toBe(OWNER);
+    who.role = "super_admin";
+    try {
+      const r = await a.assignJobOwner(JOB, adminId);
+      expect(r.ok).toBe(true);
+      expect(r.commission?.ownerId).toBe(adminId);
+      expect((await commission()).owner_id).toBe(adminId);
+      const back = await a.assignJobOwner(JOB, OWNER);
+      expect(back.commission).toMatchObject({ ownerId: OWNER, ownerName: "Petr Obchodník", rate: 0.1 });
+      expect((await a.assignJobOwner(JOB, "00000000-0000-0000-0000-000000000000")).error).toMatch(/Uživatel nenalezen/);
+    } finally {
+      who.role = "obchodnik";
+    }
 
     expect((await a.deleteSupplierQuote(quoteIds[1])).ok).toBe(true);
   }, 60_000);

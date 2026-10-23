@@ -25,6 +25,8 @@ console.log(`07 · Stránky toku — podrobné stavy a autor (značka ${TAG})`);
 // ── Vlastní data (číslo zakázky i nabídky vlastní → čítače dokladů se nespotřebují) ──
 async function cleanup() {
   const ids = sql(`select id from orders where title like ${lit(`${PREFIX}%`)}`).split("\n").filter(Boolean);
+  // #25: e-maily fixtur do schránky dílny („moje“ zaměstnance)
+  sql(`delete from emails where subject like ${lit(`${PREFIX}%`)}`);
   if (!ids.length) return 0;
   const inList = ids.map(lit).join(",");
   // vystavené PDF (potvrzení) z úložiště, archiv dokladů a odchozí e-maily
@@ -70,6 +72,14 @@ const AIJ = job({ title: "AI nabídka", status: "naceneni" });
 const AIQ = quote(AIJ, { ai: true });
 const SENTJ = job({ title: "odeslaná nabídka", status: "nabidka" });
 const SENTQ = quote(SENTJ, { status: "odeslano", sent: true });
+// #25: obchodní tok vidí zaměstnanec jen „svůj“ — poptávka PROP a nabídka SENTJ přišly e-mailem do schránky dílny
+const DILNA_BOX = "d5000000-0000-0000-0000-000000000002";
+function mailToDilna(j) {
+  sql(`insert into emails (mailbox_id, owner_id, direction, subject, from_email, order_id, received_at, category)
+    values (${lit(DILNA_BOX)}, ${lit(ID.dilna)}, 'in', ${lit(`${PREFIX}e-mail ${j.number}`)}, 'nakup@example.test', ${lit(j.id)}, now(), 'poptavka')`);
+}
+mailToDilna(PROP);
+mailToDilna(SENTJ);
 
 async function flowPage(page, path, title) {
   await page.goto(`${BASE}${path}`);
@@ -83,7 +93,9 @@ async function chipCount(page, group, label) {
   const b = page.getByRole("group", { name: group }).getByRole("button", { name: new RegExp(`^${label}\\s*\\d+$`) }).first();
   return Number((await b.innerText()).replace(/\D+/g, ""));
 }
-const dbCount = (phase, key) => Number(sql(`select coalesce(sum(n), 0) from flow_counts() where flow_phase = ${lit(phase)} and flow_key = ${lit(key)}`) || 0);
+/** Počet podle DB; s `mine` jen „moje“ toho uživatele (#25: ne-admin vidí na stránkách toku svoje). */
+const dbCount = (phase, key, mine = null) => Number(sql(`select coalesce(sum(n), 0) from flow_counts(null, 30, ${mine ? lit(mine) : "null"})
+  where flow_phase = ${lit(phase)} and flow_key = ${lit(key)}`) || 0);
 async function menu(page, scope, item) {
   await scope.getByRole("button", { name: /^Další akce/ }).click();
   await page.getByRole("menuitem", { name: item }).click();
@@ -95,8 +107,8 @@ await T("/inquiries: chipy s počty = DB; Převzít → „V řešení · <obcho
   await login(page, USERS.obchod);
   await flowPage(page, "/inquiries", "Poptávky");
   await waitHydrated(page, 'main [role="group"][aria-label="Stav poptávky"] button');
-  expect(await chipCount(page, "Stav poptávky", "Přijatá") === dbCount("inquiry", "prijata"), "počet Přijatá = flow_counts");
-  expect(await chipCount(page, "Stav poptávky", "V řešení") === dbCount("inquiry", "v_reseni"), "počet V řešení = flow_counts");
+  expect(await chipCount(page, "Stav poptávky", "Přijatá") === dbCount("inquiry", "prijata", ID.obchod), "počet Přijatá = flow_counts (moje)");
+  expect(await chipCount(page, "Stav poptávky", "V řešení") === dbCount("inquiry", "v_reseni", ID.obchod), "počet V řešení = flow_counts (moje)");
   const r = row(page, INQ);
   await r.locator('[data-flow-state="inquiry.prijata"]').waitFor({ timeout: 10_000 });
   await shot(page, S("01-inquiries"));
@@ -218,7 +230,7 @@ await T("/confirmations: rozpor → Požádat o opravu → Přijmout, jak je (be
   await login(page, USERS.obchod);
   await flowPage(page, "/confirmations", "Potvrzení objednávek");
   await waitHydrated(page, 'main [role="group"][aria-label="Stav objednávky"] button');
-  expect(await chipCount(page, "Stav objednávky", "Doručená") === dbCount("order", "dorucena"), "počet Doručená = flow_counts");
+  expect(await chipCount(page, "Stav objednávky", "Doručená") === dbCount("order", "dorucena", ID.obchod), "počet Doručená = flow_counts (moje)");
   const r = () => row(page, AIJ);
   await r().waitFor({ timeout: 10_000 });
   expect(norm(await r().innerText()).includes("Potvrdit objednávku"), "další krok: Potvrdit objednávku");
@@ -272,7 +284,8 @@ await T("/confirmations: rozpor → Požádat o opravu → Přijmout, jak je (be
 await T("mobil 390 px: stránky toku bez přetékání, chipy posuvné, autor viditelný jako text", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
-  for (const [path, title] of [["/inquiries", "Poptávky"], ["/pricing", "Nacenění"], ["/quotes", "Nabídky"], ["/confirmations?stav=potvrzena", "Potvrzení objednávek"]]) {
+  // #25: Nacenění jen super admin — obchodník ho nemá
+  for (const [path, title] of [["/inquiries", "Poptávky"], ["/quotes", "Nabídky"], ["/confirmations?stav=potvrzena", "Potvrzení objednávek"]]) {
     await flowPage(page, path, title);
     await expectNoOverflow(page, path);
   }

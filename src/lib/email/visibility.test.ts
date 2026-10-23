@@ -5,8 +5,8 @@ import {
   INBOX_CATEGORIES, categoryStyle, countByCategory, inferSentKind, sentKindFromApproval,
   approvalTypeForKind, sentItemKind, SENT_KIND_STYLE, SENT_KINDS, toEmailItem, toSentItemFromMail,
   toSentItemFromApproval, mergeSentItems, extractAddress, usefulAiSummary, jobStageForEmailCategory,
-  jobTitleFromSubject, pragueDate, buildJobFromEmail, one, JOB_TITLE_MAX, filterInbox, foldText, mailtoReply,
-  filterSent, countSentKinds, categoryCodeFromLabel,
+  jobTitleFromSubject, pragueDate, buildJobFromEmail, jobPeopleFromEmail, one, JOB_TITLE_MAX, filterInbox, foldText, mailtoReply,
+  filterSent, countSentKinds, categoryCodeFromLabel, attachmentIssuer,
   type EmailListRow,
 } from "./visibility";
 import type { SentItem } from "@/lib/data/types";
@@ -303,6 +303,56 @@ describe("zakázka z e-mailu", () => {
     );
     expect(inquiry).toMatchObject({ status: "poptavka", inquiry_date: "2026-10-22", customer_id: "c2", note: "Poptávka 5 ks hřídelí", customer_contact: null });
     expect(inquiry).not.toHaveProperty("order_date");
+
+    // #25: obchodník / zpracovává podle vlastníka schránky, založil vždy klikající
+    const owned = buildJobFromEmail(base, { number: "Z-2026-009", actorId: ME, ownerId: OTHER, assigneeId: null });
+    expect(owned).toMatchObject({ owner_id: OTHER, created_by: ME });
+    expect(owned).not.toHaveProperty("assignee_id");
+    const worker = buildJobFromEmail(base, { number: "Z-2026-010", actorId: ME, ownerId: null, assigneeId: OTHER });
+    expect(worker).toMatchObject({ owner_id: null, assignee_id: OTHER, created_by: ME });
+  });
+
+  it("#25 kdo zakázku z e-mailu vlastní (jobPeopleFromEmail)", () => {
+    const SALES = "33333333-3333-4333-8333-333333333333";
+    const WORKER = "44444444-4444-4444-8444-444444444444";
+    const ADMIN = "55555555-5555-4555-8555-555555555555";
+    const CUSTOMER_OWNER = "66666666-6666-4666-8666-666666666666";
+    const admin = { id: ADMIN, role: "super_admin" };
+    // schránka obchodníka (i když kliká admin) → obchodník schránky
+    expect(jobPeopleFromEmail({ mailboxOwner: { id: SALES, role: "obchodnik" }, customerOwnerId: CUSTOMER_OWNER, actor: admin }))
+      .toEqual({ ownerId: SALES, assigneeId: null });
+    expect(jobPeopleFromEmail({ mailboxOwner: { id: ADMIN, role: "super_admin" }, customerOwnerId: CUSTOMER_OWNER, actor: admin }))
+      .toEqual({ ownerId: ADMIN, assigneeId: null });
+    // schránka zaměstnance → zpracovává on, obchodník = obchodník zákazníka, jinak klikající obchodník / admin, jinak nikdo
+    expect(jobPeopleFromEmail({ mailboxOwner: { id: WORKER, role: "zamestnanec" }, customerOwnerId: CUSTOMER_OWNER, actor: admin }))
+      .toEqual({ ownerId: CUSTOMER_OWNER, assigneeId: WORKER });
+    expect(jobPeopleFromEmail({ mailboxOwner: { id: WORKER, role: "zamestnanec" }, customerOwnerId: null, actor: { id: SALES, role: "obchodnik" } }))
+      .toEqual({ ownerId: SALES, assigneeId: WORKER });
+    expect(jobPeopleFromEmail({ mailboxOwner: { id: WORKER, role: "zamestnanec" }, customerOwnerId: null, actor: { id: WORKER, role: "zamestnanec" } }))
+      .toEqual({ ownerId: null, assigneeId: WORKER });
+    // schránka bez vlastníka (info@) → obchodník zákazníka, jinak klikající
+    expect(jobPeopleFromEmail({ mailboxOwner: null, customerOwnerId: CUSTOMER_OWNER, actor: admin })).toEqual({ ownerId: CUSTOMER_OWNER, assigneeId: null });
+    expect(jobPeopleFromEmail({ mailboxOwner: null, customerOwnerId: null, actor: admin })).toEqual({ ownerId: ADMIN, assigneeId: null });
+  });
+
+  it("#25 vystavitel příloh e-mailu (attachmentIssuer)", () => {
+    const S = "77777777-7777-4777-8777-777777777777";
+    const C = "88888888-8888-4888-8888-888888888888";
+    // dodavatel: nabídka dodavatele, faktura (i bez dodavatele — fail closed), e-mail jen od dodavatele
+    expect(attachmentIssuer({ category: "nabidka_dodavatele" })).toBe("dodavatel");
+    expect(attachmentIssuer({ category: "faktura", customerId: C })).toBe("dodavatel");
+    expect(attachmentIssuer({ category: "faktura", supplierId: S })).toBe("dodavatel");
+    expect(attachmentIssuer({ category: "ostatni", supplierId: S })).toBe("dodavatel");
+    expect(attachmentIssuer({ category: "potvrzeni_objednavky", supplierId: S })).toBe("dodavatel");
+    // zákazník: poptávka, objednávka, potvrzení, reklamace, technická dokumentace od zákazníka
+    for (const category of ["poptavka", "objednavka", "potvrzeni_objednavky", "reklamace", "technicka_dokumentace"] as const) {
+      expect(attachmentIssuer({ category, customerId: C })).toBe("zakaznik");
+    }
+    // nejasné: bez firmy, obě firmy, upomínka zákazníka, ostatní → neznámý vystavitel
+    expect(attachmentIssuer({ category: "poptavka" })).toBeNull();
+    expect(attachmentIssuer({ category: "poptavka", customerId: C, supplierId: S })).toBeNull();
+    expect(attachmentIssuer({ category: "upominka", customerId: C })).toBeNull();
+    expect(attachmentIssuer({ category: null, customerId: C })).toBeNull();
   });
 });
 

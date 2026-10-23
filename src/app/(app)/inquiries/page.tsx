@@ -5,6 +5,8 @@ import { listJobs, getJobFormOptions } from "@/lib/data/jobs";
 import { getEmails } from "@/lib/data/queries";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowJobStates, listFlowStateJobIds } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
+import { mineParam } from "@/lib/auth/flow-scope";
 import type { EmailItem } from "@/lib/data/types";
 import { INQUIRY_ORDER, INQUIRY_STATES, OPEN_INQUIRY, chipsForTab } from "@/lib/jobs/flow-status";
 import { Button } from "@/components/ui/button";
@@ -38,13 +40,19 @@ export default async function InquiriesPage({
   const mail = can("mail");
   const selected = parseStateParam(sp[STATE_PARAM], INQUIRY_ORDER, OPEN_INQUIRY);
   const withClosed = selected.some((k) => CLOSED_JOB_KEYS.includes(k));
-  const [counts, ids, all, options, emails] = await Promise.all([
-    getFlowCounts(),
-    listFlowStateJobIds([{ phase: "inquiry", keys: selected }]),
-    listJobs(withClosed ? { sort: "deadline", dir: "asc" } : { stages: [...OPEN_STAGES], sort: "deadline", dir: "asc" }),
+  // #25: obchodní tok jen „moje" (super admin všichni, nebo „Jen moje")
+  const scope = await getFlowScope(await flowWhoFrom(sp));
+  const [counts, ids, all, options, allEmails] = await Promise.all([
+    getFlowCounts({ mine: mineParam(scope) }),
+    listFlowStateJobIds([{ phase: "inquiry", keys: selected }], { scope }),
+    listJobs(withClosed ? { sort: "deadline", dir: "asc" } : { stages: [...OPEN_STAGES], sort: "deadline", dir: "asc" }, { scope }),
     getJobFormOptions(),
     mail ? getEmails() : Promise.resolve([] as EmailItem[]),
   ]);
+  // pošta je už podle schránek; super admin v „Jen moje" jen své schránky
+  const emails = scope && scope.canToggle && !scope.all
+    ? allEmails.filter((e) => Boolean(e.mailboxId && scope.mailboxIds.includes(e.mailboxId)))
+    : allEmails;
   // bez podrobných stavů (DB je nemá) aspoň poptávky podle hlavního stavu
   const jobs = ids ? all.filter((j) => ids.has(j.id)) : all.filter((j) => j.stage === "poptavka");
   const states = await getFlowJobStates(jobs.map((j) => j.id));

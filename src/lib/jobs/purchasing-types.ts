@@ -138,6 +138,8 @@ export interface PurchaseOrderListItem extends PurchaseOrderView {
   customer: { id: string; name: string } | null;
   itemCount: number;
   drawingNumbers: string[];
+  /** #25: bez práva na nákupní ceny — ceny, volný text, PDF a akce skryté (maskPurchaseOrderListItem). */
+  pricesHidden?: boolean;
 }
 
 /** Provize zakázky — čte se z commission_entries (počítá DB trigger). */
@@ -203,6 +205,8 @@ export interface JobPurchasing {
   supplierQuotes: SupplierQuoteView[];
   purchaseOrders: PurchaseOrderView[];
   commission: JobCommissionView | null;
+  /** #25: provize cizí zakázky — vidí ji jen obchodník zakázky a super admin (commission je pak null). */
+  commissionHidden?: boolean;
   /** Obchodník zakázky (komu provize patří). */
   owner: PersonRef | null;
   totals: JobPurchasingTotals;

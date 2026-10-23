@@ -1,5 +1,5 @@
 import type {
-  ActorKind, ChangeVia, JobStage, JobFileKind, JobSource, PriorityLevel, QuoteStatus,
+  ActorKind, ChangeVia, DocIssuerKey, JobStage, JobFileKind, JobFileOrigin, JobSource, PriorityLevel, QuoteStatus,
 } from "@/lib/supabase/database.types";
 import type {
   JobInput, JobItemInput, JobQuoteItemInput, JobQuoteInput, JobListItem, JobDetail, JobItem,
@@ -569,7 +569,7 @@ export const QUOTE_LIST_SELECT = [
 
 export const JOB_FILE_SELECT = [
   "id, job_id, kind, title, filename, mime_type, size_bytes, storage_path, version, archived, replaced_by",
-  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by",
+  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin",
   `uploader:profiles!uploaded_by(${PERSON})`,
 ].join(", ");
 
@@ -802,9 +802,14 @@ export interface FileRow {
   note?: string | null;
   created_at: string;
   uploaded_by?: string | null;
+  issuer?: string | null;
+  origin?: string | null;
   uploader?: Embed<PersonEmbed>;
   job?: Embed<{ id: string; number: string | null; title: string | null; customer?: Embed<{ name: string }> }>;
 }
+
+const FILE_ISSUERS: readonly DocIssuerKey[] = ["my", "zakaznik", "dodavatel"];
+const FILE_ORIGINS: readonly JobFileOrigin[] = ["generated", "upload", "capture", "email", "import"];
 
 export interface EventRow {
   id: string;
@@ -1111,6 +1116,8 @@ export function rowToJobFile(row: FileRow): JobFile {
     aiConfidence: num(row.ai_confidence),
     note: row.note ?? null,
     hasAiData: Boolean(ai && typeof ai === "object" && Object.keys(ai).length > 0),
+    issuer: FILE_ISSUERS.includes(row.issuer as DocIssuerKey) ? (row.issuer as DocIssuerKey) : null,
+    origin: FILE_ORIGINS.includes(row.origin as JobFileOrigin) ? (row.origin as JobFileOrigin) : null,
   };
 }
 

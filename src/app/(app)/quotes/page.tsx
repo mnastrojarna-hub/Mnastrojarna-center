@@ -4,6 +4,8 @@ import { requireFeature, getAccess } from "@/lib/auth/session";
 import { listQuotes } from "@/lib/data/jobs";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowQuoteInfo } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
+import { mineParam } from "@/lib/auth/flow-scope";
 import { Button } from "@/components/ui/button";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { BookLink, FlowHeader, FlowHint } from "@/components/flow/flow-header";
@@ -26,8 +28,10 @@ export default async function QuotesPage({
   await requireFeature("workflow");
   const sp = (await searchParams) ?? {};
   const { can } = await getAccess();
-  const list = await listQuotes({ includeArchived: true });
-  const [info, counts] = await Promise.all([getFlowQuoteInfo(list.map((q) => q.id)), getFlowCounts()]);
+  // #25: nabídky jen „moje" (super admin všichni, nebo „Jen moje"); fronta „Ke schválení" vždy všech
+  const scope = await getFlowScope(await flowWhoFrom(sp));
+  const list = await listQuotes({ includeArchived: true }, { scope });
+  const [info, counts] = await Promise.all([getFlowQuoteInfo(list.map((q) => q.id)), getFlowCounts({ mine: mineParam(scope) })]);
   const today = todayPrague();
   const openByJob = new Map<string, number>();
   for (const q of list) {

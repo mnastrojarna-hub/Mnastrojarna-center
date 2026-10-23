@@ -1077,6 +1077,12 @@ export interface Database {
       };
       /** Moje zakázky obchodního toku (migrace 20261023155000; session → vždy auth.uid()). */
       flow_mine_job_ids: { Args: { p_user: string }; Returns: string[] };
+      /** Totéž jako jedno pole (bez limitu řádků PostgRESTu; migrace 20261023157000). */
+      flow_mine_job_id_list: { Args: { p_user: string }; Returns: string[] };
+      /** Objekt úložiště patří nákupnímu dokladu (migrace 20261023155000). */
+      job_file_path_is_price_doc: { Args: { p_path: string }; Returns: boolean };
+      /** Která z daných id jsou nákupní doklady (i přes sdílenou cestu v úložišti; migrace 20261023157000). */
+      job_file_price_ids: { Args: { p_ids: string[] }; Returns: string[] };
       /** Odznaky menu (p_mine null = všichni). */
       flow_badge_counts: {
         Args: { p_mine?: string | null };

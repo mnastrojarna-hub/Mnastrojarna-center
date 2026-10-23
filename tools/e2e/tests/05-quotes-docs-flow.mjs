@@ -659,7 +659,12 @@ await T("/inquiries: rychlá poptávka — validace, nový zákazník → karta 
 
 await T("/pricing?job=<id>: otevře zakázku, validace, „Uložit nacenění“ → Nacenění + nacenil; „Vytvořit nabídku z ceny“ → NAB, platnost, lhůta", async (context) => {
   const page = await context.newPage();
+  // #25: Nacenění jen super admin — obchodníka stránka vrátí do Knihy s vysvětlením
   await login(page, USERS.obchod);
+  await page.goto(`${BASE}/pricing?job=${P1.id}`);
+  await page.waitForURL(/\/orders\?pristup=pricing/, { timeout: 20_000 });
+  await page.context().clearCookies();
+  await login(page, USERS.admin);
   await flowPage(page, `/pricing?job=${P1.id}`, "Nacenění");
   const li = page.locator(`main li#job-${P1.id}`);
   await li.waitFor({ timeout: 10_000 });
@@ -668,7 +673,7 @@ await T("/pricing?job=<id>: otevře zakázku, validace, „Uložit nacenění“
   await waitHydrated(page, `li#job-${P1.id} button[aria-expanded]`);
   const price = li.getByLabel("Položka 1: prodejní cena za kus");
   const purchase = li.getByLabel("Položka 1: nákupní cena za kus");
-  expect(/4\s?817,29/.test(await purchase.inputValue()), `obchodník vidí nákup (${await purchase.inputValue()})`);
+  expect(/4\s?817,29/.test(await purchase.inputValue()), `super admin vidí nákup (${await purchase.inputValue()})`);
   await li.getByRole("button", { name: "Vytvořit nabídku z ceny" }).click();
   await li.getByText(/Doplň prodejní cenu u všech položek \(chybí u 1\)/).waitFor({ timeout: 5_000 });
   await price.fill("abc");
@@ -686,7 +691,7 @@ await T("/pricing?job=<id>: otevře zakázku, validace, „Uložit nacenění“
   await eventually(() => {
     const o = sql(`select o.status || '|' || coalesce(o.priced_by::text,'-') || '|' || o.value || '|' || i.unit_price || '|' || coalesce(i.purchase_unit_price::text,'-')
       from orders o join order_items i on i.order_id = o.id where o.id = ${lit(P1.id)}`).split("|");
-    expect(o[0] === "naceneni" && o[1] === ID.obchod && num(o[2]) === 38400 && num(o[3]) === 6400 && num(o[4]) === PURCHASE, `DB po uložení: ${o.join("|")}`);
+    expect(o[0] === "naceneni" && o[1] === ID.admin && num(o[2]) === 38400 && num(o[3]) === 6400 && num(o[4]) === PURCHASE, `DB po uložení: ${o.join("|")}`);
   });
   await li.getByLabel("Dodací lhůta (dní)").fill("15");
   await li.getByLabel("Platnost nabídky (dní)").fill("45");
@@ -698,7 +703,7 @@ await T("/pricing?job=<id>: otevře zakázku, validace, „Uložit nacenění“
   expect((await status.getByRole("link", { name: "Otevřít nabídku" }).getAttribute("href")) === `/orders/${P1.id}?tab=nabidky`, "odkaz na nabídku v kartě");
   expect((await status.getByRole("link", { name: /Další krok v Nabídkách/ }).getAttribute("href")) === "/quotes", "odkaz na /quotes");
   const q = sql(`select number || '|' || status || '|' || total || '|' || valid_until || '|' || lead_time_days || '|' || created_by from quotes where job_id = ${lit(P1.id)}`);
-  expect(q === `${nab}|ke_schvaleni|${q.split("|")[2]}|${isoDays(45)}|15|${ID.obchod}` && num(q.split("|")[2]) === 38400, `DB nabídka: ${q}`);
+  expect(q === `${nab}|ke_schvaleni|${q.split("|")[2]}|${isoDays(45)}|15|${ID.admin}` && num(q.split("|")[2]) === 38400, `DB nabídka: ${q}`);
   await shot(page, S("23-pricing-quote-created"));
 });
 
@@ -1049,7 +1054,10 @@ await T("stránky toku renderují pro super admina i obchodníka (nadpis, žádn
   for (const user of [USERS.admin, USERS.obchod]) {
     const page = await context.newPage();
     await login(page, user);
-    for (const [path, title] of [["/inquiries", "Poptávky"], ["/pricing", "Nacenění"], ["/quotes", "Nabídky"], ["/confirmations", "Potvrzení objednávek"], ["/documents", "Dokumenty"]]) {
+    // #25: Nacenění jen super admin; Objednávky dodavatelům oba (právo na nákupní ceny)
+    const flowPages = [["/inquiries", "Poptávky"], ["/pricing", "Nacenění"], ["/quotes", "Nabídky"], ["/confirmations", "Potvrzení objednávek"], ["/documents", "Dokumenty"], ["/purchasing", "Objednávky dodavatelům"]]
+      .filter(([path]) => user === USERS.admin || path !== "/pricing");
+    for (const [path, title] of flowPages) {
       const r = await page.goto(`${BASE}${path}`);
       expect(r.status() === 200, `${user.email} ${path}: HTTP 200 (${r.status()})`);
       await page.locator("main h1").filter({ hasText: title }).first().waitFor({ timeout: 20_000 });
@@ -1064,7 +1072,15 @@ await T("stránky toku renderují pro super admina i obchodníka (nadpis, žádn
 await T("zaměstnanec: stránky toku bez nákupních cen a marží (ani v datech stránky); super admin je vidí", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.dilna);
-  const pages = [["/inquiries", "Poptávky"], [`/pricing?job=${P1.id}`, "Nacenění"], ["/quotes", "Nabídky"], ["/confirmations", "Potvrzení objednávek"], ["/documents", "Dokumenty"], [`/orders/${P1.id}?tab=nabidky`, null]];
+  // #25: Nacenění jen super admin → zaměstnanec skončí v Knize s vysvětlením (nákupní ceny tam nejsou)
+  await page.goto(`${BASE}/pricing?job=${P1.id}`);
+  await page.waitForURL(/\/orders\?pristup=pricing/, { timeout: 20_000 });
+  expect(!PURCHASE_RE.test(norm(await page.content())), "zaměstnanec /pricing → Kniha bez nákupní ceny");
+  // Objednávky dodavatelům zatím jen s nákupními cenami (přehled bez cen a akcí přijde s 25-C)
+  await page.goto(`${BASE}/purchasing`);
+  await page.waitForURL(/\/orders\?pristup=margins/, { timeout: 20_000 });
+  expect(!PURCHASE_RE.test(norm(await page.content())), "zaměstnanec /purchasing → Kniha bez nákupní ceny");
+  const pages = [["/inquiries", "Poptávky"], ["/quotes", "Nabídky"], ["/confirmations", "Potvrzení objednávek"], ["/documents", "Dokumenty"], [`/orders/${P1.id}?tab=nabidky`, null]];
   for (const [path, title] of pages) {
     const r = await page.goto(`${BASE}${path}`);
     expect(r.status() === 200, `zaměstnanec ${path}: HTTP 200 (${r.status()})`);
@@ -1098,9 +1114,9 @@ await T("zaměstnanec: stránky toku bez nákupních cen a marží (ani v datech
 await T("mobil 390 px: 5 stránek toku bez vodorovného přetékání (+ rozbalené nacenění, dialog poptávky, nabídky v kartě)", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
+  // #25: Nacenění jen super admin — obchodník ho na mobilu nemá (viz test /pricing výše)
   for (const [path, title, name] of [
     ["/inquiries", "Poptávky", "70-m-inquiries"],
-    [`/pricing?job=${P1.id}`, "Nacenění", "71-m-pricing"],
     ["/quotes", "Nabídky", "72-m-quotes"],
     ["/confirmations", "Potvrzení objednávek", "73-m-confirmations"],
     ["/documents", "Dokumenty", "74-m-documents"],
