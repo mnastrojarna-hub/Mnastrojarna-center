@@ -61,6 +61,13 @@ export async function signIn(formData: FormData) {
   redirect("/orders");
 }
 
+/** Ukončí relaci na serveru (smaže auth cookies) bez přesměrování — přesměruje volající. */
+export async function endSession(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+}
+
 export async function signOut() {
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
