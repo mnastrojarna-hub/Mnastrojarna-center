@@ -51,8 +51,11 @@ import {
   selectWinningQuoteCore,
 } from "@/lib/jobs/purchasing-store";
 import { confirmDeliveryNoteCore, markJobPaidCore, setInvoiceInfoCore } from "@/lib/jobs/production-store";
-import { upsertDrawingFromCapture } from "@/lib/jobs/drawings-store";
-import { captureUuid } from "@/lib/jobs/capture-batch";
+import { SPEC_ROW_SELECT, applySpecToDrawing, upsertDrawingFromCapture } from "@/lib/jobs/drawings-store";
+import { captureUuid, emptyDrawing } from "@/lib/jobs/capture-batch";
+import {
+  SPEC_GROUP_LABEL, initialSpecState, materialDifference, mergeSpecPatch, specColumns, specExtractFields, specForMaterial, specSources,
+} from "@/lib/jobs/drawing-spec";
 import { cleanNumber, isUuid, jobFilePath, stageEventMessage, todayIso } from "@/lib/jobs/mapping";
 import { isForward, isJobStage } from "@/lib/jobs/stages";
 import { plural } from "@/lib/jobs/deadlines";
@@ -1727,10 +1730,18 @@ async function applyDoc(
     const replaceFileId = (st.onDuplicate === "version" && rdoc ? await duplicateFileInJob(db, session, rdoc, jobId) : null) ?? prevVer.id;
     if (!replaceFileId && prevVer.conflict) warnings.push(prevVer.conflict);
     const drawingData = fromDb?.extract.kind === "drawing" ? fromDb.extract.drawing : null;
+    // materiál, hmotnost, TZ / PÚ, poznámky: stav z kontroly, jinak návrh AI (stejný výpočet jako v kontrole)
+    const spec = st.spec ?? initialSpecState(drawingData ?? emptyDrawing(), {
+      aiUsed: aiUsed && Boolean(drawingData), title: st.title, quantity: st.quantity,
+    });
+    const specCols = specColumns(spec, st.material);
+    const materialChanged = Boolean(st.material.trim()) && st.material.trim() !== (aiUsed ? drawingData?.material ?? "" : "").trim();
+    const specSrc = specSources(spec, materialChanged);
     const aiExtracted: Record<string, unknown> = {
       ...(drawingData ?? {}),
       drawingNumber: number, revision: st.revision, title: st.title, material: st.material, dimensions: st.dimensions,
       generalTolerance: st.generalTolerance, tightestTolerance: st.tightestTolerance, quantity: cleanNumber(st.quantity) ?? 0,
+      ...specExtractFields(specCols),
       documentNumber: number, captureDocId: draft.id,
     };
     // název výkresu v dokumentech = název položky (z objednávky), jinak z razítka
@@ -1763,6 +1774,30 @@ async function applyDoc(
         const { error } = await db.from("order_items").update(patch as never).eq("id", itemId);
         if (error) itemChanges.length = 0;
       }
+      // materiál / hmotnost / úpravy: doplnit prázdné a AI-vyplněné, ručně zadané nepřepsat.
+      // Jiný materiál u položky (z objednávky) než na výkresu → platí objednávka (skupina, hustota, odhad).
+      const itemMat = String(cur.material ?? "").trim();
+      let itemCols = specCols;
+      if (itemMat && materialDifference(itemMat, st.material)) {
+        warnings.push(`Materiál: objednávka ${itemMat} × výkres ${st.material.trim()} — u položky platí objednávka.`);
+        itemCols = specColumns(specForMaterial(spec, itemMat, {
+          dimensions: st.dimensions, title: st.title, quantity: st.quantity,
+          overallDims: drawingData?.overallDims, shapeHint: drawingData?.shapeHint, blankDimensions: drawingData?.blankDimensions,
+        }), itemMat);
+      }
+      // starší revize než u položky (uložena vedle): jen doplnit prázdné, AI hodnoty novější revize nechat
+      const olderRev = (!replaceFileId && Boolean(prevVer.conflict))
+        || Boolean(cur.revision && st.revision && isNewerRevision(String(cur.revision), st.revision));
+      const { data: specRow } = await db.from("order_items").select(SPEC_ROW_SELECT).eq("id", itemId).maybeSingle();
+      if (specRow) {
+        const m = mergeSpecPatch(specRow as Row, itemCols, specSrc, { fillOnly: olderRev });
+        if (Object.keys(m.patch).length) {
+          const { error } = await db.from("order_items").update(m.patch as never).eq("id", itemId);
+          if (error) warnings.push("Materiál a úpravy z výkresu se k položce nezapsaly.");
+          else itemChanges.push(...m.changed.map((k) => SPEC_GROUP_LABEL[k]));
+        }
+        if (m.kept.length) warnings.push(`U položky zůstalo ručně zadané: ${m.kept.map((k) => SPEC_GROUP_LABEL[k]).join(", ")}.`);
+      }
     }
     // archiv výkresů (s právem „drawings" dle přepínače, jinak vždy potichu)
     const archive = can(c.user, "drawings", c.access.ctx) ? st.archive : true;
@@ -1775,7 +1810,7 @@ async function applyDoc(
         drawingNumber: number, revision: st.revision, customerId: done.customerId, title: st.title, material: st.material,
         dimensions: st.dimensions, generalTolerance: st.generalTolerance, tightestTolerance: st.tightestTolerance,
         quantity: cleanNumber(st.quantity), fileType, storagePath: fr?.storage_path ?? "", jobFileId: fileIds[0], jobId,
-        aiMetadata: drawingData ? { ...drawingData } : {}, uploadedBy: user.id,
+        aiMetadata: drawingData ? { ...drawingData } : {}, uploadedBy: user.id, spec: { columns: specCols, sources: specSrc },
       });
       if (res.status === "inserted" || res.status === "linked") {
         await db.from("job_files").update({ drawing_id: res.drawingId } as never).eq("id", fileIds[0]);
@@ -1785,6 +1820,9 @@ async function applyDoc(
           const qty = cleanNumber(st.quantity);
           if (st.title.trim()) await db.from("drawings").update({ title: st.title.trim() } as never).eq("id", res.drawingId).is("title", null);
           if (qty && qty > 0) await db.from("drawings").update({ quantity: Math.round(qty) } as never).eq("id", res.drawingId).is("quantity", null);
+          // materiál / úpravy: stejné pravidlo jako u položky (ručně zadané v archivu zůstává)
+          const sp = await applySpecToDrawing(db, res.drawingId, specCols, specSrc);
+          if (!sp.ok) warnings.push("Materiál a úpravy z výkresu se do archivu nezapsaly.");
         }
         out.drawingId = res.drawingId;
         out.drawingArchived = res.status === "inserted";

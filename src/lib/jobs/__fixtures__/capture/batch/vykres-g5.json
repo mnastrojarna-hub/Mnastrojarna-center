@@ -22,5 +22,25 @@
   "drawingNumbers": [
     "E2E-VK-9301",
     "SM-9301-A"
+  ],
+  "materialGroup": "bezna_ocel",
+  "overallDims": [],
+  "shapeHint": "hranol",
+  "blankDimensions": "",
+  "heatStatus": "uvedeno",
+  "heatSteps": [
+    {
+      "kind": "kaleni",
+      "value": "58+2",
+      "unit": "HRC",
+      "depthMm": "",
+      "note": ""
+    }
+  ],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "drawingNotes": [
+    "Obecné tolerance ISO 2768-mK",
+    "Nekótované hrany sražené 0,5 × 45°"
   ]
 }

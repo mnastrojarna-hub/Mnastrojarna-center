@@ -9,6 +9,8 @@ import { getDrawings } from "@/lib/data/queries";
 import { searchNormalize } from "@/lib/jobs/mapping";
 import type { DrawingItem } from "@/lib/data/types";
 import { cn, formatDate } from "@/lib/utils";
+import { DrawingSpecChips } from "@/components/jobs/drawing-spec-chips";
+import { MATERIAL_GROUPS, classifyMaterial } from "@/lib/jobs/material-groups";
 
 const TYPE_STYLE: Record<DrawingItem["fileType"], { label: string; icon: typeof FileText; badge: string }> = {
   PDF: { label: "PDF", icon: FileText, badge: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
@@ -29,7 +31,14 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
   const tokens = searchNormalize(q).split(/\s+/).filter(Boolean);
   const drawings = tokens.length
     ? all.filter((d) => {
-        const h = searchNormalize([d.number, d.revision, d.customer, d.material, d.dimensions, d.jobNumber ?? ""].join(" "));
+        const sp = d.spec;
+        const h = searchNormalize([
+          d.number, d.revision, d.customer, d.material, d.dimensions, d.jobNumber ?? "", d.title ?? "",
+          sp?.materialGroup ? MATERIAL_GROUPS[sp.materialGroup].label : "", sp?.materialDesignation ?? "",
+          // uklizené označení („ČSN 19 436" pro „ČSN 41 9436") — najde se i jiný zápis
+          sp?.materialDesignation ? classifyMaterial(sp.materialDesignation).normalizedDesignation : "",
+          sp?.heatTreatment ?? "", sp?.surfaceTreatment ?? "", sp?.hardness ?? "",
+        ].join(" "));
         return tokens.every((t) => h.includes(t));
       })
     : all;
@@ -64,7 +73,7 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
               {drawings.map((d) => {
                 const t = typeStyle(d.fileType);
                 return (
-                  <li key={d.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
                     <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", t.badge)} title={t.label}>
                       <t.icon className="h-4 w-4" />
                     </span>
@@ -75,7 +84,7 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
                         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", t.badge)}>{t.label}</span>
                       </div>
                       <p className="truncate text-xs text-muted-foreground">
-                        {[d.customer !== "—" ? d.customer : null, d.material !== "—" ? d.material : null, d.dimensions !== "—" ? d.dimensions : null, d.qty ? `${d.qty} ks` : null]
+                        {[d.title || null, d.customer !== "—" ? d.customer : null, d.material !== "—" ? d.material : null, d.dimensions !== "—" ? d.dimensions : null, d.qty ? `${d.qty} ks` : null]
                           .filter(Boolean).join(" · ") || "bez údajů"}
                       </p>
                     </div>
@@ -102,6 +111,8 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
                       )}
                       <span className="text-[11px] text-muted-foreground">{formatDate(d.uploadedAt)}</span>
                     </span>
+                    {/* štítky pod řádkem na celou šířku (na mobilu je pravý sloupec nemačká) */}
+                    <DrawingSpecChips spec={d.spec} className="basis-full pl-12" testId={`drawing-spec-${d.number}`} />
                   </li>
                 );
               })}

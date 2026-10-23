@@ -1,3 +1,4 @@
+import { specViewFromRow } from "@/lib/jobs/drawing-spec";
 import type {
   ActorKind, ChangeVia, DocIssuerKey, JobStage, JobFileKind, JobFileOrigin, JobSource, PriorityLevel, QuoteStatus,
 } from "@/lib/supabase/database.types";
@@ -727,6 +728,22 @@ export interface ItemRow {
   delivered_quantity?: number | string | null;
   delivery_closed?: boolean | null;
   delivery_closed_reason?: string | null;
+  // materiál, hmotnost, TZ / PÚ z výkresu (migrace 20261023130000 + 20261023158000)
+  material_group?: string | null;
+  material_designation?: string | null;
+  weight_kg?: number | string | null;
+  weight_source?: string | null;
+  blank_weight_kg?: number | string | null;
+  blank_dims?: string | null;
+  blank_shape?: string | null;
+  heat_status?: string | null;
+  heat_steps?: unknown;
+  heat_treatment?: string | null;
+  hardness?: string | null;
+  surface_status?: string | null;
+  surface_steps?: unknown;
+  surface_treatment?: string | null;
+  drawing_notes?: string | null;
 }
 
 export interface QuoteRow {
@@ -1024,6 +1041,7 @@ export function rowToJobItem(row: ItemRow, opts: ViewOptions): JobItem {
     note: row.note ?? null,
     ...(row.delivered_quantity !== undefined ? { deliveredQuantity: num(row.delivered_quantity) ?? 0 } : {}),
     ...(row.delivery_closed !== undefined ? { deliveryClosed: Boolean(row.delivery_closed), deliveryClosedReason: row.delivery_closed_reason ?? null } : {}),
+    ...(row.material_group !== undefined || row.heat_status !== undefined ? { spec: specViewFromRow(row as Record<string, unknown>) } : {}),
   };
 }
 

@@ -1,6 +1,27 @@
 import "server-only";
 import type { JobsDb } from "@/lib/jobs/events";
 import { isUuid } from "@/lib/jobs/mapping";
+import {
+  SPEC_COLUMN_NAMES, insertSpecRow, mergeSpecPatch, type DrawingSpecColumns, type SpecSources,
+} from "@/lib/jobs/drawing-spec";
+
+/** Sloupce materiálu / hmotnosti / úprav + zdroje (pro mergeSpecPatch). */
+export const SPEC_ROW_SELECT = `id, ${SPEC_COLUMN_NAMES.join(", ")}, spec_sources`;
+
+/**
+ * Materiál, hmotnost a úpravy z výkresu do existujícího řádku archivu: prázdné a AI-vyplněné se
+ * doplní / nahradí, ručně zadané zůstane (mergeSpecPatch).
+ */
+export async function applySpecToDrawing(
+  db: JobsDb, drawingId: string, columns: DrawingSpecColumns, sources: SpecSources,
+): Promise<{ ok: boolean; changed: string[] }> {
+  const { data, error } = await db.from("drawings").select(SPEC_ROW_SELECT).eq("id", drawingId).maybeSingle();
+  if (error || !data) return { ok: false, changed: [] };
+  const m = mergeSpecPatch(data as Record<string, unknown>, columns, sources);
+  if (!Object.keys(m.patch).length) return { ok: true, changed: [] };
+  const { error: upErr } = await db.from("drawings").update(m.patch as never).eq("id", drawingId);
+  return { ok: !upErr, changed: upErr ? [] : m.changed };
+}
 
 /**
  * Archiv výkresů z dokumentů zakázky (dávkové focení): výkres se do archivu (drawings, unikát
@@ -27,6 +48,8 @@ export interface CaptureDrawingInput {
   jobId: string;
   aiMetadata: Record<string, unknown>;
   uploadedBy: string;
+  /** Materiál, hmotnost, TZ / PÚ, poznámky (drawing-spec.ts) — u nového řádku se zapíše celé. */
+  spec?: { columns: DrawingSpecColumns; sources: SpecSources };
 }
 
 export type CaptureDrawingResult =
@@ -84,6 +107,7 @@ export async function upsertDrawingFromCapture(db: JobsDb, input: CaptureDrawing
     title: input.title.trim() || null,
     ai_metadata: input.aiMetadata,
     uploaded_by: input.uploadedBy,
+    ...(input.spec ? insertSpecRow(input.spec.columns, input.spec.sources) : {}),
   };
   const { data, error } = await db.from("drawings").insert(row as never).select("id").single();
   if (error || !data) {

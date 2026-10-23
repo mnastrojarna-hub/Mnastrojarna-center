@@ -14,6 +14,7 @@ import { CaptureFileForm } from "@/components/jobs/capture/capture-file-form";
 import { viewerPages, type LocalUrls } from "@/components/jobs/capture/capture-sort";
 import { jobsGenitive, mergeAllPlan, saveCountInfo, warningResolved, type BatchProblem } from "@/components/jobs/capture/capture-flow";
 import { BATCH_TYPES } from "@/lib/jobs/capture-batch";
+import { missingHardness } from "@/lib/jobs/drawing-spec";
 import { formatIsoDate } from "@/lib/jobs/field-labels";
 import type { ReviewItem } from "@/lib/jobs/capture-review";
 import type {
@@ -74,7 +75,13 @@ function docWarnings(review: BatchReviewModel, docId: string): BatchWarning[] {
 function needsAttention(r: BatchDocReview, review: BatchReviewModel, state: BatchApplyState): boolean {
   if (docWarnings(review, r.docId).some((w) => w.severity !== "info" && !warningResolved(w, state))) return true;
   if (r.kind === "business") return !r.aiUsed || (r.confidence !== null && r.confidence < 0.85) || r.needsClarification.length > 0 || Boolean(r.duplicateOf);
-  if (r.kind === "drawing") return !r.aiUsed || r.drawing.confidence < 0.85 || Boolean(r.duplicateOf) || Boolean(r.archiveConflict);
+  if (r.kind === "drawing") {
+    // „Nezjištěno — doplň" u tepelného zpracování / povrchové úpravy → rozbalit
+    // … a kalení / cementace bez tvrdosti („kolik je tam kalení")
+    const unknown = r.initial.spec?.heatStatus === "nezjisteno" || r.initial.spec?.surfaceStatus === "nezjisteno"
+      || missingHardness(r.initial.spec?.heatSteps ?? []);
+    return !r.aiUsed || r.drawing.confidence < 0.85 || Boolean(r.duplicateOf) || Boolean(r.archiveConflict) || unknown;
+  }
   if (r.kind === "model") return Boolean(r.duplicateOf);
   return false;
 }

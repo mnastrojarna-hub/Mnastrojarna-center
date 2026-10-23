@@ -2,6 +2,7 @@
 // Sdílí server i klient (bez server-only). Hodnoty a čisté funkce: capture-batch.ts, capture-batch-reconcile.ts.
 import type { JobFileKind, JobStage } from "@/lib/supabase/database.types";
 import type { CaptureDocKind, DocIssuer, ExtractedBusinessDoc, ExtractedParty } from "@/lib/jobs/capture-types";
+import type { DrawingSpecExtract, DrawingSpecState } from "@/lib/jobs/drawing-spec";
 import type {
   CaptureChipKey, CaptureFileRef, PartyChoice, PartyMatchView, ReviewItem, ReviewModel, ReviewOptions,
   ReviewState, ReviewFieldKey,
@@ -143,7 +144,11 @@ export interface BatchSortModel {
 }
 
 // ── vytěžení ──
-export interface DrawingExtract {
+/**
+ * Vytěžený výkres. Pole z DrawingSpecExtract (skupina materiálu, rozměry, kroky TZ / PÚ s výslovným
+ * stavem, všechny poznámky) jsou volitelná — starší vytěžení je nemají (doplní je drawing-spec.ts).
+ */
+export interface DrawingExtract extends Partial<DrawingSpecExtract> {
   drawingNumber: string; revision: string; title: string; material: string; dimensions: string;
   weightKg: number; generalTolerance: string; tightestTolerance: string; surface: string;
   heatTreatment: string; surfaceTreatment: string; quantity: number;
@@ -220,6 +225,8 @@ export interface DrawingReviewState {
   drawingNumber: string; revision: string; title: string; material: string; dimensions: string;
   generalTolerance: string; tightestTolerance: string; quantity: string;
   link: ItemLinkChoice; archive: boolean; note: string; onDuplicate: "skip" | "version" | null;
+  /** Materiál, hmotnost, TZ / PÚ, poznámky (chybí = platí návrh AI z vytěžení). */
+  spec?: DrawingSpecState;
 }
 export interface ModelReviewState {
   format: CadFormat | null; drawingNumber: string; revision: string; title: string;
@@ -276,7 +283,9 @@ export type BatchWarningCode =
   /** Objednávka bez reálného termínu → termín z nabídky / poptávky (nebo rozdíl proti nabídce). */
   | "deadline_from_quote"
   /** Výkres bez spárované položky a bez počtu kusů. */
-  | "drawing_quantity_missing";
+  | "drawing_quantity_missing"
+  /** Objednávka / nabídka uvádí jiný materiál než výkres — u položky platí objednávka. */
+  | "material_conflict";
 export type BatchWarningActionKind =
   | "same_customer" | "split_group" | "move_to_group" | "exclude_doc" | "restore_page" | "set_type"
   | "skip_duplicate" | "save_version";

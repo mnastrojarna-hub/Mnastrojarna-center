@@ -7,6 +7,8 @@ import { getAgentInstructions } from "@/lib/ai/corrections";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import { checkFeature } from "@/lib/auth/session";
+import { emptyDrawing } from "@/lib/jobs/capture-batch";
+import { initialSpecState, insertSpecRow, normalizeDrawingSpec, specColumns, specSources } from "@/lib/jobs/drawing-spec";
 
 type Result = { ok: boolean; error?: string; number?: string };
 
@@ -58,6 +60,18 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
 
     await db.storage.from("documents").upload(storagePath, bytes, { contentType: mediaType, upsert: true });
 
+    // materiál (skupina), polotovar, TZ / PÚ s výslovným stavem — stejně jako výkres z focení
+    const dr = {
+      ...emptyDrawing(), material: x.material?.trim() ?? "", blankDimensions: x.blank_dimensions?.trim() ?? "",
+      heatTreatment: x.heat_treatment?.trim() ?? "", surfaceTreatment: x.surface_treatment?.trim() ?? "",
+      notes: x.requirements?.trim() ?? "", title: x.part_name?.trim() ?? "", quantity: x.quantity > 0 ? x.quantity : 0,
+    };
+    // AI výslovně říká „bez" / „nezjištěno" — jinak by každý díl bez úprav svítil „TZ nezjištěno"
+    const { conflicts: _conflicts, ...drSpec } = normalizeDrawingSpec({ heatStatus: x.heat_status, surfaceStatus: x.surface_status }, dr);
+    Object.assign(dr, drSpec);
+    const spec = initialSpecState(dr, { aiUsed: (x.confidence ?? 0) > 0 });
+    const specRow = insertSpecRow(specColumns(spec, dr.material), specSources(spec, false));
+
     const ext = mediaType === "application/pdf" ? "PDF" : "IMG";
     const { data, error } = await db
       .from("drawings")
@@ -71,6 +85,8 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
         storage_path: storagePath,
         ai_metadata: { requirements: x.requirements, summary: x.summary, confidence: x.confidence },
         uploaded_by: auth.user.id,
+        title: x.part_name?.trim() || null,
+        ...specRow,
       } as never)
       .select("id");
     if (error) return { ok: false, error: error.message };

@@ -1,4 +1,5 @@
 // View-modely Knihy zakázek (UI ↔ datová vrstva). Plní se výhradně z DB (tabulka orders a spol.).
+import type { DrawingSpecView } from "@/lib/jobs/drawing-spec";
 import type {
   ActorKind, ChangeVia, DocIssuerKey, InquiryStatus, JobStage, JobFileKind, JobFileOrigin, JobSource, PriorityLevel,
   PurchaseOrderStatus, QuoteState, QuoteStatus,
@@ -131,6 +132,8 @@ export interface JobItem {
   /** Uzavřeno s menším množstvím (zmetky, zákazník přijal méně). */
   deliveryClosed?: boolean;
   deliveryClosedReason?: string | null;
+  /** Materiál, hmotnost, TZ / PÚ z výkresu (štítky v Položkách); null = výkres nic neuvádí. */
+  spec?: DrawingSpecView | null;
 }
 
 export interface JobQuoteItem {

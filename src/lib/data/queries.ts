@@ -1,4 +1,5 @@
 import "server-only";
+import { specViewFromRow } from "@/lib/jobs/drawing-spec";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { quoteStatusLabel, approvalTypeLabel } from "@/lib/data/labels";
 import type {
@@ -265,6 +266,8 @@ export async function getDrawings(opts: { customerId?: string } = {}): Promise<D
       jobId: job?.id ?? d.job_id ?? null,
       jobNumber: job?.number ?? null,
       jobFileId: d.job_file_id ?? null,
+      title: d.title ?? null,
+      spec: specViewFromRow(d as unknown as Record<string, unknown>),
     };
   });
 }

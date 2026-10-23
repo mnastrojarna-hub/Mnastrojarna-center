@@ -470,3 +470,19 @@ describe("pravidla — hraniční případy (ověření)", () => {
     expect(bundleKeyOf([{ fromZip: "vykresy.zip", bundle: "zip:u/1/a.zip" }])).toBe("zip:u/1/a.zip");
   });
 });
+
+describe("materiál: platí objednávka, jiný materiál na výkresu = upozornění", () => {
+  it("jiná skupina → „warn“ (kontrola se otevře); jen jiný zápis téže skupiny → „info“; shoda → nic", () => {
+    const po = rd("objednavka_zakaznik", { doc: order({ items: [item("4711-02", { material: "42CrMo4" }), item("4711-03", { material: "S235JR" })] }) });
+    const vk = rd("vykres", { dr: drawing({ drawingNumber: "4711-02", material: "C45" }) });
+    const vk3 = rd("vykres", { dr: drawing({ drawingNumber: "4711-03", material: "11 373" }) });
+    const gd = groupDocOf([po, vk, vk3], OUR);
+    expect(gd.doc.items.map((i) => i.material)).toEqual(["42CrMo4", "S235JR"]);
+    const w = gd.warnings.filter((x) => x.code === "material_conflict");
+    expect(w.map((x) => [x.severity, x.docIds.includes(vk.id) ? "vk" : "vk3"])).toEqual([["warn", "vk"], ["info", "vk3"]]);
+    expect(w[0].message).toContain("42CrMo4");
+    expect(w[0].message).toContain("C45");
+    const same = rd("vykres", { dr: drawing({ drawingNumber: "4711-02", material: "42CrMo4+QT" }) });
+    expect(groupDocOf([po, same], OUR).warnings.some((x) => x.code === "material_conflict")).toBe(false);
+  });
+});

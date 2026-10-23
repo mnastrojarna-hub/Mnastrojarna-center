@@ -144,6 +144,12 @@ export interface Drawing {
   drawing_notes: string | null;
   weight_source: WeightSource | null;
   material_condition: string | null;
+  // Výslovný stav a kroky úprav + zdroj údajů (migrace 20261023158000) — viz drawing-spec.ts
+  heat_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  surface_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  heat_steps: Record<string, unknown>[] | null;
+  surface_steps: Record<string, unknown>[] | null;
+  spec_sources: Record<string, "ai" | "rucne">;
 }
 
 export interface Quote {
@@ -485,6 +491,12 @@ export interface OrderItem {
   drawing_notes: string | null;
   weight_source: WeightSource | null;
   material_condition: string | null;
+  // Výslovný stav a kroky úprav + zdroj údajů (migrace 20261023158000) — viz drawing-spec.ts
+  heat_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  surface_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  heat_steps: Record<string, unknown>[] | null;
+  surface_steps: Record<string, unknown>[] | null;
+  spec_sources: Record<string, "ai" | "rucne">;
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */

@@ -463,6 +463,9 @@ export interface ExtractedDocument {
   removed_weight_kg: number;    // úběr (polotovar − hotový)
   surface_treatment: string;    // povrchová úprava
   heat_treatment: string;       // tepelná úprava
+  /** uvedeno | bez (výkres přečten, úprava na něm není) | nezjisteno (nečitelné) — starší výstupy je nemají */
+  heat_status?: "uvedeno" | "bez" | "nezjisteno";
+  surface_status?: "uvedeno" | "bez" | "nezjisteno";
   surface_qualities: string[];  // jakosti povrchů (Ra)
   machining_technologies: string[];
   tolerances_before_ht: ToleranceCounts; // počty přesných rozměrů před tepelkou
@@ -492,7 +495,8 @@ export async function extractFromDocument(input: {
       doc_type: "ostatni", part_name: "", part_type: "jine", order_type: "vyroba_dilu",
       drawing_number: "", revision: "", material: "", blank_dimensions: "",
       blank_weight_kg: 0, finished_weight_kg: 0, removed_weight_kg: 0,
-      surface_treatment: "", heat_treatment: "", surface_qualities: [], machining_technologies: [],
+      surface_treatment: "", heat_treatment: "", heat_status: "nezjisteno", surface_status: "nezjisteno",
+      surface_qualities: [], machining_technologies: [],
       tolerances_before_ht: emptyTol(), tolerances_after_ht: emptyTol(),
       geom_tolerance_count: 0, thread_count: 0, hole_count: 0, pocket_count: 0,
       quantity: 0, customer: "", requirements: "",
@@ -523,6 +527,8 @@ export async function extractFromDocument(input: {
       removed_weight_kg: { type: "number" },
       surface_treatment: { type: "string" },
       heat_treatment: { type: "string" },
+      heat_status: { type: "string", enum: ["uvedeno", "bez", "nezjisteno"] },
+      surface_status: { type: "string", enum: ["uvedeno", "bez", "nezjisteno"] },
       surface_qualities: { type: "array", items: { type: "string" } },
       machining_technologies: { type: "array", items: { type: "string" } },
       tolerances_before_ht: tolSchema,
@@ -541,7 +547,7 @@ export async function extractFromDocument(input: {
     required: [
       "doc_type", "part_name", "part_type", "order_type", "drawing_number", "revision", "material",
       "blank_dimensions", "blank_weight_kg", "finished_weight_kg", "removed_weight_kg",
-      "surface_treatment", "heat_treatment", "surface_qualities", "machining_technologies",
+      "surface_treatment", "heat_treatment", "heat_status", "surface_status", "surface_qualities", "machining_technologies",
       "tolerances_before_ht", "tolerances_after_ht",
       "geom_tolerance_count", "thread_count", "hole_count", "pocket_count",
       "quantity", "customer", "requirements",
@@ -566,7 +572,10 @@ export async function extractFromDocument(input: {
       "číslo výkresu a revizi; materiál; rozměry a odhad váhy polotovaru; odhad váhy hotového dílu a úběr; povrchovou a tepelnou úpravu; jakosti povrchů (Ra); " +
       "technologie obrábění; POČTY přesných rozměrů rozdělené dle nejtěsnější tolerance do skupin ≤0,005 / ≤0,01 / ≤0,04 / ≤0,1 mm, a to ZVLÁŠŤ pro rozměry " +
       "kontrolované před tepelným zpracováním a po něm; počet geometrických tolerancí (rovinnost, kolmost, souosost, házení…); počet závitů; počet otvorů; počet kapes; " +
-      "množství a zákazníka. Co nelze z výkresu přečíst, nech prázdné/0 a uveď v needs_clarification, sniž confidence. Nehádej." +
+      "množství a zákazníka. Co nelze z výkresu přečíst, nech prázdné/0 a uveď v needs_clarification, sniž confidence. Nehádej. " +
+      "heat_status / surface_status: \"uvedeno\" = na výkresu je tepelné zpracování / povrchová úprava (vyplň heat_treatment / surface_treatment " +
+      "i s hodnotami, např. „kalit 58±2 HRC, nitridovat 700 HV“), \"bez\" = výkres je čitelný a úprava na něm (v razítku ani poznámkách) NENÍ, " +
+      "\"nezjisteno\" = nelze přečíst / nejisté. Stav dodání materiálu (+QT, +A, +N) není tepelné zpracování výkresu." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {

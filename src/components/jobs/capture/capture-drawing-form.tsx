@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   AI_FIELD, AiMark, ConfidenceMeter, DuplicateNotice, FieldLabel, ItemLinkSelect, ToggleRow,
 } from "@/components/jobs/capture/capture-parts";
+import { CaptureDrawingSpec } from "@/components/jobs/capture/capture-drawing-spec";
 import type { BatchDocReview, DrawingReviewState, ItemOption } from "@/lib/jobs/capture-batch-types";
+import { initialSpecState, recomputeSpecEstimate, resolveMaterialGroup, type DrawingSpecState } from "@/lib/jobs/drawing-spec";
 import { cn } from "@/lib/utils";
 
 type DrawingReview = Extract<BatchDocReview, { kind: "drawing" }>;
@@ -17,7 +19,7 @@ const FIELDS: { key: TextKey; label: string; cls?: string; mono?: boolean; input
   { key: "drawingNumber", label: "Číslo výkresu", mono: true },
   { key: "revision", label: "Revize" },
   { key: "title", label: "Název dílu", cls: "sm:col-span-2" },
-  { key: "material", label: "Materiál" },
+  { key: "material", label: "Materiál (označení z výkresu)" },
   { key: "dimensions", label: "Rozměry" },
   { key: "generalTolerance", label: "Obecné tolerance" },
   { key: "tightestTolerance", label: "Nejpřesnější tolerance" },
@@ -53,7 +55,37 @@ export function CaptureDrawingForm({
   idPrefix: string;
   disabled?: boolean;
 }) {
-  const set = (patch: Partial<DrawingReviewState>) => onChange({ ...state, ...patch });
+  // starší stav bez sekce materiálu → návrh z vytěžení
+  const fallbackSpec = React.useMemo(
+    () => doc.initial.spec ?? initialSpecState(doc.drawing, { aiUsed: doc.aiUsed, title: doc.initial.title, quantity: doc.initial.quantity }),
+    [doc],
+  );
+  const spec: DrawingSpecState = state.spec ?? fallbackSpec;
+  const set = (patch: Partial<DrawingReviewState>) => {
+    const next: DrawingReviewState = { ...state, ...patch };
+    // materiál / rozměry / název / počet → přepočet odhadu polotovaru (a skupiny, dokud ji člověk nezvolil)
+    if ("material" in patch || "dimensions" in patch || "title" in patch || "quantity" in patch) {
+      let sp = next.spec ?? spec;
+      if ("material" in patch && !sp.manual.includes("material_group")) {
+        sp = { ...sp, materialGroup: resolveMaterialGroup(next.material, doc.drawing.materialGroup ?? null) };
+      }
+      next.spec = recomputeSpecEstimate(sp, {
+        material: next.material, dimensions: next.dimensions, title: next.title, quantity: next.quantity,
+        overallDims: doc.drawing.overallDims, shapeHint: doc.drawing.shapeHint, blankDimensions: doc.drawing.blankDimensions,
+      });
+    }
+    onChange(next);
+  };
+  const setSpec = (sp: DrawingSpecState) => {
+    // ručně změněná skupina mění hustotu → přepočítat odhad
+    const next = sp.materialGroup !== spec.materialGroup
+      ? recomputeSpecEstimate(sp, {
+        material: state.material, dimensions: state.dimensions, title: state.title, quantity: state.quantity,
+        overallDims: doc.drawing.overallDims, shapeHint: doc.drawing.shapeHint, blankDimensions: doc.drawing.blankDimensions,
+      })
+      : sp;
+    onChange({ ...state, spec: next });
+  };
   return (
     <div className="space-y-3">
       {doc.aiUsed ? (
@@ -103,6 +135,15 @@ export function CaptureDrawingForm({
           Čísla na výkresu: <span className="font-mono">{doc.drawing.drawingNumbers!.join(" · ")}</span>
         </p>
       )}
+      <CaptureDrawingSpec
+        spec={spec}
+        initial={doc.initial.spec ?? null}
+        aiUsed={doc.aiUsed}
+        onChange={setSpec}
+        idPrefix={`${idPrefix}-spec`}
+        disabled={disabled}
+      />
+
       {doc.drawing.customerName && (
         <p className="text-xs text-muted-foreground" data-testid="capture-drawing-author">
           Kreslil (z razítka): {doc.drawing.customerName} — jen informace, zákazník se bere ze zakázky.

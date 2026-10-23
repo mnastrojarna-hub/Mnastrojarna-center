@@ -4,6 +4,8 @@ import * as React from "react";
 import { ArrowUp, ArrowDown, Trash2, Plus, PencilRuler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { DrawingSpecChips } from "@/components/jobs/drawing-spec-chips";
+import type { DrawingSpecView } from "@/lib/jobs/drawing-spec";
 import {
   draftTotals, emptyItemDraft, isInvalidDecimal, lineTotal, moveItem, formatMoney, formatPercent, formatQty,
   type ItemDraft,
@@ -51,12 +53,14 @@ function Cell({
 }
 
 export function ItemsEditor({
-  drafts, onChange, columns = {}, emptyHint,
+  drafts, onChange, columns = {}, emptyHint, specs,
 }: {
   drafts: ItemDraft[];
   onChange: (next: ItemDraft[]) => void;
   columns?: ItemsEditorColumns;
   emptyHint?: string;
+  /** Štítky z výkresu (materiál, hmotnost, TZ / PÚ) podle klíče konceptu (= id položky). */
+  specs?: Record<string, DrawingSpecView | null | undefined>;
 }) {
   const currency = columns.currency ?? "CZK";
   const totals = draftTotals(drafts);
@@ -133,6 +137,7 @@ export function ItemsEditor({
                   <td>
                     <Cell label="Název" value={d.name} onChange={(v) => set(i, "name", v)} placeholder="Název dílu" className="font-medium" />
                     <Cell label="Popis" value={d.description} onChange={(v) => set(i, "description", v)} placeholder="popis, úprava, tolerance…" className="h-7 text-xs text-muted-foreground" />
+                    <DrawingSpecChips spec={specs?.[d.key]} className="px-2 pb-1" testId={`item-spec-${i}`} />
                   </td>
                   <td><Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="1.2379" /></td>
                   <td><Cell label="Množství" numeric value={d.quantity} onChange={(v) => set(i, "quantity", v)} placeholder="1" /></td>
@@ -191,6 +196,7 @@ export function ItemsEditor({
                   <span className="text-muted-foreground">Popis</span>
                   <Cell label="Popis" value={d.description} onChange={(v) => set(i, "description", v)} placeholder="úprava, tolerance…" className="border-input" />
                 </label>
+                {specs?.[d.key] && <DrawingSpecChips spec={specs[d.key]} className="col-span-2" testId={`item-spec-m-${i}`} />}
                 <label>
                   <span className="text-muted-foreground">Množství</span>
                   <div className="flex gap-1">

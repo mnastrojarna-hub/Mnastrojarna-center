@@ -12,6 +12,8 @@ import { normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { normalizeDrawing } from "@/lib/jobs/capture-batch";
 import type { CaptureDocKind, DocIssuer, ExtractedBusinessDoc } from "@/lib/jobs/capture-types";
 import type { AiUsage, BatchDocType, DrawingExtract } from "@/lib/jobs/capture-batch-types";
+import { MATERIAL_GROUP_KEYS, materialGroupPromptList } from "@/lib/jobs/material-groups";
+import { HARDNESS_UNITS, HEAT_STEP_KINDS, SHAPE_HINTS, SURFACE_STEP_KINDS, TREATMENT_STATUSES } from "@/lib/jobs/drawing-spec";
 
 /**
  * AI čtení obchodního dokladu z fotky / PDF („Vyfoť doklad → zakázka se vyplní sama“).
@@ -68,7 +70,7 @@ const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as co
 type ImageType = (typeof IMAGE_TYPES)[number];
 const MAX_FILES = 20;
 const BUSINESS_MAX_TOKENS = 32_000;
-const DRAWING_MAX_TOKENS = 8_000;
+const DRAWING_MAX_TOKENS = 12_000;
 
 export const AI_NOT_CONFIGURED = "AI není nakonfigurováno — doplň Claude API klíč v Nastavení.";
 
@@ -384,14 +386,51 @@ export const DRAWING_SCHEMA = {
     drawingNumber: str("Číslo výkresu přesně znak po znaku"),
     revision: str("Revize / index"),
     title: str("Název dílu"),
-    material: str("Materiál včetně normy"),
+    material: str("Označení materiálu přesně jak je na výkresu, včetně normy a stavu (1.2379, ČSN 41 9436, 42CrMo4+QT, AlMgSi1)"),
+    materialGroup: { type: "string", enum: [...MATERIAL_GROUP_KEYS, ""], description: "Skupina materiálu (\"\" = materiál neuveden)" },
     dimensions: str("Obrysové / polotovarové rozměry"),
+    overallDims: { type: "array", items: { type: "number" }, description: "3 největší obrysové rozměry dílu v mm, sestupně ([] = nelze určit)" },
+    shapeHint: { type: "string", enum: [...SHAPE_HINTS, ""], description: "Tvar dílu pro polotovar (\"\" = nelze určit)" },
+    blankDimensions: str("Rozměr polotovaru, je-li na výkresu zvlášť (pole Polotovar / Rohmaß / blank), jinak prázdné"),
     weightKg: num("Hmotnost v kg (0 = neuvedeno)"),
     generalTolerance: str("Obecné tolerance (ISO 2768-mK…)"),
     tightestTolerance: str("Nejpřesnější předepsaná tolerance"),
     surface: str("Drsnost (Ra 0,8)"),
-    heatTreatment: str(),
-    surfaceTreatment: str(),
+    heatTreatment: str("Tepelné zpracování doslovně z výkresu"),
+    surfaceTreatment: str("Povrchové úpravy doslovně z výkresu"),
+    heatStatus: { type: "string", enum: [...TREATMENT_STATUSES], description: "uvedeno | bez (výkres přečten, TZ na něm není) | nezjisteno (nečitelné / nejisté)" },
+    heatSteps: {
+      type: "array",
+      description: "Kroky tepelného zpracování v pořadí z výkresu",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          kind: { type: "string", enum: [...HEAT_STEP_KINDS] },
+          value: str("Hodnota tvrdosti / pevnosti jak je na výkresu (58±2, 55-60, min. 600), jinak prázdné"),
+          unit: { type: "string", enum: [...HARDNESS_UNITS, ""] },
+          depthMm: str("Hloubka vrstvy v mm (0,3 nebo 0,8-1,2), jinak prázdné"),
+          note: str("Upřesnění (vakuově, jen čep Ø20, HV1…)"),
+        },
+        required: ["kind", "value", "unit", "depthMm", "note"],
+      },
+    },
+    surfaceStatus: { type: "string", enum: [...TREATMENT_STATUSES], description: "uvedeno | bez (výkres přečten, PÚ na něm není) | nezjisteno (nečitelné / nejisté)" },
+    surfaceSteps: {
+      type: "array",
+      description: "Kroky povrchové úpravy v pořadí z výkresu",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          kind: { type: "string", enum: [...SURFACE_STEP_KINDS] },
+          spec: str("Specifikace (Fe/Zn 8 modrá pasivace, RAL 9005, tvrdý elox…), jinak prázdné"),
+          thicknessUm: str("Tloušťka vrstvy v µm (8, 15-20), jinak prázdné"),
+        },
+        required: ["kind", "spec", "thicknessUm"],
+      },
+    },
+    drawingNotes: { type: "array", items: { type: "string" }, description: "VŠECHNY poznámky / technické požadavky výkresu, 1 položka = 1 poznámka" },
     quantity: num("Množství na výkresu (0 = neuvedeno)"),
     customerName: str("Firma z razítka, která výkres kreslila — jen informace, není to zákazník"),
     drawingDate: str("RRRR-MM-DD"),
@@ -405,7 +444,10 @@ export const DRAWING_SCHEMA = {
     customerOrderNumber: str("Číslo objednávky zákazníka, je-li výslovně na listu"),
     ourQuoteNumber: str("Číslo naší nabídky, je-li výslovně na listu"),
   },
-  required: [...DRAWING_STR_FIELDS, "weightKg", "quantity", "confidence", "needsClarification", "drawingNumbers", "customerOrderNumber", "ourQuoteNumber"],
+  required: [
+    ...DRAWING_STR_FIELDS, "weightKg", "quantity", "confidence", "needsClarification", "drawingNumbers", "customerOrderNumber", "ourQuoteNumber",
+    "materialGroup", "overallDims", "shapeHint", "blankDimensions", "heatStatus", "heatSteps", "surfaceStatus", "surfaceSteps", "drawingNotes",
+  ],
 };
 
 function drawingPrompt(): string {
@@ -416,10 +458,26 @@ function drawingPrompt(): string {
     "drawingNumbers = VŠECHNA čísla výkresu / dílu na listu, hlavní číslo výkresu první (výkres často nese 2 čísla — " +
       "číslo výkresu a číslo dílu zákazníka / sestavy / artiklu). Podle nich se výkres páruje s objednávkou.",
     "customerOrderNumber / ourQuoteNumber jen když je na listu výslovně číslo objednávky zákazníka / naší nabídky, jinak prázdné.",
-    "material = materiál včetně normy (1.2379, S355J2, AlMgSi1). dimensions = obrysové / polotovarové rozměry " +
-      "(„120 × 80 × 25 mm“ nebo „Ø40 × 120“). generalTolerance = obecné tolerance (ISO 2768-mK…).",
-    "tightestTolerance = nejpřesnější předepsaná tolerance (např. „±0,01“ nebo „H7“). surface = drsnost (Ra 0,8).",
-    "heatTreatment / surfaceTreatment = tepelné / povrchové úpravy. quantity jen když je na výkresu (jinak 0).",
+    "material = označení materiálu PŘESNĚ jak je na výkresu, včetně normy a stavu dodání (1.2379, ČSN 41 9436, 42CrMo4+QT, " +
+      "AlMgSi1, S355J2). materialGroup = skupina materiálu z výčtu: " + materialGroupPromptList() + ". Bez materiálu prázdné.",
+    "weightKg = hmotnost dílu, jen když je na výkresu uvedená (razítko „Hmotnost / Gewicht / Mass“), jinak 0 — NEODHADUJ.",
+    "dimensions = obrysové rozměry dílu („120 × 80 × 25 mm“ nebo „Ø40 × 120“). overallDims = 3 největší obrysové rozměry v mm sestupně " +
+      "(rotační díl: délka, průměr, průměr). shapeHint = tvar dílu (kulatina = rotační díl, trubka, sestihran, ctyrhran, hranol, plech = " +
+      "výpalek / ohýbaný díl, odlitek). blankDimensions jen když je na výkresu zvlášť rozměr polotovaru.",
+    "generalTolerance = obecné tolerance (ISO 2768-mK…). tightestTolerance = nejpřesnější předepsaná tolerance (např. „±0,01“ nebo „H7“). " +
+      "surface = drsnost (Ra 0,8).",
+    "TEPELNÉ ZPRACOVÁNÍ a POVRCHOVÉ ÚPRAVY čti vždy — razítko, poznámky, technické požadavky i značky u kót. heatSteps = kroky TZ v pořadí " +
+      "z výkresu s hodnotou a jednotkou (kaleno 58±2 HRC → kind kaleni, value „58±2“, unit HRC; nitridováno 700 HV, hloubka 0,3 mm → " +
+      "nitridace, 700, HV, depthMm „0,3“; cementováno 0,8 mm, 58 HRC → cementace s depthMm; zušlechtěno 28–32 HRC → zuslechteni; " +
+      "indukčně kaleno jen na čepu → indukcni_kaleni s note). surfaceSteps = kroky PÚ v pořadí (nitridace → černění: černění je PÚ; " +
+      "galvanický zinek Fe/Zn 8 → galvanicky_zinek, thicknessUm „8“; chemický nikl 15 µm; tvrdý elox 50 µm → eloxovani, spec „tvrdý“; " +
+      "fosfát Zn/Mn; lak RAL 9005; práškové lakování; pasivace; tryskání; DLC / PVD / TiN → povlak).",
+    "heatStatus / surfaceStatus VŽDY výslovně: „uvedeno“ = na výkresu je (kroky vyplň); „bez“ = výkres je čitelný a úprava na něm NENÍ " +
+      "(nebo je napsáno bez TZ / bez PÚ); „nezjisteno“ = výkres je nečitelný nebo si nejsi jistý. Stav materiálu (+QT, +A, T6) v označení " +
+      "materiálu není krok TZ. heatTreatment / surfaceTreatment = doslovný text úprav z výkresu (prázdné, když nejsou).",
+    "drawingNotes = VŠECHNY poznámky výkresu doslovně, každá zvlášť: technické požadavky, obecné tolerance (ISO 2768-mK), nekótované " +
+      "hrany / sražení, drsnost neoznačených ploch, značení, normy, zkoušky. notes = krátké shrnutí poznámek. title = název / popis dílu.",
+    "quantity jen když je na výkresu (jinak 0).",
     `customerName = firma z razítka, která výkres kreslila (projekce / konstrukce; je-li to ${COMPANY.name}, nech prázdné). ` +
       "Je to jen informace — NENÍ to zákazník, zákazník se páruje podle čísel výkresu a objednávky.",
     "Co nelze přečíst, nech prázdné / 0 a sniž confidence; co ověřit, napiš česky do needsClarification.",

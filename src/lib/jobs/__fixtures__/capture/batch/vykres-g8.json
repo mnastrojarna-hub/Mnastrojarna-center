@@ -1,1 +1,42 @@
-{"drawingNumber": "ITR-901-A", "revision": "B", "title": "Upínací deska", "material": "1.2379", "dimensions": "120 × 80 × 25 mm", "weightKg": 1.9, "generalTolerance": "ISO 2768-mK", "tightestTolerance": "±0,01", "surface": "Ra 0,8", "heatTreatment": "kalit 58+2 HRC", "surfaceTreatment": "", "quantity": 60, "customerName": "Projekce Novák s.r.o.", "drawingDate": "2026-09-30", "sheet": "List 1/1", "scale": "1:1", "notes": "", "summary": "Výkres upínací desky 4711-02 rev. B.", "confidence": 0.9, "needsClarification": []}
+{
+  "drawingNumber": "ITR-901-A",
+  "revision": "B",
+  "title": "Upínací deska",
+  "material": "1.2379",
+  "dimensions": "120 × 80 × 25 mm",
+  "weightKg": 1.9,
+  "generalTolerance": "ISO 2768-mK",
+  "tightestTolerance": "±0,01",
+  "surface": "Ra 0,8",
+  "heatTreatment": "kalit 58+2 HRC",
+  "surfaceTreatment": "",
+  "quantity": 60,
+  "customerName": "Projekce Novák s.r.o.",
+  "drawingDate": "2026-09-30",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "notes": "",
+  "summary": "Výkres upínací desky 4711-02 rev. B.",
+  "confidence": 0.9,
+  "needsClarification": [],
+  "materialGroup": "nastrojova_ocel",
+  "overallDims": [],
+  "shapeHint": "hranol",
+  "blankDimensions": "",
+  "heatStatus": "uvedeno",
+  "heatSteps": [
+    {
+      "kind": "kaleni",
+      "value": "58+2",
+      "unit": "HRC",
+      "depthMm": "",
+      "note": ""
+    }
+  ],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "drawingNotes": [
+    "Obecné tolerance ISO 2768-mK",
+    "Nekótované hrany sražené 0,5 × 45°"
+  ]
+}
