@@ -15,10 +15,23 @@ import { QuotesTab } from "./quotes-tab";
 import { DocumentsTab } from "./documents-tab";
 import { HistoryTab } from "./history-tab";
 import { UploadQueue } from "./upload-controls";
-import { isDetailTab, type DetailTab } from "./detail-helpers";
+import { DETAIL_TABS_ID, detailTabOf, isDetailTab, type DetailTab } from "./detail-helpers";
+import { FlowActionsProvider, type FlowAccess } from "./flow-actions";
 import { ProductionTab, type JobProductionData } from "@/components/jobs/production/production-tab";
 import { PurchasingTab } from "@/components/jobs/purchasing/purchasing-tab";
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
+import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";
+import type { JobPayment, OrderRevision } from "@/lib/data/flow-status";
+
+/** Podrobné stavy a „kdo · kdy" karty (načítá stránka; bez nich karta funguje se sloupci zakázky). */
+export interface JobFlowData {
+  stamps?: JobStamps | null;
+  /** „změnil X · kdy" u klíčových polí (sloupec → razítko). */
+  fieldStamps?: Record<string, ChangeStamp>;
+  payments?: JobPayment[];
+  revisions?: OrderRevision[];
+  access?: FlowAccess | null;
+}
 
 const TABS: { key: DetailTab; label: string; icon: LucideIcon; tone: string; count: string }[] = [
   { key: "prehled", label: "Přehled", icon: LayoutDashboard, tone: "text-sky-600 dark:text-sky-400", count: "" },
@@ -35,7 +48,7 @@ const TABS: { key: DetailTab; label: string; icon: LucideIcon; tone: string; cou
  * hlavička se stavem, časová osa, termíny a záložky.
  */
 export function JobDetailView({
-  job, options, perms, initialTab, production, purchasing,
+  job, options, perms, initialTab, production, purchasing, flow, initialAction,
 }: {
   job: JobDetail;
   options: JobFormOptions;
@@ -45,12 +58,28 @@ export function JobDetailView({
   production?: JobProductionData | null;
   /** Nákup a marže — jen pro role s právem „margins" (jinak null → záložka se skryje). */
   purchasing?: JobPurchasing | null;
+  flow?: JobFlowData | null;
+  /** Akce z odkazu Knihy (?akce=…) — otevře se rovnou její dialog. */
+  initialAction?: string | null;
 }) {
   const tabs = TABS.filter((t) => t.key !== "nakup" || Boolean(purchasing));
-  const [tab, setTab] = React.useState<DetailTab>(
-    isDetailTab(initialTab) && tabs.some((t) => t.key === initialTab) ? initialTab : "prehled",
-  );
+  const fromUrl = detailTabOf(initialTab);
+  const [tab, setTab] = React.useState<DetailTab>(fromUrl && tabs.some((t) => t.key === fromUrl) ? fromUrl : "prehled");
+  // odkaz na jinou záložku stejné zakázky (soft navigace) — stránka zůstává připojená
+  const [lastUrlTab, setLastUrlTab] = React.useState(fromUrl);
+  if (fromUrl !== lastUrlTab) {
+    setLastUrlTab(fromUrl);
+    if (fromUrl && tabs.some((t) => t.key === fromUrl)) setTab(fromUrl);
+  }
   const [itemsDirty, setItemsDirty] = React.useState(false);
+  // odkaz s ?tab= (Kniha, akce „Naplánovat výrobu"…) → záložky do zorného pole (mobil: jinak 1500 px pod okrajem)
+  const scrolledToTab = React.useRef(false);
+  React.useEffect(() => {
+    if (scrolledToTab.current || !fromUrl || fromUrl === "prehled") return;
+    scrolledToTab.current = true;
+    const t = window.setTimeout(() => document.getElementById(DETAIL_TABS_ID)?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    return () => window.clearTimeout(t);
+  }, [fromUrl]);
 
   function changeTab(next: string) {
     if (!isDetailTab(next) || !tabs.some((t) => t.key === next)) return;
@@ -78,59 +107,68 @@ export function JobDetailView({
 
   return (
     <JobDetailProvider jobId={job.id} perms={perms} options={options}>
-      <div className="space-y-4">
-        <JobToolbar job={job} />
-        <JobHeader job={job} />
-        {tab !== "dokumenty" && <UploadQueue />}
-        <StageTimeline job={job} />
-        <DeadlinePanel job={job} />
+      <FlowActionsProvider
+        job={job}
+        stamps={flow?.stamps ?? job.stamps ?? null}
+        revisions={flow?.revisions}
+        access={flow?.access}
+        setTab={changeTab}
+        initialAction={initialAction}
+      >
+        <div className="space-y-4">
+          <JobToolbar job={job} />
+          <JobHeader job={job} />
+          {tab !== "dokumenty" && <UploadQueue />}
+          <StageTimeline job={job} stamps={flow?.stamps ?? null} />
+          <DeadlinePanel job={job} fieldStamps={flow?.fieldStamps} />
 
-        <Tabs value={tab} onValueChange={changeTab} className="pt-1">
-          <div className="-mx-4 overflow-x-auto px-4 scrollbar-thin sm:mx-0 sm:px-0">
-            <TabsList className="h-auto w-max gap-1 rounded-xl p-1 sm:w-auto">
-              {tabs.map((t) => {
-                const Icon = t.icon;
-                const n = counts[t.key];
-                return (
-                  <TabsTrigger key={t.key} value={t.key} className="gap-1.5 rounded-lg px-3 py-1.5">
-                    <Icon className={cn("h-4 w-4", t.tone)} />
-                    {t.label}
-                    {t.key === "polozky" && itemsDirty && <span className="h-2 w-2 rounded-full bg-amber-500" title="Neuložené změny" />}
-                    {t.key !== "prehled" && n > 0 && (
-                      <span className={cn("min-w-[1.25rem] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums", t.count)}>{n}</span>
-                    )}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </div>
+          <Tabs id={DETAIL_TABS_ID} value={tab} onValueChange={changeTab} className="scroll-mt-16 pt-1">
+            <div className="-mx-4 overflow-x-auto px-4 scrollbar-thin sm:mx-0 sm:px-0">
+              <TabsList className="h-auto w-max gap-1 rounded-xl p-1 sm:w-auto">
+                {tabs.map((t) => {
+                  const Icon = t.icon;
+                  const n = counts[t.key];
+                  return (
+                    <TabsTrigger key={t.key} value={t.key} className="gap-1.5 rounded-lg px-3 py-1.5">
+                      <Icon className={cn("h-4 w-4", t.tone)} />
+                      {t.label}
+                      {t.key === "polozky" && itemsDirty && <span className="h-2 w-2 rounded-full bg-amber-500" title="Neuložené změny" />}
+                      {t.key !== "prehled" && n > 0 && (
+                        <span className={cn("min-w-[1.25rem] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums", t.count)}>{n}</span>
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
 
-          <TabsContent value="prehled">
-            <OverviewTab job={job} />
-          </TabsContent>
-          <TabsContent value="vyroba">
-            <ProductionTab job={job} data={production ?? null} />
-          </TabsContent>
-          {/* položky zůstávají připojené, ať se neuložené změny při přepnutí záložky neztratí */}
-          <TabsContent value="polozky" forceMount className="data-[state=inactive]:hidden">
-            <ItemsTab items={job.items} currency={job.currency} onDirtyChange={setItemsDirty} />
-          </TabsContent>
-          <TabsContent value="nabidky">
-            <QuotesTab job={job} />
-          </TabsContent>
-          {purchasing && (
-            <TabsContent value="nakup">
-              <PurchasingTab job={job} data={purchasing} />
+            <TabsContent value="prehled">
+              <OverviewTab job={job} fieldStamps={flow?.fieldStamps} />
             </TabsContent>
-          )}
-          <TabsContent value="dokumenty">
-            <DocumentsTab files={job.files} quotes={job.quotes} />
-          </TabsContent>
-          <TabsContent value="historie">
-            <HistoryTab events={job.events} />
-          </TabsContent>
-        </Tabs>
-      </div>
+            <TabsContent value="vyroba">
+              <ProductionTab job={job} data={production ?? null} flow={flow ?? null} />
+            </TabsContent>
+            {/* položky zůstávají připojené, ať se neuložené změny při přepnutí záložky neztratí */}
+            <TabsContent value="polozky" forceMount className="data-[state=inactive]:hidden">
+              <ItemsTab items={job.items} currency={job.currency} onDirtyChange={setItemsDirty} />
+            </TabsContent>
+            <TabsContent value="nabidky">
+              <QuotesTab job={job} />
+            </TabsContent>
+            {purchasing && (
+              <TabsContent value="nakup">
+                <PurchasingTab job={job} data={purchasing} />
+              </TabsContent>
+            )}
+            <TabsContent value="dokumenty">
+              <DocumentsTab files={job.files} quotes={job.quotes} />
+            </TabsContent>
+            <TabsContent value="historie">
+              <HistoryTab events={job.events} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </FlowActionsProvider>
     </JobDetailProvider>
   );
 }

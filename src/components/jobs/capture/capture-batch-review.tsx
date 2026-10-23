@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, Eye, EyeOff, Info, PenLine, Sparkles, Star } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Combine, Eye, EyeOff, Info, PenLine, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/jobs/book/native-select";
 import { GROUP_BAR, TONES, TypeChip } from "@/components/jobs/capture/capture-parts";
@@ -12,7 +12,7 @@ import { CaptureDrawingForm } from "@/components/jobs/capture/capture-drawing-fo
 import { CaptureModelForm } from "@/components/jobs/capture/capture-model-form";
 import { CaptureFileForm } from "@/components/jobs/capture/capture-file-form";
 import { viewerPages, type LocalUrls } from "@/components/jobs/capture/capture-sort";
-import { warningResolved, type BatchProblem } from "@/components/jobs/capture/capture-flow";
+import { jobsGenitive, mergeAllPlan, saveCountInfo, warningResolved, type BatchProblem } from "@/components/jobs/capture/capture-flow";
 import { BATCH_TYPES } from "@/lib/jobs/capture-batch";
 import { formatIsoDate } from "@/lib/jobs/field-labels";
 import type { ReviewItem } from "@/lib/jobs/capture-review";
@@ -42,6 +42,10 @@ export interface CaptureBatchReviewProps {
   onAssign: (docId: string, groupKey: string) => void;
   onAction: (w: BatchWarning, a: BatchWarningAction) => void;
   onChangeType: (docId: string) => void;
+  /** „Sloučit do jedné zakázky" (víc skupin). */
+  onMergeAll?: () => void;
+  /** Kontrola se přepočítává (tlačítka akcí čekají). */
+  busy?: boolean;
   /** Skok na problém (z hlášky nad „Uložit vše"). */
   jumpRef?: React.MutableRefObject<((p: Pick<BatchProblem, "groupKey" | "docId">) => void) | null>;
 }
@@ -105,8 +109,41 @@ function statusText(r: BatchDocReview, st: DocApplyState | undefined, groupItems
   return "přiloží se";
 }
 
+/** Na první pohled: kolik zakázek se uloží (a proč víc než jedna) + „Sloučit do jedné zakázky". */
+function SaveCountBanner({ review, state, locked, busy, onMergeAll }: {
+  review: BatchReviewModel; state: BatchApplyState; locked: Set<string>; busy?: boolean; onMergeAll?: () => void;
+}) {
+  const info = saveCountInfo(review, state);
+  if (info.count === 0) return null;
+  const canMerge = Boolean(onMergeAll) && mergeAllPlan(review, state, locked) !== null;
+  if (info.count === 1) {
+    return (
+      <p data-testid="capture-save-count" data-count={1} className={cn("flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium", TONES.emerald)}>
+        <CheckCircle2 className="h-4 w-4 shrink-0" /> Uloží se do 1 zakázky
+      </p>
+    );
+  }
+  return (
+    <div data-testid="capture-save-count" data-count={info.count} className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+      <p className="flex items-start gap-1.5 font-semibold">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> Pozor: uloží se do {jobsGenitive(info.count)}
+      </p>
+      {info.reasons.length > 0 && (
+        <ul className="mt-1 space-y-0.5 pl-6 text-xs">
+          {info.reasons.map((r) => <li key={r}>proč: {r}</li>)}
+        </ul>
+      )}
+      {canMerge && (
+        <Button type="button" size="sm" variant="outline" className="mt-2 h-9 border-amber-400" disabled={busy} onClick={onMergeAll} data-testid="capture-merge-all">
+          <Combine /> Sloučit do jedné zakázky
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function CaptureBatchReview({
-  review, state, batch, local, locked, picking, onChange, onPickJob, onAssign, onAction, onChangeType, jumpRef,
+  review, state, batch, local, locked, picking, onChange, onPickJob, onAssign, onAction, onChangeType, onMergeAll, busy, jumpRef,
 }: CaptureBatchReviewProps) {
   // pravidlo rozbalení se počítá z odpovědi serveru (ne při každém psaní) — klíč = seznam id
   const attentionKey = review.docs
@@ -191,6 +228,8 @@ export function CaptureBatchReview({
           </Button>
         )}
       </div>
+
+      <SaveCountBanner review={review} state={state} locked={locked} busy={busy} onMergeAll={onMergeAll} />
 
       {groups.map(({ g, i, st }) => {
         const docs = st.docIds

@@ -323,10 +323,35 @@ function savedWord(n: number): string {
   return `${plural(n, "Uložen", "Uloženy", "Uloženo")} ${n} ${plural(n, "doklad", "doklady", "dokladů")}`;
 }
 
+/**
+ * Kolik skutečných zakázek skupiny dají: různé cíle (existující zakázka), „new" / nevybraný cíl = každá
+ * skupina zvlášť. Dvě skupiny do stejné zakázky = 1 zakázka.
+ */
+export function distinctJobCount(groups: { job: { targetKey: string } }[]): number {
+  const seen = new Set<string>();
+  let n = 0;
+  for (const g of groups) {
+    const k = g.job.targetKey;
+    if (!k || k === "new") n++;
+    else if (!seen.has(k)) {
+      seen.add(k);
+      n++;
+    }
+  }
+  return n;
+}
+
 /** Nadpis obrazovky Hotovo („Uloženo 6 dokladů k zakázce Z-2026-031 · stav Vyfakturováno"). */
 export function batchResultHeadline(r: Pick<BatchResult, "groups" | "docs">): string {
   const saved = r.docs.filter((d) => d.ok && d.skipped !== "excluded").length;
-  const groups = r.groups.filter((g) => g.ok && g.jobNumber);
+  // skupiny uložené do stejné zakázky = jedna zakázka (počítají se různá jobId)
+  const groups: BatchResult["groups"] = [];
+  for (const g of r.groups) {
+    if (!g.ok || !g.jobNumber) continue;
+    const same = groups.findIndex((x) => (x.jobId && x.jobId === g.jobId) || (!x.jobId && !g.jobId && x.jobNumber === g.jobNumber));
+    if (same < 0) groups.push(g);
+    else groups[same] = { ...groups[same], created: groups[same].created || g.created, stageTo: groups[same].stageTo ?? g.stageTo };
+  }
   if (!saved && !groups.length) return "Nic se neuložilo";
   if (groups.length <= 1) {
     const g = groups[0];
@@ -349,7 +374,8 @@ export function batchSummaryLine(review: BatchReviewModel, state: BatchApplyStat
   const excluded = state.sort.docs.filter((d) => d.excluded).length;
   const groups = state.groups.filter((g) => g.docIds.some((id) => active.some((d) => d.id === id)));
   const parts: string[] = [];
-  parts.push(`${groups.length} ${plural(groups.length, "zakázka", "zakázky", "zakázek")}`);
+  const jobs = distinctJobCount(groups);
+  parts.push(`${jobs} ${plural(jobs, "zakázka", "zakázky", "zakázek")}`);
   parts.push(`${active.length} ${plural(active.length, "doklad", "doklady", "dokladů")}`);
   // mazání a změny stavu hned na začátku (na mobilu se konec řádku ořízne)
   if (excluded) parts.push(`vyřazeno ${excluded} (smaže se)`);
@@ -711,6 +737,11 @@ export function normalizeClassification(
     d.reason = redactPrices(rd.reason).slice(0, 200);
     d.drawingNumbers = [...new Set(rd.drawingNumbers.map(safeDocNumber).filter(Boolean))].slice(0, 30);
     d.flags = flags;
+    if (type === "vykres") {
+      // firma z razítka výkresu = kdo kreslil, ne zákazník → ani strana, ani v názvu
+      d.partyName = "";
+      d.title = drawingTitle(d.title, [rd.partyName, rd.issuerName], d.drawingNumbers.length ? d.drawingNumbers : [d.documentNumber]);
+    }
     if (type === "nabidka_my" && flags.includes("accepted")) {
       type = "objednavka_zakaznik";
       d.type = type;
@@ -825,7 +856,58 @@ export function normalizeClassification(
   return { sort: { docs: kept, excludedPageIds }, pages: outPages, warnings: uniqueWarnings(warnings) };
 }
 
+/**
+ * Název výkresu bez firmy z razítka (projekce, která kreslila): firma se z názvu od AI vyjme,
+ * prázdný název = „Výkres <čísla>".
+ */
+export function drawingTitle(title: string, firms: string[], numbers: string[]): string {
+  let t = String(title ?? "");
+  for (const f of firms.map((x) => String(x ?? "").trim()).filter((x) => x.length >= 3)) {
+    const esc = f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // jen celé slovo („KOVO" nesmaže „Kovový držák")
+    t = t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, "giu"), " ");
+  }
+  t = t.replace(/\(\s*\)/g, " ").replace(/\s+/g, " ").replace(/^[\s·,;:–-]+|[\s·,;:–(-]+$/g, "").trim();
+  const nums = numbers.filter(Boolean);
+  if (!t || /^(výkres|drawing|zeichnung)$/i.test(t)) return `Výkres${nums.length ? ` ${nums.join(" / ")}` : ""}`;
+  return t.slice(0, 120);
+}
+
+// ── Balík (ZIP, později e-mail s přílohami) ─────────────────
+/** Balík souboru: explicitní (e-mail…), jinak ZIP, ze kterého pochází; null = samostatný soubor. */
+export function fileBundleKey(f: Pick<BatchFile, "fromZip"> & { bundle?: string | null }): string | null {
+  if (f.bundle) return f.bundle;
+  return f.fromZip ? `zip:${f.fromZip}` : null;
+}
+
+/** Balík dokladu = společný balík všech souborů jeho stránek (smíšený doklad = null). */
+export function bundleKeyOf(files: (Pick<BatchFile, "fromZip"> & { bundle?: string | null })[]): string | null {
+  if (!files.length) return null;
+  const keys = new Set(files.map(fileBundleKey));
+  if (keys.size !== 1) return null;
+  return [...keys][0] ?? null;
+}
+
 // ── Výkres ──────────────────────────────────────────────────
+/** Čísla výkresu (bez mezer navíc, max. 80 znaků, bez duplicit; 1. = hlavní). */
+export function cleanDrawingNumbers(list: unknown[]): string[] {
+  const out: string[] = [];
+  for (const v of list) {
+    if (typeof v !== "string") continue;
+    const n = v.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!n || out.some((x) => docNumbersEqual(x, n))) continue;
+    out.push(n);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+/** Všechna čísla výkresu (i ze starších vytěžení bez drawingNumbers). */
+export function drawingNumbersOf(dr: Pick<DrawingExtract, "drawingNumber" | "drawingNumbers"> | null | undefined): string[] {
+  if (!dr) return [];
+  return cleanDrawingNumbers([dr.drawingNumber, ...(dr.drawingNumbers ?? [])]);
+}
+
 const DRAWING_STR_KEYS = [
   "drawingNumber", "revision", "title", "material", "dimensions", "generalTolerance", "tightestTolerance",
   "surface", "heatTreatment", "surfaceTreatment", "customerName", "drawingDate", "sheet", "scale", "notes", "summary",
@@ -836,7 +918,7 @@ export function emptyDrawing(): DrawingExtract {
     drawingNumber: "", revision: "", title: "", material: "", dimensions: "", weightKg: 0,
     generalTolerance: "", tightestTolerance: "", surface: "", heatTreatment: "", surfaceTreatment: "",
     quantity: 0, customerName: "", drawingDate: "", sheet: "", scale: "", notes: "", summary: "",
-    confidence: 0, needsClarification: [],
+    confidence: 0, needsClarification: [], drawingNumbers: [], customerOrderNumber: "", ourQuoteNumber: "",
   };
 }
 
@@ -865,7 +947,10 @@ export function normalizeDrawing(raw: unknown): DrawingExtract {
     const max = k === "notes" || k === "summary" ? 1000 : 200;
     out[k] = typeof o[k] === "string" ? (o[k] as string).replace(/\s+/g, " ").trim().slice(0, max) : "";
   }
-  out.drawingNumber = out.drawingNumber.slice(0, 80);
+  out.drawingNumbers = cleanDrawingNumbers([out.drawingNumber, ...(Array.isArray(o.drawingNumbers) ? o.drawingNumbers : [])]);
+  out.drawingNumber = (out.drawingNumber || out.drawingNumbers[0] || "").slice(0, 80);
+  out.customerOrderNumber = safeDocNumber(o.customerOrderNumber);
+  out.ourQuoteNumber = safeDocNumber(o.ourQuoteNumber);
   out.revision = out.revision.replace(/^(?:rev(?:ize|ision)?|index|idx)\.?\s*/i, "").slice(0, 20);
   out.drawingDate = isoDate(out.drawingDate);
   out.weightKg = nonNeg(o.weightKg);

@@ -1,0 +1,81 @@
+{
+  "docKind": "objednavka",
+  "issuer": "zakaznik",
+  "documentNumber": "PO-E2E-13",
+  "documentDate": "2026-10-21",
+  "customer": {
+    "name": "STROJMETAL, a. s.",
+    "ico": "45274649",
+    "dic": "CZ45274649",
+    "street": "Průmyslová 124",
+    "city": "Kladno",
+    "zip": "272 01",
+    "country": "CZ",
+    "email": "dvorak@strojmetal.cz",
+    "phone": "+420 603 111 222",
+    "contactPerson": "Ing. Jan Dvořák"
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "PO-E2E-13",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "2026-12-18",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "8800-01",
+      "revision": "",
+      "name": "Hřídel",
+      "description": "",
+      "material": "",
+      "quantity": 10,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "8800-02",
+      "revision": "",
+      "name": "Pouzdro",
+      "description": "",
+      "material": "",
+      "quantity": 0,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "8800-03",
+      "revision": "",
+      "name": "Víko",
+      "description": "",
+      "material": "",
+      "quantity": 0,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Objednávka PO-E2E-13 na 3 díly.",
+  "confidence": 0.93,
+  "needsClarification": []
+}

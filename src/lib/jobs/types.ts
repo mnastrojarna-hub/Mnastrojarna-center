@@ -1,8 +1,9 @@
 // View-modely Knihy zakázek (UI ↔ datová vrstva). Plní se výhradně z DB (tabulka orders a spol.).
 import type {
-  JobStage, JobFileKind, JobSource, PriorityLevel, QuoteStatus,
+  ActorKind, ChangeVia, InquiryStatus, JobStage, JobFileKind, JobSource, PriorityLevel, QuoteState, QuoteStatus,
 } from "@/lib/supabase/database.types";
 import type { StageGroupKey } from "@/lib/jobs/stages";
+import type { ChangeStamp, FlowFacts, JobStamps, QuoteFacts } from "@/lib/jobs/flow-status";
 
 export interface PersonRef {
   id: string;
@@ -82,6 +83,13 @@ export interface JobListItem {
   invoiceDueDate?: string | null;
   /** Zaplaceno (RRRR-MM-DD). */
   paidAt?: string | null;
+  // ── Podrobné stavy toku a „kdo · kdy" (sloupce orders, udržuje DB) ──
+  /** Fakta pro deriveFlow / primaryChip / nextAction (chybí jen u ručně složených fixtur). */
+  flow?: FlowFacts;
+  /** Nabídky zakázky jako fakta (aktivní nabídka, stav nabídky). */
+  flowQuotes?: QuoteFacts[];
+  /** Kdo naposledy změnil hlavní stav a dílčí stavy (stage / inquiry / order / lost / proposal). */
+  stamps?: JobStamps;
 }
 
 export interface JobItem {
@@ -99,6 +107,11 @@ export interface JobItem {
   /** Nákupní cena / MJ — null bez práva na marže. */
   purchaseUnitPrice: number | null;
   note: string | null;
+  /** Dodáno zákazníkovi (po položkách, udržuje akce dodání). */
+  deliveredQuantity?: number;
+  /** Uzavřeno s menším množstvím (zmetky, zákazník přijal méně). */
+  deliveryClosed?: boolean;
+  deliveryClosedReason?: string | null;
 }
 
 export interface JobQuoteItem {
@@ -144,6 +157,19 @@ export interface JobQuote {
   /** Zákazník tuto nabídku přijal (orders.quote_id). */
   accepted: boolean;
   items: JobQuoteItem[];
+  /** Podrobný stav (quotes.state, odvozuje DB). */
+  state?: QuoteState;
+  approvalRequired?: boolean;
+  approvalRequestedAt?: string | null;
+  /** Připomínky zákazníka (stav „Připomínky“). */
+  feedback?: string | null;
+  /** Důvod zamítnutí (text) a kód důvodu. */
+  rejectedReason?: string | null;
+  lostReason?: string | null;
+  /** Kdo a jak nabídku odeslal / kdo naposledy změnil stav. */
+  sentBy?: PersonRef | null;
+  sentVia?: ChangeVia | null;
+  stateStamp?: ChangeStamp | null;
 }
 
 export interface JobFile {
@@ -166,7 +192,7 @@ export interface JobFile {
 }
 
 export type JobEventType =
-  | "created" | "stage" | "field" | "file" | "quote" | "comment" | "ai" | "email";
+  | "created" | "stage" | "status" | "field" | "file" | "quote" | "comment" | "ai" | "email";
 
 export interface JobEvent {
   id: string;
@@ -175,6 +201,14 @@ export interface JobEvent {
   data: Record<string, unknown>;
   actor: PersonRef | null;
   createdAt: string;
+  /** Druh autora (člověk / AI / systém) — z DB; chybí u starých záznamů. */
+  actorKind?: ActorKind | null;
+  /** Jméno uložené v době zápisu (přežije smazání účtu). */
+  actorName?: string | null;
+  via?: ChangeVia | null;
+  agent?: string | null;
+  /** Fáze / objekt události (job, inquiry, order, quote, delivery, payment, proposal…). */
+  entity?: string | null;
 }
 
 /** Údaje zákazníka pro doklady (PDF) a detail zakázky. */
@@ -231,8 +265,11 @@ export interface JobDetail extends JobListItem {
 }
 
 export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date";
-/** Platba faktury: po splatnosti / nezaplaceno (vč. po splatnosti) / zaplaceno. */
-export type JobPaymentFilter = "po_splatnosti" | "nezaplaceno" | "zaplaceno";
+/**
+ * Platba faktury (podrobný stav paymentKey): čeká na úhradu / částečně zaplaceno / po splatnosti /
+ * zaplaceno; „nezaplaceno" = vše kromě zaplaceno (vč. po splatnosti).
+ */
+export type JobPaymentFilter = "ceka_na_uhradu" | "castecne_zaplaceno" | "po_splatnosti" | "nezaplaceno" | "zaplaceno";
 export type JobSort = "number" | "created" | "deadline" | "customer" | "value" | "stage" | "updated";
 
 export interface JobFilters {
@@ -251,6 +288,14 @@ export interface JobFilters {
   /** Kde se zakázka právě nachází (název firmy / „U nás"). */
   location?: string;
   payment?: JobPaymentFilter;
+  /** Dílčí stav poptávky (orders.inquiry_status). */
+  inquiry?: InquiryStatus[];
+  /** Objednávka: stav dokladu (dorucena…) nebo plnění (ve_vyrobe, castecne_dodana, dokoncena). */
+  order?: string[];
+  /** Dodání zákazníkovi (k_expedici, castecne, dodano, dl_potvrzen). */
+  delivery?: string[];
+  /** Kdo naposledy změnil hlavní stav nebo dílčí stav (uuid). */
+  changedBy?: string;
   sort?: JobSort;
   dir?: "asc" | "desc";
   limit?: number;

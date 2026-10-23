@@ -18,7 +18,13 @@ import { UPLOAD_PHASE_LABELS, useJobDetail } from "@/components/jobs/detail/deta
 import { formatMoney, parseDecimal } from "@/components/jobs/detail/detail-helpers";
 import { todayInPrague } from "@/components/jobs/book/book-params";
 import { cn } from "@/lib/utils";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import { ProgressPill } from "@/components/flow-status/progress-pill";
+import { deleteJobPayment } from "@/app/actions/flow-status";
+import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";
+import type { JobPayment } from "@/lib/data/flow-status";
 import { useRunner } from "./production-context";
+import { PaymentDialog } from "./payment-dialog";
 import {
   CONFIRMED_DL_TITLE, INVOICE_TONE, closingProgress, closingStamp, confirmedDeliveryFile, invoiceTone, stampLabel,
 } from "./production-helpers";
@@ -76,8 +82,12 @@ function DoneBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** „Potvrdil · 20. 10. 14:05 · Petr Novák" — kdo krok zapsal. */
-function ByLine({ job, kind, prefix }: { job: JobDetail; kind: "delivery_note" | "invoice" | "paid"; prefix: string }) {
+/**
+ * „Potvrdil · 20. 10. 14:05 · Petr Novák" — kdo krok zapsal. Přednost má razítko ze sloupců
+ * zakázky (DB, i AI / foto / automatika), jinak poslední událost historie.
+ */
+function ByLine({ job, kind, prefix, stamp: col }: { job: JobDetail; kind: "delivery_note" | "invoice" | "paid"; prefix: string; stamp?: ChangeStamp | null }) {
+  if (col) return <ActorStamp stamp={col} verb={prefix} className="mt-1 max-w-full opacity-90" />;
   const stamp = closingStamp(job.events, kind);
   if (!stamp) return null;
   return (
@@ -102,7 +112,7 @@ function UndoButton({ onClick, busy, label = "Zrušit" }: { onClick: () => void;
 }
 
 // ── 1) Potvrzený dodací list ────────────────────────────────
-function DeliveryStep({ job, closing, state }: { job: JobDetail; closing: JobClosingInfo; state: StepState }) {
+function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing: JobClosingInfo; state: StepState; stamp?: ChangeStamp | null }) {
   const { notify } = useJobDetail();
   const { run, isBusy } = useRunner();
   const [date, setDate] = React.useState(() => todayInPrague());
@@ -159,7 +169,7 @@ function DeliveryStep({ job, closing, state }: { job: JobDetail; closing: JobClo
               <span className="opacity-80">bez skenu</span>
             )}
           </p>
-          <ByLine job={job} kind="delivery_note" prefix="Potvrdil" />
+          <ByLine job={job} kind="delivery_note" prefix="DL potvrzen" stamp={stamp} />
           {file?.uploadedBy && (
             <p className="flex min-w-0 items-center gap-1 text-[11px] opacity-80">
               <FileCheck2 className="h-3 w-3 shrink-0" /> <span className="truncate">Sken nahrál {file.uploadedBy.name}</span>
@@ -211,7 +221,9 @@ function DeliveryStep({ job, closing, state }: { job: JobDetail; closing: JobClo
 }
 
 // ── 2) Faktura a splatnost ──────────────────────────────────
-function InvoiceStep({ job, closing, state, invoiced }: { job: JobDetail; closing: JobClosingInfo; state: StepState; invoiced: boolean }) {
+function InvoiceStep({
+  job, closing, state, invoiced, margins, stamp,
+}: { job: JobDetail; closing: JobClosingInfo; state: StepState; invoiced: boolean; margins: boolean; stamp?: ChangeStamp | null }) {
   const { run, isBusy } = useRunner();
   const terms = closing.paymentTermsDays ?? job.customerDetail?.paymentTermsDays ?? null;
   const [editing, setEditing] = React.useState(false);
@@ -227,7 +239,8 @@ function InvoiceStep({ job, closing, state, invoiced }: { job: JobDetail; closin
   const shownDue = due ?? autoDue;
   const tone = invoiceTone(closing);
   const text = dueText(closing);
-  const showForm = editing || (!invoiced && state === "current");
+  // fakturu a úhrady zapisuje obchodník nebo admin (finance); zaměstnanec vidí jen stav
+  const showForm = margins && (editing || (!invoiced && state === "current"));
 
   function startEdit() {
     setNumber(closing.invoiceNumber ?? "");
@@ -267,7 +280,7 @@ function InvoiceStep({ job, closing, state, invoiced }: { job: JobDetail; closin
       icon={ReceiptText}
       title="Naše faktura"
       state={state}
-      aside={invoiced && !editing ? (
+      aside={invoiced && !editing && margins ? (
         <button type="button" onClick={startEdit} className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
           <Pencil className="h-3 w-3" /> Upravit
         </button>
@@ -291,15 +304,16 @@ function InvoiceStep({ job, closing, state, invoiced }: { job: JobDetail; closin
             </span>
           )}
           <div className="text-muted-foreground">
-            <ByLine job={job} kind="invoice" prefix="Zapsal" />
+            <ByLine job={job} kind="invoice" prefix="Fakturováno" stamp={stamp} />
           </div>
         </div>
       )}
-      {!invoiced && !showForm && (
+      {!invoiced && !showForm && margins && (
         <Button type="button" variant="outline" size="sm" onClick={startEdit}>
           <ReceiptText className="text-sky-600" /> Zapsat fakturu
         </Button>
       )}
+      {!invoiced && !margins && <FinanceNote />}
       {showForm && (
         <form onSubmit={submit} className="space-y-2 rounded-lg border bg-background p-3">
           <div className="grid gap-2 sm:grid-cols-3">
@@ -337,10 +351,46 @@ function InvoiceStep({ job, closing, state, invoiced }: { job: JobDetail; closin
 }
 
 // ── 3) Zaplaceno ────────────────────────────────────────────
-function PaidStep({
-  job, closing, state, margins, invoiced,
-}: { job: JobDetail; closing: JobClosingInfo; state: StepState; margins: boolean; invoiced: boolean }) {
+/** Seznam úhrad s autory (částky jen s právem na marže; v historii částky nejsou). */
+function PaymentList({ payments, margins, currency }: { payments: JobPayment[]; margins: boolean; currency: string }) {
   const { run, isBusy } = useRunner();
+  if (!payments.length) return null;
+  return (
+    <ul aria-label="Úhrady" className="divide-y rounded-lg border bg-background text-xs">
+      {payments.map((p) => (
+        <li key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2.5 py-1.5">
+          <span className="font-medium">{czDay(p.paidOn)}</span>
+          <span className="tabular-nums">
+            {p.amount !== null ? formatMoney(p.amount, currency) : p.whole ? "celá / zbývající částka" : "úhrada"}
+          </span>
+          {p.settles && <span className="rounded-full bg-emerald-100 px-1.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">vyrovnává</span>}
+          <ActorStamp stamp={p.stamp} short className="max-w-[12rem]" />
+          {margins && (
+            <button
+              type="button"
+              onClick={() => void run(`del-${p.id}`, () => deleteJobPayment(p.id), { success: "Úhrada odebrána." })}
+              disabled={isBusy(`del-${p.id}`)}
+              className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+              aria-label={`Odebrat úhradu ze dne ${czDay(p.paidOn)}`}
+            >
+              {isBusy(`del-${p.id}`) ? <Loader2 className="h-3 w-3 animate-spin" /> : "Odebrat"}
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PaidStep({
+  job, closing, state, margins, invoiced, payments, stamp,
+}: { job: JobDetail; closing: JobClosingInfo; state: StepState; margins: boolean; invoiced: boolean; payments: JobPayment[]; stamp?: ChangeStamp | null }) {
+  const { run, isBusy } = useRunner();
+  const { notify, refresh } = useJobDetail();
+  const [partial, setPartial] = React.useState(false);
+  const paidSoFar = job.flow?.paidSoFar ?? 0;
+  const value = job.value;
+  const pct = value && value > 0 && paidSoFar > 0 ? Math.min(100, Math.round((paidSoFar / value) * 100)) : null;
   const [date, setDate] = React.useState(() => todayInPrague());
   const [amount, setAmount] = React.useState("");
   const [open, setOpen] = React.useState(false);
@@ -348,7 +398,7 @@ function PaidStep({
   const ids = { d: React.useId(), a: React.useId() };
   const busy = isBusy("paid");
   const paidAt = closing.paidAt;
-  const showForm = open || state === "current";
+  const showForm = margins && (open || state === "current");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -383,45 +433,80 @@ function PaidStep({
               {formatMoney(closing.paidAmount ?? job.value, job.currency)} bez DPH{closing.paidAmount === null ? " (hodnota zakázky)" : ""}
             </p>
           )}
-          <ByLine job={job} kind="paid" prefix="Zapsal" />
+          <ByLine job={job} kind="paid" prefix="Zaplaceno" stamp={stamp} />
+          <div className="mt-2"><PaymentList payments={payments} margins={margins} currency={job.currency} /></div>
         </DoneBox>
       ) : showForm ? (
-        <form onSubmit={submit} className="space-y-2">
-          {!invoiced && <p className="text-xs text-amber-700 dark:text-amber-400">Faktura zatím není zapsaná — zakázka se dokončí, až ji doplníš.</p>}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[9.5rem] flex-1 sm:flex-none">
-              <label htmlFor={ids.d} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Přišlo dne</label>
-              <Input id={ids.d} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10" />
-            </div>
-            {margins && (
-              <div className="min-w-[8rem] flex-1">
-                <label htmlFor={ids.a} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Částka bez DPH</label>
-                <Input
-                  id={ids.a}
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder={job.value !== null ? formatMoney(job.value, job.currency) : "hodnota zakázky"}
-                  className="h-10 text-right tabular-nums"
-                />
-              </div>
+        <>
+          <PaymentDialog
+            open={partial}
+            onOpenChange={setPartial}
+            jobId={job.id}
+            margins={margins}
+            value={value}
+            paidSoFar={paidSoFar}
+            currency={job.currency}
+            onDone={(m) => { notify("success", m); refresh(); }}
+          />
+          <form onSubmit={submit} className="space-y-2">
+            {pct !== null && (
+              <ProgressPill
+                progress={{ done: paidSoFar, total: value ?? 0, pct, label: margins ? `${formatMoney(paidSoFar, job.currency)} z ${formatMoney(value, job.currency)}` : `${pct} %` }}
+                hue="emerald"
+                className="text-xs font-medium"
+              />
             )}
-          </div>
-          {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-          <Button type="submit" variant="success" disabled={busy || !date} className="h-11 w-full text-base font-semibold sm:w-auto sm:px-6">
-            {busy ? <Loader2 className="animate-spin" /> : <Banknote />} Zaplaceno
-          </Button>
-        </form>
-      ) : (
+            <PaymentList payments={payments} margins={margins} currency={job.currency} />
+            {!invoiced && <p className="text-xs text-amber-700 dark:text-amber-400">Faktura zatím není zapsaná — zakázka se dokončí, až ji doplníš.</p>}
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[9.5rem] flex-1 sm:flex-none">
+                <label htmlFor={ids.d} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Přišlo dne</label>
+                <Input id={ids.d} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10" />
+              </div>
+              {margins && (
+                <div className="min-w-[8rem] flex-1">
+                  <label htmlFor={ids.a} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Částka bez DPH</label>
+                  <Input
+                    id={ids.a}
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder={job.value !== null ? formatMoney(job.value, job.currency) : "hodnota zakázky"}
+                    className="h-10 text-right tabular-nums"
+                  />
+                </div>
+              )}
+            </div>
+            {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button type="submit" variant="success" disabled={busy || !date} className="h-11 w-full text-base font-semibold sm:w-auto sm:px-6">
+                {busy ? <Loader2 className="animate-spin" /> : <Banknote />} Zaplaceno
+              </Button>
+              <Button type="button" variant="outline" className="h-11 sm:h-11" onClick={() => setPartial(true)}>
+                <Banknote className="text-emerald-600" /> Zadat částečnou platbu / zálohu
+              </Button>
+            </div>
+          </form>
+        </>
+      ) : margins ? (
         <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
           <Banknote className="text-green-600" /> Označit zaplaceno
         </Button>
+      ) : (
+        <FinanceNote />
       )}
     </Step>
   );
 }
 
-export function ClosingCard({ job, closing, margins }: { job: JobDetail; closing: JobClosingInfo; margins: boolean }) {
+/** Zaměstnanec: fakturu a úhrady zapisuje obchodník nebo admin. */
+function FinanceNote() {
+  return <p className="text-xs text-muted-foreground">Fakturu a úhrady zapisuje obchodník nebo admin.</p>;
+}
+
+export function ClosingCard({
+  job, closing, margins, payments = [], stamps = null,
+}: { job: JobDetail; closing: JobClosingInfo; margins: boolean; payments?: JobPayment[]; stamps?: JobStamps | null }) {
   const p = closingProgress(closing);
   const finished = closing.stage === "dokonceno";
   // na řadě je první nehotový krok a každý, jehož předchozí krok je hotový
@@ -430,7 +515,7 @@ export function ClosingCard({ job, closing, margins }: { job: JobDetail; closing
   const fixed: StepState[] = done.map((d, i) => (d ? "done" : i === firstOpen || done[i - 1] ? "current" : "todo"));
 
   return (
-    <section aria-label="Dodání, faktura a platba" className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", finished && "border-green-300 dark:border-green-500/40")}>
+    <section id="konec-toku" aria-label="Dodání, faktura a platba" className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", finished && "border-green-300 dark:border-green-500/40")}>
       <header className="flex items-center gap-2.5 border-b px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
           <ReceiptText className="h-4 w-4" />
@@ -452,9 +537,9 @@ export function ClosingCard({ job, closing, margins }: { job: JobDetail; closing
         </div>
       )}
       <ol className="p-4">
-        <DeliveryStep job={job} closing={closing} state={fixed[0]} />
-        <InvoiceStep job={job} closing={closing} state={fixed[1]} invoiced={p.invoice} />
-        <PaidStep job={job} closing={closing} state={fixed[2]} margins={margins} invoiced={p.invoice} />
+        <DeliveryStep job={job} closing={closing} state={fixed[0]} stamp={stamps?.deliveryNote} />
+        <InvoiceStep job={job} closing={closing} state={fixed[1]} invoiced={p.invoice} margins={margins} stamp={stamps?.invoiced} />
+        <PaidStep job={job} closing={closing} state={fixed[2]} margins={margins} invoiced={p.invoice} payments={payments} stamp={stamps?.paid} />
       </ol>
     </section>
   );

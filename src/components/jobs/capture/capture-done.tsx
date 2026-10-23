@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Building2, Camera, CheckCircle2, ExternalLink, Paperclip, PenLine, Sparkles, Zap } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, Camera, CheckCircle2, ExternalLink, ListChecks, Paperclip, PenLine, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StageBadge } from "@/components/jobs/stage-badge";
 import { TONES } from "@/components/jobs/capture/capture-parts";
@@ -86,6 +86,16 @@ export function CaptureDone({
           </ul>
         </div>
       )}
+
+      {result.flowNotes?.length ? (
+        <ul aria-label="Stav dokladů" className="mt-3 w-full space-y-1 rounded-xl border border-indigo-200 bg-indigo-50 p-2.5 text-left text-xs text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
+          {result.flowNotes.map((w, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" aria-hidden /> {w}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {result.warnings?.length ? (
         <ul className="mt-3 w-full space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-left text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Building2, CalendarClock, Flame, Package, Sparkles, UserRound, ChevronRight } from "lucide-react";
-import { StageSelect } from "@/components/jobs/stage-select";
+import { StageBadge } from "@/components/jobs/stage-badge";
 import { stageMeta } from "@/lib/jobs/stages";
 import { deadlineInfo, DEADLINE_BADGE } from "@/lib/jobs/deadlines";
 import type { JobListItem } from "@/lib/jobs/types";
@@ -9,8 +9,9 @@ import { czDay, dateFromIso } from "./flow-utils";
 
 /**
  * Kompaktní řádky zakázek pro stránky toku (poptávky, potvrzení…). Celý řádek je
- * odkaz na kartu zakázky; stav jde změnit rovnou (barevný výběr), vpravo volitelná akce.
- * Bez stavu — renderuje se na serveru (StageSelect je klientský ostrůvek).
+ * odkaz na kartu zakázky; pod číslem dílčí stav fáze s autorem („V řešení · Petr
+ * Obchodník · před 5 min“), vpravo další krok. Hlavní stav je jen odznak — korekce
+ * stavu patří do karty zakázky. Bez stavu — renderuje se na serveru (akce jsou ostrůvky).
  */
 
 export function money(value: number | null, currency = "CZK"): string | null {
@@ -59,16 +60,17 @@ export function FlowJobRow({
   job,
   today,
   action,
+  state,
   extra,
-  stageSelect = true,
 }: {
   job: JobListItem;
   today: string;
-  /** Tlačítko vpravo (např. „Potvrdit objednávku"). */
+  /** Akce vpravo (další krok + menu). */
   action?: React.ReactNode;
+  /** Dílčí stav fáze (chipy) a kdo ho nastavil. */
+  state?: React.ReactNode;
   /** Doplňující řádek pod údaji. */
   extra?: React.ReactNode;
-  stageSelect?: boolean;
 }) {
   const m = stageMeta(job.stage);
   const value = money(job.value, job.currency);
@@ -84,11 +86,7 @@ export function FlowJobRow({
       <div className="pointer-events-none relative min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-mono text-sm font-bold tracking-tight">{job.number}</span>
-          {stageSelect ? (
-            <span className="pointer-events-auto relative z-10">
-              <StageSelect jobId={job.id} stage={job.stage} size="sm" />
-            </span>
-          ) : null}
+          <StageBadge stage={job.stage} size="sm" />
           {job.priority === "vysoka" && (
             <span title="Vysoká priorita" className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
               <Flame className="h-3 w-3" /> Spěchá
@@ -101,6 +99,7 @@ export function FlowJobRow({
             </span>
           )}
         </div>
+        {state && <div className="pointer-events-auto relative z-10 flex min-w-0 flex-col gap-1">{state}</div>}
         <p className="truncate font-medium leading-snug">{job.title || "Bez názvu"}</p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex min-w-0 items-center gap-1">
@@ -137,7 +136,7 @@ export function FlowJobRow({
         </div>
         {extra && <div className="pointer-events-auto relative z-10 pt-1">{extra}</div>}
       </div>
-      <div className="relative z-10 flex shrink-0 items-center gap-2 self-stretch sm:self-auto">
+      <div className="relative z-10 flex shrink-0 items-center gap-2 self-stretch sm:max-w-[50%] sm:self-auto">
         {action}
         <ChevronRight aria-hidden className="hidden h-5 w-5 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground sm:block" />
       </div>
@@ -149,16 +148,19 @@ export function FlowJobList({
   jobs,
   today,
   renderAction,
+  renderState,
 }: {
   jobs: JobListItem[];
   today: string;
   /** Akce řádku (volá se na serveru — vrací prvek s čistými daty). */
   renderAction?: (job: JobListItem) => React.ReactNode;
+  /** Dílčí stav a autor řádku. */
+  renderState?: (job: JobListItem) => React.ReactNode;
 }) {
   return (
     <ul className="space-y-2">
       {jobs.map((j) => (
-        <FlowJobRow key={j.id} job={j} today={today} action={renderAction?.(j)} />
+        <FlowJobRow key={j.id} job={j} today={today} action={renderAction?.(j)} state={renderState?.(j)} />
       ))}
     </ul>
   );

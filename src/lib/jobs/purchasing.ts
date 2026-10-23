@@ -3,7 +3,7 @@ import type { JobItem } from "@/lib/jobs/types";
 import type {
   PurchaseItem, PurchaseItemInput, PurchaseSupplierRef, SupplierQuoteView, PurchaseOrderView,
   PurchaseOrderListItem, JobCommissionView, JobPurchasingTotals, SupplierQuoteInput, SupplierQuoteSource,
-  PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseItemsSource, RequiredDateSource,
+  PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseItemsSource, RequiredDateSource, PurchaseOrderStamps,
 } from "@/lib/jobs/purchasing-types";
 import {
   cleanText, cleanDate, cleanNumber, cleanMoney, cleanCurrency, isUuid, one, personRef, searchNormalize, todayIso,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/jobs/mapping";
 import { STAGES, isJobStage, stageRank } from "@/lib/jobs/stages";
 import { czDate, czWeekday } from "@/lib/pdf/types";
+import { stampFromRow, type ChangeStamp, type PurchaseExtraState } from "@/lib/jobs/flow-status";
 
 /**
  * Nákupní strana zakázky — čistá logika (bez DB): stavy objednávek vydaných,
@@ -794,6 +795,7 @@ export const SUPPLIER_QUOTE_SELECT = [
   "*",
   SUPPLIER_EMBED,
   `creator:profiles!created_by(${PERSON})`,
+  `selector:profiles!selected_by(${PERSON})`,
   "items:supplier_quote_items!supplier_quote_id(*)",
 ].join(", ");
 
@@ -801,8 +803,13 @@ export const PURCHASE_ORDER_SELECT = [
   "*",
   SUPPLIER_EMBED,
   `creator:profiles!created_by(${PERSON})`,
+  `status_changer:profiles!status_changed_by(${PERSON})`,
+  `sender:profiles!sent_by(${PERSON})`,
+  `confirmer:profiles!confirmed_by(${PERSON})`,
+  `deliverer:profiles!delivered_by(${PERSON})`,
+  `canceller:profiles!cancelled_by(${PERSON})`,
   "quote:supplier_quotes!supplier_quote_id(id, number, quote_date)",
-  "items:purchase_order_items!purchase_order_id(*)",
+  `items:purchase_order_items!purchase_order_id(*, receiver:profiles!received_changed_by(${PERSON}))`,
 ].join(", ");
 
 export const PURCHASE_ORDER_LIST_SELECT = [
@@ -832,6 +839,13 @@ export interface PurchaseItemDbRow {
   unit?: string | null;
   unit_price?: number | string | null;
   note?: string | null;
+  received_quantity?: number | string | null;
+  received_changed_at?: string | null;
+  received_changed_by?: string | null;
+  receipt_closed?: boolean | null;
+  receipt_closed_reason?: string | null;
+  order_item_id?: string | null;
+  receiver?: Embed<PersonEmbed>;
 }
 
 export interface SupplierQuoteDbRow {
@@ -853,8 +867,11 @@ export interface SupplierQuoteDbRow {
   created_by?: string | null;
   created_at: string;
   updated_at?: string | null;
+  selected_at?: string | null;
+  selected_by?: string | null;
   supplier?: Embed<SupplierEmbedRow>;
   creator?: Embed<PersonEmbed>;
+  selector?: Embed<PersonEmbed>;
   items?: PurchaseItemDbRow[] | null;
 }
 
@@ -878,10 +895,26 @@ export interface PurchaseOrderDbRow {
   file_id?: string | null;
   created_by?: string | null;
   sent_at?: string | null;
+  sent_by?: string | null;
+  status_changed_at?: string | null;
+  status_changed_by?: string | null;
+  status_changed_via?: string | null;
+  confirmed_at?: string | null;
+  confirmed_by?: string | null;
+  delivered_at?: string | null;
+  delivered_by?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
   created_at: string;
   updated_at?: string | null;
   supplier?: Embed<SupplierEmbedRow>;
   creator?: Embed<PersonEmbed>;
+  status_changer?: Embed<PersonEmbed>;
+  sender?: Embed<PersonEmbed>;
+  confirmer?: Embed<PersonEmbed>;
+  deliverer?: Embed<PersonEmbed>;
+  canceller?: Embed<PersonEmbed>;
   quote?: Embed<{ id: string; number: string | null; quote_date: string | null }>;
   items?: PurchaseItemDbRow[] | null;
   job?: Embed<{
@@ -936,6 +969,10 @@ export function rowToPurchaseItem(row: PurchaseItemDbRow): PurchaseItem {
     unit: row.unit ?? "ks",
     unitPrice: num(row.unit_price),
     note: row.note ?? null,
+    receivedQuantity: num(row.received_quantity) ?? 0,
+    receiptClosed: Boolean(row.receipt_closed),
+    receiptClosedReason: row.receipt_closed_reason ?? null,
+    orderItemId: row.order_item_id ?? null,
   };
 }
 
@@ -965,11 +1002,105 @@ export function rowToSupplierQuoteView(row: SupplierQuoteDbRow): SupplierQuoteVi
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
     items: itemsOf(row.items),
+    selectedStamp: row.selected ? poStamp(row.selected_at, row.selected_by, row.selector) : null,
   };
+}
+
+/**
+ * Razítko kroku objednávky ze sloupců (at + by + embed profilu). Krok, který se stal bez
+ * přihlášeného účtu (přímý zápis, starší data), je „Systém"; via jen u změny stavu.
+ */
+function poStamp(at: string | null | undefined, byId: string | null | undefined, person: Embed<PersonEmbed>, via?: string | null): ChangeStamp | null {
+  const fields: Record<string, unknown> = { s_at: at ?? null, s_by: byId ?? null, s_via: via ?? null };
+  return stampFromRow(fields, "s", personRef(person));
+}
+
+/** Kdo co s objednávkou udělal — ze sloupců DB (ne z historie). */
+export function purchaseOrderStamps(row: PurchaseOrderDbRow): PurchaseOrderStamps {
+  const status = row.status;
+  let received: ChangeStamp | null = null;
+  for (const it of row.items ?? []) {
+    const st = poStamp(it.received_changed_at, it.received_changed_by, it.receiver);
+    if (st && (!received || (st.at ?? "") > (received.at ?? ""))) received = st;
+  }
+  return {
+    created: poStamp(row.created_at, row.created_by, row.creator),
+    status: poStamp(row.status_changed_at, row.status_changed_by, row.status_changer, row.status_changed_via),
+    sent: row.sent_at ? poStamp(row.sent_at, row.sent_by, row.sender) : null,
+    confirmed: status === "potvrzena" || row.confirmed_at ? poStamp(row.confirmed_at, row.confirmed_by, row.confirmer) : null,
+    delivered: status === "dodana" ? poStamp(row.delivered_at, row.delivered_by, row.deliverer) : null,
+    cancelled: status === "zrusena" ? poStamp(row.cancelled_at, row.cancelled_by, row.canceller) : null,
+    received,
+  };
+}
+
+/** Převzato vše (položka převzatá v plném množství nebo uzavřená s menším). */
+export function isItemReceived(it: Pick<PurchaseItem, "quantity" | "receivedQuantity" | "receiptClosed">): boolean {
+  return Boolean(it.receiptClosed) || (it.receivedQuantity ?? 0) + 1e-9 >= it.quantity;
+}
+
+/** Převzetí po položkách: „1/2 položek", částečně = něco převzato, ale ne vše. */
+export function purchaseReceipt(items: Pick<PurchaseItem, "quantity" | "receivedQuantity" | "receiptClosed">[]): { done: number; total: number; partial: boolean } {
+  const total = items.length;
+  const done = items.filter(isItemReceived).length;
+  const any = items.some((it) => (it.receivedQuantity ?? 0) > 0 || it.receiptClosed);
+  return { done, total, partial: any && done < total };
+}
+
+/** Odvozený stav objednávky dodavateli navíc k enumu (1.8): částečně dodaná / po termínu. */
+export function purchaseExtraStates(
+  po: Pick<PurchaseOrderView, "status" | "requiredDate" | "confirmedDate"> & { receipt?: { partial: boolean } | null },
+  today: string,
+): PurchaseExtraState[] {
+  const out: PurchaseExtraState[] = [];
+  if ((po.status === "odeslana" || po.status === "potvrzena" || po.status === "vystavena") && po.receipt?.partial) out.push("castecne_dodana");
+  const due = po.confirmedDate ?? po.requiredDate;
+  if (po.status !== "dodana" && po.status !== "zrusena" && po.status !== "navrh" && due && due < today) out.push("po_terminu");
+  return out;
+}
+
+/** Výrobní operace pro pravidlo „Dodáno k nám" (2.7). */
+export interface StageRuleOperation {
+  id: string;
+  position: number;
+  status: string;
+  inHouse: boolean;
+  purchaseOrderId: string | null;
+}
+
+/**
+ * Pravidlo 2.7 (M6) — posune dodání objednávky dodavateli zakázku do „Dodáno k nám"?
+ *  • bez operací: všechny nezrušené objednávky dodané;
+ *  • s operacemi: všechny hotové / přeskočené a POSLEDNÍ nepřeskočená je kooperace
+ *    (po kooperaci nezbývá vlastní operace) — navázané operace dodaných PO se počítají jako hotové;
+ *  • objednávka bez navázané operace (materiál) u zakázky s operacemi stav neposouvá.
+ */
+export function purchaseDeliveryAdvances(input: {
+  deliveredPoId: string;
+  orders: { id: string; status: PurchaseOrderStatus }[];
+  operations: StageRuleOperation[];
+}): { advance: boolean; pendingOrders: number; reason: "vse_dodano" | "ceka_objednavky" | "material" | "zbyva_vyroba" | "kooperace_hotova" } {
+  const pending = input.orders.filter((o) => o.id !== input.deliveredPoId && o.status !== "zrusena" && o.status !== "dodana").length;
+  if (!input.operations.length) {
+    return pending ? { advance: false, pendingOrders: pending, reason: "ceka_objednavky" } : { advance: true, pendingOrders: 0, reason: "vse_dodano" };
+  }
+  const delivered = new Set(input.orders.filter((o) => o.status === "dodana").map((o) => o.id));
+  delivered.add(input.deliveredPoId);
+  const ops = [...input.operations].sort((a, b) => a.position - b.position).map((o) => ({
+    ...o,
+    status: o.purchaseOrderId && delivered.has(o.purchaseOrderId) && o.status !== "preskoceno" ? "hotovo" : o.status,
+  }));
+  const linked = ops.some((o) => o.purchaseOrderId === input.deliveredPoId);
+  if (!linked) return { advance: false, pendingOrders: pending, reason: "material" };
+  const allDone = ops.every((o) => o.status === "hotovo" || o.status === "preskoceno");
+  const last = [...ops].reverse().find((o) => o.status !== "preskoceno");
+  if (allDone && last && !last.inHouse) return { advance: true, pendingOrders: pending, reason: "kooperace_hotova" };
+  return { advance: false, pendingOrders: pending, reason: "zbyva_vyroba" };
 }
 
 export function rowToPurchaseOrderView(row: PurchaseOrderDbRow): PurchaseOrderView {
   const quote = one(row.quote);
+  const items = itemsOf(row.items);
   return {
     id: row.id,
     jobId: row.job_id,
@@ -992,12 +1123,16 @@ export function rowToPurchaseOrderView(row: PurchaseOrderDbRow): PurchaseOrderVi
     createdBy: personRef(row.creator),
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
-    items: itemsOf(row.items),
+    items,
+    cancelReason: row.cancel_reason ?? null,
+    stamps: purchaseOrderStamps(row),
+    receipt: purchaseReceipt(items),
   };
 }
 
 export function rowToPurchaseOrderListItem(row: PurchaseOrderDbRow): PurchaseOrderListItem {
-  const { items, ...view } = rowToPurchaseOrderView(row);
+  const view = rowToPurchaseOrderView(row);
+  const items = view.items;
   const job = one(row.job);
   const customer = job ? one(job.customer) : null;
   const drawingNumbers: string[] = [];

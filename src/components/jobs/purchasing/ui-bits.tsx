@@ -4,7 +4,6 @@ import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import { PURCHASE_ORDER_STATUS_META } from "@/lib/jobs/purchasing";
-import { formatStamp } from "@/components/commissions/model";
 import { cn } from "@/lib/utils";
 
 /** Dialog přes celou obrazovku na mobilu, na počítači velký uprostřed. */
@@ -108,26 +107,4 @@ export async function openPdfPreview(url: string, body: unknown): Promise<string
     win?.close();
     return "Spojení se nepovedlo — zkus to znovu.";
   }
-}
-
-/** „Vystavil Vít Volný · 22. 10. 14:05" — který účet úkon udělal. */
-export function ActorStamp({
-  verb, by, at, className, icon: Icon,
-}: {
-  verb: string;
-  by: string | null | undefined;
-  at?: string | null;
-  className?: string;
-  icon?: LucideIcon;
-}) {
-  const when = formatStamp(at);
-  return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground", className)} suppressHydrationWarning>
-      {Icon && <Icon className="h-3 w-3 shrink-0" />}
-      <span className="truncate">
-        {verb} <strong className="font-medium text-foreground">{by || "neznámý účet"}</strong>
-        {when ? ` · ${when}` : ""}
-      </span>
-    </span>
-  );
 }

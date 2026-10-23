@@ -4,35 +4,48 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, GripVertical, Inbox, X } from "lucide-react";
-import { StageSelect } from "@/components/jobs/stage-select";
+import { StageCorrectionDialog, StageSelect } from "@/components/jobs/stage-select";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import { RowAction, RowStateChip } from "@/components/jobs/book/job-rows";
+import { rowFlowView, type BookAccess } from "@/components/jobs/book/book-flow";
 import {
   CustomerDocNumber, CustomerNoteMark, DeadlineBlock, JobCounters, JobValue, PaymentMark, PeopleStack, PriorityMark,
   ProductionLine, SourceMark, formatMoney,
 } from "@/components/jobs/book/job-cells";
 import { groupByStage, moveJobStage } from "@/components/jobs/book/book-params";
-import { setJobStage } from "@/app/actions/jobs";
-import { stageMeta } from "@/lib/jobs/stages";
+import { nextStage, stageMeta } from "@/lib/jobs/stages";
+import type { FlowActionKey } from "@/lib/jobs/flow-status";
 import type { JobStage } from "@/lib/supabase/database.types";
 import type { JobListItem } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Tabule (kanban): sloupec = stav. Kartu stačí přetáhnout do jiného sloupce
- * (změna se ukáže hned, při chybě se vrátí a ukáže důvod). Na dotykových
- * zařízeních a z klávesnice se stav mění výběrem na kartě.
+ * Tabule (kanban): sloupec = stav. Tah karty do jiného sloupce (2.4): na další krok s dokladem
+ * (Potvrzená objednávka, Dodáno, Faktura) otevře kartu zakázky rovnou s dialogem té akce,
+ * jinak „Korekce stavu" s náhledem dopadu (u Nerealizováno / Zrušeno s povinným důvodem).
+ * Na dotykových zařízeních a z klávesnice se stav mění výběrem na kartě nebo tlačítkem kroku.
  */
 
 const COLUMN_LIMIT = 80;
 const DRAG_TYPE = "application/x-zakazka";
 
-export function JobBoard({ jobs, stages, today }: { jobs: JobListItem[]; stages: JobStage[]; today: string }) {
+/** Další krok, který se dělá dokladem → tah otevře dialog té akce. */
+const STEP_ACTION: Partial<Record<JobStage, FlowActionKey>> = {
+  potvrzeno: "order.confirm",
+  dodano_zakaznikovi: "delivery.record",
+  fakturovano: "payment.invoice",
+};
+
+export function JobBoard({
+  jobs, stages, today, access,
+}: { jobs: JobListItem[]; stages: JobStage[]; today: string; access?: BookAccess | null }) {
   const router = useRouter();
   const [local, setLocal] = React.useState(jobs);
   const [synced, setSynced] = React.useState(jobs);
   const [dragId, setDragId] = React.useState<string | null>(null);
   const [overStage, setOverStage] = React.useState<JobStage | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [, startTransition] = React.useTransition();
+  const [pendingMove, setPendingMove] = React.useState<{ job: JobListItem; to: JobStage } | null>(null);
 
   // nová data ze serveru přepíšou optimistický stav
   if (jobs !== synced) {
@@ -48,24 +61,16 @@ export function JobBoard({ jobs, stages, today }: { jobs: JobListItem[]; stages:
 
   const columns = groupByStage(local, stages);
 
-  async function move(id: string, to: JobStage) {
+  function move(id: string, to: JobStage) {
     const job = local.find((j) => j.id === id);
     if (!job || job.stage === to) return;
-    const from = job.stage;
-    setLocal((cur) => moveJobStage(cur, id, to));
     setError(null);
-    try {
-      const res = await setJobStage(id, to);
-      if (!res.ok) {
-        setLocal((cur) => moveJobStage(cur, id, from));
-        setError(`${job.number}: ${res.error ?? "stav se nepodařilo změnit."}`);
-        return;
-      }
-      startTransition(() => router.refresh());
-    } catch {
-      setLocal((cur) => moveJobStage(cur, id, from));
-      setError(`${job.number}: stav se nepodařilo změnit — zkus to znovu.`);
+    const step = nextStage(job.stage) === to ? STEP_ACTION[to] : undefined;
+    if (step) {
+      router.push(`/orders/${job.id}?akce=${encodeURIComponent(step)}`);
+      return;
     }
+    setPendingMove({ job, to });
   }
 
   return (
@@ -132,6 +137,7 @@ export function JobBoard({ jobs, stages, today }: { jobs: JobListItem[]; stages:
                       setOverStage(null);
                     }}
                     onStageChanged={(s) => setLocal((cur) => moveJobStage(cur, job.id, s))}
+                    access={access ?? null}
                   />
                 ))}
                 {col.jobs.length > shown.length && (
@@ -156,6 +162,21 @@ export function JobBoard({ jobs, stages, today }: { jobs: JobListItem[]; stages:
         })}
       </div>
 
+      <StageCorrectionDialog
+        open={pendingMove !== null}
+        onOpenChange={(o) => !o && setPendingMove(null)}
+        jobId={pendingMove?.job.id ?? ""}
+        from={pendingMove?.job.stage ?? "poptavka"}
+        to={pendingMove?.to ?? null}
+        flow={pendingMove?.job.flow}
+        quotes={pendingMove?.job.flowQuotes}
+        title={pendingMove ? `${pendingMove.job.number}: ${stageMeta(pendingMove.job.stage).label} → ${stageMeta(pendingMove.to).label}` : undefined}
+        onDone={(s) => {
+          const id = pendingMove?.job.id;
+          if (id) setLocal((cur) => moveJobStage(cur, id, s));
+        }}
+      />
+
       {error && (
         <div
           role="alert"
@@ -179,6 +200,7 @@ function BoardCard({
   onDragStart,
   onDragEnd,
   onStageChanged,
+  access,
 }: {
   job: JobListItem;
   today: string;
@@ -186,8 +208,10 @@ function BoardCard({
   onDragStart: (e: React.DragEvent<HTMLLIElement>) => void;
   onDragEnd: () => void;
   onStageChanged: (s: JobStage) => void;
+  access: BookAccess | null;
 }) {
   const m = stageMeta(job.stage);
+  const view = rowFlowView(job, access, today);
   return (
     <li
       draggable
@@ -217,6 +241,7 @@ function BoardCard({
       <p className="mt-1 truncate text-sm font-semibold">{job.customer?.name ?? <span className="italic text-muted-foreground">Bez zákazníka</span>}</p>
       <p className="truncate text-xs text-muted-foreground">{job.title || "Bez názvu"}</p>
       <CustomerDocNumber job={job} className="mt-1.5" />
+      <RowStateChip job={job} view={view} className="relative z-10 mt-1.5" />
       <ProductionLine job={job} compact className="mt-2" />
       <div className="mt-2 flex items-end justify-between gap-2">
         <DeadlineBlock job={job} today={today} compact />
@@ -227,11 +252,17 @@ function BoardCard({
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
-        <div className="relative z-10">
-          <StageSelect jobId={job.id} stage={job.stage} size="sm" onChanged={onStageChanged} />
+        <div className="relative z-10 flex min-w-0 flex-col items-start gap-0.5">
+          <StageSelect jobId={job.id} stage={job.stage} size="sm" onChanged={onStageChanged} flow={job.flow} quotes={job.flowQuotes} />
+          <ActorStamp stamp={view.stamp} short className="max-w-[9.5rem]" />
         </div>
         <PeopleStack owner={job.owner} assignee={job.assignee} />
       </div>
+      {view.next && view.next.key !== "proposal.decide" && (
+        <div className="relative z-10 mt-2 flex justify-end">
+          <RowAction job={job} view={view} />
+        </div>
+      )}
     </li>
   );
 }

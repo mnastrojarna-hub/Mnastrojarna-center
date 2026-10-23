@@ -8,6 +8,9 @@ import { SegmentTabs, StageChips } from "@/components/jobs/book/segment-tabs";
 import { BookToolbar } from "@/components/jobs/book/book-toolbar";
 import { JobRows, JobRowsHeader } from "@/components/jobs/book/job-rows";
 import { JobBoard } from "@/components/jobs/book/job-board";
+import { FlowFilterChips } from "@/components/jobs/book/flow-filter-chips";
+import type { BookAccess } from "@/components/jobs/book/book-flow";
+import { getFlowCounts } from "@/lib/data/flow-status";
 import { BookEmpty } from "@/components/jobs/book/book-empty";
 import { StageLegend } from "@/components/jobs/book/stage-legend";
 import {
@@ -38,15 +41,18 @@ export default async function OrdersPage({
     ? FEATURE_LABELS[pristupKey as Feature]
     : null;
 
-  const { can } = await getAccess();
+  const { can, features } = await getAccess();
   const margins = can("margins");
+  const access: BookAccess = { features, userId: user.id, role: user.role };
+  const chipSegment = params.segment === "objednavky" || params.segment === "poptavky";
   // objednávky v běhu: hodnota (jen s právem na marže) a faktury po splatnosti
-  const [jobs, counts, options, running, production] = await Promise.all([
+  const [jobs, counts, options, running, production, flowCounts] = await Promise.all([
     listJobs(bookParamsToFilters(params)),
     getJobStageCounts(),
     getJobFormOptions(),
     listJobs({ stages: ORDER_STAGES }),
     listOperationLocations(),
+    chipSegment ? getFlowCounts() : Promise.resolve({} as Record<string, number>),
   ]);
 
   const today = todayInPrague();
@@ -78,6 +84,7 @@ export default async function OrdersPage({
         <section aria-label="Filtry knihy" className="space-y-3 rounded-2xl border bg-card p-2.5 shadow-sm sm:p-3">
           <SegmentTabs counts={segmentCounts(counts.byStage)} />
           <StageChips byStage={counts.byStage} />
+          {chipSegment && <FlowFilterChips counts={flowCounts} />}
           <BookToolbar options={options} production={production} />
         </section>
 
@@ -100,11 +107,11 @@ export default async function OrdersPage({
           {jobs.length === 0 ? (
             <BookEmpty segment={params.segment} filtered={filtered} options={options} defaultStage={defaultStage} userId={user.id} />
           ) : params.view === "tabule" ? (
-            <JobBoard jobs={jobs} stages={boardStages(params)} today={today} />
+            <JobBoard jobs={jobs} stages={boardStages(params)} today={today} access={access} />
           ) : (
             <>
               <JobRowsHeader />
-              <JobRows jobs={rows} today={today} />
+              <JobRows jobs={rows} today={today} access={access} />
             </>
           )}
         </BookPending>

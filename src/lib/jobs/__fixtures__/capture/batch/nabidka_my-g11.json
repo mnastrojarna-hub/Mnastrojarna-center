@@ -1,0 +1,59 @@
+{
+  "docKind": "nabidka",
+  "issuer": "my",
+  "documentNumber": "136/026",
+  "documentDate": "2026-10-12",
+  "customer": {
+    "name": "Strojmetal Kladno – nákup, p. Novák",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "novak@strojmetal.cz",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "136/026",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "F00N603W84",
+      "revision": "",
+      "name": "Těleso ventilu",
+      "description": "",
+      "material": "1.4301",
+      "quantity": 120,
+      "unit": "ks",
+      "unitPrice": 85,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 10200,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "Dodací lhůta: 4 týdny od objednávky",
+  "note": "",
+  "summary": "Naše nabídka 136/026 — těleso ventilu, 120 ks.",
+  "confidence": 0.92,
+  "needsClarification": []
+}

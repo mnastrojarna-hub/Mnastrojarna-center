@@ -1,26 +1,48 @@
 import { NextResponse } from "next/server";
 import { syncMailbox, type SyncResult } from "@/lib/email/ingest";
 import { apiRequire, getAccess } from "@/lib/auth/session";
-import { selectMailboxesToSync } from "@/lib/email/visibility";
+import { isUuidLike, selectMailboxesToSync } from "@/lib/email/visibility";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 
 // IMAP klient vyžaduje Node runtime
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Vercel (Fluid compute): Hobby max 300 s; vlastní limit níže drží odpověď hluboko pod ním
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
+
+/**
+ * Nejzazší konec stahování (zbytek zpráv se stáhne příště — stav se posouvá jen o zpracované).
+ * Nová schránka / e-mail se začne jen do konce − 60 s (SYNC_RESERVE_MS) → odpověď do ~160 s, pod maxDuration.
+ */
+const SYNC_BUDGET_MS = 160_000;
 
 /**
  * Ruční synchronizace pošty: super admin stáhne všechny schránky (včetně
  * globálního účtu), ostatní jen své vlastní schránky.
+ * Tělo (volitelné): { auto: true } = automatické stažení při otevření Přijaté pošty (přeskočí
+ * schránky stažené před < 2 min), { mailboxId } = jen jedna schránka (Nastavení → po uložení).
  */
-export async function POST() {
+export async function POST(req: Request) {
   const auth = await apiRequire("mail");
   if (auth instanceof NextResponse) return auth;
   const { user } = auth;
   const { can } = await getAccess();
+  let body: { auto?: unknown; mailboxId?: unknown } = {};
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    // bez těla = ruční stažení všeho
+  }
+  const auto = body.auto === true;
+  const manual = !auto; // tlačítko / po uložení schránky: přihlásí se i se známým odmítnutým heslem
+  const only = typeof body.mailboxId === "string" && isUuidLike(body.mailboxId) ? body.mailboxId : undefined;
+  const deadline = Date.now() + SYNC_BUDGET_MS;
 
   if (can("mail_all")) {
-    return NextResponse.json(await syncMailbox({ limit: 20 }));
+    return NextResponse.json(
+      await syncMailbox({ limit: 20, actor: userActor(user), auto, manual, deadline, ...(only ? { mailboxIds: [only] } : {}) }),
+    );
   }
 
   const none: SyncResult = {
@@ -34,7 +56,7 @@ export async function POST() {
   if (!isSupabaseConfigured()) return NextResponse.json(none);
 
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(user) });
     const { data, error } = await db.from("mailboxes").select("id, owner_id, active").eq("owner_id", user.id);
     if (error) return NextResponse.json({ ...none, message: error.message }, { status: 500 });
     const selection = selectMailboxesToSync(
@@ -42,7 +64,9 @@ export async function POST() {
       (data ?? []) as { id: string; owner_id: string | null; active: boolean | null }[],
     );
     if (selection.kind !== "own") return NextResponse.json(none);
-    return NextResponse.json(await syncMailbox({ mailboxIds: selection.mailboxIds, limit: 20 }));
+    const ids = only ? selection.mailboxIds.filter((id) => id === only) : selection.mailboxIds;
+    if (!ids.length) return NextResponse.json(none);
+    return NextResponse.json(await syncMailbox({ mailboxIds: ids, limit: 20, actor: userActor(user), auto, manual, deadline }));
   } catch (err) {
     return NextResponse.json(
       { ...none, configured: true, message: err instanceof Error ? err.message : "Chyba synchronizace" },

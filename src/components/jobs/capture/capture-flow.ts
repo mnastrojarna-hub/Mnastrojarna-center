@@ -3,7 +3,7 @@ import {
   defaultCustomerChoice, defaultSupplierChoice, switchTarget,
   type CaptureFileRef, type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
-import { BATCH_TYPES, pagesKey } from "@/lib/jobs/capture-batch";
+import { BATCH_TYPES, distinctJobCount, pagesKey } from "@/lib/jobs/capture-batch";
 import { applyGroupFills } from "@/lib/jobs/capture-batch-reconcile";
 import type {
   BatchApplyState, BatchDocType, BatchGroupReview, BatchGroupState, BatchResult, BatchReviewModel, BatchSort,
@@ -396,6 +396,69 @@ export function chosenTargets(state: BatchApplyState | null): Record<string, str
   return out;
 }
 
+// ── Kolik zakázek se uloží, sloučení do jedné ──────────────
+/** Skupiny, které se uloží jako zakázky (aspoň 1 aktivní doklad v kontrole). */
+export function jobGroupsToSave(review: BatchReviewModel, state: BatchApplyState): BatchGroupState[] {
+  const active = new Set(state.sort.docs.filter((d) => !d.excluded).map((d) => d.id));
+  return state.groups.filter((g) => g.docIds.some((id) => active.has(id) && review.docs.some((r) => r.docId === id)));
+}
+
+/** „1 zakázky", „2 zakázek" (do …). */
+export function jobsGenitive(n: number): string {
+  return `${n} ${n === 1 ? "zakázky" : "zakázek"}`;
+}
+
+export interface SaveCountInfo {
+  count: number;
+  /** Proč víc zakázek (důvody samostatných skupin). */
+  reasons: string[];
+}
+
+/**
+ * Kolik SKUTEČNÝCH zakázek se uloží a proč (důvody dalších zakázek, bez duplicit). Skupiny se stejnou
+ * cílovou zakázkou = 1 zakázka; „nová" / nevybraný cíl = každá skupina zvlášť.
+ */
+export function saveCountInfo(review: BatchReviewModel, state: BatchApplyState): SaveCountInfo {
+  const groups = jobGroupsToSave(review, state);
+  const reasons: string[] = [];
+  const seen = new Set<string>();
+  let n = 0;
+  for (const g of groups) {
+    const k = g.job.targetKey;
+    if (k && k !== "new") {
+      if (seen.has(k)) continue;
+      seen.add(k);
+    }
+    n++;
+    if (n === 1) continue;
+    const rg = review.groups.find((x) => x.key === g.key);
+    const why = rg?.autoReason || (rg?.label ? `samostatná zakázka ${rg.label}` : "");
+    if (why && !reasons.includes(why)) reasons.push(`Zakázka ${n}: ${why}`);
+  }
+  return { count: distinctJobCount(groups), reasons };
+}
+
+export interface MergeAllPlan {
+  /** Klíč skupiny, do které se vše přesune (první). */
+  target: string;
+  /** docId → klíč první skupiny. */
+  assign: Record<string, string>;
+  /** Doklady mají různé IČO zákazníka (potvrzení před sloučením). */
+  icos: string[];
+}
+
+/** Sloučit vše do první zakázky (jen neuložené doklady); null = není co / nejde (uloženo). */
+export function mergeAllPlan(review: BatchReviewModel, state: BatchApplyState, locked: Set<string> = new Set()): MergeAllPlan | null {
+  const groups = jobGroupsToSave(review, state);
+  if (groups.length < 2) return null;
+  if (groups.some((g) => g.docIds.some((id) => locked.has(id)))) return null;
+  const target = groups[0].key;
+  const assign: Record<string, string> = {};
+  for (const g of groups.slice(1)) for (const id of g.docIds) assign[id] = target;
+  const icos = [...new Set(groups.map((g) => (review.groups.find((x) => x.key === g.key)?.model.docCustomer.ico ?? "").replace(/\D+/g, "")).filter(Boolean))];
+  return { target, assign, icos };
+}
+
 /** Skupiny, kde uživatel potvrdil „Je to stejný zákazník". */
 export function confirmedGroups(state: BatchApplyState | null): string[] {
   return (state?.groups ?? []).filter((g) => g.customerConfirmed).map((g) => g.key);
@@ -406,6 +469,7 @@ export function warningResolved(w: BatchWarning, state: BatchApplyState): boolea
   const group = w.groupKey ? state.groups.find((g) => g.key === w.groupKey) : null;
   switch (w.code) {
     case "customer_conflict":
+    case "customer_written_differently":
       return Boolean(group?.customerConfirmed);
     case "target_required":
       return Boolean(group?.job.targetKey);

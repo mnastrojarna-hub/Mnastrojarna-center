@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
@@ -46,7 +47,7 @@ async function begin(feature: Feature = "orders"): Promise<Ctx | { error: string
   const access = await checkFeature(feature);
   if ("error" in access) return { error: access.error };
   const { can } = await getAccess();
-  const db = await createOperatorClient();
+  const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user, can };
 }
 
@@ -120,6 +121,21 @@ function nameFromColumns(r: Row, names: Map<string, string>): string {
       supplierName: (r.supplier_name as string | null | undefined) ?? null,
     }),
   });
+}
+
+/**
+ * Zakázka je dodaná jen částečně (po položkách nebo poznámkou bez položek) — faktura ani potvrzený
+ * DL pak stav neposouvají (M5); na Dodáno zákazníkovi ji posune až úplné dodání (DB).
+ */
+async function partiallyDelivered(db: JobsDb, jobId: string): Promise<boolean> {
+  const j = await loadJob(db, jobId, "id, status, items_count, items_delivered, items_partial, partial_delivery_at");
+  if (!j) return false;
+  const count = Number(j.items_count) || 0;
+  const delivered = Number(j.items_delivered) || 0;
+  const partial = Number(j.items_partial) || 0;
+  if (count > 0) return (delivered > 0 || partial > 0) && delivered < count;
+  const late = ["dodano_zakaznikovi", "fakturovano", "dokonceno"].includes(String(j.status));
+  return Boolean(j.partial_delivery_at) && !late;
 }
 
 async function jobStage(db: JobsDb, jobId: string): Promise<JobStage | null> {
@@ -525,7 +541,8 @@ export async function confirmDeliveryNote(
   const c = await begin();
   if ("error" in c) return fail(c.error);
   try {
-    const res = await confirmDeliveryNoteCore(c.db, c.user.id, jobId, opts ?? {});
+    const partial = isUuid(jobId) && (await partiallyDelivered(c.db, jobId));
+    const res = await confirmDeliveryNoteCore(c.db, c.user.id, jobId, { ...(opts ?? {}), ...(partial ? { stage: false } : {}) });
     if (!res.ok) return fail(res.error);
     revalidateProduction(jobId, true);
     return res;
@@ -559,16 +576,17 @@ export async function unconfirmDeliveryNote(jobId: string): Promise<ActionResult
 /**
  * Naše faktura: číslo, datum, splatnost. Bez zadané splatnosti = datum faktury
  * + splatnost zákazníka (jinak 14 dní). S číslem / datem faktury → Vyfakturováno
- * (už zaplacená zakázka rovnou Dokončeno), jen dopředu.
+ * (už zaplacená zakázka rovnou Dokončeno), jen dopředu — při částečném dodání stav zůstává.
  */
 export async function setInvoiceInfo(
   jobId: string,
   input: { invoiceNumber?: string | null; invoiceDate?: string | null; invoiceDueDate?: string | null },
 ): Promise<ActionResult<{ invoiceDate: string | null; invoiceDueDate: string | null; stage: JobStage }>> {
-  const c = await begin();
+  const c = await begin("margins"); // faktura a úhrady = finance (obchodník, admin)
   if ("error" in c) return fail(c.error);
   try {
-    const res = await setInvoiceInfoCore(c.db, c.user.id, jobId, input);
+    const partial = isUuid(jobId) && (await partiallyDelivered(c.db, jobId));
+    const res = await setInvoiceInfoCore(c.db, c.user.id, jobId, input, partial ? { stage: false } : {});
     if (!res.ok) return fail(res.error);
     if (res.changed) revalidateProduction(jobId, true);
     const { changed: _changed, ...out } = res;
@@ -587,7 +605,7 @@ export async function markJobPaid(
   jobId: string,
   opts: { date?: string; amount?: number | null } = {},
 ): Promise<ActionResult<{ stage: JobStage; paidAt: string }>> {
-  const c = await begin();
+  const c = await begin("margins"); // faktura a úhrady = finance (obchodník, admin)
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   const rawDate = opts?.date;

@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import {
-  Send, FileText, MoreHorizontal, Loader2, BadgeCheck, PackageCheck, Ban, RotateCcw, Pencil, MailCheck, Download, ArchiveRestore,
-  type LucideIcon,
+  Send, FileText, MoreHorizontal, Loader2, BadgeCheck, PackageCheck, PackageOpen, Ban, RotateCcw, Pencil, MailCheck, Download,
+  ArchiveRestore, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,11 +14,9 @@ import { isPurchaseOrderEditable, purchaseOrderTransitions } from "@/lib/jobs/pu
 import type { PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type { Notify } from "@/components/jobs/detail/toast";
-import { ConfirmDialog } from "@/components/jobs/detail/confirm-dialog";
 import { ConfirmPurchaseOrderDialog, SendPurchaseOrderDialog } from "./purchase-order-dialogs";
-import { TRANSITION_LABELS } from "./purchasing-model";
-
-type Order = Omit<PurchaseOrderView, "items">;
+import { CancelPurchaseOrderDialog, ReceivePurchaseOrderDialog } from "./purchase-receive-dialog";
+import { TRANSITION_LABELS, purchaseNextStep } from "./purchasing-model";
 
 const TRANSITION_ICONS: Record<PurchaseOrderStatus, LucideIcon> = {
   navrh: RotateCcw,
@@ -31,12 +29,13 @@ const TRANSITION_ICONS: Record<PurchaseOrderStatus, LucideIcon> = {
 
 /**
  * Akce objednávky dodavateli (záložka zakázky i přehled objednávek): hlavní další
- * krok podle stavu (poslat → potvrzeno → dodáno), PDF a menu s ostatními přechody.
+ * krok podle stavu jako sloveso (Poslat → Dodavatel potvrdil → Převzít zboží / zbytek),
+ * PDF a menu s ostatními přechody. Zrušení vždy s důvodem.
  */
 export function PurchaseOrderActions({
   order, notify, onChanged, onEdit, size = "sm",
 }: {
-  order: Order;
+  order: PurchaseOrderView;
   notify: Notify;
   onChanged: () => void;
   /** Úprava (jen dokud objednávka neodešla) — bez ní se položka v menu neukáže. */
@@ -44,11 +43,14 @@ export function PurchaseOrderActions({
   size?: "sm" | "default";
 }) {
   const [busy, setBusy] = React.useState<string | null>(null);
-  const [dialog, setDialog] = React.useState<null | "send" | "confirm" | "cancel">(null);
+  const [dialog, setDialog] = React.useState<null | "send" | "confirm" | "cancel" | "receive">(null);
   const transitions = purchaseOrderTransitions(order.status);
   const editable = isPurchaseOrderEditable(order.status);
   const pdfHref = order.fileId ? `/api/jobs/files/${order.fileId}` : `/api/pdf/purchase-order/${order.id}`;
   const supplierName = order.supplier?.name ?? null;
+  /** Převzetí po položkách (jen objednávka s položkami, odeslaná / potvrzená). */
+  const canReceive = (order.status === "odeslana" || order.status === "potvrzena") && order.items.some((it) => Boolean(it.id));
+  const next = purchaseNextStep(order);
 
   async function setStatus(to: PurchaseOrderStatus, ok: string) {
     setBusy(to);
@@ -97,29 +99,36 @@ export function PurchaseOrderActions({
     void setStatus(to, msg[to]);
   }
 
-  // hlavní další krok podle stavu
+  // hlavní další krok podle stavu (sloveso)
   let primary: React.ReactNode = null;
-  if (order.status === "navrh" || order.status === "vystavena") {
+  let primaryTarget: PurchaseOrderStatus | null = null;
+  if (next === "poslat") {
     primary = (
       <Button size={size} variant="send" onClick={() => setDialog("send")} disabled={busy !== null}>
         <Send className="h-4 w-4" /> Poslat e-mailem
       </Button>
     );
-  } else if (order.status === "odeslana") {
+  } else if (next === "potvrzeno") {
+    primaryTarget = "potvrzena";
     primary = (
       <Button size={size} variant="success" onClick={() => setDialog("confirm")} disabled={busy !== null}>
         <BadgeCheck className="h-4 w-4" /> Dodavatel potvrdil
       </Button>
     );
-  } else if (order.status === "potvrzena") {
+  } else if (next === "prevzit" || next === "prevzit_zbytek") {
+    const label = next === "prevzit_zbytek" ? "Převzít zbytek" : canReceive ? "Převzít zboží" : "Dodáno k nám";
+    if (!canReceive) primaryTarget = "dodana";
     primary = (
-      <Button size={size} variant="success" onClick={() => runTransition("dodana")} disabled={busy !== null}>
-        {busy === "dodana" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />} Dodáno k nám
+      <Button
+        size={size}
+        variant="success"
+        onClick={() => (canReceive ? setDialog("receive") : runTransition("dodana"))}
+        disabled={busy !== null}
+      >
+        {busy === "dodana" ? <Loader2 className="h-4 w-4 animate-spin" /> : canReceive ? <PackageOpen className="h-4 w-4" /> : <PackageCheck className="h-4 w-4" />} {label}
       </Button>
     );
   }
-  const primaryTarget: PurchaseOrderStatus | null =
-    order.status === "odeslana" ? "potvrzena" : order.status === "potvrzena" ? "dodana" : null;
   const menuTransitions = transitions.filter((t) => t !== primaryTarget);
 
   return (
@@ -155,6 +164,11 @@ export function PurchaseOrderActions({
           <DropdownMenuItem onSelect={() => void regenerate()}>
             <RotateCcw /> Přegenerovat PDF
           </DropdownMenuItem>
+          {canReceive && next !== "prevzit" && next !== "prevzit_zbytek" && (
+            <DropdownMenuItem onSelect={() => setDialog("receive")}>
+              <PackageOpen /> Převzít zboží po položkách…
+            </DropdownMenuItem>
+          )}
           {menuTransitions.length > 0 && <DropdownMenuSeparator />}
           {menuTransitions.map((t) => {
             const Icon = TRANSITION_ICONS[t];
@@ -164,7 +178,7 @@ export function PurchaseOrderActions({
                 onSelect={() => runTransition(t)}
                 className={t === "zrusena" ? "text-red-600 focus:text-red-700 dark:text-red-400 [&_svg]:text-red-600" : undefined}
               >
-                <Icon /> {TRANSITION_LABELS[t]}
+                <Icon /> {t === "dodana" && canReceive ? "Dodáno k nám — přišlo vše" : t === "zrusena" ? "Zrušit objednávku…" : TRANSITION_LABELS[t]}
               </DropdownMenuItem>
             );
           })}
@@ -185,25 +199,23 @@ export function PurchaseOrderActions({
         notify={notify}
         onDone={onChanged}
       />
-      <ConfirmDialog
+      <CancelPurchaseOrderDialog
         open={dialog === "cancel"}
         onOpenChange={(o) => setDialog(o ? "cancel" : null)}
-        icon={Ban}
-        tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
-        title={`Zrušit objednávku ${order.number}?`}
-        confirmLabel="Zrušit objednávku"
-        confirmVariant="destructive"
-        onConfirm={async () => {
-          const res = await updatePurchaseOrder(order.id, { status: "zrusena" });
-          if (!res.ok) return res.error ?? "Objednávku se nepodařilo zrušit.";
-          notify("success", `Objednávka ${order.number} zrušena — do nákladů se už nepočítá.`);
-          onChanged();
-          return null;
-        }}
-      >
-        Zrušená objednávka se nezapočítává do nákupu zakázky — marže a provize se přepočítají.
-        {order.sentAt ? " Dodavateli to dej vědět — objednávka už odešla." : ""}
-      </ConfirmDialog>
+        order={order}
+        notify={notify}
+        onDone={onChanged}
+      />
+      {canReceive && (
+        <ReceivePurchaseOrderDialog
+          open={dialog === "receive"}
+          onOpenChange={(o) => setDialog(o ? "receive" : null)}
+          order={{ id: order.id, number: order.number, supplierName }}
+          items={order.items}
+          notify={notify}
+          onDone={onChanged}
+        />
+      )}
     </div>
   );
 }

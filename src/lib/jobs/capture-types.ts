@@ -155,6 +155,8 @@ export interface CaptureResult {
   autoApplied?: boolean;
   /** Dílčí problémy, které uložení neshodily (např. nepřiložená stránka). */
   warnings?: string[];
+  /** Co doklad udělal s podrobnými stavy (revize objednávky, rozpor, dodáno částečně…). */
+  flowNotes?: string[];
 }
 
 /** Mapování druhu dokladu na druh souboru zakázky. */

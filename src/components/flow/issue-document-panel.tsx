@@ -55,7 +55,7 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [warning, setWarning] = React.useState<string | null>(null);
-  const [done, setDone] = React.useState<{ fileId: string; filename: string; number: string; version: number; kind: JobDocumentKind; jobId: string } | null>(null);
+  const [done, setDone] = React.useState<{ fileId: string; filename: string; number: string; version: number; kind: JobDocumentKind; jobId: string; sentTo?: string } | null>(null);
   const [sending, setSending] = React.useState(false);
 
   const job = jobs.find((j) => j.id === jobId) ?? null;
@@ -180,6 +180,7 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
           <p className="min-w-0 flex-1">
             Hotovo: <span className="font-semibold">{ISSUABLE_KINDS.find((k) => k.kind === done.kind)?.label} {done.number}</span>
             {done.version > 1 ? ` (verze ${done.version}, starší je v archivu)` : ""} — uloženo v Dokumentech zakázky.
+            {done.sentTo && <> <strong>Odesláno na {done.sentTo}.</strong></>}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">
@@ -188,7 +189,7 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
               </a>
             </Button>
             <Button type="button" size="sm" variant="send" onClick={() => setSending(true)}>
-              <Send className="h-4 w-4" /> Poslat zákazníkovi
+              <Send className="h-4 w-4" /> {done.sentTo ? "Poslat znovu" : "Poslat zákazníkovi"}
             </Button>
           </div>
         </div>
@@ -217,8 +218,9 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
           fileId={done.fileId}
           filename={done.filename}
           title={`Poslat ${ACCUSATIVE[done.kind]} ${done.number} zákazníkovi`}
-          onSent={() => {
+          onSent={({ to }) => {
             setSending(false);
+            setDone((d) => (d ? { ...d, sentTo: to } : d));
             router.refresh();
           }}
         />

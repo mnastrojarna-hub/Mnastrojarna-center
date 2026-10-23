@@ -15,9 +15,9 @@ import {
 } from "@/lib/data/purchasing";
 import { registerJobFile } from "@/app/actions/job-files";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
-import { isForward, isJobStage, stageRank } from "@/lib/jobs/stages";
+import { isJobStage } from "@/lib/jobs/stages";
 import {
-  cleanDate, cleanText, describeChanges, diffJob, fieldEventMessage, isUuid, jobFilePath, stageEventMessage,
+  cleanDate, cleanText, describeChanges, diffJob, fieldEventMessage, isUuid, jobFilePath,
   translateDbError, type JobChange,
 } from "@/lib/jobs/mapping";
 import {
@@ -29,9 +29,12 @@ import {
 } from "@/lib/jobs/purchasing";
 import type {
   JobCommissionView, PurchaseItem, PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseOrderMail,
-  PurchaseOrderPatch, PurchaseOrderView, SupplierQuoteInput, SupplierQuoteView,
+  PurchaseOrderPatch, PurchaseOrderView, PurchaseReceiptInput, SupplierQuoteInput, SupplierQuoteView,
 } from "@/lib/jobs/purchasing-types";
-import { findOrCreateSupplierByParty, insertSupplierQuote, isOurParty, selectWinningQuoteCore } from "@/lib/jobs/purchasing-store";
+import {
+  applyPurchaseDelivered, findOrCreateSupplierByParty, insertSupplierQuote, isOurParty, receivePurchaseItems, selectWinningQuoteCore,
+} from "@/lib/jobs/purchasing-store";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { renderPurchaseOrderPdf } from "@/lib/pdf/render-purchase";
 import { buildPurchaseOrderDoc } from "@/lib/pdf/purchase-docs";
@@ -63,7 +66,7 @@ async function begin(): Promise<Ctx | { error: string }> {
   if (!isSupabaseConfigured()) return { error: "Supabase není nakonfigurováno." };
   const access = await checkFeature("margins");
   if ("error" in access) return { error: access.error };
-  const db = await createOperatorClient();
+  const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user };
 }
 
@@ -654,6 +657,8 @@ export async function updatePurchaseOrder(
     if (to !== from) {
       if (!canChangePurchaseOrderStatus(from, to)) return fail(`Stav nelze změnit z „${statusLabel(from)}" na „${statusLabel(to)}".`);
       row.status = to;
+      if (to === "zrusena") row.cancel_reason = cleanText(patch.cancelReason, 500);
+      if (from === "zrusena") row.cancel_reason = null;
       if (to === "odeslana" && !po.sentAt) row.sent_at = new Date().toISOString();
       if (to === "potvrzena" && !("confirmed_date" in row) && !po.confirmedDate && po.requiredDate) {
         // bez zadaného termínu dodavatel potvrdil požadovaný
@@ -679,7 +684,8 @@ export async function updatePurchaseOrder(
     if ("supplier_reference" in row && row.supplier_reference) parts.push(`potvrzení č. ${row.supplier_reference as string}`);
     if ("required_date" in row) parts.push(row.required_date ? `požadovaný termín ${czDate(row.required_date as string)}` : "požadovaný termín smazán");
     if (newRows) parts.push(`položky (${newRows.length})`);
-    const rest = Object.keys(row).filter((k) => !["status", "sent_at", "confirmed_date", "supplier_reference", "required_date", "total"].includes(k));
+    if (to === "zrusena" && row.cancel_reason) parts.push(`důvod: ${row.cancel_reason as string}`);
+    const rest = Object.keys(row).filter((k) => !["status", "sent_at", "confirmed_date", "supplier_reference", "required_date", "total", "cancel_reason"].includes(k));
     if (rest.length) parts.push("podmínky / poznámka");
     await logJobEvent(db, {
       jobId: po.jobId, type: "field",
@@ -700,25 +706,11 @@ export async function updatePurchaseOrder(
         const err = await patchJob(c, po.jobId, job, { supplier_promised_date: confirmed }, {}, { purchaseOrderId: id });
         if (err) return fail(err);
       }
-      if (to === "dodana" && from !== "dodana" && isJobStage(job.status) && isForward(job.status, "dodano_k_nam")) {
-        const all = await fetchPurchaseOrders(db, po.jobId);
-        const pending = all.filter((o) => o.id !== id && o.status !== "zrusena" && o.status !== "dodana");
-        if (!pending.length) {
-          const { error } = await db.from("orders").update({ status: "dodano_k_nam" } as never).eq("id", po.jobId);
-          if (error) return fail(error.message);
-          await logJobEvent(db, {
-            jobId: po.jobId, type: "stage",
-            message: stageEventMessage(job.status, "dodano_k_nam", `objednávka ${po.number} dodána`),
-            data: { from: job.status, to: "dodano_k_nam", purchaseOrderId: id }, actorId: user.id,
-          });
-          stage = "dodano_k_nam";
-          hint = "Zakázka přesunuta do stavu Dodáno k nám.";
-        } else {
-          hint = `Čeká se ještě na ${pending.length} ${pending.length === 1 ? "objednávku" : pending.length < 5 ? "objednávky" : "objednávek"} — stav zakázky zůstává.`;
-        }
-      } else if (to === "dodana" && isJobStage(job.status) && stageRank(job.status) < 0) {
-        hint = "Zakázka je ve zvláštním stavu — posuň ji ručně.";
-      }
+    }
+    if (to === "dodana" && from !== "dodana") {
+      const eff = await applyPurchaseDelivered(db, user.id, { id, jobId: po.jobId, number: po.number }, { markItems: true });
+      if (eff.stage) stage = eff.stage;
+      if (eff.hint) hint = [hint, eff.hint].filter(Boolean).join(" ");
     }
 
     // PDF přegenerovat, dokud objednávka neodešla a změnil se její obsah
@@ -737,6 +729,56 @@ export async function updatePurchaseOrder(
     });
     revalidatePurchasing(po.jobId);
     return { ok: true, ...(hint ? { hint } : {}), ...(fileId !== undefined ? { fileId } : {}), ...(stage ? { stage } : {}) };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Převzetí zboží od dodavatele po položkách (celkové převzaté množství, volitelně uzavření
+ * s menším množstvím + důvod). Převzato vše → objednávka „Dodána" a dopady do zakázky (2.7).
+ * Kdo převzal zapíše DB do received_changed_by; do historie jdou jen množství, nikdy ceny.
+ */
+export async function setPurchaseReceived(
+  id: string,
+  receipts: PurchaseReceiptInput[],
+  opts: { note?: string } = {},
+): Promise<ActionResult<{ complete: boolean; done: number; total: number; hint?: string; stage?: JobStage }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(PO_NOT_FOUND);
+  if (!Array.isArray(receipts) || !receipts.length || receipts.length > 300) return fail("Zadej převzaté množství.");
+  if (receipts.some((r) => !r || !isUuid(r.itemId))) return fail("Položka nepatří k této objednávce.");
+  const note = cleanText(opts.note, 500);
+  try {
+    const { db, user } = c;
+    const po = await fetchPurchaseOrder(db, id);
+    if (!po) return fail(PO_NOT_FOUND);
+    if (po.status === "zrusena") return fail("Zrušená objednávka se nepřebírá — nejdřív ji obnov.");
+    if (po.status === "navrh") return fail("Objednávka je teprve návrh — vystav ji a pošli dodavateli.");
+    const res = await receivePurchaseItems(db, id, receipts);
+    if (!res.ok) return fail(res.error);
+    if (res.changed) {
+      const supplier = po.supplier?.name ?? "dodavatel";
+      await logJobEvent(db, {
+        jobId: po.jobId, type: "field",
+        message: `Objednávka ${po.number} (${supplier}): převzato ${res.done}/${res.total} ${res.total === 1 ? "položky" : "položek"} — ${res.lines.join("; ")}${note ? ` — ${note}` : ""}`.slice(0, 1900),
+        data: { purchaseOrderId: id, number: po.number, receipt: true, fields: ["received_quantity"] },
+        actorId: user.id, entity: "purchase_order", entityId: id,
+      });
+    }
+    let hint: string | undefined;
+    let stage: JobStage | undefined;
+    if (res.complete && po.status !== "dodana") {
+      const up = await updatePurchaseOrder(id, { status: "dodana" });
+      if (!up.ok) return fail(up.error ?? "Objednávku se nepodařilo označit jako dodanou.");
+      hint = up.hint;
+      stage = up.stage;
+    } else if (!res.complete) {
+      hint = `Převzato ${res.done}/${res.total} položek — objednávka čeká na zbytek.`;
+    }
+    revalidatePurchasing(po.jobId);
+    return { ok: true, complete: res.complete, done: res.done, total: res.total, ...(hint ? { hint } : {}), ...(stage ? { stage } : {}) };
   } catch (err) {
     return fail(err);
   }

@@ -197,6 +197,49 @@ async function copyAttachments(db: JobsDb, emailId: string, jobId: string, actor
 }
 
 /**
+ * Přiřadí e-mail k existující zakázce (stejné číslo objednávky zákazníka — žádná duplicitní
+ * zakázka). Přílohy se zkopírují do Dokumentů zakázky; do historie se zapíše, kdo přiřadil.
+ */
+export async function linkEmailToJob(emailId: string, jobId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return fail("Supabase není nakonfigurováno.");
+  const access = await checkFeature("orders");
+  if ("error" in access) return fail(access.error);
+  if (!isUuidLike(emailId)) return fail(NOT_FOUND);
+  if (!isUuidLike(jobId)) return fail("Zakázka nenalezena.");
+  const { user } = access;
+  try {
+    const found = await getVisibleEmailRow<{ id: string; subject: string | null; order_id: string | null }>(emailId, "id, subject, order_id");
+    if (!found) return fail(NOT_FOUND);
+    if (found.row.order_id) return found.row.order_id === jobId ? { ok: true } : fail("E-mail už patří k jiné zakázce.");
+    const db = await createOperatorClient();
+    const { data: job } = await db.from("orders").select("id, number").eq("id", jobId).maybeSingle();
+    if (!job) return fail("Zakázka nenalezena.");
+    const { data: linked, error } = await db.from("emails").update({ order_id: jobId } as never)
+      .eq("id", emailId).is("order_id", null).select("id");
+    if (error) return fail(error.message);
+    if (!linked || !(linked as unknown[]).length) return fail("E-mail mezitím přiřadil někdo jiný — obnov stránku.");
+    const subject = (found.row.subject ?? "").trim() || "(bez předmětu)";
+    await logJobEvent(db, {
+      jobId, type: "email", message: `Přiřazen e-mail „${subject.slice(0, 200)}“`,
+      data: { emailId, action: "linked" }, actorId: user.id,
+    });
+    const files = await copyAttachments(db, emailId, jobId, user.id);
+    if (files > 0) {
+      await logJobEvent(db, {
+        jobId, type: "file", message: files === 1 ? "Přiložena příloha e-mailu" : `Přiloženo ${files} příloh e-mailu`,
+        data: { emailId, count: files }, actorId: user.id,
+      });
+    }
+    await logAudit({ action: "email_linked_to_job", entity: "emails", entityId: emailId, diff: { jobId } });
+    for (const p of ["/orders", "/inbox", "/inquiries", "/confirmations"]) revalidatePath(p);
+    revalidatePath(`/orders/${jobId}`);
+    return { ok: true };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
  * Založí zakázku z e-mailu (Poptávka, u objednávky/potvrzení stav Objednávka)
  * a propojí ji s e-mailem. Už propojený e-mail vrátí existující zakázku.
  */

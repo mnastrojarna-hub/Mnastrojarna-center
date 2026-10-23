@@ -1,6 +1,25 @@
 {
   "extends": "next/core-web-vitals",
   "rules": {
-    "@next/next/no-img-element": "off"
+    "@next/next/no-img-element": "off",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Program > VariableDeclaration > VariableDeclarator[init.callee.name=/^create(Admin|Operator)Client$/]",
+        "message": "Klient Supabase vytvářej pro každé volání (nese autora změny v hlavičkách) — nikdy ho nesdílej v modulu."
+      },
+      {
+        "selector": "Program > VariableDeclaration > VariableDeclarator[init.argument.callee.name=/^create(Admin|Operator)Client$/]",
+        "message": "Klient Supabase vytvářej pro každé volání (nese autora změny v hlavičkách) — nikdy ho nesdílej v modulu."
+      },
+      {
+        "selector": "Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[init.callee.name=/^create(Admin|Operator)Client$/]",
+        "message": "Klient Supabase vytvářej pro každé volání (nese autora změny v hlavičkách) — nikdy ho nesdílej v modulu."
+      },
+      {
+        "selector": "Program:has(> ExpressionStatement[directive='use client']) ImportDeclaration[source.value='@/lib/supabase/server']",
+        "message": "Servisní klíč patří jen na server — v klientské komponentě (\"use client\") server.ts neimportuj."
+      }
+    ]
   }
 }

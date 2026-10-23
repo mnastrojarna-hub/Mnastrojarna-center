@@ -98,8 +98,10 @@ describe("odznaky", () => {
     expect(renderToString(<OrderStatusBadge status="objednavka" />)).toContain("Objednávka");
     expect(renderToString(<OrderStatusBadge status="Ve výrobě" />)).toContain("bg-yellow-100");
     expect(renderToString(<OrderStatusBadge status="Neznámý" />)).toContain("Neznámý");
-    expect(renderToString(<QuoteStatusBadge status="ke_schvaleni" />)).toContain("Ke schválení");
-    expect(renderToString(<QuoteStatusBadge status="Přijato" />)).toContain("bg-green-100");
+    // stavy nabídky = QUOTE_STATES (lib/jobs/flow-status)
+    expect(renderToString(<QuoteStatusBadge status="ke_schvaleni" />)).toContain("Čeká na schválení");
+    expect(renderToString(<QuoteStatusBadge status="Přijato" />)).toContain("bg-violet-700");
+    expect(renderToString(<QuoteStatusBadge status="odeslano" state="vyprsela" />)).toContain("Vypršela platnost");
     expect(renderToString(<QuoteStatusBadge status="odeslano" archived />)).toContain("Archiv");
     expect(renderToString(<CategoryBadge category="Poptávka" />)).toContain("bg-sky-50");
   });

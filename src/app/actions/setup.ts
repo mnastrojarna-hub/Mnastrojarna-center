@@ -6,6 +6,7 @@ import { canModifySetup, superAdminExists } from "@/lib/setup/guard";
 import { checkSchemaTables, type SchemaCheck } from "@/lib/setup/status";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient, createClient, hasServiceKey } from "@/lib/supabase/server";
+import { resolveRequestActor } from "@/lib/supabase/actor";
 
 const GUARD_ERROR = "Systém už je nastaven — změny smí provádět jen přihlášený super admin.";
 
@@ -167,7 +168,8 @@ export async function createSuperAdmin(input: {
   }
   if (!(await canModifySetup())) return { ok: false, error: GUARD_ERROR };
 
-  const db = createAdminClient();
+  // zakládá prvního super admina — autor je přihlášený (pokud je), jinak „Systém"
+  const db = createAdminClient({ actor: await resolveRequestActor() });
 
   const { data: created, error: createError } = await db.auth.admin.createUser({
     email,

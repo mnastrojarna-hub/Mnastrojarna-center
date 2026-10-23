@@ -131,6 +131,19 @@ export interface Drawing {
   job_file_id: string | null;
   title: string | null;
   job_id: string | null;
+  // Materiál, hmotnost a úpravy z výkresu (migrace 20261023130000) — viz DrawingMaterialColumns
+  material_group: string | null;
+  material_designation: string | null;
+  weight_kg: number | null;
+  blank_weight_kg: number | null;
+  blank_dims: string | null;
+  blank_shape: string | null;
+  heat_treatment: string | null;
+  surface_treatment: string | null;
+  hardness: string | null;
+  drawing_notes: string | null;
+  weight_source: WeightSource | null;
+  material_condition: string | null;
 }
 
 export interface Quote {
@@ -165,6 +178,27 @@ export interface Quote {
   payment_terms: string | null;
   archived: boolean;
   storage_path: string | null;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  /** Odvozený stav (jen pro čtení — plní trigger). */
+  state: QuoteState;
+  state_changed_at: string | null;
+  state_changed_by: string | null;
+  state_changed_via: ChangeVia | null;
+  /** Nutné schválit před odesláním (jen pro čtení — trigger). */
+  approval_required: boolean;
+  approval_requested_at: string | null;
+  approval_requested_by: string | null;
+  sent_by: string | null;
+  sent_via: ChangeVia | null;
+  accepted_at: string | null;
+  accepted_by: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
+  lost_reason: LostReason | null;
+  competitor_price: number | null;
+  feedback_at: string | null;
+  superseded_by: string | null;
+  updated_by: string | null;
 }
 
 export interface QuoteItem {
@@ -257,6 +291,62 @@ export interface Order {
   invoice_due_date: string | null;
   /** Idempotence dávkového focení ("<captureId>:<groupKey>"). */
   capture_key: string | null;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  /** null = bez poptávky (rovnou objednávka). */
+  inquiry_status: InquiryStatus | null;
+  inquiry_status_changed_at: string | null;
+  inquiry_status_changed_by: string | null;
+  inquiry_status_changed_via: ChangeVia | null;
+  waiting_since: string | null;
+  waiting_note: string | null;
+  /** null = objednávka zatím není. */
+  order_status: OrderDocStatus | null;
+  order_status_changed_at: string | null;
+  order_status_changed_by: string | null;
+  order_status_changed_via: ChangeVia | null;
+  order_mismatch: OrderMismatch | null;
+  /** Poslední revize objednávky přijatá od zákazníka (0 = žádná). */
+  order_revision: number;
+  /** Revize, kterou jsme přijali (potvrdili). */
+  order_confirmed_revision: number | null;
+  order_changed_at: string | null;
+  order_changed_by: string | null;
+  confirmed_by: string | null;
+  confirmation_issued_at: string | null;
+  confirmation_issued_by: string | null;
+  confirmation_issued_revision: number | null;
+  confirmation_sent_at: string | null;
+  confirmation_sent_by: string | null;
+  confirmation_sent_via: ChangeVia | null;
+  confirmation_sent_revision: number | null;
+  lost_reason: LostReason | null;
+  lost_note: string | null;
+  lost_at: string | null;
+  lost_by: string | null;
+  flow_proposal: FlowProposal | null;
+  flow_proposal_at: string | null;
+  flow_proposal_by: string | null;
+  stage_changed_by: string | null;
+  stage_changed_via: ChangeVia | null;
+  stage_change_cause: FlowCause | null;
+  stage_change_note: string | null;
+  updated_by: string | null;
+  delivery_note_confirmed_by: string | null;
+  invoiced_by: string | null;
+  invoice_sent_at: string | null;
+  invoice_sent_by: string | null;
+  paid_by: string | null;
+  /** Σ evidovaných úhrad (bez DPH). */
+  paid_so_far: number;
+  items_count: number;
+  items_priced: number;
+  /** Položky dodané nebo uzavřené s menším množstvím. */
+  items_delivered: number;
+  items_partial: number;
+  last_delivery_at: string | null;
+  partial_delivery_note: string | null;
+  partial_delivery_at: string | null;
+  partial_delivery_by: string | null;
 }
 
 /** Výrobní operace zakázky (migrace 0022). */
@@ -279,6 +369,12 @@ export interface JobOperationRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  // (volitelné: řádky z fixture testů výroby je nemají)
+  status_changed_at?: string | null;
+  status_changed_by?: string | null;
+  status_changed_via?: ChangeVia | null;
+  updated_by?: string | null;
 }
 
 export interface OrderItem {
@@ -300,6 +396,30 @@ export interface OrderItem {
   created_at: string;
   /** Idempotence dávkového focení. */
   capture_key: string | null;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  delivered_quantity: number;
+  delivered_changed_at: string | null;
+  delivered_changed_by: string | null;
+  /** Uzavřeno s menším množstvím (zmetky, zákazník přijal méně). */
+  delivery_closed: boolean;
+  delivery_closed_reason: string | null;
+  delivery_closed_at: string | null;
+  delivery_closed_by: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  // Materiál, hmotnost a úpravy z výkresu (migrace 20261023130000) — viz DrawingMaterialColumns
+  material_group: string | null;
+  material_designation: string | null;
+  weight_kg: number | null;
+  blank_weight_kg: number | null;
+  blank_dims: string | null;
+  blank_shape: string | null;
+  heat_treatment: string | null;
+  surface_treatment: string | null;
+  hardness: string | null;
+  drawing_notes: string | null;
+  weight_source: WeightSource | null;
+  material_condition: string | null;
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
@@ -326,6 +446,14 @@ export interface JobFileRow {
   order_item_id: string | null;
   capture_id: string | null;
   content_sha256: string | null;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  origin: JobFileOrigin | null;
+  issuer: DocIssuerKey | null;
+  /** Revize objednávky, kterou náš doklad pokrývá. */
+  order_revision: number | null;
+  archived_at: string | null;
+  archived_by: string | null;
+  updated_by: string | null;
 }
 
 /** Záznam historie zakázky. */
@@ -337,6 +465,15 @@ export interface JobEventRow {
   data: Record<string, unknown>;
   actor_id: string | null;
   created_at: string;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  actor_kind: ActorKind;
+  /** Jméno autora v době zápisu (přežije smazání účtu). */
+  actor_name: string | null;
+  via: ChangeVia | null;
+  agent: string | null;
+  entity: string;
+  entity_id: string | null;
+  request_id: string | null;
 }
 
 export interface AiTrainingExample {
@@ -363,16 +500,29 @@ export interface PasswordResetCode {
   created_at: string;
 }
 
-/** Připojení schránky — servery příchozí (IMAP) a odchozí (SMTP) pošty, příp. Graph. */
+/**
+ * Připojení schránky — příchozí server (`imap_*` platí i pro POP3 při `incoming_protocol: "pop3"`),
+ * odchozí SMTP, příp. Graph. Viz src/lib/email/mail-config.ts.
+ */
 export interface MailboxConfig {
+  /** Předvolba poskytovatele: hosting90 | gmail | m365 | other. */
+  preset?: "hosting90" | "gmail" | "m365" | "other";
+  /** Protokol příchozí pošty (výchozí IMAP). */
+  incoming_protocol?: "imap" | "pop3";
   imap_host?: string;
   imap_port?: number;
   imap_user?: string;
   imap_password?: string;
+  /** Šifrování příchozího spojení (výchozí podle portu: 993/995 TLS, 143/110 STARTTLS). */
+  imap_tls?: "tls" | "starttls";
+  /** Šifrovat, ale neověřovat jméno v certifikátu — jen po výslovném souhlasu. */
+  imap_skip_name_check?: boolean;
   smtp_host?: string;
   smtp_port?: number;
   smtp_user?: string;
   smtp_password?: string;
+  smtp_tls?: "tls" | "starttls";
+  smtp_skip_name_check?: boolean;
   ms_graph_client_id?: string;
   ms_graph_client_secret?: string;
   ms_graph_tenant_id?: string;
@@ -389,6 +539,37 @@ export interface Mailbox {
   created_at: string;
   /** Vlastník schránky — jen on (a super admin) vidí její poštu (migrace 0019). */
   owner_id: string | null;
+  /** Stav stahování a posledního testu (tabulka mailbox_status) — jen pro UI. */
+  status?: MailboxStatus | null;
+  /** Která hesla jsou uložená (samotná hesla se do prohlížeče nikdy neposílají). */
+  secrets_set?: { imap_password: boolean; smtp_password: boolean; ms_graph_client_secret: boolean };
+  updated_by?: string | null;
+}
+
+/** Stav schránky (migrace 20261023120000_schranky_diagnostika) — mimo `mailboxes`, aby stahování nepřepisovalo autora nastavení. */
+export interface MailboxStatus {
+  mailbox_id: string;
+  last_sync_attempt_at: string | null;
+  last_sync_ok_at: string | null;
+  last_sync_error: string | null;
+  /** Druh poslední chyby stažení (classifyMailError: auth, timeout, tls_…); null = OK. */
+  last_sync_error_kind?: string | null;
+  /** Otisk přihlašovacích údajů při odmítnutém hesle (credentialFingerprint) — automatika se do změny nepřihlašuje. */
+  last_sync_auth_fp?: string | null;
+  last_sync_fetched: number | null;
+  last_sync_new: number | null;
+  /** Kolik nových zpráv na serveru ještě čeká (časový limit / limit dávky). */
+  last_sync_remaining: number | null;
+  last_test_at: string | null;
+  last_test_ok: boolean | null;
+  last_test_error: string | null;
+  /** Kroky posledního testu (bez hesel). */
+  last_test: Record<string, unknown> | null;
+  last_test_by: string | null;
+  /** Stav inkrementálního stahování (IMAP UIDVALIDITY/UID, POP3 UIDL). */
+  sync_state: Record<string, unknown>;
+  sync_lock_until: string | null;
+  updated_at: string;
 }
 
 export interface Email {
@@ -540,6 +721,10 @@ export interface SupplierQuoteRow {
   // migrace capture_batch
   capture_id: string | null;
   capture_doc_id: string | null;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  selected_at: string | null;
+  selected_by: string | null;
+  updated_by: string | null;
 }
 
 export interface SupplierQuoteItemRow {
@@ -578,6 +763,20 @@ export interface PurchaseOrderRow {
   sent_at: string | null;
   created_at: string;
   updated_at: string;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  status_changed_at: string | null;
+  status_changed_by: string | null;
+  status_changed_via: ChangeVia | null;
+  sent_by: string | null;
+  /** Kdy zapsáno potvrzení (≠ confirmed_date = termín). */
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  delivered_at: string | null;
+  delivered_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+  updated_by: string | null;
 }
 
 export interface PurchaseOrderItemRow {
@@ -591,6 +790,13 @@ export interface PurchaseOrderItemRow {
   unit: string;
   unit_price: number | null;
   note: string | null;
+  // Podrobné stavy toku + atribuce (migrace 20261023100000)
+  received_quantity: number;
+  received_changed_at: string | null;
+  received_changed_by: string | null;
+  receipt_closed: boolean;
+  receipt_closed_reason: string | null;
+  order_item_id: string | null;
 }
 
 export interface KnowledgeDocument {
@@ -740,6 +946,7 @@ export interface Database {
       orders: Tbl<Order>;
       order_items: Tbl<OrderItem>;
       mailboxes: Tbl<Mailbox>;
+      mailbox_status: Tbl<MailboxStatus>;
       emails: Tbl<Email>;
       automation_settings: Tbl<AutomationSetting>;
       approval_queue: Tbl<ApprovalItemRow>;
@@ -765,8 +972,12 @@ export interface Database {
       capture_sessions: Tbl<CaptureSessionRow>;
       capture_doc_extracts: Tbl<CaptureDocExtractRow>;
       capture_apply_steps: Tbl<CaptureApplyStepRow>;
+      job_payments: Tbl<JobPaymentRow>;
+      job_order_revisions: Tbl<JobOrderRevisionRow>;
     };
-    Views: Record<string, never>;
+    Views: {
+      job_flow_v: { Row: JobFlowRow; Relationships: [] };
+    };
     Functions: {
       next_doc_number: { Args: { p_prefix: string }; Returns: string };
       next_job_number: { Args: Record<string, never>; Returns: string };
@@ -775,6 +986,20 @@ export interface Database {
       recompute_job_commission: { Args: { p_job: string }; Returns: undefined };
       capture_try_lock: { Args: { p_capture: string; p_user: string; p_token: string; p_ttl_seconds: number }; Returns: boolean };
       capture_unlock: { Args: { p_capture: string; p_token: string }; Returns: undefined };
+      app_whoami: { Args: Record<string, never>; Returns: Record<string, unknown> };
+      flow_counts: {
+        Args: { p_owner?: string | null; p_closed_days?: number };
+        Returns: { flow_phase: string; flow_key: string; n: number }[];
+      };
+      flow_register_order_change: {
+        Args: { p_job: string; p_note?: string | null; p_file?: string | null; p_changes?: Json | null; p_customer_order_number?: string | null };
+        Returns: number;
+      };
+      flow_decide_order_change: { Args: { p_job: string; p_accept: boolean; p_note?: string | null }; Returns: undefined };
+      flow_reject_quote: {
+        Args: { p_quote: string; p_reason: string; p_note?: string | null; p_competitor_price?: number | null; p_close_job?: boolean };
+        Returns: JobStage;
+      };
     };
     Enums: {
       user_role: UserRole;
@@ -785,3 +1010,116 @@ export interface Database {
     };
   };
 }
+
+// ── Podrobné stavy obchodního toku + „kdo to udělal" (migrace 20261023100000) ──
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type InquiryStatus = "prijata" | "v_reseni" | "ceka_na_podklady" | "zpracovana" | "odmitnuta" | "stazena";
+export type OrderDocStatus = "dorucena" | "rozpor" | "potvrzena" | "aktualizovana" | "stornovana";
+export type QuoteState = "rozpracovana" | "ke_schvaleni" | "schvalena" | "odeslana" | "pripominky"
+  | "prijata" | "zamitnuta" | "archivovana";
+export type LostReason = "nevyrabime" | "kapacita" | "nevyplati_se" | "duplicita" | "cena" | "termin"
+  | "jiny_dodavatel" | "projekt_zrusen" | "bez_odezvy" | "zakaznik_stahl" | "jine" | "neuvedeno";
+export type ChangeVia = "rucne" | "ai" | "foto" | "email" | "automaticky" | "import" | "cron" | "rest" | "db";
+export type ActorKind = "user" | "ai" | "system";
+export type FlowCause = "vyroba" | "platba" | "nabidka" | "dodani" | "poptavka" | "objednavka" | "obnoveni"
+  | "podklady" | "potvrzeni" | "uzavreni" | "prijeti";
+export type OrderRevisionDecision = "ceka" | "prijata" | "odmitnuta";
+export type JobFileOrigin = "generated" | "upload" | "capture" | "email" | "import";
+export type DocIssuerKey = "my" | "zakaznik" | "dodavatel";
+
+export type OrderMismatchKind = "cena" | "mnozstvi" | "revize_vykresu" | "termin" | "chybi_polozka" | "polozka_navic"
+  | "platebni_podminky" | "jine";
+
+/** Rozpor objednávky s nabídkou (orders.order_mismatch). */
+export interface OrderMismatch {
+  items: { kind: OrderMismatchKind; label: string; quote?: string | null; order?: string | null }[];
+  source: "ai" | "rucne";
+  detected_at: string;
+  fix_requested_at?: string | null;
+  resolved?: { decision: "prijato_jak_je" | "opraveno"; at: string; by: string | null } | null;
+}
+
+/** Návrh změny dílčího stavu (orders.flow_proposal) — zaměstnanec / AI navrhne, rozhodne člověk s právem. */
+export interface FlowProposal {
+  phase: "inquiry" | "order" | "quote";
+  to: string;
+  quoteId?: string;
+  reason?: LostReason;
+  note?: string;
+  kind: "user" | "ai";
+  agent?: string;
+  label: string;
+  confidence?: number;
+  by?: string | null;
+}
+
+/** Úhrada zakázky (bez DPH; amount null = celá / zbývající částka). */
+export interface JobPaymentRow {
+  id: string;
+  job_id: string;
+  paid_on: string;
+  amount: number | null;
+  /** Úhrada zakázku vyrovnává („Zaplaceno"). */
+  settles: boolean;
+  note: string | null;
+  recorded_by: string | null;
+  recorded_name: string | null;
+  via: ChangeVia;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Revize objednávky zákazníka (změna potvrzené objednávky). */
+export interface JobOrderRevisionRow {
+  id: string;
+  job_id: string;
+  revision: number;
+  customer_order_number: string | null;
+  file_id: string | null;
+  changes: { field: string; label: string; from: unknown; to: unknown }[] | null;
+  note: string | null;
+  decision: OrderRevisionDecision;
+  decided_at: string | null;
+  decided_by: string | null;
+  decision_note: string | null;
+  created_by: string | null;
+  created_via: string | null;
+  created_at: string;
+}
+
+/** Řádek view job_flow_v — odvozené dílčí stavy (zrcadlo v src/lib/jobs/flow-status.ts). */
+export interface JobFlowRow {
+  id: string;
+  number: string | null;
+  status: JobStage;
+  owner_id: string | null;
+  assignee_id: string | null;
+  customer_id: string | null;
+  stage_changed_at: string;
+  stage_rank: number;
+  inquiry_key: InquiryStatus | null;
+  pricing_key: "ceka" | "ceka_na_dodavatele" | "rozpracovano" | "naceneno" | null;
+  quote_id: string | null;
+  quote_number: string | null;
+  quote_revision: number | null;
+  quote_ai: boolean | null;
+  quote_approval_required: boolean | null;
+  quote_key: QuoteState | "vyprsela" | null;
+  order_key: OrderDocStatus | null;
+  fulfilment_key: "ve_vyrobe" | "castecne_dodana" | "dokoncena" | null;
+  confirmation_key: "k_vystaveni" | "vystaveno" | "odeslano" | "bez_dokladu" | null;
+  delivery_key: "k_expedici" | "castecne" | "dodano" | "dl_potvrzen" | null;
+  payment_key: "ceka_na_uhradu" | "castecne_zaplaceno" | "po_splatnosti" | "zaplaceno" | null;
+  waiting_days: number | null;
+  has_proposal: boolean;
+  items_count: number;
+  items_delivered: number;
+  items_partial: number;
+  production_done: number;
+  production_total: number;
+  paid_so_far: number;
+}
+
+/** Zdroj hmotnosti dílu (drawings / order_items.weight_source, migrace 20261023130000). */
+export type WeightSource = "vykres" | "odhad" | "rucne";

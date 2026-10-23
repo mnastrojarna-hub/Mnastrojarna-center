@@ -293,9 +293,9 @@ export function DeleteUserDialog({
           <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span>
-              Smazání je <strong>nevratné</strong>. Zakázky, nabídky a doklady zůstanou, jen u nich zmizí jméno.
-              Pokud chceš zachovat historii, uživatele raději <strong>deaktivuj</strong> — nepřihlásí se, ale nic
-              se neztratí.
+              Smazání je <strong>nevratné</strong> a jde jen u účtu bez historie změn. Účet, který už něco
+              posunul nebo změnil, <strong>deaktivuj</strong> — nepřihlásí se, ale jeho jméno zůstane u všech
+              záznamů.
             </span>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

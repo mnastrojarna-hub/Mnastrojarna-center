@@ -639,6 +639,299 @@ await T("mobil 390 px: dávka 3 dokladů bez vodorovného posunu, list stránky,
   await page.close();
 }, { mobile: true });
 
+// ── Pravidla majitele: balík = 1 zákazník, firma z razítka výkresu se ignoruje, platí objednávka ──
+/** Kontrola (první odpověď /batch/review) při přechodu na Kontrolu. */
+async function toReviewWithModel(page) {
+  const [resp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/jobs/capture/batch/review"), { timeout: 120_000 }),
+    toReview(page),
+  ]);
+  const body = await resp.json().catch(() => ({}));
+  expect(body.ok && body.review, `batch/review ok (${JSON.stringify(body).slice(0, 300)})`);
+  return body.review;
+}
+
+await T("ZIP = jeden zákazník: objednávka + naše nabídka (zákazník psán jinak) + výkres projekční firmy se 2 čísly → 1 zakázka bez dotazu", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  const zip = zipFile(`${TAG}-balik.zip`, [
+    { name: `${TAG}-zb__objednavka_zakaznik.pdf`, buffer: multiPagePdf("o.pdf", ["Objednavka PO-E2E-4471"]).buffer },
+    { name: `${TAG}-zb__nabidka_my-g4.pdf`, buffer: multiPagePdf("n.pdf", ["Nabidka NAB-E2E-1 Strojmetal Kladno"]).buffer },
+    { name: `${TAG}-zb__vykres-g4.pdf`, buffer: multiPagePdf("v.pdf", ["Vykres KN-4471-77 Projekce Novak"]).buffer },
+  ]);
+  await upload(page, [zip]);
+  await readBatch(page);
+  const cards = await sortCards(page);
+  expect(cards.length === 3, `3 doklady ze ZIPu (${JSON.stringify(cards)})`);
+  const review = await toReviewWithModel(page);
+  expect(review.groups.length === 1, `1 skupina (${review.groups.map((g) => g.label).join(" | ")})`);
+  expect(!review.warnings.some((w) => w.code === "customer_conflict"), "bez dotazu „Je to stejný zákazník?“");
+  expect(review.initial.groups[0].customerConfirmed === true, "zákazník balíku potvrzený automaticky");
+  const text = await page.getByTestId("capture-group").first().innerText();
+  expect(!/Je to stejný zákazník/.test(await captureDialog(page).innerText()), "dialog se na zákazníka neptá");
+  expect(!/Projekce Novák/.test(text), "hlavička skupiny bez projekční firmy");
+  const vk = review.docs.find((d) => d.kind === "drawing");
+  const vst = review.initial.docs[vk.docId];
+  const item1 = review.initial.groups[0].job.items.find((i) => i.drawingNumber === "4711-03");
+  expect(vst.state.link.mode === "docItem" && vst.state.link.itemKey === item1?.key, `výkres podle 2. čísla k položce 4711-03 (${JSON.stringify(vst.state.link)})`);
+  await shot(page, "capture-multi/zip-1-zakaznik");
+  const res = await saveAll(page);
+  const g = res.groups.find((x) => x.ok && x.jobId);
+  expect(res.groups.length === 1 && g && !g.customerCreated, `1 zakázka, žádný nový zákazník (${JSON.stringify(res.groups)})`);
+  expect(sql(`select customer_id from orders where id = ${q(g.jobId)}`) === STROJMETAL, "zákazník = Strojmetal (ne projekce z razítka)");
+  const itemId = sql(`select id from order_items where order_id = ${q(g.jobId)} and drawing_number = '4711-03'`);
+  const vf = jobFiles(g.jobId).find((f) => f.kind === "vykres");
+  expect(vf && vf.order_item_id === itemId, `výkres u položky 4711-03 (${vf?.order_item_id} × ${itemId})`);
+  const arch = sql(`select customer_id from drawings where job_id = ${q(g.jobId)} and drawing_number = 'KN-4471-77'`);
+  expect(arch === STROJMETAL, `archiv výkresů: zákazník zakázky (${arch})`);
+  await page.close();
+});
+
+await T("samostatný výkres (bez dokladu) → spárován s existující zakázkou podle čísla výkresu na listu", async (context) => {
+  const job = myJob("V");
+  sql(`insert into order_items (order_id, position, drawing_number, name, quantity, unit) values (${q(job.id)}, 0, 'SM-9301-A', 'Příruba', 8, 'ks')`);
+  const itemId = sql(`select id from order_items where order_id = ${q(job.id)}`);
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [pngFile(fname("vk5", "vykres-g5"), 51)]);
+  // 1 doklad → rovnou Kontrola (bez kroku Roztřídění)
+  const reviewResp = page.waitForResponse((r) => r.url().includes("/api/jobs/capture/batch/review"), { timeout: 120_000 });
+  const b = await readBatch(page, { expectSort: false });
+  if (!b.batch?.skipSort) await page.getByTestId("capture-sort-continue").click();
+  const review = (await (await reviewResp).json()).review;
+  await page.getByTestId("capture-group").first().waitFor({ timeout: 60_000 });
+  expect(review.initial.groups[0].job.targetKey === job.id, `cíl = existující zakázka (${review.initial.groups[0].job.targetKey})`);
+  expect(!review.warnings.some((w) => w.code === "target_required"), "cíl netřeba vybírat");
+  const group = page.locator(`[data-testid="capture-group"][data-target="${job.id}"]`);
+  expect(await group.count() === 1, "skupina s předvyplněnou zakázkou");
+  expect(/podle čísla výkresu SM-9301-A/.test(await captureDialog(page).innerText()), "důvod: podle čísla výkresu");
+  const author = page.getByTestId("capture-drawing-author");
+  if (await author.count()) expect(/jen informace/.test(await author.first().innerText()), "firma z razítka jen jako informace");
+  const res = await saveAll(page);
+  expect(res.groups.length === 1 && res.groups[0].jobId === job.id && !res.groups[0].created, `uloženo k zakázce ${job.number} (${JSON.stringify(res.groups)})`);
+  const vf = jobFiles(job.id).find((f) => f.kind === "vykres");
+  expect(vf && vf.order_item_id === itemId, `výkres u položky SM-9301-A (${vf?.order_item_id})`);
+  await page.close();
+});
+
+await T("objednávka na celek + naše nabídka → položky a počty z nabídky, hodnota = cena objednávky", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [pngFile(fname("cel", "objednavka_zakaznik-g6"), 61), pngFile(fname("cnab", "nabidka_my-g6"), 62)]);
+  await readBatch(page);
+  const review = await toReviewWithModel(page);
+  expect(review.groups.length === 1, "1 skupina");
+  const w = review.warnings.find((x) => x.code === "whole_order");
+  expect(w && /položky a počty převzaty z nabídky NAB-E2E-6/.test(w.message), `upozornění na objednávku na celek (${w?.message})`);
+  expect(/Objednávka je na celek/.test(await captureDialog(page).innerText()), "upozornění vidět v Kontrole");
+  const items = review.initial.groups[0].job.items.map((i) => `${i.drawingNumber}:${i.quantity}`);
+  expect(JSON.stringify(items) === JSON.stringify(["6600-01:10", "6600-02:5"]), `položky z nabídky (${items})`);
+  const res = await saveAll(page);
+  const jobId = res.groups.find((g) => g.ok && g.jobId)?.jobId;
+  const rows = (sqlJson(`select json_agg(json_build_array(drawing_number, quantity) order by position) from order_items where order_id = ${q(jobId)}`) ?? [])
+    .map(([n, qty]) => `${n}:${Number(qty)}`);
+  expect(JSON.stringify(rows) === JSON.stringify(["6600-01:10", "6600-02:5"]), `položky zakázky (${rows})`);
+  const value = Number(sql(`select value from orders where id = ${q(jobId)}`));
+  expect(value === 50000, `hodnota zakázky = cena objednávky (${value})`);
+  await page.close();
+});
+
+// ── Pravidla majitele 2: jedno nahrání = jedna zakázka, termín z nabídky, počty a názvy u výkresů ──
+/** Text hlavičky „Uloží se do …" a počet zakázek. */
+async function saveCount(page) {
+  const el = page.getByTestId("capture-save-count");
+  await el.waitFor({ timeout: 30_000 });
+  return { count: Number(await el.getAttribute("data-count")), text: await el.innerText() };
+}
+
+/** Další odpověď /batch/review po akci (rozdělit / sloučit). */
+async function reviewAfter(page, action) {
+  const [resp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/jobs/capture/batch/review"), { timeout: 120_000 }),
+    action(),
+  ]);
+  const body = await resp.json().catch(() => ({}));
+  expect(body.ok && body.review, `batch/review ok (${JSON.stringify(body).slice(0, 300)})`);
+  await page.waitForTimeout(300);
+  return body.review;
+}
+
+await T("produkční případ: objednávka 8000060875/GPO84339 + výkres + STEP + fotka + naše nabídka 136/026 (zákazník psán jinak) → JEDNA zakázka", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [
+    pngFile(fname("p6b-po", "objednavka_zakaznik-g11"), 121),
+    pngFile(fname("p6b-vk", "vykres-g11"), 122),
+    stepFile(`${TAG}-EM72231CJ0000.step`, "EM72231CJ0000"),
+    pngFile(fname("p6b-foto", "foto"), 123),
+    pngFile(fname("p6b-nab", "nabidka_my-g11"), 124),
+  ]);
+  await readBatch(page);
+  expect((await sortCards(page)).length === 5, "5 dokladů v roztřídění");
+  const review = await toReviewWithModel(page);
+  expect(review.groups.length === 1, `1 skupina (${review.groups.map((g) => `${g.label}: ${g.autoReason}`).join(" | ")})`);
+  expect(!review.warnings.some((w) => w.severity === "block"), "žádný blokující dotaz na zákazníka");
+  const sc = await saveCount(page);
+  expect(sc.count === 1 && /Uloží se do 1 zakázky/.test(sc.text), `hlavička: uloží se do 1 zakázky (${sc.text})`);
+  expect(await page.getByTestId("capture-merge-all").count() === 0, "bez tlačítka Sloučit (není co)");
+  expect(/^Uložit vše \(5\)$/.test((await page.getByTestId("capture-save").innerText()).trim()), "Uložit vše (5) bez počtu zakázek");
+  expect(review.initial.groups[0].job.stage === "objednavka", `stav objednávka (${review.initial.groups[0].job.stage})`);
+  await shot(page, "capture-multi/6b-jedna-zakazka");
+  const res = await saveAll(page);
+  const jobs = res.groups.filter((g) => g.ok && g.jobId);
+  expect(jobs.length === 1, `uložena 1 zakázka (${JSON.stringify(res.groups)})`);
+  const jobId = jobs[0].jobId;
+  const row = sqlJson(`select row_to_json(o) from (select status, customer_id, customer_order_number from orders where id = ${q(jobId)}) o`);
+  expect(row?.status === "objednavka" && row?.customer_id === STROJMETAL && row?.customer_order_number === "8000060875/GPO84339", `zakázka: stav objednávka, Strojmetal, PO (${JSON.stringify(row)})`);
+  const kinds = jobFiles(jobId).map((f) => f.kind).sort();
+  expect(JSON.stringify(kinds) === JSON.stringify(["foto", "model_3d", "nabidka", "objednavka", "vykres"]), `všech 5 dokladů u jedné zakázky (${kinds})`);
+  const nab = jobFiles(jobId).find((f) => f.kind === "nabidka");
+  expect(nab?.ai_extracted?.documentNumber === "136/026", `nabídka 136/026 jako dokument nabídky zakázky (${nab?.ai_extracted?.documentNumber})`);
+  const other = Number(sql(`select count(*) from job_files where ai_extracted->>'documentNumber' = '136/026' and job_id <> ${q(jobId)} and created_at >= ${q(STARTED)}`));
+  expect(other === 0, "žádná druhá zakázka jen s nabídkou");
+  await page.close();
+});
+
+await T("dvě objednávky stejného zákazníka v jednom nahrání → výchozí 1 zakázka, „Rozdělit“ i „Sloučit“ jedním ťuknutím", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [pngFile(fname("two-a", "objednavka_zakaznik"), 131), pngFile(fname("two-b", "objednavka_zakaznik-g13"), 132)]);
+  await readBatch(page);
+  let review = await toReviewWithModel(page);
+  expect(review.groups.length === 1, `výchozí 1 skupina (${review.groups.length})`);
+  const w = review.warnings.find((x) => x.code === "multiple_orders");
+  expect(w && w.severity === "warn" && /PO-E2E-13/.test(w.message), `upozornění na další objednávku (${w?.message})`);
+  expect((await saveCount(page)).count === 1, "hlavička: 1 zakázka");
+  // rozdělit jedním ťuknutím
+  review = await reviewAfter(page, () => captureDialog(page).getByRole("button", { name: "Rozdělit na samostatné zakázky" }).first().click());
+  expect(review.groups.length === 2, `po rozdělení 2 skupiny (${review.groups.length})`);
+  const sc = await saveCount(page);
+  expect(sc.count === 2 && /Pozor: uloží se do 2 zakázek/.test(sc.text) && /proč:/.test(sc.text), `hlavička: Pozor 2 zakázky + proč (${sc.text})`);
+  expect(/Uložit vše do 2 zakázek \(2\)/.test(await page.getByTestId("capture-save").innerText()), "Uložit vše ukáže počet zakázek");
+  await shot(page, "capture-multi/rozdelit-2-zakazky");
+  // a zpět: sloučit do jedné
+  review = await reviewAfter(page, () => page.getByTestId("capture-merge-all").click());
+  expect(review.groups.length === 1, `po sloučení 1 skupina (${review.groups.length})`);
+  expect((await saveCount(page)).count === 1, "hlavička zase: 1 zakázka");
+  const res = await saveAll(page);
+  expect(res.groups.filter((g) => g.ok && g.jobId).length === 1, `uložena 1 zakázka (${JSON.stringify(res.groups)})`);
+  await page.close();
+});
+
+await T("termín z nabídky: objednávka bez termínu + naše nabídka „do 4 týdnů od objednání“ → termín zakázky se zdrojem, v DB", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [pngFile(fname("dl-po", "objednavka_zakaznik-g12"), 141), pngFile(fname("dl-nab", "nabidka_my-g12"), 142)]);
+  await readBatch(page);
+  const review = await toReviewWithModel(page);
+  const g = review.initial.groups[0];
+  expect(g.job.fields.customerRequiredDate === "2026-11-18" && g.job.fields.dueDate === "2026-11-18", `termín 18. 11. 2026 (${g.job.fields.customerRequiredDate} / ${g.job.fields.dueDate})`);
+  const src = review.groups[0].fieldSources.customerRequiredDate?.label ?? "";
+  expect(src === "z nabídky NAB-E2E-12 (4 týdny od objednání → 18. 11. 2026)", `zdroj termínu (${src})`);
+  const dlg = captureDialog(page);
+  expect(/Objednávka nemá reálný termín \(chybí\) — převzat z nabídky NAB-E2E-12/.test(await dlg.innerText()), "upozornění v Kontrole");
+  // zdroj vidět u pole (údaje zakázky)
+  const grp = page.getByTestId("capture-group").first();
+  const data = grp.getByRole("button", { name: /Údaje zakázky/ });
+  if ((await data.getAttribute("aria-expanded")) !== "true") await data.click();
+  expect((await grp.innerText()).includes("z nabídky NAB-E2E-12"), "zdroj u pole termínu");
+  await shot(page, "capture-multi/termin-z-nabidky");
+  const res = await saveAll(page);
+  const jobId = res.groups.find((x) => x.ok && x.jobId)?.jobId;
+  const row = sqlJson(`select row_to_json(o) from (select customer_required_date, due_date, order_date from orders where id = ${q(jobId)}) o`);
+  expect(row?.customer_required_date === "2026-11-18" && row?.due_date === "2026-11-18", `termíny v DB (${JSON.stringify(row)})`);
+  await page.close();
+});
+
+await T("počty u výkresů: objednávka + nabídka + 3 výkresy s různými počty → objednávka > nabídka > výkres v položkách, u výkresů v UI i v DB", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [
+    pngFile(fname("q-po", "objednavka_zakaznik-g13"), 151),
+    pngFile(fname("q-nab", "nabidka_my-g13"), 152),
+    pngFile(fname("q-va", "vykres-g13a"), 153),
+    pngFile(fname("q-vb", "vykres-g13b"), 154),
+    pngFile(fname("q-vc", "vykres-g13c"), 155),
+  ]);
+  await readBatch(page);
+  const review = await toReviewWithModel(page);
+  expect(review.groups.length === 1, "1 skupina");
+  const items = review.initial.groups[0].job.items.map((i) => `${i.drawingNumber}:${i.quantity}`);
+  expect(JSON.stringify(items) === JSON.stringify(["8800-01:10", "8800-02:6", "8800-03:4"]), `položky (${items})`);
+  const drawings = review.docs.filter((d) => d.kind === "drawing");
+  const byNo = (n) => drawings.find((d) => review.initial.docs[d.docId].state.drawingNumber === n);
+  const qty = (n) => review.initial.docs[byNo(n).docId].state.quantity;
+  expect([qty("8800-01"), qty("8800-02"), qty("8800-03")].join(",") === "10,6,4", `počty u výkresů (${[qty("8800-01"), qty("8800-02"), qty("8800-03")]})`);
+  expect(byNo("8800-01").sources?.quantity === "z objednávky PO-E2E-13" && byNo("8800-02").sources?.quantity === "z nabídky NAB-E2E-13"
+    && byNo("8800-03").sources?.quantity === "z výkresu 8800-03", `zdroje počtů (${drawings.map((d) => d.sources?.quantity)})`);
+  expect(review.initial.docs[byNo("8800-01").docId].state.title === "Hřídel", "název výkresu = název z objednávky");
+  expect(review.warnings.some((w) => w.code === "quantity_conflict" && /Platí objednávka: 10 ks \(nabídka 8 ks, výkres 12 ks\)/.test(w.message)), "info: platí objednávka");
+  // v UI: rozbalit sekci výkresu 8800-02 → zdroj pod počtem kusů
+  const sec = page.locator(`section[data-doc-id="${byNo("8800-02").docId}"]`);
+  const toggle = sec.locator("button[aria-expanded]").first();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  const srcEl = sec.getByTestId("capture-drawing-quantity-source");
+  await srcEl.waitFor({ timeout: 10_000 });
+  expect((await srcEl.innerText()).includes("z nabídky NAB-E2E-13"), "zdroj počtu u výkresu v UI");
+  await shot(page, "capture-multi/pocty-u-vykresu");
+  const res = await saveAll(page);
+  const jobId = res.groups.find((x) => x.ok && x.jobId)?.jobId;
+  const rows = (sqlJson(`select json_agg(json_build_array(drawing_number, quantity, name) order by position) from order_items where order_id = ${q(jobId)}`) ?? [])
+    .map(([n, qn, name]) => `${n}:${Number(qn)}:${name}`);
+  expect(JSON.stringify(rows) === JSON.stringify(["8800-01:10:Hřídel", "8800-02:6:Pouzdro", "8800-03:4:Víko"]), `položky zakázky v DB (${rows})`);
+  const vf = jobFiles(jobId).filter((f) => f.kind === "vykres").map((f) => `${f.ai_extracted?.drawingNumber}:${f.ai_extracted?.quantity}:${f.ai_extracted?.title}`).sort();
+  expect(JSON.stringify(vf) === JSON.stringify(["8800-01:10:Hřídel", "8800-02:6:Pouzdro", "8800-03:4:Víko"]), `výkresy u zakázky v DB (${vf})`);
+  const linked = jobFiles(jobId).filter((f) => f.kind === "vykres" && f.order_item_id).length;
+  expect(linked === 3, `všechny 3 výkresy navázané na položky (${linked})`);
+  const arch = (sqlJson(`select json_agg(json_build_array(drawing_number, quantity) order by drawing_number) from drawings where job_id = ${q(jobId)}`) ?? []).map(([n, qn]) => `${n}:${qn}`);
+  expect(JSON.stringify(arch) === JSON.stringify(["8800-01:10", "8800-02:6", "8800-03:4"]), `archiv výkresů: počty (${arch})`);
+  await page.close();
+});
+
+await T("ks dle výkresu: objednávka „počet kusů dle výkresu“ + výkres 35 ks → položka i výkres 35 ks se zdrojem, název z objednávky, v DB", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  await openFromBook(page);
+  await upload(page, [pngFile(fname("dv-po", "objednavka_zakaznik-g14"), 161), pngFile(fname("dv-vk", "vykres-g14"), 162)]);
+  await readBatch(page);
+  const review = await toReviewWithModel(page);
+  expect(review.groups.length === 1, `1 skupina (${review.groups.map((g) => g.label).join(" | ")})`);
+  const items = review.initial.groups[0].job.items.map((i) => `${i.drawingNumber}:${i.quantity}`);
+  expect(JSON.stringify(items) === JSON.stringify(["9900-01:35"]), `položka s počtem z výkresu (${items})`);
+  const vk = review.docs.find((d) => d.kind === "drawing");
+  const vst = review.initial.docs[vk.docId].state;
+  expect(vst.quantity === "35" && vst.title === "Držák", `výkres: 35 ks, název z objednávky (${vst.quantity} / ${vst.title})`);
+  expect(vk.sources?.quantity === "z výkresu 9900-01 (objednávka: „dle výkresu\")", `zdroj počtu u výkresu (${vk.sources?.quantity})`);
+  const sc = await saveCount(page);
+  expect(sc.count === 1, `uloží se do 1 zakázky (${sc.text})`);
+  // v UI: zdroj pod počtem kusů výkresu
+  const sec = page.locator(`section[data-doc-id="${vk.docId}"]`);
+  const toggle = sec.locator("button[aria-expanded]").first();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  const srcEl = sec.getByTestId("capture-drawing-quantity-source");
+  await srcEl.waitFor({ timeout: 10_000 });
+  expect(/dle výkresu/.test(await srcEl.innerText()), `zdroj počtu v UI (${await srcEl.innerText()})`);
+  await shot(page, "capture-multi/ks-dle-vykresu");
+  const res = await saveAll(page);
+  expect(res.groups.filter((g) => g.ok && g.jobId).length === 1, `uložena 1 zakázka (${JSON.stringify(res.groups)})`);
+  const jobId = res.groups.find((x) => x.ok && x.jobId)?.jobId;
+  const rows = (sqlJson(`select json_agg(json_build_array(drawing_number, quantity, name) order by position) from order_items where order_id = ${q(jobId)}`) ?? [])
+    .map(([n, qn, name]) => `${n}:${Number(qn)}:${name}`);
+  expect(JSON.stringify(rows) === JSON.stringify(["9900-01:35:Držák"]), `položka zakázky v DB (${rows})`);
+  const vf = jobFiles(jobId).filter((f) => f.kind === "vykres").map((f) => `${f.ai_extracted?.drawingNumber}:${f.ai_extracted?.quantity}:${Boolean(f.order_item_id)}`);
+  expect(JSON.stringify(vf) === JSON.stringify(["9900-01:35:true"]), `výkres u zakázky v DB, navázaný na položku (${vf})`);
+  const arch = (sqlJson(`select json_agg(json_build_array(drawing_number, quantity)) from drawings where job_id = ${q(jobId)}`) ?? []).map(([n, qn]) => `${n}:${qn}`);
+  expect(JSON.stringify(arch) === JSON.stringify(["9900-01:35"]), `archiv výkresů: počet (${arch})`);
+  await page.close();
+});
+
 await T("ochrany API: cizí relace / stránka → 400, cizí Origin → 403, nepřihlášený → 401", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.admin);

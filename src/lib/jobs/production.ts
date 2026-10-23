@@ -33,12 +33,14 @@ export const OPERATION_SELECT = [
   "supplier:suppliers!supplier_id(id, name)",
   "creator:profiles!created_by(id, full_name, email)",
   "po:purchase_orders!purchase_order_id(id, number)",
+  "changer:profiles!status_changed_by(id, full_name, email)",
 ].join(", ");
 
 export type JobOperationDbRow = JobOperationRow & {
   supplier?: Embed<{ id: string; name: string }>;
   creator?: Embed<PersonEmbed>;
   po?: Embed<{ id: string; number: string | null }>;
+  changer?: Embed<PersonEmbed>;
 };
 
 export const CLOSING_SELECT = [
@@ -165,6 +167,9 @@ export function rowToJobOperation(row: JobOperationDbRow, today: string = todayI
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     overdue: isOperationOverdue({ status, plannedEnd }, today),
+    ...(row.status_changed_at
+      ? { changedBy: personRef(row.changer), changedAt: row.status_changed_at, changedVia: row.status_changed_via ?? null }
+      : {}),
   };
 }
 

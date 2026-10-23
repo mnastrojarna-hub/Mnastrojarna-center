@@ -12,6 +12,8 @@ import type { JobFileKind } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { FlowEmpty } from "./flow-header";
 import { czDay, fileKindCounts, filterFiles, formatBytes, isImageFile, todayPrague } from "./flow-utils";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import { fileOriginLabel, type FileFlowInfo } from "./flow-state";
 
 /** Dokument zakázky pro přehled (čistá data ze serveru). */
 export interface FlowFile {
@@ -27,6 +29,8 @@ export interface FlowFile {
   createdAt: string;
   uploadedBy: string | null;
   hasAiData: boolean;
+  /** Původ a autoři (bez DB stavů null). */
+  flow?: FileFlowInfo | null;
   job: { id: string; number: string; title: string; customerName: string | null };
 }
 
@@ -178,6 +182,9 @@ function FileCard({ file: f, today }: { file: FlowFile; today: string }) {
             </span>
           )}
           {f.hasAiData && <Sparkles aria-label="AI z dokladu přečetla údaje" className="h-3.5 w-3.5 text-violet-500" />}
+          {f.flow && fileOriginLabel(f.flow) && (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground">{fileOriginLabel(f.flow)}</span>
+          )}
         </div>
         <p className="line-clamp-2 break-words text-sm font-medium leading-snug" title={f.filename}>{f.title || f.filename}</p>
         {f.title && <p className="truncate text-[11px] text-muted-foreground" title={f.filename}>{f.filename}</p>}
@@ -185,11 +192,17 @@ function FileCard({ file: f, today }: { file: FlowFile; today: string }) {
           <span className="shrink-0 whitespace-nowrap font-mono font-semibold">{f.job.number}</span>
           <span className="truncate text-muted-foreground">{f.job.customerName ?? f.job.title}</span>
         </Link>
+        {f.flow?.uploaded || f.flow?.archived ? (
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {f.flow.uploaded && <ActorStamp stamp={f.flow.uploaded} verb={f.flow.origin === "generated" ? "Vystaveno" : "Nahráno"} short />}
+            {f.flow.archived && <ActorStamp stamp={f.flow.archived} verb="Archivováno" short />}
+          </div>
+        ) : null}
         <div className="mt-auto flex items-center gap-1 pt-1">
           <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
             {czDay(todayPrague(new Date(f.createdAt)), { short: true, today })}
             {size ? ` · ${size}` : ""}
-            {f.uploadedBy ? ` · ${f.uploadedBy}` : ""}
+            {f.uploadedBy && !f.flow?.uploaded ? ` · ${f.uploadedBy}` : ""}
           </span>
           <Button asChild size="icon-sm" variant="ghost" title="Otevřít">
             <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Otevřít ${f.filename}`}>

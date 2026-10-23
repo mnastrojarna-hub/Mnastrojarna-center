@@ -4,6 +4,12 @@ import { requireFeature, getAccess } from "@/lib/auth/session";
 import { getJob, listJobs } from "@/lib/data/jobs";
 import { getRecentPricingCalculations } from "@/lib/data/pricing-data";
 import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
+import { getFlowCounts } from "@/lib/data/flow-status";
+import { getFlowJobStates, listFlowStateJobIds } from "@/lib/data/flow-pages";
+import { PRICING_ORDER, chipsForTab } from "@/lib/jobs/flow-status";
+import { ToastProvider } from "@/components/jobs/detail/toast";
+import { FlowStateFilter } from "@/components/flow/flow-state-filter";
+import { STATE_PARAM, parseStateParam } from "@/components/flow/flow-state";
 import type { JobDetail } from "@/lib/jobs/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,20 +40,29 @@ export default async function PricingPage({
   const ai = can("ai_pricing");
   const settings = can("settings");
 
-  const list = await listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" });
+  const selected = parseStateParam(sp[STATE_PARAM], PRICING_ORDER, PRICING_ORDER);
+  const filtered = selected.length < PRICING_ORDER.length;
+  const [all, counts, stateIds] = await Promise.all([
+    listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" }),
+    getFlowCounts(),
+    filtered ? listFlowStateJobIds([{ phase: "pricing", keys: selected }]) : Promise.resolve(null),
+  ]);
   const wanted = typeof sp.job === "string" ? sp.job : null;
+  const list = stateIds ? all.filter((j) => stateIds.has(j.id) || j.id === wanted) : all;
   // vyžádaná zakázka vždy mezi načtenými
   const ids = list.map((j) => j.id);
   const pick = [...(wanted && ids.includes(wanted) ? [wanted] : []), ...ids.filter((id) => id !== wanted)].slice(0, MAX_JOBS);
-  const [details, calculations, params] = await Promise.all([
+  const [details, flows, calculations, params] = await Promise.all([
     Promise.all(pick.map((id) => getJob(id))),
+    getFlowJobStates(pick),
     ai ? getRecentPricingCalculations(15) : Promise.resolve([]),
     ai && settings ? getIntegrationSettingsMeta() : Promise.resolve([]),
   ]);
   const order = new Map(ids.map((id, i) => [id, i]));
   const jobs = (details.filter(Boolean) as JobDetail[])
     .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
-    .map(toPricingJob);
+    .map((j) => toPricingJob(j, flows[j.id] ?? null));
+  const chips = chipsForTab("pricing", counts);
   const pricingParams = params.filter((s) => s.category === "pricing");
   const today = todayPrague();
   const me = { id: user.id, name: user.fullName || user.email };
@@ -88,11 +103,14 @@ export default async function PricingPage({
         description={unpriced ? `${unpriced} ${unpriced === 1 ? "zakázka ještě nemá" : unpriced < 5 ? "zakázky ještě nemají" : "zakázek ještě nemá"} všechny ceny.` : "Vše naceněno — vytvoř nabídky a pošli je zákazníkům."}
         count={list.length}
       >
+        {Object.keys(counts).length > 0 && (
+          <FlowStateFilter chips={chips} selected={selected} fallback={PRICING_ORDER} label="Stav nacenění" />
+        )}
         {jobs.length === 0 ? (
           <FlowEmpty
             icon={Inbox}
             iconClass="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"
-            title="Nic nečeká na nacenění"
+            title={filtered ? "Ve vybraných stavech nic není" : "Nic nečeká na nacenění"}
             actions={
               <Button asChild variant="outline">
                 <Link href="/inquiries">Na Poptávky</Link>
@@ -103,7 +121,9 @@ export default async function PricingPage({
           </FlowEmpty>
         ) : (
           <>
-            <PricingBoard jobs={jobs} me={me} margins={margins} today={today} initialOpenId={wanted} />
+            <ToastProvider>
+              <PricingBoard jobs={jobs} me={me} margins={margins} today={today} initialOpenId={wanted} />
+            </ToastProvider>
             {list.length > jobs.length && (
               <p className="text-center text-xs text-muted-foreground">
                 Zobrazeno {jobs.length} z {list.length} — další najdeš v{" "}

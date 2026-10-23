@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { checkFeature } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
 import { cleanDate, isUuid, todayIso, translateDbError } from "@/lib/jobs/mapping";
@@ -186,6 +186,8 @@ export async function markStatementPaid(statementId: string, paidAt: string | nu
     }
 
     if (st.status !== "vyplaceno") return { ok: true, status: st.status };
+    // přepočet provizí smí jen servisní role (DB je přihlášeným odebrala) — bez klíče nic neodemykat
+    if (!hasServiceKey()) return fail("Vrátit výplatu jde jen se servisním klíčem Supabase (SUPABASE_SERVICE_ROLE_KEY) — provize by zůstaly nepřepočtené.");
     // zpět: odemknout vyúčtování i zakázky a nechat DB vše znovu spočítat
     const { error } = await db.from("commission_statements").update({ status: "otevrena", paid_at: null } as never).eq("id", st.id);
     if (error) return fail(error.message);

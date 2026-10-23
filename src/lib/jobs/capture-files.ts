@@ -327,7 +327,7 @@ export async function prepareBatchFiles(
     files: [], pages: [], contents: new Map(), sortContents: new Map(), dims: new Map(), headNumbers: {}, removePaths: [], warnings: [],
   };
   let downloaded = 0;
-  const queue: (CaptureFileRef & { fromZip?: string | null; bytes?: Uint8Array; zipFormat?: CadFormat | null })[] = refs.map((r) => ({ ...r }));
+  const queue: (CaptureFileRef & { fromZip?: string | null; bundle?: string | null; bytes?: Uint8Array; zipFormat?: CadFormat | null })[] = refs.map((r) => ({ ...r }));
   let fileNo = 0;
   while (queue.length) {
     const ref = queue.shift()!;
@@ -374,7 +374,8 @@ export async function prepareBatchFiles(
           const mimeType = mimeFromName(e.name);
           const { error } = await bucket(db).upload(path, e.data, { contentType: mimeType, upsert: false });
           if (error) { failed = true; break; }
-          uploaded.push({ path, filename: e.name, mimeType, size: e.data.length, fromZip: ref.filename, bytes: e.data });
+          // balík = tento ZIP (podle cesty v úložišti, ne názvu — dva „vykresy.zip" jsou dva balíky)
+          uploaded.push({ path, filename: e.name, mimeType, size: e.data.length, fromZip: ref.filename, bundle: `zip:${ref.path}`, bytes: e.data });
         }
         if (!failed) {
           queue.unshift(...uploaded);
@@ -393,7 +394,7 @@ export async function prepareBatchFiles(
     const base: BatchFile = {
       path: ref.path, filename: ref.filename, mimeType: ref.mimeType, size: ref.size,
       ...(ref.sortPath ? { sortPath: ref.sortPath } : {}),
-      id, pageCount: 1, sniffedMime: sniffed, format: null, fromZip: ref.fromZip ?? null,
+      id, pageCount: 1, sniffedMime: sniffed, format: null, fromZip: ref.fromZip ?? null, ...(ref.bundle ? { bundle: ref.bundle } : {}),
       splittable: false, aiReadable: false, aiSkipReason: null, sha256: sha,
     };
     if (sniffed === "application/pdf" && bytes) {

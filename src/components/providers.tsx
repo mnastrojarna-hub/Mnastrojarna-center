@@ -7,6 +7,11 @@ import { AutomationProvider } from "@/components/automation-provider";
 import { CommandPaletteProvider } from "@/components/command-palette";
 import { DebugBar } from "@/components/debug/debug-bar";
 import { AccessProvider } from "@/components/access-provider";
+import { installRscFetchBuffer } from "@/lib/rsc-fetch-buffer";
+
+// Odpovědi RSC (navigace, refresh, server akce) předat routeru celé — jinak Next 15.5
+// občas nevykreslí nová data (viz rsc-fetch-buffer.ts). Hned při načtení modulu, před první navigací.
+installRscFetchBuffer();
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

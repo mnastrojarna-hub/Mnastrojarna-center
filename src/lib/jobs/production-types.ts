@@ -39,6 +39,11 @@ export interface JobOperation {
   updatedAt: string;
   /** Termín operace prošel a není hotovo / přeskočeno. */
   overdue: boolean;
+  /** Kdo a kdy operaci naposledy přepnul (job_operations.status_changed_*, plní DB). */
+  changedBy?: PersonRef | null;
+  changedAt?: string | null;
+  /** „automaticky" = navázalo samo (spustil changedBy). */
+  changedVia?: string | null;
 }
 
 /** Souhrn výroby zakázky (řádek knihy, hlavička detailu) — z orders.production_*. */

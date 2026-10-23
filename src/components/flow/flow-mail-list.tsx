@@ -3,9 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FolderPlus, Loader2, Mail, MailOpen, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowRight, FolderPlus, Link2, Loader2, Mail, MailOpen, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createJobFromEmail } from "@/app/actions/mail";
+import { createJobFromEmail, linkEmailToJob } from "@/app/actions/mail";
 import { cn, relativeTime } from "@/lib/utils";
 
 /** E-mail z pošty pro stránky toku (jen čistá data ze serveru). */
@@ -22,6 +22,8 @@ export interface FlowEmail {
   unread: boolean;
   jobId: string | null;
   jobNumber: string | null;
+  /** Existující zakázka se stejným číslem objednávky zákazníka (withJobMatches). */
+  matchJob?: { id: string; number: string } | null;
 }
 
 const CATEGORY_TONE: Record<string, string> = {
@@ -52,6 +54,25 @@ function MailRow({ email: e }: { email: FlowEmail }) {
   const [created, setCreated] = React.useState<{ id: string; number: string | null } | null>(null);
   const jobId = created?.id ?? e.jobId;
   const jobNumber = created?.number ?? e.jobNumber;
+
+  async function link(target: { id: string; number: string }) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await linkEmailToJob(e.id, target.id);
+      if (!res.ok) {
+        setError(res.error ?? "E-mail se nepodařilo přiřadit.");
+        return;
+      }
+      setCreated({ id: target.id, number: target.number });
+      router.refresh();
+    } catch {
+      setError("Spojení se nepovedlo — zkus to znovu.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function create() {
     if (busy) return;
@@ -109,6 +130,17 @@ function MailRow({ email: e }: { email: FlowEmail }) {
               Otevřít zakázku{jobNumber ? ` ${jobNumber}` : ""} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
+        ) : e.matchJob ? (
+          <>
+            {/* stejné číslo objednávky zákazníka už má zakázka → přiřadit, ne zakládat duplicitu */}
+            <Button type="button" variant="outline" size="sm" onClick={() => void create()} disabled={busy}>
+              <FolderPlus className="h-4 w-4" /> Založit novou
+            </Button>
+            <Button type="button" variant="success" size="sm" onClick={() => void link(e.matchJob!)} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              Přiřadit k {e.matchJob.number}
+            </Button>
+          </>
         ) : (
           <Button type="button" variant="success" size="sm" onClick={() => void create()} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}

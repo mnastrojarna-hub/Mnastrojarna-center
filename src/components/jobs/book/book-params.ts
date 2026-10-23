@@ -2,6 +2,9 @@ import type { JobStage } from "@/lib/supabase/database.types";
 import type { JobDeadlineFilter, JobFilters, JobListItem, JobPaymentFilter, JobSort } from "@/lib/jobs/types";
 import { STAGE_ORDER, isJobStage } from "@/lib/jobs/stages";
 import { isOperationKind } from "@/lib/jobs/operations";
+import {
+  DELIVERY_STATES, INQUIRY_ORDER, ORDER_TAB_CHIPS, isInquiryStatus, type DeliveryState, type InquiryStatus,
+} from "@/lib/jobs/flow-status";
 
 /**
  * Kniha zakázek — parametry URL ↔ filtry, segmenty (záložky), řazení,
@@ -94,8 +97,28 @@ export const DEADLINE_FILTERS: { key: JobDeadlineFilter; label: string }[] = [
 export const PAYMENT_FILTERS: { key: JobPaymentFilter; label: string }[] = [
   { key: "po_splatnosti", label: "Po splatnosti" },
   { key: "nezaplaceno", label: "Nezaplaceno" },
+  { key: "ceka_na_uhradu", label: "Čeká na úhradu" },
+  { key: "castecne_zaplaceno", label: "Částečně zaplaceno" },
   { key: "zaplaceno", label: "Zaplaceno" },
 ];
+
+/** Dodání zákazníkovi (podrobný stav delivery_key) — pořadí filtru. */
+export const DELIVERY_FILTERS: DeliveryState[] = ["k_expedici", "castecne", "dodano", "dl_potvrzen"];
+export function deliveryLabel(k: DeliveryState): string {
+  return DELIVERY_STATES[k].label;
+}
+/** Klíče chipů segmentu Objednávky (doklad + plnění, stejné jako /confirmations). */
+export const ORDER_FILTER_KEYS: string[] = ORDER_TAB_CHIPS.map((c) => c.key);
+
+function isDeliveryKey(v: unknown): v is DeliveryState {
+  return typeof v === "string" && (DELIVERY_FILTERS as string[]).includes(v);
+}
+
+/** Seznam klíčů z URL („a,b") — jen povolené, bez duplicit, v daném pořadí. */
+function keyList<T extends string>(raw: string | undefined, allowed: readonly T[]): T[] {
+  const set = new Set((raw ?? "").split(",").map((s) => s.trim()));
+  return allowed.filter((k) => set.has(k));
+}
 
 function isPaymentFilter(v: unknown): v is JobPaymentFilter {
   return typeof v === "string" && PAYMENT_FILTERS.some((p) => p.key === v);
@@ -132,6 +155,14 @@ export interface BookParams {
   /** Kde se zakázka nachází (firma / „U nás") nebo "". */
   location: string;
   payment: JobPaymentFilter | null;
+  /** Poptávka: dílčí stavy (URL poptavka=). */
+  inquiry: InquiryStatus[];
+  /** Objednávka: doklad / plnění (URL objednavka=). */
+  order: string[];
+  /** Dodání zákazníkovi (URL dodani=). */
+  delivery: DeliveryState[];
+  /** Kdo naposledy posunul stav (uuid, URL zmenil=) nebo "". */
+  changedBy: string;
   sort: JobSort;
   dir: SortDir;
   view: BookView;
@@ -178,6 +209,10 @@ export const DEFAULT_PARAMS: BookParams = {
   step: "",
   location: "",
   payment: null,
+  inquiry: [],
+  order: [],
+  delivery: [],
+  changedBy: "",
   sort: DEFAULT_SORT,
   dir: defaultDirFor(DEFAULT_SORT),
   view: "radky",
@@ -206,6 +241,10 @@ export function parseBookParams(sp: RawSearchParams): BookParams {
     step: isProductionStepKey(stepRaw) ? stepRaw : "",
     location: (firstParam(sp, "location") ?? "").trim().slice(0, MAX_LOCATION),
     payment: isPaymentFilter(paymentRaw) ? paymentRaw : null,
+    inquiry: keyList(firstParam(sp, "poptavka"), INQUIRY_ORDER),
+    order: keyList(firstParam(sp, "objednavka"), ORDER_FILTER_KEYS),
+    delivery: keyList(firstParam(sp, "dodani"), DELIVERY_FILTERS),
+    changedBy: cleanId(firstParam(sp, "zmenil")),
     sort,
     dir,
     view: firstParam(sp, "view") === "tabule" ? "tabule" : "radky",
@@ -228,6 +267,13 @@ export function bookQuery(p: BookParams): string {
   const location = (p.location ?? "").trim().slice(0, MAX_LOCATION);
   if (location) out.set("location", location);
   if (p.payment && isPaymentFilter(p.payment)) out.set("payment", p.payment);
+  const inquiry = (p.inquiry ?? []).filter(isInquiryStatus);
+  if (inquiry.length) out.set("poptavka", keyList(inquiry.join(","), INQUIRY_ORDER).join(","));
+  const order = keyList((p.order ?? []).join(","), ORDER_FILTER_KEYS);
+  if (order.length) out.set("objednavka", order.join(","));
+  const delivery = (p.delivery ?? []).filter(isDeliveryKey);
+  if (delivery.length) out.set("dodani", keyList(delivery.join(","), DELIVERY_FILTERS).join(","));
+  if (cleanId(p.changedBy)) out.set("zmenil", cleanId(p.changedBy));
   const sort = isSort(p.sort) ? p.sort : DEFAULT_SORT;
   if (sort !== DEFAULT_SORT) out.set("sort", sort);
   if (p.dir !== defaultDirFor(sort)) out.set("dir", p.dir);
@@ -240,13 +286,26 @@ export function bookHref(p: BookParams): string {
   return qs ? `/orders?${qs}` : "/orders";
 }
 
+/** Adresa knihy v kanonickém tvaru — tak, jak ji po načtení vrátí server (parse → bookHref). */
+export function canonicalBookHref(href: string): string {
+  const sp: Record<string, string> = {};
+  new URL(href, "http://kniha.local").searchParams.forEach((v, k) => {
+    if (!(k in sp)) sp[k] = v;
+  });
+  return bookHref(parseBookParams(sp));
+}
+
 /**
  * Změna parametrů: nová záložka ruší výběr stavů, nové řazení bere svůj
  * výchozí směr (pokud ho patch neurčí). Stavy se vždy omezí na segment.
  */
 export function applyBookPatch(p: BookParams, patch: BookPatch): BookParams {
   const next: BookParams = { ...p, ...patch };
-  if (patch.segment !== undefined && patch.segment !== p.segment && patch.stages === undefined) next.stages = [];
+  if (patch.segment !== undefined && patch.segment !== p.segment) {
+    if (patch.stages === undefined) next.stages = [];
+    if (patch.inquiry === undefined) next.inquiry = [];
+    if (patch.order === undefined) next.order = [];
+  }
   if (patch.sort !== undefined && patch.dir === undefined && patch.sort !== p.sort) next.dir = defaultDirFor(patch.sort);
   next.stages = normalizeStages(next.stages, next.segment);
   return next;
@@ -261,12 +320,14 @@ export function toggleStagePatch(p: BookParams, stage: JobStage): BookPatch {
 /** „Zrušit filtry" — záložka, řazení a pohled zůstávají. */
 export const RESET_FILTERS: BookPatch = {
   stages: [], q: "", owner: "", assignee: "", customer: "", deadline: null, step: "", location: "", payment: null,
+  inquiry: [], order: [], delivery: [], changedBy: "",
 };
 
 export function activeFilterCount(p: BookParams): number {
   return [
     p.stages.length > 0, p.q.trim() !== "", p.owner !== "", p.assignee !== "", p.customer !== "", p.deadline !== null,
     Boolean(p.step), Boolean((p.location ?? "").trim()), Boolean(p.payment),
+    (p.inquiry ?? []).length > 0, (p.order ?? []).length > 0, (p.delivery ?? []).length > 0, Boolean(p.changedBy),
   ].filter(Boolean).length;
 }
 
@@ -299,6 +360,10 @@ export function bookParamsToFilters(p: BookParams): JobFilters {
   if (isProductionStepKey(p.step)) filters.step = p.step;
   if ((p.location ?? "").trim()) filters.location = p.location.trim();
   if (p.payment) filters.payment = p.payment;
+  if (p.inquiry?.length) filters.inquiry = p.inquiry;
+  if (p.order?.length) filters.order = p.order;
+  if (p.delivery?.length) filters.delivery = p.delivery;
+  if (p.changedBy) filters.changedBy = p.changedBy;
   return filters;
 }
 
@@ -331,12 +396,13 @@ export function bookKpis(counts: { byStage: Partial<Record<JobStage, number>>; o
 
 /** Kliknutí na dlaždici = filtr. Termíny jdou přes celou knihu (počty jsou celkové). */
 export const KPI_PATCHES = {
-  ordersRunning: { segment: "objednavky", stages: [], deadline: null },
-  overdue: { segment: "vse", stages: [], deadline: "overdue" },
-  dueSoon: { segment: "vse", stages: [], deadline: "week" },
-  inquiries: { segment: "poptavky", stages: [], deadline: null },
-  problems: { segment: "objednavky", stages: [...PROBLEM_STAGES], deadline: null },
-  value: { segment: "objednavky", stages: [], deadline: null, sort: "value", dir: "desc" },
+  // dlaždice = celý pohled: zbylý filtr platby (z dlaždice Po splatnosti) by výsledek zkreslil
+  ordersRunning: { segment: "objednavky", stages: [], deadline: null, payment: null },
+  overdue: { segment: "vse", stages: [], deadline: "overdue", payment: null },
+  dueSoon: { segment: "vse", stages: [], deadline: "week", payment: null },
+  inquiries: { segment: "poptavky", stages: [], deadline: null, payment: null },
+  problems: { segment: "objednavky", stages: [...PROBLEM_STAGES], deadline: null, payment: null },
+  value: { segment: "objednavky", stages: [], deadline: null, payment: null, sort: "value", dir: "desc" },
   /** Faktury po splatnosti — přes celou knihu. */
   overdueInvoices: { segment: "vse", stages: [], deadline: null, payment: "po_splatnosti" },
 } satisfies Record<keyof BookKpis | "value" | "overdueInvoices", BookPatch>;

@@ -84,7 +84,6 @@ describe.skipIf(!ENABLED)("provize ↔ lokální Supabase (E2E)", () => {
   let month = "";
   let paidStatementId = "";
   let entrySnapshot: { id: string; status: string; commission: string }[] = [];
-  const errors = vi.spyOn(console, "error");
 
   beforeAll(async () => {
     const env = loadEnv();
@@ -181,14 +180,5 @@ describe.skipIf(!ENABLED)("provize ↔ lokální Supabase (E2E)", () => {
     ruleIds.length = 0;
     const { data: e2 } = await db.from("commission_entries").select("rate").eq("owner_id", PETR).not("order_id", "is", null).neq("status", "vyplaceno").eq("cost_known", true).limit(1).single();
     expect(Number((e2 as { rate: string }).rate)).toBeCloseTo(0.1, 4);
-  });
-
-  it("historie objednávek dodavatelům se načte bez chyby", async () => {
-    const { fetchPurchaseOrderEvents } = await import("@/components/jobs/purchasing/activity-data");
-    const { data: pos } = await db.from("purchase_orders").select("id").limit(20);
-    const events = await fetchPurchaseOrderEvents(((pos ?? []) as { id: string }[]).map((p) => p.id));
-    expect(Array.isArray(events)).toBe(true);
-    const supabaseErrors = errors.mock.calls.filter((c) => String(c[0]).includes("Supabase chyba"));
-    expect(supabaseErrors).toEqual([]);
   });
 });

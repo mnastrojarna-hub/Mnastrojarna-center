@@ -1,14 +1,18 @@
 import Link from "next/link";
-import { StageSelect, NextStageButton } from "@/components/jobs/stage-select";
+import { StageSelect } from "@/components/jobs/stage-select";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import { FlowStatusChip } from "@/components/flow-status/state-chip";
+import { RowNextAction, RowProposal } from "@/components/jobs/book/row-flow";
+import { rowFlowView, type BookAccess, type RowFlowView } from "@/components/jobs/book/book-flow";
+import { actionPalette } from "@/components/flow/flow-state";
 import {
   CustomerDocNumber, CustomerNoteMark, DeadlineBlock, DrawingChips, JobCounters, JobValue, PaymentMark, PeopleStack,
   PriorityMark, ProductionLine, SourceMark,
 } from "@/components/jobs/book/job-cells";
-import { nextStage, stageMeta } from "@/lib/jobs/stages";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { stageMeta } from "@/lib/jobs/stages";
 import type { JobListItem } from "@/lib/jobs/types";
-import { cn, relativeTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /**
  * Řádky Knihy zakázek — jeden jednoduchý barevný řádek na zakázku. Celý řádek
@@ -28,13 +32,46 @@ const LAYOUT = cn(
   "2xl:grid-cols-[11rem_minmax(0,1fr)_11rem_9rem_4rem_7rem_4.5rem]",
 );
 
-export function JobRows({ jobs, today }: { jobs: JobListItem[]; today: string }) {
+export function JobRows({ jobs, today, access }: { jobs: JobListItem[]; today: string; access?: BookAccess | null }) {
   return (
     <ul role="list" className="space-y-2">
       {jobs.map((job) => (
-        <JobRow key={job.id} job={job} today={today} />
+        <JobRow key={job.id} job={job} today={today} access={access ?? null} />
       ))}
     </ul>
+  );
+}
+
+/** Chip podrobného stavu (tabulka 1.11) nebo návrh změny s ✓ / ✕; pod chipem kdo dílčí stav změnil. */
+export function RowStateChip({ job, view, className }: { job: JobListItem; view: RowFlowView; className?: string }) {
+  const proposal = job.flow?.proposal;
+  if (proposal) {
+    return <RowProposal jobId={job.id} proposal={proposal} stamp={job.stamps?.proposal} canDecide={view.canDecideProposal} className={className} />;
+  }
+  if (!view.chip) return null;
+  if (!view.chipStamp) return <FlowStatusChip chip={view.chip} size="xs" className={cn("max-w-full", className)} />;
+  return (
+    <span className={cn("inline-flex min-w-0 max-w-full flex-col items-start gap-0.5", className)}>
+      <FlowStatusChip chip={view.chip} size="xs" className="max-w-full" />
+      <ActorStamp stamp={view.chipStamp} short className="max-w-[10.5rem]" />
+    </span>
+  );
+}
+
+/** Tlačítko dalšího kroku v barvě AKCE (stejná akce = stejná barva v každém řádku). */
+export function RowAction({ job, view, className }: { job: JobListItem; view: RowFlowView; className?: string }) {
+  const tone = view.next ? actionPalette(view.next.key) : null;
+  const palette = tone && tone !== "ghost.proposal" ? tone : undefined;
+  return (
+    <RowNextAction
+      jobId={job.id}
+      action={view.next}
+      quoteId={view.activeQuoteId}
+      reopenOrderTo={job.flow?.orderConfirmedRevision ? "potvrzena" : "dorucena"}
+      waitingNote={job.flow?.waitingNote ?? null}
+      palette={palette}
+      className={className}
+    />
   );
 }
 
@@ -59,10 +96,10 @@ export function JobRowsHeader() {
   );
 }
 
-function JobRow({ job, today }: { job: JobListItem; today: string }) {
+function JobRow({ job, today, access }: { job: JobListItem; today: string; access: BookAccess | null }) {
   const m = stageMeta(job.stage);
   const label = [job.number, job.customer?.name, job.title].filter(Boolean).join(" — ");
-  const target = nextStage(job.stage);
+  const view = rowFlowView(job, access, today);
   return (
     <li
       className={cn(
@@ -113,15 +150,16 @@ function JobRow({ job, today }: { job: JobListItem; today: string }) {
             <DrawingChips numbers={job.drawingNumbers} />
           </div>
           <CustomerDocNumber job={job} className="mt-1.5 lg:hidden" />
+          <RowStateChip job={job} view={view} className="relative z-10 mt-1.5 lg:hidden" />
           <ProductionLine job={job} className="mt-2 lg:hidden" />
         </div>
 
         {/* stav */}
         <div className="relative z-10 order-2 flex shrink-0 flex-col items-end gap-0.5 lg:order-none lg:justify-self-end [grid-area:stage] xl:items-start xl:justify-self-start">
-          <StageSelect jobId={job.id} stage={job.stage} size="sm" />
-          {job.stageChangedAt && !job.productionStep && (
-            <span className="hidden text-[11px] text-muted-foreground xl:block">{relativeTime(job.stageChangedAt)}</span>
-          )}
+          <StageSelect jobId={job.id} stage={job.stage} size="sm" flow={job.flow} quotes={job.flowQuotes} />
+          {/* kdo stav naposledy posunul — text na všech šířkách, ťuknutím detail */}
+          <ActorStamp stamp={view.stamp} short className="max-w-[10.5rem] xl:max-w-[11rem]" />
+          <RowStateChip job={job} view={view} className="hidden lg:inline-flex" />
           <ProductionLine job={job} compact className="hidden w-full max-w-[11rem] lg:flex" />
         </div>
 
@@ -148,24 +186,12 @@ function JobRow({ job, today }: { job: JobListItem; today: string }) {
             <PeopleStack owner={job.owner} assignee={job.assignee} />
           </span>
           <CaptureButton jobId={job.id} label="" variant="outline" size="icon-sm" className="text-rose-600 dark:text-rose-400" />
-          {target && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex">
-                  <NextStageButton
-                    jobId={job.id}
-                    stage={job.stage}
-                    className={cn(
-                      "h-8 gap-1.5 px-3 text-xs [&>svg:first-child]:hidden",
-                      // desktop: jen barevná šipka (popisek zůstává pro čtečky, název kroku v bublině)
-                      "lg:w-8 lg:gap-0 lg:px-0 lg:text-[0px]",
-                    )}
-                  />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Posunout: {stageMeta(target).label}</TooltipContent>
-            </Tooltip>
-          )}
+          <RowAction
+            job={job}
+            view={view}
+            // desktop: jen barevná ikona (popisek zůstává pro čtečky i v bublině)
+            className="lg:w-8 lg:gap-0 lg:px-0 lg:text-[0px]"
+          />
         </div>
       </div>
     </li>

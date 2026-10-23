@@ -15,7 +15,7 @@ import { IssueOrderDialog } from "./issue-order-dialog";
 import { PurchaseOrderCard } from "./purchase-orders-section";
 import { EditPurchaseOrderDialog, SendPurchaseOrderDialog } from "./purchase-order-dialogs";
 import { SectionTitle } from "./ui-bits";
-import { orderActs, purchaseActivity } from "./purchasing-model";
+import { ownerAssignedStamp } from "./purchasing-model";
 
 type SendTarget = { id: string; number: string; supplierName: string | null; fileId: string | null };
 
@@ -33,7 +33,7 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
   const [sendTarget, setSendTarget] = React.useState<SendTarget | null>(null);
   const [editOrder, setEditOrder] = React.useState<PurchaseOrderView | null>(null);
 
-  const activity = React.useMemo(() => purchaseActivity(job.events), [job.events]);
+  const ownerAssigned = React.useMemo(() => ownerAssignedStamp(job.events), [job.events]);
   const winner = data.supplierQuotes.find((q) => q.selected) ?? null;
   const active = data.purchaseOrders.filter((p) => p.status !== "zrusena");
   const orders = React.useMemo(
@@ -45,7 +45,7 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
 
   return (
     <div className="space-y-6">
-      <MarginHeroCard job={job} data={data} ownerAssigned={activity.ownerAssigned} />
+      <MarginHeroCard job={job} data={data} ownerAssigned={ownerAssigned} />
 
       {/* Další krok: vystavit objednávku */}
       <section className="flex flex-col gap-3 rounded-2xl border border-lime-200/80 bg-gradient-to-r from-lime-50 via-card to-card p-4 shadow-sm sm:flex-row sm:items-center dark:border-lime-500/25 dark:from-lime-500/10">
@@ -103,7 +103,6 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
         <SupplierQuotesSection
           quotes={data.supplierQuotes}
           today={today}
-          selectedBy={activity.quoteSelected}
           pendingCaptured={data.pendingCaptured}
           onAdd={() => setQuoteDialog({ open: true, quote: null })}
           onEdit={(quote) => setQuoteDialog({ open: true, quote })}
@@ -131,7 +130,7 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {orders.map((po) => (
-              <PurchaseOrderCard key={po.id} order={po} today={today} notify={notify} onChanged={refresh} onEdit={() => setEditOrder(po)} acts={orderActs(po, activity)} />
+              <PurchaseOrderCard key={po.id} order={po} today={today} notify={notify} onChanged={refresh} onEdit={() => setEditOrder(po)} />
             ))}
           </div>
         )}

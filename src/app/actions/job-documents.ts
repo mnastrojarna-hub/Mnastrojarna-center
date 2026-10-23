@@ -1,15 +1,17 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { checkFeature } from "@/lib/auth/session";
+import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
+import { checkFeature, getAccess } from "@/lib/auth/session";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { getJob } from "@/lib/data/jobs";
-import { registerJobFile } from "@/app/actions/job-files";
-import { markJobQuoteSent, setJobStage } from "@/app/actions/jobs";
+import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { isForward, isJobStage } from "@/lib/jobs/stages";
+import type { JobStage } from "@/lib/supabase/database.types";
 import { cleanText, isUuid, jobFilePath, translateDbError } from "@/lib/jobs/mapping";
 import {
   DOCUMENT_KIND_LABEL, documentEmailHtml, draftDocumentEmail, firstEmail, isDocumentEmailKind, issuedEventMessage,
@@ -57,7 +59,7 @@ async function begin(): Promise<{ db: JobsDb; user: CurrentUser } | { error: str
   if (!isSupabaseConfigured()) return { error: "Supabase není nakonfigurováno." };
   const access = await checkFeature("documents");
   if ("error" in access) return { error: access.error };
-  const db = await createOperatorClient();
+  const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user };
 }
 
@@ -71,7 +73,7 @@ function myName(user: CurrentUser): string | undefined {
 }
 
 function unpricedError(n: number, kind: JobDocumentKind): string {
-  const what = kind === "faktura" ? "fakturu" : "potvrzení";
+  const what = kind === "faktura" ? "fakturu" : kind === "nabidka" ? "nabídku" : "potvrzení";
   return `${n} ${plural(n, "položka nemá", "položky nemají", "položek nemá")} cenu — doplň ceny v Nacenění, nebo ${what} přesto vystav.`;
 }
 
@@ -158,33 +160,53 @@ async function recordInvoice(
   }
 }
 
-/** Zpráva v historii: místo obecného „Nahrán dokument" konkrétní „Vystavena faktura …". */
-async function markIssuedEvent(db: JobsDb, jobId: string, fileId: string, message: string, data: Record<string, unknown>, actorId: string) {
-  try {
-    const { data: rows, error } = await db
-      .from("job_events")
-      .update({ message } as never)
-      .eq("job_id", jobId)
-      .eq("type", "file")
-      .contains("data", { fileId })
-      .select("id");
-    if (!error && Array.isArray(rows) && rows.length) return;
-  } catch {
-    // spadni na nový záznam
-  }
-  await logJobEvent(db, { jobId, type: "file", message, data: { fileId, ...data }, actorId });
+/** Stav zakázky dopředu jedním zápisem; událost s autorem zapíše DB (poznámka v hlavičce). */
+async function advanceStage(db: JobsDb, jobId: string, from: JobStage, to: JobStage, note: string): Promise<void> {
+  if (!isForward(from, to)) return;
+  const q = db.from("orders").update({ status: to } as never).eq("id", jobId).eq("status", from);
+  const { error } = await withChangeNote(q, note);
+  if (error) console.error(`[job-documents] Posun do „${to}" selhal: ${error.message}`);
+}
+
+/** Fakta dokladů zakázky (revize objednávky, dodání) pro vystavení a odeslání. */
+async function docFacts(db: JobsDb, jobId: string) {
+  const { data } = await db.from("orders")
+    .select("status, order_status, order_revision, items_count, items_delivered, items_partial, partial_delivery_at")
+    .eq("id", jobId).maybeSingle();
+  const r = (data ?? {}) as {
+    status?: string; order_status?: string | null; order_revision?: number | null; items_count?: number | null;
+    items_delivered?: number | null; items_partial?: number | null; partial_delivery_at?: string | null;
+  };
+  const count = Number(r.items_count) || 0;
+  const delivered = Number(r.items_delivered) || 0;
+  const partial = (count > 0 && (delivered > 0 || (Number(r.items_partial) || 0) > 0) && delivered < count)
+    || (count === 0 && Boolean(r.partial_delivery_at));
+  return {
+    stage: isJobStage(r.status) ? r.status : null,
+    orderStatus: r.order_status ?? null,
+    orderRevision: Math.max(1, Number(r.order_revision) || 1),
+    /** Dodáno jen částečně — faktura stav neposouvá (M5). */
+    partialDelivery: partial,
+  };
+}
+
+/** Otisk obsahu dokladu (data PDF, ne PDF samotné — to nese čas vytvoření). */
+function docFingerprint(kind: JobDocumentKind, data: unknown, extra: Record<string, unknown>): string {
+  return `g:${createHash("sha256").update(JSON.stringify({ kind, data, ...extra })).digest("hex")}`;
 }
 
 /**
  * Vygeneruje PDF doklad ze zakázky, uloží ho do Dokumentů zakázky (verzuje)
  * a vrátí id souboru. Nabídka vyžaduje quoteId (jinak poslední aktuální nabídka).
- * Potvrzení a faktura s položkami bez ceny vrátí chybu s `unpriced` — UI nabídne
- * „Přesto vystavit" (opts.force).
+ * Nabídka, potvrzení a faktura s položkami bez ceny vrátí chybu s `unpriced` — UI nabídne
+ * „Přesto vystavit" (opts.force). S opts.reuse (dialogy „Odeslat…") vrátí beze změny obsahu
+ * (otisk) poslední vystavený soubor — otevření dialogu nezakládá nové verze ani historii;
+ * výslovné „Vystavit" dál zakládá novou verzi.
  */
 export async function generateJobDocument(
   jobId: string,
   kind: JobDocumentKind,
-  opts?: { quoteId?: string; note?: string; force?: boolean },
+  opts?: { quoteId?: string; note?: string; force?: boolean; reuse?: boolean },
 ): Promise<ActionResult<{ fileId: string; number: string; filename: string; version: number; unpriced: number }>> {
   if (!isDocKind(kind)) return fail("Neznámý druh dokladu.");
   if (!isUuid(jobId)) return fail(NOT_FOUND);
@@ -201,7 +223,8 @@ export async function generateJobDocument(
     if (!job) return fail(NOT_FOUND);
 
     let number: string;
-    let pdf: Buffer;
+    let render: () => Promise<Buffer>;
+    let fpData: unknown;
     let quote: JobQuote | undefined;
     let invoice: Parameters<typeof recordInvoice>[2] | null = null;
 
@@ -212,14 +235,18 @@ export async function generateJobDocument(
       }
       const data = await buildQuoteDoc(job, quote, { preparedBy });
       if (note) data.note = note;
+      const missing = unpricedCount(data.items);
+      if (missing && !force) return { ok: false, error: unpricedError(missing, kind), unpriced: missing };
       number = data.number;
-      pdf = await renderQuotePdf(data);
+      fpData = data;
+      render = () => renderQuotePdf(data);
     } else if (kind === "potvrzeni") {
       const data = await buildConfirmationDoc(job, { preparedBy, note });
       const missing = unpricedCount(data.items);
       if (missing && !force) return { ok: false, error: unpricedError(missing, kind), unpriced: missing };
       number = data.number;
-      pdf = await renderConfirmationPdf(data);
+      fpData = data;
+      render = () => renderConfirmationPdf(data);
     } else if (kind === "dodaci_list") {
       const existing = (job.deliveryNoteNumber ?? "").trim();
       const allocated = existing || (await nextDocNumber(db, "DL"));
@@ -231,7 +258,8 @@ export async function generateJobDocument(
       }
       number = allocated;
       const data = await buildDeliveryNoteDoc(job, { number, preparedBy, note });
-      pdf = await renderDeliveryNotePdf(data);
+      fpData = data;
+      render = () => renderDeliveryNotePdf(data);
     } else {
       // ceny zkontrolovat dřív, než se spotřebuje číslo z řady
       const missing = unpricedCount(pickPricedItems(job));
@@ -250,18 +278,36 @@ export async function generateJobDocument(
         number, variableSymbol: data.variableSymbol, issueDate: data.issueDate, taxableDate: data.taxableDate,
         dueDate: data.dueDate, currency: data.currency, items: data.items, note,
       };
-      pdf = await renderInvoicePdf(data);
+      fpData = data;
+      render = () => renderInvoicePdf(data);
     }
 
-    // PDF do úložiště zakázky
     const filename = pdfFileName(kind, number);
+    const facts = await docFacts(db, jobId);
+    const orderRevision = kind === "potvrzeni" ? facts.orderRevision : null;
+    const fingerprint = docFingerprint(kind, fpData, { orderRevision, quoteId: quote?.id ?? null, filename });
+    // stejný obsah jako poslední vystavený doklad → žádná nová verze ani událost
+    if (opts?.reuse === true) {
+      const { data: same } = await db.from("job_files")
+        .select("id, filename, version")
+        .eq("job_id", jobId).eq("kind", kind).eq("archived", false).eq("content_sha256", fingerprint)
+        .order("version", { ascending: false }).limit(1);
+      const reuse = ((same ?? []) as { id: string; filename: string; version: number | null }[])[0];
+      if (reuse) {
+        return { ok: true, fileId: reuse.id, number, filename: reuse.filename, version: reuse.version ?? 1, unpriced: 0 };
+      }
+    }
+    const pdf = await render();
+
+    // PDF do úložiště zakázky
     const path = jobFilePath(jobId, crypto.randomUUID(), filename);
     const { error: upErr } = await db.storage
       .from(BUCKET)
       .upload(path, pdf, { contentType: "application/pdf", upsert: false });
     if (upErr) return fail(`PDF se nepodařilo uložit: ${upErr.message}`);
 
-    const reg = await registerJobFile({
+    // náš doklad: origin generated + vystavitel my (potvrzení → „vystaveno“ k revizi objednávky); jedna událost níže
+    const reg = await registerJobFileCore(db, user.id, {
       jobId,
       path,
       filename,
@@ -271,6 +317,11 @@ export async function generateJobDocument(
       title: `${DOCUMENT_KIND_LABEL[kind]} ${number}`,
       quoteId: quote?.id,
       note,
+      silent: true,
+      origin: "generated",
+      issuer: "my",
+      orderRevision,
+      contentSha256: fingerprint,
     });
     if (!reg.ok || !reg.file) {
       try {
@@ -288,14 +339,21 @@ export async function generateJobDocument(
     }
     if (invoice) await recordInvoice(db, job, invoice, path, user.id);
 
-    await markIssuedEvent(
-      db, jobId, file.id, issuedEventMessage(kind, number, file.version),
-      { kind, filename, version: file.version, number, action: "issued" }, user.id,
-    );
+    const partialInvoice = kind === "faktura" && facts.partialDelivery;
+    // historie jen přibývá: vlastní událost „Vystaveno …“ (registrace výše je tichá)
+    await logJobEvent(db, {
+      jobId, type: "file", entity: "file", entityId: file.id, actorId: user.id,
+      message: issuedEventMessage(kind, number, file.version, { orderRevision, partial: partialInvoice }),
+      data: {
+        fileId: file.id, kind, filename, version: file.version, number, action: "issued",
+        ...(orderRevision ? { orderRevision } : {}), ...(partialInvoice ? { partialDelivery: true } : {}),
+      },
+    });
 
-    if (kind === "faktura" && isForward(job.stage, "fakturovano")) {
-      const st = await setJobStage(jobId, "fakturovano");
-      if (!st.ok) console.error(`[job-documents] Posun do „Vyfakturováno" selhal: ${st.error}`);
+    // faktura posune zakázku, jen když je dodáno vše (při dílčí dodávce stav zůstává — M5)
+    const stageNow = facts.stage ?? job.stage;
+    if (kind === "faktura" && !partialInvoice && isForward(stageNow, "fakturovano")) {
+      await advanceStage(db, jobId, stageNow, "fakturovano", `vystavena faktura ${number}`);
     }
 
     await logAudit({
@@ -371,12 +429,27 @@ export async function sendJobDocument(
 
     const { data: jobData, error: jobErr } = await db
       .from("orders")
-      .select("id, number, status, invoice_number, delivery_note_number")
+      .select("id, number, status, order_status, invoice_number, delivery_note_number")
       .eq("id", jobId)
       .maybeSingle();
     if (jobErr) return fail(jobErr.message);
-    const job = jobData as { id: string; number: string | null; status: string; invoice_number: string | null; delivery_note_number: string | null } | null;
+    const job = jobData as {
+      id: string; number: string | null; status: string; order_status: string | null; invoice_number: string | null; delivery_note_number: string | null;
+    } | null;
     if (!job) return fail(NOT_FOUND);
+
+    // nabídku posílá zákazníkovi jen člověk s právem na marže (přechod → odeslaná, transitionFeature)
+    if (file.kind === "nabidka" && !(await getAccess()).can("margins")) {
+      return fail("Nabídku zákazníkovi odesílá obchodník nebo admin — předej ji ke schválení.");
+    }
+    // nabídku, která čeká na schválení (AI, žádost, limit), nejde odeslat — kontrola dřív, než e-mail odejde
+    if (file.kind === "nabidka" && file.quote_id) {
+      const { data: qd } = await db.from("quotes").select("status, approval_required, approved_by").eq("id", file.quote_id).maybeSingle();
+      const q = qd as { status: string; approval_required: boolean | null; approved_by: string | null } | null;
+      if (q && q.approval_required && !q.approved_by && q.status !== "odeslano" && q.status !== "prijato" && q.status !== "zamitnuto") {
+        return fail("Nabídka čeká na schválení — odeslat ji lze až po schválení.");
+      }
+    }
 
     if (Number(file.size_bytes ?? 0) > MAX_ATTACHMENT) return fail("Soubor je pro přílohu e-mailu příliš velký (max. 20 MB).");
     const { data: blob, error: dlErr } = await db.storage.from(BUCKET).download(file.storage_path);
@@ -404,12 +477,20 @@ export async function sendJobDocument(
     // ── co odeslání znamená pro zakázku ──
     const kind: DocumentEmailKind = isDocumentEmailKind(file.kind) ? file.kind : "ostatni";
     if (kind === "nabidka" && file.quote_id) {
-      const marked = await markJobQuoteSent(file.quote_id);
-      if (!marked.ok) console.error(`[job-documents] Označení nabídky jako odeslané selhalo: ${marked.error}`);
+      // odeslání nabídky = fakt e-mailu (jediná událost níže, 3.4 „bez duplicit"); stav nabídky
+      // se zapíše tady, posun zakázky na „Nabídka odeslaná" a sent_via dorovná DB. Přijatá ani
+      // zamítnutá nabídka se opětovným posláním PDF nevrací na „Odeslaná".
+      const { error } = await db
+        .from("quotes")
+        .update({ status: "odeslano", sent_at: new Date().toISOString(), sent_via: "email" } as never)
+        .eq("id", file.quote_id)
+        .in("status", ["navrh_ai", "ke_schvaleni", "odeslano"]);
+      if (error) console.error(`[job-documents] Označení nabídky jako odeslané selhalo: ${error.message}`);
     }
-    if (kind === "potvrzeni" && isJobStage(job.status) && isForward(job.status, "potvrzeno")) {
-      const st = await setJobStage(jobId, "potvrzeno");
-      if (!st.ok) console.error(`[job-documents] Posun do „Potvrzená objednávka" selhal: ${st.error}`);
+    // potvrzení: objednávku potvrdí DB z události e-mailu níže (podle revize odeslaného souboru);
+    // zakázka bez dokladu objednávky (starší data) se posune sama zde
+    if (kind === "potvrzeni" && !job.order_status && isJobStage(job.status) && isForward(job.status, "potvrzeno")) {
+      await advanceStage(db, jobId, job.status, "potvrzeno", "potvrzení objednávky odesláno e-mailem");
     }
     if (kind === "faktura" && job.invoice_number) {
       const { error } = await db

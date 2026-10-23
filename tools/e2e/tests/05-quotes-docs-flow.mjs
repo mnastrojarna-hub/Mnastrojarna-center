@@ -4,7 +4,7 @@
 // položkou, verze, dodací list, faktura), stránky toku /inquiries, /pricing, /quotes,
 // /confirmations, /documents (super admin, obchodník, zaměstnanec) a mobil 390 px.
 // Vlastní data mají prefix „E2E-quotes-docs-flow-" a na konci se uklidí.
-import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest as restCall, restLogin } from "../lib.mjs";
 import {
   PREFIX, TAG, lit, userIds, eventually, waitHydrated, expectNoOverflow, waitToast, alertTexts, isoDays,
   fetchPdf, expectPdf, mailsTo, waitMail, createCustomer, createJob, createQuote, cleanupOwnData,
@@ -64,7 +64,7 @@ const C2 = createJob({
 });
 const B1 = createJob({ title: `${PREFIX}B1 board ${TAG}`, status: "naceneni", customerId: CUST.id, ownerId: ID.obchod, reqDays: 25 });
 const B1Q = createQuote(B1, {
-  number: `E2EQDF-${TAG}-B1`, status: "ke_schvaleni", createdBy: ID.obchod, customerId: CUST.id,
+  number: `E2EQDF-${TAG}-B1`, status: "ke_schvaleni", createdBy: ID.obchod, customerId: CUST.id, approvalRequested: true,
   items: [{ drawing: `QDF-${TAG}-B1`, name: "Hřídel B1", qty: 5, price: 1200 }],
 });
 const B2 = createJob({ title: `${PREFIX}B2 board zamítnutí ${TAG}`, status: "nabidka", customerId: CUST.id, ownerId: ID.obchod });
@@ -149,7 +149,7 @@ await T("PDF API: náhled nabídky i dokladů → 200 application/pdf %PDF, nic 
 
 // ═════════════════════════ KARTA ZAKÁZKY · NABÍDKY ═════════════════════════
 
-await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) → NAB-…, Ke schválení, „Zadal“ obchodník, DB", async (context) => {
+await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) → NAB-…, Rozpracovaná, „Zadal“ obchodník, DB", async (context) => {
   const page = await context.newPage();
   await openJob(page, USERS.obchod, Q1, "nabidky");
   const panel = activePanel(page);
@@ -180,7 +180,7 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   await waitToast(page, /vytvořena — teď ji schval/);
 
   const row = await eventually(() => {
-    const r = sql(`select id || '|' || number || '|' || status || '|' || total || '|' || valid_until || '|' || lead_time_days || '|' || created_by || '|' || coalesce(approved_by::text,'-') || '|' || revision || '|' || archived || '|' || coalesce(note,'')
+    const r = sql(`select id || '|' || number || '|' || status || '|' || total || '|' || valid_until || '|' || lead_time_days || '|' || created_by || '|' || coalesce(approved_by::text,'-') || '|' || revision || '|' || (case when archived then 't' else 'f' end) || '|' || coalesce(note,'')
       from quotes where job_id = ${lit(Q1.id)}`);
     expect(r, "nabídka v DB");
     return r.split("|");
@@ -189,6 +189,9 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   st.q1 = { id: qid, number };
   expect(/^NAB-\d{4}-\d+$/.test(number), `číslo NAB-RRRR-NNN (${number})`);
   expect(status === "ke_schvaleni" && approvedBy === "-", `stav ke_schvaleni, neschváleno (${status}, ${approvedBy})`);
+  // podrobný stav: obchodník s právem marží, ne AI, bez limitu → Rozpracovaná, schválení se nevyžaduje (1.3)
+  const qs = sql(`select state || '|' || approval_required || '|' || coalesce(state_changed_by::text, '-') from quotes where id = ${lit(qid)}`);
+  expect(qs === `rozpracovana|false|${ID.obchod}`, `quotes.state rozpracovaná, bez nutnosti schválení, autor obchodník (${qs})`);
   expect(num(total) === 5892, `celkem 4×1250,50 + 10×89 = 5892 (${total})`);
   expect(valid === isoDays(21) && leadDays === "18", `platnost ${valid}, lhůta ${leadDays}`);
   expect(createdBy === ID.obchod && revision === "1" && archived === "f", `zadal obchodník, rev 1, ne archiv (${createdBy}, ${revision}, ${archived})`);
@@ -202,10 +205,12 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   const card = quoteCard(page, number);
   await card.waitFor({ timeout: 10_000 });
   const t = norm(await card.innerText());
-  for (const s of ["rev. 1", "Ke schválení", "Petr Obchodník", "čeká na schválení", "5 892", "18 dní"]) expect(t.includes(s), `karta nabídky obsahuje „${s}" (${t.slice(0, 300)})`);
+  for (const s of ["rev. 1", "Rozpracovaná", "Petr Obchodník", "nevyžaduje se", "5 892", "18 dní"]) expect(t.includes(s), `karta nabídky obsahuje „${s}" (${t.slice(0, 300)})`);
+  // kdo stav nastavil — razítko u stavu karty (jméno, ne prázdné)
+  expect(await card.getByRole("button", { name: /^Rozpracovaná: Petr Obchodník.* — podrobnosti$/ }).isVisible(), "razítko stavu: Rozpracovaná · Petr Obchodník");
   const send = card.getByRole("button", { name: "Odeslat zákazníkovi" });
-  expect(await send.isDisabled(), "Odeslat je zakázané, dokud není schváleno");
-  expect((await send.getAttribute("title")) === "Nejdřív nabídku schval", "nápověda u Odeslat");
+  expect(await send.isEnabled(), "obchodník smí rozpracovanou nabídku odeslat hned (schválení se nevyžaduje)");
+  expect(await card.getByRole("button", { name: "Schválit" }).isVisible(), "schválit jde i tak (čtyři oči dobrovolně)");
   expect(/Nabídky\s*1/.test(await page.getByRole("tab", { name: /^Nabídky/ }).innerText()), "záložka Nabídky ukazuje 1");
   await shot(page, S("02-quote-created"));
 });
@@ -223,8 +228,9 @@ await T("detail Nabídky: schválení super adminem → „Schválil“ + datum,
   });
   expect(await card.getByRole("button", { name: "Schválit" }).count() === 0, "tlačítko Schválit zmizelo");
   expect(await card.getByRole("button", { name: "Odeslat zákazníkovi" }).isEnabled(), "Odeslat zákazníkovi je povolené");
-  const db = sql(`select q.approved_by || '|' || (q.approved_at is not null) || '|' || q.status || '|' || o.approved_by from quotes q join orders o on o.id = q.job_id where q.id = ${lit(st.q1.id)}`);
-  expect(db === `${ID.admin}|true|ke_schvaleni|${ID.admin}`, `DB schválení: ${db}`);
+  const db = sql(`select q.approved_by || '|' || (q.approved_at is not null) || '|' || q.status || '|' || o.approved_by || '|' || q.state || '|' || q.state_changed_by from quotes q join orders o on o.id = q.job_id where q.id = ${lit(st.q1.id)}`);
+  expect(db === `${ID.admin}|true|ke_schvaleni|${ID.admin}|schvalena|${ID.admin}`, `DB schválení: ${db}`);
+  expect(await card.getByRole("button", { name: /^Schválená: Super Admin.* — podrobnosti$/ }).isVisible(), "razítko stavu: Schválená · Super Admin");
   const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
   expect(ev === `Nabídka ${st.q1.number} schválena|${ID.admin}`, `historie: ${ev}`);
   await shot(page, S("03-quote-approved"));
@@ -237,9 +243,11 @@ await T("detail Nabídky: PDF náhled z karty → 200 application/pdf %PDF, náh
   const card = quoteCard(page, st.q1.number);
   const href = await card.getByRole("link", { name: "PDF náhled" }).getAttribute("href");
   expect(href === `/api/pdf/job/${Q1.id}?type=nabidka&quoteId=${st.q1.id}`, `odkaz PDF náhledu (${href})`);
-  const [popup] = await Promise.all([page.waitForEvent("popup"), card.getByRole("link", { name: "PDF náhled" }).click()]);
-  await popup.waitForLoadState("domcontentloaded").catch(() => {});
-  expect(popup.url().includes(`/api/pdf/job/${Q1.id}`), `PDF se otevřelo v novém panelu (${popup.url()})`);
+  const link = card.getByRole("link", { name: "PDF náhled" });
+  expect((await link.getAttribute("target")) === "_blank" && /noopener/.test((await link.getAttribute("rel")) ?? ""), "odkaz otevírá nový panel (target=_blank, noopener)");
+  // nový panel se otevře; headless Chromium u PDF prohlížeče adresu nehlásí (":"), obsah ověří fetch níže
+  const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 10_000 }), link.click()]);
+  expect(popup.url() !== page.url(), `PDF se otevřelo v novém panelu, karta zůstala (${popup.url()})`);
   await popup.close();
   expectPdf(await fetchPdf(page.request, `${BASE}${href}`), "PDF náhled nabídky");
   expect(sql(`select count(*) from job_files where job_id = ${lit(Q1.id)}`) === "0", "náhled nic neuložil do Dokumentů");
@@ -290,8 +298,10 @@ await T("detail Nabídky: odeslání e-mailem — dialog předvyplněný, mail s
   });
   const out = sql(`select count(*) || '|' || coalesce(max(owner_id::text),'-') from emails where order_id = ${lit(Q1.id)} and direction = 'out' and subject like ${lit(`%${st.q1.number}%`)}`);
   expect(out === `1|${ID.obchod}`, `odeslaná pošta: 1 záznam, odesílatel obchodník (${out})`);
-  const stage = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'stage' order by created_at desc limit 1`);
-  expect(stage === `Stav: Nacenění → Nabídka odeslaná|${ID.obchod}`, `historie: posun stavu (${stage})`);
+  const stage = sql(`select message || '|' || actor_id || '|' || actor_name || '|' || via from job_events where job_id = ${lit(Q1.id)} and type = 'stage' order by created_at desc limit 1`);
+  expect(stage.startsWith("Stav: Nacenění → Nabídka odeslaná") && stage.endsWith(`|${ID.obchod}|Petr Obchodník|automaticky`), `historie: posun stavu automaticky, spustil obchodník (${stage})`);
+  const qdb = sql(`select state || '|' || sent_by || '|' || sent_via from quotes where id = ${lit(st.q1.id)}`);
+  expect(qdb === `odeslana|${ID.obchod}|email`, `DB: Odeslaná e-mailem, odeslal obchodník (${qdb})`);
   await eventually(async () => {
     const t = norm(await card.innerText());
     expect(t.includes("Odesláno"), `karta: stav Odesláno (${t.slice(0, 200)})`);
@@ -314,7 +324,7 @@ await T("historie: odeslání nabídky z karty = JEN JEDNA událost „odeslána
   expect(ui.length === 1, `v záložce Historie právě 1 položka odeslání, je ${ui.length}: ${ui.join(" ‖ ")}`);
 });
 
-await T("detail Nabídky: nová verze (R2) → stará archivována, „Starší verze (1)“, rev. 2 čeká na schválení", async (context) => {
+await T("detail Nabídky: nová verze (R2) → stará archivována, „Starší verze (1)“, rev. 2 rozpracovaná", async (context) => {
   expect(st.q1, "nabídka existuje");
   const page = await context.newPage();
   await openJob(page, USERS.obchod, Q1, "nabidky");
@@ -324,19 +334,21 @@ await T("detail Nabídky: nová verze (R2) → stará archivována, „Starší 
   const card = quoteCard(page, r2);
   await card.waitFor({ timeout: 10_000 });
   const t = norm(await card.innerText());
-  for (const s of ["rev. 2", "Ke schválení", "čeká na schválení", "5 892", "Petr Obchodník"]) expect(t.includes(s), `karta R2 obsahuje „${s}" (${t.slice(0, 250)})`);
+  for (const s of ["rev. 2", "Rozpracovaná", "nevyžaduje se", "5 892", "Petr Obchodník"]) expect(t.includes(s), `karta R2 obsahuje „${s}" (${t.slice(0, 250)})`);
   expect(await quoteCard(page, st.q1.number).count() === 0, "původní verze není mezi aktuálními");
   const older = activePanel(page).getByRole("button", { name: "Starší verze (1)" });
   expect(await older.isVisible(), "odkaz Starší verze (1)");
   await older.click();
   const old = quoteCard(page, st.q1.number);
   await old.waitFor({ timeout: 5_000 });
-  expect(norm(await old.innerText()).includes("archiv"), "stará verze je v archivu");
-  const db = sql(`select number || '|' || revision || '|' || status || '|' || archived || '|' || coalesce(approved_by::text,'-') || '|' || total || '|' || created_by || '|' || id
+  expect(/archiv/i.test(norm(await old.innerText())), "stará verze je v archivu (Archivovaná)");
+  const db = sql(`select number || '|' || revision || '|' || status || '|' || (case when archived then 't' else 'f' end) || '|' || coalesce(approved_by::text,'-') || '|' || total || '|' || created_by || '|' || id
     from quotes where job_id = ${lit(Q1.id)} order by revision`).split("\n");
   expect(db.length === 2, `2 nabídky v DB (${db.join(" ; ")})`);
   const [o, n] = db.map((r) => r.split("|"));
   expect(o[3] === "t" && o[2] === "odeslano", `stará: archivována, stav odesláno (${db[0]})`);
+  const states = sql(`select string_agg(state, ',' order by revision) from quotes where job_id = ${lit(Q1.id)}`);
+  expect(states === "archivovana,rozpracovana", `podrobné stavy verzí: archivovaná, rozpracovaná (${states})`);
   expect(n[0] === r2 && n[1] === "2" && n[2] === "ke_schvaleni" && n[3] === "f" && n[4] === "-" && num(n[5]) === 5892 && n[6] === ID.obchod, `nová verze (${db[1]})`);
   st.r2 = { id: n[7], number: r2 };
   expect(sql(`select count(*) from quote_items where quote_id = ${lit(st.r2.id)}`) === "2", "položky zkopírované do nové verze");
@@ -382,7 +394,7 @@ await T("detail Nabídky: archivace a obnovení verze z archivu", async (context
   expect(evs === `Nabídka ${st.r2.number} archivována ; Nabídka ${st.r2.number} obnovena z archivu`, `historie: ${evs}`);
 });
 
-await T("detail Nabídky: přijetí — schválit R2, „Přijata zákazníkem“ → Přijato, zakázka Objednávka, hodnota = nabídka, orders.quote_id", async (context) => {
+await T("detail Nabídky: přijetí — schválit R2, „Odesláno jinak“, „Přijata zákazníkem“ → Přijatá, zakázka Objednávka, hodnota = nabídka, orders.quote_id", async (context) => {
   expect(st.r2, "R2 existuje");
   const page = await context.newPage();
   await openJob(page, USERS.obchod, Q1, "nabidky");
@@ -390,6 +402,19 @@ await T("detail Nabídky: přijetí — schválit R2, „Přijata zákazníkem�
   await card.getByRole("button", { name: "Schválit" }).click();
   await waitToast(page, /schválena/);
   await eventually(async () => expect(await card.getByRole("button", { name: "Schválit" }).count() === 0, "schváleno"));
+  // přijmout jde jen odeslanou nabídku (1.3) — tady odešla osobně
+  await quoteMenu(page, card, "Odesláno jinak…");
+  const sentDlg = page.getByRole("dialog");
+  await sentDlg.getByRole("heading", { name: `Odesláno jinak — ${st.r2.number}` }).waitFor({ timeout: 10_000 });
+  await sentDlg.getByRole("textbox").fill(`předáno osobně ${TAG}`);
+  await sentDlg.getByRole("button", { name: "Označit jako odeslanou" }).click();
+  await waitToast(page, new RegExp(`Nabídka ${esc(st.r2.number)} označena jako odeslaná`));
+  await eventually(() => {
+    const q = sql(`select state || '|' || sent_via || '|' || sent_by from quotes where id = ${lit(st.r2.id)}`);
+    expect(q === `odeslana|rucne|${ID.obchod}`, `DB: Odeslaná jinak, odeslal obchodník (${q})`);
+  });
+  const sentEv = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
+  expect(sentEv === `Nabídka ${st.r2.number} odeslána zákazníkovi (jinak než e-mailem) — předáno osobně ${TAG}|${ID.obchod}`, `historie: odesláno jinak s poznámkou (${sentEv})`);
   await card.getByRole("button", { name: "Přijata zákazníkem" }).click();
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: `Zákazník přijal nabídku ${st.r2.number}?` }).waitFor({ timeout: 10_000 });
@@ -397,13 +422,13 @@ await T("detail Nabídky: přijetí — schválit R2, „Přijata zákazníkem�
   await dlg.getByRole("button", { name: "Ano, přijata" }).click();
   await waitToast(page, /přijata — zakázka je teď Objednávka/);
   await eventually(() => {
-    const db = sql(`select q.status || '|' || o.status || '|' || o.value || '|' || coalesce(o.quote_id::text,'-') from quotes q join orders o on o.id = q.job_id where q.id = ${lit(st.r2.id)}`).split("|");
-    expect(db[0] === "prijato" && db[1] === "objednavka" && num(db[2]) === 5690 && db[3] === st.r2.id, `DB přijetí: ${db.join("|")}`);
+    const db = sql(`select q.status || '|' || o.status || '|' || o.value || '|' || coalesce(o.quote_id::text,'-') || '|' || q.state || '|' || coalesce(o.order_status, '-') from quotes q join orders o on o.id = q.job_id where q.id = ${lit(st.r2.id)}`).split("|");
+    expect(db[0] === "prijato" && db[1] === "objednavka" && num(db[2]) === 5690 && db[3] === st.r2.id && db[4] === "prijata" && db[5] === "dorucena", `DB přijetí (+ objednávka Doručená): ${db.join("|")}`);
   });
   await eventually(async () => expect(norm(await card.innerText()).includes("Přijatá — platí pro zakázku"), "karta: Přijatá — platí pro zakázku"));
   expect(await page.locator('main section[aria-label="Zakázka"]').getByRole("button", { name: "Stav zakázky: Objednávka — změnit" }).isVisible(), "hlavička: Objednávka");
   const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
-  expect(ev.startsWith(`Nabídka ${st.r2.number} přijata zákazníkem — hodnota zakázky`) && ev.endsWith(ID.obchod), `historie: ${ev}`);
+  expect(ev === `Nabídka ${st.r2.number} přijata zákazníkem|${ID.obchod}`, `historie: ${ev}`);
   await shot(page, S("09-quote-accepted"));
 });
 
@@ -411,22 +436,28 @@ await T("detail Nabídky: zamítnutí s důvodem (super admin) → Zamítnuto, r
   const page = await context.newPage();
   await openJob(page, USERS.admin, Q2, "nabidky");
   const card = quoteCard(page, Q2Q.number);
-  await quoteMenu(page, card, "Zákazník nabídku zamítl");
+  await quoteMenu(page, card, "Zákazník nabídku zamítl…");
   const dlg = page.getByRole("dialog");
-  await dlg.getByRole("heading", { name: `Zákazník zamítl nabídku ${Q2Q.number}` }).waitFor({ timeout: 10_000 });
-  await dlg.getByRole("button", { name: "Vysoká cena" }).click();
-  expect((await dlg.locator("textarea").inputValue()) === "Vysoká cena", "rychlá volba důvodu vyplní text");
+  await dlg.getByRole("heading", { name: `Zákazník nabídku zamítl — ${Q2Q.number}` }).waitFor({ timeout: 10_000 });
+  expect(norm(await dlg.innerText()).includes("Zakázka → Nerealizováno"), "náhled dopadu: jediná otevřená nabídka → zakázka Nerealizováno");
+  const confirm = dlg.getByRole("button", { name: "Zamítnuta" });
+  expect(await confirm.isDisabled(), "bez důvodu nejde potvrdit");
+  await dlg.getByRole("radio", { name: "Cena", exact: true }).click();
+  await dlg.getByRole("textbox").fill("Konkurence o 12 % levnější");
   await shot(page, S("10-quote-reject-dialog"));
-  await dlg.getByRole("button", { name: "Označit jako zamítnutou" }).click();
-  await waitToast(page, new RegExp(`Nabídka ${esc(Q2Q.number)} označena jako zamítnutá`));
+  await confirm.click();
+  await waitToast(page, new RegExp(`Nabídka ${esc(Q2Q.number)} zamítnuta`));
   await eventually(() => {
-    const db = sql(`select status || '|' || coalesce(rejected_reason,'-') from quotes where id = ${lit(Q2Q.id)}`);
-    expect(db === "zamitnuto|Vysoká cena", `DB: ${db}`);
+    const db = sql(`select q.status || '|' || q.state || '|' || coalesce(q.lost_reason,'-') || '|' || coalesce(q.rejected_reason,'-') || '|' || coalesce(q.state_changed_by::text,'-') || '|' || o.status || '|' || coalesce(o.lost_reason,'-')
+      from quotes q join orders o on o.id = q.job_id where q.id = ${lit(Q2Q.id)}`);
+    expect(db === `zamitnuto|zamitnuta|cena|Konkurence o 12 % levnější|${ID.admin}|nerealizovano|cena`, `DB: ${db}`);
   });
-  await eventually(async () => expect(norm(await card.innerText()).includes("Zamítnuto"), "karta: Zamítnuto"));
+  await eventually(async () => expect(norm(await card.innerText()).includes("Zamítnutá"), "karta: Zamítnutá"));
   expect(await card.getByRole("button", { name: "Přijata zákazníkem" }).count() === 0, "zamítnutou nabídku už nelze přijmout");
   const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q2.id)} and type = 'quote' order by created_at desc limit 1`);
-  expect(ev === `Nabídka ${Q2Q.number} zamítnuta — Vysoká cena|${ID.admin}`, `historie: ${ev}`);
+  expect(ev === `Nabídka ${Q2Q.number} zamítnuta — Cena: Konkurence o 12 % levnější|${ID.admin}`, `historie: ${ev}`);
+  const stage = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q2.id)} and type = 'stage' order by created_at desc limit 1`);
+  expect(stage.startsWith("Stav: Nabídka odeslaná → Nerealizováno") && stage.endsWith(`|${ID.admin}`), `historie: zakázka uzavřena s autorem (${stage})`);
 });
 
 // ═════════════════════════ KARTA ZAKÁZKY · DOKLADY ▾ ═════════════════════════
@@ -436,7 +467,7 @@ async function issueFromMenu(page, label) {
   await page.getByRole("menuitem", { name: new RegExp(`^${label}`) }).click();
 }
 const filesOf = (jobId, kind) =>
-  sql(`select id || '|' || version || '|' || archived || '|' || filename || '|' || coalesce(replaced_by::text,'-') || '|' || coalesce(uploaded_by::text,'-')
+  sql(`select id || '|' || version || '|' || (case when archived then 't' else 'f' end) || '|' || filename || '|' || coalesce(replaced_by::text,'-') || '|' || coalesce(uploaded_by::text,'-')
     from job_files where job_id = ${lit(jobId)} and kind = ${lit(kind)} order by version`).split("\n").filter(Boolean).map((r) => r.split("|"));
 
 await T("Doklady ▾: Potvrzení s neoceněnou položkou → dialog „Přesto vystavit“ → PDF v Dokumentech (v1), historie", async (context) => {
@@ -524,8 +555,9 @@ await T("Doklady ▾: Faktura (neoceněná položka → Přesto vystavit) → FV
   const f = filesOf(D1.id, "faktura");
   expect(f.length === 1 && f[0][1] === "1", `job_files faktura v1 (${f.length})`);
   expectPdf(await fetchPdf(page.request, `${BASE}/api/jobs/files/${f[0][0]}`), "uložená faktura");
-  const stage = sql(`select message from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
-  expect(stage === "Stav: Objednávka → Vyfakturováno", `historie stavu: ${stage}`);
+  const stage = sql(`select message || '|' || actor_id || '|' || actor_name from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
+  expect(stage.startsWith("Stav: Objednávka → Vyfakturováno") && stage.includes(fv) && stage.endsWith(`|${ID.obchod}|Petr Obchodník`), `historie stavu s číslem faktury a autorem: ${stage}`);
+  expect(sql(`select coalesce(invoiced_by::text, '-') from orders where id = ${lit(D1.id)}`) === ID.obchod, "orders.invoiced_by = obchodník");
   await eventually(async () => {
     await page.reload();
     await page.locator('main section[aria-label="Zakázka"]').waitFor({ timeout: 15_000 });
@@ -541,11 +573,26 @@ await T("detail: vystavený doklad (potvrzení) jde z karty zakázky poslat zák
   const group = activePanel(page).locator("section").filter({ hasText: "Potvrzení" }).first();
   await group.waitFor({ timeout: 10_000 });
   await group.getByRole("button", { name: "Další akce dokumentu" }).first().click();
-  const items = (await page.getByRole("menuitem").allInnerTexts()).map(norm);
   await shot(page, S("14-docs-row-menu"));
-  await page.keyboard.press("Escape");
-  const send = items.filter((t) => /poslat|odeslat|e-mail/i.test(t));
-  expect(send.length > 0, `menu dokumentu nabízí odeslání e-mailem (nabízí: ${items.join(", ")})`);
+  await page.getByRole("menuitem", { name: "Poslat zákazníkovi e-mailem…" }).click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("heading", { name: "Poslat potvrzení objednávky zákazníkovi" }).waitFor({ timeout: 10_000 });
+  await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
+  const subject = await dlg.getByLabel("Předmět").inputValue();
+  expect(/Potvrzení objednávky/.test(subject), `předmět potvrzení (${subject})`);
+  const filesBefore = filesOf(D1.id, "potvrzeni").length;
+  const t0 = new Date().toISOString();
+  await dlg.getByRole("button", { name: "Odeslat potvrzení objednávky" }).click();
+  await waitToast(page, new RegExp(`odesláno na ${esc(CUST_EMAIL)}`), 30_000);
+  const mail = await waitMail(CUST_EMAIL, (m) => /Potvrzení objednávky/.test(m.subject) && m.receivedAt > t0);
+  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", "e-mail s PDF potvrzení v příloze");
+  expect(filesOf(D1.id, "potvrzeni").length === filesBefore, "odeslal se existující doklad — nová verze nevznikla");
+  await eventually(() => {
+    const o = sql(`select coalesce(confirmation_sent_by::text, '-') || '|' || coalesce(confirmation_sent_via, '-') from orders where id = ${lit(D1.id)}`);
+    expect(o === `${ID.obchod}|email`, `DB: potvrzení odeslal obchodník e-mailem (${o})`);
+  });
+  const ev = sql(`select message || '|' || actor_id || '|' || actor_name from job_events where job_id = ${lit(D1.id)} and type = 'email' order by created_at desc limit 1`);
+  expect(ev.includes(CUST_EMAIL) && ev.endsWith(`|${ID.obchod}|Petr Obchodník`), `historie: e-mail s autorem (${ev})`);
 });
 
 // ═════════════════════════ STRÁNKY TOKU ═════════════════════════
@@ -635,27 +682,37 @@ await T("/pricing?job=<id>: otevře zakázku, validace, „Uložit nacenění“
   const nab = /NAB-[\w-]+/.exec(await status.innerText())[0];
   st.p1Quote = nab;
   expect((await status.getByRole("link", { name: "Otevřít nabídku" }).getAttribute("href")) === `/orders/${P1.id}?tab=nabidky`, "odkaz na nabídku v kartě");
-  expect((await status.getByRole("link", { name: /Schválit a odeslat/ }).getAttribute("href")) === "/quotes", "odkaz na /quotes");
+  expect((await status.getByRole("link", { name: /Další krok v Nabídkách/ }).getAttribute("href")) === "/quotes", "odkaz na /quotes");
   const q = sql(`select number || '|' || status || '|' || total || '|' || valid_until || '|' || lead_time_days || '|' || created_by from quotes where job_id = ${lit(P1.id)}`);
   expect(q === `${nab}|ke_schvaleni|${q.split("|")[2]}|${isoDays(45)}|15|${ID.obchod}` && num(q.split("|")[2]) === 38400, `DB nabídka: ${q}`);
   await shot(page, S("23-pricing-quote-created"));
 });
 
-await T("/quotes: počty chipů = DB, hledání, filtr Ke schválení, archiv; kdo zadal / schválil", async (context) => {
+/** Chip stavu „<štítek> N“ na /quotes a jeho počet. */
+const quoteChip = (page, label) => page.locator('main [role=group][aria-label="Stav nabídky"] button[aria-pressed]').filter({ hasText: new RegExp(`^\\s*${esc(label)}\\s*\\d+\\s*$`) });
+const quoteChipNum = async (page, label) => Number(/(\d+)\s*$/.exec(norm(await quoteChip(page, label).innerText()))[1]);
+/** Počet nabídek v podrobném stavu podle DB (stejně jako flow_counts pro admina). */
+const quoteCountDb = (key) => Number(sql(`select coalesce(sum(n), 0) from flow_counts(null, 30) where flow_phase = 'quote' and flow_key = ${lit(key)}`));
+/** V „Více ▾“ zaškrtne uzavřené stavy (Přijatá, Zamítnutá, Archivovaná). */
+async function quoteMore(page, labels) {
+  await page.locator('main [role=group][aria-label="Stav nabídky"]').getByRole("button", { name: /^Více|Přijatá|Zamítnutá|Archivovaná/ }).last().click();
+  for (const l of labels) await page.getByRole("menuitemcheckbox", { name: new RegExp(`^${esc(l)}`) }).click();
+  await page.keyboard.press("Escape");
+}
+const quoteRows = (page) => page.locator("main ul > li").filter({ has: page.locator("span.font-mono") });
+const quoteNums = async (page) => quoteRows(page).locator("span.font-mono.text-sm").allInnerTexts();
+
+await T("/quotes: počty chipů = DB, hledání, filtr Čeká na schválení, archiv; kdo zadal / schválil / odeslal", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.admin);
   await flowPage(page, "/quotes", "Nabídky");
   await waitHydrated(page, 'main input[aria-label="Hledat v nabídkách"]');
-  const chipBtn = (label) => page.locator("main button[aria-pressed]").filter({ hasText: new RegExp(`^\\s*${label}\\s*\\d+\\s*$`) });
-  const chipNum = async (label) => Number(/(\d+)\s*$/.exec(norm(await chipBtn(label).innerText()))[1]);
   await eventually(async () => {
     try {
-      for (const [label, status] of [["Ke schválení", "ke_schvaleni"], ["Odesláno", "odeslano"], ["Přijato", "prijato"], ["Zamítnuto", "zamitnuto"]]) {
-        const db = Number(sql(`select count(*) from quotes where not archived and status = ${lit(status)}`));
-        expect((await chipNum(label)) === db, `chip ${label} = DB ${db}`);
+      for (const [label, key] of [["Rozpracovaná", "rozpracovana"], ["Čeká na schválení", "ke_schvaleni"], ["Schválená", "schvalena"], ["Odeslaná", "odeslana"]]) {
+        const db = quoteCountDb(key);
+        expect((await quoteChipNum(page, label)) === db, `chip ${label} = flow_counts ${db}`);
       }
-      const all = Number(sql("select count(*) from quotes where not archived"));
-      expect((await chipNum("Vše")) === all, `chip Vše = DB ${all}`);
     } catch (err) {
       await page.reload();
       await waitHydrated(page, 'main input[aria-label="Hledat v nabídkách"]');
@@ -663,41 +720,51 @@ await T("/quotes: počty chipů = DB, hledání, filtr Ke schválení, archiv; k
     }
   }, { timeout: 20_000 });
   await shot(page, S("30-quotes-board"));
-  const rows = page.locator("main ul > li").filter({ has: page.locator("span.font-mono") });
   const search = page.locator('main input[aria-label="Hledat v nabídkách"]');
   await search.fill(`E2EQDF-${TAG}`);
+  // výchozí „Otevřené“: B1 (čeká na schválení) a B2 (odeslaná); zamítnutá Q2 je ve „Více“
   await eventually(async () => {
-    const nums = await rows.locator("span.font-mono.text-sm").allInnerTexts();
-    expect(nums.length === 3 && [B1Q.number, B2Q.number, Q2Q.number].every((n) => nums.includes(n)), `hledání: 3 vlastní nabídky (${nums})`);
+    const nums = await quoteNums(page);
+    expect(nums.length === 2 && nums.includes(B1Q.number) && nums.includes(B2Q.number), `otevřené vlastní nabídky: B1 + B2 (${nums})`);
   });
-  await chipBtn("Ke schválení").click();
+  await quoteMore(page, ["Zamítnutá"]);
   await eventually(async () => {
-    const nums = await rows.locator("span.font-mono.text-sm").allInnerTexts();
-    expect(nums.length === 1 && nums[0] === B1Q.number, `filtr Ke schválení: jen B1 (${nums})`);
+    const nums = await quoteNums(page);
+    expect(nums.length === 3 && nums.includes(Q2Q.number), `+ Zamítnutá: i Q2 (${nums})`);
   });
-  const b1 = rows.filter({ hasText: B1Q.number });
-  const bt = norm(await b1.innerText());
-  expect(bt.includes("Petr Obchodník") && bt.includes("zatím neschváleno") && bt.includes(B1.number), `řádek B1: kdo zadal, neschváleno, zakázka (${bt.slice(0, 250)})`);
-  await chipBtn("Vše").click();
-  // archiv: původní verze Q1 je archivovaná
+  const q2t = norm(await quoteRows(page).filter({ hasText: Q2Q.number }).innerText());
+  expect(q2t.includes("Zamítnuto — Cena") && q2t.includes("S. Admin"), `řádek Q2: Zamítnuto — Cena · S. Admin (${q2t.slice(0, 260)})`);
+  // jedno ťuknutí na „Otevřené“ a pak na stav = jen ten stav
+  await quoteChip(page, "Otevřené").click();
+  await quoteChip(page, "Čeká na schválení").click();
+  await eventually(async () => {
+    const nums = await quoteNums(page);
+    expect(nums.length === 1 && nums[0] === B1Q.number, `filtr Čeká na schválení: jen B1 (${nums})`);
+  });
+  expect(new URL(page.url()).searchParams.get("stav") === "ke_schvaleni", `filtr je v adrese (?stav=ke_schvaleni) (${page.url()})`);
+  const bt = norm(await quoteRows(page).filter({ hasText: B1Q.number }).innerText());
+  expect(bt.includes("Zadáno · P. Obchodník") && bt.includes("zatím neschváleno") && bt.includes("žádost o schválení") && bt.includes(B1.number),
+    `řádek B1: kdo zadal, neschváleno, důvod schválení, zakázka (${bt.slice(0, 300)})`);
+  await quoteChip(page, "Otevřené").click();
+  // archiv: původní verze Q1 je archivovaná, R2 přijatá
   expect(st.q1 && st.r2, "Q1 + R2 existují");
   await search.fill(st.q1.number);
+  await eventually(async () => expect((await quoteNums(page)).length === 0, "mezi otevřenými nic (R2 přijatá, Q1 archiv)"));
+  await quoteMore(page, ["Přijatá", "Archivovaná"]);
   await eventually(async () => {
-    const nums = await rows.locator("span.font-mono.text-sm").allInnerTexts();
-    expect(nums.length === 1 && nums[0] === st.r2.number, `bez archivu jen R2 (${nums})`);
+    const nums = await quoteNums(page);
+    expect(nums.length === 2 && nums.includes(st.q1.number) && nums.includes(st.r2.number), `Přijatá + Archivovaná: R2 i původní verze (${nums})`);
   });
-  const r2t = norm(await rows.filter({ hasText: st.r2.number }).innerText());
-  expect(r2t.includes("verze 2") && r2t.includes("schválil Petr Obchodník") && r2t.includes("Přijatá nabídka zakázky"), `řádek R2 (${r2t.slice(0, 250)})`);
-  await page.locator("main").getByRole("switch", { name: "Zobrazit archivované" }).click();
-  await eventually(async () => {
-    const nums = await rows.locator("span.font-mono.text-sm").allInnerTexts();
-    expect(nums.length === 2 && nums.includes(st.q1.number), `s archivem i původní verze (${nums})`);
-  });
-  expect(norm(await rows.filter({ hasText: new RegExp(`${esc(st.q1.number)}(?!-R2)`) }).first().innerText()).includes("archiv"), "původní verze označená archiv");
+  const r2t = norm(await quoteRows(page).filter({ hasText: st.r2.number }).innerText());
+  for (const x of ["verze 2", "Přijatá", "Schváleno · P. Obchodník", "Odesláno jinak · P. Obchodník", "Přijato · P. Obchodník"]) {
+    expect(r2t.includes(x), `řádek R2 obsahuje „${x}“ (${r2t.slice(0, 300)})`);
+  }
+  const q1t = norm(await quoteRows(page).filter({ hasText: new RegExp(`${esc(st.q1.number)}(?!-R2)`) }).first().innerText());
+  expect(q1t.includes("Archivovaná") && q1t.includes("Odesláno e-mailem · P. Obchodník"), `původní verze: Archivovaná, odeslaná e-mailem (${q1t.slice(0, 260)})`);
   await shot(page, S("31-quotes-search-archive"));
 });
 
-await T("/quotes: neschválenou nabídku nelze odeslat (stejně jako v kartě zakázky)", async (context) => {
+await T("/quotes: nabídku čekající na schválení nelze odeslat (stejně jako v kartě zakázky)", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await flowPage(page, "/quotes", "Nabídky");
@@ -705,14 +772,23 @@ await T("/quotes: neschválenou nabídku nelze odeslat (stejně jako v kartě za
   await page.locator('main input[aria-label="Hledat v nabídkách"]').fill(B1Q.number);
   const row = page.locator("main ul > li").filter({ hasText: B1Q.number }).first();
   await row.waitFor({ timeout: 10_000 });
-  expect(sql(`select coalesce(approved_by::text,'-') from quotes where id = ${lit(B1Q.id)}`) === "-", "B1 není schválená");
-  const send = row.getByRole("button", { name: "Odeslat", exact: true });
-  const offered = (await send.count()) > 0 && (await send.isEnabled());
+  expect(sql(`select coalesce(approved_by::text,'-') || '|' || state || '|' || approval_required from quotes where id = ${lit(B1Q.id)}`) === "-|ke_schvaleni|true", "B1 čeká na schválení");
+  expect(await row.getByRole("button", { name: "Schválit" }).isVisible(), "další krok je Schválit");
+  const send = row.getByRole("button", { name: /^Odeslat nabídku$|^Schválit a odeslat$/ });
+  const offered = (await send.count()) > 0 && (await send.first().isEnabled());
+  await row.getByRole("button", { name: `Další akce nabídky ${B1Q.number}` }).click();
+  const items = (await page.getByRole("menuitem").allInnerTexts()).map(norm);
+  await page.keyboard.press("Escape");
   await shot(page, S("32-quotes-unapproved-row"));
-  expect(!offered, "tlačítko Odeslat u neschválené nabídky je skryté nebo zakázané (karta zakázky: „Nejdřív nabídku schval“)");
+  expect(!offered && !items.some((t) => /^Odeslat nabídku|^Odesláno jinak/.test(t)), `odeslání neschválené nabídky se nenabízí (menu: ${items.join(", ")})`);
+  // ani obejitím UI (REST s přihlášením obchodníka): DB odmítne odeslat neschválenou nabídku
+  const token = await restLogin(USERS.obchod);
+  const r = await restCall("PATCH", `quotes?id=eq.${B1Q.id}`, { token, body: { status: "odeslano", sent_at: new Date().toISOString() } });
+  expect(r.status >= 400 && /čeká na schválení/i.test(JSON.stringify(r.body)), `REST: DB odmítne odeslání bez schválení (${r.status} ${JSON.stringify(r.body).slice(0, 160)})`);
+  expect(sql(`select status || '|' || state from quotes where id = ${lit(B1Q.id)}`) === "ke_schvaleni|ke_schvaleni", "nabídka zůstala neodeslaná");
 });
 
-await T("/quotes: Schválit → Odeslat (dialog předvyplněný, mail s PDF) → Přijata → zakázka Objednávka", async (context) => {
+await T("/quotes: Schválit → Odeslat nabídku (dialog předvyplněný, mail s PDF) → Zákazník objednal → zakázka Objednávka", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await flowPage(page, "/quotes", "Nabídky");
@@ -721,10 +797,10 @@ await T("/quotes: Schválit → Odeslat (dialog předvyplněný, mail s PDF) →
   const row = page.locator("main ul > li").filter({ hasText: B1Q.number }).first();
   await row.waitFor({ timeout: 10_000 });
   await row.getByRole("button", { name: "Schválit" }).click();
-  await waitToast(page, new RegExp(`Nabídka ${esc(B1Q.number)} schválena`));
-  await eventually(async () => expect(norm(await row.innerText()).includes("schválil Petr Obchodník"), "řádek: schválil Petr Obchodník"));
-  expect(sql(`select approved_by from quotes where id = ${lit(B1Q.id)}`) === ID.obchod, "DB: schválil obchodník");
-  await row.getByRole("button", { name: "Odeslat", exact: true }).click();
+  await waitToast(page, /Nabídka schválena/);
+  await eventually(async () => expect(norm(await row.innerText()).includes("Schváleno · P. Obchodník"), "řádek: Schváleno · P. Obchodník"));
+  expect(sql(`select approved_by || '|' || state || '|' || state_changed_by from quotes where id = ${lit(B1Q.id)}`) === `${ID.obchod}|schvalena|${ID.obchod}`, "DB: schválil obchodník, stav Schválená");
+  await row.getByRole("button", { name: "Odeslat nabídku" }).click();
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: `Odeslat nabídku ${B1Q.number} zákazníkovi` }).waitFor({ timeout: 10_000 });
   await dlg.locator('a[href^="/api/jobs/files/"]').waitFor({ timeout: 30_000 });
@@ -739,25 +815,26 @@ await T("/quotes: Schválit → Odeslat (dialog předvyplněný, mail s PDF) →
   const mail = await waitMail(CUST_EMAIL, (m) => m.subject.includes(B1Q.number) && m.receivedAt > t0);
   expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF přílohou (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => {
-    const db = sql(`select q.status || '|' || (q.sent_at is not null) || '|' || o.status from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B1Q.id)}`);
-    expect(db === "odeslano|true|nabidka", `DB po odeslání: ${db}`);
+    const db = sql(`select q.status || '|' || (q.sent_at is not null) || '|' || o.status || '|' || q.state || '|' || q.sent_by || '|' || q.sent_via from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B1Q.id)}`);
+    expect(db === `odeslano|true|nabidka|odeslana|${ID.obchod}|email`, `DB po odeslání: ${db}`);
   });
-  await eventually(async () => expect(await row.getByRole("button", { name: "Přijata" }).isVisible(), "tlačítko Přijata"));
-  await row.getByRole("button", { name: "Přijata" }).click();
+  await eventually(async () => expect(norm(await row.innerText()).includes("Odesláno e-mailem · P. Obchodník"), "řádek: Odesláno e-mailem · P. Obchodník"));
+  await row.getByRole("button", { name: "Zákazník objednal" }).click();
   const acc = page.getByRole("dialog");
-  await acc.getByRole("heading", { name: `Zákazník přijal nabídku ${B1Q.number}?` }).waitFor({ timeout: 10_000 });
-  await acc.getByRole("button", { name: "Ano, přijata" }).click();
-  await waitToast(page, /přijata — zakázka je v Objednávkách/);
+  await acc.getByRole("heading", { name: `Zákazník objednal podle ${B1Q.number}?` }).waitFor({ timeout: 10_000 });
+  await acc.getByRole("button", { name: "Ano, objednal" }).click();
+  await waitToast(page, /přijata — zakázka čeká na potvrzení objednávky/);
   await eventually(() => {
-    const db = sql(`select q.status || '|' || o.status || '|' || coalesce(o.quote_id::text,'-') || '|' || o.value from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B1Q.id)}`).split("|");
-    expect(db[0] === "prijato" && db[1] === "objednavka" && db[2] === B1Q.id && num(db[3]) === 6000, `DB po přijetí: ${db.join("|")}`);
+    const db = sql(`select q.status || '|' || o.status || '|' || coalesce(o.quote_id::text,'-') || '|' || o.value || '|' || q.state || '|' || coalesce(o.order_status, '-') || '|' || coalesce(q.accepted_by::text, '-') from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B1Q.id)}`).split("|");
+    expect(db[0] === "prijato" && db[1] === "objednavka" && db[2] === B1Q.id && num(db[3]) === 6000 && db[4] === "prijata" && db[5] === "dorucena" && db[6] === ID.obchod, `DB po přijetí: ${db.join("|")}`);
   });
-  await eventually(async () => expect(norm(await row.innerText()).includes("Přijatá nabídka zakázky"), "řádek: Přijatá nabídka zakázky"));
+  const stage = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(B1.id)} and type = 'stage' order by created_at desc limit 1`);
+  expect(stage.startsWith("Stav: Nabídka odeslaná → Objednávka") && stage.endsWith(`|${ID.obchod}`), `historie: posun na Objednávku s autorem (${stage})`);
   const ev = sentEventsOf(B1.id);
   expect(ev.length === 1, `historie B1: právě 1 událost odeslání, je ${ev.length}: ${ev.join(" ‖ ")}`);
 });
 
-await T("/quotes: „Zákazník zamítl“ z menu s důvodem, pak Archivovat → zmizí, s přepínačem archivu je vidět", async (context) => {
+await T("/quotes: „Zamítnout nabídku…“ z menu s důvodem (zakázka se uzavře), pak Archivovat", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.admin);
   await flowPage(page, "/quotes", "Nabídky");
@@ -766,21 +843,31 @@ await T("/quotes: „Zákazník zamítl“ z menu s důvodem, pak Archivovat →
   const row = page.locator("main ul > li").filter({ hasText: B2Q.number }).first();
   await row.waitFor({ timeout: 10_000 });
   await row.getByRole("button", { name: `Další akce nabídky ${B2Q.number}` }).click();
-  await page.getByRole("menuitem", { name: "Zákazník zamítl" }).click();
+  await page.getByRole("menuitem", { name: "Zamítnout nabídku…" }).click();
   const dlg = page.getByRole("dialog");
-  await dlg.getByRole("heading", { name: `Zákazník zamítl nabídku ${B2Q.number}?` }).waitFor({ timeout: 10_000 });
+  await dlg.getByRole("heading", { name: `Zamítnout nabídku ${B2Q.number}` }).waitFor({ timeout: 10_000 });
+  expect(norm(await dlg.innerText()).includes("Zakázka se uzavře jako Nerealizovaná"), "náhled dopadu na zakázku");
+  await dlg.getByRole("radio", { name: /^Vybral jiného dodavatele/ }).click();
   await dlg.locator("textarea").fill("Objednali jinde");
-  await dlg.getByRole("button", { name: "Označit jako zamítnutou" }).click();
-  await waitToast(page, new RegExp(`Nabídka ${esc(B2Q.number)} zamítnuta`));
-  await eventually(() => expect(sql(`select status || '|' || rejected_reason from quotes where id = ${lit(B2Q.id)}`) === "zamitnuto|Objednali jinde", "DB: zamítnuto + důvod"));
-  await eventually(async () => expect(norm(await row.innerText()).includes("Zamítnuto"), "řádek: Zamítnuto"));
+  await dlg.getByRole("button", { name: "Zamítnout", exact: true }).click();
+  await waitToast(page, new RegExp(`${esc(B2Q.number)} zamítnuta`));
+  await eventually(() => {
+    const db = sql(`select q.status || '|' || q.lost_reason || '|' || q.rejected_reason || '|' || q.state_changed_by || '|' || o.status from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B2Q.id)}`);
+    expect(db === `zamitnuto|jiny_dodavatel|Objednali jinde|${ID.admin}|nerealizovano`, `DB: zamítnuto + důvod + autor, zakázka Nerealizováno (${db})`);
+  });
+  // zamítnutá je uzavřená — ve „Více ▾ Zamítnutá“ s autorem
+  await quoteMore(page, ["Zamítnutá"]);
+  await eventually(async () => {
+    const t = norm(await row.innerText());
+    expect(t.includes("Zamítnuto — Vybral jiného dodavatele · S. Admin") && t.includes("Objednali jinde"), `řádek: Zamítnuto s důvodem a autorem (${t.slice(0, 260)})`);
+  });
   await row.getByRole("button", { name: `Další akce nabídky ${B2Q.number}` }).click();
   await page.getByRole("menuitem", { name: "Archivovat" }).click();
   await waitToast(page, new RegExp(`Nabídka ${esc(B2Q.number)} archivována`));
   await eventually(() => expect(sql(`select archived from quotes where id = ${lit(B2Q.id)}`) === "t", "DB: archivována"));
-  await page.locator("main").getByText("Žádná nabídka neodpovídá filtru").waitFor({ timeout: 10_000 });
-  await page.locator("main").getByRole("switch", { name: "Zobrazit archivované" }).click();
-  await eventually(async () => expect(norm(await page.locator("main ul > li").filter({ hasText: B2Q.number }).first().innerText()).includes("archiv"), "s archivem: B2 s „archiv“"));
+  await row.getByRole("button", { name: `Další akce nabídky ${B2Q.number}` }).click();
+  expect(await page.getByRole("menuitem", { name: "Obnovit z archivu" }).isVisible(), "archivovanou jde obnovit");
+  await page.keyboard.press("Escape");
 });
 
 await T("/confirmations: Potvrdit objednávku → termín, e-mail s PDF → Potvrzená objednávka, due_date, jedna změna stavu", async (context) => {
@@ -910,7 +997,8 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   await dlg.getByRole("heading", { name: /Poslat potvrzení objednávky POT-\S+ zákazníkovi/ }).waitFor({ timeout: 10_000 });
   await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu předvyplněno"), { timeout: 20_000 });
   const subject = await dlg.getByLabel("Předmět").inputValue();
-  expect(/POT-/.test(subject), `předmět s číslem potvrzení (${subject})`);
+  // předmět potvrzení nese číslo objednávky zákazníka (podle něj si ji zákazník spáruje), číslo POT je v PDF
+  expect(subject.startsWith(`Potvrzení objednávky č. QDF-DOC-${TAG}`), `předmět s číslem objednávky zákazníka (${subject})`);
   expect(filesOf(DOC1.id, "potvrzeni").length === 1, "odeslání existujícího PDF nevytvořilo novou verzi");
   const t0 = new Date().toISOString();
   await dlg.getByRole("button", { name: "Odeslat potvrzení objednávky" }).click();
@@ -919,8 +1007,8 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => expect(sql(`select status from orders where id = ${lit(DOC1.id)}`) === "potvrzeno", "DB: Potvrzená objednávka"));
   // zpětná vazba po odeslání (UX)
-  const feedback = await page.locator('[role="status"]').filter({ hasText: /odesl|poslán/i }).count();
-  if (!feedback) notes.push("/documents: po odeslání dokladu z panelu se dialog jen zavře — žádné potvrzení „odesláno na …“ (toast chybí).");
+  await panel.locator('[role="status"]').filter({ hasText: `Odesláno na ${CUST_EMAIL}.` }).waitFor({ timeout: 10_000 });
+  expect(sql(`select coalesce(confirmation_sent_by::text, '-') || '|' || coalesce(confirmation_sent_via, '-') from orders where id = ${lit(DOC1.id)}`) === `${ID.obchod}|email`, "DB: potvrzení odeslal obchodník e-mailem");
   // dodací list
   await kindBtn("Dodací list").click();
   await panel.getByRole("button", { name: "Vystavit PDF" }).click();

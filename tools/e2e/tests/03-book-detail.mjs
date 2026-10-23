@@ -182,12 +182,20 @@ await T("kniha: čipy stavů — barvy, vícenásobný výběr, počty, „Vše�
   expect(rowStages(await readRows(page)).length === dbCount(SEGMENTS.objednavky), "po „Vše“ celý segment");
 });
 
+/** Čísla zakázek zákazníka CUST v segmentu Objednávky (podle DB, seřazená). */
+const custOrderNumbers = () => sql(
+  `select coalesce(string_agg(number, ',' order by number), '') from orders where customer_id = ${lit(CUST.id)} and status::text in (${SEGMENTS.objednavky.map(lit).join(",")})`,
+).split(",").filter(Boolean);
+const sameSet = (a, b) => a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
+
 await T("kniha: hledání — číslo Z-…, zákazník, číslo obj. zákazníka, výkres, bez diakritiky", async (context) => {
   const page = await context.newPage();
   await openBook(page, USERS.admin);
+  // zákazník má v Objednávkách F1, F2 i zakázky D1–D5, DEL-A/B; poptávka F3 do segmentu nepatří
+  const byCustomer = (n) => n.includes(F1.number) && n.includes(F2.number) && !n.includes(F3.number) && sameSet(n, custOrderNumbers());
   const cases = [
     [F1.number, (n) => n.length === 1 && n[0] === F1.number, "číslo zakázky"],
-    [`${PREFIX}kovo ${tagLc}`, (n) => n.length === 2 && n.includes(F1.number) && n.includes(F2.number), "název zákazníka (malými)"],
+    [`${PREFIX}kovo ${tagLc}`, byCustomer, "název zákazníka (malými)"],
     [CUST.number, (n) => n.includes(F1.number) && n.includes(F2.number), "naše číslo zákazníka"],
     [`E2EB-PO-${TAG}`, (n) => n.length === 1 && n[0] === F1.number, "číslo objednávky zákazníka"],
     [`e2eb-dwg-${tagLc}`, (n) => n.length === 1 && n[0] === F1.number, "číslo výkresu"],
@@ -255,7 +263,10 @@ await T("kniha: filtry obchodník, zpracovává, zákazník, termín, výroba, k
   await page.getByRole("option", { name: new RegExp(CUST.name) }).click();
   await waitParams(page, (sp) => sp.get("customer") === CUST.id, "filtr Zákazník");
   nums = numbersOf(await readRows(page));
-  expect(nums.length === 2 && nums.includes(F1.number) && nums.includes(F2.number), `zákazník: F1 + F2 (${nums.join(",")})`);
+  expect(
+    nums.includes(F1.number) && nums.includes(F2.number) && !nums.includes(F3.number) && sameSet(nums, custOrderNumbers()),
+    `zákazník: F1 + F2 a jen jeho objednávky podle DB (${nums.join(",")})`,
+  );
   await reset();
 
   // termín
@@ -634,30 +645,43 @@ await T("detail: hlavička (číslo, zákazník + č. zákazníka, obj. zákazn�
   }
   expect((await h.getByRole("link", { name: CUST.name }).getAttribute("href")) === `/customers/${CUST.id}`, "zákazník je odkaz na kartu");
   expect(await h.getByRole("button", { name: "Stav zakázky: Objednávka — změnit" }).isVisible(), "stav Objednávka");
-  expect(await h.getByRole("button", { name: /Posunout: Potvrzená objednávka/ }).isVisible(), "další krok = Potvrzená objednávka");
+  // další krok je sloveso (nextAction), ne název stavu; „Posunout" už neexistuje
+  expect(await h.getByRole("button", { name: "Potvrdit objednávku" }).isVisible(), "další krok = Potvrdit objednávku");
+  expect(!(await h.innerText()).includes("Posunout"), "hlavička bez „Posunout“");
   expect((await h.getByRole("radio", { name: "Střední" }).getAttribute("aria-checked")) === "true", "priorita Střední");
   expect((await page.title()).includes(D1.number), `titulek stránky obsahuje číslo (${await page.title()})`);
   const tl = page.locator('main section[aria-label="Průběh zakázky"]');
   expect((await tl.locator("[aria-current=step]").innerText()).startsWith("Objednávka"), "aktuální krok osy = Objednávka");
-  expect((await tl.innerText()).includes("hotovo 3 z 10 kroků"), `osa: hotovo 3 z 10 (${(await tl.innerText()).split("\n")[1]})`);
+  expect((await tl.innerText()).includes("hotovo 4 z 10 kroků"), `osa: hotovo 4 z 10 — dosažený krok se počítá (${(await tl.innerText()).split("\n")[1]})`);
   expect(await page.locator('main section[aria-label="Termíny"]').isVisible(), "panel Termíny");
   await shot(page, S("20-detail-header"));
 });
 
-await T("detail: „Posunout“ (obchodník) → DB status + stage_changed_at, Historie se jménem", async (context) => {
+await T("detail: další krok „Potvrdit objednávku“ (obchodník) → DB stav + dílčí stav + autor, Historie se jménem", async (context) => {
   const page = await context.newPage();
   const before = sql(`select stage_changed_at from orders where id = ${lit(D1.id)}`);
   await openJob(page, USERS.obchod, D1);
   await page.waitForTimeout(1100); // ať je nový čas změny jistě větší
-  await header(page).getByRole("button", { name: /Posunout: Potvrzená objednávka/ }).click();
-  await header(page).getByRole("button", { name: "Stav zakázky: Potvrzená objednávka — změnit" }).waitFor({ timeout: 10_000 });
+  await header(page).getByRole("button", { name: "Potvrdit objednávku" }).click();
+  const dlg = page.getByRole("dialog");
+  await dlg.waitFor({ timeout: 10_000 });
+  const mail = dlg.getByRole("switch", { name: "Poslat potvrzení zákazníkovi e-mailem" });
+  if ((await mail.getAttribute("aria-checked")) === "true") await mail.click();
+  await dlg.getByRole("button", { name: "Potvrdit objednávku" }).click();
+  await header(page).getByRole("button", { name: "Stav zakázky: Potvrzená objednávka — změnit" }).waitFor({ timeout: 20_000 });
   await eventually(async () => {
-    const r = sql(`select status || '|' || (stage_changed_at > ${lit(before)}::timestamptz) || '|' || (confirmed_at is not null) from orders where id = ${lit(D1.id)}`);
-    expect(r === "potvrzeno|true|true", `DB po posunu: ${r}`);
+    const r = sql(`select status || '|' || (stage_changed_at > ${lit(before)}::timestamptz) || '|' || (confirmed_at is not null) || '|' || order_status || '|' || coalesce(order_status_changed_by::text, '-') || '|' || coalesce(stage_changed_by::text, '-') || '|' || coalesce(confirmation_sent_via, '-')
+      from orders where id = ${lit(D1.id)}`);
+    // bez e-mailu: potvrzeno, ale potvrzení NEODEŠLO (žádný falešný fakt „odesláno")
+    expect(r === `potvrzeno|true|true|potvrzena|${ID.obchod}|${ID.obchod}|-`, `DB po potvrzení: ${r}`);
   });
-  const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
-  expect(ev === `Stav: Objednávka → Potvrzená objednávka|${ID.obchod}`, `událost stavu: ${ev}`);
-  expect(await header(page).getByRole("button", { name: /Posunout: Ve výrobě/ }).isVisible(), "další krok = Ve výrobě");
+  const ev = sql(`select message || '|' || actor_id || '|' || coalesce(actor_name, '') from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
+  expect(ev.startsWith("Stav: Objednávka → Potvrzená objednávka") && ev.endsWith(`|${ID.obchod}|Petr Obchodník`), `událost stavu s autorem: ${ev}`);
+  const st = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(D1.id)} and type = 'status' and data->>'field' = 'order_status' order by created_at desc limit 1`);
+  expect(st.startsWith("Objednávka: Doručená → Potvrzená") && st.endsWith(`|${ID.obchod}`), `událost dílčího stavu: ${st}`);
+  // potvrzená, potvrzení ještě neodešlo → další krok Odeslat potvrzení (chip bez dokladu); autor stavu u hlavičky
+  await eventually(async () => expect(await header(page).getByRole("button", { name: "Odeslat potvrzení" }).isVisible(), "další krok = Odeslat potvrzení"));
+  expect(await header(page).getByRole("button", { name: /Petr Obchodník.* — podrobnosti$/ }).first().isVisible(), "hlavička: kdo stav změnil (razítko)");
   expect((await page.locator('main section[aria-label="Průběh zakázky"] [aria-current=step]').innerText()).startsWith("Potvrzeno"), "osa: Potvrzeno");
   await openTab(page, "Historie");
   const li = historyItem(page, "Potvrzená objednávka");
@@ -667,20 +691,25 @@ await T("detail: „Posunout“ (obchodník) → DB status + stage_changed_at, H
   await shot(page, S("21-detail-history-stage"));
 });
 
-await T("detail: StageSelect (zaměstnanec) → Ve výrobě, Historie ukáže jméno účtu", async (context) => {
+await T("detail: StageSelect (zaměstnanec) → Korekce stavu s náhledem → Ve výrobě, Historie ukáže jméno účtu", async (context) => {
   const page = await context.newPage();
   const before = sql(`select status || '|' || stage_changed_at from orders where id = ${lit(D1.id)}`).split("|");
   await openJob(page, USERS.dilna, D1);
   await page.waitForTimeout(1100);
   await header(page).getByRole("button", { name: /^Stav zakázky: / }).click();
   await page.getByRole("menuitem", { name: /^Ve výrobě/ }).click();
-  await header(page).getByRole("button", { name: "Stav zakázky: Ve výrobě — změnit" }).waitFor({ timeout: 10_000 });
+  const dlg = page.getByRole("dialog");
+  await dlg.waitFor({ timeout: 10_000 });
+  expect((await dlg.innerText()).includes(`Korekce stavu: ${STAGE_LABELS[before[0]]} → Ve výrobě`), "dialog korekce s náhledem");
+  await dlg.getByRole("textbox").fill(`E2E korekce ${TAG}`);
+  await dlg.getByRole("button", { name: "Změnit na Ve výrobě" }).click();
+  await header(page).getByRole("button", { name: "Stav zakázky: Ve výrobě — změnit" }).waitFor({ timeout: 15_000 });
   await eventually(async () => {
-    const r = sql(`select status || '|' || (stage_changed_at > ${lit(before[1])}::timestamptz) from orders where id = ${lit(D1.id)}`);
-    expect(r === "ve_vyrobe|true", `DB po změně: ${r}`);
+    const r = sql(`select status || '|' || (stage_changed_at > ${lit(before[1])}::timestamptz) || '|' || stage_changed_by || '|' || stage_changed_via from orders where id = ${lit(D1.id)}`);
+    expect(r === `ve_vyrobe|true|${ID.dilna}|rucne`, `DB po korekci: ${r}`);
   });
-  const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
-  expect(ev === `Stav: ${STAGE_LABELS[before[0]]} → Ve výrobě|${ID.dilna}`, `událost: ${ev}`);
+  const ev = sql(`select message || '|' || actor_id || '|' || actor_name from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
+  expect(ev === `Stav: ${STAGE_LABELS[before[0]]} → Ve výrobě — E2E korekce ${TAG}|${ID.dilna}|Jana Zaměstnanec`, `událost: ${ev}`);
   await openTab(page, "Historie");
   const li = historyItem(page, "Jana Zaměstnanec");
   await li.waitFor({ timeout: 10_000 });
@@ -877,7 +906,7 @@ await T("detail: nahrání dokumentu → v1, stejný název = v2 a archivace v1;
   const fileInput = page.locator("main input[type=file][multiple]").first();
   await fileInput.setInputFiles({ name: fname, mimeType: "application/pdf", buffer: PDF("v1") });
   await eventually(async () => expect(sql(`select count(*) from job_files where job_id = ${lit(D4.id)}`) === "1", "DB: 1 soubor"), { timeout: 20_000 });
-  const v1 = sql(`select id || '|' || version || '|' || archived || '|' || uploaded_by || '|' || kind from job_files where job_id = ${lit(D4.id)}`).split("|");
+  const v1 = sql(`select id || '|' || version || '|' || (case when archived then 't' else 'f' end) || '|' || uploaded_by || '|' || kind from job_files where job_id = ${lit(D4.id)}`).split("|");
   expect(v1[1] === "1" && v1[2] === "f" && v1[3] === ID.obchod, `v1: verze 1, aktivní, nahrál obchodník (${v1.join(",")})`);
   // bez obnovení stránky: záložka a hlavička ukážou nový dokument
   await eventually(async () => {
@@ -887,7 +916,7 @@ await T("detail: nahrání dokumentu → v1, stejný název = v2 a archivace v1;
   // nová verze se stejným názvem
   await page.locator("main input[type=file][multiple]").first().setInputFiles({ name: fname, mimeType: "application/pdf", buffer: PDF("v2") });
   await eventually(async () => expect(sql(`select count(*) from job_files where job_id = ${lit(D4.id)}`) === "2", "DB: 2 záznamy"), { timeout: 20_000 });
-  const rows = sql(`select id || '|' || version || '|' || archived || '|' || coalesce(replaced_by::text,'') from job_files where job_id = ${lit(D4.id)} order by version`).split("\n").map((r) => r.split("|"));
+  const rows = sql(`select id || '|' || version || '|' || (case when archived then 't' else 'f' end) || '|' || coalesce(replaced_by::text,'') from job_files where job_id = ${lit(D4.id)} order by version`).split("\n").map((r) => r.split("|"));
   expect(rows[0][1] === "1" && rows[0][2] === "t", `v1 archivována (${rows[0].join(",")})`);
   expect(rows[1][1] === "2" && rows[1][2] === "f", `v2 aktivní (${rows[1].join(",")})`);
   expect(rows[0][3] === rows[1][0], "v1.replaced_by = v2");

@@ -141,7 +141,8 @@ function fakeDoc(type: BatchDocType, pages: number[], group: string | null, flag
     drawingNumbers: [
       ...(doc?.items.map((i) => i.drawingNumber).filter(Boolean) ?? []),
       ...(drawing && typeof drawing.drawingNumber === "string" ? [drawing.drawingNumber] : []),
-    ],
+      ...(drawing && Array.isArray(drawing.drawingNumbers) ? drawing.drawingNumbers.filter((x): x is string => typeof x === "string") : []),
+    ].filter((x, i, a) => x && a.indexOf(x) === i),
     flags,
     confidence: 0.9,
     reason: "testovací roztřídění",

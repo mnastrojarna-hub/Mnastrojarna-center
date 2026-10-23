@@ -40,9 +40,17 @@ const SENT: Record<DocumentEmailKind, string> = {
   ostatni: "Odeslán dokument",
 };
 
-/** „Vystavena faktura FV-2026-003 (PDF) — verze 2" */
-export function issuedEventMessage(kind: DocumentEmailKind, number: string, version = 1): string {
-  return `${ISSUED[kind]} ${number.trim()} (PDF)${version > 1 ? ` — verze ${version}` : ""}`;
+/**
+ * „Vystavena faktura FV-2026-003 (PDF) — verze 2"; potvrzení k pozdější revizi objednávky
+ * „Vystaveno potvrzení objednávky POT-2026-104 k rev 2 (PDF)". Doplněk „dílčí dodávka" u faktury,
+ * která stav zakázky neposunula.
+ */
+export function issuedEventMessage(
+  kind: DocumentEmailKind, number: string, version = 1, opts: { orderRevision?: number | null; partial?: boolean } = {},
+): string {
+  const rev = kind === "potvrzeni" && opts.orderRevision && opts.orderRevision > 1 ? ` k rev ${opts.orderRevision}` : "";
+  const partial = kind === "faktura" && opts.partial ? " · dílčí dodávka, stav zakázky zůstává" : "";
+  return `${ISSUED[kind]} ${number.trim()}${rev} (PDF)${version > 1 ? ` — verze ${version}` : ""}${partial}`;
 }
 
 /** „Odeslána nabídka NAB-2026-031 na nakup@firma.cz" */

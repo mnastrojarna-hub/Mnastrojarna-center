@@ -1,0 +1,70 @@
+{
+  "docKind": "nabidka",
+  "issuer": "my",
+  "documentNumber": "NAB-E2E-13",
+  "documentDate": "2026-10-10",
+  "customer": {
+    "name": "STROJMETAL, a. s.",
+    "ico": "45274649",
+    "dic": "CZ45274649",
+    "street": "Průmyslová 124",
+    "city": "Kladno",
+    "zip": "272 01",
+    "country": "CZ",
+    "email": "dvorak@strojmetal.cz",
+    "phone": "+420 603 111 222",
+    "contactPerson": "Ing. Jan Dvořák"
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "NAB-E2E-13",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "8800-01",
+      "revision": "",
+      "name": "Hřídel",
+      "description": "",
+      "material": "",
+      "quantity": 8,
+      "unit": "ks",
+      "unitPrice": 500,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "8800-02",
+      "revision": "",
+      "name": "Pouzdro",
+      "description": "",
+      "material": "",
+      "quantity": 6,
+      "unit": "ks",
+      "unitPrice": 300,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "6 týdnů",
+  "note": "",
+  "summary": "Naše nabídka NAB-E2E-13.",
+  "confidence": 0.92,
+  "needsClarification": []
+}

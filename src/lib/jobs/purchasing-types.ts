@@ -2,6 +2,7 @@
 // Čisté typy — sdílí UI, datová vrstva i akce. Nákupní ceny vidí jen role s právem „margins".
 import type { CommissionStatus, JobStage, PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type { PersonRef } from "@/lib/jobs/types";
+import type { ChangeStamp } from "@/lib/jobs/flow-status";
 
 export type SupplierQuoteSource = "manual" | "foto" | "email" | "ai";
 
@@ -17,6 +18,13 @@ export interface PurchaseItem {
   /** Nákupní cena / MJ bez DPH; null = cena neuvedena. */
   unitPrice: number | null;
   note: string | null;
+  /** Objednávka dodavateli: převzaté množství (0 = nic). */
+  receivedQuantity?: number;
+  /** Uzavřeno s menším množstvím (zmetky, dodavatel víc nedodá). */
+  receiptClosed?: boolean;
+  receiptClosedReason?: string | null;
+  /** Vazba na položku zakázky (order_items.id). */
+  orderItemId?: string | null;
 }
 
 /** Dodavatel z adresáře (pro objednávku, PDF a e-mail). */
@@ -60,6 +68,8 @@ export interface SupplierQuoteView {
   createdAt: string;
   updatedAt: string;
   items: PurchaseItem[];
+  /** Kdo nabídku vybral jako vítěznou (selected_by/at plní DB trigger). */
+  selectedStamp?: ChangeStamp | null;
 }
 
 /** Objednávka vydaná dodavateli (OV-2026-004). */
@@ -92,10 +102,38 @@ export interface PurchaseOrderView {
   createdAt: string;
   updatedAt: string;
   items: PurchaseItem[];
+  /** Důvod zrušení (zadává se při zrušení). */
+  cancelReason?: string | null;
+  /** Kdo co s objednávkou udělal — ze sloupců DB (plní triggery atomicky se změnou). */
+  stamps?: PurchaseOrderStamps;
+  /** Převzetí po položkách: kolik položek je převzatých (nebo uzavřených) z kolika. */
+  receipt?: { done: number; total: number; partial: boolean };
 }
 
-/** Řádek přehledu „Objednávky dodavatelům". */
-export interface PurchaseOrderListItem extends Omit<PurchaseOrderView, "items"> {
+/** Razítka objednávky dodavateli (null = krok zatím nenastal). */
+export interface PurchaseOrderStamps {
+  created: ChangeStamp | null;
+  status: ChangeStamp | null;
+  sent: ChangeStamp | null;
+  confirmed: ChangeStamp | null;
+  delivered: ChangeStamp | null;
+  cancelled: ChangeStamp | null;
+  /** Poslední zápis převzatého množství (nejnovější položka). */
+  received: ChangeStamp | null;
+}
+
+/** Převzetí od dodavatele — jedna položka objednávky. */
+export interface PurchaseReceiptInput {
+  itemId: string;
+  /** Celkem převzato (ne přírůstek). */
+  received: number;
+  /** Uzavřít s menším množstvím (víc nepřijde). */
+  close?: boolean;
+  closeReason?: string;
+}
+
+/** Řádek přehledu „Objednávky dodavatelům" (s položkami — převzetí jde i z přehledu). */
+export interface PurchaseOrderListItem extends PurchaseOrderView {
   job: { id: string; number: string; title: string; stage: JobStage } | null;
   customer: { id: string; name: string } | null;
   itemCount: number;
@@ -261,6 +299,8 @@ export interface PurchaseOrderPatch {
   currency?: string;
   /** Jen dokud objednávka neodešla (návrh / vystavena). */
   items?: PurchaseItemInput[];
+  /** Důvod zrušení (status = zrusena). */
+  cancelReason?: string;
 }
 
 /** E-mail s objednávkou pro dodavatele. */

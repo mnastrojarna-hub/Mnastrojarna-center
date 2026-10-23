@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { JobCommissionView, SupplierQuoteView } from "@/lib/jobs/purchasing-types";
 import {
   commissionDisplay, compareSupplierQuotes, draftsFromJobItems, emptyPurchaseDraft, isPurchaseOrderLate, marginHero,
-  matchesPurchaseFilter, orderActs, purchaseActivity, purchaseDraftFrom, purchaseDraftsToInput, purchaseDraftsTotal,
+  matchesPurchaseFilter, ownerAssignedStamp, purchaseChips, purchaseDraftFrom, purchaseNextStep, purchaseSteps,
+  receiptDraftsFrom, receiptDraftsToInput, validateReceiptDrafts, purchaseDraftsToInput, purchaseDraftsTotal,
   purchaseOrderFormFromDraft, purchaseOrderFormToInput, supplierQuoteFormFrom, supplierQuoteFormNew, supplierQuoteFormToInput,
   validatePurchaseDrafts, validatePurchaseOrderForm, validateSupplierQuoteForm,
 } from "./purchasing-model";
@@ -143,34 +144,96 @@ describe("objednávky — termíny a filtry", () => {
     expect(matchesPurchaseFilter(po("odeslana"), "ceka", t)).toBe(true);
     expect(matchesPurchaseFilter(po("odeslana"), "po_terminu", t)).toBe(true);
     expect(matchesPurchaseFilter(po("zrusena"), "zrusena", t)).toBe(true);
+    expect(matchesPurchaseFilter({ ...po("potvrzena"), receipt: { partial: true } }, "castecne", t)).toBe(true);
+    expect(matchesPurchaseFilter({ ...po("dodana"), receipt: { partial: true } }, "castecne", t)).toBe(false);
+    expect(matchesPurchaseFilter(po("potvrzena"), "castecne", t)).toBe(false);
   });
 });
 
-describe("kdo co udělal (historie)", () => {
-  const ev = (type: string, data: Record<string, unknown>, who: string, at: string) => ({ type, data, actor: { name: who }, createdAt: at });
-  it("úkony objednávek, výběr vítěze, přidělení obchodníka", () => {
-    const a = purchaseActivity([
-      ev("email", { purchaseOrderId: "po1" }, "Vít Volný", "2026-10-22T13:00:00Z"),
-      ev("field", { purchaseOrderId: "po1", number: "OV-2026-001", itemCount: 1 }, "Admin", "2026-10-22T12:05:00Z"),
-      ev("field", { purchaseOrderId: "po1", changes: [{ field: "supplier_id" }] }, "Admin", "2026-10-22T12:05:01Z"),
-      ev("field", { purchaseOrderId: "po1", number: "OV-2026-001", fields: ["status", "confirmed_date"], statusFrom: "odeslana", statusTo: "potvrzena" }, "Petr", "2026-10-23T08:00:00Z"),
-      ev("field", { purchaseOrderId: "po1", fields: ["note"] }, "Petr", "2026-10-23T09:00:00Z"),
-      ev("quote", { supplierQuoteId: "q1", action: "selected" }, "Admin", "2026-10-21T10:00:00Z"),
-      ev("quote", { supplierQuoteId: "q1", action: "selected", purchaseOrderId: "po1" }, "Vít Volný", "2026-10-22T12:06:00Z"),
-      ev("field", { changes: [{ field: "owner_id" }] }, "Admin", "2026-10-20T10:00:00Z"),
-      ev("stage", { purchaseOrderId: "po1", from: "potvrzeno", to: "dodano_k_nam" }, "Petr", "2026-10-24T08:00:00Z"),
-    ]);
-    expect(a.orders.get("po1")?.map((x) => [x.kind, x.verb, x.by])).toEqual([
-      ["vystavena", "Vystavil", "Admin"],
-      ["odeslana_email", "Odeslal dodavateli", "Vít Volný"],
-      ["potvrzena", "Potvrzení zapsal", "Petr"],
-      ["upravena", "Upravil", "Petr"],
-    ]);
-    expect(a.quoteSelected.get("q1")).toEqual({ by: "Vít Volný", at: "2026-10-22T12:06:00Z" });
-    expect(a.ownerAssigned).toEqual({ by: "Admin", at: "2026-10-20T10:00:00Z" });
+describe("kdo co udělal (razítka ze sloupců)", () => {
+  const st = (name: string | null, at: string) => ({
+    by: name ? { id: `u-${name}`, name } : null, byName: name, at, via: null, kind: name ? ("user" as const) : ("system" as const),
   });
-  it("bez historie aspoň autor objednávky", () => {
-    const acts = orderActs({ id: "x", createdBy: { id: "u", name: "Vít Volný" }, createdAt: "2026-10-22T12:05:00Z" }, null);
-    expect(acts).toEqual([{ kind: "vystavena", verb: "Vystavil", by: "Vít Volný", at: "2026-10-22T12:05:00Z" }]);
+  it("kroky objednávky od nejstaršího, zrušení s důvodem, převzetí jen u nedodané", () => {
+    const steps = purchaseSteps({
+      status: "zrusena",
+      cancelReason: "Objednáno jinde",
+      receipt: { done: 1, total: 2, partial: true },
+      stamps: {
+        created: st("Admin", "2026-10-22T12:05:00Z"),
+        status: st("Petr", "2026-10-24T08:00:00Z"),
+        sent: st("Vít Volný", "2026-10-22T13:00:00Z"),
+        confirmed: st("Petr", "2026-10-23T08:00:00Z"),
+        delivered: null,
+        cancelled: st("Petr", "2026-10-24T08:00:00Z"),
+        received: st("Pavel Dílna", "2026-10-23T12:00:00Z"),
+      },
+    });
+    expect(steps.map((s) => [s.label, s.stamp.by?.name])).toEqual([
+      ["Vystavena", "Admin"],
+      ["Odeslána", "Vít Volný"],
+      ["Potvrzena dodavatelem", "Petr"],
+      ["Převzato 1/2 položek", "Pavel Dílna"],
+      ["Zrušena — Objednáno jinde", "Petr"],
+    ]);
+    // bez rodových sloves
+    for (const s of steps) expect(s.label).not.toMatch(/(il|ila|al|ala)\b/);
+    expect(purchaseSteps({ status: "navrh", stamps: undefined, receipt: undefined, cancelReason: null })).toEqual([]);
+  });
+  it("přidělení obchodníka z poslední události owner_id", () => {
+    const ev = (data: Record<string, unknown>, name: string | null, at: string) => ({
+      type: "field" as const, data, actor: name ? { id: "x", name } : null, createdAt: at,
+    });
+    const s = ownerAssignedStamp([
+      ev({ changes: [{ field: "owner_id" }] }, "Admin", "2026-10-20T10:00:00Z"),
+      ev({ changes: [{ field: "title" }] }, "Petr", "2026-10-21T10:00:00Z"),
+      ev({ changes: [{ field: "owner_id" }] }, null, "2026-10-22T10:00:00Z"),
+    ]);
+    expect(s).toMatchObject({ by: null, kind: "system", at: "2026-10-22T10:00:00Z" });
+    expect(ownerAssignedStamp([])).toBeNull();
+  });
+  it("další krok: poslat → potvrzeno → převzít (zbytek)", () => {
+    expect(purchaseNextStep({ status: "navrh" })).toBe("poslat");
+    expect(purchaseNextStep({ status: "odeslana" })).toBe("potvrzeno");
+    expect(purchaseNextStep({ status: "odeslana", receipt: { partial: true } })).toBe("prevzit_zbytek");
+    expect(purchaseNextStep({ status: "potvrzena" })).toBe("prevzit");
+    expect(purchaseNextStep({ status: "potvrzena", receipt: { partial: true } })).toBe("prevzit_zbytek");
+    expect(purchaseNextStep({ status: "dodana" })).toBeNull();
+    expect(purchaseNextStep({ status: "zrusena" })).toBeNull();
+  });
+});
+
+describe("převzetí od dodavatele", () => {
+  const items = [
+    { id: "i1", drawingNumber: "4711-02", name: "Příruba", material: null, quantity: 10, unit: "ks", unitPrice: 100, note: null, receivedQuantity: 4 },
+    { id: "i2", drawingNumber: null, name: "Hřídel", material: null, quantity: 5, unit: "ks", unitPrice: null, note: null, receivedQuantity: 3, receiptClosed: true, receiptClosedReason: "2 ks zmetky" },
+    { drawingNumber: null, name: "bez id", material: null, quantity: 1, unit: "ks", unitPrice: null, note: null },
+  ];
+  it("předvyplní celé množství, uzavřené zachová, položky bez id vynechá", () => {
+    const d = receiptDraftsFrom(items as never);
+    expect(d.map((x) => [x.itemId, x.before, x.received, x.close, x.reason])).toEqual([
+      ["i1", 4, "10", false, ""],
+      ["i2", 3, "3", true, "2 ks zmetky"],
+    ]);
+    expect(validateReceiptDrafts(d)).toBeNull();
+    expect(receiptDraftsToInput(d)).toEqual([
+      { itemId: "i1", received: 10 },
+      { itemId: "i2", received: 3, close: true, closeReason: "2 ks zmetky" },
+    ]);
+  });
+  it("kontrola: záporné množství, uzavření bez důvodu; uzavření plného množství se neposílá", () => {
+    const d = receiptDraftsFrom(items as never);
+    expect(validateReceiptDrafts([{ ...d[0], received: "-1" }])).toMatch(/4711-02: zadej převzaté množství/);
+    expect(validateReceiptDrafts([{ ...d[0], received: "6", close: true, reason: " " }])).toMatch(/důvod/);
+    expect(receiptDraftsToInput([{ ...d[0], received: "10", close: true, reason: "x" }])).toEqual([{ itemId: "i1", received: 10 }]);
+    expect(validateReceiptDrafts([])).toMatch(/nemá položky/);
+  });
+  it("chipy: částečně dodaná s průběhem, po termínu se dny", () => {
+    const chips = purchaseChips({ status: "potvrzena", requiredDate: "2026-10-20", confirmedDate: null, receipt: { done: 1, total: 2, partial: true } }, "2026-10-23");
+    expect(chips.map((c) => [c.key, c.progress?.label ?? null, c.hint])).toEqual([
+      ["castecne_dodana", "1/2 položek", null],
+      ["po_terminu", null, "+3 dny"],
+    ]);
+    expect(purchaseChips({ status: "dodana", requiredDate: "2026-10-20", confirmedDate: null, receipt: { done: 2, total: 2, partial: false } }, "2026-10-23")).toEqual([]);
   });
 });

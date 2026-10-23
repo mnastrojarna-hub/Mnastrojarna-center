@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/jobs/mapping";
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
 import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
+import { approvalReasons, canApproveQuote, quoteFactsFromRow, reasonRequired } from "@/lib/jobs/flow-status";
 
 /**
  * Akce Knihy zakázek: zakázka, položky, stav, komentáře a nabídky.
@@ -40,7 +42,8 @@ async function begin(feature: Feature = "orders"): Promise<Ctx | { error: string
   const access = await checkFeature(feature);
   if ("error" in access) return { error: access.error };
   const { can } = await getAccess();
-  const db = await createOperatorClient();
+  // autor změn = přihlášený uživatel (DB z hlaviček doplní *_by a historii)
+  const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user, margins: can("margins") };
 }
 
@@ -112,6 +115,12 @@ function rawValue(v: unknown, refs: Record<string, string>): string {
 }
 
 /** Změna stavu + záznam do historie (sdílí setJobStage i nabídky). */
+/** Uzavření zakázky (nerealizováno / zrušeno) jen přes moveJobStage — s právem marže a důvodem. */
+const CLOSE_NEEDS_REASON = "Uzavřít zakázku jako nerealizovanou nebo zrušenou jde jen přes Korekci stavu s důvodem.";
+
+/** Nabídka vzniká jen jako rozpracovaná / ke schválení; další stavy mění setQuoteState (práva, přechody). */
+const NEW_QUOTE_STATUSES = new Set(["navrh_ai", "ke_schvaleni"]);
+
 async function applyStage(
   db: JobsDb, jobId: string, from: JobStage | null, to: JobStage, actorId: string, note?: string | null,
 ): Promise<string | null> {
@@ -148,6 +157,7 @@ export async function createJob(
   try {
     const { db, user, margins } = c;
     const stage: JobStage = input.stage ?? "poptavka";
+    if (reasonRequired("job", stage)) return fail(CLOSE_NEEDS_REASON);
     const row = jobInputToRow({ ...input, stage });
     if (!margins) delete row.purchase_cost;
 
@@ -254,6 +264,7 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     const changes = diffJob(before, row);
     const fromStage = isJobStage(before.status) ? before.status : null;
     const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
+    if (stageTo && reasonRequired("job", stageTo)) return fail(CLOSE_NEEDS_REASON);
     if (!changes.length && !stageTo) return { ok: true };
 
     if (changes.length) {
@@ -312,6 +323,7 @@ export async function setJobStage(id: string, stage: JobStage, note?: string): P
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(NOT_FOUND);
   if (!isJobStage(stage)) return fail("Neznámý stav zakázky.");
+  if (reasonRequired("job", stage)) return fail(CLOSE_NEEDS_REASON);
   try {
     const job = await loadJob(c.db, id, "id, status");
     if (!job) return fail(NOT_FOUND);
@@ -394,19 +406,38 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       return { ...r, order_id: jobId };
     });
 
-    // nejdřív vložit nové, pak smazat staré — při chybě se nic neztratí
+    // upsert podle id: existující se upraví (dodávky a uzavření položek zůstanou), nové se vloží,
+    // odebrané smažou. Vložení ani smazání stav zakázky neposouvá.
+    const keep = new Set<string>();
+    const fresh: Row[] = [];
+    const existing: { id: string; row: Row }[] = [];
+    items.forEach((it, i) => {
+      if (it.id && isUuid(it.id) && old.has(it.id) && !keep.has(it.id)) {
+        keep.add(it.id);
+        existing.push({ id: it.id, row: rows[i] });
+      } else {
+        fresh.push(rows[i]);
+      }
+    });
     let insertedIds: string[] = [];
-    if (rows.length) {
-      const { data: ins, error: insErr } = await db.from("order_items").insert(rows as never).select("id");
+    if (fresh.length) {
+      const { data: ins, error: insErr } = await db.from("order_items").insert(fresh as never).select("id");
       if (insErr) return fail(insErr.message);
       insertedIds = ((ins ?? []) as { id: string }[]).map((r) => r.id);
     }
-    if (old.size) {
-      const { error: delErr } = await db.from("order_items").delete().in("id", [...old.keys()]);
-      if (delErr) {
+    for (const e of existing) {
+      const { order_id: _orderId, ...patch } = e.row;
+      void _orderId;
+      const { error: upErr } = await db.from("order_items").update(patch as never).eq("id", e.id).eq("order_id", jobId);
+      if (upErr) {
         if (insertedIds.length) await db.from("order_items").delete().in("id", insertedIds);
-        return fail(delErr.message);
+        return fail(upErr.message);
       }
+    }
+    const removed = [...old.keys()].filter((id) => !keep.has(id));
+    if (removed.length) {
+      const { error: delErr } = await db.from("order_items").delete().in("id", removed);
+      if (delErr) return fail(delErr.message);
     }
 
     const totals = computeItemTotals(rows.map((r) => ({
@@ -539,7 +570,7 @@ export async function createJobQuote(jobId: string, input: JobQuoteInput): Promi
       number,
       job_id: jobId,
       customer_id: job.customer_id ?? null,
-      status: header.status ?? "ke_schvaleni",
+      status: typeof header.status === "string" && NEW_QUOTE_STATUSES.has(header.status) ? header.status : "ke_schvaleni",
       currency: header.currency ?? "CZK",
       total: totals.value,
       revision,
@@ -591,6 +622,7 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
     const oldItems = [...(quote.items ?? [])].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
 
     const update: Row = quoteInputToRow(input);
+    delete update.status; // stav jen přes setQuoteState (práva + povolené přechody)
     let itemRows: Row[] | null = null;
     if (Array.isArray(input.items)) {
       itemRows = input.items.map((it, i) => {
@@ -650,13 +682,26 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
 }
 
 export async function approveJobQuote(quoteId: string): Promise<ActionResult> {
-  const c = await begin();
+  // schválení = člověk s právem na marže zkontroloval nabídku (AI, žádost, limit — R10)
+  const c = await begin("margins");
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {
     const { db, user } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
+    const { data: flowRow } = await db.from("quotes")
+      .select("id, number, revision, status, state, approved_by, approval_required, approval_requested_at, created_by, archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total")
+      .eq("id", quoteId).maybeSingle();
+    if (flowRow) {
+      const facts = quoteFactsFromRow(flowRow as Row);
+      const ctx = { can: (f: Feature) => f !== "margins" || c.margins, userId: user.id, isSuperAdmin: user.role === "super_admin", assigneeId: null };
+      if (!canApproveQuote(facts, ctx, approvalReasons(facts))) {
+        return fail(facts.state === "rozpracovana" || facts.state === "ke_schvaleni" || facts.state === "schvalena"
+          ? "Vlastní nabídku nad limitem schválení musí schválit někdo jiný (super admin)."
+          : "Odeslanou, archivovanou nebo uzavřenou nabídku už schvalovat nejde.");
+      }
+    }
     const now = new Date().toISOString();
     const update: Row = { approved_by: user.id, approved_at: now };
     if (quote.status === "navrh_ai") update.status = "ke_schvaleni";
@@ -677,7 +722,8 @@ export async function approveJobQuote(quoteId: string): Promise<ActionResult> {
 }
 
 export async function markJobQuoteSent(quoteId: string): Promise<ActionResult> {
-  const c = await begin();
+  // odeslání nabídky zákazníkovi = právo na marže (transitionFeature quote → odeslana)
+  const c = await begin("margins");
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {
@@ -746,7 +792,8 @@ export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
 }
 
 export async function rejectJobQuote(quoteId: string, reason?: string): Promise<ActionResult> {
-  const c = await begin();
+  // zamítnutí může zavřít zakázku → jen s právem na marže (jako setQuoteState → zamitnuta)
+  const c = await begin("margins");
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {

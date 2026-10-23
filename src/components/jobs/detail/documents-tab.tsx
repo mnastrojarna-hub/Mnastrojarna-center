@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   ExternalLink, Download, MoreHorizontal, Upload, Pencil, Archive, ArchiveRestore, Trash2, Sparkles, FileText,
-  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X,
+  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,9 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { FileKindBadge } from "@/components/jobs/stage-badge";
+import { DocumentSendDialog } from "@/components/flow/document-send-dialog";
+import { useAccess } from "@/components/access-provider";
+import type { JobDocumentKind } from "@/app/actions/job-documents";
 import { setJobFileArchived, updateJobFile, deleteJobFile } from "@/app/actions/job-files";
 import { FILE_KINDS, FILE_KIND_ORDER, JOB_FILE_ACCEPT } from "@/lib/jobs/file-kinds";
 import type { JobFileKind } from "@/lib/supabase/database.types";
@@ -23,6 +26,14 @@ import { useJobDetail } from "./detail-context";
 import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
+
+/** Doklady, které jde z karty poslat zákazníkovi e-mailem (PDF v příloze). */
+const SENDABLE: Partial<Record<JobFileKind, { kind: JobDocumentKind; what: string }>> = {
+  nabidka: { kind: "nabidka", what: "nabídku" },
+  potvrzeni: { kind: "potvrzeni", what: "potvrzení objednávky" },
+  dodaci_list: { kind: "dodaci_list", what: "dodací list" },
+  faktura: { kind: "faktura", what: "fakturu" },
+};
 
 const fileUrl = (id: string, download = false) => `/api/jobs/files/${id}${download ? "?download=1" : ""}`;
 
@@ -66,7 +77,7 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
 }
 
 function FileRow({
-  file, all, quotes, onEdit, onDelete, onPreview,
+  file, all, quotes, onEdit, onDelete, onPreview, onSend,
 }: {
   file: JobFile;
   all: JobFile[];
@@ -74,6 +85,8 @@ function FileRow({
   onEdit: (f: JobFile) => void;
   onDelete: (f: JobFile) => void;
   onPreview: (f: JobFile) => void;
+  /** Poslat doklad zákazníkovi e-mailem (jen doklady a s právem na dokumenty). */
+  onSend?: (f: JobFile) => void;
 }) {
   const { perms, notify, refresh, startUpload } = useJobDetail();
   const [busy, setBusy] = React.useState(false);
@@ -158,6 +171,11 @@ function FileRow({
             <DropdownMenuItem asChild>
               <a href={fileUrl(file.id, true)}><Download /> Stáhnout</a>
             </DropdownMenuItem>
+            {onSend && !file.archived && SENDABLE[file.kind] && (
+              <DropdownMenuItem onSelect={() => onSend(file)}>
+                <Send /> Poslat zákazníkovi e-mailem…
+              </DropdownMenuItem>
+            )}
             {!file.archived && (
               <DropdownMenuItem onSelect={() => versionInput.current?.click()}>
                 <Upload /> Nahrát novou verzi
@@ -331,7 +349,11 @@ function Lightbox({ images, index, onIndex, onClose }: { images: JobFile[]; inde
 
 /** Záložka Dokumenty — po druzích, s verzemi a archivem. */
 export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick<JobQuote, "id" | "number">[] }) {
-  const { notify, refresh } = useJobDetail();
+  const { jobId, notify, refresh } = useJobDetail();
+  const { can, features } = useAccess();
+  // oprávnění dorazí na klient po načtení layoutu; server akce je hlídá znovu
+  const canSend = features.length === 0 || can("documents");
+  const [sending, setSending] = React.useState<JobFile | null>(null);
   const [showArchive, setShowArchive] = React.useState(false);
   const [editing, setEditing] = React.useState<JobFile | null>(null);
   const [deleting, setDeleting] = React.useState<JobFile | null>(null);
@@ -377,7 +399,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
                 </header>
                 <ul className="divide-y">
                   {list.map((f) => (
-                    <FileRow key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview} />
+                    <FileRow key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview} onSend={canSend ? setSending : undefined} />
                   ))}
                 </ul>
               </section>
@@ -398,6 +420,22 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
       )}
 
       {editing && <FileEditDialog file={editing} onOpenChange={(o) => !o && setEditing(null)} />}
+      {sending && SENDABLE[sending.kind] && (
+        <DocumentSendDialog
+          open
+          onOpenChange={(o) => !o && setSending(null)}
+          jobId={jobId}
+          kind={SENDABLE[sending.kind]!.kind}
+          fileId={sending.id}
+          filename={sending.filename}
+          quoteId={sending.quoteId ?? undefined}
+          title={`Poslat ${SENDABLE[sending.kind]!.what} zákazníkovi`}
+          onSent={({ to }) => {
+            notify("success", `${sending.title || sending.filename} odesláno na ${to}.`);
+            refresh();
+          }}
+        />
+      )}
       {deleting && (
         <ConfirmDialog
           open

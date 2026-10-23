@@ -1,0 +1,70 @@
+{
+  "docKind": "nabidka",
+  "issuer": "my",
+  "documentNumber": "NAB-E2E-1",
+  "documentDate": "2026-10-14",
+  "customer": {
+    "name": "Strojmetal Kladno, závod Slaný",
+    "ico": "",
+    "dic": "",
+    "street": "Průmyslová 124",
+    "city": "Kladno",
+    "zip": "272 01",
+    "country": "CZ",
+    "email": "dvorak@strojmetal.cz",
+    "phone": "+420 603 111 222",
+    "contactPerson": "Ing. Jan Dvořák"
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "NAB-E2E-1",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "2026-12-04",
+  "items": [
+    {
+      "drawingNumber": "4711-02",
+      "revision": "C",
+      "name": "Upínací deska",
+      "description": "",
+      "material": "1.2379",
+      "quantity": 20,
+      "unit": "ks",
+      "unitPrice": 2450,
+      "deliveryDate": "2026-12-04"
+    },
+    {
+      "drawingNumber": "4711-03",
+      "revision": "A",
+      "name": "Vodicí lišta",
+      "description": "",
+      "material": "S355J2",
+      "quantity": 40,
+      "unit": "ks",
+      "unitPrice": 780,
+      "deliveryDate": "2026-12-04"
+    }
+  ],
+  "totalWithoutVat": 80200,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Naše nabídka NAB-E2E-1 (zákazník psán jinak — Strojmetal Kladno).",
+  "confidence": 0.92,
+  "needsClarification": []
+}

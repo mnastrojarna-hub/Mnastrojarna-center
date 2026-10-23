@@ -6,7 +6,7 @@ import {
   cleanNumber, cleanText, isGenericCaptureName, isUuid, isValidJobFilePath, rowToJobFile, translateDbError,
   JOB_FILE_SELECT, type FileRow,
 } from "@/lib/jobs/mapping";
-import type { JobFileKind } from "@/lib/supabase/database.types";
+import type { DocIssuerKey, JobFileKind, JobFileOrigin } from "@/lib/supabase/database.types";
 import type { ActionResult, JobFile } from "@/lib/jobs/types";
 
 /**
@@ -38,9 +38,18 @@ export interface RegisterJobFileInput {
   drawingId?: string | null;
   /** Relace dávkového focení. */
   captureId?: string | null;
-  /** SHA-256 obsahu (duplicity). */
+  /** SHA-256 obsahu (duplicity); „g:“ = otisk dat vystaveného dokladu (stejný obsah = žádná nová verze). */
   contentSha256?: string | null;
+  /** Odkud dokument je (generated = náš doklad vystavený serverem — jen serverový kód). */
+  origin?: JobFileOrigin | null;
+  /** Kdo doklad vystavil (my / zákazník / dodavatel). */
+  issuer?: DocIssuerKey | null;
+  /** Revize objednávky, kterou náš doklad (potvrzení) pokrývá. */
+  orderRevision?: number | null;
 }
+
+const ORIGINS: JobFileOrigin[] = ["generated", "upload", "capture", "email", "import"];
+const ISSUERS: DocIssuerKey[] = ["my", "zakaznik", "dodavatel"];
 
 const FILE_NOT_FOUND = "Dokument nenalezen.";
 const MAX_NAME = 255;
@@ -96,7 +105,11 @@ export async function registerJobFileCore(
     aiExtracted = input.aiExtracted;
   }
   const aiConf = cleanNumber(input.aiConfidence);
-  const sha = typeof input.contentSha256 === "string" && /^(p:)?[0-9a-f]{64}$/.test(input.contentSha256) ? input.contentSha256 : null;
+  const sha = typeof input.contentSha256 === "string" && /^(p:|g:)?[0-9a-f]{64}$/.test(input.contentSha256) ? input.contentSha256 : null;
+  if (input.origin !== undefined && input.origin !== null && !ORIGINS.includes(input.origin)) return fail("Neznámý původ dokumentu.");
+  if (input.issuer !== undefined && input.issuer !== null && !ISSUERS.includes(input.issuer)) return fail("Neznámý vystavitel dokladu.");
+  const orderRevision = cleanNumber(input.orderRevision);
+  if (orderRevision !== null && (!Number.isInteger(orderRevision) || orderRevision < 1 || orderRevision > 10_000)) return fail("Neplatná revize objednávky.");
 
   try {
     const { data: job } = await db.from("orders").select("id").eq("id", jobId).maybeSingle();
@@ -164,6 +177,9 @@ export async function registerJobFileCore(
     if (input.drawingId) row.drawing_id = input.drawingId.toLowerCase();
     if (input.captureId) row.capture_id = input.captureId.toLowerCase();
     if (sha) row.content_sha256 = sha;
+    if (input.origin) row.origin = input.origin;
+    if (input.issuer) row.issuer = input.issuer;
+    if (orderRevision !== null) row.order_revision = orderRevision;
     const { data: created, error } = await db.from("job_files").insert(row as never).select(JOB_FILE_SELECT).single();
     if (error || !created) {
       // souběžná registrace téže cesty → vrátit tu první

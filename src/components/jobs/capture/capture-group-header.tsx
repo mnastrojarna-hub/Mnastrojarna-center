@@ -313,7 +313,7 @@ export function CaptureGroupHeader({
                 {w.actions.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {w.actions.map((a, i) => (
-                      <Button key={i} type="button" size="sm" variant={i === 0 ? "default" : "outline"} className="h-8" onClick={() => onAction(w, a)}>
+                      <Button key={i} type="button" size="sm" variant={i === 0 && w.severity !== "info" ? "default" : "outline"} className="h-8" onClick={() => onAction(w, a)}>
                         {a.label}
                       </Button>
                     ))}

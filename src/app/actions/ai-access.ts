@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature } from "@/lib/auth/session";
 import { invalidateSettingsCache } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
@@ -24,7 +25,7 @@ export async function saveAiAccessSettings(input: {
   }
 
   try {
-    const db = createAdminClient();
+    const db = createAdminClient({ actor: userActor(access.user) });
     const now = new Date().toISOString();
     const rows = [
       {

@@ -201,7 +201,7 @@ await T("admin: Vyfotit doklad → AI předvyplní → oprava → uložení do v
   expect(res.created === false && res.jobId === job.id, "uloženo do existující (vlastní) zakázky");
   const done = await dlg.innerText();
   expect(done.includes("Doklad přiložen k zakázce v Dokumentech"), "hláška o přiloženém dokladu");
-  expect(await page.getByRole("link", { name: /Otevřít zakázku/ }).isVisible(), "odkaz Otevřít zakázku");
+  expect(await dlg.getByRole("link", { name: /Otevřít zakázku/ }).isVisible(), "odkaz Otevřít zakázku");
   await shot(page, "capture/a-done");
 
   // DB: zakázka

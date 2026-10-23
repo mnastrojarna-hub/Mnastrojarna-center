@@ -1,5 +1,5 @@
 import type {
-  JobStage, JobFileKind, JobSource, PriorityLevel, QuoteStatus,
+  ActorKind, ChangeVia, JobStage, JobFileKind, JobSource, PriorityLevel, QuoteStatus,
 } from "@/lib/supabase/database.types";
 import type {
   JobInput, JobItemInput, JobQuoteItemInput, JobQuoteInput, JobListItem, JobDetail, JobItem,
@@ -11,6 +11,10 @@ import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { isOperationKind } from "@/lib/jobs/operations";
 import { effectiveDeadline, deadlineInfo, pragueToday, type DeadlineInput } from "@/lib/jobs/deadlines";
 import { fieldLabel, formatFieldValue, SENSITIVE_JOB_COLUMNS } from "@/lib/jobs/field-labels";
+import {
+  deriveFlow, flowFactsFromRow, isQuoteState, paymentKey, quoteFactsFromRow, stampFromRow,
+  type FlowFacts, type JobStamps, type QuoteFacts,
+} from "@/lib/jobs/flow-status";
 
 /**
  * Mapování Knihy zakázek: vstup formuláře → sloupce orders, řádky DB → view-modely,
@@ -466,6 +470,29 @@ export function jobFilePath(jobId: string, uuid: string, filename: string): stri
 // ── Selecty (PostgREST, vždy s nápovědou FK sloupce) ────────
 const PERSON = "id, full_name, email";
 
+/** Nabídka jako fakta toku (QuoteFacts) — embed v Knize i detailu. */
+const FLOW_QUOTE_EMBED =
+  "id, job_id, number, revision, status, state, approved_by, approval_required, approval_requested_at, created_by, "
+  + "archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total";
+
+/** Fakta podrobných stavů a „kdo · kdy" (orders, udržuje DB) — sloupce mimo základní výběr Knihy. */
+const FLOW_LIST_COLUMNS = [
+  "inquiry_status, order_status, order_revision, order_confirmed_revision, confirmation_issued_revision",
+  "confirmation_sent_revision, items_count, items_priced, items_delivered, items_partial, last_delivery_at",
+  "partial_delivery_at, paid_so_far, waiting_since, waiting_note, order_status_changed_at, lost_reason, lost_note",
+  "flow_proposal, order_mismatch",
+  "stage_changed_by, stage_changed_via, stage_change_cause, stage_change_note",
+  "inquiry_status_changed_at, inquiry_status_changed_by, inquiry_status_changed_via",
+  "order_status_changed_by, order_status_changed_via, lost_at, lost_by, flow_proposal_at, flow_proposal_by",
+].join(", ");
+
+/** Embedy pro fakta toku: operace (počet), objednávky dodavatelům, nabídky dodavatelů bez ceny. */
+const FLOW_EMBEDS = [
+  "ops:job_operations!job_id(count)",
+  "pos:purchase_orders!job_id(status)",
+  "sq:supplier_quotes!job_id(total)",
+].join(", ");
+
 export const JOB_LIST_SELECT = [
   "id, number, title, status, priority, customer_id, customer_order_number, customer_inquiry_number",
   "value, purchase_cost, currency, inquiry_date, order_date, customer_required_date, due_date",
@@ -473,14 +500,21 @@ export const JOB_LIST_SELECT = [
   "owner_id, assignee_id, created_by, supplier_id, ai_filled, source, created_at, updated_at, stage_changed_at",
   "production_step, production_location, production_done, production_total, production_problem",
   "customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
+  FLOW_LIST_COLUMNS,
   "customer:customers!customer_id(id, name, customer_number, ico)",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
   `creator:profiles!created_by(${PERSON})`,
+  `stager:profiles!stage_changed_by(${PERSON})`,
+  `inq_by:profiles!inquiry_status_changed_by(${PERSON})`,
+  `ord_by:profiles!order_status_changed_by(${PERSON})`,
+  `lost_person:profiles!lost_by(${PERSON})`,
+  `prop_by:profiles!flow_proposal_by(${PERSON})`,
   "supplier:suppliers!supplier_id(id, name)",
   "items:order_items!order_id(position, drawing_number, quantity)",
-  "quotes:quotes!job_id(id, archived)",
+  `quotes:quotes!job_id(${FLOW_QUOTE_EMBED})`,
   "files:job_files!job_id(id, archived)",
+  FLOW_EMBEDS,
 ].join(", ");
 
 export const JOB_DETAIL_SELECT = [
@@ -491,14 +525,24 @@ export const JOB_DETAIL_SELECT = [
   `creator:profiles!created_by(${PERSON})`,
   `pricer:profiles!priced_by(${PERSON})`,
   `approver:profiles!approved_by(${PERSON})`,
+  `stager:profiles!stage_changed_by(${PERSON})`,
+  `inq_by:profiles!inquiry_status_changed_by(${PERSON})`,
+  `ord_by:profiles!order_status_changed_by(${PERSON})`,
+  `lost_person:profiles!lost_by(${PERSON})`,
+  `prop_by:profiles!flow_proposal_by(${PERSON})`,
   "supplier:suppliers!supplier_id(id, name)",
   "items:order_items!order_id(*)",
+  FLOW_EMBEDS,
 ].join(", ");
 
 export const JOB_QUOTE_SELECT = [
   "id, number, revision, title, status, total, currency, valid_until, lead_time_days, delivery_terms",
   "payment_terms, note, approved_at, sent_at, created_at, archived, ai_generated, job_id, customer_id",
+  "state, approved_by, approval_required, approval_requested_at, created_by, superseded_by, feedback, feedback_at",
+  "rejected_reason, lost_reason, sent_by, sent_via, state_changed_at, state_changed_by, state_changed_via",
   `creator:profiles!created_by(${PERSON})`,
+  `sender:profiles!sent_by(${PERSON})`,
+  `state_person:profiles!state_changed_by(${PERSON})`,
   `approver:profiles!approved_by(${PERSON})`,
   `owner:profiles!owner_id(${PERSON})`,
   "items:quote_items!quote_id(*)",
@@ -521,7 +565,8 @@ export const JOB_FILE_LIST_SELECT = [
   "job:orders!job_id(id, number, title, customer:customers!customer_id(name))",
 ].join(", ");
 
-export const JOB_EVENT_SELECT = `id, job_id, type, message, data, actor_id, created_at, actor:profiles!actor_id(${PERSON})`;
+export const JOB_EVENT_SELECT =
+  `id, job_id, type, message, data, actor_id, actor_kind, actor_name, via, agent, entity, created_at, actor:profiles!actor_id(${PERSON})`;
 
 export const JOB_COUNT_SELECT = "id, status, due_date, customer_required_date, max_tolerated_date, supplier_promised_date";
 
@@ -530,6 +575,8 @@ export const MATCH_JOB_SELECT = [
   "customer:customers!customer_id(id, name, ico, dic, email, contacts:customer_contacts!customer_id(email))",
   "items:order_items!order_id(drawing_number)",
   "quotes:quotes!job_id(number, items:quote_items!quote_id(drawing_number))",
+  // vyfocená naše nabídka (doklad zakázky) — její číslo páruje další doklady („dle nabídky 136/026")
+  "quote_docs:job_files!job_id(kind, doc_no:ai_extracted->>documentNumber)",
 ].join(", ");
 
 export const MATCH_CUSTOMER_SELECT =
@@ -628,8 +675,17 @@ export interface JobRow {
   approver?: Embed<PersonEmbed>;
   supplier?: Embed<{ id: string; name: string }>;
   items?: ItemRow[] | null;
-  quotes?: { id: string; archived?: boolean | null }[] | null;
+  quotes?: (Partial<QuoteRow> & { id: string; archived?: boolean | null })[] | null;
   files?: { id: string; archived?: boolean | null }[] | null;
+  // podrobné stavy a „kdo · kdy"
+  stager?: Embed<PersonEmbed>;
+  inq_by?: Embed<PersonEmbed>;
+  ord_by?: Embed<PersonEmbed>;
+  lost_person?: Embed<PersonEmbed>;
+  prop_by?: Embed<PersonEmbed>;
+  ops?: { count?: number | null }[] | null;
+  pos?: { status?: string | null }[] | null;
+  sq?: { total?: number | string | null }[] | null;
 }
 
 export interface ItemRow {
@@ -646,6 +702,9 @@ export interface ItemRow {
   purchase_unit_price?: number | string | null;
   vat_rate?: number | string | null;
   note?: string | null;
+  delivered_quantity?: number | string | null;
+  delivery_closed?: boolean | null;
+  delivery_closed_reason?: string | null;
 }
 
 export interface QuoteRow {
@@ -668,6 +727,23 @@ export interface QuoteRow {
   ai_generated?: boolean | null;
   job_id?: string | null;
   customer_id?: string | null;
+  state?: string | null;
+  approved_by?: string | null;
+  approval_required?: boolean | null;
+  approval_requested_at?: string | null;
+  created_by?: string | null;
+  superseded_by?: string | null;
+  feedback?: string | null;
+  feedback_at?: string | null;
+  rejected_reason?: string | null;
+  lost_reason?: string | null;
+  sent_by?: string | null;
+  sent_via?: string | null;
+  state_changed_at?: string | null;
+  state_changed_by?: string | null;
+  state_changed_via?: string | null;
+  sender?: Embed<PersonEmbed>;
+  state_person?: Embed<PersonEmbed>;
   creator?: Embed<PersonEmbed>;
   approver?: Embed<PersonEmbed>;
   owner?: Embed<PersonEmbed>;
@@ -705,6 +781,11 @@ export interface EventRow {
   message: string;
   data?: Record<string, unknown> | null;
   actor_id?: string | null;
+  actor_kind?: string | null;
+  actor_name?: string | null;
+  via?: string | null;
+  agent?: string | null;
+  entity?: string | null;
   created_at: string;
   actor?: Embed<PersonEmbed>;
 }
@@ -742,6 +823,66 @@ function byPosition<T extends { position?: number | null }>(rows: T[] | null | u
 export interface ViewOptions {
   /** Uživatel smí vidět nákupní ceny a marže. */
   margins: boolean;
+}
+
+// ── Podrobné stavy toku a „kdo · kdy" z řádku ───────────────
+type AnyRow = Record<string, unknown>;
+
+/** Nabídky zakázky jako fakta toku (jen řádky se stavem — embed Knihy / detailu). */
+export function flowQuotesOf(quotes: readonly (Partial<QuoteRow> & { id: string })[] | null | undefined): QuoteFacts[] {
+  return (quotes ?? []).filter((q) => typeof q.status === "string").map((q) => quoteFactsFromRow(q as unknown as AnyRow));
+}
+
+/** Fakta pro deriveFlow / primaryChip / nextAction z řádku orders (sloupce FLOW_LIST_COLUMNS + embedy FLOW_EMBEDS). */
+export function flowFactsOfRow(row: JobRow): FlowFacts {
+  const opsCount = Array.isArray(row.ops) ? Number(row.ops[0]?.count ?? 0) || 0 : 0;
+  return flowFactsFromRow(row as unknown as AnyRow, {
+    pendingSupplierQuotes: (row.sq ?? []).filter((x) => x.total === null || x.total === undefined).length,
+    hasOperations: opsCount > 0,
+    hasPurchaseOrders: (row.pos ?? []).some((p) => p.status !== "zrusena"),
+    assigneeName: personRef(row.assignee)?.name ?? null,
+  });
+}
+
+/** Kdo naposledy změnil hlavní stav a dílčí stavy — ze sloupců *_changed_* (bez historie událostí). */
+export function rowStamps(row: JobRow): JobStamps {
+  const r = row as unknown as AnyRow;
+  const proposal = r.flow_proposal ? stampFromRow(r, "flow_proposal", personRef(row.prop_by)) : null;
+  if (proposal && (r.flow_proposal as { kind?: unknown }).kind === "ai") proposal.kind = "ai";
+  return {
+    stage: stampFromRow(r, "stage_changed", personRef(row.stager)),
+    inquiry: stampFromRow(r, "inquiry_status_changed", personRef(row.inq_by)),
+    order: stampFromRow(r, "order_status_changed", personRef(row.ord_by)),
+    confirmed: null,
+    confirmationSent: null,
+    deliveryNote: null,
+    invoiced: null,
+    paid: null,
+    lost: r.lost_reason ? stampFromRow(r, "lost", personRef(row.lost_person)) : null,
+    proposal,
+    stageHistory: {},
+  };
+}
+
+/** Minimální fakta pro odvození platby u řádků bez faktů toku (testy, starší volání). */
+function paymentFacts(
+  j: Pick<JobListItem, "stage" | "paidAt" | "invoiceDueDate" | "invoiceNumber"> & { flow?: FlowFacts },
+): FlowFacts {
+  const base: FlowFacts = j.flow ?? {
+    stage: j.stage, inquiryStatus: null, orderStatus: null, orderRevision: 0, orderConfirmedRevision: null,
+    confirmationIssuedRevision: null, confirmationSentRevision: null, itemsCount: 0, itemsPriced: 0, itemsDelivered: 0,
+    itemsPartial: 0, lastDeliveryAt: null, partialDeliveryAt: null, productionDone: 0, productionTotal: 0,
+    deliveryNoteConfirmedAt: null, invoiceNumber: null, invoiceDueDate: null, paidAt: null, paidSoFar: 0,
+    waitingSince: null, orderStatusChangedAt: null, pendingSupplierQuotes: 0, lostReason: null, proposal: null,
+    hasOperations: false, hasPurchaseOrders: false,
+  };
+  return {
+    ...base,
+    stage: j.stage,
+    paidAt: cleanDate(j.paidAt),
+    invoiceNumber: cleanText(j.invoiceNumber, 120),
+    invoiceDueDate: cleanDate(j.invoiceDueDate),
+  };
 }
 
 export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
@@ -799,6 +940,9 @@ export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
     invoiceNumber: cleanText(row.invoice_number, 120),
     invoiceDueDate: cleanDate(row.invoice_due_date),
     paidAt: cleanDate(row.paid_at),
+    ...(isJobStage(row.status) && "inquiry_status" in row
+      ? { flow: flowFactsOfRow(row), flowQuotes: flowQuotesOf(row.quotes), stamps: rowStamps(row) }
+      : {}),
   };
 }
 
@@ -816,6 +960,8 @@ export function rowToJobItem(row: ItemRow, opts: ViewOptions): JobItem {
     unitPrice: num(row.unit_price),
     purchaseUnitPrice: opts.margins ? num(row.purchase_unit_price) : null,
     note: row.note ?? null,
+    ...(row.delivered_quantity !== undefined ? { deliveredQuantity: num(row.delivered_quantity) ?? 0 } : {}),
+    ...(row.delivery_closed !== undefined ? { deliveryClosed: Boolean(row.delivery_closed), deliveryClosedReason: row.delivery_closed_reason ?? null } : {}),
   };
 }
 
@@ -836,8 +982,29 @@ export function rowToJobQuoteItem(row: ItemRow, opts: ViewOptions): JobQuoteItem
   };
 }
 
+const VIAS: ChangeVia[] = ["rucne", "ai", "foto", "email", "automaticky", "import", "cron", "rest", "db"];
+function viaOrNull(v: unknown): ChangeVia | null {
+  return typeof v === "string" && (VIAS as string[]).includes(v) ? (v as ChangeVia) : null;
+}
+const ACTOR_KINDS: ActorKind[] = ["user", "ai", "system"];
+
 export function rowToJobQuote(row: QuoteRow, opts: ViewOptions & { acceptedQuoteId?: string | null }): JobQuote {
+  const statePerson = personRef(row.state_person);
   return {
+    ...(isQuoteState(row.state) ? { state: row.state } : {}),
+    approvalRequired: Boolean(row.approval_required),
+    approvalRequestedAt: row.approval_requested_at ?? null,
+    feedback: cleanText(row.feedback, 2000),
+    rejectedReason: cleanText(row.rejected_reason, 2000),
+    lostReason: row.lost_reason ?? null,
+    sentBy: personRef(row.sender),
+    sentVia: viaOrNull(row.sent_via),
+    stateStamp: row.state_changed_at
+      ? {
+        by: statePerson, byName: statePerson?.name ?? null, at: row.state_changed_at, via: viaOrNull(row.state_changed_via),
+        kind: viaOrNull(row.state_changed_via) === "ai" ? "ai" : row.state_changed_by || statePerson ? "user" : "system",
+      }
+      : null,
     id: row.id,
     number: row.number ?? "—",
     revision: row.revision ?? 1,
@@ -883,7 +1050,7 @@ export function rowToJobFile(row: FileRow): JobFile {
   };
 }
 
-const EVENT_TYPES: JobEventType[] = ["created", "stage", "field", "file", "quote", "comment", "ai", "email"];
+const EVENT_TYPES: JobEventType[] = ["created", "stage", "status", "field", "file", "quote", "comment", "ai", "email"];
 
 /** Odstraní z dat události citlivé hodnoty (nákupní ceny) pro uživatele bez práva na marže. */
 export function sanitizeEventData(data: Record<string, unknown>, opts: ViewOptions): Record<string, unknown> {
@@ -914,6 +1081,11 @@ export function rowToJobEvent(row: EventRow, opts: ViewOptions): JobEvent {
     data: sanitizeEventData(data, opts),
     actor: personRef(row.actor),
     createdAt: row.created_at,
+    actorKind: (ACTOR_KINDS as string[]).includes(row.actor_kind ?? "") ? (row.actor_kind as ActorKind) : row.actor_id ? "user" : null,
+    actorName: cleanText(row.actor_name, 300),
+    via: viaOrNull(row.via),
+    agent: cleanText(row.agent, 40),
+    entity: cleanText(row.entity, 40),
   };
 }
 
@@ -1041,30 +1213,54 @@ export function matchesDeadline(j: JobListItem, filter: JobFilters["deadline"], 
 /** Stav úhrady naší faktury; null = zatím bez faktury (nebo zakázka neproběhla). */
 export type JobPaymentState = "zaplaceno" | "po_splatnosti" | "nezaplaceno";
 
-export function paymentStateOf(
-  j: Pick<JobListItem, "stage" | "paidAt" | "invoiceDueDate" | "invoiceNumber">,
+/** Podrobný stav platby (= payment_key v job_flow_v; deleguje na paymentKey). */
+export function paymentKeyOf(
+  j: Pick<JobListItem, "stage" | "paidAt" | "invoiceDueDate" | "invoiceNumber"> & { flow?: FlowFacts },
   today: string = todayIso(),
-): JobPaymentState | null {
-  if (j.stage === "nerealizovano" || j.stage === "zruseno") return null;
-  // dokončená zakázka = zaplacená (trigger doplní paid_at)
-  if (cleanDate(j.paidAt) || j.stage === "dokonceno") return "zaplaceno";
-  const due = cleanDate(j.invoiceDueDate);
-  if (!due && !cleanText(j.invoiceNumber) && j.stage !== "fakturovano") return null;
-  return due && due < today ? "po_splatnosti" : "nezaplaceno";
+) {
+  return paymentKey(paymentFacts(j), today);
 }
 
-/** Splňuje zakázka filtr platby? „nezaplaceno" zahrnuje i faktury po splatnosti. */
+/** Hrubý stav úhrady pro řádek Knihy (zaplaceno / po splatnosti / nezaplaceno) — z paymentKey. */
+export function paymentStateOf(
+  j: Pick<JobListItem, "stage" | "paidAt" | "invoiceDueDate" | "invoiceNumber"> & { flow?: FlowFacts },
+  today: string = todayIso(),
+): JobPaymentState | null {
+  const key = paymentKeyOf(j, today);
+  if (!key) return null;
+  return key === "zaplaceno" || key === "po_splatnosti" ? key : "nezaplaceno";
+}
+
+/** Splňuje zakázka filtr platby? „nezaplaceno" zahrnuje částečně zaplacené i po splatnosti. */
 export function matchesPayment(j: JobListItem, filter: JobPaymentFilter | undefined, today: string = todayIso()): boolean {
   if (!filter) return true;
-  const state = paymentStateOf(j, today);
-  if (filter === "nezaplaceno") return state === "nezaplaceno" || state === "po_splatnosti";
-  return state === filter;
+  const key = paymentKeyOf(j, today);
+  if (filter === "nezaplaceno") return key === "ceka_na_uhradu" || key === "castecne_zaplaceno" || key === "po_splatnosti";
+  return key === filter;
+}
+
+/** Filtry podrobných stavů (poptávka, objednávka / plnění, dodání) přes deriveFlow — stejné odvození jako job_flow_v. */
+export function matchesFlow(
+  j: JobListItem,
+  filters: Pick<JobFilters, "inquiry" | "order" | "delivery">,
+  today: string = todayIso(),
+): boolean {
+  const inquiry = filters.inquiry ?? [];
+  const order = filters.order ?? [];
+  const delivery = filters.delivery ?? [];
+  if (!inquiry.length && !order.length && !delivery.length) return true;
+  if (!j.flow) return false;
+  const s = deriveFlow(j.flow, j.flowQuotes ?? [], today);
+  if (inquiry.length && !(s.inquiry && (inquiry as string[]).includes(s.inquiry))) return false;
+  if (order.length && !((s.order && order.includes(s.order)) || (s.fulfilment && order.includes(s.fulfilment)))) return false;
+  if (delivery.length && !(s.delivery && delivery.includes(s.delivery))) return false;
+  return true;
 }
 
 /** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
 export function filterJobs(
   items: JobListItem[],
-  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment">,
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery">,
   today: Date = pragueToday(),
 ): JobListItem[] {
   const tokens = searchNormalize(filters.q ?? "").split(/\s+/).filter(Boolean);
@@ -1079,6 +1275,7 @@ export function filterJobs(
     if (step && j.productionStep !== step) return false;
     if (location && searchNormalize((j.productionLocation ?? "").trim()) !== location) return false;
     if (!matchesPayment(j, filters.payment, todayDay)) return false;
+    if (!matchesFlow(j, filters, todayDay)) return false;
     return matchesDeadline(j, filters.deadline, today);
   });
 }

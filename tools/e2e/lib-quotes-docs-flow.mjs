@@ -167,11 +167,13 @@ export function createJob(f) {
 }
 
 /** Nabídka přes SQL s vlastním číslem (nespotřebuje čítač NAB). */
-export function createQuote(job, { number, status = "ke_schvaleni", approvedBy = null, createdBy, customerId, items = [], validDays = 30, sent = false }) {
+export function createQuote(job, { number, status = "ke_schvaleni", approvedBy = null, createdBy, customerId, items = [], validDays = 30, sent = false, approvalRequested = false }) {
   const total = items.reduce((s, it) => (it.price === null || it.price === undefined ? s : s + it.price * (it.qty ?? 1)), 0) || null;
-  const id = sql(`insert into quotes (number, job_id, customer_id, status, total, currency, valid_until, revision, created_by, owner_id, approved_by, approved_at, lead_time_days, archived, sent_at, title)
+  // approvalRequested: autor požádal o schválení → podrobný stav „Čeká na schválení“
+  const id = sql(`insert into quotes (number, job_id, customer_id, status, total, currency, valid_until, revision, created_by, owner_id, approved_by, approved_at, lead_time_days, archived, sent_at, title, approval_requested_at, approval_requested_by)
     values (${lit(number)}, ${lit(job.id)}, ${lit(customerId)}, ${lit(status)}::quote_status, ${total ?? "null"}, 'CZK', current_date + ${validDays}, 1, ${lit(createdBy)}, ${lit(createdBy)},
-      ${lit(approvedBy)}, ${approvedBy ? "now()" : "null"}, 14, false, ${sent ? "now()" : "null"}, ${lit(job.title)})
+      ${lit(approvedBy)}, ${approvedBy ? "now()" : "null"}, 14, false, ${sent ? "now()" : "null"}, ${lit(job.title)},
+      ${approvalRequested ? "now()" : "null"}, ${approvalRequested ? lit(createdBy) : "null"})
     returning id`).split("\n")[0];
   items.forEach((it, i) => {
     sql(`insert into quote_items (quote_id, position, drawing_number, name, quantity, unit, unit_price, purchase_unit_price)

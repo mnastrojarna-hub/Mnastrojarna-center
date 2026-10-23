@@ -3,6 +3,8 @@ import * as React from "react";
 import { renderToString } from "react-dom/server";
 import type { JobDetail, JobListItem, JobQuote, JobFile } from "@/lib/jobs/types";
 import type { EmailItem } from "@/lib/data/types";
+import { deriveFlow, menuActions, nextAction, type ActionCtx, type FlowFacts } from "@/lib/jobs/flow-status";
+import type { FlowJobState } from "./flow-state";
 
 // Smoke test stránek obchodního toku bez Next.js: router, session, data a akce jsou nahrazené
 const access = { features: new Set<string>(["workflow", "documents", "orders", "mail", "margins"]) };
@@ -10,13 +12,20 @@ const access = { features: new Set<string>(["workflow", "documents", "orders", "
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/inquiries",
+  useSearchParams: () => new URLSearchParams(),
   redirect: vi.fn(),
 }));
 vi.mock("@/app/actions/jobs", () => ({
   setJobStage: vi.fn(), createJob: vi.fn(), updateJob: vi.fn(), saveJobItems: vi.fn(), createJobQuote: vi.fn(),
   approveJobQuote: vi.fn(), markJobQuoteSent: vi.fn(), acceptJobQuote: vi.fn(), rejectJobQuote: vi.fn(), setJobQuoteArchived: vi.fn(),
+  newJobQuoteRevision: vi.fn(),
 }));
 vi.mock("@/app/actions/job-documents", () => ({ generateJobDocument: vi.fn(), sendJobDocument: vi.fn(), draftJobDocumentEmail: vi.fn() }));
+vi.mock("@/app/actions/flow-status", () => ({
+  takeInquiry: vi.fn(), setInquiryStatus: vi.fn(), proposeFlowChange: vi.fn(), decideFlowProposal: vi.fn(), setQuoteState: vi.fn(),
+  setOrderStatus: vi.fn(), requestOrderFix: vi.fn(), registerOrderChange: vi.fn(), decideOrderChange: vi.fn(),
+}));
+vi.mock("@/app/actions/flow-pages", () => ({ extendQuoteValidity: vi.fn() }));
 vi.mock("@/app/actions/mail", () => ({ createJobFromEmail: vi.fn() }));
 vi.mock("@/components/ai-pricing-panel", () => ({ AiPricingPanel: () => <div>AI-PANEL</div> }));
 vi.mock("@/components/integration-settings-editor", () => ({ IntegrationSettingsEditor: () => <div>PARAMS-EDITOR</div> }));
@@ -129,6 +138,53 @@ vi.mock("@/lib/data/pricing-data", () => ({
 }));
 vi.mock("@/lib/data/settings-data", () => ({ getIntegrationSettingsMeta: async () => [{ key: "pricing_rate", category: "pricing", label: "Sazba", isSecret: false, value: "1000" }] }));
 
+// ── Podrobné stavy toku (jako z DB: deriveFlow + nextAction pro přihlášeného) ──
+const TODAY = "2026-10-23";
+function flowFacts(over: Partial<FlowFacts>): FlowFacts {
+  return {
+    stage: "poptavka", inquiryStatus: "v_reseni", orderStatus: null, orderRevision: 0, orderConfirmedRevision: null,
+    confirmationIssuedRevision: null, confirmationSentRevision: null, itemsCount: 1, itemsPriced: 0, itemsDelivered: 0, itemsPartial: 0,
+    lastDeliveryAt: null, partialDeliveryAt: null, productionDone: 0, productionTotal: 0, deliveryNoteConfirmedAt: null,
+    invoiceNumber: null, invoiceDueDate: null, paidAt: null, paidSoFar: 0, waitingSince: null, orderStatusChangedAt: null,
+    pendingSupplierQuotes: 0, lostReason: null, proposal: null, hasOperations: false, hasPurchaseOrders: false, ...over,
+  };
+}
+const petr = { by: { id: "u1", name: "Petr Obchodník" }, byName: null, at: "2026-10-23T08:00:00Z", via: "rucne" as const, kind: "user" as const };
+function flowState(jobId: string, f: FlowFacts, stamps: Partial<FlowJobState["stamps"]> = {}): FlowJobState {
+  const snapshot = deriveFlow(f, [], TODAY);
+  const ctx = { can: (x: string) => access.features.has(x), userId: "u1", isSuperAdmin: false, assigneeId: f.assigneeId ?? null } as ActionCtx;
+  return {
+    jobId, facts: f, snapshot, quotes: [],
+    stamps: { stage: null, inquiry: null, order: null, orderChange: null, confirmed: null, confirmationSent: null, lost: null, proposal: null, ...stamps },
+    next: nextAction(f, snapshot, ctx), menu: menuActions(f, snapshot, ctx), canDecideProposal: false,
+  };
+}
+const flowStates = (): Record<string, FlowJobState> => ({
+  j1: flowState("j1", flowFacts({}), { inquiry: petr }),
+  j2: flowState("j2", flowFacts({ stage: "naceneni", itemsPriced: 0 }), { inquiry: petr }),
+  j4: flowState("j4", flowFacts({ stage: "objednavka", inquiryStatus: "zpracovana", orderStatus: "dorucena", orderRevision: 1 }), { order: petr }),
+  j5: flowState("j5", flowFacts({ stage: "potvrzeno", inquiryStatus: "zpracovana", orderStatus: "potvrzena", orderRevision: 1, orderConfirmedRevision: 1, confirmationSentRevision: 1 }), { confirmed: petr }),
+});
+const VIEW_KEY = { inquiry: "inquiry", pricing: "pricing", order: "order", fulfilment: "fulfilment" } as const;
+vi.mock("@/lib/data/flow-pages", () => ({
+  getFlowJobStates: vi.fn(async (ids: string[]) => Object.fromEntries(Object.entries(flowStates()).filter(([id]) => ids.includes(id)))),
+  listFlowStateJobIds: vi.fn(async (filter: { phase: keyof typeof VIEW_KEY; keys: string[] }[]) => {
+    const out = new Set<string>();
+    for (const [id, st] of Object.entries(flowStates())) {
+      for (const f of filter) if (f.keys.includes(String(st.snapshot[VIEW_KEY[f.phase]]))) out.add(id);
+    }
+    return out;
+  }),
+  getFlowQuoteInfo: vi.fn(async () => ({})),
+  getLatestOrderRevisions: vi.fn(async () => ({})),
+  getFileFlowInfo: vi.fn(async () => ({
+    f1: { origin: "generated", issuer: "my", orderRevision: null, uploaded: petr, archived: null },
+  })),
+}));
+vi.mock("@/lib/data/flow-status", () => ({
+  getFlowCounts: vi.fn(async () => ({ "inquiry.prijata": 2, "inquiry.v_reseni": 1, "pricing.ceka": 2, "quote.odeslana": 1, "quote.ke_schvaleni": 1, "order.dorucena": 1, "order.potvrzena": 1 })),
+}));
+
 type PageModule = { default: (...args: any[]) => Promise<React.ReactElement> };
 
 async function page(mod: Promise<PageModule>, props?: unknown): Promise<string> {
@@ -142,9 +198,14 @@ beforeEach(() => {
 });
 
 describe("stránky obchodního toku — vykreslení", () => {
-  it("Poptávky: hlavička, proužek toku, poptávka s odkazem Nacenit, pošta se Založit zakázku", async () => {
-    const html = await page(import("@/app/(app)/inquiries/page"));
+  it("Poptávky: hlavička, chipy stavů s počty, stav + autor, další krok Nacenit, pošta se Založit zakázku", async () => {
+    const html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
     expect(html).toContain("Poptávky");
+    expect(html).toContain("Otevřené poptávky");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Otevřené<span[^>]*>3</);
+    expect(html).toContain("V řešení · Petr Obchodník");
+    expect(html).toContain('data-flow-state="inquiry.v_reseni"');
+    expect(html).not.toContain("Stav zakázky:"); // korekce stavu jen v kartě zakázky
     expect(html).toContain('aria-current="step"');
     expect(html).toContain('href="/orders?segment=poptavky&amp;stages=poptavka"');
     expect(html).toContain("Z-2026-101");
@@ -159,7 +220,7 @@ describe("stránky obchodního toku — vykreslení", () => {
 
   it("Poptávky bez pošty: sekce pošty se nevykreslí", async () => {
     access.features.delete("mail");
-    const html = await page(import("@/app/(app)/inquiries/page"));
+    const html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
     expect(html).not.toContain("Poptávky v poště");
   });
 
@@ -170,6 +231,8 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain("Marže");
     expect(html).toContain("Vytvořit nabídku z ceny");
     expect(html).toContain("Nacenil: <span");
+    expect(html).toContain("Čeká na nacenění");
+    expect(html).toContain('aria-label="Stav nacenění"');
     expect(html).not.toContain("AI-PANEL");
     expect(html).not.toContain("AI návrh ceny");
 
@@ -183,30 +246,40 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain("PARAMS-EDITOR");
   });
 
-  it("Nabídky: počty stavů, verze, schválil, po platnosti, PDF náhled", async () => {
-    const html = await page(import("@/app/(app)/quotes/page"));
+  it("Nabídky: chipy stavů (QUOTE_STATES), verze, kdo zadal / schválil, vypršelá platnost, PDF náhled", async () => {
+    const html = await page(import("@/app/(app)/quotes/page"), { searchParams: Promise.resolve({}) });
     expect(html).toContain("NAB-2026-031");
     expect(html).toContain("verze 2");
-    expect(html).toContain("schválil Super Admin");
+    expect(html).toContain("Schváleno · S. Admin");
+    expect(html).toContain("Zadáno · P. Obchodník");
     expect(html).toContain("zatím neschváleno");
-    expect(html).toContain("Platnost vypršela");
+    expect(html).toContain("Vypršela platnost");
+    expect(html).toContain('data-quote-state="vyprsela"');
     expect(html).toContain('href="/api/pdf/job/j3?type=nabidka&amp;quoteId=q1"');
-    expect(html).toContain("Zobrazit archivované (1)");
-    expect(html).toContain("Schválit");
+    expect(html).toContain("Čeká na schválení");
+    expect(html).toContain('aria-label="Stav nabídky"');
     expect(html).toContain("bez ceny");
+    expect(html).not.toContain("Archivovaná"); // archiv je jen ve „Více“ (výchozí = otevřené)
     expect(html).not.toContain("AI-PANEL");
   });
 
-  it("Potvrzení: objednávka s tlačítkem Potvrdit, naposledy potvrzené, objednávky v poště", async () => {
-    const html = await page(import("@/app/(app)/confirmations/page"));
+  it("Potvrzení: akční seznam K potvrzení (Doručená + autor + Potvrdit objednávku), chip Potvrzené filtruje, pošta", async () => {
+    let html = await page(import("@/app/(app)/confirmations/page"), { searchParams: Promise.resolve({}) });
     expect(html).toContain("Potvrzení objednávek");
+    expect(html).toContain("K potvrzení");
     expect(html).toContain("Z-2026-104");
     expect(html).toContain("Obj. zák.");
+    expect(html).toContain("Doručená · Petr Obchodník");
     expect(html).toContain("Potvrdit objednávku");
-    expect(html).toContain("Naposledy potvrzené");
-    expect(html).toContain("Z-2026-105");
+    expect(html).not.toContain("Z-2026-105"); // potvrzená není ve frontě
     expect(html).toContain("Objednávky v poště");
     expect(html).toContain("Otevřít zakázku Z-2026-104");
+
+    html = await page(import("@/app/(app)/confirmations/page"), { searchParams: Promise.resolve({ stav: "potvrzena" }) });
+    expect(html).toContain("Z-2026-105");
+    expect(html).toContain("Potvrzená · Petr Obchodník");
+    expect(html).toContain("Potvrzení odesláno");
+    expect(html).not.toContain(">Z-2026-104<");
   });
 
   it("Dokumenty: filtry druhů s počty, náhled fotky, verze, vystavení dokladu, vzory", async () => {
@@ -222,5 +295,7 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain("Vystavit PDF");
     expect(html).toContain("Vzory dokladů");
     expect(html).toContain('href="/api/pdf/dodaci-list"');
+    expect(html).toContain("náš doklad");
+    expect(html).toContain("Vystaveno · P. Obchodník");
   });
 });

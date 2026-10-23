@@ -45,6 +45,14 @@ export interface MailboxOption {
   displayName: string | null;
   ownerId: string | null;
   ownerName: string | null;
+  /** Poslední úspěšné stažení (mailbox_status). */
+  lastSyncAt?: string | null;
+  /** Chyba posledního stažení (null = poslední proběhlo OK). */
+  lastSyncError?: string | null;
+  /** Server odmítl heslo a údaje se od té doby nezměnily — automaticky se nestahuje (jen ručně). */
+  authBlocked?: boolean;
+  /** Schránka nemá kompletní nastavení (server / heslo) — nestahuje se. */
+  incomplete?: boolean;
 }
 
 export interface MailboxOwnership {

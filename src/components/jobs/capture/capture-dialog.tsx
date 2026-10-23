@@ -19,7 +19,8 @@ import { CaptureBatchReview } from "@/components/jobs/capture/capture-batch-revi
 import { CaptureBatchDone } from "@/components/jobs/capture/capture-batch-done";
 import {
   INITIAL_FLOW, allTargets, batchProblemAt, batchSaveProblem, canRead, captureReducer, chosenTargets, confirmedGroups, currentSummaries,
-  currentTarget, docExtractStatus, extractingCount, missingExtracts, readyRefs, reviewProblem, savedDocIds,
+  currentTarget, docExtractStatus, extractingCount, jobGroupsToSave, jobsGenitive, mergeAllPlan, missingExtracts, readyRefs,
+  reviewProblem, savedDocIds,
   type CaptureFlowState, type CaptureStep, type PageDraft,
 } from "@/components/jobs/capture/capture-flow";
 import {
@@ -35,7 +36,7 @@ import { releasePdfThumbs } from "@/components/jobs/capture/pdf-thumbs";
 import {
   CAPTURE_BATCH_MAX_FILES, defaultCustomerChoice, defaultSupplierChoice, isBatchUploadable, switchTarget,
 } from "@/lib/jobs/capture-review";
-import { batchSummaryLine, pagesKey, validateBatchSort } from "@/lib/jobs/capture-batch";
+import { batchSummaryLine, distinctJobCount, pagesKey, validateBatchSort } from "@/lib/jobs/capture-batch";
 import { canAutoApplyBatch } from "@/lib/jobs/capture-batch-reconcile";
 import type {
   BatchApplyState, BatchDocType, BatchResult, BatchSort, BatchSortModel, BatchWarning, BatchWarningAction,
@@ -381,7 +382,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
     onSaved?.(batchToCaptureResult(res));
   }, [router, onSaved]);
 
-  const requestReview = React.useCallback(async (opts: { sort?: BatchSort; assign?: Record<string, string>; targets?: Record<string, string> } = {}) => {
+  const requestReview = React.useCallback(async (opts: { sort?: BatchSort; assign?: Record<string, string>; targets?: Record<string, string>; confirm?: string[] } = {}) => {
     const s = stateRef.current;
     if (!s.batch || reviewInFlight.current) return;
     const sort = opts.sort ?? s.sort;
@@ -399,7 +400,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         sort,
         assign: Object.keys(assignRef.current).length ? assignRef.current : undefined,
         targets: { ...chosenTargets(s.batchState), ...opts.targets },
-        customerConfirmed: confirmedGroups(s.batchState),
+        customerConfirmed: [...new Set([...confirmedGroups(s.batchState), ...(opts.confirm ?? [])])],
       });
       if (closed.current) return;
       const cur = stateRef.current;
@@ -407,9 +408,9 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         dispatch({ type: "failed", error: res.error, step: cur.step === "review" ? "review" : cur.step === "reading" ? "sort" : cur.step });
         return;
       }
-      // „new" → skutečný klíč skupiny, aby příští požadavek nezakládal další
+      // „new" / „new:<doklad>" → skutečný klíč skupiny, aby příští požadavek nezakládal další
       for (const [docId, key] of Object.entries(assignRef.current)) {
-        if (key !== "new") continue;
+        if (key !== "new" && !key.startsWith("new:")) continue;
         const g = res.review.groups.find((x) => x.docIds.includes(docId));
         if (g) assignRef.current[docId] = g.key;
       }
@@ -628,8 +629,12 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         return;
       }
       case "split_group": {
-        const ids = a.docId ? [a.docId] : w.docIds;
-        void requestReview({ assign: Object.fromEntries(ids.map((id) => [id, "new"])) });
+        // doklady akce odejdou SPOLEČNĚ do jedné nové zakázky („new:<první>")
+        const ids = a.docIds?.length ? a.docIds : a.docId ? [a.docId] : w.docIds;
+        if (!ids.length) return;
+        if (ids.some((id) => savedDocIds(s.batchResult).has(id))) { dispatch({ type: "failed", error: LOCKED_SORT, step: "review" }); return; }
+        const key = `new:${ids[0]}`;
+        void requestReview({ assign: Object.fromEntries(ids.map((id) => [id, key])) });
         return;
       }
       case "move_to_group":
@@ -670,6 +675,19 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
       default:
         return;
     }
+  }
+
+  /** „Sloučit do jedné zakázky": všechny doklady do první skupiny (odlišné IČO jen s potvrzením). */
+  function mergeAll() {
+    const s = stateRef.current;
+    if (!s.batch || !s.batchReview || !s.batchState) return;
+    const plan = mergeAllPlan(s.batchReview, s.batchState, savedDocIds(s.batchResult));
+    if (!plan) {
+      if (savedDocIds(s.batchResult).size) dispatch({ type: "failed", error: LOCKED_SORT, step: "review" });
+      return;
+    }
+    if (plan.icos.length > 1 && !window.confirm(`Doklady mají různé IČO zákazníka (${plan.icos.join(" × ")}). Opravdu je uložit do jedné zakázky?`)) return;
+    void requestReview({ assign: plan.assign, confirm: plan.icos.length > 1 ? [plan.target] : [] });
   }
 
   function fileOnlyAndRetry(docId: string) {
@@ -897,6 +915,8 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
                   }}
                   onAssign={(docId, key) => void requestReview({ assign: { [docId]: key } })}
                   onAction={onWarningAction}
+                  onMergeAll={mergeAll}
+                  busy={reviewBusy}
                   jumpRef={jumpToProblem}
                   onChangeType={(docId) => {
                     if (lockedDocs.size) {
@@ -1038,7 +1058,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
                   data-testid="capture-save"
                 >
                   {step === "saving" ? <Loader2 className="animate-spin" /> : <Check />}
-                  <span className="truncate">{step === "saving" ? "Ukládám…" : `Uložit vše (${state.batchState ? state.batchState.sort.docs.filter((d) => !d.excluded && !lockedDocs.has(d.id)).length : 0})`}</span>
+                  <span className="truncate">{step === "saving" ? "Ukládám…" : saveAllLabel(state, lockedDocs)}</span>
                 </Button>
               ) : (
                 <Button type="button" size="lg" onClick={save} disabled={step === "saving"} className={cn("min-w-0 flex-1 sm:flex-none", SAVE_TONE)} data-testid="capture-save">
@@ -1069,6 +1089,16 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
 
 /** Zelené „Uložit" s kontrastem AA (bílá na emerald-700 ≥ 5:1 ve světlém i tmavém). */
 const SAVE_TONE = "bg-emerald-700 text-white shadow-sm hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600";
+
+/** „Uložit vše (5)", při víc zakázkách „Uložit vše do 2 zakázek (5)" — počet zakázek nesmí překvapit. */
+function saveAllLabel(state: CaptureFlowState, locked: Set<string>): string {
+  const docs = state.batchState ? state.batchState.sort.docs.filter((d) => !d.excluded && !locked.has(d.id)).length : 0;
+  // skutečné zakázky (skupiny do stejné zakázky = 1), ne počet skupin
+  const jobs = state.batchReview && state.batchState
+    ? distinctJobCount(jobGroupsToSave(state.batchReview, state.batchState).filter((g) => g.docIds.some((id) => !locked.has(id))))
+    : 1;
+  return jobs > 1 ? `Uložit vše do ${jobsGenitive(jobs)} (${docs})` : `Uložit vše (${docs})`;
+}
 
 /** Souhrn nad „Uložit vše" („2 zakázky · 6 dokladů · + nový zákazník…"). */
 function batchSummaryText(state: CaptureFlowState): string {

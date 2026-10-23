@@ -17,8 +17,14 @@ import type { JobItemInput, PersonRef } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { DeadlineChip } from "./flow-job-list";
 import {
-  addDaysIso, amountInput, formatPercent, marginPercent, marginTone, parseAmount, pricingSummary, quoteStatusUi,
+  addDaysIso, amountInput, formatPercent, marginPercent, marginTone, parseAmount, pricingSummary,
 } from "./flow-utils";
+import { StateChip } from "@/components/flow-status/state-chip";
+import { QUOTE_STATES, quoteDisplayState } from "@/lib/jobs/flow-status";
+import { quoteStateFromStatus } from "@/lib/data/labels";
+import { FlowRowState } from "./flow-row-state";
+import { FlowActionBar } from "./flow-actions";
+import { actionPalette, type FlowJobState } from "./flow-state";
 
 /** Zakázka k nacenění (čistá data ze serveru). */
 export interface PricingJob {
@@ -52,8 +58,13 @@ export interface PricingJob {
     purchaseUnitPrice: number | null;
     note: string | null;
   }[];
-  quotes: { id: string; number: string; status: QuoteStatus; revision: number; archived: boolean; total: number | null }[];
+  quotes: { id: string; number: string; status: QuoteStatus; revision: number; archived: boolean; total: number | null; validUntil?: string | null }[];
+  /** Podrobný stav (nacenění, poptávka, nabídka), autor a další krok — bez DB stavů null. */
+  flow?: FlowJobState | null;
 }
+
+/** Akce, které na Nacenění dělá samotná karta (rozbalení, „Vytvořit nabídku z ceny“). */
+const BOARD_ACTIONS = ["pricing.open", "quote.create"] as const;
 
 interface Row {
   key: string;
@@ -211,6 +222,24 @@ export function PricingBoard({
                 <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", open && "rotate-180")} />
               </div>
             </button>
+            {job.flow && (
+              <div className="flex flex-col gap-2 border-t border-dashed px-3 py-2 pl-4 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <FlowRowState state={job.flow} tab="pricing" />
+                </div>
+                <FlowActionBar
+                  target={{
+                    jobId: job.id, jobNumber: job.number, facts: job.flow.facts, quotes: job.flow.quotes,
+                    quote: job.flow.snapshot.activeQuote, today,
+                    onlyOpenQuote: job.flow.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
+                  }}
+                  next={job.flow.next}
+                  menu={job.flow.menu}
+                  exclude={[...BOARD_ACTIONS]}
+                  palette={job.flow.next ? actionPalette(job.flow.next.key) : undefined}
+                />
+              </div>
+            )}
             {open && (
               <PricingPanel
                 key={`${job.id}:${job.items.map((i) => i.id).join(",")}`}
@@ -251,7 +280,8 @@ function PricingPanel({
   const [validity, setValidity] = React.useState("30");
   const [busy, setBusy] = React.useState<null | "save" | "quote">(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [baseline] = React.useState(() => signature(initial));
+  // uložený stav — po uložení se posune (položky si drží id, editor se znovu nepřipojí)
+  const [baseline, setBaseline] = React.useState(() => signature(initial));
   const dirty = signature(rows) !== baseline || !job.items.length;
 
   const nums = rows.map(parsed);
@@ -313,6 +343,7 @@ function PricingPanel({
     try {
       const err = await persist(c.items);
       if (err) return setError(err);
+      setBaseline(signature(rows));
       onResult({ saved: true });
       router.refresh();
     } catch {
@@ -338,6 +369,7 @@ function PricingPanel({
       if (dirty) {
         const err = await persist(c.items);
         if (err) return setError(err);
+        setBaseline(signature(rows));
       }
       const res = await createJobQuote(job.id, {
         title: job.title || undefined,
@@ -376,14 +408,14 @@ function PricingPanel({
         <div role="status" className="flex flex-col gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100 sm:flex-row sm:items-center">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-violet-600" />
           <p className="min-w-0 flex-1">
-            Nabídka <span className="font-mono font-semibold">{result.quote.number}</span> je vytvořená a čeká na schválení a odeslání.
+            Nabídka <span className="font-mono font-semibold">{result.quote.number}</span> je vytvořená — stav a další krok vidíš u zakázky (schválení, pokud je potřeba, pak odeslání).
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">
               <Link href={`/orders/${job.id}?tab=nabidky`}>Otevřít nabídku</Link>
             </Button>
-            <Button asChild size="sm" className="bg-violet-600 text-white hover:bg-violet-600/90">
-              <Link href="/quotes">Schválit a odeslat <ArrowRight className="h-3.5 w-3.5" /></Link>
+            <Button asChild size="sm" className="bg-violet-700 text-white hover:bg-violet-800">
+              <Link href="/quotes">Další krok v Nabídkách <ArrowRight className="h-3.5 w-3.5" /></Link>
             </Button>
           </div>
         </div>
@@ -559,10 +591,13 @@ function PricingPanel({
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <span>Nabídky zakázky:</span>
           {job.quotes.map((q) => {
-            const ui = quoteStatusUi(q.status);
+            const facts = job.flow?.quotes.find((x) => x.id === q.id);
+            const state = facts?.state ?? quoteStateFromStatus(q.status, { archived: q.archived }) ?? "rozpracovana";
+            const display = quoteDisplayState({ state, validUntil: facts?.validUntil ?? q.validUntil ?? null }, today);
             return (
-              <Link key={q.id} href={`/orders/${job.id}?tab=nabidky`} className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium hover:brightness-95", ui.badge, q.archived && "opacity-60 line-through")}>
-                <span className="font-mono">{q.number}</span> · {ui.label}
+              <Link key={q.id} href={`/orders/${job.id}?tab=nabidky`} className="inline-flex items-center gap-1 hover:opacity-90">
+                <span className="font-mono font-medium text-foreground">{q.number}</span>
+                <StateChip meta={QUOTE_STATES[display]} size="xs" ai={facts?.aiGenerated} />
               </Link>
             );
           })}

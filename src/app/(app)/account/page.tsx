@@ -174,6 +174,11 @@ export default async function AccountPage() {
                           {m.displayName ? `${m.email} · ` : ""}
                           {m.lastSyncAt ? `staženo ${relativeTime(m.lastSyncAt)}` : "zatím nestaženo"}
                         </div>
+                        {m.incomplete ? (
+                          <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">Nastavení schránky není kompletní — požádej super admina.</div>
+                        ) : m.lastSyncError ? (
+                          <div className="mt-0.5 break-words text-xs text-destructive">Poslední stažení selhalo: {m.lastSyncError}</div>
+                        ) : null}
                       </div>
                       <Badge
                         variant={m.active ? "outline" : "muted"}

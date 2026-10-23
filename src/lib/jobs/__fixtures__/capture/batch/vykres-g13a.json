@@ -1,0 +1,25 @@
+{
+  "drawingNumber": "8800-01",
+  "revision": "",
+  "title": "Hřídel hnací",
+  "material": "1.4301",
+  "dimensions": "Ø40 × 85 mm",
+  "weightKg": 0.6,
+  "generalTolerance": "ISO 2768-mK",
+  "tightestTolerance": "±0,02",
+  "surface": "Ra 1,6",
+  "heatTreatment": "",
+  "surfaceTreatment": "",
+  "quantity": 12,
+  "customerName": "Konstrukce Vrba s.r.o.",
+  "drawingDate": "2026-09-15",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "notes": "",
+  "summary": "Výkres 8800-01.",
+  "confidence": 0.9,
+  "needsClarification": [],
+  "drawingNumbers": [
+    "8800-01"
+  ]
+}

@@ -3,15 +3,16 @@
 import * as React from "react";
 import { Check } from "lucide-react";
 import { stageMeta } from "@/lib/jobs/stages";
+import { actorName, shortPersonName, type JobStamps } from "@/lib/jobs/flow-status";
 import { cn } from "@/lib/utils";
 import { buildTimeline, shortDate, longDate, type TimelineInput } from "./detail-helpers";
 
 /**
  * Barevná časová osa zakázky: hotové kroky plné, aktuální zvýrazněný,
- * pod kroky data. Speciální stav (pauza, reklamace…) jako stuha nad osou.
+ * pod kroky data a kdo krok udělal. Speciální stav (pauza, reklamace…) jako stuha nad osou.
  * Na mobilu se osa posouvá do strany.
  */
-export function StageTimeline({ job, today }: { job: TimelineInput; today?: Date }) {
+export function StageTimeline({ job, today, stamps }: { job: TimelineInput; today?: Date; stamps?: JobStamps | null }) {
   const { steps, side, doneCount } = buildTimeline(job);
   const sideMeta = side ? stageMeta(side) : null;
   const SideIcon = sideMeta?.icon;
@@ -52,6 +53,8 @@ export function StageTimeline({ job, today }: { job: TimelineInput; today?: Date
           const reached = s.state !== "todo";
           const prevReached = i > 0 && steps[i - 1].state !== "todo";
           const date = shortDate(s.date, today);
+          const who = s.state !== "todo" ? stamps?.stageHistory[s.stage] ?? null : null;
+          const whoName = who ? (who.kind === "user" && who.by?.name ? shortPersonName(who.by.name) : actorName(who)) : null;
           return (
             <li
               key={s.stage}
@@ -92,6 +95,11 @@ export function StageTimeline({ job, today }: { job: TimelineInput; today?: Date
               <span className="mt-0.5 h-3.5 text-[10px] leading-none text-muted-foreground" title={longDate(s.date) ?? undefined}>
                 {date ?? ""}
               </span>
+              {whoName && (
+                <span className="mt-0.5 max-w-[6.5rem] truncate text-[10px] leading-none text-muted-foreground" title={who ? actorName(who) : undefined}>
+                  {whoName}
+                </span>
+              )}
             </li>
           );
         })}

@@ -6,7 +6,7 @@ import {
   isValidJobFilePath, jobFilePath, rowToJobListItem, rowToJobDetail, rowToJobEvent, rowToJobFile,
   resolveStageFilter, filterJobs, sortJobs, countJobStages, aiFilledColumns, stageEventMessage,
   computeMargin, todayIso, matchesDeadline, fetchPaged, isGenericCaptureName, translateDbError, type JobRow,
-  paymentStateOf, matchesPayment, JOB_LIST_SELECT,
+  paymentStateOf, matchesPayment, JOB_LIST_SELECT, rowToJobItem, rowToJobQuote, paymentKeyOf, flowFactsOfRow,
 } from "./mapping";
 import type { JobListItem } from "./types";
 
@@ -496,5 +496,107 @@ describe("historie a AI učení", () => {
       { type: "comment", data: null, created_at: "2026-10-05" },
     ]);
     expect([...set].sort()).toEqual(["title", "value"]);
+  });
+});
+
+describe("řádky → podrobné stavy toku a autor", () => {
+  const base: JobRow = {
+    id: UUID, number: "Z-2026-010", title: "Hřídel", status: "poptavka", priority: "stredni",
+    created_at: "2026-10-01T10:00:00Z", updated_at: "2026-10-01T10:00:00Z",
+  };
+  const flowRow = {
+    ...base,
+    inquiry_status: "v_reseni", order_status: null, order_revision: 0, items_count: 2, items_priced: 1,
+    paid_so_far: "0", stage_changed_at: "2026-10-02T08:00:00Z", stage_changed_by: "u1", stage_changed_via: "rucne",
+    stage_change_cause: null, stage_change_note: "ručně",
+    inquiry_status_changed_at: "2026-10-03T08:00:00Z", inquiry_status_changed_by: "u2", inquiry_status_changed_via: "rucne",
+    lost_reason: null, flow_proposal: { phase: "inquiry", to: "odmitnuta", reason: "kapacita", kind: "ai", label: "Odmítnout" },
+    flow_proposal_at: "2026-10-04T08:00:00Z", flow_proposal_by: null,
+    stager: { id: "u1", full_name: "Jan Novák", email: "jan@firma.cz" },
+    inq_by: [{ id: "u2", full_name: "Petr Obchodník", email: "petr@firma.cz" }],
+    assignee: { id: "u2", full_name: "Petr Obchodník", email: "petr@firma.cz" },
+    ops: [{ count: 3 }],
+    pos: [{ status: "zrusena" }],
+    sq: [{ total: null }, { total: "1200" }, { total: null }],
+    quotes: [
+      { id: "q1", archived: true },
+      { id: "q2", status: "odeslano", state: "odeslana", revision: 2, number: "N-1", archived: false, sent_at: "2026-10-03T08:00:00Z" },
+    ],
+  } as unknown as JobRow;
+
+  it("seznam: fakta toku, nabídky jako fakta a razítka ze sloupců *_changed_*", () => {
+    const item = rowToJobListItem(flowRow, { margins: false });
+    expect(item.flow).toMatchObject({
+      stage: "poptavka", inquiryStatus: "v_reseni", itemsCount: 2, itemsPriced: 1, pendingSupplierQuotes: 2,
+      hasOperations: true, hasPurchaseOrders: false, assigneeName: "Petr Obchodník",
+    });
+    expect(item.flowQuotes?.map((q) => [q.id, q.state])).toEqual([["q2", "odeslana"]]);
+    expect(item.stamps?.stage).toMatchObject({ by: { id: "u1", name: "Jan Novák" }, via: "rucne", kind: "user", note: "ručně" });
+    expect(item.stamps?.inquiry).toMatchObject({ by: { id: "u2", name: "Petr Obchodník" }, kind: "user" });
+    expect(item.stamps?.order).toBeNull();
+    expect(item.stamps?.lost).toBeNull();
+    // návrh od AI bez uživatele = druh ai
+    expect(item.stamps?.proposal).toMatchObject({ kind: "ai", at: "2026-10-04T08:00:00Z" });
+  });
+
+  it("bez sloupců toku (starší výběr) se fakta nedopočítávají", () => {
+    const item = rowToJobListItem(base, { margins: false });
+    expect(item.flow).toBeUndefined();
+    expect(item.stamps).toBeUndefined();
+  });
+
+  it("důvod prohry nese razítko lost_*; zrušená PO se do nákupu nepočítá", () => {
+    const facts = flowFactsOfRow({
+      ...flowRow, status: "nerealizovano", lost_reason: "kapacita", lost_at: "2026-10-05T08:00:00Z", lost_by: "u2",
+      pos: [{ status: "odeslana" }],
+    } as unknown as JobRow);
+    expect(facts.lostReason).toBe("kapacita");
+    expect(facts.hasPurchaseOrders).toBe(true);
+    const item = rowToJobListItem({ ...flowRow, lost_reason: "kapacita", lost_at: "2026-10-05T08:00:00Z", lost_by: "u2" } as unknown as JobRow, { margins: false });
+    expect(item.stamps?.lost).toMatchObject({ at: "2026-10-05T08:00:00Z", kind: "user" });
+  });
+
+  it("událost: druh, uložené jméno, způsob a fáze; neznámé hodnoty se zahodí", () => {
+    const ai = rowToJobEvent({
+      id: "e1", type: "status", message: "Poptávka: Přijatá → V řešení", created_at: "x", actor_id: null,
+      actor_kind: "ai", actor_name: null, via: "email", agent: "email-ingest", entity: "inquiry",
+    }, { margins: true });
+    expect(ai).toMatchObject({ type: "status", actorKind: "ai", via: "email", agent: "email-ingest", entity: "inquiry", actor: null });
+    const deleted = rowToJobEvent({
+      id: "e2", type: "stage", message: "m", created_at: "x", actor_id: null, actor_kind: "user", actor_name: "Karel Smazaný", via: "rucne",
+    }, { margins: true });
+    expect(deleted).toMatchObject({ actorKind: "user", actorName: "Karel Smazaný", actor: null });
+    const legacy = rowToJobEvent({ id: "e3", type: "stage", message: "m", created_at: "x", actor_id: "u1", via: "telepatie" }, { margins: true });
+    expect(legacy).toMatchObject({ actorKind: "user", via: null });
+    expect(rowToJobEvent({ id: "e4", type: "stage", message: "m", created_at: "x" }, { margins: true }).actorKind).toBeNull();
+  });
+
+  it("nabídka: podrobný stav, kdo odeslal a razítko stavu (AI = druh ai)", () => {
+    const q = rowToJobQuote({
+      id: "q1", number: "N-1", status: "odeslano", state: "odeslana", created_at: "x", sent_via: "email",
+      sender: { id: "u1", full_name: "Jan Novák", email: "jan@firma.cz" }, approval_required: true,
+      state_changed_at: "2026-10-03T08:00:00Z", state_changed_by: null, state_changed_via: "ai", feedback: "  ",
+    }, { margins: false });
+    expect(q).toMatchObject({ state: "odeslana", approvalRequired: true, sentVia: "email", sentBy: { id: "u1", name: "Jan Novák" }, feedback: null });
+    expect(q.stateStamp).toMatchObject({ kind: "ai", via: "ai", by: null });
+    const noState = rowToJobQuote({ id: "q2", number: "N-2", status: "navrh_ai", state: "nesmysl", created_at: "x" }, { margins: false });
+    expect(noState.state).toBeUndefined();
+    expect(noState.stateStamp).toBeNull();
+  });
+
+  it("položka: dodané množství a uzavření s menším množstvím", () => {
+    const it1 = rowToJobItem({ id: "i1", position: 0, quantity: 10, delivered_quantity: "7", delivery_closed: true, delivery_closed_reason: "zmetky" }, { margins: false });
+    expect(it1).toMatchObject({ deliveredQuantity: 7, deliveryClosed: true, deliveryClosedReason: "zmetky" });
+    const it2 = rowToJobItem({ id: "i2", position: 1, quantity: 1 }, { margins: false });
+    expect(it2.deliveredQuantity).toBeUndefined();
+  });
+
+  it("platba z faktů toku: částečná úhrada = nezaplaceno / castecne_zaplaceno", () => {
+    const flow = rowToJobListItem({ ...flowRow, status: "fakturovano", invoice_number: "FV-1", invoice_due_date: "2026-11-30", paid_so_far: 500 } as unknown as JobRow, { margins: true });
+    expect(paymentKeyOf(flow, "2026-10-22")).toBe("castecne_zaplaceno");
+    expect(paymentStateOf(flow, "2026-10-22")).toBe("nezaplaceno");
+    expect(matchesPayment(flow, "castecne_zaplaceno", "2026-10-22")).toBe(true);
+    expect(matchesPayment(flow, "nezaplaceno", "2026-10-22")).toBe(true);
+    expect(matchesPayment(flow, "ceka_na_uhradu", "2026-10-22")).toBe(false);
   });
 });

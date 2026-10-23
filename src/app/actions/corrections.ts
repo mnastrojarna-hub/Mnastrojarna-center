@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { checkFeature } from "@/lib/auth/session";
+import { userActor } from "@/lib/supabase/actor-headers";
+import { logAudit } from "@/lib/audit";
 
 type Result = { ok: boolean; error?: string };
 
@@ -23,7 +25,7 @@ export async function recordCorrection(input: {
   if (typeof input.correctedValue !== "string" || !input.correctedValue.trim()) return { ok: false, error: "Chybí správná hodnota." };
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data, error } = await db
       .from("ai_corrections")
       .insert({
@@ -51,9 +53,11 @@ export async function deleteCorrection(id: string): Promise<Result> {
   if (typeof id !== "string" || !id) return { ok: false, error: "Chybí korekce." };
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   try {
-    const db = await createOperatorClient();
-    const { error } = await db.from("ai_corrections").delete().eq("id", id);
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
+    const { data: gone, error } = await db.from("ai_corrections").delete().eq("id", id).select("id, agent_key, field");
     if (error) return { ok: false, error: error.message };
+    const row = ((gone ?? []) as { id: string; agent_key: string | null; field: string | null }[])[0];
+    if (row) await logAudit({ action: "ai_correction_deleted", entity: "ai_corrections", entityId: id, diff: { agent: row.agent_key, field: row.field }, actor: userActor(auth.user) });
     revalidatePath("/settings");
     revalidatePath("/tuning");
     return { ok: true };

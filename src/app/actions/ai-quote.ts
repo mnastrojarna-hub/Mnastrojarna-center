@@ -8,6 +8,7 @@ import { sendMail } from "@/lib/email/send";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import { checkFeature } from "@/lib/auth/session";
+import { aiActor } from "@/lib/supabase/actor-headers";
 
 export interface QuoteItemInput {
   description: string;
@@ -46,7 +47,8 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
   if (!input.items.length) return { ok: false, error: "Nabídka nemá žádné položky." };
 
   try {
-    const db = createAdminClient();
+    // AI jedná za přihlášeného obchodníka (historie: „✨ AI za účet …")
+    const db = createAdminClient({ actor: aiActor(auth.user.id, "ai-quote") });
 
     // Číslo nabídky
     const { data: numData } = await db.rpc("next_doc_number", { p_prefix: "NAB" });
@@ -74,10 +76,12 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
         created_by: auth.user.id,
         owner_id: auth.user.id,
       } as never)
-      .select("id")
+      .select("id, approval_required")
       .single();
     if (qErr || !quote) return { ok: false, error: qErr?.message ?? "Nepodařilo se uložit nabídku." };
     const quoteId = (quote as { id: string }).id;
+    // režim „se schválením" (automation_settings.quote): AI nabídku musí před odesláním schválit člověk
+    const approvalRequired = (quote as { approval_required?: boolean }).approval_required === true;
 
     await db.from("quote_items").insert(
       input.items.map((it, i) => ({
@@ -142,16 +146,21 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
     // Odeslání (plná automatika)
     let sent = false;
     let sentReason: string | undefined;
-    if (input.autoSend && input.customerEmail) {
+    if (input.autoSend && input.customerEmail && approvalRequired) {
+      sentReason = "Nabídka čeká na schválení — odeslat ji lze až po schválení.";
+    } else if (input.autoSend && input.customerEmail) {
       const res = await sendMail({
         to: input.customerEmail,
         subject: `Cenová nabídka ${number} — ${COMPANY.name}`,
         text: input.coverEmail,
+        from: { ownerId: auth.user.id }, // ze schránky obchodníka, který nabídku vytvořil
+        senderId: auth.user.id,
       });
       sent = res.sent;
       sentReason = res.reason;
       if (sent) {
-        await db.from("quotes").update({ status: "odeslano", sent_at: new Date().toISOString() } as never).eq("id", quoteId);
+        await db.from("quotes")
+          .update({ status: "odeslano", sent_at: new Date().toISOString(), sent_via: "email" } as never).eq("id", quoteId);
       }
     }
 

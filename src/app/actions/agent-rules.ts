@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { checkFeature } from "@/lib/auth/session";
+import { userActor } from "@/lib/supabase/actor-headers";
+import { logAudit } from "@/lib/audit";
 
 export interface SaveRulesInput {
   agentKey: string;
@@ -27,7 +29,8 @@ export async function saveAgentRules(
   }
 
   try {
-    const db = await createOperatorClient();
+    const actor = userActor(auth.user);
+    const db = await createOperatorClient({ actor });
     const { data, error } = await db
       .from("ai_agent_rules")
       .update({
@@ -46,6 +49,10 @@ export async function saveAgentRules(
           : "Pro ukládání doplň servisní klíč Supabase (Nastavení → Integrace) nebo se přihlas jako super admin.",
       };
     }
+    await logAudit({
+      action: "agent_rules_updated", entity: "ai_agent_rules", entityId: input.agentKey,
+      diff: { agent: input.agentKey, always: always.length, never: never.length }, actor,
+    });
     revalidatePath("/settings");
     revalidatePath("/tuning");
     return { ok: true };

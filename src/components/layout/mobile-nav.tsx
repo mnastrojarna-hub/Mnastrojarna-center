@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, Inbox, MessageSquareQuote, Camera, Menu } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { navForFeatures } from "@/lib/nav";
+import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ export function MobileNav({ features }: { features: Feature[] }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const sections = navForFeatures(features);
+  const activeHref = activeNavHref(pathname, sections.flatMap((s) => s.items.map((i) => i.href)));
 
   React.useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -30,7 +31,7 @@ export function MobileNav({ features }: { features: Feature[] }) {
     <>
       <nav className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
         {items.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = matchesNavPath(pathname, item.href);
           return (
             <Link
               key={item.href}
@@ -97,7 +98,7 @@ export function MobileNav({ features }: { features: Feature[] }) {
                       href={item.href}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border p-2.5 text-sm font-medium",
-                        pathname.startsWith(item.href) ? "border-primary/40 bg-primary/5 text-primary" : "hover:bg-accent",
+                        item.href === activeHref ? "border-primary/40 bg-primary/5 text-primary" : "hover:bg-accent",
                       )}
                     >
                       <item.icon className={cn("h-4 w-4 shrink-0", item.color)} />

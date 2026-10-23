@@ -6,7 +6,13 @@ import { superAdminExists } from "@/lib/setup/guard";
 import { checkFeature } from "@/lib/auth/session";
 import { isUuidLike } from "@/lib/email/visibility";
 import { logAudit } from "@/lib/audit";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { invalidateSettingsCache } from "@/lib/settings";
+import {
+  describeConfigChanges, mergeMailboxSecrets, normalizeEmail, normalizeMailboxConfig, validateMailboxConfig, type SecretChanges,
+} from "@/lib/email/mail-config";
+import { testMailbox } from "@/lib/email/mailbox-diagnose";
+import { updateMailboxStatus } from "@/lib/email/mailbox-status";
 import type { MailboxProvider, MailboxConfig } from "@/lib/supabase/database.types";
 
 type Result = { ok: boolean; error?: string };
@@ -50,7 +56,8 @@ export async function saveIntegrationSettings(
       // upsert: klíč nemusí být předem zaveden migrací (nové verze přidávají klíče)
       const { data, error } = await db
         .from("integration_settings")
-        .upsert({ key, value: val.trim() === "" ? null : val.trim() } as never, { onConflict: "key" })
+        // hesla se neořezávají (mezera může být součástí hesla) — jen konce řádků
+        .upsert({ key, value: val.trim() === "" ? null : secrets.has(key) ? val.replace(/[\r\n]+/g, "") : val.trim() } as never, { onConflict: "key" })
         .select("key");
       if (error) return { ok: false, error: error.message };
       changed += data?.length ?? 0;
@@ -66,102 +73,134 @@ export async function saveIntegrationSettings(
   }
 }
 
+// ── Limit schválení nabídek (čtyři oči nad částkou, R10) ────
+const QUOTE_APPROVAL_LIMIT_KEY = "quote_approval_limit";
+
+/**
+ * Nabídka nad limitem (Kč bez DPH) potřebuje schválení; vlastní nabídku nad limitem schválí jen
+ * super admin. null / 0 = vypnuto. DB počítá approval_required při každém zápisu nabídky.
+ */
+export async function saveQuoteApprovalLimit(limit: number | null): Promise<Result> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno — nelze uložit." };
+  const access = await checkFeature("settings");
+  if ("error" in access) return { ok: false, error: access.error };
+  const value = limit === null || limit === 0 ? null : Number(limit);
+  if (value !== null && (!Number.isFinite(value) || value < 0 || value > 1e10)) return { ok: false, error: "Limit musí být kladná částka v Kč." };
+  try {
+    const actor = userActor(access.user);
+    const db = await createOperatorClient({ actor });
+    const { data: prev } = await db.from("integration_settings").select("value").eq("key", QUOTE_APPROVAL_LIMIT_KEY).maybeSingle();
+    const from = (prev as { value: string | null } | null)?.value ?? null;
+    const next = value === null ? null : String(Math.round(value));
+    const { error } = await db.from("integration_settings").upsert({
+      key: QUOTE_APPROVAL_LIMIT_KEY, value: next, category: "firma", label: "Limit schválení nabídek (Kč bez DPH)", is_secret: false,
+    } as never, { onConflict: "key" });
+    if (error) return { ok: false, error: error.message };
+    invalidateSettingsCache();
+    if (from !== next) {
+      await logAudit({ action: "settings_updated", entity: "integration_settings", entityId: QUOTE_APPROVAL_LIMIT_KEY, diff: { key: QUOTE_APPROVAL_LIMIT_KEY, from, to: next }, actor });
+    }
+    revalidatePath("/settings");
+    revalidatePath("/quotes");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
+  }
+}
+
 // ── Schránky ────────────────────────────────────────────────
 
 export interface MailboxPayload {
   provider: MailboxProvider;
   email: string;
   displayName?: string;
+  /** Servery, porty, uživatelé, šifrování. Hesla sem nepatří (starší volání je tu smí mít). */
   config: MailboxConfig;
+  /** Nová hesla — jen po výslovném „Změnit heslo"; prázdné / chybějící = beze změny. */
+  secrets?: SecretChanges;
   /** Vlastník schránky (vidí její poštu). Undefined = beze změny, null = bez vlastníka. */
   ownerId?: string | null;
 }
 
-/** Kontrola vstupu schránky; vrací chybu, nebo null. */
-function validateMailbox(payload: MailboxPayload): string | null {
+/** Kontrola vstupu schránky (typ, adresa, vlastník, povinná pole podle typu); vrací chybu, nebo null. */
+function validateMailbox(payload: MailboxPayload, config: MailboxConfig, errors: string[]): string | null {
   if (!payload || typeof payload !== "object") return "Chybí údaje schránky.";
   if (!VALID_PROVIDERS.includes(payload.provider)) return "Neznámý typ schránky.";
-  const email = String(payload.email ?? "").trim();
-  if (!email) return "Zadej e-mailovou adresu.";
-  if (!/^[^\s@]+@[^\s@]+$/.test(email)) return "Neplatná e-mailová adresa.";
   if (payload.ownerId !== undefined && payload.ownerId !== null && !isUuidLike(payload.ownerId)) {
     return "Neplatný vlastník schránky.";
   }
-  return null;
+  if (errors.length) return errors.join(" ");
+  return validateMailboxConfig({ provider: payload.provider, email: payload.email, config });
 }
 
-/** Vyčistí konfiguraci: prázdné hodnoty pryč, porty na čísla. */
-function sanitizeConfig(config: MailboxConfig): MailboxConfig {
-  const out: Record<string, string | number> = {};
-  for (const [key, raw] of Object.entries(config)) {
-    if (raw === undefined || raw === null) continue;
-    const val = String(raw).trim();
-    if (!val) continue;
-    out[key] = key.endsWith("_port") ? Number(val) : val;
-  }
-  return out as MailboxConfig;
+/** Normalizovaná konfigurace + hesla (nová přednostně, jinak uložená). */
+function prepareConfig(payload: MailboxPayload, prev: MailboxConfig | null) {
+  const { config, errors, notes } = normalizeMailboxConfig(payload.config ?? {});
+  return { config: mergeMailboxSecrets(prev, config, payload.secrets ?? {}), errors, notes };
 }
 
-export async function addMailbox(payload: MailboxPayload): Promise<Result> {
+export async function addMailbox(payload: MailboxPayload): Promise<Result & { id?: string; notes?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
-  const invalid = validateMailbox(payload);
+  const { config, errors, notes } = prepareConfig(payload, null);
+  const invalid = validateMailbox(payload, config, errors);
   if (invalid) return { ok: false, error: invalid };
   const denied = await guardSettings();
   if (denied) return { ok: false, error: denied };
   try {
     const db = await createOperatorClient();
+    const email = normalizeEmail(payload.email);
+    const { data: dup } = await db.from("mailboxes").select("id").ilike("email", email).limit(1);
+    if (dup && dup.length) return { ok: false, error: `Schránka ${email} už existuje — uprav ji v seznamu.` };
     const { data, error } = await db
       .from("mailboxes")
       .insert({
         provider: payload.provider,
-        email: payload.email.trim(),
+        email,
         display_name: payload.displayName?.trim() || null,
-        config: sanitizeConfig(payload.config ?? {}),
+        config,
         owner_id: payload.ownerId ?? null,
       } as never)
       .select("id");
     if (error) return { ok: false, error: error.message };
     if (!data || data.length === 0) return { ok: false, error: NEED_OPERATOR };
+    const id = (data[0] as { id: string }).id;
     await logAudit({
       action: "mailbox_added",
       entity: "mailboxes",
-      entityId: (data[0] as { id: string }).id,
-      diff: { email: payload.email, provider: payload.provider, owner_id: payload.ownerId ?? null },
+      entityId: id,
+      diff: { email, provider: payload.provider, owner_id: payload.ownerId ?? null, changes: describeConfigChanges({}, config) },
     });
     revalidatePath("/settings");
     revalidatePath("/users");
     revalidatePath("/inbox");
-    return { ok: true };
+    return { ok: true, id, notes };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
   }
 }
 
-/** Úprava schránky. Prázdná hesla = ponechat původní. */
-export async function updateMailbox(id: string, payload: MailboxPayload): Promise<Result> {
+/** Úprava schránky. Hesla se mění jen výslovně (`secrets`); prázdná = ponechat původní. */
+export async function updateMailbox(id: string, payload: MailboxPayload): Promise<Result & { notes?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   if (!isUuidLike(id)) return { ok: false, error: "Schránka nenalezena." };
-  const invalid = validateMailbox(payload);
-  if (invalid) return { ok: false, error: invalid };
   const denied = await guardSettings();
   if (denied) return { ok: false, error: denied };
   try {
     const db = await createOperatorClient();
-    const { data: existing } = await db.from("mailboxes").select("config, owner_id").eq("id", id).maybeSingle();
+    const { data: existing } = await db.from("mailboxes").select("config, owner_id, provider, email, display_name").eq("id", id).maybeSingle();
     if (!existing) return { ok: false, error: "Schránka nenalezena." };
-    const prevRow = existing as { config?: MailboxConfig; owner_id?: string | null };
+    const prevRow = existing as { config?: MailboxConfig; owner_id?: string | null; provider: MailboxProvider; email: string; display_name: string | null };
     const prev = (prevRow.config ?? {}) as MailboxConfig;
-    const next = sanitizeConfig(payload.config ?? {});
-    // tajné hodnoty: prázdné pole znamená „beze změny"
-    for (const key of ["imap_password", "smtp_password", "ms_graph_client_secret"] as const) {
-      if (!next[key] && prev[key]) next[key] = prev[key];
-    }
+    const { config: next, errors, notes } = prepareConfig(payload, prev);
+    const invalid = validateMailbox(payload, next, errors);
+    if (invalid) return { ok: false, error: invalid };
+    const email = normalizeEmail(payload.email);
     const ownerChanged = payload.ownerId !== undefined && (payload.ownerId ?? null) !== (prevRow.owner_id ?? null);
     const { error } = await db
       .from("mailboxes")
       .update({
         provider: payload.provider,
-        email: payload.email.trim(),
+        email,
         display_name: payload.displayName?.trim() || null,
         config: next,
         ...(ownerChanged ? { owner_id: payload.ownerId ?? null } : {}),
@@ -172,17 +211,44 @@ export async function updateMailbox(id: string, payload: MailboxPayload): Promis
       // Už stažená pošta schránky patří novému vlastníkovi (stejně jako setMailboxOwner)
       await db.from("emails").update({ owner_id: payload.ownerId ?? null } as never).eq("mailbox_id", id).eq("direction", "in");
     }
+    // Jiný server / protokol → stav stahování začne znovu (UID / UIDL platí jen pro jeden server)
+    if (prev.imap_host !== next.imap_host || (prev.incoming_protocol ?? "imap") !== (next.incoming_protocol ?? "imap") || prev.imap_user !== next.imap_user) {
+      await updateMailboxStatus(id, { sync_state: {}, last_sync_error: null });
+    }
     await logAudit({
       action: "mailbox_updated",
       entity: "mailboxes",
       entityId: id,
-      diff: { email: payload.email, provider: payload.provider, ...(ownerChanged ? { owner_id: payload.ownerId ?? null } : {}) },
+      diff: {
+        email,
+        provider: payload.provider,
+        ...(prevRow.provider !== payload.provider ? { provider_from: prevRow.provider } : {}),
+        ...(ownerChanged ? { owner_id: payload.ownerId ?? null } : {}),
+        changes: describeConfigChanges(prev, next),
+      },
     });
     revalidatePath("/settings");
-    if (ownerChanged) {
-      revalidatePath("/users");
-      revalidatePath("/inbox");
-    }
+    revalidatePath("/inbox");
+    if (ownerChanged) revalidatePath("/users");
+    return { ok: true, notes };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
+  }
+}
+
+/** Zapnutí / vypnutí schránky (vypnutá se nestahuje ani se z ní neodesílá). */
+export async function setMailboxActive(id: string, active: boolean): Promise<Result> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
+  if (!isUuidLike(id)) return { ok: false, error: "Schránka nenalezena." };
+  const denied = await guardSettings();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const db = await createOperatorClient();
+    const { error } = await db.from("mailboxes").update({ active: active === true } as never).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await logAudit({ action: "mailbox_updated", entity: "mailboxes", entityId: id, diff: { active: active === true } });
+    revalidatePath("/settings");
+    revalidatePath("/inbox");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
@@ -216,77 +282,24 @@ export interface MailboxTestResult {
   graph: { ok: boolean; error?: string } | null;
 }
 
-/** Otestuje IMAP (příchozí), SMTP (odchozí) a případně Microsoft Graph. */
-export async function testMailboxConnection(config: MailboxConfig): Promise<MailboxTestResult> {
+/**
+ * Otestuje příchozí (IMAP/POP3), odchozí (SMTP) a případně Microsoft Graph — postupně po krocích.
+ * UI volá /api/mailboxes/diagnose (vlastní maxDuration); tato akce zůstává pro starší volání.
+ * S `mailboxId` doplní uložená hesla schránky (do prohlížeče se neposílají).
+ */
+export async function testMailboxConnection(
+  config: MailboxConfig,
+  opts: { mailboxId?: string; email?: string; provider?: MailboxProvider; secrets?: SecretChanges } = {},
+): Promise<MailboxTestResult> {
   const guard = await guardSettings();
   if (guard) {
     const denied = { ok: false, error: guard };
     return { imap: denied, smtp: denied, graph: null };
   }
   if (!config || typeof config !== "object") return { imap: null, smtp: null, graph: null };
-
-  const result: MailboxTestResult = { imap: null, smtp: null, graph: null };
-
-  if (config.imap_host && config.imap_user && config.imap_password) {
-    try {
-      const { ImapFlow } = await import("imapflow");
-      const client = new ImapFlow({
-        host: config.imap_host,
-        port: Number(config.imap_port || 993),
-        secure: true,
-        auth: { user: config.imap_user, pass: config.imap_password },
-        logger: false,
-      });
-      await client.connect();
-      await client.logout();
-      result.imap = { ok: true };
-    } catch (err) {
-      result.imap = { ok: false, error: err instanceof Error ? err.message : "IMAP chyba" };
-    }
-  }
-
-  if (config.smtp_host && config.smtp_user && config.smtp_password) {
-    try {
-      const nodemailer = (await import("nodemailer")).default;
-      const port = Number(config.smtp_port || 465);
-      const transport = nodemailer.createTransport({
-        host: config.smtp_host,
-        port,
-        secure: port === 465,
-        auth: { user: config.smtp_user, pass: config.smtp_password },
-        connectionTimeout: 8000,
-      });
-      await transport.verify();
-      result.smtp = { ok: true };
-    } catch (err) {
-      result.smtp = { ok: false, error: err instanceof Error ? err.message : "SMTP chyba" };
-    }
-  }
-
-  if (config.ms_graph_client_id && config.ms_graph_client_secret && config.ms_graph_tenant_id) {
-    try {
-      const params = new URLSearchParams({
-        client_id: config.ms_graph_client_id,
-        client_secret: config.ms_graph_client_secret,
-        scope: "https://graph.microsoft.com/.default",
-        grant_type: "client_credentials",
-      });
-      const res = await fetch(
-        `https://login.microsoftonline.com/${config.ms_graph_tenant_id}/oauth2/v2.0/token`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: params,
-          signal: AbortSignal.timeout(8000),
-        },
-      );
-      result.graph = res.ok
-        ? { ok: true }
-        : { ok: false, error: `Microsoft odmítl přihlášení (HTTP ${res.status}).` };
-    } catch (err) {
-      result.graph = { ok: false, error: err instanceof Error ? err.message : "Graph chyba" };
-    }
-  }
-
-  return result;
+  const provider: MailboxProvider = opts.provider ?? (config.ms_graph_client_id ? "outlook" : "imap");
+  const email = opts.email ?? config.imap_user ?? "";
+  const r = await testMailbox({ mailboxId: opts.mailboxId && isUuidLike(opts.mailboxId) ? opts.mailboxId : null, provider, email, config, secrets: opts.secrets });
+  const short = (d: { ok: boolean; error?: string } | null) => (d ? { ok: d.ok, error: d.error } : null);
+  return { imap: short(r.incoming) ?? (r.error ? { ok: false, error: r.error } : null), smtp: short(r.smtp), graph: short(r.graph) };
 }

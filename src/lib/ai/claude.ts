@@ -48,6 +48,8 @@ export async function categorizeEmail(input: {
   subject: string;
   body: string;
   rules?: string; // firemní pravidla (VŽDY/NIKDY/pokyny) z ai_agent_rules
+  /** Přerušení (časový limit synchronizace pošty). */
+  signal?: AbortSignal;
 }): Promise<EmailAnalysis> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
@@ -94,7 +96,7 @@ export async function categorizeEmail(input: {
         content: `Od: ${input.from}\nPředmět: ${input.subject}\n\n${input.body}`,
       },
     ],
-  });
+  }, input.signal ? { signal: input.signal, maxRetries: 0 } : undefined);
 
   return JSON.parse(textOf(message)) as EmailAnalysis;
 }
@@ -106,6 +108,8 @@ export async function draftReply(input: {
   body: string;
   category?: string;
   rules?: string;
+  /** Přerušení (časový limit synchronizace pošty). */
+  signal?: AbortSignal;
 }): Promise<string> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
@@ -127,7 +131,7 @@ export async function draftReply(input: {
         content: `Kategorie: ${input.category ?? "neznámá"}\nOd: ${input.from}\nPředmět: ${input.subject}\n\n${input.body}`,
       },
     ],
-  });
+  }, input.signal ? { signal: input.signal, maxRetries: 0 } : undefined);
 
   return textOf(message).trim();
 }

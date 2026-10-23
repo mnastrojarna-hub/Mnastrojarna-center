@@ -1,0 +1,70 @@
+{
+  "docKind": "nabidka",
+  "issuer": "my",
+  "documentNumber": "NAB-E2E-6",
+  "documentDate": "2026-10-14",
+  "customer": {
+    "name": "STROJMETAL, a. s.",
+    "ico": "45274649",
+    "dic": "CZ45274649",
+    "street": "Průmyslová 124",
+    "city": "Kladno",
+    "zip": "272 01",
+    "country": "CZ",
+    "email": "dvorak@strojmetal.cz",
+    "phone": "+420 603 111 222",
+    "contactPerson": "Ing. Jan Dvořák"
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "NAB-E2E-6",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "2026-12-04",
+  "items": [
+    {
+      "drawingNumber": "6600-01",
+      "revision": "A",
+      "name": "Unášeč",
+      "description": "",
+      "material": "42CrMo4",
+      "quantity": 10,
+      "unit": "ks",
+      "unitPrice": 3000,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "6600-02",
+      "revision": "B",
+      "name": "Matice",
+      "description": "",
+      "material": "C45",
+      "quantity": 5,
+      "unit": "ks",
+      "unitPrice": 4000,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 50000,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Naše nabídka NAB-E2E-6 na 2 díly.",
+  "confidence": 0.92,
+  "needsClarification": []
+}

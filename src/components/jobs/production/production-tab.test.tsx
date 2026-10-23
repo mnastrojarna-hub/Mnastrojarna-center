@@ -146,9 +146,9 @@ describe("Záložka Výroba — render", () => {
     );
     expect(html).toContain("Hotovo · 10. 10. 10:00 · Karel Dílna");
     expect(html).toContain("Začato · 12. 10. 10:00 · Dominik Šponer");
-    expect(html).toContain("začal Dominik Šponer");
+    expect(html).toContain("začátek: Dominik Šponer");
     expect(html).toContain("Přidal Petra Obchodní");
-    expect(html).toContain("Potvrdil · 20. 10. 10:00 · Eva Expedice");
+    expect(html).toContain("DL potvrzen · 20. 10. 10:00 · Eva Expedice");
     expect(html).toContain("Sken nahrál Eva Expedice");
   });
 

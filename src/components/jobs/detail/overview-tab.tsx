@@ -14,6 +14,15 @@ import { JobField, InlineSelect, PersonChip, type SelectOption } from "./inline-
 import { SearchSelect, type SearchOption } from "./search-select";
 import { formatPercent, longDate, parseTags, tagTone } from "./detail-helpers";
 import { openProductionTab } from "@/components/jobs/production/production-chip";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import type { ChangeStamp } from "@/lib/jobs/flow-status";
+
+/** „změna · J. Novák · před 2 dny" pod klíčovým polem (M12). */
+function FieldStamp({ stamps, column }: { stamps?: Record<string, ChangeStamp>; column: string }) {
+  const s = stamps?.[column];
+  if (!s) return null;
+  return <ActorStamp stamp={s} verb="změna" short className="-mt-2 max-w-full" />;
+}
 
 function InfoCard({
   icon: Icon, tone, title, subtitle, children, className,
@@ -125,7 +134,7 @@ function TagsEditor({ tags }: { tags: string[] }) {
 }
 
 /** Záložka Přehled — vše upravitelné na místě (klik → uprav → Enter). */
-export function OverviewTab({ job }: { job: JobDetail }) {
+export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?: Record<string, ChangeStamp> }) {
   const { options, perms, save } = useJobDetail();
 
   const customerOptions = React.useMemo<SearchOption[]>(
@@ -191,6 +200,7 @@ export function OverviewTab({ job }: { job: JobDetail }) {
           onSave={(id) => save({ customerId: id })}
           onCreate={(name) => save({ customerName: name })}
         />
+        <FieldStamp stamps={fieldStamps} column="customer_id" />
         {cd && (
           <div className="-mt-1 space-y-0.5 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
@@ -247,10 +257,12 @@ export function OverviewTab({ job }: { job: JobDetail }) {
           label="Obchodník" icon={UserRound} iconClass="text-amber-500" value={job.owner?.id ?? null} options={people}
           onSave={(id) => save({ ownerId: id })} display={personDisplay}
         />
+        <FieldStamp stamps={fieldStamps} column="owner_id" />
         <InlineSelect
           label="Zpracovává" icon={ClipboardList} iconClass="text-amber-500" value={job.assignee?.id ?? null} options={people}
           onSave={(id) => save({ assigneeId: id })} display={personDisplay} hint="Kdo má zakázku teď na stole."
         />
+        <FieldStamp stamps={fieldStamps} column="assignee_id" />
         <InlineSelect
           label="Nacenil" icon={Calculator} iconClass="text-amber-500" value={job.pricedBy?.id ?? null} options={people}
           onSave={(id) => save({ pricedById: id })} display={personDisplay}
@@ -291,6 +303,7 @@ export function OverviewTab({ job }: { job: JobDetail }) {
             icon={Banknote} iconClass="text-emerald-500" placeholder="Doplnit částku"
             hint="Počítá se z položek, nebo z přijaté nabídky."
           />
+          <FieldStamp stamps={fieldStamps} column="value" />
           {perms.margins && (
             <JobField
               field="purchaseCost" kind="money" currency={job.currency} label="Nákupní náklady" value={job.purchaseCost}

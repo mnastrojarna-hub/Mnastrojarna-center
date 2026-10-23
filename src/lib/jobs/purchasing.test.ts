@@ -520,7 +520,8 @@ describe("řádky DB → view", () => {
       job: { id: JOB_ID, number: "Z-2026-105", stage: "potvrzeno" }, customer: { id: "c1", name: "Strojmetal" },
       itemCount: 1, drawingNumbers: ["VK-2291"],
     });
-    expect("items" in li).toBe(false);
+    expect(li.items).toHaveLength(1);
+    expect(li.receipt).toEqual({ done: 0, total: 1, partial: false });
     expect(filterPurchaseOrders([li], "hruby vk-2291")).toHaveLength(1);
     expect(filterPurchaseOrders([li], "strojmetal ov-2026-004")).toHaveLength(1);
     expect(filterPurchaseOrders([li], "tepkal")).toHaveLength(0);

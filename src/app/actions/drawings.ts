@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { extractFromDocument } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
+import { userActor } from "@/lib/supabase/actor-headers";
+import { logAudit } from "@/lib/audit";
 import { checkFeature } from "@/lib/auth/session";
 
 type Result = { ok: boolean; error?: string; number?: string };
@@ -33,7 +35,7 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
       rules: await getAgentInstructions("extraction"),
     });
 
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const drawingNumber = x.drawing_number?.trim() || file.name.replace(/\.[^.]+$/, "");
     const revision = x.revision?.trim() || "A";
 
@@ -82,6 +84,10 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
       storage_path: storagePath,
     } as never);
 
+    await logAudit({
+      action: "drawing_uploaded", entity: "drawings", entityId: (data[0] as { id: string }).id,
+      diff: { drawingNumber, revision, aiConfidence: x.confidence ?? null }, actor: userActor(auth.user),
+    });
     revalidatePath("/drawings");
     return { ok: true, number: drawingNumber };
   } catch (err) {
