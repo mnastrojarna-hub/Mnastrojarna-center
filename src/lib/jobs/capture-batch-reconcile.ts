@@ -79,14 +79,19 @@ const SUPPLIER_PRIMARY: BatchDocType[] = [
   "potvrzeni_dodavatel", "dodaci_list_dodavatel", "faktura_dodavatel", "objednavka_my", "nabidka_dodavatel", "poptavka_my",
 ];
 
+/**
+ * IČO pro porovnání: jen číslice, kratší než 8 doplněné úvodními nulami (4304080 = 04304080 — stejně jako
+ * icoKey v customers.ts, který úvodní nuly ignoruje). Delší zůstane (neplatné IČO).
+ */
 function digits(v: string | null | undefined): string {
-  return (v ?? "").replace(/\D+/g, "");
+  const d = (v ?? "").replace(/\D+/g, "");
+  return d && d.length < 8 ? d.padStart(8, "0") : d;
 }
 
-/** České IČO (8 číslic): kontrolní číslice podle mod 11 (váhy 8…2). Jiná délka = součet se neověřuje (true). */
+/** České IČO: přesně 8 číslic (po doplnění úvodních nul) a kontrolní číslice podle mod 11 (váhy 8…2). */
 export function isIcoChecksumValid(v: string | null | undefined): boolean {
   const d = digits(v);
-  if (d.length !== 8) return true;
+  if (d.length !== 8) return false;
   let sum = 0;
   for (let i = 0; i < 7; i++) sum += Number(d[i]) * (8 - i);
   const r = sum % 11;
@@ -94,19 +99,30 @@ export function isIcoChecksumValid(v: string | null | undefined): boolean {
   return Number(d[7]) === check;
 }
 
+/** Editační vzdálenost ≤ 1 (jedna jiná / chybějící / přebývající číslice). */
+function withinOneEdit(x: string, y: string): boolean {
+  if (Math.abs(x.length - y.length) > 1) return false;
+  let i = 0;
+  while (i < x.length && i < y.length && x[i] === y[i]) i++;
+  if (x.length === y.length) return x.slice(i + 1) === y.slice(i + 1);
+  return x.length > y.length ? x.slice(i + 1) === y.slice(i) : x.slice(i) === y.slice(i + 1);
+}
+
 /**
  * Odlišné IČO, které NENÍ silný důkaz jiného zákazníka (spíš chyba čtení): jedno neprojde kontrolním
- * součtem, nebo se liší o jednu číslici / přehozením dvou sousedních číslic.
+ * součtem / nemá 8 číslic, nebo se liší o jednu číslici (i chybějící / přebývající) či přehozením dvou
+ * sousedních číslic. Silný důkaz = dvě platná IČO, která se liší víc.
  */
 export function isWeakIcoClash(a: string | null | undefined, b: string | null | undefined): boolean {
   const x = digits(a);
   const y = digits(b);
   if (!x || !y || x === y) return false;
   if (!isIcoChecksumValid(x) || !isIcoChecksumValid(y)) return true;
-  if (x.length !== y.length) return false;
+  const rx = (a ?? "").replace(/\D+/g, "");
+  const ry = (b ?? "").replace(/\D+/g, "");
+  if (withinOneEdit(x, y) || withinOneEdit(rx, ry)) return true;
   const diff: number[] = [];
   for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) diff.push(i);
-  if (diff.length === 1) return true;
   return diff.length === 2 && diff[1] === diff[0] + 1 && x[diff[0]] === y[diff[1]] && x[diff[1]] === y[diff[0]];
 }
 
@@ -391,11 +407,15 @@ export function groupBatch(input: GroupBatchInput): { groups: GroupDraft[]; warn
     // odkaz čísly (objednávka „dle nabídky 136/026" ↔ nabídka 136/026) je silnější než jinak přečtené IČO:
     // doklad jde do odkazované skupiny, ale k potvrzení „Ano, jedna zakázka / Rozdělit" (conflictDocIds)
     const refClash = compatible.some((g) => refersTo(g, d)) ? null : groups.find((g) => icoClash(g) && !sameBundle(g) && refersTo(g, d)) ?? null;
-    // IČO se liší jen chybou čtení (neprojde součtem mod 11 / jiná číslice / přehozené sousední číslice) a skupina
-    // má stejný výkres → slabý důkaz: ke skupině, jen s dotazem „Ano, jedna zakázka / Rozdělit" (conflictDocIds)
+    // IČO se liší jen slabě (neprojde součtem mod 11 / nemá 8 číslic / jedna jiná, chybějící či přebývající
+    // číslice / přehozené sousední číslice) NEBO stejný (podobný) název zákazníka → slabý důkaz i bez společného
+    // výkresu: ke skupině, jen s blokujícím dotazem „Ano, jedna zakázka / Rozdělit" (conflictDocIds). Silný důkaz
+    // pro rozdělení = jen dvě platná, výrazně odlišná IČO s jiným názvem.
     const dNums = docDrawingNumbers(d);
-    const weakIco = refClash ? null : groups.find((g) => icoClash(g) && !sameBundle(g) && [...g.icos].every((x) => isWeakIcoClash(x, ico))
-      && dNums.length > 0 && shareDrawing(dNums, g.drawings)) ?? null;
+    const sameName = (g: WorkGroup) => Boolean(p?.name.trim()) && g.names.some((n) => nameSimilarity(n, p!.name) >= SAME_NAME);
+    const weakGroups = refClash ? [] : groups.filter((g) => icoClash(g) && !sameBundle(g)
+      && ([...g.icos].every((x) => isWeakIcoClash(x, ico)) || sameName(g)));
+    const weakIco = weakGroups.find((g) => dNums.length > 0 && shareDrawing(dNums, g.drawings)) ?? weakGroups[0] ?? null;
     // přednost: skupina, jejíž doklady na tento odkazují (objednávka „dle NAB-6" ↔ nabídka NAB-6), balík, IČO
     const target = compatible.find((g) => refersTo(g, d)) ?? refClash ?? compatible.find(sameBundle)
       ?? compatible.find((g) => Boolean(ico) && g.icos.has(ico)) ?? weakIco ?? compatible[0] ?? null;
@@ -1133,12 +1153,22 @@ export function groupDeadlineOf(
   return { result, source, fillDue: result.proposal?.from === "quote", warnings };
 }
 
+/**
+ * Termín do dokladu (requiredDeliveryDate) — SDÍLÍ dávka i jedna fotka objednávky (capture-single-deadline):
+ * návrh z nabídky / poptávky; reálný termín jen u položky (hlavička = datum objednávky) → termín položky;
+ * nereálný termín (= datum objednávky / před ním) bez návrhu → pole prázdné, ne zakázka hned po termínu;
+ * jinak beze změny (reálný termín objednávky se nikdy nepřepisuje).
+ */
+export function deadlineDocDate(current: string, d: GroupDeadline): string {
+  if (d.result.proposal) return d.result.proposal.date;
+  if (d.result.realistic && d.result.fromItems) return d.result.current;
+  if (!d.result.realistic && d.result.reason && DROP_REASONS.includes(d.result.reason)) return "";
+  return current;
+}
+
 /** Navržený termín do dokladu skupiny (požadovaný termín zakázky = termín, na který zákazník přistoupil). */
 function applyGroupDeadline(doc: ExtractedBusinessDoc, d: GroupDeadline): void {
-  if (d.result.proposal) doc.requiredDeliveryDate = d.result.proposal.date;
-  else if (d.result.realistic && d.result.fromItems) doc.requiredDeliveryDate = d.result.current;
-  // nereálný termín (= datum objednávky / před ním) bez návrhu → pole prázdné, ne zakázka hned po termínu
-  else if (!d.result.realistic && d.result.reason && DROP_REASONS.includes(d.result.reason)) doc.requiredDeliveryDate = "";
+  doc.requiredDeliveryDate = deadlineDocDate(doc.requiredDeliveryDate, d);
 }
 
 export interface GroupDoc {

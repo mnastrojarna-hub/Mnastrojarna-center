@@ -118,8 +118,29 @@ const DOC_FIELDS = [
   "customerOrderNumber", "customerInquiryNumber", "ourQuoteNumber", "ourJobNumber",
   "ourOrderConfirmationNumber", "supplierNumberAtCustomer", "requiredDeliveryDate",
   "promisedDeliveryDate", "items", "totalWithoutVat", "currency", "paymentTerms",
-  "deliveryTerms", "note", "summary", "confidence", "needsClarification",
+  "deliveryTerms", "deliveryLeadTime", "note", "summary", "confidence", "needsClarification",
 ];
+
+/** Strukturovaná dodací lhůta (nabídka naše i dodavatelská, potvrzení) — jen DODACÍ / výrobní lhůta. */
+const leadTimeSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Jen DODACÍ / výrobní lhůta (Dodací lhůta, Termín dodání, Lieferzeit, Delivery time, Lead time) u nabídky " +
+    "(naší i dodavatelské) a potvrzení objednávky; nikdy platnost nabídky, splatnost, záruka, skonto, záloha ani " +
+    "reklamační lhůta. Bez dodací lhůty: value 0, unit dny, from neuvedeno, text prázdný.",
+  properties: {
+    value: num("Počet jednotek dodací lhůty (u rozpětí 6–8 týdnů horní mez 8), 0 = neuvedeno"),
+    unit: { type: "string", enum: ["dny", "pracovni_dny", "tydny", "mesice"] },
+    from: {
+      type: "string",
+      enum: ["objednavka", "potvrzeni", "podklady", "jine", "neuvedeno"],
+      description: "Od čeho lhůta běží: objednávka (i závazná / platná), potvrzení objednávky, dodání podkladů / schválení výkresů, jiné (záloha, platba, materiál, dokončení výroby), neuvedeno",
+    },
+    text: str("Doslovný úsek dokladu s dodací lhůtou včetně toho, od čeho běží („Dodací lhůta 4 týdny od objednávky“), jinak prázdné"),
+  },
+  required: ["value", "unit", "from", "text"],
+};
 
 /** JSON schéma = přesně ExtractedBusinessDoc (vše povinné, prázdné = "" / 0). */
 export const BUSINESS_DOC_SCHEMA = {
@@ -144,7 +165,8 @@ export const BUSINESS_DOC_SCHEMA = {
     totalWithoutVat: num("Celkem bez DPH (0 = neuvedeno)"),
     currency: str("CZK, EUR…"),
     paymentTerms: str(),
-    deliveryTerms: str(),
+    deliveryTerms: str("Dodací podmínky (Incoterms, místo, způsob, dodací lhůta) — ne platební podmínky"),
+    deliveryLeadTime: leadTimeSchema,
     note: str("Ručně psané poznámky, razítka"),
     summary: str("1–2 věty česky"),
     confidence: num("0–1"),
@@ -194,6 +216,17 @@ export function systemPrompt(): string {
     "DATA ve formátu RRRR-MM-DD (12.3.2026 → 2026-03-12). documentDate = datum vystavení; requiredDeliveryDate = termín " +
       "dodání požadovaný zákazníkem; promisedDeliveryDate = potvrzený / slíbený termín (náš u našeho potvrzení či nabídky, " +
       "dodavatele u jeho dokladu). Týden („KW 14/2026“, „týden 14“) převeď na pondělí toho týdne a uveď to v needsClarification.",
+
+    "DODACÍ LHŮTA (deliveryLeadTime) u nabídky (naší i dodavatelské) a potvrzení objednávky: jen DODACÍ / výrobní lhůta " +
+      "(„Dodací lhůta 4 týdny od objednávky“ → value 4, unit tydny, from objednavka; „6–8 Wochen nach Auftragseingang“ → " +
+      "value 8, unit tydny, from objednavka; „20 pracovních dnů od potvrzení“ → value 20, unit pracovni_dny, from potvrzeni; " +
+      "„3 týdny od schválení výkresů“ → from podklady; „4 týdny od obdržení závazné objednávky“ → from objednavka; text = " +
+      "doslovný úsek celé klauzule včetně toho, od čeho lhůta běží). NIKDY sem nepatří platnost / závaznost nabídky, " +
+      "splatnost, platební lhůta, skonto, záloha, záruka ani reklamační lhůta — ty patří do paymentTerms / note. Lhůta běžící " +
+      "od něčeho jiného (uhrazení / připsání zálohy či platby, obdržení materiálu, dokončení výroby) → from jine. Zahájení " +
+      "výroby, vzorky / Erstmuster, expresní dodání za příplatek ani frekvence dílčích dodávek („každé 2 týdny“) dodací " +
+      "lhůtou NEJSOU — u vzorků a série ber lhůtu série. Bez dodací lhůty (nebo „dle dohody“) value 0, " +
+      "from neuvedeno, text prázdný. Konkrétní datum dodání patří do promisedDeliveryDate, ne sem.",
 
     "POLOŽKY: každý řádek dokladu = jedna položka — drawingNumber (číslo výkresu / artiklu), revision (index, rev.), " +
       "name (název dílu), description, material, quantity, unit, unitPrice (cena za MJ bez DPH, 0 = neuvedeno), " +

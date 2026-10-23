@@ -23,7 +23,7 @@ export async function jobQuoteTerms(db: JobsDb, job: Pick<JobDetail, "id" | "quo
     if (!ax || ax.docKind !== "nabidka" || ax.issuer !== "my") continue;
     const doc = normalizeExtracted(ax);
     const terms = quoteTermsOfDoc(doc, doc.documentNumber, { inSystem: true });
-    if (terms.date || terms.texts.length || terms.notes?.length) out.push(terms);
+    if (terms.date || terms.structured || terms.texts.length || terms.notes?.length) out.push(terms);
   }
   return out;
 }

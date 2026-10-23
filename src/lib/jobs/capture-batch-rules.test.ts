@@ -18,7 +18,8 @@ import { nameSimilarity } from "./matching";
 const OUR = "04304080";
 const STROJ: ExtractedParty = { ...emptyParty(), name: "STROJMETAL, a. s.", ico: "45274649" };
 const STROJ_ODDLY: ExtractedParty = { ...emptyParty(), name: "Strojmetal Kladno, závod Slaný" };
-const KOVO: ExtractedParty = { ...emptyParty(), name: "Kovo Plus s.r.o.", ico: "27654321" };
+// platné IČO (mod 11) — IČO se špatným součtem není silný důkaz jiného zákazníka (3. kolo, nález 4)
+const KOVO: ExtractedParty = { ...emptyParty(), name: "Kovo Plus s.r.o.", ico: "27654320" };
 const ZIP = "zip:podklady.zip";
 const JOB_A = "11111111-1111-4111-8111-111111111111";
 const JOB_B = "22222222-2222-4222-8222-222222222222";
@@ -356,7 +357,7 @@ describe("pravidla — hraniční případy (ověření)", () => {
   });
 
   it("samostatná objednávka jiného zákazníka se nesloučí se ZIPem (poptávka ZIPu bez čitelného zákazníka)", () => {
-    const kovo = rd("objednavka_zakaznik", { doc: order({ documentNumber: "PO-9", customerOrderNumber: "PO-9", customer: { ...KOVO, ico: "27654398" }, items: [item("9000-01")] }) });
+    const kovo = rd("objednavka_zakaznik", { doc: order({ documentNumber: "PO-9", customerOrderNumber: "PO-9", customer: { ...KOVO, ico: "27654397" }, items: [item("9000-01")] }) });
     const rfq = rd("poptavka_zakaznik", { doc: bdoc({ docKind: "poptavka", issuer: "zakaznik", documentNumber: "RFQ-1", customer: emptyParty(), items: [item("4711-02")] }), bundleKey: ZIP });
     const nab = rd("nabidka_my", { doc: quote(), bundleKey: ZIP });
     // naše nabídka, u které AI přečetla jako zákazníka naše IČO

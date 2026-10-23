@@ -52,6 +52,7 @@
   "currency": "CZK",
   "paymentTerms": "",
   "deliveryTerms": "Dodací lhůta: 4 týdny od objednávky",
+  "deliveryLeadTime": { "value": 4, "unit": "tydny", "from": "objednavka", "text": "4 týdny od objednávky" },
   "note": "",
   "summary": "Naše nabídka 136/026 — těleso ventilu, 120 ks.",
   "confidence": 0.92,

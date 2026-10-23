@@ -491,7 +491,7 @@ export async function analyzeSingle(
     const withTerms = async (j: JobDetail, reasonText: string | null, score: number | null) => {
       const terms = isOrder ? await jobQuoteTerms(db, j) : [];
       const dl = orderDeadlineForJob(doc, terms);
-      if (dl) deadlineNotes[j.id] = dl.message;
+      if (dl?.message) deadlineNotes[j.id] = dl.message;
       return existingTarget(j, session, margins, reasonText, score, terms);
     };
     if (fixedJob) {
@@ -513,10 +513,11 @@ export async function analyzeSingle(
     // nejlepší shoda jen nad prahem (alternativy jsou jen nabídka)
     const best = targets.find((t) => t.mode === "existing" && (fixedJob || (t.score ?? 0) >= 60)) ?? targets[targets.length - 1];
     if (best.jobId && deadlineNotes[best.jobId]) notes.push(deadlineNotes[best.jobId]);
-    // nová zakázka: termín = datum objednávky / před ním (bez nabídky) se neuloží — varování (= bez plné automatiky)
+    // nová zakázka: stejná upozornění jako dávka — termín = datum objednávky / před ním (bez nabídky) se neuloží,
+    // termín v minulosti → „doplň termín" (obojí = bez plné automatiky); termín jen z položky se tiše převezme
     else if (!best.jobId && isOrder) {
       const dl = orderDeadlineForJob(doc, []);
-      if (dl?.drop) notes.push(dl.message);
+      if (dl?.message) notes.push(dl.message);
     }
 
     const hideMoney = !margins && supplierSide;

@@ -195,7 +195,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
       await db.from("orders").delete().in("id", created);
     }
     await db.from("drawings").delete().in("drawing_number", ["4711-02", "4711-03", "9999-77"]).gte("created_at", startedAt);
-    await db.from("customers").delete().eq("ico", "27654321").gte("created_at", startedAt);
+    await db.from("customers").delete().in("ico", ["27654320", "27654321"]).gte("created_at", startedAt);
     await db.from("customers").delete().like("name", `${TAG}%`);
     await db.from("orders").delete().like("number", `${TAG}%`);
     // záznamy auditu o smazání vlastních testovacích řádků (20k zákazníků, 5k zakázek) — audit nezaplevelit
@@ -334,7 +334,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     const ids = res.groups.map((g) => g.jobId!);
     const { data } = await db.from("orders").select("id, customer:customers!customer_id(name, ico)").in("id", ids);
     const icos = ((data ?? []) as unknown as { customer: { ico: string } }[]).map((r) => r.customer.ico).sort();
-    expect(icos).toEqual(["27654321", "45274649"]);
+    expect(icos).toEqual(["27654320", "45274649"]);
     expect(res.groups.find((g) => g.customerName?.startsWith("Kovo"))?.customerCreated).toBe(true);
   }, 120_000);
 

@@ -463,13 +463,15 @@ describe("2. kolo — nález 3: řetězec odkazů a chybná číslice v IČO →
     expect(r.groups).toHaveLength(1);
     expect(conflict(r)).toMatchObject({ severity: "block", docIds: [c.nab.id] });
   });
-  it("pravidla zůstávají: dvě platná různá IČO bez odkazu = 2 skupiny; chybné IČO bez stejného výkresu = 2 skupiny", () => {
+  it("pravidla zůstávají: dvě platná různá IČO bez odkazu = 2 skupiny; chybné IČO i bez stejného výkresu = 1 skupina + dotaz (3. kolo)", () => {
     const a = rd("objednavka_zakaznik", { doc: order() });
     const b = rd("objednavka_zakaznik", { doc: order({ documentNumber: "K-1", customerOrderNumber: "K-1", customer: { ...emptyParty(), name: "Kovo Plus s.r.o.", ico: "27082440" } }) });
     expect(groupBatch({ docs: [a, b], ourIco: OUR }).groups).toHaveLength(2);
     const x = rd("objednavka_zakaznik", { doc: order() });
     const y = rd("objednavka_zakaznik", { doc: order({ documentNumber: "K-2", customerOrderNumber: "K-2", customer: { ...STROJ, ico: "45274648" }, items: [item("9999-01")] }) });
-    expect(groupBatch({ docs: [x, y], ourIco: OUR }).groups).toHaveLength(2);
+    const weak = groupBatch({ docs: [x, y], ourIco: OUR });
+    expect(weak.groups).toHaveLength(1);
+    expect(conflict(weak)).toMatchObject({ severity: "block", docIds: [y.id] });
     // dvě objednávky stejného zákazníka = 1 skupina + „Rozdělit“
     const p = rd("objednavka_zakaznik", { doc: order() });
     const q = rd("objednavka_zakaznik", { doc: order({ documentNumber: "PO-2", customerOrderNumber: "PO-2", items: [item("9999-01")] }) });
@@ -512,5 +514,91 @@ describe("2. kolo — nález 7 u jedné fotky objednávky (analyzeSingle): term�
     const real = singleNewTarget({ aiUsed: true, doc: po({ requiredDeliveryDate: "2026-12-04" }) }, true, TODAY);
     expect(real.proposed.customerRequiredDate).toBe("2026-12-04");
     expect(singleOrderDeadline(po({ requiredDeliveryDate: "2026-12-04" }), [], TODAY)).toBeNull();
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// 3. kolo
+// ════════════════════════════════════════════════════════════
+describe("3. kolo — nález 4: IČO jiné délky / bez úvodních nul / jen špatný součet / podobný název → nikdy silný důkaz", () => {
+  const conflict = (r: ReturnType<typeof groupBatch>) => r.warnings.find((w) => w.code === "customer_conflict");
+  const two = (ico: string, name = STROJ.name) => {
+    const a = rd("objednavka_zakaznik", { doc: order() });
+    const b = rd("objednavka_zakaznik", { doc: order({ documentNumber: "K-9", customerOrderNumber: "K-9", customer: { ...emptyParty(), name, ico }, items: [item("9999-01")] }) });
+    return { a, b, r: groupBatch({ docs: [a, b], ourIco: OUR }) };
+  };
+  it("IČO bez úvodní nuly = stejné IČO (04304080 ~ 4304080 je naše; 08291578 ~ 8291578)", () => {
+    expect(isIcoChecksumValid("4304080")).toBe(true);
+    const a = rd("objednavka_zakaznik", { doc: order({ customer: { ...STROJ, ico: "08291578" } }) });
+    const b = rd("nabidka_my", { doc: quote({ customer: { ...STROJ, ico: "8291578" } }) });
+    const r = groupBatch({ docs: [a, b], ourIco: OUR });
+    expect(r.groups).toHaveLength(1);
+    expect(conflict(r)).toBeUndefined();
+  });
+  it("IČO s chybějící číslicí (7 číslic, jiné) / přebývající číslicí (9 číslic) → 1 skupina + blokující dotaz", () => {
+    expect(isIcoChecksumValid("452746491")).toBe(false);
+    expect(isIcoChecksumValid("4527464")).toBe(false);
+    for (const ico of ["4527464", "452746491", "452764649"]) {
+      const { b, r } = two(ico, "Úplně jiný název s.r.o.");
+      expect(r.groups, ico).toHaveLength(1);
+      expect(conflict(r), ico).toMatchObject({ severity: "block", docIds: [b.id] });
+      expect(conflict(r)!.actions.map((x) => x.label)).toEqual(["Ano, jedna zakázka", "Rozdělit na samostatné zakázky"]);
+    }
+  });
+  it("jen špatný kontrolní součet bez společného výkresu → 1 skupina + dotaz", () => {
+    const { b, r } = two("12345678", "Kovo Plus s.r.o.");
+    expect(isIcoChecksumValid("12345678")).toBe(false);
+    expect(r.groups).toHaveLength(1);
+    expect(conflict(r)).toMatchObject({ severity: "block", docIds: [b.id] });
+  });
+  it("dvě platná IČO s jednou odlišnou číslicí / přehozením / stejným názvem → 1 skupina + dotaz", () => {
+    // 45274649 × 45274657 (obě platná, liší se o 2 číslice, ale stejný název) → slabý rozdíl
+    expect(isIcoChecksumValid("45274657")).toBe(true);
+    const same = two("45274657");
+    expect(same.r.groups).toHaveLength(1);
+    expect(conflict(same.r)).toMatchObject({ severity: "block" });
+    expect(isWeakIcoClash("45274649", "4527464")).toBe(true);
+    expect(isWeakIcoClash("45274649", "452746491")).toBe(true);
+  });
+  it("rozdělení dál funguje: „Rozdělit“ → 2 skupiny; dvě platná různá IČO a jiný název bez odkazu → 2 skupiny bez dotazu", () => {
+    const { r, a, b } = two("4527464", "Jiný s.r.o.");
+    const split = conflict(r)!.actions[1];
+    const key = `new:${split.docIds![0]}`;
+    expect(groupBatch({ docs: [a, b], ourIco: OUR, assign: Object.fromEntries(split.docIds!.map((id) => [id, key])) }).groups).toHaveLength(2);
+    const strong = two("27082440", "Kovo Plus s.r.o.");
+    expect(strong.r.groups).toHaveLength(2);
+    expect(conflict(strong.r)).toBeUndefined();
+  });
+});
+
+describe("3. kolo — nález 5: jedna fotka objednávky — termín v hlavičce = datum objednávky, reálný termín jen u položky", () => {
+  const po = (over: Partial<ExtractedBusinessDoc> = {}) => {
+    const d = normalizeExtracted(fixture("objednavka_zakaznik-g11"));
+    return { ...d, requiredDeliveryDate: "2026-10-20", items: d.items.map((i) => ({ ...i, deliveryDate: "2026-12-04" })), ...over };
+  };
+  it("nová zakázka: termín 4. 12. 2026 z položky (stejně jako dávka)", () => {
+    const doc = po();
+    expect(doc.documentDate).toBe("2026-10-20");
+    const t = singleNewTarget({ aiUsed: true, doc }, true, TODAY);
+    expect(t.proposed.customerRequiredDate).toBe("2026-12-04");
+    const dl = singleOrderDeadline(doc, [], TODAY);
+    expect(dl).toMatchObject({ drop: false, docDate: "2026-12-04" });
+    // stejné jako dávka
+    const g = groupDocOf([rd("objednavka_zakaznik", { doc })], OUR, { today: TODAY });
+    expect(g.doc.requiredDeliveryDate).toBe("2026-12-04");
+  });
+  it("existující zakázka: termín z položky, ne datum objednávky; nabídka s lhůtou ho nepřepíše (reálný termín objednávky)", () => {
+    const four = quoteTermsOfQuote({ number: "NAB-1", leadTimeDays: null, deliveryTerms: "Dodací lhůta 4 týdny od objednávky", note: null });
+    const t = singleExistingTarget(job(), { aiUsed: true, doc: po() }, true, "podle čísla", 92, [four], TODAY);
+    expect(t.proposed.customerRequiredDate).toBe("2026-12-04");
+    expect(t.proposed.dueDate ?? "").toBe("");
+  });
+  it("termín v minulosti bez nabídky → informace do needsClarification (jako v dávce), termín zůstane", () => {
+    const doc = po({ documentDate: "2026-09-01", requiredDeliveryDate: "2026-10-01", items: po().items.map((i) => ({ ...i, deliveryDate: "" })) });
+    const dl = singleOrderDeadline(doc, [], TODAY);
+    expect(dl).toMatchObject({ drop: false, date: "" });
+    expect(dl!.message).toMatch(/už uplynul.*doplň termín zakázky/);
+    const batch = groupDocOf([rd("objednavka_zakaznik", { doc })], OUR, { today: TODAY });
+    expect(batch.deadline?.warnings[0]?.message).toBe(dl!.message);
   });
 });

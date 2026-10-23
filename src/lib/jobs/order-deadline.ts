@@ -1,6 +1,7 @@
 import type { ExtractedBusinessDoc } from "@/lib/jobs/capture-types";
 import {
-  addLeadTime, czDate, isByAgreement, isRealisticDueDate, leadAmountText, leadText, parseLeadTime, parseYmd, pragueToday, type LeadTime,
+  addLeadTime, czDate, isLeadBlocked, isRealisticDueDate, leadAmountText, leadOfExtracted, leadText, parseLeadTime, parseYmd, pragueToday,
+  type LeadBlocked, type LeadTime,
 } from "@/lib/jobs/lead-time";
 
 /**
@@ -18,12 +19,17 @@ export interface QuoteTerms {
   inSystem: boolean;
   /** Absolutní termín z nabídky (RRRR-MM-DD, "" = neuveden). */
   date: string;
-  /** Dodací podmínky — lhůta se čte bez dalšího („4 týdny od objednání"). */
+  /** Dodací podmínky — režim dodacího pole: holá doba platí („4 týdny od objednání"), jiná podmínka ne. */
   texts: string[];
-  /** Poznámka, popisy položek, shrnutí — lhůta jen u kontextového slova („dodání 4 týdny", „Lieferzeit…"). */
+  /** Poznámka, popisy položek, shrnutí — volný text: lhůta jen u výslovného dodacího slova („dodání 4 týdny"). */
   notes?: string[];
-  /** quotes.lead_time_days (kalendářní dny), null = neuvedeno — má přednost před texty. */
+  /** quotes.lead_time_days (kalendářní dny), null = neuvedeno — má přednost před vším. */
   leadTimeDays?: number | null;
+  /**
+   * Strukturovaná dodací lhůta z AI (deliveryLeadTime) — hned po lead_time_days. Blok (lhůta od zálohy /
+   * materiálu, rozpor hodnoty s textem) = u této nabídky nečíst dodací podmínky ani poznámky („doplň termín").
+   */
+  structured?: LeadTime | LeadBlocked | null;
   /** Doklad dávky (zdroj pole), jinak null. */
   docId?: string | null;
 }
@@ -114,6 +120,7 @@ export function quoteTermsOfDoc(doc: ExtractedBusinessDoc, number: string, opts:
     date: parseYmd(doc.promisedDeliveryDate) ? doc.promisedDeliveryDate : itemDates[itemDates.length - 1] ?? "",
     texts: [doc.deliveryTerms].map(clean).filter(Boolean),
     notes: [doc.note, ...doc.items.map((i) => i.description), doc.summary].map(clean).filter(Boolean),
+    structured: leadOfExtracted(doc.deliveryLeadTime),
     docId: opts.docId ?? null,
   };
 }
@@ -140,59 +147,29 @@ export function quoteTermsOfQuote(q: { number: string; leadTimeDays: number | nu
   };
 }
 
-/** Slovo, u kterého číslo v poznámce / shrnutí znamená dodací lhůtu (bez diakritiky, malými). */
-const LEAD_CONTEXT = /(dodani|dodaci|dodavk|dodame|dodat\b|lhut|termin|expedic|liefer|delivery|deliver\b|lead\s*time|\baro\b|shipping|versand)/g;
-
-/** Bez diakritiky, malými (délka zachována — indexy sedí na původní NFC text). */
-function foldText(s: string): string {
-  return s.normalize("NFC").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-}
-
 /**
- * Lhůta z poznámky / popisu / shrnutí jen u kontextového slova („Výroba dle 3D modelu, dodání 4 týdny" →
- * 4 týdny; „Kalení 2 dny" → nic). Čte se JEN klauzule s kontextovým slovem (hranice tečka, středník i čárka):
- * nejdřív za slovem, jinak těsně před ním („4 týdny dodání"); klauzule se předává celá, aby slovo před
- * „lhůta / termín" rozhodlo („Platební / Reklamační / Záruční lhůta 14 dní" = nic). „dle dohody" v klauzuli = nic.
+ * Lhůta z poznámky / popisu položky / shrnutí = režim volného textu (kladný seznam): číslo jen u výslovného
+ * dodacího slova („dodání 4 týdny", „dodací lhůta X", „Lieferzeit ca. X", „X týdnů od objednání", „X weeks
+ * ARO"). „lhůta" / „termín" / „Frist" samy nestačí; „úhrada do 14 dnů od dodání", „lhůta 30 dní pro
+ * reklamace", „termín vzorků 5 dnů" = nic.
  */
 export function parseLeadTimeInContext(text: string): LeadTime | null {
-  const raw = clean(text).normalize("NFC");
-  if (!raw) return null;
-  const f = foldText(raw);
-  if (f.length !== raw.length) return null;
-  const BOUND = /[.;,\n](?:\s|$)/g;
-  LEAD_CONTEXT.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = LEAD_CONTEXT.exec(f))) {
-    const at = m.index;
-    const wordEnd = at + m[0].length;
-    // konec klauzule za kontextovým slovem, začátek klauzule před ním
-    BOUND.lastIndex = wordEnd;
-    const stop = BOUND.exec(f)?.index ?? f.length;
-    let start = 0;
-    BOUND.lastIndex = 0;
-    let b: RegExpExecArray | null;
-    while ((b = BOUND.exec(f)) && b.index < at) start = b.index + b[0].length;
-    while (start < at && /\s/.test(f[start])) start++;
-    const clause = raw.slice(start, stop);
-    // „Termín dodání dle dohody, kalení 2 dny" — dodání se dohodne, číslo jinde lhůtou není
-    if (isByAgreement(clause)) return null;
-    const rel = at - start;
-    const lead = parseLeadTime(clause, { startAt: rel })
-      ?? parseLeadTime(raw.slice(start, wordEnd), { startAt: Math.max(0, rel - 30) });
-    if (lead) return lead;
-  }
-  return null;
+  return parseLeadTime(text, { mode: "free-text" });
 }
 
 /**
- * Lhůta nabídky: quotes.lead_time_days (zadaná v systému) má přednost, pak dodací podmínky, pak poznámka /
- * položky / shrnutí jen u kontextového slova (dodání, lhůta, termín, expedice, Lieferzeit, delivery, ARO…).
+ * Lhůta nabídky: quotes.lead_time_days (zadaná v systému) má přednost, pak strukturovaná dodací lhůta z AI
+ * (deliveryLeadTime), pak dodací podmínky (dodací pole), pak poznámka / položky / shrnutí (volný text).
+ * Zablokovaná strukturovaná lhůta (od zálohy / materiálu, rozpor s textem) = null — dodací podmínky ani
+ * poznámky téže nabídky se nečtou („doplň termín").
  */
-export function leadOfTerms(t: Pick<QuoteTerms, "texts" | "leadTimeDays" | "notes">): LeadTime | null {
+export function leadOfTerms(t: Pick<QuoteTerms, "texts" | "leadTimeDays" | "notes" | "structured">): LeadTime | null {
   const n = Number(t.leadTimeDays);
   if (t.leadTimeDays != null && Number.isFinite(n) && n > 0 && n < 3 * 365) return { days: Math.round(n), unit: "kalendarni", from: null, text: `${Math.round(n)} dní` };
+  if (isLeadBlocked(t.structured)) return null;
+  if (t.structured && t.structured.days > 0) return t.structured;
   for (const text of t.texts) {
-    const lead = parseLeadTime(text);
+    const lead = parseLeadTime(text, { mode: "delivery-field" });
     if (lead) return lead;
   }
   for (const text of t.notes ?? []) {
