@@ -153,27 +153,38 @@ await T("/inquiries: zaměstnanec jen navrhne odmítnutí; obchodník ✓ → Od
 });
 
 // ═════════════════════════ NABÍDKY ═════════════════════════
-await T("/quotes: AI nabídka Čeká na schválení → Schválit (+ Vrátit) → Odesláno jinak → Zákazník objednal; kdo u každého kroku", async (context) => {
+await T("/quotes: AI nabídka Neschválená → super admin Schválit (+ Vrátit) → obchodník Odesláno jinak → Zákazník objednal; kdo u každého kroku", async (context) => {
+  // #25: schvaluje (i „Vrátit k úpravě“) jen super admin — v samostatném kontextu
+  await withContext(browser, errors, async (ac) => {
+    const ap = await ac.newPage();
+    await login(ap, USERS.admin);
+    await flowPage(ap, "/quotes", "Nabídky");
+    await waitHydrated(ap, 'main [role="group"][aria-label="Stav nabídky"] button');
+    expect(await chipCount(ap, "Stav nabídky", "Neschválená") === dbCount("quote", "ke_schvaleni"), "počet Neschválená = flow_counts");
+    const r = quoteRow(ap, AIQ);
+    await r.waitFor({ timeout: 10_000 });
+    expect(await r.getAttribute("data-quote-state") === "ke_schvaleni", "AI nabídka čeká na schválení");
+    expect(norm(await r.innerText()).includes("kontrola AI"), "důvod schválení: kontrola AI");
+    await r.getByRole("button", { name: "Schválit", exact: true }).click();
+    await waitToast(ap, /schválena/);
+    await eventually(async () => expect(await quoteRow(ap, AIQ).getAttribute("data-quote-state") === "schvalena", "stav Schválená"));
+    await quoteRow(ap, AIQ).getByRole("button", { name: "Vrátit" }).click();
+    await waitToast(ap, /Vráceno/);
+    await eventually(() => expect(sql(`select state || '|' || coalesce(approved_by::text, '-') from quotes where id = ${lit(AIQ.id)}`) === "ke_schvaleni|-", "Vrátit = zase čeká na schválení"));
+    await ap.reload();
+    await waitHydrated(ap, 'main [role="group"][aria-label="Stav nabídky"] button');
+    await quoteRow(ap, AIQ).getByRole("button", { name: "Schválit", exact: true }).click();
+    await waitToast(ap, /schválena/);
+    await eventually(async () => expect(norm(await quoteRow(ap, AIQ).innerText()).includes("Schváleno ·"), "kdo schválil"));
+  });
+  expect(sql(`select approved_by from quotes where id = ${lit(AIQ.id)}`) === ID.admin, "DB: schválil super admin");
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await flowPage(page, "/quotes", "Nabídky");
   await waitHydrated(page, 'main [role="group"][aria-label="Stav nabídky"] button');
-  expect(await chipCount(page, "Stav nabídky", "Čeká na schválení") === dbCount("quote", "ke_schvaleni"), "počet Čeká na schválení = flow_counts");
-  const r = quoteRow(page, AIQ);
-  await r.waitFor({ timeout: 10_000 });
-  expect(await r.getAttribute("data-quote-state") === "ke_schvaleni", "AI nabídka čeká na schválení");
-  expect(norm(await r.innerText()).includes("kontrola AI"), "důvod schválení: kontrola AI");
-  await r.getByRole("button", { name: "Schválit", exact: true }).click();
-  await waitToast(page, /schválena/);
-  await eventually(async () => expect(await quoteRow(page, AIQ).getAttribute("data-quote-state") === "schvalena", "stav Schválená"));
-  await quoteRow(page, AIQ).getByRole("button", { name: "Vrátit" }).click();
-  await waitToast(page, /Vráceno/);
-  await eventually(() => expect(sql(`select state || '|' || coalesce(approved_by::text, '-') from quotes where id = ${lit(AIQ.id)}`) === "ke_schvaleni|-", "Vrátit = zase čeká na schválení"));
-  await page.reload();
-  await waitHydrated(page, 'main [role="group"][aria-label="Stav nabídky"] button');
-  await quoteRow(page, AIQ).getByRole("button", { name: "Schválit", exact: true }).click();
-  await waitToast(page, /schválena/);
-  await eventually(async () => expect(norm(await quoteRow(page, AIQ).innerText()).includes("Schváleno ·"), "kdo schválil"));
+  await quoteRow(page, AIQ).waitFor({ timeout: 10_000 });
+  // obchodník neschválenou nabídku schválit nemůže — u schválené už tlačítko Schválit není
+  expect(await quoteRow(page, AIQ).getByRole("button", { name: "Schválit", exact: true }).count() === 0, "obchodník nemá Schválit");
   await menu(page, quoteRow(page, AIQ), "Odesláno jinak…");
   const dlg = page.getByRole("dialog");
   await dlg.getByLabel(/Jak odešla/).fill("osobně na schůzce");

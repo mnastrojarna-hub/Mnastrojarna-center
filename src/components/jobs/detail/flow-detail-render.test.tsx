@@ -139,7 +139,7 @@ describe("karta zakázky — podrobné stavy a autor", () => {
     expect(flat(html)).toContain("⚙ Automaticky (výroba začala) · Petr Obchodník · před 2 min");
   });
 
-  it("zaměstnanec bez práva: místo odmítnutí jen navrhnout (menu), primární Předat ke schválení", () => {
+  it("zaměstnanec bez práva: rozpracovanou nabídku (super admina) neodesílá ani nepředává (#25)", () => {
     const worker = { features: ["orders", "workflow"] as never[], userId: "u2", role: "zamestnanec" as const };
     const draft = { ...QF, status: "navrh_ai" as const, state: "rozpracovana" as const, sentAt: null };
     const html = render(
@@ -150,7 +150,8 @@ describe("karta zakázky — podrobné stavy a autor", () => {
         flow={{ access: worker }}
       />,
     );
-    expect(html).toContain(">Předat ke schválení<");
+    // #25: „Předat ke schválení“ zaniklo (nabídky ne-adminů čekají na super admina samy)
+    expect(html).not.toContain(">Předat ke schválení<");
     expect(html).not.toContain(">Odeslat nabídku<");
   });
 });

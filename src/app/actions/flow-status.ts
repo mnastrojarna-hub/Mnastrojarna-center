@@ -14,11 +14,12 @@ import type {
   FlowProposal, InquiryStatus, JobStage, LostReason, OrderDocStatus, OrderMismatch, OrderMismatchKind, QuoteState,
 } from "@/lib/supabase/database.types";
 import {
-  FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, INQUIRY_STATES, ORDER_STATES, QUOTE_STATES, actorName, approvalReasons,
-  canApproveQuote, canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
-  isQuoteState, lostReasonLabel, lostReasonsFor, paymentKey, quoteFactsFromRow, quoteLabel, reasonRequired,
+  FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, INQUIRY_STATES, ORDER_STATES, QUOTE_ADMIN_ONLY, QUOTE_STATES, actorName,
+  canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
+  isQuoteState, lostReasonLabel, lostReasonsFor, paymentKey, quoteFactsFromRow, quoteLabel, quoteSendBlock, reasonRequired,
   relativeStampTime, stageEffect, transitionFeature, type ActionCtx, type PaymentState, type StageEffect,
 } from "@/lib/jobs/flow-status";
+import { approveQuoteCore } from "@/lib/jobs/quote-approval-store";
 
 /**
  * Akce podrobných stavů obchodního toku. Každý zápis je JEDEN update nebo RPC s optimistickým
@@ -303,11 +304,17 @@ async function quoteResult(db: JobsDb, quoteId: string, jobId: string | null): P
   return { ok: true, ...(job ?? {}), ...(q && isQuoteState(q.state) ? { quoteState: q.state } : {}) };
 }
 
-/** Ruční změna stavu nabídky (tabulka 5.8). */
-export async function setQuoteState(
-  quoteId: string, to: QuoteState,
-  opts: { reason?: LostReason | null; note?: string | null; competitorPrice?: number | null; feedback?: string | null; closeJob?: boolean } = {},
-): Promise<FlowResult> {
+type QuoteStateOpts = {
+  reason?: LostReason | null; note?: string | null; competitorPrice?: number | null; feedback?: string | null; closeJob?: boolean;
+  /** Schválení ze seznamu: projde jen nezměněná nabídka (quotes.updated_at). */
+  expectedUpdatedAt?: string | null;
+};
+
+const QUOTE_REQUEST_RETIRED = "Nabídky ostatních schvaluje super admin automaticky — předávat je není potřeba.";
+const QUOTE_UNAPPROVE_PENDING = "Neschválenou nabídku nejde vrátit mezi rozpracované — zůstává neschválená, dokud ji super admin neschválí.";
+
+/** Ruční změna stavu nabídky (tabulka 5.8; #25 schvaluje jen super admin, odeslání hlídá quoteSendBlock). */
+export async function setQuoteState(quoteId: string, to: QuoteState, opts: QuoteStateOpts = {}): Promise<FlowResult> {
   if (!isQuoteState(to)) return fail("Neznámý stav nabídky.");
   const c = await begin("workflow");
   if ("error" in c) return fail(c.error);
@@ -320,20 +327,32 @@ export async function setQuoteState(
 }
 
 async function applyQuote(
-  c: Ctx, quoteId: string, to: QuoteState,
-  opts: { reason?: LostReason | null; note?: string | null; competitorPrice?: number | null; feedback?: string | null; closeJob?: boolean },
-  proposedBy: string | null,
+  c: Ctx, quoteId: string, to: QuoteState, opts: QuoteStateOpts, proposedBy: string | null,
 ): Promise<FlowResult> {
   const row = await loadQuote(c.db, quoteId);
   if (!row) return fail(QUOTE_NOT_FOUND);
   const quote = quoteFactsFromRow(row);
   const jobId = typeof row.job_id === "string" ? row.job_id : null;
   const from = quote.state;
+  // #25: „Předat ke schválení“ zaniklo; neschválenou nabídku nejde „odschválit“
+  if (to === "ke_schvaleni") return fail(QUOTE_REQUEST_RETIRED);
+  if (to === "rozpracovana" && from === "ke_schvaleni") return fail(QUOTE_UNAPPROVE_PENDING);
+  if (to === "schvalena" && !c.can("quote_approval")) return fail(QUOTE_ADMIN_ONLY);
   if (!canTransition("quote", from, to)) {
     if (to === "prijata" && from === "prijata") return quoteResult(c.db, quoteId, jobId);
     return fail(`Z „${QUOTE_STATES[from].label}“ nejde přejít na „${QUOTE_STATES[to].label}“.`);
   }
   if (!c.can(transitionFeature("quote", to, from))) return deny();
+  if (to === "odeslana" && (from === "rozpracovana" || from === "schvalena")) {
+    // #25: neschválenou nikdo; schválenou nabídku ne-admina i její autor, obchodník nebo řešitel zakázky
+    const job = jobId ? await loadJob(c.db, jobId, "owner_id, assignee_id") : null;
+    const block = quoteSendBlock(quote, {
+      can: c.can, userId: c.user.id, isSuperAdmin: c.user.role === "super_admin",
+      jobOwnerId: typeof job?.owner_id === "string" ? job.owner_id : null,
+      jobAssigneeId: typeof job?.assignee_id === "string" ? job.assignee_id : null,
+    });
+    if (block) return fail(block);
+  }
   const text = note(opts.note);
   const label = quoteLabel(quote);
   // v historii stejně jako ostatní události nabídek („Nabídka NAB-… schválena")
@@ -361,18 +380,12 @@ async function applyQuote(
     return null;
   };
 
-  if (to === "ke_schvaleni") {
-    const err = await update({ approval_requested_at: now });
-    if (err) return err;
-    await log(`${evLabel}: předána ke schválení`, "approval_requested");
-  } else if (to === "schvalena") {
-    if (!canApproveQuote(quote, { ...actionCtx(c), assigneeId: null }, approvalReasons(quote))) {
-      return fail("Vlastní nabídku nad limitem schválení musí schválit někdo jiný (super admin).");
-    }
-    const err = await update({ approved_by: c.user.id, approved_at: now });
-    if (err) return err;
-    if (jobId) await c.db.from("orders").update({ approved_by: c.user.id, approved_at: now } as never).eq("id", jobId);
-    await log(`${evLabel} schválena`, "approved");
+  if (to === "schvalena") {
+    // jediné jádro schválení (super admin, položky s cenou, otisk; čas schválení doplní DB)
+    const res = await approveQuoteCore(c.db, c.user, quoteId, {
+      expectedUpdatedAt: opts.expectedUpdatedAt ?? null, note: [proposedBy ? `na návrh: ${proposedBy}` : null, text].filter(Boolean).join(" — ") || null,
+    });
+    if (!res.ok) return fail(res.error ?? "Nabídku se nepodařilo schválit.");
   } else if (to === "rozpracovana") {
     const err = await update({ approved_by: null, approval_requested_at: null });
     if (err) return err;
@@ -434,12 +447,15 @@ async function applyQuote(
   return quoteResult(c.db, quoteId, jobId);
 }
 
-/** „Schválit a odeslat“ jedním klikem: schválí a odešle e-mailem (soubor nabídky) nebo jako „odesláno jinak“. */
+/**
+ * „Schválit a odeslat“ jedním klikem (jen super admin): schválí a buď PDF nabídky vystaví NA SERVERU
+ * (nikdy soubor od klienta) a odešle e-mailem, nebo zapíše „odesláno jinak“.
+ */
 export async function approveAndSendQuote(
   quoteId: string,
-  email?: { fileId: string; to: string; cc?: string; subject: string; body: string } | null,
+  email?: { to: string; cc?: string; subject: string; body: string } | null,
 ): Promise<FlowResult> {
-  const c = await begin("margins");
+  const c = await begin("quote_approval");
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {
@@ -447,17 +463,53 @@ export async function approveAndSendQuote(
     if (!row) return fail(QUOTE_NOT_FOUND);
     const quote = quoteFactsFromRow(row);
     const jobId = typeof row.job_id === "string" ? row.job_id : null;
-    if (quote.state !== "schvalena") {
+    if (quote.state !== "schvalena" && quote.state !== "rozpracovana") {
       const approved = await applyQuote(c, quoteId, "schvalena", {}, null);
       if (!approved.ok) return approved;
     }
     if (email && jobId) {
-      const { sendJobDocument } = await import("@/app/actions/job-documents");
-      const sent = await sendJobDocument(jobId, email.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body });
+      const { generateJobDocument, sendJobDocument } = await import("@/app/actions/job-documents");
+      const doc = await generateJobDocument(jobId, "nabidka", { quoteId, reuse: true });
+      if (!doc.ok || !doc.fileId) return fail(doc.error ?? "PDF nabídky se nepodařilo vystavit.");
+      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body });
       if (!sent.ok) return fail(sent.error ?? "Odeslání e-mailem selhalo.");
       return quoteResult(c.db, quoteId, jobId);
     }
     return await applyQuote(c, quoteId, "odeslana", {}, null);
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** Super admin vrátí neschválenou nabídku autorovi k přepracování (důvod povinný; nabídka zůstává neschválená). */
+export async function returnQuoteToAuthor(quoteId: string, reason: string): Promise<FlowResult> {
+  const c = await begin("quote_approval");
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  const text = cleanText(reason, 1000);
+  if (!text || text.length < 3) return fail("Napiš, co má autor upravit.");
+  try {
+    const row = await loadQuote(c.db, quoteId);
+    if (!row) return fail(QUOTE_NOT_FOUND);
+    const quote = quoteFactsFromRow(row);
+    const jobId = typeof row.job_id === "string" ? row.job_id : null;
+    if (quote.state !== "ke_schvaleni" || quote.archived) return fail("Vrátit k přepracování jde jen neschválenou nabídku.");
+    if (quote.returnedAt) return fail("Nabídka už je vrácená autorovi — čeká na jeho úpravu.");
+    const q = c.db.from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: text } as never)
+      .eq("id", quoteId).eq("state", "ke_schvaleni").is("approval_returned_at", null);
+    const { data, error } = await withChangeNote(q, `vráceno k přepracování: ${text}`).select("id");
+    if (error) return fail(error);
+    if (!data?.length) return conflict(c.db, "quotes", quoteId, "state_changed");
+    if (jobId) {
+      const label = quote.number?.trim() ? `Nabídka ${quoteLabel(quote)}` : "Nabídka";
+      await logJobEvent(c.db, {
+        jobId, type: "quote", entity: "quote", entityId: quoteId, actorId: c.user.id,
+        message: `${label} vrácena autorovi k přepracování — ${text}`,
+        data: { quoteId, number: quote.number, action: "returned", note: text },
+      });
+    }
+    revalidateFlow(jobId);
+    return quoteResult(c.db, quoteId, jobId);
   } catch (err) {
     return fail(err);
   }

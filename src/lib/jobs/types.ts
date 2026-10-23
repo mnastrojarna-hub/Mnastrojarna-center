@@ -188,6 +188,17 @@ export interface JobQuote {
   sentBy?: PersonRef | null;
   sentVia?: ChangeVia | null;
   stateStamp?: ChangeStamp | null;
+  /** #25: připravil (nebo před odesláním změnil) ne-admin → odeslat až po schválení super adminem. */
+  adminApprovalRequired?: boolean;
+  approvalRequestedBy?: string | null;
+  /** Obchodník nabídky (quotes.owner_id). */
+  ownerId?: string | null;
+  /** #25: super admin vrátil nabídku autorovi k přepracování (kdy, proč, kdo). */
+  returnedAt?: string | null;
+  returnNote?: string | null;
+  returnedBy?: PersonRef | null;
+  /** Optimistický zámek schválení ze seznamu. */
+  updatedAt?: string | null;
 }
 
 export interface JobFile {

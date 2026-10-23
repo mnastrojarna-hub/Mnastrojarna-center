@@ -187,7 +187,7 @@ await T("poptávka: Převzít → V řešení · Petr Obchodník; Čeká na podk
 });
 
 // ═════════════════════════ 2. NACENĚNÍ ═════════════════════════
-await T("nacenění: /pricing uloží ceny → Nacenění (jen dopředu) + nacenil; „Vytvořit nabídku z ceny“ → Rozpracovaná · autor", async (context) => {
+await T("nacenění: /pricing uloží ceny → Nacenění (jen dopředu) + nacenil; „Vytvořit nabídku z ceny“ → Neschválená · autor", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await page.goto(`${BASE}/pricing?job=${J.id}`);
@@ -210,17 +210,29 @@ await T("nacenění: /pricing uloží ceny → Nacenění (jen dopředu) + nacen
   await li.getByRole("button", { name: "Vytvořit nabídku z ceny" }).click();
   await li.locator('[role="status"]').filter({ hasText: /Nabídka NAB-\S+ je vytvořená/ }).waitFor({ timeout: 20_000 });
   const q = sql(`select state || '|' || created_by || '|' || coalesce(state_changed_by::text, '-') || '|' || approval_required from quotes where job_id = ${lit(J.id)}`);
-  expect(q === `rozpracovana|${ID.obchod}|${ID.obchod}|false`, `DB nabídka: Rozpracovaná, zadal obchodník, bez nutnosti schválení (${q})`);
+  // #25: nabídku obchodníka schvaluje super admin → Neschválená
+  expect(q === `ke_schvaleni|${ID.obchod}|${ID.obchod}|true`, `DB nabídka: Neschválená, zadal obchodník, čeká na super admina (${q})`);
   await shot(page, S("02-pricing"));
 });
 
 // ═════════════════════════ 3. NABÍDKA ═════════════════════════
 await T("nabídka: „Odesláno jinak…“ s poznámkou → Odeslaná · autor, zakázka jen dopředu na Nabídku, poptávka Zpracovaná", async (context) => {
   // e-mailem odesílá nabídku E2E 05; tady stav nezávisle na poštovním serveru
+  // #25: nejdřív ji schválí super admin (obchodník ji do té doby odeslat nemůže)
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await openJob(page, J);
-  expect(await nextBtn(page, "Odeslat nabídku").isVisible(), "další krok: Odeslat nabídku (obchodník, schválení se nevyžaduje)");
+  expect(await nextBtn(page, "Odeslat nabídku").count() === 0, "neschválenou nabídku obchodník neodešle");
+  await withContext(browser, errors, async (ac) => {
+    const ap = await ac.newPage();
+    await login(ap, USERS.admin);
+    await openJob(ap, J);
+    await nextBtn(ap, "Schválit").click();
+    await eventually(() => expect(sql(`select state || '|' || approved_by from quotes where job_id = ${lit(J.id)}`) === `schvalena|${ID.admin}`, "DB: schválil super admin"));
+  });
+  await page.reload();
+  await waitHydrated(page, 'main section[aria-label="Zakázka"] button[aria-label^="Stav zakázky:"]');
+  await eventually(async () => expect(await nextBtn(page, "Odeslat nabídku").isVisible(), "další krok po schválení: Odeslat nabídku (obchodník)"));
   await stateMenu(page, "Odesláno jinak…");
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: /^Odesláno jinak — / }).waitFor({ timeout: 10_000 });

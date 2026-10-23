@@ -1,6 +1,6 @@
 import type { JobStage, JobFileKind, PriorityLevel } from "@/lib/supabase/database.types";
 import {
-  CAUSE_LABELS, quoteDisplayState, quoteStateOf, type ChangeStamp, type FlowCause, type QuoteDisplayState, type QuoteState,
+  CAUSE_LABELS, quoteApprovalBlock, quoteDisplayState, quoteStateOf, type ChangeStamp, type FlowCause, type QuoteDisplayState, type QuoteState,
 } from "@/lib/jobs/flow-status";
 import type {
   JobDetail, JobEvent, JobFile, JobItem, JobItemInput, JobQuote, JobQuoteInput, JobQuoteItemInput,
@@ -302,28 +302,49 @@ export function quoteDisplayOf(
 }
 
 export type QuoteAction =
-  | "approve" | "requestApproval" | "unapprove" | "edit" | "send" | "markSent" | "feedback" | "answerNoChange" | "accept"
-  | "reject" | "propose" | "reopen" | "extend" | "revision" | "archive" | "unarchive" | "pdf" | "delete";
+  | "approve" | "requestApproval" | "unapprove" | "returnToAuthor" | "edit" | "send" | "markSent" | "feedback"
+  | "answerNoChange" | "accept" | "reject" | "propose" | "reopen" | "extend" | "revision" | "archive" | "unarchive"
+  | "pdf" | "delete";
 
-/** Které akce nabídka v daném stavu nabízí (pořadí = pořadí tlačítek; přechody dle QUOTE_TRANSITIONS). */
+/**
+ * Které akce nabídka v daném stavu nabízí (pořadí = pořadí tlačítek; přechody dle QUOTE_TRANSITIONS).
+ * #25: schvaluje jen super admin (canApprove / approver); odeslat podle `sendBlock` (quoteSendBlock — null = smí);
+ * bez `sendBlock` platí: s právem na marže a jen schválená / bez nutnosti schválení. „Předat ke schválení“ zaniklo.
+ */
 export function quoteActions(
-  q: Pick<JobQuote, "status" | "approvedBy" | "archived" | "accepted" | "sentAt" | "validUntil"> & Partial<Pick<JobQuote, "state" | "approvalRequired" | "feedback">>,
-  opts: { canDelete: boolean; margins?: boolean; canApprove?: boolean; today?: string },
+  q: Pick<JobQuote, "status" | "approvedBy" | "archived" | "accepted" | "sentAt" | "validUntil">
+    & Partial<Pick<JobQuote, "state" | "approvalRequired" | "feedback" | "adminApprovalRequired" | "returnedAt">>,
+  opts: {
+    canDelete: boolean; margins?: boolean; canApprove?: boolean; today?: string;
+    /** Výsledek quoteSendBlock pro přihlášeného (null = smí odeslat). */
+    sendBlock?: string | null;
+    /** Super admin s dialogem „Vrátit k přepracování…“ (25-C). */
+    canReturn?: boolean;
+    /** Smí schvalovat / zrušit schválení (quote_approval = jen super admin). Výchozí = `canDelete`
+     *  (mazání je také jen super admina) — starší volající (karta nabídky) `approver` nepředávají. */
+    approver?: boolean;
+  },
 ): QuoteAction[] {
   const out: QuoteAction[] = [];
   const margins = opts.margins ?? true;
-  const canApprove = opts.canApprove ?? margins;
+  const approver = opts.approver ?? opts.canDelete;
+  // #25: „Schválit“ jen schvalovatel — i když volající bez kontextu toku pošle canApprove = margins
+  const canApprove = (opts.canApprove ?? margins) && approver;
   const shown = quoteDisplayOf(q, opts.today);
   const st: QuoteState = shown === "vyprsela" ? (q.state ?? "odeslana") : shown;
+  const approvalOk = quoteApprovalBlock({
+    adminApprovalRequired: q.adminApprovalRequired, approvalRequired: q.approvalRequired, approvedBy: q.approvedBy, sentAt: q.sentAt,
+    state: q.state,
+  }) === null;
+  const maySend = opts.sendBlock !== undefined ? opts.sendBlock === null : margins && approvalOk;
   if (!q.archived && st !== "archivovana") {
     const draft = st === "rozpracovana" || st === "ke_schvaleni" || st === "schvalena";
-    if ((st === "rozpracovana" || st === "ke_schvaleni") && canApprove) out.push("approve");
-    const sendable = st === "schvalena" || (st === "rozpracovana" && margins && !q.approvalRequired);
-    if (sendable && margins) out.push("send", "markSent");
-    if (st === "odeslana" || st === "pripominky") out.push("send");
-    if (st === "rozpracovana") out.push("requestApproval");
+    if (st === "ke_schvaleni" && canApprove) out.push("approve");
+    if (st === "ke_schvaleni" && opts.canReturn && !q.returnedAt) out.push("returnToAuthor");
+    if ((st === "schvalena" || st === "rozpracovana") && maySend) out.push("send", "markSent");
+    if ((st === "odeslana" || st === "pripominky") && maySend) out.push("send");
     if (draft) out.push("edit");
-    if ((st === "ke_schvaleni" || st === "schvalena") && margins) out.push("unapprove");
+    if (st === "schvalena" && approver) out.push("unapprove");
     if ((st === "odeslana" || st === "pripominky") && !q.accepted) out.push("accept");
     if (st === "odeslana") out.push("feedback");
     if (st === "pripominky" && margins) out.push("answerNoChange");

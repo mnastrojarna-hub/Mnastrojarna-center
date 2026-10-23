@@ -123,6 +123,8 @@ export async function registerJobFile(input: {
   if (!input || typeof input !== "object") return fail("Neplatná zakázka.");
   // náš vystavený doklad (potvrzení → „vystaveno“) zapisuje jen generateJobDocument přímo jádrem
   if ((input.origin as string | null | undefined) === "generated") return fail("Neplatný původ dokumentu.");
+  // #25: doklad dodavatele k naší nabídce nepatří (jinak by se poslal jako „naše nabídka“ mimo schválení)
+  if (input.issuer === "dodavatel" && input.quoteId) return fail("Nabídka dodavatele nepatří k naší nabídce.");
   // jádro (lib/jobs/job-files-store) — nové volby (vazba položky, relace focení) jen pro serverový kód
   return registerJobFileCore(c.db, c.user.id, {
     jobId: input.jobId, path: input.path, filename: input.filename, mimeType: input.mimeType, size: input.size,

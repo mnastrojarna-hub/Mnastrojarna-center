@@ -124,6 +124,8 @@ describe.skipIf(!ENABLED)("Balík 3: starší akce, plánovač a audit — autor
     const jobId = await newJob({ status: "naceneni", owner_id: id("sales") });
     const { data: q } = await svc.from("quotes").insert({ job_id: jobId, number: `NAB-E2E-B3-${TAG}`, status: "navrh_ai", ai_generated: true, total: 5000, revision: 1 }).select("id").single();
     const quoteId = (q as { id: string }).id;
+    // #25: super admin schválí jen nabídku s položkami a cenami
+    await svc.from("quote_items").insert({ quote_id: quoteId, position: 0, name: "Díl", quantity: 1, unit: "ks", unit_price: 5000, vat_rate: 21 });
     const { data: item } = await svc.from("approval_queue").insert({ type: "quote", title: `B3 nabídka ${TAG}`, quote_id: quoteId, order_id: jobId, ai_confidence: 0.9 }).select("id").single();
     const itemId = (item as { id: string }).id;
     queueIds.push(itemId);
@@ -161,7 +163,7 @@ describe.skipIf(!ENABLED)("Balík 3: starší akce, plánovač a audit — autor
     expect((s as Row).updated_by).toBe(id("admin"));
   }, 60_000);
 
-  it("limit schválení nabídek: uložení (jen settings) + audit; DB pak vyžaduje schválení nad limitem", async () => {
+  it("limit schválení nabídek: uložení (jen settings) + audit; od #25 už schválení nevyžaduje (nabídky ne-adminů schvaluje super admin vždy)", async () => {
     const i = await import("./integrations");
     as("sales");
     expect((await i.saveQuoteApprovalLimit(1000)).ok).toBe(false);
@@ -172,7 +174,10 @@ describe.skipIf(!ENABLED)("Balík 3: starší akce, plánovač a audit — autor
     expect(s).toMatchObject({ value: "80000", category: "firma", updated_by: id("admin") });
     const jobId = await newJob({ status: "naceneni" });
     const { data: q } = await svc.from("quotes").insert({ job_id: jobId, number: `NAB-E2E-B3L-${TAG}`, status: "ke_schvaleni", total: 90_000, revision: 1 }).select("approval_required, state").single();
-    expect(q).toMatchObject({ approval_required: true, state: "ke_schvaleni" });
+    expect(q).toMatchObject({ approval_required: false, state: "rozpracovana" });
+    const { data: qs } = await svc.from("quotes").insert({ job_id: jobId, number: `NAB-E2E-B3L-${TAG}-s`, status: "ke_schvaleni", total: 10, revision: 1, created_by: id("sales") })
+      .select("approval_required, admin_approval_required, state").single();
+    expect(qs).toMatchObject({ approval_required: true, admin_approval_required: true, state: "ke_schvaleni" });
     const { data: au } = await svc.from("audit_log").select("actor_id, diff").eq("action", "settings_updated").eq("entity_id", "quote_approval_limit").gte("created_at", startedAt).order("created_at", { ascending: false }).limit(1).single();
     expect(au).toMatchObject({ actor_id: id("admin"), diff: { to: "80000" } });
   }, 60_000);

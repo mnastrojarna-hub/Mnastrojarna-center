@@ -117,7 +117,8 @@ describe("akce řádku", () => {
   });
 
   it("Nacenit vede na /pricing?job=, ne do neexistující záložky", () => {
-    const st = state(facts(), SALES);
+    // #25: Nacenění (pricing) má jen super admin
+    const st = state(facts(), [...SALES, "pricing"]);
     expect(st.next?.key).toBe("pricing.open");
     const html = renderToString(<FlowActionBar target={{ jobId: "j1", jobNumber: "Z-2026-101", facts: st.facts, today: TODAY }} next={st.next} menu={st.menu} />);
     expect(html).toContain('href="/pricing?job=j1"');
@@ -165,7 +166,7 @@ describe("přehled nabídek", () => {
     const q = toFlowQuote({ ...base, status: "ke_schvaleni", sentAt: null, aiGenerated: false }, null, { today: TODAY, onlyOpen: false });
     expect(q.display).toBe("ke_schvaleni");
     const html = renderToString(<QuotesBoard quotes={[q]} today={TODAY} counts={null} />);
-    expect(text(html)).toContain("Čeká na schválení");
+    expect(text(html)).toContain("Neschválená"); // #25: štítek stavu ke_schvaleni
     expect(text(html)).toContain("Zadáno · P. Obchodník");
   });
 });

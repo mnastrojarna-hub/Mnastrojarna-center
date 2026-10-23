@@ -158,9 +158,9 @@ describe("řádek Knihy — podrobné stavy", () => {
     expect(worker).not.toContain("Přijmout návrh");
   });
 
-  it("zaměstnanec u rozpracované nabídky jen předá ke schválení; odeslaná → Zákazník objednal", () => {
+  it("zaměstnanec u rozpracované nabídky nemá další krok (#25: „Předat ke schválení“ zaniklo); odeslaná → Zákazník objednal", () => {
     const draft = job({ stage: "naceneni", flow: facts({ stage: "naceneni", inquiryStatus: "v_reseni" }), flowQuotes: [quote({ status: "navrh_ai", state: "rozpracovana", sentAt: null })] });
-    expect(rowFlowView(draft, WORKER).next?.key).toBe("quote.requestApproval");
+    expect(rowFlowView(draft, WORKER).next).toBeNull();
     expect(rowFlowView(draft, SALES).next?.key).toBe("quote.send");
     const sent = job({ stage: "nabidka", flow: facts({ stage: "nabidka", inquiryStatus: "zpracovana" }), flowQuotes: [quote()] });
     const v = rowFlowView(sent, SALES);

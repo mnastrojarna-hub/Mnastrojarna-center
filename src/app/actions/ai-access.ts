@@ -40,7 +40,7 @@ export async function saveAiAccessSettings(input: {
       {
         key: "ai_capture_for_all",
         category: "ai_access",
-        label: "AI čtení dokladů z fotky pro všechny uživatele",
+        label: "AI focení pro všechny uživatele",
         is_secret: false,
         value: input.aiCaptureForAll ? "true" : "false",
         updated_by: access.user.id,

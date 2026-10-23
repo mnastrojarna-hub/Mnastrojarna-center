@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { can, allowedFeatures, type AccessContext, type AccessSubject } from "./permissions";
+import {
+  ALL_FEATURES, DEFAULT_ACCESS_CONTEXT, FEATURE_HINTS, FEATURE_LABELS, can, allowedFeatures,
+  type AccessContext, type AccessSubject,
+} from "./permissions";
 
 const ctx = (o: Partial<AccessContext> = {}): AccessContext => ({ aiEnabled: true, aiCaptureForAll: false, aiConfigured: true, ...o });
 const admin: AccessSubject = { role: "super_admin", aiAccess: false, active: true };
@@ -51,5 +54,31 @@ describe("oprávnění dle rolí", () => {
     expect(can(sales, "commissions_all", ctx())).toBe(false);
     expect(can(staff, "margins", ctx())).toBe(false);
     expect(can(staff, "commissions", ctx())).toBe(false);
+  });
+
+  it("#25: Nacenění, schvalování nabídek a obchodní tok všech jen super admin (i bez AI klíče)", () => {
+    for (const f of ["pricing", "quote_approval", "flow_all"] as const) {
+      expect(can(admin, f, ctx({ aiConfigured: false, aiEnabled: false }))).toBe(true);
+      expect(can(sales, f, ctx())).toBe(false);
+      expect(can({ ...staff, aiAccess: true }, f, ctx({ aiCaptureForAll: true }))).toBe(false);
+      expect(ALL_FEATURES).toContain(f);
+    }
+    expect(FEATURE_HINTS.pricing).toContain("Nacenění zatím dělá jen super admin");
+  });
+
+  it("#25: AI focení pro všechny je výchozí — s klíčem ho má obchodník i zaměstnanec", () => {
+    expect(DEFAULT_ACCESS_CONTEXT.aiCaptureForAll).toBe(true);
+    const withKey = { ...DEFAULT_ACCESS_CONTEXT, aiConfigured: true };
+    expect(can(sales, "ai_capture", withKey)).toBe(true);
+    expect(can(staff, "ai_capture", withKey)).toBe(true);
+    // bez klíče (výchozí kontext integračních testů) se AI nespouští nikomu
+    expect(can(staff, "ai_capture", DEFAULT_ACCESS_CONTEXT)).toBe(false);
+    // super admin ho vypne → jen per-uživatel
+    expect(can(staff, "ai_capture", { ...withKey, aiCaptureForAll: false })).toBe(false);
+  });
+
+  it("popisky pokrývají všechny funkce", () => {
+    for (const f of ALL_FEATURES) expect(FEATURE_LABELS[f]).toBeTruthy();
+    expect(new Set(ALL_FEATURES).size).toBe(ALL_FEATURES.length);
   });
 });

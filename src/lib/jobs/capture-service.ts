@@ -139,7 +139,7 @@ function bucket(db: JobsDb) {
 export async function aiAvailability(access: Access): Promise<{ available: boolean; reason: string | null }> {
   if (access.can("ai_capture") && (await isDocumentReaderConfigured())) return { available: true, reason: null };
   // E2E bez API klíče: testovací AI_FAKE_CAPTURE pro super admina
-  if (process.env.AI_FAKE_CAPTURE && access.user?.role === "super_admin") return { available: true, reason: null };
+  if (process.env.AI_FAKE_CAPTURE && can(access.user, "ai_capture", { ...access.ctx, aiEnabled: true, aiConfigured: true })) return { available: true, reason: null };
   const permitted = can(access.user, "ai_capture", { ...access.ctx, aiEnabled: true, aiConfigured: true });
   if (!permitted) return { available: false, reason: AI_NOT_ALLOWED };
   if (!access.ctx.aiEnabled) return { available: false, reason: AI_DISABLED };

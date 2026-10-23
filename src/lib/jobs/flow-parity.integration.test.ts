@@ -21,6 +21,8 @@ const dayAgo = (n: number) => pragueToday(new Date(Date.now() - n * 86_400_000))
 describe.skipIf(!LOCAL_ENABLED)("parita deriveFlow ↔ job_flow_v", () => {
   let svc: SupabaseClient;
   let db: SupabaseClient;
+  /** #25: nabídky fixtur zakládá super admin (nabídka obchodníka by čekala na jeho schválení). */
+  let qdb: SupabaseClient;
   const jobs: string[] = [];
   let n = 0;
 
@@ -42,6 +44,7 @@ describe.skipIf(!LOCAL_ENABLED)("parita deriveFlow ↔ job_flow_v", () => {
   beforeAll(async () => {
     svc = localAdmin();
     db = localAdmin(userActor({ id: await profileId(svc, DEMO.sales.email) }));
+    qdb = localAdmin(userActor({ id: await profileId(svc, DEMO.admin.email) }));
 
     // 1) e-mailová poptávka (přijatá)
     await job({ status: "poptavka", source: "email" });
@@ -57,14 +60,14 @@ describe.skipIf(!LOCAL_ENABLED)("parita deriveFlow ↔ job_flow_v", () => {
     });
     // 4) odeslaná nabídka po platnosti (vypršela) — odeslaná před 5 dny
     await job({ status: "naceneni" }, async (id) => {
-      const { data } = ok(await db.from("quotes").insert({ number: `${PREFIX}-Q4`, job_id: id, status: "ke_schvaleni", total: 1000, revision: 1, valid_until: dayAgo(1) }).select("id").single());
-      ok(await db.from("quotes").update({ status: "odeslano", sent_at: daysAgo(5) }).eq("id", (data as { id: string }).id));
+      const { data } = ok(await qdb.from("quotes").insert({ number: `${PREFIX}-Q4`, job_id: id, status: "ke_schvaleni", total: 1000, revision: 1, valid_until: dayAgo(1) }).select("id").single());
+      ok(await qdb.from("quotes").update({ status: "odeslano", sent_at: daysAgo(5) }).eq("id", (data as { id: string }).id));
     });
     // 5) připomínky zákazníka k revizi 2 (r1 archivovaná)
     await job({ status: "nabidka" }, async (id) => {
-      ok(await db.from("quotes").insert({ number: `${PREFIX}-Q5`, job_id: id, status: "odeslano", total: 1000, revision: 1, archived: true }));
-      const { data } = ok(await db.from("quotes").insert({ number: `${PREFIX}-Q5-R2`, job_id: id, status: "odeslano", total: 900, revision: 2, valid_until: "2099-01-01" }).select("id").single());
-      ok(await db.from("quotes").update({ feedback: "Chtějí jiný materiál" }).eq("id", (data as { id: string }).id));
+      ok(await qdb.from("quotes").insert({ number: `${PREFIX}-Q5`, job_id: id, status: "odeslano", total: 1000, revision: 1, archived: true }));
+      const { data } = ok(await qdb.from("quotes").insert({ number: `${PREFIX}-Q5-R2`, job_id: id, status: "odeslano", total: 900, revision: 2, valid_until: "2099-01-01" }).select("id").single());
+      ok(await qdb.from("quotes").update({ feedback: "Chtějí jiný materiál" }).eq("id", (data as { id: string }).id));
     });
     // 6) doručená objednávka s vystaveným potvrzením (náš doklad)
     await job({ status: "objednavka", order_date: "2026-10-10", customer_order_number: "PAR-6" }, async (id) => {

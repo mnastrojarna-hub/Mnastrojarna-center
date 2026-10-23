@@ -20,7 +20,10 @@ import {
 } from "@/lib/jobs/mapping";
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
 import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
-import { approvalReasons, canApproveQuote, quoteFactsFromRow, reasonRequired } from "@/lib/jobs/flow-status";
+import {
+  FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
+} from "@/lib/jobs/flow-status";
+import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
 
 /**
  * Akce Knihy zakázek: zakázka, položky, stav, komentáře a nabídky.
@@ -32,6 +35,7 @@ interface Ctx {
   db: JobsDb;
   user: CurrentUser;
   margins: boolean;
+  can: (f: Feature) => boolean;
 }
 
 const NOT_FOUND = "Zakázka nenalezena.";
@@ -44,7 +48,7 @@ async function begin(feature: Feature = "orders"): Promise<Ctx | { error: string
   const { can } = await getAccess();
   // autor změn = přihlášený uživatel (DB z hlaviček doplní *_by a historii)
   const db = await createOperatorClient({ actor: userActor(access.user) });
-  return { db, user: access.user, margins: can("margins") };
+  return { db, user: access.user, margins: can("margins"), can };
 }
 
 function fail(err: unknown): { ok: false; error: string } {
@@ -538,11 +542,35 @@ function itemsSignature(rows: Row[]): string {
   );
 }
 
+/** Plný podpis položek (i nákupní cena a poznámka) — beze změny se položky vůbec nepřepisují. */
+function itemsFullSignature(rows: Row[]): string {
+  return JSON.stringify(
+    [...rows]
+      .sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0))
+      .map((r) => [r.drawing_number ?? null, r.name ?? null, r.description ?? null, r.material ?? null,
+        cleanNumber(r.quantity), r.unit ?? "ks", cleanNumber(r.unit_price), cleanNumber(r.vat_rate),
+        cleanNumber(r.purchase_unit_price), r.note ?? null, r.drawing_id ?? null]),
+  );
+}
+
 function revalidateQuote(jobId: string | null) {
   revalidateJob(jobId);
 }
 
-export async function createJobQuote(jobId: string, input: JobQuoteInput): Promise<ActionResult<{ id: string; number: string }>> {
+const PENDING_SUFFIX = " — čeká na schválení super admina";
+const QUOTE_EDIT_SENT = "Odeslanou nabídku nejde upravit — vytvoř novou verzi.";
+const QUOTE_EDIT_ARCHIVED = "Archivovanou verzi nabídky neupravuj — obnov ji z archivu, nebo vytvoř novou verzi.";
+
+/** Stav nabídky po zápisu (schválení / nutnost schválení dopočítá DB). */
+async function quoteApprovalState(db: JobsDb, quoteId: string): Promise<{ state: string | null; approvedBy: string | null; adminApprovalRequired: boolean }> {
+  const { data } = await db.from("quotes").select("state, approved_by, admin_approval_required").eq("id", quoteId).maybeSingle();
+  const r = (data ?? {}) as { state?: string | null; approved_by?: string | null; admin_approval_required?: boolean | null };
+  return { state: r.state ?? null, approvedBy: r.approved_by ?? null, adminApprovalRequired: Boolean(r.admin_approval_required) };
+}
+
+export async function createJobQuote(
+  jobId: string, input: JobQuoteInput,
+): Promise<ActionResult<{ id: string; number: string; needsApproval?: boolean }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
@@ -595,20 +623,24 @@ export async function createJobQuote(jobId: string, input: JobQuoteInput): Promi
       await db.from("orders").update({ priced_by: user.id } as never).eq("id", jobId);
     }
 
+    // #25: nabídku ne-admina označí DB „Neschválená“ — odeslat ji půjde až po schválení super adminem
+    const after = await quoteApprovalState(db, quoteId);
+    const needsApproval = after.adminApprovalRequired && !after.approvedBy;
     await logJobEvent(db, {
       jobId, type: "quote",
-      message: `${quoteLabel({ number })} vytvořena${revision > 1 ? ` (verze ${revision})` : ""}`,
-      data: { quoteId, number, revision, total: totals.value, action: "created" },
+      message: `${quoteLabel({ number })} vytvořena${revision > 1 ? ` (verze ${revision})` : ""}${needsApproval ? PENDING_SUFFIX : ""}`,
+      data: { quoteId, number, revision, total: totals.value, action: "created", ...(needsApproval ? { needsApproval: true } : {}) },
       actorId: user.id,
     });
+    if (needsApproval) await scheduleQuoteApprovalNotice({ quoteId, jobId, authorId: user.id });
     revalidateQuote(jobId);
-    return { ok: true, id: quoteId, number };
+    return { ok: true, id: quoteId, number, needsApproval };
   } catch (err) {
     return fail(err);
   }
 }
 
-export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Promise<ActionResult> {
+export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Promise<ActionResult<{ approvalReset: boolean }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
@@ -619,6 +651,12 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
     const { db, user, margins } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
+    // #25: odeslanou / uzavřenou nabídku ani archivní verzi neupravujeme (nová verze se schválí znovu)
+    const state = typeof quote.state === "string" ? quote.state : null;
+    if (quote.archived === true || state === "archivovana") return fail(QUOTE_EDIT_ARCHIVED);
+    if (state && state !== "rozpracovana" && state !== "ke_schvaleni" && state !== "schvalena") return fail(QUOTE_EDIT_SENT);
+    const isAdmin = user.role === "super_admin";
+    const wasApproved = Boolean(quote.approved_by);
     const oldItems = [...(quote.items ?? [])].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
 
     const update: Row = quoteInputToRow(input);
@@ -639,11 +677,9 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
     }
 
     const contentChanged = itemRows !== null && itemsSignature(itemRows) !== itemsSignature(oldItems);
-    const resetApproval = Boolean(quote.approved_by) && contentChanged;
-    if (resetApproval) {
-      update.approved_by = null;
-      update.approved_at = null;
-    }
+    // beze změny položky nepřepisovat (přepis = změna obsahu → u ne-admina nové schválení)
+    if (itemRows && itemsFullSignature(itemRows) === itemsFullSignature(oldItems)) itemRows = null;
+    // #25: schválení po změně ruší DB (ne-admin); super admin úpravou znovu schvaluje — tady se nic nepíše
 
     if (itemRows) {
       let insertedIds: string[] = [];
@@ -666,70 +702,79 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
       if (error) return fail(error.message);
     }
 
+    const now = await quoteApprovalState(db, quoteId);
+    const resetApproval = wasApproved && !now.approvedBy;
+    const reapproved = isAdmin && Boolean(now.approvedBy) && now.state === "schvalena";
+    if (reapproved) {
+      // co super admin uložil, je nově schválené znění (čas schválení posunula DB)
+      const sha = await quoteSnapshotShaById(quote.job_id, quoteId);
+      const { error } = await db.from("quotes").update({ approved_snapshot_sha: sha } as never).eq("id", quoteId);
+      if (error) console.error(`[jobs] Otisk schválené nabídky se nepodařilo uložit: ${error.message}`);
+    }
+
     if (quote.job_id) {
+      const suffix = resetApproval ? " (schválení zrušeno — nutno znovu schválit)"
+        : reapproved && wasApproved ? " a znovu schválena" : "";
       await logJobEvent(db, {
         jobId: quote.job_id, type: "quote",
-        message: `${quoteLabel(quote)} upravena${resetApproval ? " (schválení zrušeno — nutno znovu schválit)" : ""}`,
-        data: { quoteId, number: quote.number, action: "updated", total: update.total ?? null, approvalReset: resetApproval },
+        message: `${quoteLabel(quote)} upravena${suffix}`,
+        data: { quoteId, number: quote.number, action: "updated", total: update.total ?? null, approvalReset: resetApproval, contentChanged },
         actorId: user.id,
       });
     }
+    if (resetApproval || (!isAdmin && now.adminApprovalRequired && !now.approvedBy && quote.approval_returned_at)) {
+      await scheduleQuoteApprovalNotice({ quoteId, jobId: quote.job_id, authorId: user.id });
+    }
     revalidateQuote(quote.job_id);
+    return { ok: true, approvalReset: resetApproval };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+export async function approveJobQuote(quoteId: string, opts: { expectedUpdatedAt?: string | null } = {}): Promise<ActionResult> {
+  // #25: schvaluje jen super admin (nabídky ostatních i AI) — jádro sdílí setQuoteState i fronta
+  const c = await begin("quote_approval");
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
+  try {
+    const res = await approveQuoteCore(c.db, c.user, quoteId, { expectedUpdatedAt: opts.expectedUpdatedAt ?? null });
+    if (!res.ok) return fail(res.error ?? "Nabídku se nepodařilo schválit.");
+    revalidateQuote(res.jobId ?? null);
     return { ok: true };
   } catch (err) {
     return fail(err);
   }
 }
 
-export async function approveJobQuote(quoteId: string): Promise<ActionResult> {
-  // schválení = člověk s právem na marže zkontroloval nabídku (AI, žádost, limit — R10)
-  const c = await begin("margins");
-  if ("error" in c) return fail(c.error);
-  if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
-  try {
-    const { db, user } = c;
-    const quote = await loadQuote(db, quoteId);
-    if (!quote) return fail(QUOTE_NOT_FOUND);
-    const { data: flowRow } = await db.from("quotes")
-      .select("id, number, revision, status, state, approved_by, approval_required, approval_requested_at, created_by, archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total")
-      .eq("id", quoteId).maybeSingle();
-    if (flowRow) {
-      const facts = quoteFactsFromRow(flowRow as Row);
-      const ctx = { can: (f: Feature) => f !== "margins" || c.margins, userId: user.id, isSuperAdmin: user.role === "super_admin", assigneeId: null };
-      if (!canApproveQuote(facts, ctx, approvalReasons(facts))) {
-        return fail(facts.state === "rozpracovana" || facts.state === "ke_schvaleni" || facts.state === "schvalena"
-          ? "Vlastní nabídku nad limitem schválení musí schválit někdo jiný (super admin)."
-          : "Odeslanou, archivovanou nebo uzavřenou nabídku už schvalovat nejde.");
-      }
-    }
-    const now = new Date().toISOString();
-    const update: Row = { approved_by: user.id, approved_at: now };
-    if (quote.status === "navrh_ai") update.status = "ke_schvaleni";
-    const { error } = await db.from("quotes").update(update as never).eq("id", quoteId);
-    if (error) return fail(error.message);
-    if (quote.job_id) {
-      await db.from("orders").update({ approved_by: user.id, approved_at: now } as never).eq("id", quote.job_id);
-      await logJobEvent(db, {
-        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} schválena`,
-        data: { quoteId, number: quote.number, action: "approved" }, actorId: user.id,
-      });
-    }
-    revalidateQuote(quote.job_id);
-    return { ok: true };
-  } catch (err) {
-    return fail(err);
-  }
+/** Fakta nabídky + obchodník a řešitel zakázky pro quoteSendBlock. */
+async function sendCheck(c: Ctx, quoteId: string): Promise<string | null> {
+  const { data } = await c.db.from("quotes").select(FLOW_QUOTE_COLUMNS).eq("id", quoteId).maybeSingle();
+  if (!data) return QUOTE_NOT_FOUND;
+  const facts = quoteFactsFromRow(data as Row);
+  const jobId = (data as Row).job_id;
+  const job = typeof jobId === "string" ? await loadJob(c.db, jobId, "owner_id, assignee_id") : null;
+  return quoteSendBlock(facts, {
+    can: c.can, userId: c.user.id, isSuperAdmin: c.user.role === "super_admin",
+    jobOwnerId: typeof job?.owner_id === "string" ? job.owner_id : null,
+    jobAssigneeId: typeof job?.assignee_id === "string" ? job.assignee_id : null,
+  });
 }
 
 export async function markJobQuoteSent(quoteId: string): Promise<ActionResult> {
-  // odeslání nabídky zákazníkovi = právo na marže (transitionFeature quote → odeslana)
-  const c = await begin("margins");
+  // #25: kdo smí odeslat, rozhodne quoteSendBlock (neschválenou nikdo; schválenou i autor / řešitel)
+  const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {
     const { db, user } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
+    if (quote.state !== "rozpracovana" && quote.state !== "schvalena" && quote.state !== "ke_schvaleni") {
+      return fail("Odeslat jde jen rozpracovanou nebo schválenou nabídku.");
+    }
+    const block = await sendCheck(c, quoteId);
+    if (block) return fail(block);
     const { error } = await db.from("quotes").update({ status: "odeslano", sent_at: new Date().toISOString() } as never).eq("id", quoteId);
     if (error) return fail(error.message);
     if (quote.job_id) {
@@ -760,6 +805,9 @@ export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
     if (!quote.job_id) return fail("Nabídka není přiřazená k žádné zakázce.");
+    // #25: přijmout jde jen odeslanou nabídku — a neschválenou zákazník nikdy nedostal
+    if (quoteApprovalBlock(quoteFactsFromRow(quote))) return fail(QUOTE_ACCEPT_BLOCKED);
+    if (quote.state !== "odeslana" && quote.state !== "pripominky") return fail("Zákazník může přijmout jen odeslanou nabídku.");
     const job = await loadJob(db, quote.job_id, "id, status, value");
     if (!job) return fail(NOT_FOUND);
 
@@ -800,6 +848,8 @@ export async function rejectJobQuote(quoteId: string, reason?: string): Promise<
     const { db, user } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
+    // #25: zamítnout jde jen odeslanou nabídku (= flow_reject_quote) — jinak by šla „zamítnout a znovu otevřít“
+    if (quote.state !== "odeslana" && quote.state !== "pripominky") return fail("Zamítnout lze jen odeslanou nabídku.");
     const why = cleanText(reason, 2000);
     const { error } = await db.from("quotes").update({ status: "zamitnuto", rejected_reason: why } as never).eq("id", quoteId);
     if (error) return fail(error.message);
@@ -880,14 +930,17 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
     }
     await db.from("quotes").update({ archived: true } as never).eq("id", quoteId);
 
+    const st = await quoteApprovalState(db, createdId);
+    const needsApproval = st.adminApprovalRequired && !st.approvedBy;
     if (quote.job_id) {
       await logJobEvent(db, {
         jobId: quote.job_id, type: "quote",
-        message: `Nová verze nabídky ${number} (verze ${finalRev}) — ${quote.number ?? "původní"} archivována`,
-        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision" },
+        message: `Nová verze nabídky ${number} (verze ${finalRev}) — ${quote.number ?? "původní"} archivována${needsApproval ? PENDING_SUFFIX : ""}`,
+        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision", ...(needsApproval ? { needsApproval: true } : {}) },
         actorId: user.id,
       });
     }
+    if (needsApproval) await scheduleQuoteApprovalNotice({ quoteId: createdId, jobId: quote.job_id, authorId: user.id });
     revalidateQuote(quote.job_id);
     return { ok: true, id: createdId, number };
   } catch (err) {

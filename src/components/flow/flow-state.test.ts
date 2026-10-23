@@ -100,22 +100,47 @@ describe("chipy řádku", () => {
 });
 
 describe("akce nabídky v přehledu", () => {
-  it("rozpracovaná: obchodník Odeslat, zaměstnanec Předat ke schválení", () => {
+  it("rozpracovaná (nabídka super admina): obchodník Odeslat, zaměstnanec nic (#25 — „Předat ke schválení“ zaniklo)", () => {
     const q = quote();
     expect(quoteRowActions({ quote: q, display: "rozpracovana", hasJob: true, current: true }, ctx(SALES)).next?.key).toBe("quote.send");
     const staff = quoteRowActions({ quote: q, display: "rozpracovana", hasJob: true, current: true }, ctx(STAFF));
-    expect(staff.next?.key).toBe("quote.requestApproval");
+    expect(staff.next).toBeNull();
     expect(staff.menu).not.toContain("quote.send");
+    expect(staff.menu).not.toContain("quote.requestApproval");
   });
 
-  it("AI nabídka ke schválení: schvalovatel Schválit, autor nad limitem jen super admin", () => {
+  it("#25: neschválenou nabídku (AI i ne-admin) schvaluje jen super admin", () => {
     const ai = quote({ state: "ke_schvaleni", approvalRequired: true, aiGenerated: true });
-    const r = quoteRowActions({ quote: ai, display: "ke_schvaleni", hasJob: true, current: true }, ctx(SALES));
-    expect(r.next?.key).toBe("quote.approve");
-    expect(r.menu).toContain("quote.approveSend");
-    const limit = quote({ state: "ke_schvaleni", approvalRequired: true, createdBy: "u1" });
-    expect(quoteRowActions({ quote: limit, display: "ke_schvaleni", hasJob: true, current: true }, ctx(SALES)).next).toBeNull();
-    expect(quoteRowActions({ quote: limit, display: "ke_schvaleni", hasJob: true, current: true }, ctx(SALES, { isSuperAdmin: true })).next?.key).toBe("quote.approve");
+    const sales = quoteRowActions({ quote: ai, display: "ke_schvaleni", hasJob: true, current: true }, ctx(SALES));
+    expect(sales.next).toBeNull();
+    expect(sales.menu).not.toContain("quote.approve");
+    expect(sales.menu).not.toContain("quote.unapprove");
+    const admin = quoteRowActions({ quote: ai, display: "ke_schvaleni", hasJob: true, current: true }, ctx([...SALES, "quote_approval"], { isSuperAdmin: true }));
+    expect(admin.next?.key).toBe("quote.approve");
+    expect(admin.menu).toContain("quote.approveSend");
+    // „Vrátit k přepracování…“ jen když UI umí dialog (withReturn)
+    expect(admin.menu).not.toContain("quote.returnToAuthor");
+    const withReturn = quoteRowActions({ quote: ai, display: "ke_schvaleni", hasJob: true, current: true },
+      ctx([...SALES, "quote_approval"], { isSuperAdmin: true, withReturn: true }));
+    expect(withReturn.menu).toContain("quote.returnToAuthor");
+  });
+
+  it("#25: schválenou nabídku ne-admina odešle i zaměstnanec — autor; cizí ne", () => {
+    const approved = quote({ state: "schvalena", approvalRequired: true, adminApprovalRequired: true, approvedBy: "admin", createdBy: "u1" });
+    const author = quoteRowActions({ quote: approved, display: "schvalena", hasJob: true, current: true }, ctx(STAFF));
+    expect(author.next?.key).toBe("quote.send");
+    expect(author.menu).toEqual(expect.arrayContaining(["quote.send", "quote.markSent"]));
+    expect(author.menu).not.toContain("quote.unapprove");
+    const other = quoteRowActions({ quote: { ...approved, createdBy: "u7" }, display: "schvalena", hasJob: true, current: true }, ctx(STAFF));
+    expect(other.next).toBeNull();
+    expect(other.menu).not.toContain("quote.send");
+    // řešitel zakázky smí také
+    expect(quoteRowActions({ quote: { ...approved, createdBy: "u7" }, display: "schvalena", hasJob: true, current: true, jobAssigneeId: "u1" }, ctx(STAFF)).next?.key)
+      .toBe("quote.send");
+    // vrácená nabídka: autor „Upravit podle připomínek“
+    const returned = quote({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, createdBy: "u1", returnedAt: "2026-10-23T08:00:00Z" });
+    expect(quoteRowActions({ quote: returned, display: "ke_schvaleni", hasJob: true, current: true }, ctx(STAFF)).next)
+      .toEqual({ key: "quote.edit", label: "Upravit podle připomínek" });
   });
 
   it("odeslaná / vypršelá / připomínky; zaměstnanec jen navrhne zamítnutí; bez zakázky nic", () => {
@@ -161,7 +186,10 @@ describe("nabídka bez ceny a e-mail k existující zakázce (review)", () => {
 describe("odkazy akcí a menu stránky", () => {
   it("akce mimo stránku vedou do správné záložky karty zakázky", () => {
     expect(flowActionHref("pricing.open", "j1")).toBe("/pricing?job=j1");
-    expect(flowActionHref("quote.create", "j1")).toBe("/pricing?job=j1");
+    // #25: „Vytvořit nabídku“ vede do Nacenění jen super admina, ostatní rovnou do editoru nabídky
+    expect(flowActionHref("quote.create", "j1", { canPrice: true })).toBe("/pricing?job=j1");
+    expect(flowActionHref("quote.create", "j1", { canPrice: false })).toBe("/orders/j1?tab=nabidky&nova=1");
+    expect(flowActionHref("quote.create", "j1")).toBe("/orders/j1?tab=nabidky&nova=1");
     expect(flowActionHref("pricing.supplierPrice", "j1")).toBe("/orders/j1?tab=nakup");
     expect(flowActionHref("quote.edit", "j1")).toBe("/orders/j1?tab=nabidky");
     expect(flowActionHref("delivery.record", "j1")).toBe("/orders/j1?tab=vyroba");

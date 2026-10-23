@@ -1,6 +1,6 @@
 import {
   CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FULFILMENT_STATES, INQUIRY_STATES, ORDER_STATES, PRICING_STATES,
-  QUOTE_STATES, approvalReasons, canApproveQuote, deliveryProgress, lostReasonLabel, productionProgress, quoteLabel, quoteUnpriced,
+  QUOTE_STATES, canApproveQuote, deliveryProgress, lostReasonLabel, productionProgress, quoteLabel, quoteSendBlock, quoteUnpriced,
   waitingText, type ActionCtx, type ChangeStamp, type FlowActionKey, type FlowFacts, type FlowPhase, type FlowSnapshot,
   type PaletteKey, type Progress, type QuoteDisplayState, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
@@ -216,14 +216,20 @@ export interface QuoteRowInput {
   hasJob: boolean;
   /** Aktivní (nearchivovaná) verze zakázky. */
   current: boolean;
+  /** Obchodník a řešitel zakázky (po schválení smí nabídku odeslat i oni — #25). */
+  jobOwnerId?: string | null;
+  jobAssigneeId?: string | null;
 }
 
-/** Další krok a menu jedné nabídky — stejná pravidla jako nextAction / menuActions (1.12). */
+/** Další krok a menu jedné nabídky — stejná pravidla jako nextAction / menuActions (1.12, #25). */
 export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextStep; menu: FlowActionKey[] } {
   const q = r.quote;
   const margins = ctx.can("margins");
-  const reasons = approvalReasons(q);
-  const canApprove = canApproveQuote(q, ctx, reasons);
+  const canApprove = canApproveQuote(q, ctx);
+  const canSend = quoteSendBlock(q, {
+    can: ctx.can, userId: ctx.userId, isSuperAdmin: ctx.isSuperAdmin,
+    jobOwnerId: r.jobOwnerId ?? ctx.ownerId ?? null, jobAssigneeId: r.jobAssigneeId ?? ctx.assigneeId,
+  }) === null;
   const ok = (k: FlowActionKey) => ctx.can(FLOW_ACTIONS[k].feature);
   const step = (k: FlowActionKey): NextStep => (ok(k) ? { key: k, label: FLOW_ACTIONS[k].label } : null);
   const st = q.state;
@@ -232,27 +238,26 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
   const add = (k: FlowActionKey) => { if (!keys.includes(k)) keys.push(k); };
 
   const unpriced = quoteUnpriced(q);
+  const mayReturn = ctx.withReturn === true && ctx.can("quote_approval") && !q.returnedAt && !q.archived;
   if (unpriced) {
-    // bez ceny nejde odeslat — další krok je doplnit cenu (na kartě zakázky)
+    // bez ceny nejde odeslat ani schválit — další krok je doplnit cenu (na kartě zakázky)
     next = r.hasJob && ok("quote.edit") ? { key: "quote.edit", label: "Doplnit cenu" } : null;
     add("quote.edit");
-    if (st === "rozpracovana") add("quote.requestApproval");
-    if (st !== "schvalena" && canApprove) add("quote.approve");
-    if (st !== "rozpracovana") add("quote.unapprove");
+    if (st === "ke_schvaleni" && mayReturn) add("quote.returnToAuthor");
+    if (st === "schvalena") add("quote.unapprove");
   } else if (st === "rozpracovana") {
-    if (margins && !q.approvalRequired && r.hasJob) next = step("quote.send");
-    else if (margins && canApprove) next = r.hasJob ? step("quote.approveSend") : step("quote.approve");
-    else next = step("quote.requestApproval");
-    add("quote.requestApproval");
-    if (canApprove) add("quote.approve");
-    if (r.hasJob) { add("quote.send"); add("quote.markSent"); }
+    // rozpracovaná = schválení není nutné (nabídka super admina)
+    next = r.hasJob && canSend ? step("quote.send") : null;
+    if (r.hasJob && canSend) { add("quote.send"); add("quote.markSent"); }
   } else if (st === "ke_schvaleni") {
-    next = canApprove ? step("quote.approve") : null;
+    // #25: neschválenou schválí jen super admin
+    next = canApprove ? step("quote.approve") : q.returnedAt && q.createdBy === ctx.userId && r.hasJob
+      ? { key: "quote.edit", label: "Upravit podle připomínek" } : null;
     if (canApprove) { add("quote.approve"); if (r.hasJob) add("quote.approveSend"); }
-    add("quote.unapprove");
+    if (mayReturn) add("quote.returnToAuthor");
   } else if (st === "schvalena") {
-    next = r.hasJob ? step("quote.send") : null;
-    if (r.hasJob) { add("quote.send"); add("quote.markSent"); }
+    next = r.hasJob && canSend ? step("quote.send") : null;
+    if (r.hasJob && canSend) { add("quote.send"); add("quote.markSent"); }
     add("quote.unapprove");
   } else if (st === "odeslana" || st === "pripominky") {
     next = r.display === "vyprsela" ? step("quote.extend") : st === "pripominky" ? step("quote.newRevision") : step("quote.accept");
@@ -280,18 +285,22 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
 export const INLINE_ACTIONS: readonly FlowActionKey[] = [
   "proposal.decide", "inquiry.take", "inquiry.wait", "inquiry.resume", "inquiry.decline", "inquiry.withdraw",
   "inquiry.reopen", "inquiry.propose", "quote.requestApproval", "quote.approve", "quote.approveSend", "quote.unapprove",
-  "quote.send", "quote.markSent", "quote.feedback", "quote.answerNoChange", "quote.accept", "quote.reject", "quote.propose",
+  "quote.returnToAuthor", "quote.send", "quote.markSent", "quote.feedback", "quote.answerNoChange", "quote.accept", "quote.reject", "quote.propose",
   "quote.reopen", "quote.newRevision", "quote.extend", "order.confirm", "order.confirmOther", "order.flagMismatch",
   "order.resolveMismatch", "order.requestFix", "order.registerChange", "order.decideChange", "order.rejectChange",
   "order.sendConfirmation", "order.cancel", "order.propose", "order.reopen",
 ];
 
-/** Odkaz akce, která se dělá jinde (nacenění, výroba, dodání, faktura) — null = řeší se na místě. */
-export function flowActionHref(key: FlowActionKey, jobId: string): string | null {
+/**
+ * Odkaz akce, která se dělá jinde (nacenění, výroba, dodání, faktura) — null = řeší se na místě.
+ * #25: „Vytvořit nabídku“ vede do Nacenění jen super admina (canPrice); ostatní rovnou do editoru nabídky.
+ */
+export function flowActionHref(key: FlowActionKey, jobId: string, opts: { canPrice?: boolean } = {}): string | null {
   switch (key) {
     case "pricing.open":
-    case "quote.create":
       return `/pricing?job=${jobId}`;
+    case "quote.create":
+      return opts.canPrice ? `/pricing?job=${jobId}` : `/orders/${jobId}?tab=nabidky&nova=1`;
     case "pricing.supplierPrice":
       return `/orders/${jobId}?tab=nakup`;
     case "quote.edit":

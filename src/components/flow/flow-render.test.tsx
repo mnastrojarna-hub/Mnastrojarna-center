@@ -199,6 +199,7 @@ beforeEach(() => {
 
 describe("stránky obchodního toku — vykreslení", () => {
   it("Poptávky: hlavička, chipy stavů s počty, stav + autor, další krok Nacenit, pošta se Založit zakázku", async () => {
+    access.features.add("pricing"); // #25: krok „Nacenit“ má jen super admin (pricing)
     const html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
     expect(html).toContain("Poptávky");
     expect(html).toContain("Otevřené poptávky");
@@ -231,7 +232,7 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain("Marže");
     expect(html).toContain("Vytvořit nabídku z ceny");
     expect(html).toContain("Nacenil: <span");
-    expect(html).toContain("Čeká na nacenění");
+    expect(html).toContain("Bez ceny"); // #25: chip pricing.ceka
     expect(html).toContain('aria-label="Stav nacenění"');
     expect(html).not.toContain("AI-PANEL");
     expect(html).not.toContain("AI návrh ceny");
@@ -256,7 +257,7 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain("Vypršela platnost");
     expect(html).toContain('data-quote-state="vyprsela"');
     expect(html).toContain('href="/api/pdf/job/j3?type=nabidka&amp;quoteId=q1"');
-    expect(html).toContain("Čeká na schválení");
+    expect(html).toContain("Neschválená"); // #25: štítek stavu ke_schvaleni
     expect(html).toContain('aria-label="Stav nabídky"');
     expect(html).toContain("bez ceny");
     expect(html).not.toContain("Archivovaná"); // archiv je jen ve „Více“ (výchozí = otevřené)

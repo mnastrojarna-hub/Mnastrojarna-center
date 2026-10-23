@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
   CAUSE_LABELS, CHIP_BASE, CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FLOW_PALETTE, FULFILMENT_STATES,
@@ -10,6 +10,8 @@ import {
   lostReasonsFor, menuActions, nextAction, paymentProgress, phaseTrail, primaryChip, productionProgress,
   quoteDisplayState, quoteStateOf, reasonRequired, relativeStampTime, stageEffect, stageEffectText, stampFromRow,
   stampText, stampTitle, transitionFeature, approvalReasons, quoteLabel, flowFactsFromRow, quoteFactsFromRow,
+  QUOTE_ACCEPT_BLOCKED, QUOTE_ARCHIVED_SEND, QUOTE_AWAITS_APPROVAL, QUOTE_SEND_NO_RIGHT, approvedStampText,
+  quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent,
   type ActionCtx, type ChangeStamp, type FlowFacts, type FlowStateMeta, type JobStamps, type QuoteFacts,
 } from "./flow-status";
 import { STAGES, STAGE_ORDER, stageRank } from "./stages";
@@ -45,7 +47,8 @@ function ctx(features: Feature[] = ["orders", "workflow", "documents", "margins"
 }
 const SALES = ctx();
 const WORKER = ctx(["orders", "workflow", "documents"]);
-const ADMIN = ctx(["orders", "workflow", "documents", "margins", "delete"], { isSuperAdmin: true });
+// #25: super admin má i Nacenění, schvalování nabídek a obchodní tok všech
+const ADMIN = ctx(["orders", "workflow", "documents", "margins", "delete", "pricing", "quote_approval", "flow_all"], { isSuperAdmin: true });
 
 const ALL_META: FlowStateMeta[] = [
   ...Object.values(INQUIRY_STATES), ...Object.values(PRICING_STATES), ...Object.values(QUOTE_STATES),
@@ -128,8 +131,19 @@ describe("přechody, práva a důvody", () => {
     expect(canTransition("quote", "zamitnuta", "odeslana")).toBe(true);
     expect(canTransition("quote", "prijata", "zamitnuta")).toBe(false);
     expect(QUOTE_TRANSITIONS.archivovana).toEqual([]);
-    for (const to of ["schvalena", "rozpracovana", "odeslana", "zamitnuta"]) expect(transitionFeature("quote", to)).toBe("margins");
+    // #25: schválit / zrušit schválení jen super admin; odeslat rozpracovanou či schválenou = workflow (+ quoteSendBlock)
+    expect(transitionFeature("quote", "schvalena", "ke_schvaleni")).toBe("quote_approval");
+    expect(transitionFeature("quote", "rozpracovana", "schvalena")).toBe("quote_approval");
+    expect(transitionFeature("quote", "odeslana", "schvalena")).toBe("workflow");
+    expect(transitionFeature("quote", "odeslana", "rozpracovana")).toBe("workflow");
+    expect(transitionFeature("quote", "odeslana", "pripominky")).toBe("margins");
+    expect(transitionFeature("quote", "odeslana", "zamitnuta")).toBe("margins");
+    expect(transitionFeature("quote", "odeslana")).toBe("margins");
+    expect(transitionFeature("quote", "zamitnuta")).toBe("margins");
     for (const to of ["ke_schvaleni", "pripominky", "prijata"]) expect(transitionFeature("quote", to)).toBe("workflow");
+    expect(QUOTE_TRANSITIONS.rozpracovana).toEqual(["odeslana"]);
+    expect(QUOTE_TRANSITIONS.ke_schvaleni).toEqual(["schvalena"]);
+    expect(QUOTE_TRANSITIONS.schvalena).toEqual(["odeslana", "rozpracovana"]);
     expect(reasonRequired("quote", "zamitnuta")).toBe(true);
   });
 
@@ -322,15 +336,21 @@ describe("nextAction (tabulka 1.12)", () => {
 
   it("nacenění a nabídka podle práva", () => {
     const f = facts({ stage: "naceneni", inquiryStatus: "v_reseni" });
-    expect(next(f)?.key).toBe("pricing.open");
+    // #25: Nacenění jen super admin — obchodník i zaměstnanec rovnou „Vytvořit nabídku“
+    expect(next(f, [], ADMIN)?.key).toBe("pricing.open");
+    expect(next(f)?.key).toBe("quote.create");
+    expect(next(f, [], WORKER)?.key).toBe("quote.create");
     expect(next({ ...f, itemsCount: 2, itemsPriced: 2 })?.key).toBe("quote.create");
     expect(next({ ...f, pendingSupplierQuotes: 1 })?.key).toBe("pricing.supplierPrice");
-    expect(next({ ...f, pendingSupplierQuotes: 1 }, [], WORKER)?.key).toBe("pricing.open");
+    expect(next({ ...f, pendingSupplierQuotes: 1 }, [], WORKER)?.key).toBe("quote.create");
+    expect(next({ ...f, pendingSupplierQuotes: 1 }, [], ADMIN)?.key).toBe("pricing.supplierPrice");
     const draft = quote({ state: "rozpracovana" });
     expect(next(f, [draft])?.key).toBe("quote.send");
-    expect(next(f, [draft], WORKER)?.key).toBe("quote.requestApproval");
+    // rozpracovaná (nabídka super admina) — zaměstnanec ji neodesílá a „Předat ke schválení“ zaniklo
+    expect(next(f, [draft], WORKER)).toBeNull();
     const pending = quote({ state: "ke_schvaleni", approvalRequired: true, aiGenerated: true });
-    expect(next(f, [pending])?.key).toBe("quote.approve");
+    expect(next(f, [pending], ADMIN)?.key).toBe("quote.approve");
+    expect(next(f, [pending])).toBeNull();
     expect(next(f, [pending], WORKER)).toBeNull();
     expect(next(f, [quote({ state: "schvalena", approvedBy: ME })])?.key).toBe("quote.send");
   });
@@ -419,17 +439,140 @@ describe("menuActions", () => {
     expect(menuActions(z, deriveFlow(z, [], TODAY), ADMIN)).toContain("order.reopen");
   });
 
-  it("schválení vlastní nabídky nad limitem jen super admin (čtyři oči)", () => {
-    const q = quote({ state: "ke_schvaleni", approvalRequired: true, createdBy: ME, total: 500_000 });
-    const reasons = approvalReasons(q);
-    expect(reasons).toEqual({ ai: false, requested: false, limit: true });
-    expect(canApproveQuote(q, SALES, reasons)).toBe(false);
-    expect(canApproveQuote(q, ADMIN, reasons)).toBe(true);
-    expect(canApproveQuote(quote({ ...q, createdBy: OTHER }), SALES, approvalReasons(q))).toBe(true);
+  it("#25: schvaluje jen super admin (quote_approval) — neschválenou, nearchivovanou, s cenou", () => {
+    const own = quote({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, createdBy: ME, total: 500_000 });
+    expect(approvalReasons(own)).toMatchObject({ ai: false, author: true });
+    expect(canApproveQuote(own, SALES)).toBe(false);
+    expect(canApproveQuote(own, ADMIN)).toBe(true);
     const ai = quote({ state: "ke_schvaleni", approvalRequired: true, aiGenerated: true, createdBy: ME });
-    expect(canApproveQuote(ai, SALES, approvalReasons(ai))).toBe(true);
-    expect(canApproveQuote(ai, WORKER, approvalReasons(ai))).toBe(false);
-    expect(canApproveQuote(quote({ state: "odeslana", status: "odeslano" }), ADMIN, reasons)).toBe(false);
+    expect(approvalReasons(ai)).toMatchObject({ ai: true, author: false });
+    expect(canApproveQuote(ai, SALES)).toBe(false);
+    expect(canApproveQuote(ai, WORKER)).toBe(false);
+    expect(canApproveQuote(ai, ADMIN)).toBe(true);
+    expect(canApproveQuote(quote({ state: "odeslana", status: "odeslano" }), ADMIN)).toBe(false);
+    expect(canApproveQuote(quote({ state: "schvalena", approvedBy: OTHER }), ADMIN)).toBe(false);
+    expect(canApproveQuote({ ...own, archived: true }, ADMIN)).toBe(false);
+    expect(canApproveQuote({ ...own, total: null }, ADMIN)).toBe(false);
+  });
+
+  it("#25: menu nabídky — bez „Předat ke schválení“; zrušit schválení jen u schválené; odeslat dle quoteSendBlock", () => {
+    const f = facts({ stage: "naceneni", inquiryStatus: "v_reseni" });
+    const pending = quote({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, createdBy: OTHER, total: 1000 });
+    const salesMenu = menuActions(f, deriveFlow(f, [pending], TODAY), SALES);
+    expect(salesMenu).not.toContain("quote.requestApproval");
+    expect(salesMenu).not.toContain("quote.approve");
+    expect(salesMenu).not.toContain("quote.unapprove");
+    expect(salesMenu).not.toContain("quote.send");
+    const adminMenu = menuActions(f, deriveFlow(f, [pending], TODAY), ADMIN);
+    expect(adminMenu).toEqual(expect.arrayContaining(["quote.approve", "quote.approveSend"]));
+    expect(adminMenu).not.toContain("quote.unapprove");
+    expect(adminMenu).not.toContain("quote.returnToAuthor"); // až s dialogem (withReturn, 25-C)
+    expect(menuActions(f, deriveFlow(f, [pending], TODAY), { ...ADMIN, withReturn: true })).toContain("quote.returnToAuthor");
+    const approved = { ...pending, state: "schvalena" as const, approvedBy: ME };
+    const workerAuthor = ctx(["orders", "workflow", "documents"], { userId: OTHER });
+    const wm = menuActions(f, deriveFlow(f, [approved], TODAY), workerAuthor);
+    expect(wm).toEqual(expect.arrayContaining(["quote.send", "quote.markSent"]));
+    expect(wm).not.toContain("quote.unapprove");
+    expect(menuActions(f, deriveFlow(f, [approved], TODAY), WORKER)).not.toContain("quote.send");
+    expect(menuActions(f, deriveFlow(f, [approved], TODAY), ADMIN)).toContain("quote.unapprove");
+    // vrácená nabídka: autor „Upravit podle připomínek“
+    const returned = { ...pending, returnedAt: "2026-10-23T08:00:00Z", returnNote: "doplň termín" };
+    expect(nextAction(f, deriveFlow(f, [returned], TODAY), workerAuthor)).toEqual({ key: "quote.edit", label: "Upravit podle připomínek" });
+    expect(nextAction(f, deriveFlow(f, [returned], TODAY), WORKER)).toBeNull();
+  });
+});
+
+describe("schvalování nabídek super adminem (#25)", () => {
+  it("FLOW_ACTIONS: schválit / vrátit jen quote_approval, odeslat workflow, Nacenit pricing", () => {
+    for (const k of ["quote.approve", "quote.approveSend", "quote.unapprove", "quote.returnToAuthor"] as const) {
+      expect(FLOW_ACTIONS[k].feature, k).toBe("quote_approval");
+    }
+    expect(FLOW_ACTIONS["quote.send"].feature).toBe("workflow");
+    expect(FLOW_ACTIONS["quote.markSent"].feature).toBe("workflow");
+    expect(FLOW_ACTIONS["pricing.open"].feature).toBe("pricing");
+    expect(FLOW_ACTIONS["pricing.supplierPrice"].feature).toBe("margins");
+    expect(FLOW_ACTIONS["quote.returnToAuthor"]).toMatchObject({ label: "Vrátit k přepracování…", kind: "dialog" });
+    expect(QUOTE_STATES.ke_schvaleni.label).toBe("Neschválená");
+    expect(QUOTE_STATES.ke_schvaleni.description).toContain("čeká na schválení super admina");
+    expect(PRICING_STATES.ceka.label).toBe("Bez ceny");
+    expect(PRICING_STATES.ceka.short).toBe("Bez ceny");
+  });
+
+  it("quoteApprovalBlock: nabídka ne-admina bez schválení v JAKÉMKOLI stavu, AI jen neodeslaná", () => {
+    expect(quoteApprovalBlock({ adminApprovalRequired: true, approvedBy: null })).toBe(QUOTE_AWAITS_APPROVAL);
+    // i „odeslaná“ / zamítnutá — R7 je nezávislé na stavu
+    expect(quoteApprovalBlock({ adminApprovalRequired: true, approvedBy: null, sentAt: "2026-10-01T08:00:00Z" })).toBe(QUOTE_AWAITS_APPROVAL);
+    expect(quoteApprovalBlock({ adminApprovalRequired: true, approvedBy: OTHER })).toBeNull();
+    expect(quoteApprovalBlock({ approvalRequired: true, approvedBy: null })).toBe(QUOTE_AWAITS_APPROVAL);
+    expect(quoteApprovalBlock({ approvalRequired: true, approvedBy: null, sentAt: "2026-10-01T08:00:00Z" })).toBeNull();
+    // „odesláno“ rozhoduje stav, ne sent_at: neodeslaná AI nabídka s podvrženým sent_at zůstává blokovaná
+    expect(quoteApprovalBlock({ approvalRequired: true, approvedBy: null, sentAt: "2026-10-01T08:00:00Z", state: "ke_schvaleni" }))
+      .toBe(QUOTE_AWAITS_APPROVAL);
+    expect(quoteApprovalBlock({ approvalRequired: true, approvedBy: null, sentAt: null, state: "odeslana" })).toBeNull();
+    expect(quoteApprovalBlock({ approvalRequired: true, approvedBy: null, sentAt: null, state: "zamitnuta" })).toBe(QUOTE_AWAITS_APPROVAL);
+    expect(quoteWasSent({ state: "schvalena", sentAt: "2026-10-01T08:00:00Z" })).toBe(false);
+    expect(quoteWasSent({ state: "pripominky", sentAt: null })).toBe(true);
+    expect(quoteWasSent({ state: "archivovana", sentAt: "2026-10-01T08:00:00Z" })).toBe(true);
+    expect(quoteApprovalBlock({ approvalRequired: false })).toBeNull();
+    expect(QUOTE_ACCEPT_BLOCKED).toContain("přijmout ji lze až po schválení a odeslání");
+  });
+
+  it("quoteSendBlock: margins, autor / obchodník / řešitel schválené, zamítnutá, archiv", () => {
+    const base = quote({ state: "schvalena", approvalRequired: true, adminApprovalRequired: true, approvedBy: OTHER, createdBy: "author" });
+    const viewer = (features: Feature[], userId: string, p: Record<string, unknown> = {}) =>
+      ({ can: (f: Feature) => features.includes(f), userId, ...p });
+    const W: Feature[] = ["orders", "workflow", "documents"];
+    expect(quoteSendBlock(base, viewer([...W, "margins"], "someone"))).toBeNull();
+    expect(quoteSendBlock(base, viewer(W, "author"))).toBeNull();
+    expect(quoteSendBlock(base, viewer(W, "owner", { jobOwnerId: "owner" }))).toBeNull();
+    expect(quoteSendBlock(base, viewer(W, "solver", { jobAssigneeId: "solver" }))).toBeNull();
+    expect(quoteSendBlock(base, viewer(W, "stranger"))).toBe(QUOTE_SEND_NO_RIGHT);
+    // neschválená: nikdo, ani super admin
+    expect(quoteSendBlock({ ...base, state: "ke_schvaleni", approvedBy: null }, viewer([...W, "margins", "quote_approval"], "admin", { isSuperAdmin: true })))
+      .toBe(QUOTE_AWAITS_APPROVAL);
+    // rozpracovaná nabídka super admina (bez příznaku) — jen margins
+    const adminDraft = quote({ state: "rozpracovana" });
+    expect(quoteSendBlock(adminDraft, viewer([...W, "margins"], "x"))).toBeNull();
+    expect(quoteSendBlock(adminDraft, viewer(W, ME))).toBe(QUOTE_SEND_NO_RIGHT);
+    // zamítnutá (znovuotevření) jen margins; archivní verze jen super admin
+    expect(quoteSendBlock({ ...base, state: "zamitnuta" }, viewer(W, "author"))).toBe(QUOTE_SEND_NO_RIGHT);
+    expect(quoteSendBlock({ ...base, archived: true }, viewer([...W, "margins"], "x"))).toBe(QUOTE_ARCHIVED_SEND);
+    expect(quoteSendBlock({ ...base, archived: true }, viewer([...W, "margins"], "x", { isSuperAdmin: true }))).toBeNull();
+  });
+
+  it("quoteAwaitsApproval, quoteApprovalFlag a approvedStampText", () => {
+    expect(quoteAwaitsApproval({ state: "ke_schvaleni" })).toBe(true);
+    expect(quoteAwaitsApproval({ state: "ke_schvaleni", archived: true })).toBe(false);
+    expect(quoteAwaitsApproval({ state: "schvalena" })).toBe(false);
+
+    const pending = quote({ id: "qp", state: "ke_schvaleni", number: "NAB-2026-040", adminApprovalRequired: true, approvalRequired: true });
+    expect(quoteApprovalFlag([pending])).toMatchObject({
+      kind: "pending", quoteId: "qp", label: "Neschválená — čeká na schválení super admina", short: "Neschválená",
+      title: "Nabídka NAB-2026-040 čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi.",
+    });
+    const returned = { ...pending, returnedAt: "2026-10-23T08:00:00Z", returnNote: "doplň termín" };
+    expect(quoteApprovalFlag([returned])).toMatchObject({ kind: "returned", label: "Vráceno k přepracování: doplň termín", short: "Vráceno", note: "doplň termín" });
+    // čekající má přednost před vrácenou
+    expect(quoteApprovalFlag([returned, { ...pending, id: "qp2" }])).toMatchObject({ kind: "pending", quoteId: "qp2" });
+    const approved = quote({ id: "qa", state: "schvalena", approvedBy: OTHER, adminApprovalRequired: true });
+    expect(quoteApprovalFlag([approved], { author: "Petr Obchodník", approver: "Jan Semorád", at: "2026-10-23T09:00:00Z" })).toEqual({
+      kind: "approved", quoteId: "qa", number: "NAB-2026-031", label: "Připravil(a) P. Obchodník · Schválil J. Semorád · 23. 10. 2026",
+    });
+    expect(quoteApprovalFlag([quote({ state: "odeslana", status: "odeslano" })])).toBeNull();
+    expect(quoteApprovalFlag([])).toBeNull();
+
+    expect(approvedStampText("Petr Obchodník", "Jan Semorád", "2026-10-23")).toBe("Připravil(a) P. Obchodník · Schválil J. Semorád · 23. 10. 2026");
+    expect(approvedStampText("Jan Semorád", "Jan Semorád", "2026-10-23")).toBe("Schválil J. Semorád · 23. 10. 2026");
+    expect(approvedStampText(null, null, null)).toBe("Schválená");
+  });
+
+  it("quoteFactsFromRow čte sloupce #25", () => {
+    const f = quoteFactsFromRow({
+      id: "q", job_id: "j", number: "N", revision: 1, status: "ke_schvaleni", state: "ke_schvaleni", approved_by: null,
+      approval_required: true, created_by: ME, archived: false, admin_approval_required: true,
+      approval_returned_at: "2026-10-23T08:00:00Z", approval_return_note: "doplň", updated_at: "2026-10-23T08:00:01Z", owner_id: OTHER,
+    });
+    expect(f).toMatchObject({ adminApprovalRequired: true, returnedAt: "2026-10-23T08:00:00Z", returnNote: "doplň", updatedAt: "2026-10-23T08:00:01Z", ownerId: OTHER });
   });
 });
 
@@ -649,18 +792,22 @@ describe("kdo · kdy", () => {
 
 // ── Parita s SQL migrací ────────────────────────────────────
 describe("parita TS ↔ SQL migrace", () => {
-  const sql = readFileSync(path.resolve(__dirname, "../../../supabase/migrations/20261023100000_podrobne_stavy_atribuce.sql"), "utf8");
+  // #25: funkce se předefinovávají v pozdějších migracích (20261023155000) — platí POSLEDNÍ definice
+  // napříč seřazenými migracemi, proto se čte vše a hledá od konce.
+  const dir = path.resolve(__dirname, "../../../supabase/migrations");
+  const sql = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()
+    .map((f) => readFileSync(path.join(dir, f), "utf8")).join("\n");
 
   function checkList(name: string): string[] {
-    const m = new RegExp(`${name} check \\(([\\s\\S]*?)\\);`).exec(sql);
-    expect(m, name).not.toBeNull();
+    const m = [...sql.matchAll(new RegExp(`${name} check \\(([\\s\\S]*?)\\);`, "g"))].at(-1);
+    expect(m, name).toBeTruthy();
     const inner = m![1];
     const list = /in\s*\(([\s\S]*?)\)\s*\)?$/.exec(inner.trim());
     return [...(list ? list[1] : inner).matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
   }
 
   function labelBlock(fn: string, field?: string): Record<string, string> {
-    const start = sql.indexOf(`create or replace function ${fn}(`);
+    const start = sql.lastIndexOf(`create or replace function ${fn}(`);
     expect(start, fn).toBeGreaterThan(-1);
     let body = sql.slice(start, sql.indexOf("$$;", start));
     if (field) {
@@ -688,6 +835,7 @@ describe("parita TS ↔ SQL migrace", () => {
     for (const [k, m] of Object.entries(ORDER_STATES)) expect(ord[k], k).toBe(m.label);
     const qs = labelBlock("flow_state_label", "quote_state");
     for (const [k, m] of Object.entries(QUOTE_STATES)) if (k !== "vyprsela") expect(qs[k], k).toBe(m.label);
+    expect(qs.ke_schvaleni).toBe("Neschválená"); // #25 (20261023155000)
     const lost = labelBlock("lost_reason_label");
     for (const [k, m] of Object.entries(LOST_REASONS)) expect(lost[k], k).toBe(m.label);
     const cause = labelBlock("flow_cause_label");
@@ -697,7 +845,7 @@ describe("parita TS ↔ SQL migrace", () => {
   it("job_stage_label a job_stage_rank = stages.ts", () => {
     const labels = labelBlock("job_stage_label");
     for (const s of STAGE_ORDER) expect(labels[s], s).toBe(STAGES[s].label);
-    const start = sql.indexOf("create or replace function job_stage_rank(");
+    const start = sql.lastIndexOf("create or replace function job_stage_rank(");
     const body = sql.slice(start, sql.indexOf("$$;", start));
     const ranks: Record<string, number> = {};
     for (const m of body.matchAll(/when '([a-z_]+)' then (\d+)/g)) ranks[m[1]] = Number(m[2]);

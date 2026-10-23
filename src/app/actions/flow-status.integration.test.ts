@@ -121,14 +121,21 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
   async function quoteRow(quoteId: string): Promise<Row> {
     return (await svc.from("quotes").select("*").eq("id", quoteId).single()).data as Row;
   }
-  async function addQuote(jobId: string, patch: Row = {}): Promise<string> {
+  /** #25: výchozí autor = super admin (jeho nabídka schválení nepotřebuje → „Rozpracovaná“);
+   *  `author: "sales"` = nabídka obchodníka → „Neschválená“, dokud ji super admin neschválí. */
+  async function addQuote(jobId: string, patch: Row = {}, author: "sales" | "admin" = "admin"): Promise<string> {
     const { localAdmin } = await import("@/test/local-supabase");
     const { userActor } = await import("@/lib/supabase/actor-headers");
-    const { data, error } = await localAdmin(userActor({ id: id("sales") })).from("quotes").insert({
+    const { data, error } = await localAdmin(userActor({ id: id(author) })).from("quotes").insert({
       number: `${PREFIX}-Q${++n}`, job_id: jobId, status: "ke_schvaleni", total: 50_000, revision: 1, valid_until: "2099-01-01", owner_id: id("sales"), ...patch,
     }).select("id").single();
     if (error) throw new Error(error.message);
     return (data as { id: string }).id;
+  }
+  /** #25: super admin schválí jen nabídku s položkami a cenami. */
+  async function addQuoteItem(quoteId: string, unitPrice = 50_000): Promise<void> {
+    const { error } = await svc.from("quote_items").insert({ quote_id: quoteId, position: 0, name: "Díl", quantity: 1, unit: "ks", unit_price: unitPrice, vat_rate: 21 });
+    if (error) throw new Error(error.message);
   }
 
   beforeAll(async () => {
@@ -238,28 +245,37 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
     const jobId = await newJob({ status: "naceneni" });
     const qId = await addQuote(jobId, { ai_generated: true });
     expect(await quoteRow(qId)).toMatchObject({ approval_required: true, state: "ke_schvaleni" });
+    await addQuoteItem(qId);
     as("sales");
     const direct = await j.markJobQuoteSent(qId);
     expect(direct.error).toBe("Nabídka čeká na schválení — odeslat ji lze až po schválení.");
     expect((await a.setQuoteState(qId, "odeslana")).error).toContain("nejde přejít");
     as("worker");
     expect((await a.approveAndSendQuote(qId)).error).toBe("K této akci nemáš oprávnění.");
+    // #25: schvaluje (i „Schválit a odeslat“) jen super admin
     as("sales");
+    expect((await a.approveAndSendQuote(qId)).error).toBe("K této akci nemáš oprávnění.");
+    as("admin");
     const r = await a.approveAndSendQuote(qId);
     expect(r).toMatchObject({ ok: true, quoteState: "odeslana", stage: "nabidka" });
-    expect(await quoteRow(qId)).toMatchObject({ approved_by: id("sales"), sent_by: id("sales"), sent_via: "rucne", state_changed_by: id("sales") });
+    expect(await quoteRow(qId)).toMatchObject({ approved_by: id("admin"), sent_by: id("admin"), sent_via: "rucne", state_changed_by: id("admin") });
     expect((await job(jobId)).inquiry_status).toBe("zpracovana");
   });
 
-  it("čtyři oči: vlastní nabídku nad limitem neschválí autor, super admin ano", async () => {
+  it("#25: nabídku obchodníka schvaluje jen super admin; limit částky už schválení nevyžaduje", async () => {
     await svc.from("integration_settings").upsert({ key: "quote_approval_limit", value: "100000", category: "firma", label: "Limit schválení nabídek", is_secret: false });
     try {
       const jobId = await newJob({ status: "naceneni" });
-      const qId = await addQuote(jobId, { total: 150_000, created_by: id("sales") });
-      expect(await quoteRow(qId)).toMatchObject({ approval_required: true, state: "ke_schvaleni", created_by: id("sales") });
+      // nabídka super admina nad (dřívějším) limitem → bez schválení
+      const big = await addQuote(jobId, { total: 150_000 });
+      expect(await quoteRow(big)).toMatchObject({ approval_required: false, state: "rozpracovana" });
+      const qId = await addQuote(jobId, { total: 150_000 }, "sales");
+      await addQuoteItem(qId, 150_000);
+      expect(await quoteRow(qId)).toMatchObject({ approval_required: true, admin_approval_required: true, state: "ke_schvaleni", created_by: id("sales") });
       as("sales");
-      expect((await j.approveJobQuote(qId)).error).toContain("musí schválit někdo jiný");
-      expect((await a.setQuoteState(qId, "schvalena")).error).toContain("musí schválit někdo jiný");
+      expect((await j.approveJobQuote(qId)).error).toBe("K této akci nemáš oprávnění.");
+      expect((await a.setQuoteState(qId, "schvalena")).error).toBe("Nabídku schvaluje jen super admin.");
+      expect((await a.setQuoteState(qId, "ke_schvaleni")).error).toContain("předávat je není potřeba");
       as("admin");
       expect(await a.setQuoteState(qId, "schvalena")).toMatchObject({ ok: true, quoteState: "schvalena" });
       expect((await quoteRow(qId)).approved_by).toBe(id("admin"));

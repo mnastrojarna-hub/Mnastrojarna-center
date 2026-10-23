@@ -3,15 +3,20 @@ import type { UserRole } from "@/lib/supabase/database.types";
 /**
  * Oprávnění — čistá logika bez DB (sdílí server i klient).
  *
- * Pravidla dle zadání:
- *  - Kniha zakázek, obchodní tok (poptávky, nacenění, nabídky, potvrzení, dokumenty),
- *    zákazníci a dodavatelé → všichni aktivní uživatelé.
- *  - Pošta → každý svou schránku, super admin všechny.
- *  - AI asistent, ladění AI, znalostní DB, archiv výkresů, AI nacenění,
- *    nastavení a správa uživatelů → jen super admin.
- *  - AI čtení dokladů z fotky → super admin; ostatní jen když jim to super admin
- *    povolí (per uživatel, nebo pro všechny) — jinak vyplňují ručně a AI se učí.
- *  - Marže a nákupní ceny → super admin a obchodník.
+ * Pravidla dle zadání majitele (#25 „Role a viditelnost"):
+ *  1. Obchodní tok (Poptávky, Nabídky, Potvrzení, Objednávky dodavatelům, Dokumenty) vidí každý
+ *     jen „svůj" (zakázky, kde je obchodník / zpracovává / založil, a doklady z jeho schránky);
+ *     super admin vše (flow_all). „Moje" je filtr datových dotazů, ne hranice oprávnění.
+ *  2. Kniha zakázek, detail zakázky, zákazníci a dodavatelé → všichni aktivní uživatelé;
+ *     nákupní ceny, marže a nákupní doklady jen obchodník a super admin (margins).
+ *  3. Pošta → každý své schránky, super admin všechny.
+ *  4. Vyfotit doklad → AI čtení pro všechny (výchozí zapnuto, super admin může vypnout);
+ *     ručně jen bez API klíče nebo po vypnutí.
+ *  5. Nacenění → zatím jen super admin (pricing); ostatní připraví nabídku ručně.
+ *  6. Nabídku kohokoli jiného než super admina schvaluje před odesláním super admin
+ *     (quote_approval); po schválení ji odešle obchodník nebo její autor.
+ *  AI asistent, ladění AI, znalostní DB, archiv výkresů, AI nacenění, nastavení a správa
+ *  uživatelů → jen super admin.
  */
 
 export type Feature =
@@ -34,12 +39,16 @@ export type Feature =
   | "margins"         // nákupní ceny a marže
   | "users"           // správa uživatelů
   | "settings"        // systémové nastavení
-  | "delete";         // mazání zakázek a dokladů
+  | "delete"          // mazání zakázek a dokladů
+  | "pricing"         // Nacenění (zatím jen super admin)
+  | "quote_approval"  // schvalování nabídek
+  | "flow_all";       // obchodní tok všech (bez toho jen „moje")
 
 export const ALL_FEATURES: Feature[] = [
   "orders", "workflow", "documents", "customers", "suppliers", "mail", "mail_all", "dashboard",
   "ai_assistant", "ai_tuning", "knowledge", "drawings", "ai_pricing", "ai_capture",
   "commissions", "commissions_all", "margins", "users", "settings", "delete",
+  "pricing", "quote_approval", "flow_all",
 ];
 
 export interface AccessSubject {
@@ -60,7 +69,8 @@ export interface AccessContext {
 
 export const DEFAULT_ACCESS_CONTEXT: AccessContext = {
   aiEnabled: true,
-  aiCaptureForAll: false,
+  // #25: AI focení pro všechny je výchozí stav (super admin ho může vypnout)
+  aiCaptureForAll: true,
   aiConfigured: false,
 };
 
@@ -68,7 +78,7 @@ const EVERYONE: Feature[] = ["orders", "workflow", "documents", "customers", "su
 const SALES_EXTRA: Feature[] = ["commissions", "margins"];
 const ADMIN_ONLY: Feature[] = [
   "mail_all", "dashboard", "ai_assistant", "ai_tuning", "knowledge", "drawings",
-  "commissions_all", "users", "settings", "delete",
+  "commissions_all", "users", "settings", "delete", "pricing", "quote_approval", "flow_all",
 ];
 /** Funkce, které reálně volají AI — vyžadují hlavní vypínač i klíč (bez klíče se pracuje ručně). */
 const AI_RUNTIME: Feature[] = ["ai_pricing", "ai_capture"];
@@ -105,9 +115,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 /** Krátké vysvětlení role pro správu uživatelů. */
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
-  super_admin: "Vidí a nastavuje vše, včetně AI, pošty všech a uživatelů.",
-  obchodnik: "Kniha zakázek, zákazníci, dodavatelé, vlastní pošta, marže a vlastní provize.",
-  zamestnanec: "Kniha zakázek, zákazníci, dodavatelé a vlastní pošta. Bez marží a provizí.",
+  super_admin: "Vidí a nastavuje vše — obchodní tok všech, Nacenění, schvalování nabídek, AI, poštu všech schránek a uživatele.",
+  obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem.",
+  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem odešle sám.",
 };
 
 /** Lidský popis, proč funkce není dostupná (pro stránku „bez přístupu"). */
@@ -132,4 +142,12 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   users: "Uživatelé",
   settings: "Nastavení",
   delete: "Mazání",
+  pricing: "Nacenění",
+  quote_approval: "Schvalování nabídek",
+  flow_all: "Obchodní tok všech",
+};
+
+/** Doplňující vysvětlení u odepřené funkce (AccessBanner) — co dělat místo toho. */
+export const FEATURE_HINTS: Partial<Record<Feature, string>> = {
+  pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin.",
 };

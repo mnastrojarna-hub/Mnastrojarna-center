@@ -443,6 +443,12 @@ await T("jeden doklad = beze změny (bez Roztřídění); jediná nabídka dodav
 });
 
 await T("bez AI (zaměstnanec, bez marží): ruční roztřídění, nabídka dodavatele čeká na Nákup, admin ji zapíše", async (context) => {
+  // #25: „AI focení pro všechny“ je výchozí zapnuté — pro ruční režim ho test dočasně vypne (úklid ho vrátí)
+  if (sql("select value from integration_settings where key = 'ai_capture_for_all'") === "true") {
+    sql("update integration_settings set value = 'false' where key = 'ai_capture_for_all'");
+    cleanup.restore.push("update integration_settings set value = 'true' where key = 'ai_capture_for_all'");
+    await new Promise((r) => setTimeout(r, 31_000)); // server drží nastavení v mezipaměti 30 s
+  }
   const page = await context.newPage();
   await login(page, USERS.dilna);
   await openFromBook(page);
@@ -488,7 +494,12 @@ await T("obchodník bez AI: 2 fotky + STEP → ruční roztřídění „Každá
     sql(`update profiles set ai_access = false where id = ${q(OBCHOD_ID)}`);
     cleanup.restore.push(`update profiles set ai_access = true where id = ${q(OBCHOD_ID)}`);
   }
-  expect(sql("select value from integration_settings where key = 'ai_capture_for_all'") !== "true", "ai_capture_for_all vypnuté — neměníme sdílené nastavení");
+  // #25: „AI focení pro všechny“ je výchozí zapnuté — pro ruční režim ho test dočasně vypne (úklid ho vrátí)
+  if (sql("select value from integration_settings where key = 'ai_capture_for_all'") === "true") {
+    sql("update integration_settings set value = 'false' where key = 'ai_capture_for_all'");
+    cleanup.restore.push("update integration_settings set value = 'true' where key = 'ai_capture_for_all'");
+    await new Promise((r) => setTimeout(r, 31_000)); // server drží nastavení v mezipaměti 30 s
+  }
   const since = new Date().toISOString();
   const drawingNo = `OB-${RUN}`.toUpperCase();
   const page = await context.newPage();

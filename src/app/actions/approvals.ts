@@ -53,10 +53,20 @@ export async function resolveApproval(
     if (row.status !== "pending") return { ok: false, error: "Položku už někdo vyřídil — obnov stránku." };
 
     if (action === "approved") {
-      // AI nabídka: schválení = člověk s právem na marže zkontroloval nabídku (approved_by)
+      // AI nabídka: schvaluje jen super admin — stejné jádro jako „Schválit“ u nabídky (approveQuoteCore, #25)
+      // Řádky „quote“ zakládá jen AI návrh (ai-quote.ts) — jiný řádek se nabídkou neschvaluje. Už schválenou /
+      // odeslanou (schválil ji někdo v kartě nabídky) nebo nabídku bez nutnosti schválení jen vyřídíme.
       if (row.type === "quote" && row.quote_id) {
-        const appr = await approveJobQuote(row.quote_id);
-        if (!appr.ok) return { ok: false, error: appr.error ?? "Nabídku se nepodařilo schválit." };
+        const { data: qd } = await supabase.from("quotes").select("state, ai_generated").eq("id", row.quote_id).maybeSingle();
+        const quote = qd as { state: string | null; ai_generated: boolean | null } | null;
+        if (!quote) return { ok: false, error: "Nabídka z této položky už neexistuje — položku zamítni." };
+        if (!quote.ai_generated) {
+          return { ok: false, error: "Položka fronty neodpovídá AI návrhu nabídky — nabídku schval v záložce Nabídky zakázky." };
+        }
+        if (quote.state === "ke_schvaleni") {
+          const appr = await approveJobQuote(row.quote_id);
+          if (!appr.ok) return { ok: false, error: appr.error ?? "Nabídku se nepodařilo schválit." };
+        }
       }
 
       // Odchozí akce: schválení = skutečné odeslání e-mailu adresátovi

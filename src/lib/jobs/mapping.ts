@@ -475,7 +475,8 @@ const PERSON = "id, full_name, email";
 /** Nabídka jako fakta toku (QuoteFacts) — embed v Knize i detailu. */
 const FLOW_QUOTE_EMBED =
   "id, job_id, number, revision, status, state, approved_by, approval_required, approval_requested_at, created_by, "
-  + "archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total";
+  + "archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total, "
+  + "admin_approval_required, approval_returned_at, approval_return_note, updated_at, owner_id";
 
 /** Fakta podrobných stavů a „kdo · kdy" (orders, udržuje DB) — sloupce mimo základní výběr Knihy. */
 const FLOW_LIST_COLUMNS = [
@@ -549,11 +550,14 @@ export const JOB_QUOTE_SELECT = [
   "payment_terms, note, approved_at, sent_at, created_at, archived, ai_generated, job_id, customer_id",
   "state, approved_by, approval_required, approval_requested_at, created_by, superseded_by, feedback, feedback_at",
   "rejected_reason, lost_reason, sent_by, sent_via, state_changed_at, state_changed_by, state_changed_via",
+  "admin_approval_required, approval_requested_by, owner_id, approval_returned_at, approval_returned_by",
+  "approval_return_note, updated_at",
   `creator:profiles!created_by(${PERSON})`,
   `sender:profiles!sent_by(${PERSON})`,
   `state_person:profiles!state_changed_by(${PERSON})`,
   `approver:profiles!approved_by(${PERSON})`,
   `owner:profiles!owner_id(${PERSON})`,
+  `returner:profiles!approval_returned_by(${PERSON})`,
   "items:quote_items!quote_id(*)",
 ].join(", ");
 
@@ -760,11 +764,21 @@ export interface QuoteRow {
   state_changed_at?: string | null;
   state_changed_by?: string | null;
   state_changed_via?: string | null;
+  // #25 schvalování super adminem
+  admin_approval_required?: boolean | null;
+  approval_requested_by?: string | null;
+  owner_id?: string | null;
+  approval_returned_at?: string | null;
+  approval_returned_by?: string | null;
+  approval_return_note?: string | null;
+  approved_snapshot_sha?: string | null;
+  updated_at?: string | null;
   sender?: Embed<PersonEmbed>;
   state_person?: Embed<PersonEmbed>;
   creator?: Embed<PersonEmbed>;
   approver?: Embed<PersonEmbed>;
   owner?: Embed<PersonEmbed>;
+  returner?: Embed<PersonEmbed>;
   items?: ItemRow[] | null;
   job?: Embed<{ id: string; number: string | null; title: string | null; status: string; quote_id?: string | null }>;
   customer?: Embed<{ id: string; name: string }>;
@@ -1069,6 +1083,13 @@ export function rowToJobQuote(row: QuoteRow, opts: ViewOptions & { acceptedQuote
     aiGenerated: Boolean(row.ai_generated),
     accepted: Boolean(opts.acceptedQuoteId && opts.acceptedQuoteId === row.id),
     items: byPosition(row.items).map((i) => rowToJobQuoteItem(i, opts)),
+    adminApprovalRequired: Boolean(row.admin_approval_required),
+    approvalRequestedBy: row.approval_requested_by ?? null,
+    ownerId: row.owner_id ?? null,
+    returnedAt: row.approval_returned_at ?? null,
+    returnNote: cleanText(row.approval_return_note, 2000),
+    returnedBy: personRef(row.returner),
+    updatedAt: row.updated_at ?? null,
   };
 }
 

@@ -289,8 +289,8 @@ export const PRICING_STATES: Record<PricingState, FlowStateMeta<PricingState>> =
     icon: PenLine, tone: "work", palette: "amber.work", source: "derived", terminal: false,
   }),
   ceka: meta({
-    key: "ceka", phase: "pricing", label: "Čeká na nacenění", short: "Nacenit",
-    description: "Žádná položka zatím nemá cenu.",
+    key: "ceka", phase: "pricing", label: "Bez ceny", short: "Bez ceny",
+    description: "Žádná položka zatím nemá cenu — doplň ji v nabídce.",
     icon: Calculator, tone: "action", palette: "amber.action", source: "derived", terminal: false,
   }),
 };
@@ -302,8 +302,8 @@ export const QUOTE_STATES: Record<QuoteDisplayState, FlowStateMeta<QuoteDisplayS
     icon: FilePen, tone: "work", palette: "violet.work", source: "both", terminal: false,
   }),
   ke_schvaleni: meta({
-    key: "ke_schvaleni", phase: "quote", label: "Čeká na schválení", short: "Ke schválení",
-    description: "Před odesláním ji musí schválit člověk s právem (AI nabídka, žádost, limit).",
+    key: "ke_schvaleni", phase: "quote", label: "Neschválená", short: "Neschválená",
+    description: "Neschválená — čeká na schválení super admina. Odeslat ji půjde až po schválení.",
     icon: ShieldQuestion, tone: "action", palette: "violet.action", source: "both", terminal: false,
   }),
   schvalena: meta({
@@ -560,9 +560,14 @@ export const INQUIRY_TRANSITIONS: Record<InquiryStatus, InquiryStatus[]> = {
   stazena: ["prijata", "v_reseni"],
 };
 
+/**
+ * #25: rozpracovaná = schválení není potřeba (nabídka super admina) → rovnou odeslat; neschválenou
+ * schvaluje jen super admin; zrušit schválení jde jen u schválené (nabídka ne-admina / AI pak skončí
+ * zase v „Neschválená“ — výsledek hlásí skutečný stav).
+ */
 export const QUOTE_TRANSITIONS: Record<QuoteState, QuoteState[]> = {
-  rozpracovana: ["ke_schvaleni", "schvalena", "odeslana"],
-  ke_schvaleni: ["schvalena", "rozpracovana"],
+  rozpracovana: ["odeslana"],
+  ke_schvaleni: ["schvalena"],
   schvalena: ["odeslana", "rozpracovana"],
   odeslana: ["pripominky", "prijata", "zamitnuta"],
   pripominky: ["odeslana", "prijata", "zamitnuta"],
@@ -597,7 +602,12 @@ export function transitionFeature(phase: ReasonPhase, to: string, from?: string 
     return "workflow";
   }
   if (phase === "quote") {
-    return to === "schvalena" || to === "rozpracovana" || to === "odeslana" || to === "zamitnuta" ? "margins" : "workflow";
+    // #25: schválit / zrušit schválení = jen super admin; odeslat rozpracovanou či schválenou = workflow
+    // (kdo smí, rozhodne quoteSendBlock); odpověď bez změny, znovuotevření a zamítnutí = margins
+    if (to === "schvalena" || to === "rozpracovana") return "quote_approval";
+    if (to === "odeslana") return from === "rozpracovana" || from === "schvalena" ? "workflow" : "margins";
+    if (to === "zamitnuta") return "margins";
+    return "workflow";
   }
   if (phase === "order") {
     if (to === "stornovana") return "margins";
@@ -751,9 +761,17 @@ export interface QuoteFacts {
   supersededBy: string | null;
   /** Rozhoduje mezi verzemi se stejnou revizí (jako created_at v DB). */
   createdAt?: string | null;
-  /** Žádost o schválení (důvod schválení). */
+  /** Žádost o schválení (od #25 jen informace — schválení nevyžaduje). */
   approvalRequestedAt?: string | null;
   total?: number | null;
+  /** #25: připravil (nebo před odesláním změnil) ne-admin → odeslat až po schválení super adminem. */
+  adminApprovalRequired?: boolean;
+  /** #25: super admin vrátil nabídku autorovi k přepracování (kdy a proč). */
+  returnedAt?: string | null;
+  returnNote?: string | null;
+  /** Optimistický zámek schválení ze seznamu (položky i hlavička ho vždy posunou). */
+  updatedAt?: string | null;
+  ownerId?: string | null;
 }
 
 export interface FlowSnapshot {
@@ -1501,7 +1519,7 @@ export type FlowActionKey =
   | "inquiry.reopen" | "inquiry.propose" | "pricing.open" | "pricing.supplierPrice" | "quote.create" | "quote.edit"
   | "quote.requestApproval" | "quote.approve" | "quote.approveSend" | "quote.unapprove" | "quote.send" | "quote.markSent"
   | "quote.feedback" | "quote.answerNoChange" | "quote.accept" | "quote.reject" | "quote.propose" | "quote.reopen"
-  | "quote.newRevision" | "quote.extend" | "order.confirm" | "order.confirmOther" | "order.flagMismatch"
+  | "quote.returnToAuthor" | "quote.newRevision" | "quote.extend" | "order.confirm" | "order.confirmOther" | "order.flagMismatch"
   | "order.resolveMismatch" | "order.requestFix" | "order.registerChange" | "order.decideChange" | "order.rejectChange"
   | "order.sendConfirmation" | "order.cancel" | "order.propose" | "order.reopen" | "production.plan" | "delivery.record"
   | "delivery.closeShort" | "delivery.partialNote" | "delivery.confirmNote" | "payment.invoice" | "payment.record"
@@ -1535,16 +1553,19 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "inquiry.withdraw": act({ key: "inquiry.withdraw", label: "Zákazník stáhl…", icon: Undo2, intent: "danger", feature: "margins", needsReason: true, kind: "dialog" }),
   "inquiry.reopen": act({ key: "inquiry.reopen", label: "Obnovit poptávku", icon: Undo, intent: "secondary", feature: "margins", kind: "direct" }),
   "inquiry.propose": act({ key: "inquiry.propose", label: "Navrhnout odmítnutí…", icon: Hand, intent: "danger", feature: "workflow", needsReason: true, kind: "dialog" }),
-  "pricing.open": act({ key: "pricing.open", label: "Nacenit", icon: Calculator, intent: "primary", feature: "workflow", kind: "link", href: tab("items") }),
+  // #25: Nacenění zatím jen super admin (ostatní „Vytvořit nabídku“ ručně)
+  "pricing.open": act({ key: "pricing.open", label: "Nacenit", icon: Calculator, intent: "primary", feature: "pricing", kind: "link", href: tab("items") }),
   "pricing.supplierPrice": act({ key: "pricing.supplierPrice", label: "Zadat cenu dodavatele", icon: Hourglass, intent: "primary", feature: "margins", kind: "link", href: tab("purchasing") }),
   "quote.create": act({ key: "quote.create", label: "Vytvořit nabídku", icon: FilePlus, intent: "primary", feature: "workflow", kind: "link", href: tab("quotes") }),
   "quote.edit": act({ key: "quote.edit", label: "Upravit nabídku", icon: Pencil, intent: "secondary", feature: "workflow", kind: "link", href: tab("quotes") }),
   "quote.requestApproval": act({ key: "quote.requestApproval", label: "Předat ke schválení", icon: ShieldQuestion, intent: "primary", feature: "workflow", kind: "direct" }),
-  "quote.approve": act({ key: "quote.approve", label: "Schválit", icon: ShieldCheck, intent: "primary", feature: "margins", kind: "direct" }),
-  "quote.approveSend": act({ key: "quote.approveSend", label: "Schválit a odeslat", icon: Send, intent: "primary", feature: "margins", kind: "dialog" }),
-  "quote.unapprove": act({ key: "quote.unapprove", label: "Vrátit k úpravě", icon: Undo, intent: "secondary", feature: "margins", kind: "dialog" }),
-  "quote.send": act({ key: "quote.send", label: "Odeslat nabídku", icon: Send, intent: "primary", feature: "margins", kind: "dialog" }),
-  "quote.markSent": act({ key: "quote.markSent", label: "Odesláno jinak…", icon: Hand, intent: "secondary", feature: "margins", kind: "dialog" }),
+  // #25: schvaluje jen super admin; odeslat smí kdo smí pracovat s tokem — konkrétně rozhodne quoteSendBlock
+  "quote.approve": act({ key: "quote.approve", label: "Schválit", icon: ShieldCheck, intent: "primary", feature: "quote_approval", kind: "direct" }),
+  "quote.approveSend": act({ key: "quote.approveSend", label: "Schválit a odeslat", icon: Send, intent: "primary", feature: "quote_approval", kind: "dialog" }),
+  "quote.unapprove": act({ key: "quote.unapprove", label: "Vrátit k úpravě", icon: Undo, intent: "secondary", feature: "quote_approval", kind: "dialog" }),
+  "quote.returnToAuthor": act({ key: "quote.returnToAuthor", label: "Vrátit k přepracování…", icon: Undo2, intent: "secondary", feature: "quote_approval", kind: "dialog" }),
+  "quote.send": act({ key: "quote.send", label: "Odeslat nabídku", icon: Send, intent: "primary", feature: "workflow", kind: "dialog" }),
+  "quote.markSent": act({ key: "quote.markSent", label: "Odesláno jinak…", icon: Hand, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "quote.feedback": act({ key: "quote.feedback", label: "Zákazník má připomínky…", icon: MessageSquareWarning, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "quote.answerNoChange": act({ key: "quote.answerNoChange", label: "Odpovědět bez změny", icon: Send, intent: "secondary", feature: "margins", kind: "direct" }),
   "quote.accept": act({ key: "quote.accept", label: "Zákazník objednal", icon: Trophy, intent: "primary", feature: "workflow", kind: "direct" }),
@@ -1582,21 +1603,147 @@ export interface ActionCtx {
   isSuperAdmin: boolean;
   assigneeId: string | null;
   assigneeName?: string | null;
+  /** Obchodník zakázky (#25 — po schválení smí nabídku odeslat i on). */
+  ownerId?: string | null;
+  /**
+   * UI umí dialog „Vrátit k přepracování…“ (#25, 25-C) — do té doby se akce v menu nenabízí,
+   * aby v menu nebyla položka bez dialogu. Server (returnQuoteToAuthor) je hotový.
+   */
+  withReturn?: boolean;
 }
 
-/** Důvody schválení aktivní nabídky (M1). */
-export function approvalReasons(q: QuoteFacts, aiApprovalMode = true): { limit: boolean; ai: boolean; requested: boolean } {
-  const ai = q.aiGenerated && aiApprovalMode;
-  const requested = !!q.approvalRequestedAt;
-  return { ai, requested, limit: q.approvalRequired && !ai && !requested };
+// ── Schvalování nabídek super adminem (#25) ─────────────────
+/** = text výjimky DB (R7). */
+export const QUOTE_AWAITS_APPROVAL = "Nabídka čeká na schválení — odeslat ji lze až po schválení.";
+/** = text výjimky DB (R7 / přijetí). */
+export const QUOTE_ACCEPT_BLOCKED = "Nabídka čeká na schválení — přijmout ji lze až po schválení a odeslání.";
+export const QUOTE_SEND_NO_RIGHT = "Nabídku zákazníkovi odesílá obchodník, super admin, nebo autor schválené nabídky.";
+export const QUOTE_ADMIN_ONLY = "Nabídku schvaluje jen super admin.";
+export const QUOTE_ARCHIVED_SEND = "Archivovanou verzi nabídky neposíláme — platí novější verze.";
+export const QUOTE_PENDING_LABEL = "Neschválená — čeká na schválení super admina";
+
+/** Důvody schválení (#25): AI nabídka v režimu se schválením, nebo ji připravil ne-admin.
+ *  `limit` a `requested` (limit částky, žádost) #25 ruší — zůstávají jen kvůli starším volajícím (vždy false). */
+export function approvalReasons(q: QuoteFacts, aiApprovalMode = true): { ai: boolean; author: boolean; limit: false; requested: false } {
+  const ai = q.aiGenerated && aiApprovalMode && q.approvalRequired;
+  return { ai, author: q.adminApprovalRequired === true, limit: false, requested: false };
 }
 
-/** Kdo smí schválit: margins; je-li důvodem jen limit a schvaluje autor → jen super admin (čtyři oči). */
-export function canApproveQuote(q: QuoteFacts, ctx: ActionCtx, reasons: { limit: boolean; ai: boolean; requested: boolean }): boolean {
-  if (!ctx.can("margins")) return false;
-  if (q.state === "prijata" || q.state === "zamitnuta" || q.state === "archivovana" || q.state === "odeslana" || q.state === "pripominky") return false;
-  if (reasons.limit && !reasons.ai && !reasons.requested && q.createdBy && q.createdBy === ctx.userId) return ctx.isSuperAdmin;
-  return true;
+/** Schvaluje jen super admin (quote_approval), jen neschválenou, nearchivovanou nabídku s cenou.
+ *  (Třetí parametr je pozůstatek — důvody už o schvalovateli nerozhodují.) */
+export function canApproveQuote(q: QuoteFacts, ctx: Pick<ActionCtx, "can">, _reasons?: unknown): boolean {
+  return ctx.can("quote_approval") && q.state === "ke_schvaleni" && !q.archived && !quoteUnpriced(q);
+}
+
+/** Odešla už nabídka zákazníkovi? Podle stavu (sent_at sám nestačí — u neodeslané ho stav přebíjí);
+ *  zamítnutá / archivní verze a volající bez stavu podle sent_at. */
+export function quoteWasSent(q: { state?: QuoteState | null; sentAt?: string | null }): boolean {
+  if (q.state === "odeslana" || q.state === "pripominky" || q.state === "prijata") return true;
+  if (q.state === "rozpracovana" || q.state === "ke_schvaleni" || q.state === "schvalena") return false;
+  return Boolean(q.sentAt);
+}
+
+/** Část „schválení“: null = obsah smí k zákazníkovi (v jakémkoli stavu). */
+export function quoteApprovalBlock(q: {
+  adminApprovalRequired?: boolean; approvalRequired?: boolean; approvedBy?: unknown; sentAt?: string | null;
+  state?: QuoteState | null;
+}): string | null {
+  if (q.adminApprovalRequired && !q.approvedBy) return QUOTE_AWAITS_APPROVAL;
+  if (q.approvalRequired && !q.approvedBy && !quoteWasSent(q)) return QUOTE_AWAITS_APPROVAL;
+  return null;
+}
+
+export interface QuoteSendViewer {
+  can: (f: Feature) => boolean;
+  userId: string;
+  jobOwnerId?: string | null;
+  jobAssigneeId?: string | null;
+  isSuperAdmin?: boolean;
+}
+
+/** Smí tento uživatel nabídku odeslat zákazníkovi? null = ano, jinak důvod (stejná pravidla jako DB). */
+export function quoteSendBlock(
+  q: Pick<QuoteFacts, "state" | "archived" | "createdBy" | "adminApprovalRequired" | "approvalRequired" | "approvedBy" | "sentAt">,
+  viewer: QuoteSendViewer,
+): string | null {
+  const approval = quoteApprovalBlock(q);
+  if (approval) return approval;
+  if (q.archived && !viewer.isSuperAdmin) return QUOTE_ARCHIVED_SEND;
+  if (q.state === "zamitnuta" && !viewer.can("margins")) return QUOTE_SEND_NO_RIGHT;
+  if (viewer.can("margins")) return null;
+  const me = viewer.userId;
+  if (q.adminApprovalRequired && q.approvedBy && me && (me === q.createdBy || me === viewer.jobOwnerId || me === viewer.jobAssigneeId)) {
+    return null;
+  }
+  return QUOTE_SEND_NO_RIGHT;
+}
+
+/** UI štítek „Neschválená“: neodeslaná, čeká na super admina, nearchivovaná. */
+export function quoteAwaitsApproval(q: { state?: QuoteState | null; archived?: boolean }): boolean {
+  return q.state === "ke_schvaleni" && !q.archived;
+}
+
+export type QuoteApprovalFlag =
+  | { kind: "pending"; quoteId: string; number: string | null; label: string; short: string; title: string }
+  | { kind: "returned"; quoteId: string; number: string | null; label: string; short: string; title: string; note: string | null }
+  | { kind: "approved"; quoteId: string; number: string | null; label: string };
+
+const CZ_DAY = new Intl.DateTimeFormat("cs-CZ", { timeZone: "Europe/Prague", day: "numeric", month: "numeric", year: "numeric" });
+
+/** „23. 10. 2026“ (pražský den). */
+function czDay(at: string | null | undefined): string | null {
+  if (!at) return null;
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(at) ? `${at}T12:00:00Z` : at);
+  return isNaN(d.getTime()) ? null : CZ_DAY.format(d).replace(/\s+/g, " ");
+}
+
+/** „Připravil(a) P. Obchodník · Schválil J. Semorád · 23. 10. 2026“ (autor vynechán, když schválil sám). */
+export function approvedStampText(author: string | null, approver: string | null, at: string | null): string {
+  const parts: string[] = [];
+  const a = author?.trim() || null;
+  const b = approver?.trim() || null;
+  if (a && a !== b) parts.push(`Připravil(a) ${shortPersonName(a)}`);
+  if (b) parts.push(`Schválil ${shortPersonName(b)}`);
+  const day = czDay(at);
+  if (day) parts.push(day);
+  return parts.length ? parts.join(" · ") : "Schválená";
+}
+
+/**
+ * Štítek schválení pro Knihu / hlavičku zakázky: pending|returned = některá otevřená verze čeká na super admina
+ * (čekající má přednost před vrácenou); approved = aktivní nabídka je schválená a čeká na odeslání.
+ */
+export function quoteApprovalFlag(
+  quotes: readonly QuoteFacts[],
+  people?: { author: string | null; approver: string | null; at: string | null } | null,
+): QuoteApprovalFlag | null {
+  const open = quotes.filter((q) => quoteAwaitsApproval(q));
+  const pending = open.find((q) => !q.returnedAt);
+  if (pending) {
+    const n = pending.number?.trim() || null;
+    return {
+      kind: "pending", quoteId: pending.id, number: n, label: QUOTE_PENDING_LABEL, short: "Neschválená",
+      title: `${n ? `Nabídka ${n}` : "Nabídka"} čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi.`,
+    };
+  }
+  const returned = open[0];
+  if (returned) {
+    const n = returned.number?.trim() || null;
+    const note = returned.returnNote?.trim() || null;
+    return {
+      kind: "returned", quoteId: returned.id, number: n, note,
+      label: note ? `Vráceno k přepracování: ${note}` : "Vráceno k přepracování", short: "Vráceno",
+      title: `${n ? `Nabídka ${n}` : "Nabídka"} je vrácená autorovi k přepracování${note ? ` — ${note}` : ""}. Odeslat ji půjde po schválení super adminem.`,
+    };
+  }
+  const active = activeQuote([...quotes]);
+  if (active && active.state === "schvalena") {
+    return {
+      kind: "approved", quoteId: active.id, number: active.number?.trim() || null,
+      label: approvedStampText(people?.author ?? null, people?.approver ?? null, people?.at ?? null),
+    };
+  }
+  return null;
 }
 
 function proposalFeature(p: FlowProposal): Feature {
@@ -1614,19 +1761,24 @@ export function quoteUnpriced(q: Pick<QuoteFacts, "total" | "state"> | null | un
   return Boolean(q) && q!.total === null && (q!.state === "rozpracovana" || q!.state === "ke_schvaleni" || q!.state === "schvalena");
 }
 
+/** Odesílatel pro quoteSendBlock z kontextu akcí (obchodník / řešitel zakázky). */
+export function sendViewerOf(ctx: ActionCtx): QuoteSendViewer {
+  return { can: ctx.can, userId: ctx.userId, jobOwnerId: ctx.ownerId ?? null, jobAssigneeId: ctx.assigneeId, isSuperAdmin: ctx.isSuperAdmin };
+}
+
 function quoteNext(s: FlowSnapshot, ctx: ActionCtx): Next | undefined {
   const q = s.activeQuote;
   if (!q || !s.quote) return undefined;
   if (quoteUnpriced(q)) return allowed(ctx, "quote.edit", "Doplnit cenu");
   if (s.quote === "ke_schvaleni") {
-    return canApproveQuote(q, ctx, approvalReasons(q)) ? allowed(ctx, "quote.approve") : null;
+    // #25: schvaluje jen super admin; vrácenou nabídku autor upraví podle připomínek
+    if (canApproveQuote(q, ctx)) return allowed(ctx, "quote.approve");
+    if (q.returnedAt && q.createdBy && q.createdBy === ctx.userId) return allowed(ctx, "quote.edit", "Upravit podle připomínek");
+    return null;
   }
-  if (s.quote === "schvalena") return allowed(ctx, "quote.send");
-  if (s.quote === "rozpracovana") {
-    // rozpracovaná = schválení není nutné; s nutností schválení by byla „ke schválení“
-    if (ctx.can("margins") && !q.approvalRequired) return allowed(ctx, "quote.send");
-    if (ctx.can("margins") && canApproveQuote(q, ctx, approvalReasons(q))) return allowed(ctx, "quote.approveSend");
-    return allowed(ctx, "quote.requestApproval");
+  if (s.quote === "schvalena" || s.quote === "rozpracovana") {
+    // rozpracovaná = schválení není nutné (nabídka super admina); schválenou odešle obchodník nebo autor
+    return quoteSendBlock(q, sendViewerOf(ctx)) === null ? allowed(ctx, "quote.send") : null;
   }
   return undefined;
 }
@@ -1644,8 +1796,11 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     const qn = quoteNext(s, ctx);
     if (qn !== undefined) return qn;
     if (s.pricing === "naceneno") return allowed(ctx, "quote.create");
-    if (s.pricing === "ceka_na_dodavatele") return allowed(ctx, "pricing.supplierPrice") ?? allowed(ctx, "pricing.open");
-    return allowed(ctx, "pricing.open");
+    // #25: Nacenění jen super admin — ostatní rovnou „Vytvořit nabídku“ (ručně)
+    if (s.pricing === "ceka_na_dodavatele") {
+      return allowed(ctx, "pricing.supplierPrice") ?? allowed(ctx, "pricing.open") ?? allowed(ctx, "quote.create");
+    }
+    return allowed(ctx, "pricing.open") ?? allowed(ctx, "quote.create");
   }
   if (f.stage === "nabidka") {
     if (s.quote === "pripominky") return allowed(ctx, "quote.newRevision");
@@ -1701,12 +1856,13 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
   if (q && s.quote) {
     const st = q.state;
     if (st === "rozpracovana" || st === "ke_schvaleni" || st === "schvalena") add("quote.edit");
-    // rozpracovaná = schválení není nutné (jinak by byla „ke schválení“)
-    if (st === "rozpracovana") add("quote.requestApproval");
-    if ((st === "rozpracovana" || st === "ke_schvaleni") && canApproveQuote(q, ctx, approvalReasons(q))) add("quote.approve");
-    if (st === "ke_schvaleni" && !quoteUnpriced(q) && canApproveQuote(q, ctx, approvalReasons(q))) add("quote.approveSend");
-    if ((st === "schvalena" || st === "rozpracovana") && !quoteUnpriced(q)) { add("quote.send"); add("quote.markSent"); }
-    if (st === "ke_schvaleni" || st === "schvalena") add("quote.unapprove");
+    // #25: neschválenou schválí jen super admin („Předat ke schválení“ už není potřeba — děje se samo)
+    if (st === "ke_schvaleni" && canApproveQuote(q, ctx)) { add("quote.approve"); add("quote.approveSend"); }
+    if (st === "ke_schvaleni" && ctx.withReturn && ctx.can("quote_approval") && !q.returnedAt && !q.archived) add("quote.returnToAuthor");
+    if ((st === "schvalena" || st === "rozpracovana") && !quoteUnpriced(q) && quoteSendBlock(q, sendViewerOf(ctx)) === null) {
+      add("quote.send"); add("quote.markSent");
+    }
+    if (st === "schvalena") add("quote.unapprove");
     if (st === "odeslana" || st === "pripominky") {
       add("quote.accept");
       if (st === "odeslana") add("quote.feedback");
@@ -1765,7 +1921,8 @@ export const FLOW_ORDER_COLUMNS = [
 /** Sloupce quotes pro QuoteFacts. */
 export const FLOW_QUOTE_COLUMNS =
   "id, job_id, number, revision, status, state, approved_by, approval_required, approval_requested_at, created_by, "
-  + "archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total";
+  + "archived, sent_at, valid_until, ai_generated, superseded_by, created_at, total, "
+  + "admin_approval_required, approval_returned_at, approval_return_note, updated_at, owner_id";
 
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
@@ -1839,6 +1996,11 @@ export function quoteFactsFromRow(r: Record<string, unknown>): QuoteFacts {
     createdAt: textOrNull(r.created_at),
     approvalRequestedAt: textOrNull(r.approval_requested_at),
     total: numOrNull(r.total),
+    adminApprovalRequired: r.admin_approval_required === true,
+    returnedAt: textOrNull(r.approval_returned_at),
+    returnNote: textOrNull(r.approval_return_note),
+    updatedAt: textOrNull(r.updated_at),
+    ownerId: textOrNull(r.owner_id),
   };
 }
 

@@ -74,10 +74,10 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
   const as = (u: "sales" | "worker" | "admin") => { who.current = u; };
   const id = (u: "sales" | "worker" | "admin") => who.users[u].id;
 
-  async function client() {
+  async function client(author: "sales" | "admin" = "sales") {
     const { localAdmin } = await import("@/test/local-supabase");
     const { userActor } = await import("@/lib/supabase/actor-headers");
-    return localAdmin(userActor({ id: id("sales") }));
+    return localAdmin(userActor({ id: id(author) }));
   }
   async function newJob(patch: Row = {}, items: Row[] = [{ name: "Hřídel", drawing_number: "FD-1", quantity: 4, unit_price: 1000 }]): Promise<string> {
     n += 1;
@@ -229,23 +229,27 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
     const quoteId = (q as { id: string }).id;
     await db.from("quote_items").insert({ quote_id: quoteId, position: 0, name: "Hřídel", drawing_number: "FD-1", quantity: 4, unit_price: 1000 });
     as("sales");
+    // #25: PDF k odeslání neschválené nabídky se vůbec nevystaví (náhled s vodoznakem je jinde)
+    const refused = await docs.generateJobDocument(jobId, "nabidka", { quoteId });
+    expect(refused).toMatchObject({ ok: false, code: "approval" });
+    expect((await svc.from("emails").select("id").eq("order_id", jobId)).data).toHaveLength(0);
+    // obchodník neschválí; schválí super admin
+    expect((await flow.setQuoteState(quoteId, "schvalena")).error).toBe("Nabídku schvaluje jen super admin.");
+    as("admin");
+    expect(await flow.setQuoteState(quoteId, "schvalena")).toMatchObject({ ok: true, quoteState: "schvalena" });
+    as("sales");
     const pdf = await docs.generateJobDocument(jobId, "nabidka", { quoteId });
     expect(pdf.ok, pdf.error).toBe(true);
-    const blocked = await draftAndSend(jobId, pdf.fileId!);
-    expect(blocked.error).toBe("Nabídka čeká na schválení — odeslat ji lze až po schválení.");
-    expect((await svc.from("emails").select("id").eq("order_id", jobId)).data).toHaveLength(0);
-
-    expect(await flow.setQuoteState(quoteId, "schvalena")).toMatchObject({ ok: true, quoteState: "schvalena" });
     const sent = await draftAndSend(jobId, pdf.fileId!);
     expect(sent.ok, sent.error).toBe(true);
     expect((await svc.from("quotes").select("*").eq("id", quoteId).single()).data).toMatchObject({
-      status: "odeslano", state: "odeslana", sent_via: "email", sent_by: id("sales"), approved_by: id("sales"),
+      status: "odeslano", state: "odeslana", sent_via: "email", sent_by: id("sales"), approved_by: id("admin"),
     });
     expect((await job(jobId)).status).toBe("nabidka");
     const info = (await data.getFlowQuoteInfo([quoteId]))[quoteId];
     expect(info).toMatchObject({ display: "odeslana", next: { key: "quote.accept" } });
     expect(info.stamps.sent).toMatchObject({ via: "email", by: { id: id("sales") } });
-    expect(info.stamps.approved?.by?.id).toBe(id("sales"));
+    expect(info.stamps.approved?.by?.id).toBe(id("admin"));
   }, 60_000);
 
   it("faktura při částečném dodání stav neposouvá; po dodání všeho ano (stejné číslo faktury)", async () => {
@@ -273,7 +277,8 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
 
   it("prodloužit platnost: vypršelá → odeslaná, událost s autorem; neodeslanou ani do minulosti nejde", async () => {
     const jobId = await newJob({ status: "nabidka", customer_order_number: null });
-    const db = await client();
+    // #25: odeslanou nabídku rovnou vloží jen super admin (nabídka obchodníka by čekala na schválení)
+    const db = await client("admin");
     const { data: q } = await db.from("quotes").insert({
       number: `${PREFIX}-Q${++n}`, job_id: jobId, status: "odeslano", sent_at: "2026-09-01T08:00:00Z", total: 1000, revision: 1,
       valid_until: "2026-09-30", owner_id: id("sales"), created_by: id("sales"),
@@ -301,7 +306,8 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
     expect(st.snapshot.inquiry).toBe(v.inquiry_key);
     expect(st.snapshot.pricing).toBe(v.pricing_key);
     expect(st.stamps.inquiry).toMatchObject({ by: { id: id("sales"), name: who.users.sales.fullName }, via: "rucne", kind: "user" });
-    expect(st.next?.key).toBe("pricing.open");
+    // #25: Nacenění jen super admin — obchodník rovnou „Vytvořit nabídku“
+    expect(st.next?.key).toBe("quote.create");
     expect(st.menu).toEqual(expect.arrayContaining(["inquiry.wait", "inquiry.decline", "inquiry.withdraw"]));
     as("worker");
     const w = (await data.getFlowJobStates([jobId]))[jobId];

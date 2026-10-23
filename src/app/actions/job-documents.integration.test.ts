@@ -244,6 +244,12 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     });
     expect(q.ok, q.error).toBe(true);
     quoteId = q.id!;
+    // #25: nabídku obchodníka musí před vystavením PDF k odeslání schválit super admin
+    expect(q.needsApproval).toBe(true);
+    const blocked = await d.generateJobDocument(jobId, "nabidka", { quoteId });
+    expect(blocked).toMatchObject({ ok: false, code: "approval" });
+    const { data: adminRow } = await db.from("profiles").select("id").eq("email", "admin@local.test").single();
+    expect((await db.from("quotes").update({ approved_by: (adminRow as { id: string }).id }).eq("id", quoteId)).error).toBeNull();
     const res = await d.generateJobDocument(jobId, "nabidka", { quoteId });
     expect(res.ok, res.error).toBe(true);
     expect(res.number).toBe(q.number);

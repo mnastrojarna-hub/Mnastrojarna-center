@@ -199,6 +199,15 @@ export interface Quote {
   feedback_at: string | null;
   superseded_by: string | null;
   updated_by: string | null;
+  // Role a viditelnost (migrace 20261023155000)
+  /** Připravil ne-admin — odeslat až po schválení super adminem (jen pro čtení — trigger). */
+  admin_approval_required: boolean;
+  /** Otisk obsahu při schválení (píše jen server). */
+  approved_snapshot_sha: string | null;
+  /** Super admin vrátil nabídku autorovi k přepracování. */
+  approval_returned_at: string | null;
+  approval_returned_by: string | null;
+  approval_return_note: string | null;
 }
 
 export interface QuoteItem {
@@ -1063,8 +1072,23 @@ export interface Database {
       production_handoff_backfill: { Args: Record<string, never>; Returns: undefined };
       production_route_version: { Args: { p_job: string }; Returns: string };
       flow_counts: {
-        Args: { p_owner?: string | null; p_closed_days?: number };
+        Args: { p_owner?: string | null; p_closed_days?: number; p_mine?: string | null };
         Returns: { flow_phase: string; flow_key: string; n: number }[];
+      };
+      /** Moje zakázky obchodního toku (migrace 20261023155000; session → vždy auth.uid()). */
+      flow_mine_job_ids: { Args: { p_user: string }; Returns: string[] };
+      /** Odznaky menu (p_mine null = všichni). */
+      flow_badge_counts: {
+        Args: { p_mine?: string | null };
+        Returns: {
+          inquiries: number; pricing: number; quotes_pending: number; quotes_pending_manual: number;
+          quotes_ready: number; quotes_returned: number; confirmations: number;
+        }[];
+      };
+      my_mailbox_ids: { Args: Record<string, never>; Returns: string[] };
+      job_file_is_price_doc: {
+        Args: { p_id: string; p_kind: string; p_issuer: string | null; p_origin: string | null };
+        Returns: boolean;
       };
       flow_register_order_change: {
         Args: { p_job: string; p_note?: string | null; p_file?: string | null; p_changes?: Json | null; p_customer_order_number?: string | null };

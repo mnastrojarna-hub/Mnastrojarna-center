@@ -151,22 +151,26 @@ describe("nabídky", () => {
     validUntil: null, createdAt: "2026-10-01T10:00:00Z", revision: 1, ...over,
   });
   it("akce podle podrobného stavu (QUOTE_TRANSITIONS)", () => {
-    // rozpracovaná bez nutnosti schválení: obchodník schválí i rovnou odešle
+    // #25: rozpracovaná = nabídka super admina bez nutnosti schválení → obchodník rovnou odešle; „Předat ke schválení“ zaniklo
     expect(quoteActions(q({ state: "rozpracovana" }), { canDelete: false })).toEqual(
-      ["approve", "send", "markSent", "requestApproval", "edit", "revision", "pdf", "archive"],
+      ["send", "markSent", "edit", "revision", "pdf", "archive"],
     );
-    // zaměstnanec bez marží jen předá ke schválení
+    // zaměstnanec bez marží ji neodesílá
     expect(quoteActions(q({ state: "rozpracovana" }), { canDelete: false, margins: false })).toEqual(
-      ["requestApproval", "edit", "revision", "pdf", "archive"],
+      ["edit", "revision", "pdf", "archive"],
     );
     const waiting = quoteActions(q({ state: "ke_schvaleni", approvalRequired: true }), { canDelete: true });
     expect(waiting).toContain("approve");
     expect(waiting).not.toContain("send");
+    expect(waiting).not.toContain("unapprove"); // neschválenou nejde „odschválit“
     expect(waiting).toContain("delete");
+    // schvaluje jen super admin (canApprove z canApproveQuote)
+    expect(quoteActions(q({ state: "ke_schvaleni", approvalRequired: true }), { canDelete: false, canApprove: false })).not.toContain("approve");
     const approved = quoteActions(q({ state: "schvalena", approvedBy: { id: "u", name: "A" } }), { canDelete: true });
     expect(approved).not.toContain("approve");
     expect(approved).toContain("send");
     expect(approved).toContain("unapprove");
+    expect(quoteActions(q({ state: "schvalena", approvedBy: { id: "u", name: "A" } }), { canDelete: false, approver: false })).not.toContain("unapprove");
     const sent = quoteActions(q({ state: "odeslana", status: "odeslano", sentAt: "2026-10-02T10:00:00Z" }), { canDelete: true, today: "2026-10-05" });
     expect(sent).toEqual(["send", "accept", "feedback", "extend", "reject", "revision", "pdf", "archive"]);
     expect(quoteActions(q({ state: "odeslana", status: "odeslano", sentAt: "x" }), { canDelete: false, margins: false })).toContain("propose");
@@ -174,6 +178,31 @@ describe("nabídky", () => {
     expect(accepted).toEqual(["pdf"]);
     expect(quoteActions(q({ state: "zamitnuta", status: "zamitnuto", sentAt: "x" }), { canDelete: false })).toContain("reopen");
     expect(quoteActions(q({ archived: true }), { canDelete: false })).toEqual(["pdf", "unarchive"]);
+  });
+  it("#25: sendBlock a canReturn", () => {
+    const pending = q({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true });
+    // vrátit k přepracování jen super admin s dialogem, jen nevrácenou
+    expect(quoteActions(pending, { canDelete: false, canApprove: true, approver: true, canReturn: true })).toEqual(
+      ["approve", "returnToAuthor", "edit", "revision", "pdf", "archive"],
+    );
+    expect(quoteActions({ ...pending, returnedAt: "2026-10-23T08:00:00Z" }, { canDelete: false, canApprove: true, approver: true, canReturn: true }))
+      .not.toContain("returnToAuthor");
+    expect(quoteActions(pending, { canDelete: false, canApprove: true, approver: true })).not.toContain("returnToAuthor");
+    // karta nabídky (bez `approver`): obchodník s canApprove = margins (bez kontextu toku) „Schválit“ ani
+    // „Vrátit k úpravě…“ nedostane — schvaluje jen super admin (= jediný s mazáním)
+    expect(quoteActions(pending, { canDelete: false, margins: true, canApprove: true })).not.toContain("approve");
+    const salesApproved = q({ state: "schvalena", approvalRequired: true, adminApprovalRequired: true, approvedBy: { id: "a", name: "Admin" } });
+    expect(quoteActions(salesApproved, { canDelete: false, margins: true, canApprove: false })).not.toContain("unapprove");
+    expect(quoteActions(salesApproved, { canDelete: true, margins: true, canApprove: false })).toContain("unapprove");
+    expect(quoteActions(pending, { canDelete: true, margins: true, canApprove: true })).toContain("approve");
+    // schválená nabídka ne-admina: zaměstnanec-autor odešle (sendBlock null), cizí ne
+    const approved = q({ state: "schvalena", approvalRequired: true, adminApprovalRequired: true, approvedBy: { id: "a", name: "Admin" } });
+    expect(quoteActions(approved, { canDelete: false, margins: false, sendBlock: null })).toEqual(
+      expect.arrayContaining(["send", "markSent"]),
+    );
+    expect(quoteActions(approved, { canDelete: false, margins: false, sendBlock: "Nabídku zákazníkovi odesílá obchodník…" })).not.toContain("send");
+    // bez sendBlock: neschválenou nikdo neodešle ani s maržemi (i když je „odeslaná“ ze staršího stavu)
+    expect(quoteActions(q({ state: "odeslana", status: "odeslano", sentAt: "x", adminApprovalRequired: true }), { canDelete: false })).not.toContain("send");
   });
   it("zobrazený stav: vypršela po platnosti, starší data bez state se odvodí", () => {
     expect(quoteDisplayOf(q({ state: "odeslana", status: "odeslano", validUntil: "2026-10-10" }), "2026-10-22")).toBe("vyprsela");
