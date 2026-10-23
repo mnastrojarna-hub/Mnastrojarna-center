@@ -1,0 +1,70 @@
+{
+  "docKind": "nabidka",
+  "issuer": "dodavatel",
+  "documentNumber": "NAB-552",
+  "documentDate": "2026-10-16",
+  "customer": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "supplier": {
+    "name": "Kovoobrábění Hrubý s.r.o.",
+    "ico": "25874411",
+    "dic": "CZ25874411",
+    "street": "Dělnická 455",
+    "city": "Kralupy nad Vltavou",
+    "zip": "278 01",
+    "country": "CZ",
+    "email": "objednavky@hruby-cnc.cz",
+    "phone": "+420 315 700 120",
+    "contactPerson": "Pavel Hrubý"
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "2026-11-28",
+  "items": [
+    {
+      "drawingNumber": "4711-02",
+      "revision": "C",
+      "name": "Upínací deska",
+      "description": "",
+      "material": "1.2379",
+      "quantity": 20,
+      "unit": "ks",
+      "unitPrice": 1450,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "4711-03",
+      "revision": "A",
+      "name": "Vodicí lišta",
+      "description": "",
+      "material": "S355J2",
+      "quantity": 40,
+      "unit": "ks",
+      "unitPrice": 410,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 45400,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Nabídka dodavatele Hrubý NAB-552 na 4711-02 a 4711-03, termín 28. 11. 2026.",
+  "confidence": 0.92,
+  "needsClarification": []
+}

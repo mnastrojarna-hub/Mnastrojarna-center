@@ -18,7 +18,7 @@ import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { isForward, isJobStage, stageRank } from "@/lib/jobs/stages";
 import {
   cleanDate, cleanText, describeChanges, diffJob, fieldEventMessage, isUuid, jobFilePath, stageEventMessage,
-  todayIso, translateDbError, type JobChange,
+  translateDbError, type JobChange,
 } from "@/lib/jobs/mapping";
 import {
   PURCHASE_ORDER_STATUS_META, buildPurchaseOrderDraft, canChangePurchaseOrderStatus, cleanPurchaseItems,
@@ -31,6 +31,8 @@ import type {
   JobCommissionView, PurchaseItem, PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseOrderMail,
   PurchaseOrderPatch, PurchaseOrderView, SupplierQuoteInput, SupplierQuoteView,
 } from "@/lib/jobs/purchasing-types";
+import { findOrCreateSupplierByParty, insertSupplierQuote, isOurParty, selectWinningQuoteCore } from "@/lib/jobs/purchasing-store";
+import { normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { renderPurchaseOrderPdf } from "@/lib/pdf/render-purchase";
 import { buildPurchaseOrderDoc } from "@/lib/pdf/purchase-docs";
 import { czDate } from "@/lib/pdf/types";
@@ -175,48 +177,59 @@ export async function createSupplierQuote(jobId: string, input: SupplierQuoteInp
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
-  const conv = supplierQuoteInputToRow(input, { today: todayIso() });
-  if ("error" in conv) return fail(conv.error);
-  const items = cleanPurchaseItems(input?.items, { allowEmpty: true });
-  if ("error" in items) return fail(items.error);
-  const total = resolveSupplierQuoteTotal(input.total, items.rows);
-  if (!items.rows.length && total === null) return fail("Zadej položky nebo celkovou cenu nabídky.");
+  try {
+    const res = await insertSupplierQuote(c.db, c.user.id, jobId, input);
+    if (!res.ok) return fail(res.error);
+    revalidatePurchasing(jobId);
+    return { ok: true, id: res.id };
+  } catch (err) {
+    return fail(err);
+  }
+}
 
+/**
+ * Nabídka dodavatele vyfocená uživatelem bez práva na marže (soubor s „čeká na zapsání do Nákupu")
+ * → nabídka s položkami a cenami z přečteného dokladu. Příznak čekání se zruší.
+ */
+export async function importCapturedSupplierQuote(fileId: string): Promise<ActionResult<{ id: string }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(fileId)) return fail("Dokument nenalezen.");
   try {
     const { db, user } = c;
-    const job = await loadJob(db, jobId, "id, number");
-    if (!job) return fail(JOB_NOT_FOUND);
-    const row = conv.row;
-    let name = (row.supplier_name as string | null) ?? "";
-    if (row.supplier_id) {
-      const found = await supplierName(db, row.supplier_id as string);
-      if (!found) return fail("Dodavatel nenalezen.");
-      name = found;
-    }
-    if (row.file_id && !(await fileBelongsToJob(db, row.file_id as string, jobId))) return fail("Dokument nepatří k této zakázce.");
-
-    const { data: created, error } = await db
-      .from("supplier_quotes")
-      .insert({ ...row, job_id: jobId, total, selected: false, created_by: user.id } as never)
-      .select("id")
-      .single();
-    if (error || !created) return fail(error?.message ?? "Nabídku se nepodařilo uložit.");
-    const id = (created as { id: string }).id;
-    const itemErr = await replaceItems(db, "supplier_quote_items", "supplier_quote_id", id, items.rows);
-    if (itemErr) {
-      await db.from("supplier_quotes").delete().eq("id", id);
-      return fail(itemErr);
-    }
-
-    const delivery = row.delivery_date as string | null;
-    await logJobEvent(db, {
-      jobId, type: "quote",
-      message: `Přidána nabídka dodavatele ${quoteLabel(name, row.number as string | null)}${delivery ? ` — termín dodání ${czDate(delivery)}` : ""}`,
-      data: { supplierQuoteId: id, supplierId: row.supplier_id ?? null, number: row.number ?? null, itemCount: items.rows.length, source: row.source },
-      actorId: user.id,
-    });
-    revalidatePurchasing(jobId);
-    return { ok: true, id };
+    const { data } = await db.from("job_files").select("id, job_id, ai_extracted, capture_id").eq("id", fileId).maybeSingle();
+    const file = data as { id: string; job_id: string; ai_extracted: Record<string, unknown> | null; capture_id: string | null } | null;
+    if (!file) return fail("Dokument nenalezen.");
+    const ext = file.ai_extracted ?? {};
+    if (ext.purchasingPending !== true) return fail("Nabídka už je v Nákupu zapsaná.");
+    const doc = normalizeExtracted(ext);
+    const ours = isOurParty(doc.supplier);
+    const supplier = !ours && (doc.supplier.name.trim() || doc.supplier.ico.trim())
+      ? await findOrCreateSupplierByParty(db, doc.supplier)
+      : null;
+    const docId = typeof ext.captureDocId === "string" ? ext.captureDocId : null;
+    const res = await insertSupplierQuote(db, user.id, file.job_id, {
+      supplierId: supplier?.id ?? null,
+      supplierName: supplier ? undefined : (!ours && doc.supplier.name) || "Dodavatel z focení",
+      number: doc.documentNumber || undefined,
+      quoteDate: doc.documentDate || undefined,
+      deliveryDate: doc.promisedDeliveryDate || undefined,
+      currency: doc.currency || undefined,
+      note: doc.note || undefined,
+      fileId: file.id,
+      source: "foto",
+      items: doc.items.map((it) => ({
+        drawingNumber: it.drawingNumber || undefined, name: it.name || it.description || undefined, material: it.material || undefined,
+        quantity: it.quantity > 0 ? it.quantity : 1, unit: it.unit || "ks", unitPrice: it.unitPrice > 0 ? it.unitPrice : null,
+      })),
+      total: doc.totalWithoutVat > 0 ? doc.totalWithoutVat : null,
+    }, { captureId: file.capture_id, captureDocId: docId });
+    if (!res.ok) return fail(res.error);
+    const { purchasingPending: _pending, ...rest } = ext;
+    void _pending;
+    await db.from("job_files").update({ ai_extracted: rest } as never).eq("id", file.id);
+    revalidatePurchasing(file.job_id);
+    return { ok: true, id: res.id };
   } catch (err) {
     return fail(err);
   }
@@ -336,39 +349,9 @@ export async function selectWinningSupplierQuote(id: string): Promise<ActionResu
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(QUOTE_NOT_FOUND);
   try {
-    const { db, user } = c;
-    const quote = await fetchSupplierQuote(db, id);
-    if (!quote) return fail(QUOTE_NOT_FOUND);
-    const job = await loadJob(db, quote.jobId, "id, supplier_id, purchase_cost, supplier_promised_date");
-    if (!job) return fail(JOB_NOT_FOUND);
-
-    if (!quote.selected) {
-      const { error: unErr } = await db
-        .from("supplier_quotes")
-        .update({ selected: false } as never)
-        .eq("job_id", quote.jobId)
-        .eq("selected", true)
-        .neq("id", id);
-      if (unErr) return fail(unErr.message);
-      const { error } = await db.from("supplier_quotes").update({ selected: true } as never).eq("id", id);
-      if (error) return fail(error.message);
-      await logJobEvent(db, {
-        jobId: quote.jobId, type: "quote",
-        message: `Vybrána vítězná nabídka dodavatele ${quoteLabel(quote.supplierName, quote.number)}`,
-        data: { supplierQuoteId: id, action: "selected", supplierId: quote.supplier?.id ?? null },
-        actorId: user.id,
-      });
-    }
-
-    const patch: Row = {};
-    if (!job.supplier_id && quote.supplier) patch.supplier_id = quote.supplier.id;
-    if (quote.total !== null) patch.purchase_cost = quote.total;
-    if (!job.supplier_promised_date && quote.deliveryDate) patch.supplier_promised_date = quote.deliveryDate;
-    const refs: Record<string, string> = quote.supplier ? { [quote.supplier.id]: quote.supplier.name } : {};
-    const err = await patchJob(c, quote.jobId, job, patch, refs, { supplierQuoteId: id });
-    if (err) return fail(err);
-
-    revalidatePurchasing(quote.jobId);
+    const res = await selectWinningQuoteCore(c.db, c.user.id, id);
+    if (!res.ok) return fail(res.error);
+    revalidatePurchasing(res.jobId);
     return { ok: true };
   } catch (err) {
     return fail(err);

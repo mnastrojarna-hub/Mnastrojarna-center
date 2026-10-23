@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, ImageOff, ZoomIn, ZoomOut } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, Paperclip, ZoomIn, ZoomOut } from "lucide-react";
+import { usePdfThumb } from "@/components/jobs/capture/pdf-thumbs";
 import { cn } from "@/lib/utils";
 
 export interface ViewerPage {
@@ -10,20 +11,67 @@ export interface ViewerPage {
   url: string | null;
   mimeType: string;
   name: string;
+  /** Strana PDF (dávka: doklad z části PDF) — prohlížeč ji otevře přes #page=N. */
+  page?: number;
+  /** Soubor bez náhledu (CAD, kancelářský…): formát na dlaždici („STEP"). */
+  file?: { format: string | null; cad: boolean } | null;
 }
 
-function isPdf(p: Pick<ViewerPage, "mimeType" | "name">): boolean {
-  return p.mimeType === "application/pdf" || /\.pdf$/i.test(p.name);
+function isPdf(p: Pick<ViewerPage, "mimeType" | "name" | "file">): boolean {
+  return !p.file && (p.mimeType === "application/pdf" || /\.pdf$/i.test(p.name));
+}
+
+function pdfSrc(p: ViewerPage): string | null {
+  if (!p.url) return null;
+  return p.page && p.page > 1 ? `${p.url}#page=${p.page}` : p.url;
+}
+
+/** Dotykové zařízení (Android Chrome PDF v <iframe> nevykreslí, iOS ukáže jen 1. stranu). */
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    setCoarse(mq.matches);
+    const on = () => setCoarse(mq.matches);
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return coarse;
+}
+
+/** Strana PDF vykreslená přes pdf.js jako obrázek (správná strana i na mobilu); selže-li, <iframe>. */
+function PdfPage({ page, index, zoom, onZoom }: { page: ViewerPage; index: number; zoom: boolean; onZoom: () => void }) {
+  const img = usePdfThumb(page.url, page.page ?? 1, 1000);
+  if (img.failed) {
+    return <iframe key={page.key} title={`Stránka ${index + 1}: ${page.name}`} src={pdfSrc(page) ?? undefined} className="h-full min-h-[50vh] w-full bg-white" />;
+  }
+  if (!img.src) {
+    return <div className="flex h-full min-h-40 items-center justify-center text-sm text-slate-300"><FileText className="mr-2 h-5 w-5 animate-pulse" /> Načítám stranu…</div>;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- vykreslená strana PDF
+    <img
+      key={page.key}
+      src={img.src}
+      alt={`Stránka ${index + 1}: ${page.name}`}
+      onClick={onZoom}
+      className={cn("select-none bg-white transition-[width]", zoom ? "w-[220%] max-w-none cursor-zoom-out" : "mx-auto h-full w-full cursor-zoom-in object-contain")}
+      draggable={false}
+    />
+  );
 }
 
 /**
  * Náhled stránek dokladu vedle formuláře: přiblížení klepnutím, listování
- * šipkami / tažením prstem, miniatury. PDF se zobrazí přímo (prohlížeč).
+ * šipkami / tažením prstem, miniatury. PDF na počítači přímo (prohlížeč); strana z části
+ * PDF (dávka) a PDF na mobilu se vykreslí jako obrázek (pdf.js).
  */
 export function CapturePages({ pages, className }: { pages: ViewerPage[]; className?: string }) {
   const [index, setIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(false);
   const touch = React.useRef<{ x: number; y: number } | null>(null);
+  const coarse = useCoarsePointer();
   const count = pages.length;
   const i = Math.min(index, Math.max(0, count - 1));
   const page = pages[i];
@@ -67,13 +115,27 @@ export function CapturePages({ pages, className }: { pages: ViewerPage[]; classN
           if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(t.clientY - start.y)) go(dx < 0 ? 1 : -1);
         }}
       >
-        {!page.url ? (
+        {page.file ? (
+          <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-4 text-center text-sm text-slate-200">
+            {page.file.cad ? <Box className="h-12 w-12 text-purple-300" /> : <Paperclip className="h-10 w-10" />}
+            <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide">{page.file.format ?? "Soubor"}</span>
+            <span className="max-w-full break-all text-xs text-slate-300">{page.name}</span>
+            <span className="text-xs text-slate-400">Bez náhledu — uloží se jako soubor zakázky.</span>
+            {page.url && (
+              <a href={page.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white hover:bg-white/25">
+                <Download className="h-3.5 w-3.5" /> Stáhnout
+              </a>
+            )}
+          </div>
+        ) : !page.url ? (
           <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 text-sm text-slate-300">
             <ImageOff className="h-8 w-8" />
             Náhled není k dispozici
           </div>
+        ) : isPdf(page) && (page.page || coarse) ? (
+          <PdfPage page={page} index={i} zoom={zoom} onZoom={() => setZoom((z) => !z)} />
         ) : isPdf(page) ? (
-          <iframe key={page.key} title={`Stránka ${i + 1}: ${page.name}`} src={page.url} className="h-full min-h-[50vh] w-full bg-white" />
+          <iframe key={page.key} title={`Stránka ${i + 1}: ${page.name}`} src={pdfSrc(page) ?? undefined} className="h-full min-h-[50vh] w-full bg-white" />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- místní náhled / podepsaná URL
           <img
@@ -96,7 +158,7 @@ export function CapturePages({ pages, className }: { pages: ViewerPage[]; classN
             </span>
           ) : <span />}
           <span className="pointer-events-auto flex gap-1">
-            {!isPdf(page) && page.url && (
+            {!isPdf(page) && !page.file && page.url && (
               <button
                 type="button"
                 onClick={() => setZoom((z) => !z)}
@@ -107,9 +169,9 @@ export function CapturePages({ pages, className }: { pages: ViewerPage[]; classN
                 {zoom ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
               </button>
             )}
-            {page.url && (
+            {page.url && !page.file && (
               <a
-                href={page.url}
+                href={pdfSrc(page) ?? page.url}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
@@ -158,7 +220,9 @@ export function CapturePages({ pages, className }: { pages: ViewerPage[]; classN
                 n === i ? "border-rose-500 ring-2 ring-rose-500/30" : "border-transparent opacity-70 hover:opacity-100",
               )}
             >
-              {p.url && !isPdf(p) ? (
+              {p.file ? (
+                p.file.cad ? <Box className="m-auto h-5 w-5 text-purple-500" /> : <Paperclip className="m-auto h-5 w-5 text-slate-500" />
+              ) : p.url && !isPdf(p) ? (
                 // eslint-disable-next-line @next/next/no-img-element -- miniatura
                 <img src={p.url} alt="" className="h-full w-full object-cover" />
               ) : (

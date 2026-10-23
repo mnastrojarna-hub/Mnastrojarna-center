@@ -33,6 +33,7 @@ export async function recordCorrection(input: {
         ai_value: typeof input.aiValue === "string" ? input.aiValue.slice(0, 8000) : null,
         corrected_value: input.correctedValue.trim().slice(0, 8000),
         note: typeof input.note === "string" ? input.note.trim().slice(0, 2000) || null : null,
+        created_by: auth.user.id,
       } as never)
       .select("id");
     if (error) return { ok: false, error: error.message };

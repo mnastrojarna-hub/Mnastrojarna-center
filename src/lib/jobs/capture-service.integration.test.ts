@@ -85,6 +85,12 @@ function person(id: string, email: string, role: string, fullName: string) {
   return { id, email, fullName, role, initials: "TT", roleLabel: role, aiAccess: false, active: true, hasProfile: true, mustChangePassword: false };
 }
 
+/** Odpověď /analyze pro jeden doklad (dávka by tu byla chyba). */
+function single<T extends { ok: boolean }>(res: T): Extract<T, { model: unknown }> {
+  if (!res.ok || !("model" in res)) throw new Error(`Čekám jeden doklad: ${JSON.stringify(res).slice(0, 300)}`);
+  return res as Extract<T, { model: unknown }>;
+}
+
 /** Malý „JPEG" (hlavička stačí — testovací AI obsah nečte). */
 const FAKE_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(2048, 7)]);
 
@@ -100,9 +106,13 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
   let jobId = "";
   let manualJobId = "";
 
+  /** Stránky nahrané tímto testem (úklid nesmí sáhnout na soubory souběžné sady — dávka používá stejnou složku). */
+  const ownPaths = new Set<string>();
+
   async function upload(filename: string, mimeType = "image/jpeg", body: Buffer = FAKE_JPEG) {
     const prep = await s.prepareCaptureUpload({ filename, size: body.length, mimeType });
     expect(prep.ok, prep.error).toBe(true);
+    if (prep.path) ownPaths.add(prep.path);
     const { error } = await db.storage.from("job-files").uploadToSignedUrl(prep.path!, prep.token!, body, { contentType: mimeType });
     expect(error).toBeNull();
     return { path: prep.path!, filename, mimeType, size: body.length };
@@ -141,7 +151,10 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     for (const u of [admin, sales]) {
       if (!u) continue;
       const { data: left } = await db.storage.from("job-files").list(`capture/${u.id}`, { limit: 100 });
-      const mine = (left ?? []).filter((f) => f.created_at && f.created_at >= startedAt).map((f) => `capture/${u.id}/${f.name}`);
+      // vlastní stránky + relace v1 (.json); náhledy a stránky dávky patří souběžné sadě
+      const mine = (left ?? []).filter((f) => f.created_at && f.created_at >= startedAt)
+        .map((f) => `capture/${u.id}/${f.name}`)
+        .filter((p) => ownPaths.has(p) || p.endsWith(".json"));
       if (mine.length) await db.storage.from("job-files").remove(mine);
     }
     if (jobIds.length) {
@@ -161,8 +174,8 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     const res = await s.analyzeCapture({ files: [page] });
     expect(res.ok, res.ok ? "" : res.error).toBe(true);
     if (!res.ok) return;
-    const m: ReviewModel = res.model;
-    expect(res.applied).toBeUndefined(); // výchozí režim = kontrola člověkem
+    const m: ReviewModel = single(res).model;
+    expect(single(res).applied).toBeUndefined(); // výchozí režim = kontrola člověkem
     expect(m.aiUsed).toBe(true);
     expect(m.mode).toBe("approval");
     expect(m.customerMatch).toMatchObject({ name: "Strojmetal a.s.", score: 100 });
@@ -236,7 +249,7 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     const res = await s.analyzeCapture({ files: pages, jobId });
     expect(res.ok, res.ok ? "" : res.error).toBe(true);
     if (!res.ok) return;
-    const m = res.model;
+    const m = single(res).model;
     expect(m.fixedJobId).toBe(jobId);
     expect(m.targets).toHaveLength(1);
     expect(m.initial).toMatchObject({ chip: "dodaci_list_dodavatel", stage: "dodano_k_nam", fileKind: "dodaci_list", targetKey: jobId });
@@ -276,7 +289,7 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     const res = await s.analyzeCapture({ files: [page] });
     expect(res.ok, res.ok ? "" : res.error).toBe(true);
     if (!res.ok) return;
-    const m = res.model;
+    const m = single(res).model;
     expect(m.aiUsed).toBe(false);
     expect(m.reason).toMatch(/^Nemáš povolené AI čtení dokladů/);
     expect(m.initial).toMatchObject({ targetKey: "new", fields: {}, items: [], customer: { mode: "none" } });
@@ -318,13 +331,13 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
       const res = await s.analyzeCapture({ files: [page], jobId: manualJobId });
       expect(res.ok, res.ok ? "" : res.error).toBe(true);
       if (!res.ok) return;
-      expect(res.model.mode).toBe("full");
-      expect(res.applied).toMatchObject({ ok: true, autoApplied: true, stageFrom: "poptavka", stageTo: "dodano_k_nam", jobId: manualJobId });
+      expect(single(res).model.mode).toBe("full");
+      expect(single(res).applied).toMatchObject({ ok: true, autoApplied: true, stageFrom: "poptavka", stageTo: "dodano_k_nam", jobId: manualJobId });
       const { data: job } = await db.from("orders").select("status, supplier_order_number").eq("id", manualJobId).single();
       expect(job).toMatchObject({ status: "dodano_k_nam", supplier_order_number: "OBJ-2026-045" });
       const { data: ev } = await db.from("job_events").select("message, data").eq("job_id", manualJobId).eq("type", "ai");
       expect(ev?.[0]?.message).toMatch(/uloženo automaticky$/);
-      expect(await exists(r.captureSessionPath(admin.id, res.model.captureId))).toBe(false);
+      expect(await exists(r.captureSessionPath(admin.id, single(res).model.captureId))).toBe(false);
     } finally {
       await db.from("automation_settings").delete().eq("module", "capture");
     }
@@ -336,7 +349,12 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     const foreign = { ...mine, path: mine.path.replace(sales.id, admin.id) };
     expect(await s.analyzeCapture({ files: [foreign] })).toMatchObject({ ok: false, error: "Neplatná cesta souboru." });
     expect(await s.analyzeCapture({ files: [] })).toMatchObject({ ok: false });
-    expect(await s.prepareCaptureUpload({ filename: "model.step", size: 10, mimeType: "application/octet-stream" })).toMatchObject({ ok: false });
+    // dávka bere i CAD a ostatní soubory (do 50 MB); prázdný / příliš velký soubor ne
+    const step = await s.prepareCaptureUpload({ filename: "model.step", size: 10, mimeType: "application/octet-stream" });
+    expect(step).toMatchObject({ ok: true });
+    if (step.ok && step.path) await db.storage.from("job-files").remove([step.path]);
+    expect(await s.prepareCaptureUpload({ filename: "model.step", size: 0 })).toMatchObject({ ok: false, error: "Soubor je prázdný." });
+    expect(await s.prepareCaptureUpload({ filename: "big.step", size: 51 * 1024 * 1024 })).toMatchObject({ ok: false, error: "Soubor je větší než 50 MB." });
     expect(await s.applyCapture({ captureId: "00000000-0000-4000-8000-000000000000", state: {} })).toMatchObject({ ok: false });
 
     expect((await s.discardCapture({ paths: [mine.path, foreign.path] })).ok).toBe(true);

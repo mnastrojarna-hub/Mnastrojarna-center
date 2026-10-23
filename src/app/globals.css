@@ -113,3 +113,16 @@
     background: transparent;
   }
 }
+
+/*
+ * Dotykové displeje: iOS Safari při klepnutí do pole s písmem menším než 16 px
+ * stránku přiblíží a už ji samo neoddálí. Pole na mobilu proto mají vždy 16 px
+ * (desktop si nechá kompaktní velikosti z tříd). Ruční přiblížení prsty zůstává.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

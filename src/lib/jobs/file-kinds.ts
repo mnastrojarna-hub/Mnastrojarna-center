@@ -38,17 +38,35 @@ export function isJobFileKind(value: unknown): value is JobFileKind {
   return typeof value === "string" && value in FILE_KINDS;
 }
 
+/** Přípony 3D modelů a výkresů z CAD (bez tečky, malými písmeny). */
+export const CAD_3D_EXTENSIONS = [
+  "step", "stp", "iges", "igs", "stl", "3mf", "x_t", "x_b", "sldprt", "sldasm", "catpart", "catproduct",
+  "prt", "asm", "ipt", "iam", "par", "psm", "jt", "sat", "3dm", "f3d",
+] as const;
+export const CAD_2D_EXTENSIONS = ["dxf", "dwg"] as const;
+export const CAD_EXTENSIONS: readonly string[] = [...CAD_3D_EXTENSIONS, ...CAD_2D_EXTENSIONS];
+
+const CAD_ACCEPT = CAD_EXTENSIONS.map((e) => `.${e}`).join(",");
+
 /** Povolené typy souborů zakázky (fotky z mobilu, PDF, CAD modely, kancelářské dokumenty). */
 export const JOB_FILE_ACCEPT =
-  "image/*,application/pdf,.pdf,.step,.stp,.igs,.iges,.dxf,.dwg,.stl,.x_t,.sldprt,.sldasm,.xlsx,.xls,.docx,.doc,.msg,.eml,.zip";
+  `image/*,application/pdf,.pdf,${CAD_ACCEPT},.xlsx,.xls,.docx,.doc,.msg,.eml,.zip`;
+
+/**
+ * Výběr souborů v „Vyfotit doklad" (dávka): fotky, PDF, CAD, kancelář, ZIP — a na konci
+ * cokoli (neznámý typ se uloží jako „Ostatní"). Explicitní přípony kvůli iOS výběru.
+ */
+export const CAPTURE_FILES_ACCEPT =
+  `image/*,application/pdf,.pdf,${CAD_ACCEPT},.zip,.xlsx,.xls,.docx,.doc,.msg,.eml,.txt,.csv,*/*`;
 
 export const JOB_FILE_MAX_BYTES = 50 * 1024 * 1024; // 50 MB
 
 /** Odhad druhu podle názvu souboru (výchozí volba při nahrání). */
 export function guessFileKind(filename: string, mime?: string): JobFileKind {
   const f = filename.toLowerCase();
-  if (/\.(step|stp|igs|iges|stl|x_t|sldprt|sldasm)$/.test(f)) return "model_3d";
-  if (/\.(dxf|dwg)$/.test(f)) return "vykres";
+  const ext = /\.([a-z0-9_]{1,12})$/.exec(f)?.[1] ?? "";
+  if ((CAD_3D_EXTENSIONS as readonly string[]).includes(ext)) return "model_3d";
+  if ((CAD_2D_EXTENSIONS as readonly string[]).includes(ext)) return "vykres";
   if (/\.(msg|eml)$/.test(f)) return "korespondence";
   if (/faktur|invoice/.test(f)) return "faktura";
   if (/dodac|delivery|lieferschein/.test(f)) return "dodaci_list";

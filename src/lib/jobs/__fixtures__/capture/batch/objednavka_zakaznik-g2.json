@@ -1,0 +1,59 @@
+{
+  "docKind": "objednavka",
+  "issuer": "zakaznik",
+  "documentNumber": "PO-E2E-4480",
+  "documentDate": "2026-10-21",
+  "customer": {
+    "name": "Kovo Plus s.r.o.",
+    "ico": "27654321",
+    "dic": "CZ27654321",
+    "street": "Nádražní 8",
+    "city": "Beroun",
+    "zip": "266 01",
+    "country": "CZ",
+    "email": "nakup@kovoplus.cz",
+    "phone": "+420 311 222 333",
+    "contactPerson": "Petra Malá"
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "PO-E2E-4480",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "2026-12-11",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "5500-01",
+      "revision": "A",
+      "name": "Pouzdro",
+      "description": "",
+      "material": "C45",
+      "quantity": 10,
+      "unit": "ks",
+      "unitPrice": 1200,
+      "deliveryDate": "2026-12-11"
+    }
+  ],
+  "totalWithoutVat": 12000,
+  "currency": "CZK",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Objednávka PO-E2E-4480 od Kovo Plus na 1 položku 5500-01.",
+  "confidence": 0.92,
+  "needsClarification": []
+}

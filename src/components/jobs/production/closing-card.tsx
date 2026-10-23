@@ -110,6 +110,8 @@ function DeliveryStep({ job, closing, state }: { job: JobDetail; closing: JobClo
   const photoRef = React.useRef<HTMLInputElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const dateId = React.useId();
+  const photoId = React.useId();
+  const fileId = React.useId();
   const file = confirmedDeliveryFile(job.files);
   const confirmed = closing.deliveryNoteConfirmedAt;
   const busy = phase !== null || isBusy("dl");
@@ -174,14 +176,21 @@ function DeliveryStep({ job, closing, state }: { job: JobDetail; closing: JobClo
             </div>
           </div>
           <div className="grid gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
-            <Button type="button" variant="success" className="h-11 sm:hidden" onClick={() => photoRef.current?.click()} disabled={busy}>
-              {phase ? <Loader2 className="animate-spin" /> : <Camera />} Vyfotit DL
+            {/* <label for> — výběr/fotoaparát otevře prohlížeč nativně (spolehlivé i na iOS a ve vestavěných prohlížečích) */}
+            <Button asChild variant="success" className={cn("h-11 cursor-pointer sm:hidden", busy && "pointer-events-none opacity-50")}>
+              <label htmlFor={photoId} aria-disabled={busy || undefined}>
+                {phase ? <Loader2 className="animate-spin" /> : <Camera />} Vyfotit DL
+              </label>
             </Button>
-            <Button type="button" variant="outline" className="h-11 sm:hidden" onClick={() => fileRef.current?.click()} disabled={busy}>
-              <FileUp className="text-emerald-600" /> Ze souboru
+            <Button asChild variant="outline" className={cn("h-11 cursor-pointer sm:hidden", busy && "pointer-events-none opacity-50")}>
+              <label htmlFor={fileId} aria-disabled={busy || undefined}>
+                <FileUp className="text-emerald-600" /> Ze souboru
+              </label>
             </Button>
-            <Button type="button" variant="success" className="hidden h-10 sm:inline-flex" onClick={() => fileRef.current?.click()} disabled={busy}>
-              {phase ? <Loader2 className="animate-spin" /> : <FileUp />} Nahrát potvrzený DL
+            <Button asChild variant="success" className={cn("hidden h-10 cursor-pointer sm:inline-flex", busy && "pointer-events-none opacity-50")}>
+              <label htmlFor={fileId} aria-disabled={busy || undefined}>
+                {phase ? <Loader2 className="animate-spin" /> : <FileUp />} Nahrát potvrzený DL
+              </label>
             </Button>
           </div>
           {phase && <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400" aria-live="polite">{UPLOAD_PHASE_LABELS[phase]}</p>}
@@ -193,8 +202,8 @@ function DeliveryStep({ job, closing, state }: { job: JobDetail; closing: JobClo
           >
             {isBusy("dl") && !phase ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Potvrdit bez souboru
           </button>
-          <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={pickHandler} />
-          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={pickHandler} />
+          <input ref={photoRef} id={photoId} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden disabled={busy} onChange={pickHandler} />
+          <input ref={fileRef} id={fileId} type="file" accept="image/*,application/pdf" className="sr-only" tabIndex={-1} aria-hidden disabled={busy} onChange={pickHandler} />
         </>
       )}
     </Step>

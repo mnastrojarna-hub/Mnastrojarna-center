@@ -106,7 +106,7 @@ describe("Vyfotit doklad — vykreslení", () => {
     expect(pages).toContain("3 stránky");
     expect(pages).toContain("Nahrávám");
     expect(pages).toContain("Nahrání selhalo");
-    expect(pages).toContain("Vyfotit další stránku");
+    expect(pages).toContain("Vyfotit další (stránku nebo doklad)");
   });
 
   it("krok 2: AI čte / ruční příprava", () => {

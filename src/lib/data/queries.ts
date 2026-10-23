@@ -159,24 +159,31 @@ export async function getDrawings(opts: { customerId?: string } = {}): Promise<D
   if (!db) return [];
   let q = db
     .from("drawings")
-    .select("*, customers(name)")
+    .select("*, customers(name), job:orders!job_id(id, number)")
     .order("created_at", { ascending: false })
     .limit(2000);
   if (opts.customerId) q = q.eq("customer_id", opts.customerId);
   const { data, error } = await q;
   warn("drawings", error);
   if (error || !data) return [];
-  return (data as (Drawing & WithCustomer)[]).map((d) => ({
-    id: d.id,
-    number: d.drawing_number,
-    revision: d.revision,
-    customer: d.customers?.name ?? "—",
-    material: d.material ?? "—",
-    dimensions: d.dimensions ?? "—",
-    qty: d.quantity ?? 0,
-    fileType: (d.file_type as DrawingItem["fileType"]) ?? "PDF",
-    uploadedAt: d.created_at,
-  }));
+  type JobEmbed = { id: string; number: string | null } | { id: string; number: string | null }[] | null;
+  return (data as (Drawing & WithCustomer & { job?: JobEmbed })[]).map((d) => {
+    const job = Array.isArray(d.job) ? d.job[0] ?? null : d.job ?? null;
+    return {
+      id: d.id,
+      number: d.drawing_number,
+      revision: d.revision,
+      customer: d.customers?.name ?? "—",
+      material: d.material ?? "—",
+      dimensions: d.dimensions ?? "—",
+      qty: d.quantity ?? 0,
+      fileType: (d.file_type as DrawingItem["fileType"]) ?? "PDF",
+      uploadedAt: d.created_at,
+      jobId: job?.id ?? d.job_id ?? null,
+      jobNumber: job?.number ?? null,
+      jobFileId: d.job_file_id ?? null,
+    };
+  });
 }
 
 export type { CommissionPeriod } from "@/lib/data/periods";

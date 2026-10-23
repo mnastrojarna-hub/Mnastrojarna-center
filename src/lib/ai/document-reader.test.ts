@@ -42,3 +42,26 @@ describe("readBusinessDocument", () => {
       .rejects.toThrow(AI_NOT_CONFIGURED);
   });
 });
+
+describe("výkres a dávka (testovací háček)", () => {
+  it("DRAWING_SCHEMA zrcadlí DrawingExtract", async () => {
+    const { DRAWING_SCHEMA } = await import("./document-reader");
+    const { emptyDrawing } = await import("@/lib/jobs/capture-batch");
+    const s = DRAWING_SCHEMA as unknown as Schema;
+    expect(s.additionalProperties).toBe(false);
+    expect([...s.required].sort()).toEqual(Object.keys(emptyDrawing()).sort());
+    expect(Object.keys(s.properties).sort()).toEqual(Object.keys(emptyDrawing()).sort());
+  });
+
+  it("readDrawing a vytěžení dokladu dávky čtou fixtures podle druhu a skupiny", async () => {
+    vi.stubEnv("AI_FAKE_CAPTURE", FIXTURE);
+    const { readDrawing, readBusinessDocumentDetailed } = await import("./document-reader");
+    const d = await readDrawing({ files: [], fake: { type: "vykres", group: "g2" } });
+    expect(d.drawing).toMatchObject({ drawingNumber: "4711-03", revision: "A" });
+    expect(d.usage).toBeNull();
+    const b = await readBusinessDocumentDetailed({ files: [], fake: { type: "nabidka_dodavatel", group: "0" } });
+    expect(b.doc).toMatchObject({ docKind: "nabidka", issuer: "dodavatel", documentNumber: "NAB-552" });
+    const v1 = await readBusinessDocumentDetailed({ files: [] });
+    expect(v1.doc.documentNumber).toBe("4795-2026");
+  });
+});

@@ -11,6 +11,7 @@ vi.mock("@/app/actions/purchasing", () => ({
   createSupplierQuote: vi.fn(), updateSupplierQuote: vi.fn(), deleteSupplierQuote: vi.fn(), selectWinningSupplierQuote: vi.fn(),
   unselectSupplierQuote: vi.fn(), draftPurchaseOrder: vi.fn(), issuePurchaseOrder: vi.fn(), updatePurchaseOrder: vi.fn(),
   regeneratePurchaseOrderPdf: vi.fn(), draftPurchaseOrderEmail: vi.fn(), sendPurchaseOrder: vi.fn(), assignJobOwner: vi.fn(),
+  importCapturedSupplierQuote: vi.fn(),
 }));
 vi.mock("@/app/actions/jobs", () => ({ updateJob: vi.fn(), setJobStage: vi.fn() }));
 vi.mock("@/lib/jobs/upload-client", () => ({ uploadJobFiles: vi.fn(), uploadJobFile: vi.fn() }));
@@ -18,6 +19,7 @@ vi.mock("@/lib/jobs/upload-client", () => ({ uploadJobFiles: vi.fn(), uploadJobF
 import { JobDetailProvider } from "@/components/jobs/detail/detail-context";
 import { PurchasingTab } from "./purchasing-tab";
 import { PurchaseOrdersBoard } from "./purchase-orders-board";
+import { SupplierQuotesSection } from "./supplier-quotes";
 import type { JobDetail, JobFormOptions } from "@/lib/jobs/types";
 import type {
   JobCommissionView, JobPurchasing, PurchaseOrderListItem, PurchaseOrderView, SupplierQuoteView,
@@ -85,6 +87,7 @@ function data(over: Partial<JobPurchasing> = {}): JobPurchasing {
   return {
     supplierQuotes: [], purchaseOrders: [], commission: null, owner: person("u1", "Petr Obchodník"),
     totals: { revenue: 48_000, purchaseOrdersTotal: 0, plannedCost: null, cost: null, costSource: null, profit: null, margin: null },
+    pendingCaptured: [],
     ...over,
   };
 }
@@ -181,6 +184,34 @@ describe("Nákup & marže — render", () => {
     }));
     expect(html).toContain("-10 000 Kč");
     expect(html).toContain("bg-red-600");
+  });
+});
+
+describe("Nabídky z focení čekající na Nákup", () => {
+  const pending = [{ fileId: "f7", title: "Nabídka dodavatele NAB-552", supplierName: "Kovoobrábění Hrubý", createdAt: "2026-10-22T08:00:00Z" }];
+  const section = (quotes: SupplierQuoteView[]) => renderToString(
+    <JobDetailProvider jobId="j1" perms={PERMS} options={options}>
+      <SupplierQuotesSection quotes={quotes} today="2026-10-22" onAdd={() => {}} onEdit={() => {}} pendingCaptured={pending} />
+    </JobDetailProvider>,
+  ).replace(/<!-- -->/g, "");
+
+  it("pruh s tlačítkem Zapsat i bez zapsaných nabídek", () => {
+    const html = section([]);
+    expect(html).toContain("Nabídky z focení čekají na zapsání (1)");
+    expect(html).toContain("Kovoobrábění Hrubý");
+    expect(html).toContain("Zapsat");
+    expect(html).toContain("/api/jobs/files/f7");
+    expect(html).toContain("Zatím žádná nabídka dodavatele");
+  });
+
+  it("pruh nad zapsanými nabídkami; bez čekajících se neukáže", () => {
+    expect(section([quote({ id: "q1" })])).toContain("Nabídky z focení čekají na zapsání");
+    const none = renderToString(
+      <JobDetailProvider jobId="j1" perms={PERMS} options={options}>
+        <SupplierQuotesSection quotes={[quote({ id: "q1" })]} today="2026-10-22" onAdd={() => {}} onEdit={() => {}} />
+      </JobDetailProvider>,
+    );
+    expect(none).not.toContain("Nabídky z focení");
   });
 });
 

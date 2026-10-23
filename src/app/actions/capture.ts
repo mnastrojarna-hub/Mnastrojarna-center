@@ -13,7 +13,9 @@ export async function createCaptureUpload(input: {
   filename: string;
   size: number;
   mimeType?: string;
-}): Promise<ActionResult<{ path: string; token: string; bucket: string }>> {
+  /** Fotka v dávce: i podepsaná URL pro náhled roztřídění. */
+  sortPreview?: boolean;
+}): Promise<ActionResult<{ path: string; token: string; bucket: string; sortPath?: string; sortToken?: string }>> {
   return prepareCaptureUpload(input);
 }
 

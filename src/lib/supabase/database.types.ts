@@ -126,6 +126,11 @@ export interface Drawing {
   uploaded_by: string | null;
   created_at: string;
   updated_at: string;
+  // migrace capture_batch: výkres z dokumentů zakázky
+  storage_bucket: string;
+  job_file_id: string | null;
+  title: string | null;
+  job_id: string | null;
 }
 
 export interface Quote {
@@ -250,6 +255,8 @@ export interface Order {
   delivery_note_confirmed_at: string | null;
   invoice_date: string | null;
   invoice_due_date: string | null;
+  /** Idempotence dávkového focení ("<captureId>:<groupKey>"). */
+  capture_key: string | null;
 }
 
 /** Výrobní operace zakázky (migrace 0022). */
@@ -291,6 +298,8 @@ export interface OrderItem {
   purchase_unit_price: number | null;
   note: string | null;
   created_at: string;
+  /** Idempotence dávkového focení. */
+  capture_key: string | null;
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
@@ -313,6 +322,10 @@ export interface JobFileRow {
   note: string | null;
   uploaded_by: string | null;
   created_at: string;
+  // migrace capture_batch
+  order_item_id: string | null;
+  capture_id: string | null;
+  content_sha256: string | null;
 }
 
 /** Záznam historie zakázky. */
@@ -524,6 +537,9 @@ export interface SupplierQuoteRow {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // migrace capture_batch
+  capture_id: string | null;
+  capture_doc_id: string | null;
 }
 
 export interface SupplierQuoteItemRow {
@@ -670,6 +686,40 @@ export interface PricingCalculation {
   created_at: string;
 }
 
+/** Relace dávkového focení (jen servisní klíč). */
+export interface CaptureSessionRow {
+  id: string;
+  user_id: string;
+  status: "open" | "partial" | "done" | "discarded";
+  data: Record<string, unknown>;
+  lock_token: string | null;
+  lock_until: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CaptureDocExtractRow {
+  capture_id: string;
+  doc_id: string;
+  pages_key: string;
+  doc_type: string;
+  status: "reading" | "ready" | "manual" | "error";
+  data: Record<string, unknown> | null;
+  error: string | null;
+  usage: Record<string, unknown> | null;
+  started_at: string;
+  updated_at: string;
+}
+
+export interface CaptureApplyStepRow {
+  capture_id: string;
+  step: string;
+  status: "started" | "done" | "failed";
+  result: Record<string, unknown> | null;
+  updated_at: string;
+}
+
 type Tbl<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -712,6 +762,9 @@ export interface Database {
       supplier_quote_items: Tbl<SupplierQuoteItemRow>;
       purchase_orders: Tbl<PurchaseOrderRow>;
       purchase_order_items: Tbl<PurchaseOrderItemRow>;
+      capture_sessions: Tbl<CaptureSessionRow>;
+      capture_doc_extracts: Tbl<CaptureDocExtractRow>;
+      capture_apply_steps: Tbl<CaptureApplyStepRow>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -720,6 +773,8 @@ export interface Database {
       next_customer_number: { Args: Record<string, never>; Returns: string };
       next_purchase_order_number: { Args: Record<string, never>; Returns: string };
       recompute_job_commission: { Args: { p_job: string }; Returns: undefined };
+      capture_try_lock: { Args: { p_capture: string; p_user: string; p_token: string; p_ttl_seconds: number }; Returns: boolean };
+      capture_unlock: { Args: { p_capture: string; p_token: string }; Returns: undefined };
     };
     Enums: {
       user_role: UserRole;

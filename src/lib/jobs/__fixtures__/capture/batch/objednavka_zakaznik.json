@@ -1,0 +1,70 @@
+{
+  "docKind": "objednavka",
+  "issuer": "zakaznik",
+  "documentNumber": "PO-E2E-4471",
+  "documentDate": "2026-10-21",
+  "customer": {
+    "name": "STROJMETAL, a. s.",
+    "ico": "45274649",
+    "dic": "CZ45274649",
+    "street": "Průmyslová 124",
+    "city": "Kladno",
+    "zip": "272 01",
+    "country": "CZ",
+    "email": "dvorak@strojmetal.cz",
+    "phone": "+420 603 111 222",
+    "contactPerson": "Ing. Jan Dvořák"
+  },
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "PO-E2E-4471",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "NAB-E2E-1",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "D-88412",
+  "requiredDeliveryDate": "2026-12-04",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "4711-02",
+      "revision": "C",
+      "name": "Upínací deska",
+      "description": "",
+      "material": "1.2379",
+      "quantity": 20,
+      "unit": "ks",
+      "unitPrice": 2450,
+      "deliveryDate": "2026-12-04"
+    },
+    {
+      "drawingNumber": "4711-03",
+      "revision": "A",
+      "name": "Vodicí lišta",
+      "description": "",
+      "material": "S355J2",
+      "quantity": 40,
+      "unit": "ks",
+      "unitPrice": 780,
+      "deliveryDate": "2026-12-04"
+    }
+  ],
+  "totalWithoutVat": 80200,
+  "currency": "CZK",
+  "paymentTerms": "30 dní",
+  "deliveryTerms": "",
+  "note": "",
+  "summary": "Objednávka PO-E2E-4471 od Strojmetal na 2 položky (4711-02, 4711-03).",
+  "confidence": 0.92,
+  "needsClarification": []
+}
