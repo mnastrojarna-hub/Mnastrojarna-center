@@ -10,7 +10,11 @@ import { DOC_KIND_LABEL, type CaptureDocKind } from "@/lib/jobs/capture-types";
  * chyba učení nikdy nesmí shodit nahrání dokladu.
  */
 
+/** Druh příkladu: doklad (capture), výkres z dávky, roztřídění dávky. */
+export type TrainingKind = "capture" | "capture_drawing" | "capture_sort";
+
 export interface TrainingExampleInput {
+  kind?: TrainingKind;
   jobId?: string;
   jobFileId?: string;
   docKind?: string;
@@ -29,7 +33,7 @@ export async function recordTrainingExample(input: TrainingExampleInput): Promis
   try {
     const db = createAdminClient();
     await db.from("ai_training_examples").insert({
-      kind: "capture",
+      kind: input.kind ?? "capture",
       job_id: input.jobId ?? null,
       job_file_id: input.jobFileId ?? null,
       doc_kind: input.docKind ?? null,
@@ -129,23 +133,60 @@ export function formatCaptureLearningPrompt(rows: LearningRow[]): string {
   );
 }
 
+/** Roztřídění dávky jako text („objednávka zákazníka (2 str.) · výkres 4711-02 · 3D model"). */
+function compactSort(v: unknown): string {
+  const o = v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+  const docs = Array.isArray(o.docs) ? o.docs : [];
+  return docs
+    .filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object" && (d as Record<string, unknown>).excluded !== true)
+    .map((d) => {
+      const pages = Array.isArray(d.pageIds) ? d.pageIds.length : 0;
+      const label = typeof d.label === "string" ? d.label : typeof d.type === "string" ? d.type : "doklad";
+      const num = typeof d.documentNumber === "string" && d.documentNumber ? ` ${d.documentNumber}` : "";
+      return `${label}${num}${pages > 1 ? ` (${pages} str.)` : ""}`;
+    })
+    .join(" · ");
+}
+
+/** Few-shot text z oprav roztřídění dávky (čistý formátovač). */
+export function formatSortLearningPrompt(rows: LearningRow[]): string {
+  const lines: string[] = [];
+  for (const r of rows) {
+    const body = compactSort(r.final);
+    if (!body) continue;
+    const how = r.source === "corrected" ? "opraveno člověkem" : "roztříděno ručně";
+    lines.push(clip(`${lines.length + 1}) [${how}] ${body}`, MAX_EXAMPLE_CHARS));
+  }
+  if (!lines.length) return "";
+  return (
+    "UČENÍ Z RUČNÍ PRÁCE — Takto lidé roztřídili podobné dávky (vzor, jak poznat druh a vystavitele; " +
+    "hodnoty nepřebírej):\n" + lines.join("\n")
+  );
+}
+
 /**
  * Nejnovější ručně vyplněné / opravené doklady jako few-shot text do promptu
- * čtení dokladů. Bez servisního klíče nebo při chybě vrací "".
+ * čtení dokladů (sort = roztřídění dávky, drawing = výkresy). Bez servisního klíče
+ * nebo při chybě vrací "".
  */
-export async function buildCaptureLearningPrompt(limit = 8): Promise<string> {
+export async function buildCaptureLearningPrompt(
+  opts: number | { limit?: number; sort?: boolean; drawing?: boolean } = {},
+): Promise<string> {
+  const o = typeof opts === "number" ? { limit: opts } : opts;
+  const limit = o.limit ?? 8;
+  const kind: TrainingKind = o.sort ? "capture_sort" : o.drawing ? "capture_drawing" : "capture";
   if (!hasServiceKey()) return "";
   try {
     const db = createAdminClient();
     const { data, error } = await db
       .from("ai_training_examples")
       .select("doc_kind, source, final, created_at")
-      .eq("kind", "capture")
+      .eq("kind", kind)
       .in("source", ["manual", "corrected"])
       .order("created_at", { ascending: false })
       .limit(Math.max(1, Math.min(limit, 30)));
     if (error || !data) return "";
-    return formatCaptureLearningPrompt(data as LearningRow[]);
+    return kind === "capture_sort" ? formatSortLearningPrompt(data as LearningRow[]) : formatCaptureLearningPrompt(data as LearningRow[]);
   } catch {
     return "";
   }

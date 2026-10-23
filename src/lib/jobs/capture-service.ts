@@ -1,24 +1,28 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
-import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createOperatorClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { checkFeature, getAccess, type Access } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { getJob, getJobFormOptions, getMatchingCandidates } from "@/lib/data/jobs";
 import { createJob } from "@/app/actions/jobs";
-import { registerJobFile } from "@/app/actions/job-files";
+import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { recordCorrection } from "@/app/actions/corrections";
 import { getModuleMode } from "@/lib/automation";
 import { isDocumentReaderConfigured, readBusinessDocument, type ReadDocumentFile } from "@/lib/ai/document-reader";
+import { aiFailureMessage, routeDeadline } from "@/lib/ai/ai-call";
+import { findOrCreateSupplierByParty, loadSupplierCandidates } from "@/lib/jobs/purchasing-store";
+import { analyzeBatch, discardBatch } from "@/lib/jobs/capture-batch-service";
+import { liveSessionPaths } from "@/lib/jobs/capture-store";
 import { recordTrainingExample } from "@/lib/jobs/training";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
-import { composeAddress, findOrCreateCustomer, normalizeCountry, normalizeDic, normalizeIco } from "@/lib/jobs/customers";
+import { findOrCreateCustomer } from "@/lib/jobs/customers";
 import { docFieldValues, planJobUpdate, planNewJob } from "@/lib/jobs/apply-extraction";
 import { isSupplierSideDoc, matchCustomer, matchJob, matchParty } from "@/lib/jobs/matching";
 import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
-  cleanNumber, cleanText, fetchPaged, isUuid, jobFilePath, jobInputToRow, jobItemToRow, stageEventMessage,
+  cleanNumber, cleanText, computeItemTotals, isUuid, jobFilePath, jobInputToRow, jobItemToRow, stageEventMessage,
   translateDbError, validateItems, validateJobInput,
 } from "@/lib/jobs/mapping";
 import { isJobStage } from "@/lib/jobs/stages";
@@ -28,10 +32,11 @@ import type {
 import type { ActionResult, JobDetail } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
 import {
-  CAPTURE_BUCKET, CAPTURE_MAX_PAGES, CAPTURE_TTL_MS, REVIEW_FIELD_KEYS, REVIEW_FIELDS,
+  CAPTURE_BATCH_MAX_FILES, CAPTURE_BUCKET, CAPTURE_MAX_PAGES, CAPTURE_TTL_MS, REVIEW_FIELD_KEYS, REVIEW_FIELDS,
   buildExistingTarget, buildNewTarget, canAutoApply, captureEventMessage, captureFolder, capturePagePath,
-  captureSessionPath, chipByKey, chipFor, defaultCustomerChoice, defaultSupplierChoice, documentNumberFor,
-  initialReviewState, isAiReadableMime, isAiValue, isCaptureDocKind, isCaptureMime, isCapturePagePath, isFieldLocked,
+  captureSessionPath, captureSortPath, chipByKey, chipFor, defaultCustomerChoice, defaultSupplierChoice, documentNumberFor,
+  initialReviewState, isAiReadableMime, isAiValue, isBatchUploadable, isCaptureDocKind, isCapturePagePath, isCaptureSortPath,
+  isFieldLocked,
   reviewChanges, reviewItemsToInputs, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
   sniffDocumentMime,
   type AnalyzeCaptureResponse, type CaptureFileRef, type CapturePreview, type PartyMatchView, type ReviewFieldKey,
@@ -74,7 +79,7 @@ interface CaptureSession {
   matches: { jobId: string; reason: string; score: number }[];
 }
 
-interface Ctx {
+export interface Ctx {
   db: JobsDb;
   user: CurrentUser;
   access: Access;
@@ -86,14 +91,14 @@ type Row = Record<string, unknown>;
 const AI_NOT_ALLOWED = "Nemáš povolené AI čtení dokladů — vyplň údaje ručně podle fotky. AI se z tvého vyplnění učí.";
 const AI_DISABLED = "AI je vypnuté v Nastavení — vyplň údaje ručně podle fotky. AI se z tvého vyplnění učí.";
 const AI_MISSING = "AI není nastavené (chybí Claude API klíč) — vyplň údaje ručně podle fotky. AI se z tvého vyplnění učí.";
-const SESSION_GONE = "Doklad už není k dispozici (vypršel nebo už je uložený) — vyfoť ho prosím znovu.";
+export const SESSION_GONE = "Doklad už není k dispozici (vypršel nebo už je uložený) — vyfoť ho prosím znovu.";
 
 /** Claude API: obrázek max. 5 MB, celý požadavek do ~32 MB (base64 = +33 %). */
 const AI_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const AI_MAX_TOTAL_BYTES = 22 * 1024 * 1024;
 const PREVIEW_TTL_S = 3600;
 
-async function begin(): Promise<Ctx | { error: string }> {
+export async function begin(): Promise<Ctx | { error: string }> {
   if (!isSupabaseConfigured()) return { error: "Supabase není nakonfigurováno." };
   const res = await checkFeature("orders");
   if ("error" in res) return { error: res.error };
@@ -102,16 +107,16 @@ async function begin(): Promise<Ctx | { error: string }> {
   return { db, user: res.user, access, margins: access.can("margins") };
 }
 
-function message(err: unknown): string {
+export function message(err: unknown): string {
   if (typeof err === "string") return translateDbError(err);
   return err instanceof Error ? translateDbError(err.message) : "Neočekávaná chyba.";
 }
 
-function fail(err: unknown): { ok: false; error: string } {
+export function fail(err: unknown): { ok: false; error: string } {
   return { ok: false, error: message(err) };
 }
 
-function failResult(err: unknown, aiUsed = false): CaptureResult {
+export function failResult(err: unknown, aiUsed = false): CaptureResult {
   return { ok: false, error: message(err), created: false, aiUsed, filled: [] };
 }
 
@@ -120,7 +125,7 @@ function bucket(db: JobsDb) {
 }
 
 /** Smí uživatel nechat doklad přečíst AI? (+ proč ne) */
-async function aiAvailability(access: Access): Promise<{ available: boolean; reason: string | null }> {
+export async function aiAvailability(access: Access): Promise<{ available: boolean; reason: string | null }> {
   if (access.can("ai_capture") && (await isDocumentReaderConfigured())) return { available: true, reason: null };
   // E2E bez API klíče: testovací AI_FAKE_CAPTURE pro super admina
   if (process.env.AI_FAKE_CAPTURE && access.user?.role === "super_admin") return { available: true, reason: null };
@@ -133,9 +138,11 @@ async function aiAvailability(access: Access): Promise<{ available: boolean; rea
 // ── Soubory ─────────────────────────────────────────────────
 const IMAGE_EXT = /\.(pdf|jpe?g|png|webp|gif|heic|heif)$/i;
 
-function cleanFileRefs(userId: string, raw: unknown): CaptureFileRef[] | string {
+export function cleanFileRefs(userId: string, raw: unknown, max: number = CAPTURE_MAX_PAGES): CaptureFileRef[] | string {
   if (!Array.isArray(raw) || raw.length === 0) return "Vyfoť nebo vyber aspoň jednu stránku dokladu.";
-  if (raw.length > CAPTURE_MAX_PAGES) return `Doklad může mít nejvýš ${CAPTURE_MAX_PAGES} stránek.`;
+  if (raw.length > max) {
+    return max === CAPTURE_MAX_PAGES ? `Doklad může mít nejvýš ${CAPTURE_MAX_PAGES} stránek.` : `Najednou jde nahrát nejvýš ${max} souborů.`;
+  }
   const out: CaptureFileRef[] = [];
   for (const r of raw) {
     const o = r && typeof r === "object" ? (r as Record<string, unknown>) : {};
@@ -145,27 +152,36 @@ function cleanFileRefs(userId: string, raw: unknown): CaptureFileRef[] | string 
     const mimeType = (cleanText(o.mimeType, 200) ?? "").toLowerCase();
     const size = cleanNumber(o.size) ?? 0;
     if (size < 0 || size > JOB_FILE_MAX_BYTES) return "Neplatná velikost souboru.";
-    out.push({ path: o.path, filename, mimeType, size: Math.round(size) });
+    const sortPath = o.sortPath === undefined || o.sortPath === null || o.sortPath === "" ? null : o.sortPath;
+    if (sortPath !== null && !isCaptureSortPath(userId, sortPath)) return "Neplatná cesta náhledu.";
+    out.push({ path: o.path, filename, mimeType, size: Math.round(size), ...(sortPath ? { sortPath } : {}) });
   }
   return out;
 }
 
-/** Úklid zapomenutých dokladů uživatele (starší než 24 h). Best-effort. */
+/**
+ * Úklid zapomenutých dokladů uživatele (starší než 24 h). Soubory otevřených a částečně uložených
+ * dávek (relace v DB platí až 7 dní) se nemažou. Best-effort.
+ */
 async function cleanupStale(db: JobsDb, userId: string): Promise<void> {
   try {
     const folder = captureFolder(userId);
     const { data } = await bucket(db).list(folder, { limit: 100, sortBy: { column: "created_at", order: "asc" } });
     const cutoff = Date.now() - CAPTURE_TTL_MS;
-    const old = ((data ?? []) as { name: string; created_at?: string | null }[])
+    const candidates = ((data ?? []) as { name: string; created_at?: string | null }[])
       .filter((f) => f.name && f.created_at && Date.parse(f.created_at) < cutoff)
       .map((f) => `${folder}/${f.name}`);
+    if (!candidates.length) return;
+    // dávky: chyba čtení relací = raději nic nemazat
+    const live = await liveSessionPaths(db, userId);
+    const old = candidates.filter((p) => !live.has(p));
     if (old.length) await bucket(db).remove(old);
   } catch {
     // úklid nesmí shodit nahrávání
   }
 }
 
-async function signedPreviews(db: JobsDb, files: CaptureFileRef[]): Promise<CapturePreview[]> {
+export async function signedPreviews(db: JobsDb, files: CaptureFileRef[]): Promise<CapturePreview[]> {
   let urls: (string | null)[] = files.map(() => null);
   try {
     const { data } = await bucket(db).createSignedUrls(files.map((f) => f.path), PREVIEW_TTL_S);
@@ -235,24 +251,34 @@ export async function prepareCaptureUpload(input: {
   filename: string;
   size: number;
   mimeType?: string;
-}): Promise<ActionResult<{ path: string; token: string; bucket: string }>> {
+  /** Fotka v dávce: i podepsaná URL pro náhled roztřídění (1280 px). */
+  sortPreview?: boolean;
+}): Promise<ActionResult<{ path: string; token: string; bucket: string; sortPath?: string; sortToken?: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   const filename = cleanText(input?.filename, 255);
   if (!filename) return fail("Chybí název souboru.");
   const size = cleanNumber(input.size);
   if (size === null || size <= 0) return fail("Soubor je prázdný.");
-  if (size > JOB_FILE_MAX_BYTES) return fail(`Soubor je příliš velký (max. ${Math.round(JOB_FILE_MAX_BYTES / 1024 / 1024)} MB).`);
-  const mime = cleanText(input.mimeType, 200) ?? "";
-  if (!isCaptureMime(mime) && !IMAGE_EXT.test(filename)) {
-    return fail("Sem patří fotka nebo PDF dokladu. Jiné soubory (3D modely, Excel…) přidej v kartě zakázky do Dokumentů.");
-  }
+  if (!isBatchUploadable(filename, size)) return fail("Soubor je větší než 50 MB.");
   try {
     await cleanupStale(c.db, c.user.id);
     const path = capturePagePath(c.user.id, crypto.randomUUID(), filename);
     const { data, error } = await bucket(c.db).createSignedUploadUrl(path);
     if (error || !data?.token) return fail(error?.message ?? "Nahrání se nepodařilo připravit.");
-    return { ok: true, path: (data.path as string | undefined) ?? path, token: data.token as string, bucket: CAPTURE_BUCKET };
+    const out: { path: string; token: string; bucket: string; sortPath?: string; sortToken?: string } = {
+      path: (data.path as string | undefined) ?? path, token: data.token as string, bucket: CAPTURE_BUCKET,
+    };
+    const mime = (cleanText(input.mimeType, 200) ?? "").toLowerCase();
+    if (input.sortPreview === true && (mime.startsWith("image/") || IMAGE_EXT.test(filename))) {
+      const sortPath = captureSortPath(c.user.id, out.path);
+      const sort = await bucket(c.db).createSignedUploadUrl(sortPath);
+      if (!sort.error && sort.data?.token) {
+        out.sortPath = (sort.data.path as string | undefined) ?? sortPath;
+        out.sortToken = sort.data.token as string;
+      }
+    }
+    return { ok: true, ...out };
   } catch (err) {
     return fail(err);
   }
@@ -263,15 +289,30 @@ export async function discardCapture(input: { captureId?: string | null; paths?:
   const c = await begin();
   if ("error" in c) return fail(c.error);
   try {
-    const paths = (Array.isArray(input?.paths) ? input.paths : []).filter((p) => isCapturePagePath(c.user.id, p));
+    const paths = (Array.isArray(input?.paths) ? input.paths : [])
+      .filter((p) => isCapturePagePath(c.user.id, p) || isCaptureSortPath(c.user.id, p));
+    // odebraná stránka dávky: i její náhled roztřídění (cesta je deterministická)
+    for (const p of [...paths]) {
+      if (!isCapturePagePath(c.user.id, p)) continue;
+      const sp = captureSortPath(c.user.id, p);
+      if (isCaptureSortPath(c.user.id, sp) && !paths.includes(sp) && !sp.includes("00000000-0000-0000-0000-000000000000")) paths.push(sp);
+    }
     let session: CaptureSession | null = null;
     if (input?.captureId && isUuid(input.captureId)) {
+      // dávka (relace v DB) má vlastní zahození
+      if (hasServiceKey()) {
+        const batch = await discardBatch(c, input.captureId, paths);
+        if (batch) return batch;
+      }
       session = await readSession(c.db, c.user.id, input.captureId);
       paths.push(captureSessionPath(c.user.id, input.captureId));
-      for (const f of session?.files ?? []) if (!paths.includes(f.path)) paths.push(f.path);
+      for (const f of session?.files ?? []) {
+        if (!paths.includes(f.path)) paths.push(f.path);
+        if (f.sortPath && !paths.includes(f.sortPath)) paths.push(f.sortPath);
+      }
     }
-    if (paths.length) {
-      const { error } = await bucket(c.db).remove(paths.slice(0, 100));
+    for (let i = 0; i < paths.length; i += 100) {
+      const { error } = await bucket(c.db).remove(paths.slice(i, i + 100));
       if (error) return fail(error.message);
     }
     return { ok: true };
@@ -281,19 +322,9 @@ export async function discardCapture(input: { captureId?: string | null; paths?:
 }
 
 // ── 2) Čtení a návrh ────────────────────────────────────────
-function supplierCandidate(r: { id: string; name: string; ico: string | null; dic: string | null; email: string | null }): CustomerMatchCandidate {
-  return {
-    id: r.id, name: r.name, ico: r.ico ?? null, dic: r.dic ?? null, email: r.email ?? null,
-    contactEmails: [], customerNumber: null, supplierNumberAtCustomer: null,
-  };
-}
-
-async function loadSuppliers(db: JobsDb): Promise<CustomerMatchCandidate[]> {
-  const { data } = await fetchPaged<{ id: string; name: string; ico: string | null; dic: string | null; email: string | null }>(
-    (from, to) => db.from("suppliers").select("id, name, ico, dic, email").order("name").order("id").range(from, to),
-    20_000,
-  );
-  return data.map(supplierCandidate);
+/** Dodavatelé jako kandidáti párování. */
+export async function loadSuppliers(db: JobsDb): Promise<CustomerMatchCandidate[]> {
+  return loadSupplierCandidates(db);
 }
 
 const MONEY_RE = /\d[\d\s.,]*\s*(?:Kč|CZK|EUR|€|USD|\$|,-)/gi;
@@ -303,7 +334,7 @@ function redactPrices(text: string): string {
   return text.replace(MONEY_RE, "…");
 }
 
-function existingTarget(job: JobDetail, session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean, reason: string | null, score: number | null): ReviewTarget {
+export function existingTarget(job: JobDetail, session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean, reason: string | null, score: number | null): ReviewTarget {
   return buildExistingTarget({
     job,
     plan: session.aiUsed ? planJobUpdate(job, session.doc) : null,
@@ -314,7 +345,7 @@ function existingTarget(job: JobDetail, session: Pick<CaptureSession, "aiUsed" |
   });
 }
 
-function newTarget(session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean): ReviewTarget {
+export function newTarget(session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean): ReviewTarget {
   return buildNewTarget({
     plan: session.aiUsed ? planNewJob(session.doc) : null,
     margins,
@@ -323,15 +354,44 @@ function newTarget(session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boo
   });
 }
 
-export async function analyzeCapture(raw: AnalyzeCaptureInput): Promise<AnalyzeCaptureResponse> {
+/**
+ * „AI čte": jeden doklad (1 obchodní doklad kromě nabídky dodavatele, žádný další soubor) = dnešní
+ * tok a odpověď { model }; jinak dávka { batch } (roztřídění, vytěžení per doklad, kontrola skupin).
+ * Bez servisního klíče dávka neběží — vše je jeden doklad jako dřív.
+ */
+export async function analyzeCapture(raw: AnalyzeCaptureInput, signal?: AbortSignal | null): Promise<AnalyzeCaptureResponse> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
-  const files = cleanFileRefs(c.user.id, raw?.files);
+  const files = cleanFileRefs(c.user.id, raw?.files, hasServiceKey() ? CAPTURE_BATCH_MAX_FILES : CAPTURE_MAX_PAGES);
   if (typeof files === "string") return fail(files);
   const fixedJobId = raw?.jobId ? (isUuid(raw.jobId) ? raw.jobId.toLowerCase() : "") : null;
   if (fixedJobId === "") return fail("Zakázka nenalezena.");
   const expectedKind = isCaptureDocKind(raw?.expectedKind) ? raw.expectedKind : null;
+  if (!hasServiceKey()) return analyzeSingle(c, files, { fixedJobId, expectedKind, signal });
+  try {
+    return await analyzeBatch(c, files, { fixedJobId, expectedKind, signal: signal ?? null });
+  } catch (err) {
+    return fail(err);
+  }
+}
 
+/** Už přečtený doklad (souběh roztřídění a vytěžení v dávce) — dnešní tok ho jen převezme. */
+export interface PrereadDoc {
+  doc: ExtractedBusinessDoc;
+  aiUsed: boolean;
+  reason: string | null;
+  notes: string[];
+}
+
+/** Dnešní tok jednoho dokladu: AI čtení (nebo převzaté), párování, kontrolní formulář, relace v1. */
+export async function analyzeSingle(
+  c: Ctx,
+  files: CaptureFileRef[],
+  opts: { fixedJobId: string | null; expectedKind: CaptureDocKind | null; signal?: AbortSignal | null; preread?: PrereadDoc | null },
+): Promise<AnalyzeCaptureResponse> {
+  const { fixedJobId, expectedKind } = opts;
+  if (files.length > CAPTURE_MAX_PAGES) return fail(`Doklad může mít nejvýš ${CAPTURE_MAX_PAGES} stránek.`);
+  // v1 relace nese jen stránky dokladu (náhledy roztřídění se smažou s ní)
   try {
     const { db, margins, access } = c;
     const [ai, previews, options, candidates, suppliers, fixedJob, mode] = await Promise.all([
@@ -350,7 +410,12 @@ export async function analyzeCapture(raw: AnalyzeCaptureInput): Promise<AnalyzeC
     let aiUsed = false;
     let reason = ai.reason;
     const notes: string[] = [];
-    if (ai.available) {
+    if (opts.preread) {
+      doc = opts.preread.doc;
+      aiUsed = opts.preread.aiUsed;
+      reason = opts.preread.reason ?? (aiUsed ? null : ai.reason);
+      notes.push(...opts.preread.notes);
+    } else if (ai.available) {
       try {
         const loaded = await loadAiFiles(db, files);
         if (loaded.skipped.length) {
@@ -366,12 +431,14 @@ export async function analyzeCapture(raw: AnalyzeCaptureInput): Promise<AnalyzeC
               customerName: fixedJob?.customer?.name,
               expectedKind: expectedKind ?? undefined,
             },
+            deadline: routeDeadline(),
+            clientSignal: opts.signal ?? null,
           });
           aiUsed = true;
           reason = null;
         }
       } catch (err) {
-        reason = `AI doklad nepřečetla (${message(err)}). Vyplň údaje ručně podle náhledu.`;
+        reason = `AI doklad nepřečetla (${aiFailureMessage(err).replace(/\.$/, "")}). Vyplň údaje ručně podle náhledu.`;
       }
     }
     if (!aiUsed && expectedKind) doc = { ...doc, docKind: expectedKind };
@@ -467,7 +534,7 @@ export async function analyzeCapture(raw: AnalyzeCaptureInput): Promise<AnalyzeC
 
     // plná automatika: jistý doklad se uloží hned, člověk jen případně upraví
     if (canAutoApply(model)) {
-      const applied = await applyWithSession(c, session, model.initial, { auto: true });
+      const applied = await applyBusinessDoc(c, session, model.initial, { auto: true });
       if (applied.ok) return { ok: true, model, applied };
       model.needsClarification = [`Automatické uložení se nepovedlo (${applied.error}) — zkontroluj a ulož ručně.`, ...model.needsClarification];
     }
@@ -502,7 +569,7 @@ export async function applyCapture(input: { captureId: string; state: unknown })
   try {
     const session = await readSession(c.db, c.user.id, input.captureId);
     if (!session) return failResult(SESSION_GONE);
-    return await applyWithSession(c, session, input.state, { auto: false });
+    return await applyBusinessDoc(c, session, input.state, { auto: false });
   } catch (err) {
     return failResult(err);
   }
@@ -517,26 +584,8 @@ function clamp01(v: number): number {
 }
 
 /** Dodavatel podle IČO / DIČ / názvu, jinak nový. */
-async function findOrCreateSupplier(db: JobsDb, party: ExtractedParty): Promise<{ id: string; name: string; created: boolean } | null> {
-  const suppliers = await loadSuppliers(db);
-  const hit = matchParty(party, suppliers);
-  if (hit && hit.score >= 80) return { id: hit.id, name: suppliers.find((s) => s.id === hit.id)?.name ?? party.name, created: false };
-  const insert: Row = {
-    name: party.name.trim().slice(0, 300),
-    ico: normalizeIco(party.ico),
-    dic: normalizeDic(party.dic),
-    email: party.email.trim().toLowerCase() || null,
-    phone: party.phone.trim() || null,
-    contact_person: party.contactPerson.trim() || null,
-    country: normalizeCountry(party.country),
-    address: composeAddress(party),
-  };
-  const { data, error } = await db.from("suppliers").insert(insert as never).select("id, name").single();
-  if (error || !data) {
-    console.error(`[capture] Založení dodavatele selhalo: ${error?.message ?? "bez odpovědi"}`);
-    return null;
-  }
-  return { id: (data as { id: string }).id, name: (data as { name: string }).name, created: true };
+export async function findOrCreateSupplier(db: JobsDb, party: ExtractedParty): Promise<{ id: string; name: string; created: boolean } | null> {
+  return findOrCreateSupplierByParty(db, party);
 }
 
 /** Pole, která zakázka už má (formulář je nepřepisuje). */
@@ -544,13 +593,44 @@ function lockedKeys(target: ReviewTarget): ReviewFieldKey[] {
   return REVIEW_FIELD_KEYS.filter((k) => isFieldLocked(target, k));
 }
 
-async function applyWithSession(
+export interface ApplyBusinessOptions {
+  auto: boolean;
+  /** Dávka: „<captureId>:<skupina>" — idempotentní založení zakázky a položek (opakování nic nezdvojí). */
+  captureKey?: string | null;
+  /** false = stav existující zakázky se nemění (dávka posouvá stav jednou za skupinu). */
+  stage?: boolean;
+  /** false = stránky se nepřikládají (dávka přikládá každý doklad zvlášť). */
+  attachFiles?: boolean;
+  /** false = bez souhrnné události (dávka zapíše vlastní). */
+  summaryEvent?: boolean;
+  /** false = bez učení AI (dávka učí per doklad). */
+  learn?: boolean;
+  /** false = relace v1 se nemaže. */
+  cleanupSession?: boolean;
+}
+
+/** Doklad k uložení (relace v1, nebo skupina dávky se sloučeným dokladem). */
+export type BusinessDocSession = Pick<
+  CaptureSession, "captureId" | "userId" | "files" | "aiUsed" | "doc" | "fixedJobId" | "customerMatch" | "supplierMatch" | "matches"
+>;
+
+export type BusinessApplyResult = CaptureResult & {
+  /** Klíč položky formuláře → id položky zakázky (nově založené). */
+  itemIds?: Record<string, string>;
+};
+
+/**
+ * Zapíše zkontrolovaný formulář do zakázky: zákazník (najít / založit), dodavatel, nová zakázka
+ * nebo doplnění prázdných polí existující, položky, doplnění položek, stav (jen dopředu), stránky
+ * dokladu k zakázce, jedna událost a učení. Dávka volá totéž per skupina s vlastními volbami.
+ */
+export async function applyBusinessDoc(
   c: Ctx,
-  session: CaptureSession,
+  session: BusinessDocSession,
   rawState: unknown,
-  opts: { auto: boolean },
-): Promise<CaptureResult> {
-  const sane = sanitizeReviewState(rawState, { fixedJobId: session.fixedJobId });
+  opts: ApplyBusinessOptions,
+): Promise<BusinessApplyResult> {
+  const sane = sanitizeReviewState(rawState, { fixedJobId: opts.captureKey ? null : session.fixedJobId });
   if (!sane.ok) return failResult(sane.error, session.aiUsed);
   const state: ReviewState = sane.state;
   const { db, user, margins } = c;
@@ -558,6 +638,18 @@ async function applyWithSession(
   const chip = chipByKey(state.chip);
   const supplierSide = isSupplierSideDoc(state);
   const warnings: string[] = [];
+  const captureKey = opts.captureKey ?? null;
+  const itemIds: Record<string, string> = {};
+  let createdEarlier = false;
+
+  // dávka: zakázka už založená dřívějším pokusem → jen doplnit
+  if (captureKey && state.targetKey === "new") {
+    const { data: prev } = await db.from("orders").select("id").eq("capture_key", captureKey).maybeSingle();
+    if (prev) {
+      state.targetKey = (prev as { id: string }).id;
+      createdEarlier = true;
+    }
+  }
 
   // cíl
   let detail: JobDetail | null = null;
@@ -645,7 +737,37 @@ async function applyWithSession(
   let itemsMerged = 0;
   const written: ReviewFieldKey[] = [];
 
-  if (target.mode === "new") {
+  if (target.mode === "new" && captureKey) {
+    // dávka: zakázka bez položek, hned klíč relace, položky s klíčem (opakování je nezdvojí)
+    const stage: JobStage = state.stage === "keep" ? "poptavka" : state.stage;
+    const totals = computeItemTotals(items.map((it) => ({ quantity: it.quantity, unitPrice: it.unitPrice, purchaseUnitPrice: margins ? it.purchaseUnitPrice : null })));
+    const extra: Record<string, unknown> = {};
+    if (input.value === undefined && totals.value !== null) extra.value = totals.value;
+    if (margins && input.purchaseCost === undefined && totals.purchaseCost !== null) extra.purchaseCost = totals.purchaseCost;
+    if (!input.title) extra.title = items[0]?.name ?? items[0]?.drawingNumber ?? "Nová zakázka z focení";
+    const res = await createJob(
+      { ...input, ...extra, customerId, supplierId, stage, items: [], ...(customerOwnerId ? { ownerId: customerOwnerId } : {}) },
+      { source: "foto", aiFilled: aiUsed, aiConfidence: aiUsed ? doc.confidence : undefined, captureKey },
+    );
+    if (!res.ok || !res.id || !res.number) {
+      // souběh / opakování: zakázku s tímto klíčem už založil jiný pokus → použít ji
+      const { data: again } = await db.from("orders").select("id").eq("capture_key", captureKey).maybeSingle();
+      if (again) return applyBusinessDoc(c, session, { ...state, targetKey: (again as { id: string }).id }, opts);
+      return failResult(res.error ?? "Zakázku se nepodařilo založit.", aiUsed);
+    }
+    jobId = res.id;
+    jobNumber = res.number;
+    created = true;
+    stageTo = stage;
+    const ins = await insertCaptureItems(db, jobId, state.items, items, captureKey, margins);
+    if ("error" in ins) {
+      await db.from("orders").delete().eq("id", jobId);
+      return failResult(`Položky se nepodařilo uložit: ${ins.error}`, aiUsed);
+    }
+    Object.assign(itemIds, ins.ids);
+    itemsAdded = ins.added;
+    for (const k of REVIEW_FIELD_KEYS) if ((input as Record<string, unknown>)[k] !== undefined) written.push(k);
+  } else if (target.mode === "new") {
     const stage: JobStage = state.stage === "keep" ? "poptavka" : state.stage;
     const res = await createJob(
       { ...input, customerId, supplierId, stage, items, ...(customerOwnerId ? { ownerId: customerOwnerId } : {}) },
@@ -666,7 +788,13 @@ async function applyWithSession(
 
     // položky nejdřív — když selžou, nic se nezapíše
     let insertedIds: string[] = [];
-    if (items.length) {
+    if (captureKey && items.length) {
+      const ins = await insertCaptureItems(db, jobId, state.items, items, captureKey, margins);
+      if ("error" in ins) return failResult(`Položky se nepodařilo uložit: ${ins.error}`, aiUsed);
+      Object.assign(itemIds, ins.ids);
+      insertedIds = ins.inserted;
+      itemsAdded = ins.added;
+    } else if (items.length) {
       const { data: last } = await db.from("order_items").select("position").eq("order_id", jobId).order("position", { ascending: false }).limit(1);
       const start = (((last ?? []) as { position: number | null }[])[0]?.position ?? -1) + 1;
       const rows = items.map((it, i) => {
@@ -734,7 +862,7 @@ async function applyWithSession(
     }
 
     // stav
-    if (state.stage !== "keep" && state.stage !== stageFrom) {
+    if (opts.stage !== false && state.stage !== "keep" && state.stage !== stageFrom) {
       const { error } = await db.from("orders").update({ status: state.stage } as never).eq("id", jobId);
       if (error) {
         warnings.push(`Stav se nepodařilo změnit: ${message(error.message)}`);
@@ -751,7 +879,7 @@ async function applyWithSession(
   // stránky dokladu → k zakázce (první stránka = hlavní dokument s daty z AI)
   const docNumber = documentNumberFor(state, doc.documentNumber);
   const fileIds: string[] = [];
-  const total = session.files.length;
+  const total = opts.attachFiles === false ? 0 : session.files.length;
   for (let i = 0; i < total; i++) {
     const f = session.files[i];
     const dest = jobFilePath(jobId, crypto.randomUUID(), f.filename);
@@ -760,7 +888,7 @@ async function applyWithSession(
       warnings.push(`Stránku ${f.filename} se nepodařilo přiložit (${message(mvErr.message)}).`);
       continue;
     }
-    const reg = await registerJobFile({
+    const reg = await registerJobFileCore(db, user.id, {
       jobId,
       path: dest,
       filename: f.filename,
@@ -780,13 +908,16 @@ async function applyWithSession(
       continue;
     }
     fileIds.push(reg.file.id);
+    if (f.sortPath) {
+      try { await bucket(db).remove([f.sortPath]); } catch { /* náhled roztřídění vyprší sám */ }
+    }
   }
 
   // jedna událost v historii
   const filledColumns = aiUsed ? written.filter((k) => isAiValue(target, state, k, true)).map((k) => REVIEW_FIELDS[k].column) : [];
   const filledLabels = written.map((k) => REVIEW_FIELDS[k].label);
   if (customerAttached && customerName && !jobCustomerId) filledLabels.unshift(customerCreated ? `Zákazník (nový: ${customerName})` : `Zákazník ${customerName}`);
-  await logJobEvent(db, {
+  if (opts.summaryEvent !== false) await logJobEvent(db, {
     jobId,
     type: aiUsed ? "ai" : "file",
     message: captureEventMessage({
@@ -816,7 +947,7 @@ async function applyWithSession(
     )
     : [];
   const manualFilled = !aiUsed && (written.length > 0 || itemsAdded > 0 || customerAttached);
-  if (aiUsed || manualFilled) {
+  if (opts.learn !== false && (aiUsed || manualFilled)) {
     await recordTrainingExample({
       source: aiUsed ? (changes.length ? "corrected" : "ai") : "manual",
       extracted: aiUsed ? doc : null,
@@ -828,7 +959,7 @@ async function applyWithSession(
     });
   }
   const context = `${chip.label} · ${customerName ?? "bez zákazníka"}${docNumber ? ` · ${docNumber}` : ""}`.slice(0, 500);
-  for (const ch of changes.slice(0, 20)) {
+  for (const ch of opts.learn === false ? [] : changes.slice(0, 20)) {
     try {
       await recordCorrection({
         agentKey: "capture",
@@ -843,10 +974,12 @@ async function applyWithSession(
   }
 
   // úklid relace
-  try {
-    await bucket(db).remove([captureSessionPath(user.id, session.captureId)]);
-  } catch {
-    // vyprší sama
+  if (opts.cleanupSession !== false) {
+    try {
+      await bucket(db).remove([captureSessionPath(user.id, session.captureId)]);
+    } catch {
+      // vyprší sama
+    }
   }
   revalidatePath("/orders");
   revalidatePath(`/orders/${jobId}`);
@@ -856,7 +989,7 @@ async function applyWithSession(
     ok: true,
     jobId,
     jobNumber,
-    created,
+    created: created || createdEarlier,
     matchedBy: target.mode !== "existing" ? undefined
       : session.fixedJobId ? "doklad nahraný u zakázky"
       : session.matches.find((m) => m.jobId === jobId)?.reason ?? "vybráno ručně",
@@ -880,5 +1013,49 @@ async function applyWithSession(
     summary: aiUsed ? (margins || !supplierSide ? doc.summary : redactPrices(doc.summary)) : undefined,
     autoApplied: opts.auto || undefined,
     warnings: warnings.length ? warnings : undefined,
+    ...(captureKey ? { itemIds } : {}),
   };
+}
+
+/**
+ * Položky dávky s klíčem relace: založí jen ty, které ještě nejsou (opakované uložení po pádu
+ * nic nezdvojí), a vrátí id podle klíče řádku formuláře.
+ */
+async function insertCaptureItems(
+  db: JobsDb,
+  jobId: string,
+  reviewItems: ReviewState["items"],
+  inputs: ReturnType<typeof reviewItemsToInputs>,
+  captureKey: string,
+  margins: boolean,
+): Promise<{ ids: Record<string, string>; inserted: string[]; added: number } | { error: string }> {
+  const rows = reviewItems.filter((i) => !(!i.drawingNumber.trim() && !i.name.trim() && !i.description.trim()));
+  const keys = rows.map((r) => `${captureKey}:${r.key}`.slice(0, 300));
+  const ids: Record<string, string> = {};
+  const { data: existing } = await db.from("order_items").select("id, capture_key").eq("order_id", jobId).in("capture_key", keys.length ? keys : ["-"]);
+  for (const e of (existing ?? []) as { id: string; capture_key: string }[]) {
+    const i = keys.indexOf(e.capture_key);
+    if (i >= 0) ids[rows[i].key] = e.id;
+  }
+  const { data: last } = await db.from("order_items").select("position").eq("order_id", jobId).order("position", { ascending: false }).limit(1);
+  let pos = (((last ?? []) as { position: number | null }[])[0]?.position ?? -1) + 1;
+  const toInsert: Record<string, unknown>[] = [];
+  const toKeys: string[] = [];
+  rows.forEach((r, i) => {
+    if (ids[r.key]) return;
+    const row = jobItemToRow(inputs[i], pos++);
+    if (!margins) row.purchase_unit_price = null;
+    toInsert.push({ ...row, order_id: jobId, capture_key: keys[i] });
+    toKeys.push(r.key);
+  });
+  if (!toInsert.length) return { ids, inserted: [], added: 0 };
+  const { data: ins, error } = await db.from("order_items").insert(toInsert as never).select("id, capture_key");
+  if (error) return { error: error.message };
+  const inserted: string[] = [];
+  for (const r of (ins ?? []) as { id: string; capture_key: string }[]) {
+    const i = keys.indexOf(r.capture_key);
+    if (i >= 0) ids[rows[i].key] = r.id;
+    inserted.push(r.id);
+  }
+  return { ids, inserted, added: inserted.length };
 }

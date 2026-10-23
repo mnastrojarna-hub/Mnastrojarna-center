@@ -127,11 +127,16 @@ async function applyStage(
 // ── Zakázka ─────────────────────────────────────────────────
 export async function createJob(
   input: JobInput & { items?: JobItemInput[] },
-  opts: { source?: JobSource; emailId?: string; aiFilled?: boolean; aiConfidence?: number } = {},
+  opts: {
+    source?: JobSource; emailId?: string; aiFilled?: boolean; aiConfidence?: number;
+    /** Dávkové focení: „<captureId>:<skupina>" rovnou v insertu (unikát — opakování nezaloží druhou zakázku). */
+    captureKey?: string;
+  } = {},
 ): Promise<ActionResult<{ id: string; number: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!input || typeof input !== "object") return fail("Chybí údaje zakázky.");
+  if (opts.captureKey !== undefined && !/^[0-9a-f-]{36}:g\d{1,3}$/.test(String(opts.captureKey))) return fail("Neplatný klíč focení.");
   const invalid = validateJobInput(input);
   if (invalid) return fail(invalid);
   const items = input.items ?? [];
@@ -190,6 +195,7 @@ export async function createJob(
       email_id: opts.emailId ?? null,
       ai_filled: Boolean(opts.aiFilled),
       ai_confidence: clamp01(opts.aiConfidence),
+      ...(opts.captureKey ? { capture_key: opts.captureKey } : {}),
     };
     const { data: created, error } = await db.from("orders").insert(insert as never).select("id, number").single();
     if (error || !created) return fail(error?.message ?? "Zakázku se nepodařilo založit.");

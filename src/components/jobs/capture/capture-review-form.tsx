@@ -13,13 +13,14 @@ import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { NativeSelect } from "@/components/jobs/book/native-select";
 import { StagePicker } from "@/components/jobs/book/stage-picker";
 import {
-  AI_FIELD, AiMark, ConfidenceMeter, FieldLabel, LOCKED_FIELD, LockedMark, ScorePill, Section, Segmented, TONES,
+  AI_FIELD, AiMark, ConfidenceMeter, FieldLabel, GROUP_TONE, LOCKED_FIELD, LockedMark, ScorePill, Section, Segmented,
+  SOURCE_FIELD, SourceMark, TONES,
 } from "@/components/jobs/capture/capture-parts";
 import {
-  CAPTURE_CHIPS, CHIP_GROUPS, MERGE_FIELD_LABELS, REVIEW_FIELDS, changeChip, chipByKey, defaultCustomerChoice,
+  CAPTURE_CHIPS, CHIP_GROUPS, MERGE_FIELD_LABELS, REVIEW_FIELDS, REVIEW_FIELD_KEYS, REVIEW_GROUPS, changeChip, chipByKey, defaultCustomerChoice,
   defaultSupplierChoice, emptyReviewItem, hiddenFieldCount, isAiValue, isFieldLocked, proposeStage, switchTarget,
   visibleFieldGroups,
-  type ChipGroup, type MergeField, type PartyChoice, type ReviewFieldGroup, type ReviewFieldKey, type ReviewItem,
+  type MergeField, type PartyChoice, type ReviewFieldGroup, type ReviewFieldKey, type ReviewItem,
   type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
 import { isSupplierSideDoc } from "@/lib/jobs/matching";
@@ -29,19 +30,13 @@ import { formatIsoDate } from "@/lib/jobs/field-labels";
 import { nextStage, stageMeta } from "@/lib/jobs/stages";
 import { cleanNumber } from "@/lib/jobs/mapping";
 import type { ExtractedParty } from "@/lib/jobs/capture-types";
+import type { FieldSource } from "@/lib/jobs/capture-batch-types";
 import { cn, formatCZK } from "@/lib/utils";
 
 /**
  * Krok 3 — kontrola. Vše, co AI navrhla, je předvyplněné (✨ fuchsiově),
  * člověk jen opraví výjimky. Bez AI je to stejný formulář, jen prázdný.
  */
-
-const GROUP_TONE: Record<ChipGroup, string> = {
-  zakaznik: "text-sky-700 dark:text-sky-400",
-  my: "text-rose-700 dark:text-rose-400",
-  dodavatel: "text-lime-700 dark:text-lime-400",
-  ostatni: "text-slate-600 dark:text-slate-400",
-};
 
 const FIELD_GROUP_ICON: Record<ReviewFieldGroup, React.ComponentType<{ className?: string }>> = {
   zaklad: ClipboardList,
@@ -67,6 +62,20 @@ function displayValue(key: ReviewFieldKey, v: string): string {
   return v;
 }
 
+/**
+ * Vložený formulář „Údaje zakázky" ve skupině dávky: bez druhu dokladu, cíle, stavu
+ * a souboru (ty řeší hlavička skupiny a sekce dokladů); pole podle `visibleFields`,
+ * u doplněných údajů značka zdroje („z faktury FV-118").
+ */
+export interface CaptureReviewEmbedded {
+  visibleFields: ReviewFieldKey[];
+  fieldSources: Partial<Record<ReviewFieldKey, FieldSource>>;
+  itemSources: Record<string, FieldSource[]>;
+  hideTarget: true;
+  hideStage: true;
+  hideKind: true;
+}
+
 export interface CaptureReviewFormProps {
   model: ReviewModel;
   review: ReviewState;
@@ -75,24 +84,30 @@ export interface CaptureReviewFormProps {
   /** „Jiná zakázka…" — dialog načte návrh pro vybranou zakázku. */
   onPickJob: (jobId: string) => void;
   pickingJob: boolean;
+  embedded?: CaptureReviewEmbedded;
+  /** Předpona id polí (víc formulářů vedle sebe v dávce). */
+  idPrefix?: string;
 }
 
-export function CaptureReviewForm({ model, review, targets, onChange, onPickJob, pickingJob }: CaptureReviewFormProps) {
+export function CaptureReviewForm({ model, review, targets, onChange, onPickJob, pickingJob, embedded, idPrefix = "cap" }: CaptureReviewFormProps) {
   const target = targets.find((t) => t.key === review.targetKey) ?? targets[0];
-  const supplierSide = isSupplierSideDoc(review);
+  // ve skupině dávky jsou zákaznická pole zakázky; dodavatele řeší sekce dokladů
+  const supplierSide = !embedded && isSupplierSideDoc(review);
   const set = (patch: Partial<ReviewState>) => onChange({ ...review, ...patch });
 
   return (
-    <div className="space-y-3 pb-4">
-      <Banner model={model} />
-      <KindSection model={model} review={review} target={target} onChange={onChange} />
-      <TargetSection model={model} review={review} targets={targets} target={target} onChange={onChange} onPickJob={onPickJob} pickingJob={pickingJob} />
-      <CustomerSection model={model} review={review} target={target} onChange={(customer) => set({ customer })} />
-      {supplierSide && <SupplierSection model={model} review={review} target={target} onChange={(supplier) => set({ supplier })} />}
-      <FieldsSection model={model} review={review} target={target} onChange={(fields) => set({ fields })} />
-      <ItemsSection model={model} review={review} target={target} supplierSide={supplierSide} onChange={set} />
-      <StageSection review={review} target={target} onChange={(stage) => set({ stage })} />
-      <FileSection review={review} onChange={set} />
+    <div className={cn("space-y-3", !embedded && "pb-4")}>
+      {!embedded && <Banner model={model} />}
+      {!embedded?.hideKind && <KindSection model={model} review={review} target={target} onChange={onChange} />}
+      {!embedded?.hideTarget && (
+        <TargetSection model={model} review={review} targets={targets} target={target} onChange={onChange} onPickJob={onPickJob} pickingJob={pickingJob} />
+      )}
+      <CustomerSection model={model} review={review} target={target} idPrefix={idPrefix} onChange={(customer) => set({ customer })} />
+      {supplierSide && <SupplierSection model={model} review={review} target={target} idPrefix={idPrefix} onChange={(supplier) => set({ supplier })} />}
+      <FieldsSection model={model} review={review} target={target} embedded={embedded} idPrefix={idPrefix} onChange={(fields) => set({ fields })} />
+      <ItemsSection model={model} review={review} target={target} supplierSide={supplierSide} itemSources={embedded?.itemSources} idPrefix={idPrefix} onChange={set} />
+      {!embedded?.hideStage && <StageSection review={review} target={target} onChange={(stage) => set({ stage })} />}
+      {!embedded && <FileSection review={review} onChange={set} />}
     </div>
   );
 }
@@ -265,7 +280,7 @@ function TargetSection({
   );
 }
 
-function TargetCard({ t, selected, fixed, onSelect }: { t: ReviewTarget; selected: boolean; fixed: boolean; onSelect: () => void }) {
+export function TargetCard({ t, selected, fixed, onSelect }: { t: ReviewTarget; selected: boolean; fixed: boolean; onSelect: () => void }) {
   const isNew = t.mode === "new";
   const m = t.stage ? stageMeta(t.stage) : null;
   return (
@@ -370,9 +385,10 @@ function PartyFields({
   );
 }
 
-function PartyPicker({
-  kind, choice, docParty, match, options, aiUsed, onChange,
+export function PartyPicker({
+  kind, choice, docParty, match, options, aiUsed, onChange, idPrefix = "cap",
 }: {
+  idPrefix?: string;
   kind: "customer" | "supplier";
   choice: PartyChoice;
   docParty: ExtractedParty;
@@ -434,7 +450,7 @@ function PartyPicker({
             <span className="font-normal text-muted-foreground">(když už existuje se stejným IČO, použije se ten)</span>
           </p>
           <PartyFields
-            idPrefix={`cap-${kind}`}
+            idPrefix={`${idPrefix}-${kind}`}
             party={choice.party}
             docParty={docParty}
             aiUsed={aiUsed}
@@ -449,7 +465,7 @@ function PartyPicker({
   );
 }
 
-function CustomerSection({ model, review, target, onChange }: { model: ReviewModel; review: ReviewState; target: ReviewTarget; onChange: (c: PartyChoice) => void }) {
+function CustomerSection({ model, review, target, onChange, idPrefix }: { model: ReviewModel; review: ReviewState; target: ReviewTarget; onChange: (c: PartyChoice) => void; idPrefix: string }) {
   const options = React.useMemo<ComboOption[]>(() => model.options.customers.map((c) => ({
     value: c.id,
     label: c.name,
@@ -486,6 +502,7 @@ function CustomerSection({ model, review, target, onChange }: { model: ReviewMod
       action={aiHit ? <AiMark label="našla AI" /> : undefined}
     >
       <PartyPicker
+        idPrefix={idPrefix}
         kind="customer"
         choice={review.customer}
         docParty={model.docCustomer}
@@ -498,7 +515,7 @@ function CustomerSection({ model, review, target, onChange }: { model: ReviewMod
   );
 }
 
-function SupplierSection({ model, review, target, onChange }: { model: ReviewModel; review: ReviewState; target: ReviewTarget; onChange: (c: PartyChoice) => void }) {
+function SupplierSection({ model, review, target, onChange, idPrefix }: { model: ReviewModel; review: ReviewState; target: ReviewTarget; onChange: (c: PartyChoice) => void; idPrefix: string }) {
   const options = React.useMemo<ComboOption[]>(() => model.options.suppliers.map((s) => ({ value: s.id, label: s.name })), [model.options.suppliers]);
   const differs = target.mode === "existing" && target.supplierId && review.supplier.mode !== "none"
     && !(review.supplier.mode === "existing" && review.supplier.id === target.supplierId);
@@ -506,6 +523,7 @@ function SupplierSection({ model, review, target, onChange }: { model: ReviewMod
   return (
     <Section icon={Truck} tone="lime" title="Dodavatel" hint="Kdo doklad vystavil (kooperant, dodavatel materiálu…)." action={aiHit ? <AiMark label="našla AI" /> : undefined}>
       <PartyPicker
+        idPrefix={idPrefix}
         kind="supplier"
         choice={review.supplier}
         docParty={model.docSupplier}
@@ -525,11 +543,35 @@ function SupplierSection({ model, review, target, onChange }: { model: ReviewMod
 }
 
 // ── Údaje ───────────────────────────────────────────────────
-function FieldsSection({ model, review, target, onChange }: { model: ReviewModel; review: ReviewState; target: ReviewTarget; onChange: (f: ReviewState["fields"]) => void }) {
+/** Skupiny polí vloženého formuláře: `visibleFields` + vše s hodnotou / návrhem (showAll = všechna). */
+function embeddedFieldGroups(visible: ReviewFieldKey[], target: ReviewTarget, fields: ReviewState["fields"], margins: boolean, showAll: boolean) {
+  const wanted = new Set<ReviewFieldKey>(visible);
+  for (const k of REVIEW_FIELD_KEYS) if (fields[k]?.trim() || target.proposed[k] || target.conflicts[k]) wanted.add(k);
+  const keys = REVIEW_FIELD_KEYS.filter((k) => (showAll || wanted.has(k)) && (margins || !REVIEW_FIELDS[k].sensitive));
+  return REVIEW_GROUPS
+    .map((g) => ({ group: g.key, label: g.label, keys: keys.filter((k) => REVIEW_FIELDS[k].group === g.key) }))
+    .filter((g) => g.keys.length > 0);
+}
+
+function FieldsSection({
+  model, review, target, onChange, embedded, idPrefix,
+}: {
+  model: ReviewModel;
+  review: ReviewState;
+  target: ReviewTarget;
+  onChange: (f: ReviewState["fields"]) => void;
+  embedded?: CaptureReviewEmbedded;
+  idPrefix: string;
+}) {
   const [showAll, setShowAll] = React.useState(false);
   const args = { chip: review.chip, target, fields: review.fields, margins: model.margins };
-  const groups = visibleFieldGroups({ ...args, showAll });
-  const hidden = hiddenFieldCount(args);
+  const groups = embedded
+    ? embeddedFieldGroups(embedded.visibleFields, target, review.fields, model.margins, showAll)
+    : visibleFieldGroups({ ...args, showAll });
+  const hidden = embedded
+    ? embeddedFieldGroups(embedded.visibleFields, target, review.fields, model.margins, true).reduce((n, g) => n + g.keys.length, 0)
+      - embeddedFieldGroups(embedded.visibleFields, target, review.fields, model.margins, false).reduce((n, g) => n + g.keys.length, 0)
+    : hiddenFieldCount(args);
   const currency = (review.fields.currency || target.existing.currency || "CZK").toUpperCase();
   const aiCount = groups.reduce((n, g) => n + g.keys.filter((k) => !isFieldLocked(target, k) && isAiValue(target, review, k, model.aiUsed)).length, 0);
 
@@ -560,6 +602,9 @@ function FieldsSection({ model, review, target, onChange }: { model: ReviewModel
                     review={review}
                     aiUsed={model.aiUsed}
                     currency={currency}
+                    idPrefix={idPrefix}
+                    source={embedded?.fieldSources[key] && review.fields[key]?.trim()
+                      && review.fields[key] === model.initial.fields[key] ? embedded.fieldSources[key] : undefined}
                     onChange={(v) => onChange({ ...review.fields, [key]: v })}
                   />
                 ))}
@@ -583,7 +628,7 @@ function FieldsSection({ model, review, target, onChange }: { model: ReviewModel
 }
 
 function ReviewFieldInput({
-  k, target, review, aiUsed, currency, onChange,
+  k, target, review, aiUsed, currency, onChange, idPrefix, source,
 }: {
   k: ReviewFieldKey;
   target: ReviewTarget;
@@ -591,12 +636,16 @@ function ReviewFieldInput({
   aiUsed: boolean;
   currency: string;
   onChange: (v: string) => void;
+  idPrefix: string;
+  /** Údaj doplněný z jiného dokladu dávky. */
+  source?: FieldSource;
 }) {
   const meta = REVIEW_FIELDS[k];
-  const id = `cap-field-${k}`;
+  const id = `${idPrefix}-field-${k}`;
   const locked = isFieldLocked(target, k);
   const value = locked ? target.existing[k] ?? "" : review.fields[k] ?? "";
-  const ai = !locked && isAiValue(target, review, k, aiUsed);
+  const fromDoc = !locked && Boolean(source);
+  const ai = !locked && !fromDoc && isAiValue(target, review, k, aiUsed);
   const conflict = target.conflicts[k];
   const full = k === "title" || k === "deliveryMethod";
 
@@ -605,7 +654,7 @@ function ReviewFieldInput({
     control = <Input id={id} readOnly value={displayValue(k, value)} className={LOCKED_FIELD} />;
   } else if (meta.type === "currency") {
     control = (
-      <NativeSelect id={id} value={value || "CZK"} onChange={(e) => onChange(e.target.value)} className={cn(ai && AI_FIELD)}>
+      <NativeSelect id={id} value={value || "CZK"} onChange={(e) => onChange(e.target.value)} className={cn(ai && AI_FIELD, fromDoc && SOURCE_FIELD)}>
         {[...new Set([...CURRENCIES, value].filter(Boolean))].map((c) => <option key={c} value={c}>{c}</option>)}
       </NativeSelect>
     );
@@ -621,7 +670,7 @@ function ReviewFieldInput({
           maxLength={meta.max}
           placeholder={money ? "0" : undefined}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(ai && AI_FIELD, money && "pr-12 text-right tabular-nums", k === "title" && "font-medium", meta.type === "date" && "dark:[color-scheme:dark]")}
+          className={cn(ai && AI_FIELD, fromDoc && SOURCE_FIELD, money && "pr-12 text-right tabular-nums", k === "title" && "font-medium", meta.type === "date" && "dark:[color-scheme:dark]")}
           autoComplete="off"
         />
         {money && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{currency}</span>}
@@ -631,7 +680,7 @@ function ReviewFieldInput({
 
   return (
     <div className={cn(full && "sm:col-span-2")}>
-      <FieldLabel htmlFor={id} extra={locked ? <LockedMark /> : ai ? <AiMark /> : undefined}>{meta.label}</FieldLabel>
+      <FieldLabel htmlFor={id} extra={locked ? <LockedMark /> : fromDoc && source ? <SourceMark label={source.label} /> : ai ? <AiMark /> : undefined}>{meta.label}</FieldLabel>
       {control}
       {conflict && (
         <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-800 dark:text-amber-300">
@@ -646,13 +695,15 @@ function ReviewFieldInput({
 
 // ── Položky ─────────────────────────────────────────────────
 function ItemsSection({
-  model, review, target, supplierSide, onChange,
+  model, review, target, supplierSide, onChange, itemSources, idPrefix,
 }: {
   model: ReviewModel;
   review: ReviewState;
   target: ReviewTarget;
   supplierSide: boolean;
   onChange: (patch: Partial<ReviewState>) => void;
+  itemSources?: Record<string, FieldSource[]>;
+  idPrefix: string;
 }) {
   const priceMode: "sale" | "purchase" | "none" = supplierSide ? (model.margins ? "purchase" : "none") : "sale";
   const currency = (review.fields.currency || target.existing.currency || "CZK").toUpperCase();
@@ -719,6 +770,8 @@ function ItemsSection({
               key={it.key}
               index={i}
               item={it}
+              idPrefix={idPrefix}
+              sources={itemSources?.[it.key]}
               priceMode={priceMode}
               currency={currency}
               onChange={(patch) => setItem(i, patch)}
@@ -737,8 +790,10 @@ function ItemsSection({
 }
 
 function ItemRow({
-  index, item, priceMode, currency, onChange, onRemove,
+  index, item, priceMode, currency, onChange, onRemove, idPrefix, sources,
 }: {
+  idPrefix: string;
+  sources?: FieldSource[];
   index: number;
   item: ReviewItem;
   priceMode: "sale" | "purchase" | "none";
@@ -746,7 +801,7 @@ function ItemRow({
   onChange: (patch: Partial<ReviewItem>) => void;
   onRemove: () => void;
 }) {
-  const id = (f: string) => `cap-item-${item.key}-${f}`;
+  const id = (f: string) => `${idPrefix}-item-${item.key}-${f}`;
   const ai = item.aiFilled;
   const priceKey = priceMode === "purchase" ? "purchaseUnitPrice" : "unitPrice";
   const cell = (f: keyof ReviewItem, label: string, cls: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -770,6 +825,11 @@ function ItemRow({
           {item.drawingNumber || item.name || "Nová položka"}
           {ai && <AiMark label="" />}
         </span>
+        {sources?.length ? (
+          <span className="flex min-w-0 flex-1 flex-wrap justify-end gap-x-2">
+            {sources.map((src, n) => <SourceMark key={`${src.docId}-${n}`} label={src.label} />)}
+          </span>
+        ) : null}
         <Button type="button" variant="ghost" size="icon-sm" className="h-7 w-7 text-red-600 hover:text-red-700 dark:text-red-400" onClick={onRemove} aria-label="Odebrat položku">
           <Trash2 />
         </Button>

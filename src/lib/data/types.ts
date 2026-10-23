@@ -126,6 +126,10 @@ export interface DrawingItem {
   qty: number;
   fileType: "PDF" | "STEP" | "DXF" | "IMG";
   uploadedAt: string;
+  /** Výkres z focení dokladů: zakázka a dokument zakázky (soubor je v job-files). */
+  jobId: string | null;
+  jobNumber: string | null;
+  jobFileId: string | null;
 }
 
 export interface CommissionRow {

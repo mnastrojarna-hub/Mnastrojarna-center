@@ -3,11 +3,13 @@
 import * as React from "react";
 import {
   Factory, Trophy, Pencil, Trash2, Loader2, CalendarDays, Clock, Truck, Package, Paperclip, CheckCircle2, Undo2, Scale,
-  Zap, BadgePercent, FilePlus2, CalendarX,
+  Zap, BadgePercent, FilePlus2, CalendarX, Camera, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { selectWinningSupplierQuote, unselectSupplierQuote, deleteSupplierQuote } from "@/app/actions/purchasing";
-import type { SupplierQuoteView } from "@/lib/jobs/purchasing-types";
+import {
+  selectWinningSupplierQuote, unselectSupplierQuote, deleteSupplierQuote, importCapturedSupplierQuote,
+} from "@/app/actions/purchasing";
+import type { PendingCapturedQuote, SupplierQuoteView } from "@/lib/jobs/purchasing-types";
 import type { ActionResult } from "@/lib/jobs/types";
 import { useJobDetail } from "@/components/jobs/detail/detail-context";
 import { ConfirmDialog } from "@/components/jobs/detail/confirm-dialog";
@@ -254,15 +256,70 @@ export function QuotesCompare({ quotes, today }: { quotes: SupplierQuoteView[]; 
   );
 }
 
-/** Sekce nabídek dodavatelů: srovnání, karty, prázdný stav. */
+/**
+ * Nabídky dodavatelů vyfocené kolegou bez práva na marže: čekají, až je někdo s přístupem
+ * k nákupním cenám jedním ťuknutím zapíše do Nákupu (ceny se přečtou z dokladu).
+ */
+export function PendingCapturedQuotes({ items }: { items: PendingCapturedQuote[] }) {
+  const { notify, refresh } = useJobDetail();
+  const [busy, setBusy] = React.useState<string | null>(null);
+  if (!items.length) return null;
+
+  async function importOne(item: PendingCapturedQuote) {
+    setBusy(item.fileId);
+    try {
+      const res = await importCapturedSupplierQuote(item.fileId);
+      if (!res.ok) notify("error", res.error ?? "Nabídku se nepodařilo zapsat.");
+      else {
+        notify("success", `Nabídka ${item.supplierName || "dodavatele"} zapsána do Nákupu.`);
+        refresh();
+      }
+    } catch {
+      notify("error", "Spojení se nepovedlo — zkus to znovu.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="pending-captured-quotes">
+      <p className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-100">
+        <Camera className="h-4 w-4 shrink-0 text-amber-600" />
+        Nabídky z focení čekají na zapsání ({items.length})
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((it) => (
+          <li key={it.fileId} className="flex flex-wrap items-center gap-2 rounded-lg bg-background/80 px-2.5 py-2 text-sm">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{it.supplierName || "Dodavatel"}</span>
+              <span className="block truncate text-xs text-muted-foreground">{it.title}{it.createdAt ? ` · ${longDate(it.createdAt.slice(0, 10)) ?? ""}` : ""}</span>
+            </span>
+            <Button size="sm" variant="ghost" asChild>
+              <a href={`/api/jobs/files/${it.fileId}`} target="_blank" rel="noopener noreferrer" aria-label={`Dokument nabídky ${it.supplierName || "dodavatele"}`}>
+                <Paperclip className="h-4 w-4" />
+              </a>
+            </Button>
+            <Button size="sm" variant="success" disabled={busy !== null} onClick={() => void importOne(it)}>
+              {busy === it.fileId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Zapsat
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Sekce nabídek dodavatelů: čekající z focení, srovnání, karty, prázdný stav. */
 export function SupplierQuotesSection({
-  quotes, today, onAdd, onEdit, selectedBy,
+  quotes, today, onAdd, onEdit, selectedBy, pendingCaptured = [],
 }: {
   quotes: SupplierQuoteView[];
   today: string;
   onAdd: () => void;
   onEdit: (q: SupplierQuoteView) => void;
   selectedBy?: Map<string, { by: string | null; at: string }>;
+  /** Nabídky vyfocené bez práva na marže (JobPurchasing.pendingCaptured). */
+  pendingCaptured?: PendingCapturedQuote[];
 }) {
   const { notify, refresh } = useJobDetail();
   const [toDelete, setToDelete] = React.useState<SupplierQuoteView | null>(null);
@@ -272,6 +329,8 @@ export function SupplierQuotesSection({
 
   if (!quotes.length) {
     return (
+      <div className="space-y-3">
+      <PendingCapturedQuotes items={pendingCaptured} />
       <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-orange-200 bg-orange-50/40 px-4 py-8 text-center dark:border-orange-500/20 dark:bg-orange-500/5">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">
           <Factory className="h-6 w-6" />
@@ -286,11 +345,13 @@ export function SupplierQuotesSection({
           <FilePlus2 className="h-4 w-4" /> Nabídka dodavatele
         </Button>
       </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      <PendingCapturedQuotes items={pendingCaptured} />
       <QuotesCompare quotes={quotes} today={today} />
       <div className="grid gap-3 lg:grid-cols-2">
         {sorted.map((q) => (

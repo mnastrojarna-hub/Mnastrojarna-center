@@ -10,6 +10,7 @@ import { docNumbersEqual, isSupplierSideDoc, normalizeCompanyName } from "@/lib/
 import { fieldLabel } from "@/lib/jobs/field-labels";
 import { cleanDate, cleanNumber, isUuid, safeStorageName } from "@/lib/jobs/mapping";
 import { plural } from "@/lib/jobs/deadlines";
+import type { BatchSortModel } from "@/lib/jobs/capture-batch-types";
 
 /**
  * „📷 Vyfotit doklad" — kontrolní formulář (čistá logika, sdílí server i klient).
@@ -23,6 +24,12 @@ export const CAPTURE_BUCKET = "job-files";
 export const CAPTURE_MAX_PAGES = 20;
 /** Jak dlouho čeká nahraný doklad na uložení (pak ho úklid smaže). */
 export const CAPTURE_TTL_MS = 24 * 3600 * 1000;
+/** Dávka (víc dokladů v jednom kole): souborů, stran PDF a velikost souboru. */
+export const CAPTURE_BATCH_MAX_FILES = 40;
+export const CAPTURE_BATCH_MAX_PAGES = 80;
+export const CAPTURE_BATCH_MAX_FILE_BYTES = 50 * 1024 * 1024;
+/** Delší strana náhledu fotky pro roztřídění (prohlížeč ho nahraje vedle originálu). */
+export const CAPTURE_SORT_SIDE = 1280;
 
 const UUID_SRC = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -40,6 +47,25 @@ export function captureSessionPath(userId: string, captureId: string): string {
   return `${captureFolder(userId)}/${captureId.toLowerCase()}.json`;
 }
 
+/** Náhled stránky pro roztřídění: capture/<uživatel>/<uuid stránky>.sort.jpg. */
+export function captureSortPath(userId: string, pagePath: string): string {
+  const m = new RegExp(`^capture/[0-9a-f-]{36}/(${UUID_SRC})-`, "i").exec(pagePath ?? "");
+  const uuid = m ? m[1].toLowerCase() : "00000000-0000-0000-0000-000000000000";
+  return `${captureFolder(userId)}/${uuid}.sort.jpg`;
+}
+
+/** Náhled roztřídění patří přihlášenému uživateli. */
+export function isCaptureSortPath(userId: string, path: unknown): path is string {
+  if (!isUuid(userId) || typeof path !== "string" || path.includes("..")) return false;
+  return new RegExp(`^capture/${userId.toLowerCase()}/${UUID_SRC}\\.sort\\.jpg$`).test(path);
+}
+
+/** Do dávky jde jakýkoli neprázdný soubor do 50 MB (neznámý typ = „Jiné"). */
+export function isBatchUploadable(filename: string, size: number): boolean {
+  return typeof filename === "string" && filename.trim().length > 0
+    && Number.isFinite(size) && size > 0 && size <= CAPTURE_BATCH_MAX_FILE_BYTES;
+}
+
 /** Stránka patří přihlášenému uživateli (žádné ../ ani cizí složka, ani soubor relace). */
 export function isCapturePagePath(userId: string, path: unknown): path is string {
   if (!isUuid(userId) || typeof path !== "string" || path.includes("..")) return false;
@@ -52,6 +78,8 @@ export interface CaptureFileRef {
   filename: string;
   mimeType: string;
   size: number;
+  /** Náhled 1280 px pro roztřídění (jen fotky v dávce). */
+  sortPath?: string | null;
 }
 
 /** Fotka nebo PDF (jiné soubory patří do dokumentů zakázky, ne do „Vyfotit doklad"). */
@@ -400,7 +428,10 @@ export interface ReviewModel {
 }
 
 export type AnalyzeCaptureResponse =
+  /** 1 obchodní doklad (dnešní tok) */
   | { ok: true; model: ReviewModel; applied?: CaptureResult }
+  /** dávka (víc dokladů, výkres, model, nabídka dodavatele) */
+  | { ok: true; batch: BatchSortModel }
   | { ok: false; error: string };
 
 // ── Hodnoty ─────────────────────────────────────────────────

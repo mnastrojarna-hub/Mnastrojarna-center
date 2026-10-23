@@ -7,17 +7,18 @@ import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
-import { isForward, isJobStage } from "@/lib/jobs/stages";
+import { isJobStage } from "@/lib/jobs/stages";
 import { cleanDate, cleanMoney, cleanText, isUuid, stageEventMessage, todayIso, translateDbError } from "@/lib/jobs/mapping";
 import { isOperationKind, isOperationStatus, nextOperationStatus, type OperationKind, type OperationStatus } from "@/lib/jobs/operations";
 import {
   CUSTOMER_NOTE_MAX, OPERATION_SELECT, addedEventMessage, appendNote, canDeleteOwnOperation, czDay, describeOperationChanges,
-  diffOperation, dueDateFor, expandTemplate, insertPositions, moveOperation, nextToAutoStart, operationDisplayName,
+  diffOperation, expandTemplate, insertPositions, moveOperation, nextToAutoStart, operationDisplayName,
   operationInputToRow, operationKindOf, operationLabel, operationLocation, positionUpdates, rowToJobOperation, sortOperations,
   statusEventMessage, templateLabel, updateEventMessage, validateOperationInput, validateOperationList, validateReorder,
   whoRefFromRow, type JobOperationDbRow,
 } from "@/lib/jobs/production";
 import type { JobOperationInput } from "@/lib/jobs/production-types";
+import { confirmDeliveryNoteCore, setInvoiceInfoCore } from "@/lib/jobs/production-store";
 import type { JobStage } from "@/lib/supabase/database.types";
 import type { ActionResult } from "@/lib/jobs/types";
 
@@ -523,42 +524,11 @@ export async function confirmDeliveryNote(
 ): Promise<ActionResult<{ stage: JobStage; date: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
-  if (!isUuid(jobId)) return fail(NOT_FOUND);
-  const rawDate = opts?.date;
-  const date = rawDate === undefined || rawDate === null || rawDate === "" ? todayIso() : cleanDate(rawDate);
-  if (!date) return fail("Neplatné datum (čekám RRRR-MM-DD).");
-  const fileId = opts?.fileId || null;
-  if (fileId !== null && !isUuid(fileId)) return fail("Dokument nenalezen.");
   try {
-    const job = await loadJob(c.db, jobId, "id, status, delivery_note_confirmed_at");
-    if (!job) return fail(NOT_FOUND);
-    const from = isJobStage(job.status) ? job.status : null;
-
-    if (fileId) {
-      const { data: file } = await c.db.from("job_files").select("id, note").eq("id", fileId).eq("job_id", jobId).maybeSingle();
-      if (!file) return fail("Dokument nepatří k této zakázce.");
-      const line = `Potvrzeno zákazníkem ${czDay(date)}`;
-      const prev = cleanText((file as { note: string | null }).note, 5000);
-      const { error: fErr } = await c.db
-        .from("job_files")
-        .update({ title: "Potvrzený dodací list", kind: "dodaci_list", note: prev && !prev.includes(line) ? `${prev}\n${line}` : prev ?? line } as never)
-        .eq("id", fileId);
-      if (fErr) return fail(fErr.message);
-    }
-
-    const toStage: JobStage | null = from && isForward(from, "dodano_zakaznikovi") ? "dodano_zakaznikovi" : null;
-    const update: Row = { delivery_note_confirmed_at: date };
-    if (toStage) update.status = toStage;
-    const { error } = await c.db.from("orders").update(update as never).eq("id", jobId);
-    if (error) return fail(error.message);
-
-    await logJobEvent(c.db, {
-      jobId, type: fileId ? "file" : "field", message: `Potvrzený dodací list vrácen (${czDay(date)})`,
-      data: { production: "delivery_note", date, ...(fileId ? { fileId } : {}) }, actorId: c.user.id,
-    });
-    if (toStage) await logStage(c, jobId, from, toStage, "potvrzený dodací list");
+    const res = await confirmDeliveryNoteCore(c.db, c.user.id, jobId, opts ?? {});
+    if (!res.ok) return fail(res.error);
     revalidateProduction(jobId, true);
-    return { ok: true, stage: toStage ?? from ?? "poptavka", date };
+    return res;
   } catch (err) {
     return fail(err);
   }
@@ -597,81 +567,13 @@ export async function setInvoiceInfo(
 ): Promise<ActionResult<{ invoiceDate: string | null; invoiceDueDate: string | null; stage: JobStage }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
-  if (!isUuid(jobId)) return fail(NOT_FOUND);
-  if (!input || typeof input !== "object") return fail("Chybí údaje faktury.");
-  for (const v of [input.invoiceDate, input.invoiceDueDate]) {
-    if (v !== undefined && v !== null && v !== "" && cleanDate(v) === null) return fail("Neplatné datum faktury (čekám RRRR-MM-DD).");
-  }
-  if (input.invoiceNumber !== undefined && input.invoiceNumber !== null && typeof input.invoiceNumber !== "string") return fail("Neplatné číslo faktury.");
-  if (typeof input.invoiceNumber === "string" && input.invoiceNumber.trim().length > 120) return fail("Číslo faktury je příliš dlouhé.");
   try {
-    const job = await loadJob(
-      c.db, jobId,
-      "id, status, invoice_number, invoice_date, invoice_due_date, paid_at, customer:customers!customer_id(payment_terms_days)",
-    );
-    if (!job) return fail(NOT_FOUND);
-    const from = isJobStage(job.status) ? job.status : null;
-    const cust = Array.isArray(job.customer) ? job.customer[0] : job.customer;
-    const terms = (cust as { payment_terms_days?: number | null } | null)?.payment_terms_days ?? null;
-
-    const patch: Row = {};
-    if (input.invoiceNumber !== undefined) patch.invoice_number = cleanText(input.invoiceNumber, 120);
-    if (input.invoiceDate !== undefined) patch.invoice_date = cleanDate(input.invoiceDate);
-    if (input.invoiceDueDate !== undefined) patch.invoice_due_date = cleanDate(input.invoiceDueDate);
-
-    const invoiceDate = cleanDate("invoice_date" in patch ? patch.invoice_date : job.invoice_date);
-    const dueGiven = cleanDate(input.invoiceDueDate);
-    if (!dueGiven) {
-      if (invoiceDate) {
-        const dateChanged = "invoice_date" in patch && cleanDate(job.invoice_date) !== invoiceDate;
-        const dueEmpty = !cleanDate("invoice_due_date" in patch ? patch.invoice_due_date : job.invoice_due_date);
-        if (dateChanged || dueEmpty) patch.invoice_due_date = dueDateFor(invoiceDate, terms);
-      } else if ("invoice_date" in patch && input.invoiceDueDate === undefined) {
-        patch.invoice_due_date = null;
-      }
-    }
-    const due = cleanDate("invoice_due_date" in patch ? patch.invoice_due_date : job.invoice_due_date);
-    if (invoiceDate && due && due < invoiceDate) return fail("Splatnost je před datem faktury.");
-
-    const number = cleanText("invoice_number" in patch ? patch.invoice_number : job.invoice_number, 120);
-    const target: JobStage = job.paid_at ? "dokonceno" : "fakturovano";
-    const toStage = (number || invoiceDate) && from && isForward(from, target) ? target : null;
-    if (toStage) patch.status = toStage;
-
-    const changedCols = (["invoice_number", "invoice_date", "invoice_due_date"] as const).filter((k) =>
-      k in patch && (k === "invoice_number" ? cleanText(job[k], 120) !== patch[k] : cleanDate(job[k]) !== patch[k]));
-    if (!changedCols.length && !toStage) {
-      return { ok: true, invoiceDate, invoiceDueDate: due, stage: from ?? "poptavka" };
-    }
-
-    const { data: after, error } = await c.db
-      .from("orders")
-      .update(patch as never)
-      .eq("id", jobId)
-      .select("status, invoice_number, invoice_date, invoice_due_date")
-      .single();
-    if (error || !after) return fail(error?.message ?? "Fakturu se nepodařilo uložit.");
-    const a = after as { status: JobStage; invoice_number: string | null; invoice_date: string | null; invoice_due_date: string | null };
-
-    const LABELS = { invoice_number: "Číslo faktury", invoice_date: "Datum faktury", invoice_due_date: "Splatnost faktury" } as const;
-    const views = (["invoice_number", "invoice_date", "invoice_due_date"] as const)
-      .filter((k) => (k === "invoice_number" ? cleanText(job[k], 120) !== a[k] : cleanDate(job[k]) !== cleanDate(a[k])))
-      .map((k) => {
-        const f = k === "invoice_number" ? cleanText(job[k], 120) : cleanDate(job[k]);
-        const t = k === "invoice_number" ? a[k] : cleanDate(a[k]);
-        const txt = (v: string | null) => (v ? (k === "invoice_number" ? v : czDay(v)) : "—");
-        return { field: k, label: LABELS[k], from: f, to: t, fromText: txt(f), toText: txt(t) };
-      });
-    if (views.length) {
-      const head = `${a.invoice_number ? `Faktura ${a.invoice_number}` : "Faktura"}${a.invoice_date ? ` ze dne ${czDay(a.invoice_date)}` : ""}`;
-      await logJobEvent(c.db, {
-        jobId, type: "field", message: a.invoice_due_date ? `${head}, splatnost ${czDay(a.invoice_due_date)}` : head,
-        data: { changes: views, production: "invoice" }, actorId: c.user.id,
-      });
-    }
-    if (a.status !== from && isJobStage(a.status)) await logStage(c, jobId, from, a.status, "faktura vystavena");
-    revalidateProduction(jobId, true);
-    return { ok: true, invoiceDate: cleanDate(a.invoice_date), invoiceDueDate: cleanDate(a.invoice_due_date), stage: a.status };
+    const res = await setInvoiceInfoCore(c.db, c.user.id, jobId, input);
+    if (!res.ok) return fail(res.error);
+    if (res.changed) revalidateProduction(jobId, true);
+    const { changed: _changed, ...out } = res;
+    void _changed;
+    return out;
   } catch (err) {
     return fail(err);
   }

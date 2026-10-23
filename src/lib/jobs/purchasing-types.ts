@@ -160,6 +160,15 @@ export interface JobPurchasing {
   /** Obchodník zakázky (komu provize patří). */
   owner: PersonRef | null;
   totals: JobPurchasingTotals;
+  /** Nabídky dodavatelů vyfocené bez práva na marže — čekají na zapsání do Nákupu. */
+  pendingCaptured: PendingCapturedQuote[];
+}
+
+export interface PendingCapturedQuote {
+  fileId: string;
+  title: string;
+  supplierName: string;
+  createdAt: string;
 }
 
 // ── Vstupy akcí ─────────────────────────────────────────────

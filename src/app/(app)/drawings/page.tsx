@@ -1,4 +1,5 @@
-import { Box, FileBox, FileImage, FileText, PencilRuler, Search, SearchX } from "lucide-react";
+import Link from "next/link";
+import { Box, Briefcase, FileBox, FileImage, FileText, Paperclip, PencilRuler, Search, SearchX } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { DrawingUpload } from "@/components/drawing-upload";
@@ -28,7 +29,7 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
   const tokens = searchNormalize(q).split(/\s+/).filter(Boolean);
   const drawings = tokens.length
     ? all.filter((d) => {
-        const h = searchNormalize([d.number, d.revision, d.customer, d.material, d.dimensions].join(" "));
+        const h = searchNormalize([d.number, d.revision, d.customer, d.material, d.dimensions, d.jobNumber ?? ""].join(" "));
         return tokens.every((t) => h.includes(t));
       })
     : all;
@@ -78,7 +79,29 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
                           .filter(Boolean).join(" · ") || "bez údajů"}
                       </p>
                     </div>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{formatDate(d.uploadedAt)}</span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      {d.jobId && (
+                        <Link
+                          href={`/orders/${d.jobId}?tab=dokumenty`}
+                          className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800 hover:bg-sky-200 dark:bg-sky-500/15 dark:text-sky-300"
+                          title="Zakázka, ze které výkres pochází (focení dokladů)"
+                        >
+                          <Briefcase className="h-3 w-3" /> {d.jobNumber ?? "Zakázka"}
+                        </Link>
+                      )}
+                      {d.jobFileId && (
+                        <a
+                          href={`/api/jobs/files/${d.jobFileId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                          aria-label={`Soubor výkresu ${d.number}`}
+                        >
+                          <Paperclip className="h-3 w-3" /> soubor
+                        </a>
+                      )}
+                      <span className="text-[11px] text-muted-foreground">{formatDate(d.uploadedAt)}</span>
+                    </span>
                   </li>
                 );
               })}

@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
+import { createRequire } from "node:module";
 import { sql } from "./lib.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
@@ -175,6 +176,17 @@ export async function removeStorage(paths) {
   }
 }
 
+/** Počet stran PDF uloženého v bucketu job-files (pdf-lib z aplikace); -1 = soubor nejde stáhnout. */
+export async function storagePdfPages(objectPath) {
+  const env = localEnv();
+  const url = `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/job-files/${objectPath.split("/").map(encodeURIComponent).join("/")}`;
+  const r = await fetch(url, { headers: { apikey: env.SUPABASE_SECRET_KEY, authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` } });
+  if (!r.ok) return -1;
+  const { PDFDocument } = createRequire(path.join(ROOT, "package.json"))("pdf-lib");
+  const doc = await PDFDocument.load(new Uint8Array(await r.arrayBuffer()), { ignoreEncryption: true });
+  return doc.getPageCount();
+}
+
 /** Objekty v úložišti, jejichž název obsahuje fragment (např. unikátní název souboru testu). */
 export function storageObjects(fragment) {
   const out = sql(`select name from storage.objects where bucket_id = 'job-files' and name like ${q(`%${fragment}%`)} order by name`);
@@ -254,4 +266,111 @@ export function makePdf(label = "E2E doklad") {
 
 export function pdfFile(name, label) {
   return { name, mimeType: "application/pdf", buffer: makePdf(label ?? name) };
+}
+
+// ── Dávkové focení (09): vícestránkové PDF, STEP, ZIP ─────
+/** PDF s více stránkami (na každé stránce text labels[i]). */
+export function multiPagePdf(name, labels) {
+  const pages = labels.map((l) => String(l).replace(/[()\\]/g, ""));
+  const n = pages.length;
+  // 1 katalog, 2 stránky, 3 font, pak dvojice (stránka, obsah)
+  const objs = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    `<< /Type /Pages /Kids [${pages.map((_, i) => `${4 + i * 2} 0 R`).join(" ")}] /Count ${n} >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  pages.forEach((text, i) => {
+    const stream = `BT /F1 18 Tf 40 760 Td (${text}) Tj ET`;
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${5 + i * 2} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`);
+    objs.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  });
+  let out = "%PDF-1.4\n";
+  const offsets = [];
+  objs.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) out += `${String(off).padStart(10, "0")} 00000 n \n`;
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return { name, mimeType: "application/pdf", buffer: Buffer.from(out, "latin1") };
+}
+
+/** Minimální STEP (ISO-10303-21) s číslem dílu v PRODUCT('…'). */
+export function stepFile(name, partNumber = "") {
+  const pn = partNumber || name.replace(/\.[^.]+$/, "");
+  const text = [
+    "ISO-10303-21;",
+    "HEADER;",
+    "FILE_DESCRIPTION(('E2E model'),'2;1');",
+    `FILE_NAME('${pn}.stp','2026-10-22T08:00:00',('E2E'),(''),'','','');`,
+    "FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));",
+    "ENDSEC;",
+    "DATA;",
+    `#1=PRODUCT('${pn}','${pn}','',(#2));`,
+    "#2=PRODUCT_CONTEXT('',#3,'mechanical');",
+    "#3=APPLICATION_CONTEXT('E2E');",
+    "ENDSEC;",
+    "END-ISO-10303-21;",
+    "",
+  ].join("\n");
+  return { name, mimeType: "application/octet-stream", buffer: Buffer.from(text, "utf8") };
+}
+
+/** ZIP (deflate, UTF-8 názvy) z položek { name, buffer }. */
+export function zipFile(name, entries) {
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const e of entries) {
+    const nameBuf = Buffer.from(e.name, "utf8");
+    const data = Buffer.from(e.buffer);
+    const comp = zlib.deflateRawSync(data);
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x0800, 6); // UTF-8 názvy
+    local.writeUInt16LE(8, 8); // deflate
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(comp.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28);
+    locals.push(local, nameBuf, comp);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x0800, 8);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(comp.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28);
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0, 38);
+    central.writeUInt32LE(offset, 42);
+    centrals.push(central, nameBuf);
+    offset += 30 + nameBuf.length + comp.length;
+  }
+  const cd = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(cd.length, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+  return { name, mimeType: "application/zip", buffer: Buffer.concat([...locals, cd, end]) };
 }

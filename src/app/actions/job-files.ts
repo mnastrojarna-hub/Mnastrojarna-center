@@ -7,13 +7,13 @@ import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
-import { FILE_KINDS, guessFileKind, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
+import { FILE_KINDS, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
-  isUuid, isValidJobFilePath, jobFilePath, cleanText, cleanNumber, rowToJobFile, JOB_FILE_SELECT,
-  isGenericCaptureName, translateDbError, type FileRow,
+  isUuid, jobFilePath, cleanText, cleanNumber, JOB_FILE_SELECT, translateDbError, type FileRow,
 } from "@/lib/jobs/mapping";
 import type { JobFileKind } from "@/lib/supabase/database.types";
 import type { ActionResult, JobFile } from "@/lib/jobs/types";
+import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 
 /**
  * Dokumenty zakázky. Soubor jde z prohlížeče PŘÍMO do Supabase Storage
@@ -113,110 +113,13 @@ export async function registerJobFile(input: {
 }): Promise<ActionResult<{ file: JobFile }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
-  if (!input || !isUuid(input.jobId)) return fail("Neplatná zakázka.");
-  const jobId = input.jobId.toLowerCase();
-  if (!isValidJobFilePath(jobId, input.path)) return fail("Neplatná cesta souboru.");
-  const filename = cleanText(input.filename, MAX_NAME);
-  if (!filename) return fail("Chybí název souboru.");
-  if (input.kind !== undefined && !isJobFileKind(input.kind)) return fail("Neznámý druh dokumentu.");
-  if (input.replaceFileId !== undefined && input.replaceFileId !== "" && !isUuid(input.replaceFileId)) return fail(FILE_NOT_FOUND);
-  if (input.quoteId !== undefined && input.quoteId !== "" && !isUuid(input.quoteId)) return fail("Neplatná nabídka.");
-  const size = cleanNumber(input.size);
-  if (size !== null && (size < 0 || size > JOB_FILE_MAX_BYTES)) return fail("Neplatná velikost souboru.");
-  let aiExtracted: Record<string, unknown> | null = null;
-  if (input.aiExtracted !== undefined && input.aiExtracted !== null) {
-    if (typeof input.aiExtracted !== "object" || Array.isArray(input.aiExtracted)) return fail("Neplatná data z AI.");
-    if (JSON.stringify(input.aiExtracted).length > 200_000) return fail("Data z AI jsou příliš velká.");
-    aiExtracted = input.aiExtracted;
-  }
-  const aiConf = cleanNumber(input.aiConfidence);
-
-  try {
-    const { db, user } = c;
-    if (!(await jobExists(db, jobId))) return fail("Zakázka nenalezena.");
-
-    // opakovaná registrace stejného souboru → vrátit existující záznam
-    const { data: dup } = await db.from("job_files").select(JOB_FILE_SELECT).eq("storage_path", input.path).maybeSingle();
-    if (dup) return { ok: true, file: rowToJobFile(dup as FileRow) };
-
-    if (input.quoteId) {
-      const { data: q } = await db.from("quotes").select("id").eq("id", input.quoteId).eq("job_id", jobId).maybeSingle();
-      if (!q) return fail("Nabídka nepatří k této zakázce.");
-    }
-
-    const mimeType = cleanText(input.mimeType, 200);
-    let replaced: FileRow | null = null;
-    if (input.replaceFileId) {
-      replaced = await loadFile(db, input.replaceFileId);
-      if (!replaced || replaced.job_id !== jobId) return fail("Původní dokument nenalezen.");
-      // nahrazuje se vždy nejnovější verze řetězu
-      for (let hops = 0; replaced.replaced_by && hops < 50; hops++) {
-        const next = await loadFile(db, replaced.replaced_by);
-        if (!next || next.job_id !== jobId) break;
-        replaced = next;
-      }
-    }
-    const kind: JobFileKind = input.kind ?? (replaced && isJobFileKind(replaced.kind) ? replaced.kind : guessFileKind(filename, mimeType ?? undefined));
-    if (!replaced && !input.noAutoVersion && !isGenericCaptureName(filename)) {
-      // stejný druh + stejný název → automaticky nová verze (ne u „image.jpg" z fotoaparátu)
-      const { data: same } = await db
-        .from("job_files")
-        .select(JOB_FILE_SELECT)
-        .eq("job_id", jobId)
-        .eq("kind", kind)
-        .eq("filename", filename)
-        .eq("archived", false)
-        .order("version", { ascending: false })
-        .limit(1);
-      replaced = ((same ?? []) as FileRow[])[0] ?? null;
-    }
-
-    const version = replaced ? (replaced.version ?? 1) + 1 : 1;
-    const title = input.title !== undefined ? cleanText(input.title, 300) : (replaced?.title ?? null);
-    const { data: created, error } = await db
-      .from("job_files")
-      .insert({
-        job_id: jobId,
-        kind,
-        title,
-        filename,
-        mime_type: mimeType,
-        size_bytes: size === null ? null : Math.round(size),
-        storage_path: input.path,
-        version,
-        archived: false,
-        quote_id: input.quoteId || null,
-        ai_extracted: aiExtracted,
-        ai_confidence: aiConf === null ? null : Math.round(Math.min(1, Math.max(0, aiConf)) * 1000) / 1000,
-        note: cleanText(input.note, 2000),
-        uploaded_by: user.id,
-      } as never)
-      .select(JOB_FILE_SELECT)
-      .single();
-    if (error || !created) return fail(error?.message ?? "Dokument se nepodařilo uložit.");
-    const row = created as FileRow;
-
-    if (replaced) {
-      const { error: upErr } = await db
-        .from("job_files")
-        .update({ archived: true, replaced_by: row.id } as never)
-        .eq("id", replaced.id);
-      if (upErr) console.error(`[job-files] Archivace předchozí verze selhala: ${upErr.message}`);
-    }
-
-    if (!input.silent) {
-      await logJobEvent(db, {
-        jobId, type: "file",
-        message: `Nahrán dokument: ${kindLabel(kind)} — ${filename}${version > 1 ? ` (v${version})` : ""}`,
-        data: { fileId: row.id, kind, filename, version, ...(replaced ? { replacedFileId: replaced.id } : {}) },
-        actorId: user.id,
-      });
-    }
-    revalidateFiles(jobId);
-    return { ok: true, file: rowToJobFile(row) };
-  } catch (err) {
-    return fail(err);
-  }
+  if (!input || typeof input !== "object") return fail("Neplatná zakázka.");
+  // jádro (lib/jobs/job-files-store) — nové volby (vazba položky, relace focení) jen pro serverový kód
+  return registerJobFileCore(c.db, c.user.id, {
+    jobId: input.jobId, path: input.path, filename: input.filename, mimeType: input.mimeType, size: input.size,
+    kind: input.kind, title: input.title, quoteId: input.quoteId, note: input.note, replaceFileId: input.replaceFileId,
+    aiExtracted: input.aiExtracted, aiConfidence: input.aiConfidence, silent: input.silent, noAutoVersion: input.noAutoVersion,
+  });
 }
 
 export async function setJobFileArchived(fileId: string, archived: boolean): Promise<ActionResult> {

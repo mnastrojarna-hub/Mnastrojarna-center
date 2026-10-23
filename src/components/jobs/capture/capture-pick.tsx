@@ -2,17 +2,54 @@
 
 import * as React from "react";
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Camera, FileText, Images, Layers, Loader2, Plus, Sparkles, Sun, Trash2,
-  ScanLine, PenLine,
+  AlertTriangle, Archive, ArrowLeft, ArrowRight, Camera, FileText, History, Images, Layers, Loader2, Paperclip, Plus,
+  Sparkles, Sun, Trash2, ScanLine, PenLine, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PageDraft } from "@/components/jobs/capture/capture-flow";
+import { CAD_2D_EXTENSIONS, CAD_3D_EXTENSIONS, CAPTURE_FILES_ACCEPT, FILE_KINDS } from "@/lib/jobs/file-kinds";
+import { cadFormatOf } from "@/lib/jobs/capture-batch";
 import { cn } from "@/lib/utils";
 
-/** Fotky a PDF (na mobilu fotoaparát, na počítači výběr / přetažení / vložení ze schránky). */
-export const CAPTURE_ACCEPT = "image/*,application/pdf,.pdf,.heic,.heif";
+/** Výběr souborů: fotky, PDF, CAD (3D modely, DXF/DWG), kancelářské soubory, ZIP (na konci cokoli). */
+export const CAPTURE_ACCEPT = CAPTURE_FILES_ACCEPT;
 /** Fotoaparát: jen obrázky — s PDF v `accept` Android místo fotoaparátu otevře výběr souboru. */
 export const CAMERA_ACCEPT = "image/*";
+
+export type PickTileKind = "image" | "pdf" | "cad3d" | "cad2d" | "zip" | "other";
+
+function extOf(name: string): string {
+  return /\.([a-z0-9_]{1,12})$/i.exec(name)?.[1]?.toLowerCase() ?? "";
+}
+
+/** Jak soubor v dávce ukázat (fotka / PDF = stránka dokladu, ostatní = soubor). */
+export function pickTileKind(name: string, mime: string): PickTileKind {
+  const ext = extOf(name);
+  if ((CAD_3D_EXTENSIONS as readonly string[]).includes(ext)) return "cad3d";
+  if ((CAD_2D_EXTENSIONS as readonly string[]).includes(ext)) return "cad2d";
+  if (ext === "zip" || mime === "application/zip" || mime === "application/x-zip-compressed") return "zip";
+  if (mime === "application/pdf" || ext === "pdf") return "pdf";
+  if (mime.startsWith("image/") || /^(jpe?g|png|webp|gif|heic|heif)$/.test(ext)) return "image";
+  return "other";
+}
+
+/** Počítadlo dávky: „2 stránky dokladu · 1 soubor CAD · 1 ZIP". */
+export function pickCountLabel(pages: Pick<PageDraft, "name" | "mimeType">[]): string {
+  let visual = 0, cad = 0, zip = 0, other = 0;
+  for (const p of pages) {
+    const k = pickTileKind(p.name, p.mimeType);
+    if (k === "image" || k === "pdf") visual += 1;
+    else if (k === "cad3d" || k === "cad2d") cad += 1;
+    else if (k === "zip") zip += 1;
+    else other += 1;
+  }
+  const parts: string[] = [];
+  if (visual || (!cad && !zip && !other)) parts.push(`${visual === 1 ? "1 stránka" : `${visual} ${visual > 1 && visual < 5 ? "stránky" : "stránek"}`} dokladu`);
+  if (cad) parts.push(`${cad} ${cad === 1 ? "soubor" : cad < 5 ? "soubory" : "souborů"} CAD`);
+  if (zip) parts.push(`${zip} ZIP`);
+  if (other) parts.push(`${other} ${other === 1 ? "další soubor" : other < 5 ? "další soubory" : "dalších souborů"}`);
+  return parts.join(" · ");
+}
 
 /** Popisek otevírající výběr souboru: klepnutí řeší prohlížeč (label for), klávesnice Enter / mezerník. */
 function keyOpen(ref: React.RefObject<HTMLInputElement | null>) {
@@ -26,6 +63,38 @@ function keyOpen(ref: React.RefObject<HTMLInputElement | null>) {
       }
     },
   };
+}
+
+function FileTile({ name, kind }: { name: string; kind: PickTileKind }) {
+  if (kind === "cad3d" || kind === "cad2d") {
+    const fk = FILE_KINDS[kind === "cad3d" ? "model_3d" : "vykres"];
+    const Icon = fk.icon;
+    return (
+      <div className={cn("flex h-full flex-col items-center justify-center gap-1.5 px-2 text-center", fk.badge)}>
+        <Icon className="h-10 w-10" />
+        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide dark:bg-black/30">
+          {cadFormatOf(name) ?? extOf(name).toUpperCase()}
+        </span>
+        <span className="line-clamp-2 break-all text-[11px] opacity-80">{name}</span>
+      </div>
+    );
+  }
+  if (kind === "zip") {
+    return (
+      <div className={cn("flex h-full flex-col items-center justify-center gap-1.5 px-2 text-center", FILE_KINDS.ostatni.badge)}>
+        <Archive className="h-10 w-10" />
+        <span className="text-[11px] font-semibold">ZIP · rozbalí se</span>
+        <span className="line-clamp-2 break-all text-[11px] opacity-80">{name}</span>
+      </div>
+    );
+  }
+  const Icon = kind === "pdf" ? FileText : Paperclip;
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-1 px-2 text-center">
+      <Icon className={cn("h-10 w-10", kind === "pdf" ? "text-red-500" : "text-slate-500")} />
+      <span className="line-clamp-2 break-all text-[11px] text-muted-foreground">{name}</span>
+    </div>
+  );
 }
 
 function filesFrom(list: FileList | null | undefined): File[] {
@@ -47,6 +116,10 @@ export function CapturePick({
   onRemove,
   onMove,
   aiHint,
+  notice = null,
+  resume = null,
+  onResume,
+  onDiscardResume,
 }: {
   pages: PageDraft[];
   onAddFiles: (files: File[]) => void;
@@ -54,6 +127,12 @@ export function CapturePick({
   onMove: (id: string, delta: -1 | 1) => void;
   /** Uživatel má AI čtení (jinak vyplní ručně vedle fotky). */
   aiHint: boolean;
+  /** Krátká informace („Už je v dávce"). */
+  notice?: string | null;
+  /** Rozpracované focení (sessionStorage + živá relace na serveru). */
+  resume?: { pages: number; busy?: boolean } | null;
+  onResume?: () => void;
+  onDiscardResume?: () => void;
 }) {
   const cameraRef = React.useRef<HTMLInputElement>(null);
   const filesRef = React.useRef<HTMLInputElement>(null);
@@ -65,7 +144,7 @@ export function CapturePick({
   // vložení obrázku ze schránky (Ctrl+V na počítači)
   React.useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      const files = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/") || f.type === "application/pdf");
+      const files = Array.from(e.clipboardData?.files ?? []).filter((f) => f.size > 0);
       if (files.length) {
         e.preventDefault();
         onAddFiles(files);
@@ -127,12 +206,37 @@ export function CapturePick({
     },
   };
 
+  const resumeBanner = resume ? (
+    <div
+      data-testid="capture-resume"
+      className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100"
+    >
+      <History className="h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-300" />
+      <span className="min-w-0 flex-1 font-medium">
+        Máš rozpracované focení ({resume.pages === 1 ? "1 stránka" : `${resume.pages} ${resume.pages > 1 && resume.pages < 5 ? "stránky" : "stránek"}`})
+      </span>
+      <span className="flex shrink-0 gap-2">
+        <Button type="button" size="sm" onClick={onResume} disabled={resume.busy} className="bg-indigo-600 text-white hover:bg-indigo-700">
+          {resume.busy ? <Loader2 className="animate-spin" /> : null} Pokračovat
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDiscardResume} disabled={resume.busy}>Zahodit</Button>
+      </span>
+    </div>
+  ) : null;
+  const noticeLine = (
+    <p role="status" aria-live="polite" className={cn("text-xs font-medium text-sky-700 dark:text-sky-300", !notice && "sr-only")}>
+      {notice ? <><Info className="mr-1 inline h-3.5 w-3.5 align-[-3px]" />{notice}</> : null}
+    </p>
+  );
+
   if (!pages.length) {
     return (
+      <div className="flex min-h-full flex-col">
+      {resumeBanner}
       <div
         {...dropProps}
         className={cn(
-          "flex min-h-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition sm:py-12",
+          "flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition sm:py-12",
           dragOver ? "border-rose-400 bg-rose-50 dark:bg-rose-500/10" : "border-border",
         )}
       >
@@ -163,7 +267,7 @@ export function CapturePick({
           </Button>
         </div>
         <p className="mt-3 hidden text-xs text-muted-foreground sm:block">
-          …nebo sem fotky / PDF přetáhni, případně vlož ze schránky (Ctrl+V).
+          …nebo sem fotky / PDF / výkresy / 3D modely přetáhni, případně vlož ze schránky (Ctrl+V).
         </p>
 
         <ul className="mt-6 grid w-full max-w-lg gap-2 text-left text-xs sm:grid-cols-3">
@@ -177,9 +281,11 @@ export function CapturePick({
           </li>
           <li className="flex items-start gap-2 rounded-lg bg-violet-50 p-2.5 text-violet-900 dark:bg-violet-500/10 dark:text-violet-200">
             <Layers className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
-            Víc stránek = víc fotek
+            {aiHint ? "Víc dokladů najednou — AI je roztřídí" : "Víc stránek = víc fotek"}
           </li>
         </ul>
+        {noticeLine}
+      </div>
       </div>
     );
   }
@@ -187,24 +293,27 @@ export function CapturePick({
   return (
     <div {...dropProps} className={cn("rounded-2xl p-1 transition", dragOver && "bg-rose-50 ring-2 ring-rose-300 dark:bg-rose-500/10")}>
       {inputs}
+      {resumeBanner}
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold">
-          {pages.length === 1 ? "1 stránka" : `${pages.length} ${pages.length < 5 ? "stránky" : "stránek"}`} dokladu
-        </h3>
-        <p className="text-xs text-muted-foreground">Má doklad víc stránek? Přidej je ve správném pořadí.</p>
+        <h3 className="text-sm font-semibold">{pickCountLabel(pages)}</h3>
+        <p className="text-xs text-muted-foreground">
+          {pages.length >= 2 && aiHint ? (
+            <span className="font-medium text-fuchsia-700 dark:text-fuchsia-300"><Sparkles className="mr-1 inline h-3.5 w-3.5 align-[-3px]" />Klidně vše najednou — AI roztřídí</span>
+          ) : "Má doklad víc stránek? Přidej je ve správném pořadí."}
+        </p>
       </div>
+      <div className="mb-2">{noticeLine}</div>
       <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {pages.map((p, i) => (
+        {pages.map((p, i) => {
+          const kind = pickTileKind(p.name, p.mimeType);
+          return (
           <li key={p.id} className="group relative overflow-hidden rounded-xl border bg-card shadow-sm">
             <div className="relative aspect-[3/4] bg-muted">
-              {p.previewUrl && p.mimeType.startsWith("image/") && !/hei[cf]/i.test(p.mimeType) ? (
+              {kind === "image" && p.previewUrl && !/hei[cf]/i.test(p.mimeType) ? (
                 // eslint-disable-next-line @next/next/no-img-element -- místní náhled fotky
                 <img src={p.previewUrl} alt={`Stránka ${i + 1}`} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-1 px-2 text-center">
-                  <FileText className="h-10 w-10 text-red-500" />
-                  <span className="line-clamp-2 break-all text-[11px] text-muted-foreground">{p.name}</span>
-                </div>
+                <FileTile name={p.name} kind={kind} />
               )}
               <span className="absolute left-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-xs font-bold text-white shadow">
                 {i + 1}
@@ -225,26 +334,27 @@ export function CapturePick({
             <div className="flex items-center justify-between gap-1 border-t px-1.5 py-1">
               <span className="truncate pl-1 text-[11px] text-muted-foreground">{sizeLabel(p.size)}</span>
               <span className="flex shrink-0">
-                <Button type="button" variant="ghost" size="icon-sm" className="h-7 w-7" disabled={i === 0} onClick={() => onMove(p.id, -1)} aria-label="Posunout dopředu">
+                <Button type="button" variant="ghost" size="icon-sm" className="h-9 w-9" disabled={i === 0} onClick={() => onMove(p.id, -1)} aria-label="Posunout dopředu">
                   <ArrowLeft />
                 </Button>
-                <Button type="button" variant="ghost" size="icon-sm" className="h-7 w-7" disabled={i === pages.length - 1} onClick={() => onMove(p.id, 1)} aria-label="Posunout dozadu">
+                <Button type="button" variant="ghost" size="icon-sm" className="h-9 w-9" disabled={i === pages.length - 1} onClick={() => onMove(p.id, 1)} aria-label="Posunout dozadu">
                   <ArrowRight />
                 </Button>
-                <Button type="button" variant="ghost" size="icon-sm" className="h-7 w-7 text-red-600 hover:text-red-700 dark:text-red-400" onClick={() => onRemove(p.id)} aria-label="Odebrat stránku">
+                <Button type="button" variant="ghost" size="icon-sm" className="h-9 w-9 text-red-600 hover:text-red-700 dark:text-red-400" onClick={() => onRemove(p.id)} aria-label="Odebrat stránku">
                   <Trash2 />
                 </Button>
               </span>
             </div>
           </li>
-        ))}
+          );
+        })}
         <li className="flex flex-col gap-2">
           <label
             htmlFor={cameraId}
             {...keyOpen(cameraRef)}
             className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-rose-300 bg-rose-50/60 p-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
           >
-            <Camera className="h-6 w-6" /> Vyfotit další stránku
+            <Camera className="h-6 w-6" /> <span className="text-center">Vyfotit další (stránku nebo doklad)</span>
           </label>
           <label
             htmlFor={filesId}

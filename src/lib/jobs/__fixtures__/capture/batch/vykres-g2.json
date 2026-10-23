@@ -1,0 +1,22 @@
+{
+  "drawingNumber": "4711-03",
+  "revision": "A",
+  "title": "Vodicí lišta",
+  "material": "S355J2",
+  "dimensions": "400 × 30 × 20 mm",
+  "weightKg": 1.9,
+  "generalTolerance": "ISO 2768-mK",
+  "tightestTolerance": "±0,05",
+  "surface": "Ra 0,8",
+  "heatTreatment": "",
+  "surfaceTreatment": "",
+  "quantity": 0,
+  "customerName": "STROJMETAL, a. s.",
+  "drawingDate": "2026-09-30",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "notes": "",
+  "summary": "Výkres vodicí lišty 4711-03 rev. A.",
+  "confidence": 0.9,
+  "needsClarification": []
+}

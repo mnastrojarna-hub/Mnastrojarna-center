@@ -1,0 +1,19 @@
+{
+  "documents": [
+    {
+      "pages": [
+        1
+      ],
+      "type": "dodaci_list_my",
+      "flags": [
+        "signed"
+      ]
+    },
+    {
+      "pages": [
+        2
+      ],
+      "type": "faktura_my"
+    }
+  ]
+}

@@ -104,6 +104,7 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
           quotes={data.supplierQuotes}
           today={today}
           selectedBy={activity.quoteSelected}
+          pendingCaptured={data.pendingCaptured}
           onAdd={() => setQuoteDialog({ open: true, quote: null })}
           onEdit={(quote) => setQuoteDialog({ open: true, quote })}
         />

@@ -118,7 +118,7 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
   const s = await session();
   if (!s) return null;
   try {
-    const [jobRes, quotes, orders, commRes] = await Promise.all([
+    const [jobRes, quotes, orders, commRes, pendingRes] = await Promise.all([
       s.db
         .from("orders")
         .select("id, value, purchase_cost, owner_id, owner:profiles!owner_id(id, full_name, email)")
@@ -127,7 +127,16 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
       fetchSupplierQuotes(s.db, jobId),
       fetchPurchaseOrders(s.db, jobId),
       s.db.from("commission_entries").select("*").eq("order_id", jobId).maybeSingle(),
+      s.db
+        .from("job_files")
+        .select("id, title, filename, ai_extracted, created_at")
+        .eq("job_id", jobId)
+        .eq("archived", false)
+        .eq("ai_extracted->>purchasingPending", "true")
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
+    warn("pending", pendingRes.error);
     warn("job", jobRes.error);
     warn("commission", commRes.error);
     const job = jobRes.data as JobMoneyRow | null;
@@ -145,11 +154,20 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
       commission = toJobCommissionView(comm, ownerName);
     }
 
+    const pendingCaptured = ((pendingRes.data ?? []) as { id: string; title: string | null; filename: string; ai_extracted: Record<string, unknown> | null; created_at: string }[])
+      .map((f) => {
+        const sup = f.ai_extracted?.supplier;
+        const supplierName = sup && typeof sup === "object" && typeof (sup as Record<string, unknown>).name === "string"
+          ? ((sup as Record<string, unknown>).name as string)
+          : "";
+        return { fileId: f.id, title: f.title ?? f.filename, supplierName, createdAt: f.created_at };
+      });
     return {
       supplierQuotes: quotes,
       purchaseOrders: orders,
       commission,
       owner,
+      pendingCaptured,
       totals: purchasingTotals({
         revenue: cleanNumber(job.value),
         plannedCost: cleanNumber(job.purchase_cost),
