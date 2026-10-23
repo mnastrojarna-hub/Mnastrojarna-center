@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { checkFeature } from "@/lib/auth/session";
+import { userActor } from "@/lib/supabase/actor-headers";
 import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { logAudit } from "@/lib/audit";
@@ -11,7 +12,7 @@ import { FILE_KINDS, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-k
 import {
   isUuid, jobFilePath, cleanText, cleanNumber, JOB_FILE_SELECT, translateDbError, type FileRow,
 } from "@/lib/jobs/mapping";
-import type { JobFileKind } from "@/lib/supabase/database.types";
+import type { DocIssuerKey, JobFileKind, JobFileOrigin } from "@/lib/supabase/database.types";
 import type { ActionResult, JobFile } from "@/lib/jobs/types";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 
@@ -34,7 +35,7 @@ async function begin(feature: Feature = "orders"): Promise<Ctx | { error: string
   if (!isSupabaseConfigured()) return { error: "Supabase není nakonfigurováno." };
   const access = await checkFeature(feature);
   if ("error" in access) return { error: access.error };
-  const db = await createOperatorClient();
+  const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user };
 }
 
@@ -110,15 +111,26 @@ export async function registerJobFile(input: {
   silent?: boolean;
   /** Bez automatické nové verze podle stejného názvu (stránky dokladu, „scan.pdf" ze skeneru). */
   noAutoVersion?: boolean;
+  /** Odkud dokument je — „generated“ (náš vystavený doklad) smí jen server (job-documents), ne prohlížeč. */
+  origin?: Exclude<JobFileOrigin, "generated"> | null;
+  /** Kdo doklad vystavil (my / zákazník / dodavatel). */
+  issuer?: DocIssuerKey | null;
+  /** Revize objednávky, ke které doklad patří. */
+  orderRevision?: number | null;
 }): Promise<ActionResult<{ file: JobFile }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!input || typeof input !== "object") return fail("Neplatná zakázka.");
+  // náš vystavený doklad (potvrzení → „vystaveno“) zapisuje jen generateJobDocument přímo jádrem
+  if ((input.origin as string | null | undefined) === "generated") return fail("Neplatný původ dokumentu.");
+  // #25: doklad dodavatele k naší nabídce nepatří (jinak by se poslal jako „naše nabídka“ mimo schválení)
+  if (input.issuer === "dodavatel" && input.quoteId) return fail("Nabídka dodavatele nepatří k naší nabídce.");
   // jádro (lib/jobs/job-files-store) — nové volby (vazba položky, relace focení) jen pro serverový kód
   return registerJobFileCore(c.db, c.user.id, {
     jobId: input.jobId, path: input.path, filename: input.filename, mimeType: input.mimeType, size: input.size,
     kind: input.kind, title: input.title, quoteId: input.quoteId, note: input.note, replaceFileId: input.replaceFileId,
     aiExtracted: input.aiExtracted, aiConfidence: input.aiConfidence, silent: input.silent, noAutoVersion: input.noAutoVersion,
+    origin: input.origin ?? null, issuer: input.issuer ?? null, orderRevision: input.orderRevision ?? null,
   });
 }
 

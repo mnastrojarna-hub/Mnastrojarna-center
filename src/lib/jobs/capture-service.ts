@@ -17,7 +17,6 @@ import { liveSessionPaths } from "@/lib/jobs/capture-store";
 import { recordTrainingExample } from "@/lib/jobs/training";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { findOrCreateCustomer } from "@/lib/jobs/customers";
-import { docFieldValues, planJobUpdate, planNewJob } from "@/lib/jobs/apply-extraction";
 import { isSupplierSideDoc, matchCustomer, matchJob, matchParty } from "@/lib/jobs/matching";
 import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
@@ -26,6 +25,17 @@ import {
   translateDbError, validateItems, validateJobInput,
 } from "@/lib/jobs/mapping";
 import { isJobStage } from "@/lib/jobs/stages";
+import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
+import { docNumbersEqual } from "@/lib/jobs/matching";
+import { findPurchaseOrderByNumber } from "@/lib/jobs/purchasing-store";
+import {
+  autoCaptureCtx, captureStageGuard, checkPhotoOrderMismatch, confirmOrderByPhoto, markQuoteSentByPhoto, photoOrderRevision,
+  proposeFromCapture, receiveSupplierDlByPhoto, recordPhotoDelivery, registerPhotoOrderRevision,
+} from "@/lib/jobs/capture-flow";
+import { issuerKey, looksLikeCancellation, type OrderChange } from "@/lib/jobs/capture-flow-rules";
+import { singleExistingTarget, singleNewTarget, singleOrderDeadline, type SingleOrderDeadline } from "@/lib/jobs/capture-single-deadline";
+import { jobQuoteTerms } from "@/lib/jobs/job-quote-terms";
+import type { QuoteTerms } from "@/lib/jobs/order-deadline";
 import type {
   CaptureDocKind, CaptureResult, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedParty,
 } from "@/lib/jobs/capture-types";
@@ -33,7 +43,7 @@ import type { ActionResult, JobDetail } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
 import {
   CAPTURE_BATCH_MAX_FILES, CAPTURE_BUCKET, CAPTURE_MAX_PAGES, CAPTURE_TTL_MS, REVIEW_FIELD_KEYS, REVIEW_FIELDS,
-  buildExistingTarget, buildNewTarget, canAutoApply, captureEventMessage, captureFolder, capturePagePath,
+  canAutoApply, captureEventMessage, captureFolder, capturePagePath,
   captureSessionPath, captureSortPath, chipByKey, chipFor, defaultCustomerChoice, defaultSupplierChoice, documentNumberFor,
   initialReviewState, isAiReadableMime, isAiValue, isBatchUploadable, isCaptureDocKind, isCapturePagePath, isCaptureSortPath,
   isFieldLocked,
@@ -103,7 +113,8 @@ export async function begin(): Promise<Ctx | { error: string }> {
   const res = await checkFeature("orders");
   if ("error" in res) return { error: res.error };
   const access = await getAccess();
-  const db = await createOperatorClient();
+  // autor změn = účet, který fotil (via foto); plná automatika přepne na ✨ AI za tento účet (autoCaptureCtx)
+  const db = await createOperatorClient({ actor: userActor(res.user, "foto") });
   return { db, user: res.user, access, margins: access.can("margins") };
 }
 
@@ -128,7 +139,7 @@ function bucket(db: JobsDb) {
 export async function aiAvailability(access: Access): Promise<{ available: boolean; reason: string | null }> {
   if (access.can("ai_capture") && (await isDocumentReaderConfigured())) return { available: true, reason: null };
   // E2E bez API klíče: testovací AI_FAKE_CAPTURE pro super admina
-  if (process.env.AI_FAKE_CAPTURE && access.user?.role === "super_admin") return { available: true, reason: null };
+  if (process.env.AI_FAKE_CAPTURE && can(access.user, "ai_capture", { ...access.ctx, aiEnabled: true, aiConfigured: true })) return { available: true, reason: null };
   const permitted = can(access.user, "ai_capture", { ...access.ctx, aiEnabled: true, aiConfigured: true });
   if (!permitted) return { available: false, reason: AI_NOT_ALLOWED };
   if (!access.ctx.aiEnabled) return { available: false, reason: AI_DISABLED };
@@ -334,24 +345,28 @@ function redactPrices(text: string): string {
   return text.replace(MONEY_RE, "…");
 }
 
-export function existingTarget(job: JobDetail, session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean, reason: string | null, score: number | null): ReviewTarget {
-  return buildExistingTarget({
-    job,
-    plan: session.aiUsed ? planJobUpdate(job, session.doc) : null,
-    docValues: session.aiUsed ? docFieldValues(session.doc) : undefined,
-    reason,
-    score,
-    margins,
-  });
+/**
+ * Objednávka zákazníka bez reálného termínu → termín z naší nabídky zakázky v systému (lhůta od data
+ * objednávky); termín = datum objednávky / před ním bez nabídky s lhůtou → drop + varování (i bez nabídky).
+ * Vrací navržený termín a text upozornění, jinak null.
+ */
+export function orderDeadlineForJob(
+  doc: ExtractedBusinessDoc,
+  quoteTerms: QuoteTerms[] | undefined,
+  today?: string,
+): SingleOrderDeadline | null {
+  return singleOrderDeadline(doc, quoteTerms, today);
+}
+
+export function existingTarget(
+  job: JobDetail, session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean, reason: string | null, score: number | null,
+  quoteTerms?: QuoteTerms[],
+): ReviewTarget {
+  return singleExistingTarget(job, session, margins, reason, score, quoteTerms);
 }
 
 export function newTarget(session: Pick<CaptureSession, "aiUsed" | "doc">, margins: boolean): ReviewTarget {
-  return buildNewTarget({
-    plan: session.aiUsed ? planNewJob(session.doc) : null,
-    margins,
-    docKind: session.doc.docKind,
-    issuer: session.doc.issuer,
-  });
+  return singleNewTarget(session, margins);
 }
 
 /**
@@ -470,8 +485,17 @@ export async function analyzeSingle(
 
     // cíle: pevná zakázka, nebo nejlepší shoda + možnosti + nová zakázka
     const targets: ReviewTarget[] = [];
+    // objednávka bez reálného termínu → termín z naší nabídky zakázky v systému (lhůta od data objednávky)
+    const isOrder = aiUsed && doc.docKind === "objednavka" && doc.issuer !== "my" && doc.issuer !== "dodavatel";
+    const deadlineNotes: Record<string, string> = {};
+    const withTerms = async (j: JobDetail, reasonText: string | null, score: number | null) => {
+      const terms = isOrder ? await jobQuoteTerms(db, j) : [];
+      const dl = orderDeadlineForJob(doc, terms);
+      if (dl?.message) deadlineNotes[j.id] = dl.message;
+      return existingTarget(j, session, margins, reasonText, score, terms);
+    };
     if (fixedJob) {
-      targets.push(existingTarget(fixedJob, session, margins, "doklad nahráváš u této zakázky", null));
+      targets.push(await withTerms(fixedJob, "doklad nahráváš u této zakázky", null));
     } else {
       if (aiUsed) {
         const m = matchJob(doc, candidates.jobs, { customerId: cm?.id ?? null, supplierId: sm?.id ?? null });
@@ -481,15 +505,20 @@ export async function analyzeSingle(
         ];
         session.matches = picks;
         const jobs = await Promise.all(picks.map((p) => getJob(p.jobId)));
-        picks.forEach((p, i) => {
-          const j = jobs[i];
-          if (j) targets.push(existingTarget(j, session, margins, p.reason, p.score));
-        });
+        const built = await Promise.all(picks.map((p, i) => (jobs[i] ? withTerms(jobs[i]!, p.reason, p.score) : Promise.resolve(null))));
+        for (const t of built) if (t) targets.push(t);
       }
       targets.push(newTarget(session, margins));
     }
     // nejlepší shoda jen nad prahem (alternativy jsou jen nabídka)
     const best = targets.find((t) => t.mode === "existing" && (fixedJob || (t.score ?? 0) >= 60)) ?? targets[targets.length - 1];
+    if (best.jobId && deadlineNotes[best.jobId]) notes.push(deadlineNotes[best.jobId]);
+    // nová zakázka: stejná upozornění jako dávka — termín = datum objednávky / před ním (bez nabídky) se neuloží,
+    // termín v minulosti → „doplň termín" (obojí = bez plné automatiky); termín jen z položky se tiše převezme
+    else if (!best.jobId && isOrder) {
+      const dl = orderDeadlineForJob(doc, []);
+      if (dl?.message) notes.push(dl.message);
+    }
 
     const hideMoney = !margins && supplierSide;
     const model: ReviewModel = {
@@ -534,7 +563,7 @@ export async function analyzeSingle(
 
     // plná automatika: jistý doklad se uloží hned, člověk jen případně upraví
     if (canAutoApply(model)) {
-      const applied = await applyBusinessDoc(c, session, model.initial, { auto: true });
+      const applied = await applyBusinessDoc(await autoCaptureCtx(c, true), session, model.initial, { auto: true });
       if (applied.ok) return { ok: true, model, applied };
       model.needsClarification = [`Automatické uložení se nepovedlo (${applied.error}) — zkontroluj a ulož ručně.`, ...model.needsClarification];
     }
@@ -555,7 +584,9 @@ export async function captureTarget(input: { captureId: string; jobId: string })
     if (session.fixedJobId) return fail("Doklad patří k zakázce, u které se nahrával.");
     const job = await getJob(input.jobId);
     if (!job) return fail("Zakázka nenalezena.");
-    return { ok: true, target: existingTarget(job, session, c.margins, "vybráno ručně", null) };
+    const isOrder = session.aiUsed && session.doc.docKind === "objednavka" && session.doc.issuer !== "my" && session.doc.issuer !== "dodavatel";
+    const terms = isOrder ? await jobQuoteTerms(c.db, job) : [];
+    return { ok: true, target: existingTarget(job, session, c.margins, "vybráno ručně", null, terms) };
   } catch (err) {
     return fail(err);
   }
@@ -617,6 +648,8 @@ export type BusinessDocSession = Pick<
 export type BusinessApplyResult = CaptureResult & {
   /** Klíč položky formuláře → id položky zakázky (nově založené). */
   itemIds?: Record<string, string>;
+  /** Objednávka se stejným číslem u zakázky s objednávkou → rozdíl pro novou revizi (položky se nepřepsaly). */
+  orderRevision?: OrderChange[];
 };
 
 /**
@@ -736,6 +769,9 @@ export async function applyBusinessDoc(
   let itemsAdded = 0;
   let itemsMerged = 0;
   const written: ReviewFieldKey[] = [];
+  let orderRevision: OrderChange[] | null = null;
+  /** Co focení udělalo s podrobnými stavy (zobrazí se po uložení). */
+  const flowNotes: string[] = [];
 
   if (target.mode === "new" && captureKey) {
     // dávka: zakázka bez položek, hned klíč relace, položky s klíčem (opakování je nezdvojí)
@@ -786,6 +822,16 @@ export async function applyBusinessDoc(
     jobNumber = detail!.number;
     stageFrom = isJobStage(row.status) ? row.status : null;
 
+    // objednávka se stejným číslem u zakázky, která objednávku už má → revize (2.8): položky se NEpřepisují
+    if (state.chip === "objednavka_zakaznik") {
+      const rev = await photoOrderRevision(db, jobId, input.customerOrderNumber ?? doc.customerOrderNumber, doc);
+      if (rev.revision) {
+        orderRevision = rev.changes;
+        items.length = 0;
+        state.merges = [];
+      }
+    }
+
     // položky nejdřív — když selžou, nic se nezapíše
     let insertedIds: string[] = [];
     if (captureKey && items.length) {
@@ -833,7 +879,9 @@ export async function applyBusinessDoc(
       }
     }
 
-    // doplnění existujících položek (jen prázdné údaje)
+    // doplnění existujících položek (jen prázdné údaje; výjimka: počet kusů z objednávky zákazníka
+    // u zakázky, která objednávku ještě neměla — vždy platí objednávka)
+    const orderQtyWins = state.chip === "objednavka_zakaznik" && isEmptyValue(row.customer_order_number);
     for (const m of reviewMergePatches(state.merges, margins)) {
       const { data: cur } = await db
         .from("order_items")
@@ -852,7 +900,7 @@ export async function applyBusinessDoc(
         const v = m.patch[k];
         if (v === undefined || v === null || v === "") continue;
         if (col === "purchase_unit_price" && !margins) continue;
-        if (!isEmptyValue(curRow[col])) continue;
+        if (!isEmptyValue(curRow[col]) && !(col === "quantity" && orderQtyWins && m.overrideQuantity)) continue;
         patch[col] = v;
       }
       if (!Object.keys(patch).length) continue;
@@ -861,17 +909,39 @@ export async function applyBusinessDoc(
       else itemsMerged++;
     }
 
-    // stav
-    if (opts.stage !== false && state.stage !== "keep" && state.stage !== stageFrom) {
-      const { error } = await db.from("orders").update({ status: state.stage } as never).eq("id", jobId);
-      if (error) {
-        warnings.push(`Stav se nepodařilo změnit: ${message(error.message)}`);
-      } else {
+    // náš dodací list → dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi")
+    if (opts.stage !== false && state.chip === "dodaci_list_my" && doc.items.length) {
+      const d = await recordPhotoDelivery(db, user.id, jobId, doc.items, { documentNumber: documentNumberFor(state, doc.documentNumber) });
+      if (d.recorded) flowNotes.push(d.complete ? "Dodáno vše" : `Dodáno částečně: ${d.lines.join("; ")}`);
+    }
+    // DL dodavatele k naší objednávce → převzetí po položkách (2.7)
+    if (opts.stage !== false && state.chip === "dodaci_list_dodavatel" && margins && doc.customerOrderNumber) {
+      const po = await findPurchaseOrderByNumber(db, doc.customerOrderNumber, jobId);
+      if (po) {
+        const r = await receiveSupplierDlByPhoto(db, user.id, po, doc.items);
+        if (!r.ok) warnings.push(`Objednávku ${po.number} se nepodařilo převzít: ${message(r.error)}`);
+        else {
+          if (r.summary) flowNotes.push(r.summary);
+          if (r.hint) flowNotes.push(r.hint);
+        }
+      }
+    }
+
+    // stav (jen dopředu; revize objednávky stav nemění; dodání / nákup podle pravidel 2.7)
+    if (opts.stage !== false && !orderRevision && state.stage !== "keep" && state.stage !== stageFrom) {
+      const { data: cur } = await db.from("orders").select("status").eq("id", jobId).maybeSingle();
+      const now = isJobStage((cur as Row | null)?.status) ? ((cur as Row).status as JobStage) : stageFrom;
+      const guard = now === state.stage ? null : await captureStageGuard(db, jobId, state.stage);
+      if (now === state.stage) {
         stageTo = state.stage;
-        await logJobEvent(db, {
-          jobId, type: "stage", message: stageEventMessage(stageFrom, state.stage, `podle dokladu (${chip.label.toLowerCase()})`),
-          data: { from: stageFrom, to: state.stage, source: "foto" }, actorId: user.id,
-        });
+      } else if (guard && !guard.ok) {
+        flowNotes.push(guard.warning);
+      } else {
+        // událost o změně stavu zapíše DB (autor z hlavičky, poznámka x-change-note)
+        const upd = db.from("orders").update({ status: state.stage } as never).eq("id", jobId);
+        const { error } = await withChangeNote(upd, `podle dokladu (${chip.label.toLowerCase()})`);
+        if (error) warnings.push(`Stav se nepodařilo změnit: ${message(error.message)}`);
+        else stageTo = state.stage;
       }
     }
   }
@@ -902,6 +972,8 @@ export async function applyBusinessDoc(
       // stránky jednoho dokladu: žádné automatické verze podle názvu, historie = jedna souhrnná událost níže
       silent: true,
       noAutoVersion: true,
+      origin: "capture",
+      issuer: issuerKey(state.issuer),
     });
     if (!reg.ok || !reg.file) {
       warnings.push(`Stránku ${f.filename} se nepodařilo uložit (${reg.error ?? "neznámá chyba"}).`);
@@ -911,6 +983,16 @@ export async function applyBusinessDoc(
     if (f.sortPath) {
       try { await bucket(db).remove([f.sortPath]); } catch { /* náhled roztřídění vyprší sám */ }
     }
+  }
+
+  // podrobné stavy podle dokladu (2.8) — jen u jednoho dokladu; dávka to dělá per doklad
+  if (opts.stage !== false) {
+    const notes = await applyDocFlow(c, jobId, state.chip, doc, {
+      orderRevision, fileId: fileIds[0] ?? null, documentNumber: docNumber,
+      customerOrderNumber: input.customerOrderNumber ?? doc.customerOrderNumber, auto: opts.auto,
+    });
+    flowNotes.push(...notes.notes);
+    warnings.push(...notes.warnings);
   }
 
   // jedna událost v historii
@@ -1013,8 +1095,70 @@ export async function applyBusinessDoc(
     summary: aiUsed ? (margins || !supplierSide ? doc.summary : redactPrices(doc.summary)) : undefined,
     autoApplied: opts.auto || undefined,
     warnings: warnings.length ? warnings : undefined,
+    flowNotes: flowNotes.length ? flowNotes : undefined,
     ...(captureKey ? { itemIds } : {}),
+    ...(orderRevision ? { orderRevision } : {}),
   };
+}
+
+/**
+ * Podrobné stavy toku podle uloženého dokladu (spec 2.8): objednávka → revize / rozpor s nabídkou /
+ * návrh storna, naše nabídka → odeslaná, naše potvrzení → potvrzení odesláno. Sdílí jeden doklad
+ * i dávka (volá se až po uložení stránek a posunu stavu zakázky).
+ */
+export async function applyDocFlow(
+  c: Pick<Ctx, "db" | "user">,
+  jobId: string,
+  chipKey: string,
+  doc: ExtractedBusinessDoc,
+  opts: { orderRevision?: OrderChange[] | null; fileId?: string | null; documentNumber?: string | null; customerOrderNumber?: string | null; auto?: boolean; quoteId?: string | null },
+): Promise<{ notes: string[]; warnings: string[] }> {
+  const { db } = c;
+  const notes: string[] = [];
+  const warnings: string[] = [];
+  try {
+    if (chipKey === "objednavka_zakaznik") {
+      if (opts.orderRevision) {
+        if (!opts.orderRevision.length) notes.push("Objednávka beze změny proti evidované — jen přiložena.");
+        else {
+          const r = await registerPhotoOrderRevision(db, jobId, {
+            changes: opts.orderRevision, fileId: opts.fileId, customerOrderNumber: opts.customerOrderNumber, documentNumber: opts.documentNumber,
+          });
+          if (r.ok && r.revision) notes.push(`Změna objednávky zapsána jako revize ${r.revision} (${opts.orderRevision.length} ${opts.orderRevision.length === 1 ? "rozdíl" : opts.orderRevision.length < 5 ? "rozdíly" : "rozdílů"}) — položky se nepřepsaly, potvrď změnu.`);
+          else if (!r.ok) warnings.push(`Revizi objednávky se nepodařilo zapsat: ${message(r.error)}`);
+        }
+      } else {
+        const m = await checkPhotoOrderMismatch(db, jobId, doc);
+        if (m.hint) notes.push(m.hint);
+      }
+      if (looksLikeCancellation(doc)) {
+        const ok = await proposeFromCapture(db, jobId, {
+          phase: "order", to: "stornovana", reason: "projekt_zrusen", label: "Stornovat objednávku — podle vyfoceného dokladu",
+          note: (doc.summary || "Doklad vypadá na storno objednávky.").slice(0, 500), confidence: doc.confidence,
+        });
+        if (ok) notes.push("Doklad vypadá na storno — připraven návrh, rozhodne obchodník.");
+      }
+    } else if (chipKey === "nabidka_my") {
+      let quoteId = opts.quoteId ?? null;
+      const number = (opts.documentNumber || doc.documentNumber || "").trim();
+      if (!quoteId && number) {
+        const { data } = await db.from("quotes").select("id, number").eq("job_id", jobId).limit(50);
+        quoteId = ((data ?? []) as { id: string; number: string }[]).find((q) => docNumbersEqual(q.number, number))?.id ?? null;
+      }
+      if (quoteId) {
+        const r = await markQuoteSentByPhoto(db, quoteId, doc.documentDate);
+        if (!r.ok) warnings.push(r.error);
+        else if (r.changed) notes.push(`Nabídka ${number || ""} označena jako odeslaná (z fotky).`.replace("  ", " "));
+      }
+    } else if (chipKey === "potvrzeni_my") {
+      const r = await confirmOrderByPhoto(db, jobId);
+      if (!r.ok) warnings.push(`Potvrzení objednávky se nepodařilo zapsat: ${message(r.error)}`);
+      else if (r.changed) notes.push("Potvrzení objednávky zapsáno jako odeslané (z fotky).");
+    }
+  } catch (err) {
+    warnings.push(message(err));
+  }
+  return { notes, warnings };
 }
 
 /**

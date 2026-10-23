@@ -35,6 +35,24 @@ export interface ExtractedItem {
   deliveryDate: string;
 }
 
+/** Jednotka strukturované dodací lhůty z AI. */
+export type ExtractedLeadUnit = "dny" | "pracovni_dny" | "tydny" | "mesice";
+/** Od čeho dodací lhůta běží („jine" = od něčeho jiného, např. zaplacení zálohy — lhůta se nepoužije). */
+export type ExtractedLeadFrom = "objednavka" | "potvrzeni" | "podklady" | "jine";
+
+/**
+ * Strukturovaná DODACÍ / výrobní lhůta z nabídky (naší i dodavatelské) a potvrzení — nikdy platnost nabídky,
+ * splatnost, záruka, skonto ani reklamační lhůta. value 0 = jen text (čte se jako dodací pole).
+ */
+export interface ExtractedLeadTime {
+  /** Počet jednotek (u rozpětí horní mez), 0 = neuvedeno. */
+  value: number;
+  unit: ExtractedLeadUnit;
+  from: ExtractedLeadFrom | null;
+  /** Doslovný úsek dokladu („4 týdny od objednávky"). */
+  text: string;
+}
+
 /** Výstup AI čtení dokladu. Prázdný řetězec / 0 = na dokladu neuvedeno. */
 export interface ExtractedBusinessDoc {
   docKind: CaptureDocKind;
@@ -65,6 +83,8 @@ export interface ExtractedBusinessDoc {
   currency: string;
   paymentTerms: string;
   deliveryTerms: string;
+  /** Strukturovaná dodací lhůta (nabídka, potvrzení), null = neuvedena. */
+  deliveryLeadTime: ExtractedLeadTime | null;
   note: string;
   summary: string;
   confidence: number;
@@ -155,6 +175,8 @@ export interface CaptureResult {
   autoApplied?: boolean;
   /** Dílčí problémy, které uložení neshodily (např. nepřiložená stránka). */
   warnings?: string[];
+  /** Co doklad udělal s podrobnými stavy (revize objednávky, rozpor, dodáno částečně…). */
+  flowNotes?: string[];
 }
 
 /** Mapování druhu dokladu na druh souboru zakázky. */

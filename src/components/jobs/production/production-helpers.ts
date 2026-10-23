@@ -321,6 +321,8 @@ export interface ActorStamp {
 export interface ChangedByFields {
   changedBy?: PersonRef | null;
   changedAt?: string | null;
+  /** „automaticky" = navázalo samo (changedBy = kdo to spustil). */
+  changedVia?: string | null;
 }
 
 type EventLike = Pick<JobEvent, "data" | "actor" | "createdAt">;
@@ -337,7 +339,7 @@ export function operationStatusStamp(
   events: EventLike[],
   op: Pick<JobOperation, "id" | "status"> & ChangedByFields,
 ): (ActorStamp & { auto: boolean }) | null {
-  if (op.changedBy && op.changedAt) return { name: op.changedBy.name, at: op.changedAt, auto: false };
+  if (op.changedBy && op.changedAt) return { name: op.changedBy.name, at: op.changedAt, auto: op.changedVia === "automaticky" };
   for (const e of newestFirst(events)) {
     const d = e.data ?? {};
     if (d.operationId !== op.id || d.production !== "status") continue;

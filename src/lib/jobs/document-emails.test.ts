@@ -144,6 +144,9 @@ describe("historie", () => {
   it("issuedEventMessage / sentEventMessage", () => {
     expect(issuedEventMessage("faktura", "FV-2026-003")).toBe("Vystavena faktura FV-2026-003 (PDF)");
     expect(issuedEventMessage("potvrzeni", "POT-1", 2)).toBe("Vystaveno potvrzení objednávky POT-1 (PDF) — verze 2");
+    expect(issuedEventMessage("potvrzeni", "POT-1", 3, { orderRevision: 2 })).toBe("Vystaveno potvrzení objednávky POT-1 k rev 2 (PDF) — verze 3");
+    expect(issuedEventMessage("potvrzeni", "POT-1", 1, { orderRevision: 1 })).toBe("Vystaveno potvrzení objednávky POT-1 (PDF)");
+    expect(issuedEventMessage("faktura", "FV-1", 1, { partial: true })).toBe("Vystavena faktura FV-1 (PDF) · dílčí dodávka, stav zakázky zůstává");
     expect(sentEventMessage("nabidka", "NAB-1", "x@y.cz")).toBe("Odeslána nabídka NAB-1 na x@y.cz");
     expect(sentEventMessage("ostatni", null, "x@y.cz")).toBe("Odeslán dokument na x@y.cz");
   });

@@ -17,12 +17,12 @@ import type {
   BatchWarning, DocApplyState, DocExtractSummary, DuplicateRef, ModelMeta,
 } from "@/lib/jobs/capture-batch-types";
 import {
-  BATCH_TYPES, batchEventMessage, batchStage, batchTypeFor, defaultSortWithoutAi, drawingNumberFromFilename, isBatchDocType,
+  BATCH_TYPES, batchEventMessage, batchStage, batchTypeFor, bundleKeyOf, defaultSortWithoutAi, drawingNumberFromFilename, isBatchDocType,
   isBusinessType, isNewerRevision, makeWarning, normalizeClassification, pagesKey, redactPrices, revisionFromFilename, sideOf,
   uniqueWarnings, validateBatchSort,
 } from "@/lib/jobs/capture-batch";
 import {
-  canAutoApplyBatch, groupBatch, groupDocOf, journalConflictOf, reconcileGroup, sameDocParty, sanitizeBatchApplyState, sanitizeBatchSort, swapParties,
+  NEW_GROUP_ASSIGN, canAutoApplyBatch, drawingDocMatch, groupBatch, ownDrawingNumbers, groupDocOf, journalConflictOf, reconcileGroup, sameDocParty, sanitizeBatchApplyState, sanitizeBatchSort, swapParties,
   type GroupJobCandidate, type ReconcileDoc, type StrongMatch,
 } from "@/lib/jobs/capture-batch-reconcile";
 import {
@@ -42,6 +42,9 @@ import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normali
 import { docNumbersEqual, matchCustomer, matchJob, matchParty, type JobMatchCandidateExt } from "@/lib/jobs/matching";
 import { recordTrainingExample } from "@/lib/jobs/training";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { withChangeNote } from "@/lib/supabase/actor-headers";
+import { autoCaptureCtx, captureStageGuard, receiveSupplierDlByPhoto, recordPhotoDelivery } from "@/lib/jobs/capture-flow";
+import { issuerKey, type OrderChange } from "@/lib/jobs/capture-flow-rules";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import {
   advancePurchaseOrderStatus, findOrCreateSupplierByParty, findPurchaseOrderByNumber, insertSupplierQuote, isOurParty,
@@ -55,8 +58,9 @@ import { isForward, isJobStage } from "@/lib/jobs/stages";
 import { plural } from "@/lib/jobs/deadlines";
 import type { JobDetail } from "@/lib/jobs/types";
 import type { JobFileKind, JobStage } from "@/lib/supabase/database.types";
+import { jobQuoteTerms } from "@/lib/jobs/job-quote-terms";
 import {
-  SESSION_GONE, aiAvailability, analyzeSingle, applyBusinessDoc, begin, fail, loadSuppliers, message,
+  SESSION_GONE, aiAvailability, analyzeSingle, applyBusinessDoc, applyDocFlow, begin, fail, loadSuppliers, message,
   type Ctx, type PrereadDoc,
 } from "@/lib/jobs/capture-service";
 
@@ -658,6 +662,9 @@ async function reviewContext(c: Ctx, session: BatchSession, sort: BatchSort): Pr
     const docNo = extract?.kind === "business" ? extract.doc.documentNumber || d.documentNumber
       : extract?.kind === "drawing" ? extract.drawing.drawingNumber || d.documentNumber
         : extract?.kind === "model" ? extract.model.drawingNumber || d.documentNumber : d.documentNumber;
+    // výkres / model: existující zakázka jen podle čísel na listu (firma z razítka se nepoužívá)
+    const loose = drawingDocMatch({ type: d.type, documentNumber: docNo, drawingNumbers: d.drawingNumbers, extract }, md.jobs);
+    if (!strong) strong = loose.strong;
     docs.push({
       id: d.id,
       type: d.type,
@@ -674,6 +681,9 @@ async function reviewContext(c: Ctx, session: BatchSession, sort: BatchSort): Pr
       customerMatch: data?.customerMatch ?? null,
       supplierMatch: data?.supplierMatch ?? null,
       strongMatch: strong,
+      // balík (ZIP, později e-mail) = jeden zákazník
+      bundleKey: bundleKeyOf(d.pageIds.map((id) => fileOfPage(session, id)).filter((f): f is BatchFile => Boolean(f))),
+      jobHints: loose.hints,
     });
   }
   return { session, sort, rows, md, docs, typeConflicts };
@@ -685,6 +695,7 @@ async function candidateJobs(
   groupTarget: string | null,
   override: string | null,
   fixedJobId: string | null,
+  db: JobsDb,
 ): Promise<GroupJobCandidate[]> {
   const picks: { id: string; reason: string | null; score: number | null }[] = [];
   const add = (id: string | null | undefined, reason: string | null, score: number | null) => {
@@ -703,7 +714,7 @@ async function candidateJobs(
     for (const a of m.alternatives) add(a.jobId, a.reason, a.score);
   }
   // výkresy / dodavatelské doklady bez zákazníka: zakázky se stejným výkresem (jen nabídka)
-  const nums = docs.flatMap((d) => [...d.drawingNumbers, ...(d.extract?.kind === "drawing" ? [d.extract.drawing.drawingNumber] : []), ...(d.extract?.kind === "model" ? [d.extract.model.drawingNumber] : [])]).filter(Boolean);
+  const nums = docs.flatMap((d) => [...d.drawingNumbers, ...(isBusinessType(d.type) ? [] : ownDrawingNumbers(d))]).filter(Boolean);
   if (nums.length) {
     for (const j of ctx.md.jobs) {
       if (picks.length >= 5) break;
@@ -712,10 +723,13 @@ async function candidateJobs(
     }
   }
   const jobs = await Promise.all(picks.slice(0, 5).map((p) => getJob(p.id)));
+  // objednávka bez reálného termínu → termín z naší nabídky zakázky v systému
+  const needTerms = primary?.type === "objednavka_zakaznik";
+  const terms = await Promise.all(jobs.map((j) => (j && needTerms ? jobQuoteTerms(db, j) : Promise.resolve([]))));
   const out: GroupJobCandidate[] = [];
   picks.slice(0, 5).forEach((p, i) => {
     const j = jobs[i];
-    if (j) out.push({ job: j, reason: p.reason, score: p.score });
+    if (j) out.push({ job: j, reason: p.reason, score: p.score, ...(terms[i].length ? { quoteTerms: terms[i] } : {}) });
   });
   return out;
 }
@@ -849,7 +863,7 @@ export async function buildBatchReview(c: Ctx, req: ReviewRequest): Promise<{ ok
   if (typeof sort === "string") return fail(sort);
   const invalid = validateBatchSort(sort, session.pages);
   if (invalid) return fail(invalid);
-  const assign = cleanStringMap(req.assign, DOC_ID_RE, (v) => v === "new" || /^g\d{1,3}$/.test(v));
+  const assign = cleanStringMap(req.assign, DOC_ID_RE, (v) => v === "new" || NEW_GROUP_ASSIGN.test(v) || /^g\d{1,3}$/.test(v));
   const targets = cleanStringMap(req.targets, /^g\d{1,3}$/, (v) => v === "new" || isUuid(v));
   const confirmed = Array.isArray(req.customerConfirmed)
     ? req.customerConfirmed.filter((x): x is string => typeof x === "string" && /^g\d{1,3}$/.test(x)).slice(0, 100) : [];
@@ -897,7 +911,7 @@ async function reviewModel(
   for (const g of grouped.groups) {
     const gdocs = g.docIds.map((id) => ctx.docs.find((d) => d.id === id)!).filter(Boolean);
     const override = opts.targets[g.key] ?? null;
-    const jobs = await candidateJobs(ctx, gdocs, g.targetJobId, override, session.fixedJobId);
+    const jobs = await candidateJobs(ctx, gdocs, g.targetJobId, override, session.fixedJobId, db);
     const jobMap = new Map(jobs.map((j) => [j.job.id, j.job as JobDetail]));
     const { data: winners } = jobs.length
       ? await db.from("supplier_quotes").select("job_id").in("job_id", jobs.map((j) => j.job.id)).eq("selected", true)
@@ -997,6 +1011,8 @@ interface GroupDone {
   itemsAdded: number;
   /** Nová zakázka založená se stavem primárního dokladu — vyšší stav až po uložení všech dokladů skupiny. */
   stageDeferred?: JobStage | null;
+  /** Objednávka se stejným číslem u zakázky s objednávkou → rozdíl pro revizi (položky se nepřepsaly). */
+  orderRevision?: OrderChange[] | null;
 }
 
 const DOC_ORDER: BatchDocType[] = [
@@ -1056,6 +1072,8 @@ async function attachDocFiles(
       replaceFileId: part === 0 ? meta.replaceFileId ?? undefined : undefined,
       quoteId: part === 0 ? meta.quoteId ?? undefined : undefined,
       captureId: session.captureId,
+      origin: "capture",
+      issuer: issuerKey(BATCH_TYPES[draft.type]?.issuer ?? null),
       contentSha256: sha ?? null,
       silent: true,
       noAutoVersion: true,
@@ -1218,7 +1236,8 @@ async function journalConflict(db: JobsDb, session: BatchSession, steps: Map<str
   return journalConflictOf(session.lastApply, steps, jobKeys, state);
 }
 
-async function applyLocked(c: Ctx, session: BatchSession, rawState: unknown): Promise<BatchResult> {
+async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown): Promise<BatchResult> {
+  let c = cUser;
   const { db, user, margins } = c;
   const rows = await listExtracts(db, session.captureId);
   // zákazníci zákaznických dokladů (konflikt zákazníka)
@@ -1244,6 +1263,8 @@ async function applyLocked(c: Ctx, session: BatchSession, rawState: unknown): Pr
     }
     state = { ...review.initial, auto: true };
   }
+  // plná automatika: zápisy jako ✨ AI (capture) za účet, který fotil; jinak účet, který fotil (via foto)
+  c = await autoCaptureCtx(c, auto);
 
   const steps = await readSteps(db, session.captureId);
   const conflict = await journalConflict(db, session, steps, state);
@@ -1308,6 +1329,7 @@ async function applyLocked(c: Ctx, session: BatchSession, rawState: unknown): Pr
         stageTo: res.created ? res.stageTo ?? null : null, matchedBy: res.matchedBy ?? null, itemIds: res.itemIds ?? {},
         filled: res.filled ?? [], itemsAdded: res.itemsAdded ?? 0,
         stageDeferred: res.created ? stageDeferred : null,
+        orderRevision: res.orderRevision ?? null,
       };
       if (res.warnings) result.warnings.push(...res.warnings);
       await writeStep(db, session.captureId, stepKey, "done", done as unknown as Row);
@@ -1367,20 +1389,24 @@ async function applyLocked(c: Ctx, session: BatchSession, rawState: unknown): Pr
       const { data: cur } = await db.from("orders").select("id, status").eq("id", done.jobId).maybeSingle();
       const from = isJobStage((cur as Row | null)?.status) ? ((cur as Row).status as JobStage) : null;
       const to = stageTarget;
-      if (from && isForward(from, to)) {
-        const { error } = await db.from("orders").update({ status: to } as never).eq("id", done.jobId);
+      // revize objednávky stav nemění; dodání a nákup jen podle pravidel 2.7 (částečné dodání / materiál stav neposune)
+      const guard = from && isForward(from, to) && !done.orderRevision ? await captureStageGuard(c.db, done.jobId, to) : null;
+      let moved: JobStage | null = null;
+      if (guard && !guard.ok) {
+        result.warnings.push(`${done.jobNumber}: ${guard.warning}`);
+      } else if (guard?.ok && from) {
+        // událost o změně stavu zapíše DB (autor z hlavičky klienta, poznámka x-change-note)
+        const upd = c.db.from("orders").update({ status: to } as never).eq("id", done.jobId);
+        const { error } = await withChangeNote(upd, "podle vyfocených dokladů");
         if (!error) {
-          await logJobEvent(db, {
-            jobId: done.jobId, type: "stage", message: stageEventMessage(from, to, "podle vyfocených dokladů"),
-            data: { from, to, source: "foto", captureId: session.captureId, batch: true }, actorId: user.id,
-          });
           if (!done.created) gres.stageFrom = from;
           gres.stageTo = to;
+          moved = to;
         } else {
           result.warnings.push(`Stav zakázky ${done.jobNumber} se nepodařilo změnit.`);
         }
       }
-      await writeStep(db, session.captureId, stageKey, "done", { from, to });
+      await writeStep(db, session.captureId, stageKey, "done", { from, to: moved });
     } else if (steps.get(stageKey)?.status === "done") {
       const r = steps.get(stageKey)!.result as { from?: JobStage; to?: JobStage } | null;
       if (r?.to) { if (!done.created) gres.stageFrom = r.from; gres.stageTo = r.to; }
@@ -1388,10 +1414,36 @@ async function applyLocked(c: Ctx, session: BatchSession, rawState: unknown): Pr
       result.warnings.push(`Stav zakázky ${done.jobNumber} se posune, až se uloží všechny její doklady.`);
     }
 
+    // podrobné stavy podle dokladů skupiny (2.8) — až po posunu stavu: revize / rozpor / storno objednávky,
+    // naše nabídka odeslaná, naše potvrzení odesláno
+    const flowKey = `flow:${g.key}`;
+    if (!groupPending && steps.get(flowKey)?.status !== "done") {
+      for (const docId of ordered) {
+        const draft = state.sort.docs.find((d) => d.id === docId);
+        const r = result.docs.find((d) => d.docId === docId);
+        if (!draft || !r || !r.ok || r.skipped || !["objednavka_zakaznik", "nabidka_my", "potvrzeni_my"].includes(draft.type)) continue;
+        const ds = state.docs[docId];
+        if (ds?.kind === "business" && ds.state.fileOnly) continue;
+        const rdoc = ctx.docs.find((d) => d.id === docId) ?? null;
+        const doc = rdoc?.extract?.kind === "business" ? rdoc.extract.doc : null;
+        if (!doc) continue;
+        const number = (ds?.kind === "business" ? ds.state.documentNumber : "") || doc.documentNumber;
+        const isPrimaryOrder = draft.type === "objednavka_zakaznik" && docId === gd.primaryId;
+        const fl = await applyDocFlow(c, done.jobId, draft.type, doc, {
+          orderRevision: isPrimaryOrder ? done.orderRevision ?? null : null,
+          fileId: r.fileIds[0] ?? null, documentNumber: number, customerOrderNumber: doc.customerOrderNumber, auto,
+        });
+        if (fl.notes.length) r.summary = [r.summary, ...fl.notes].filter(Boolean).join(" · ");
+        result.warnings.push(...fl.warnings.map((w) => `${done.jobNumber}: ${w}`));
+        await writeStep(db, session.captureId, `doc:${docId}`, "done", r as unknown as Row);
+      }
+      await writeStep(db, session.captureId, flowKey, "done");
+    }
+
     // souhrnná událost skupiny
     const evKey = `event:${g.key}`;
     if (savedDocs.length && steps.get(evKey)?.status !== "done") {
-      await logJobEvent(db, {
+      await logJobEvent(c.db, {
         jobId: done.jobId, type: session.aiUsed ? "ai" : "file",
         message: batchEventMessage({ docs: savedDocs, aiUsed: gdocs.some((d) => d.aiUsed), auto }),
         data: { captureId: session.captureId, batch: true, docIds: g.docIds, ...(auto ? { auto: true } : {}) },
@@ -1509,6 +1561,10 @@ async function applyDoc(
       }
       if (draft.type === "dodaci_list_my") {
         if (number) await filled(db.from("orders").update({ delivery_note_number: number } as never).eq("id", jobId).is("delivery_note_number", null).select("id"), `číslo dodacího listu ${number}`);
+        // dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi"; částečně = stav zůstává)
+        const dl = await recordPhotoDelivery(db, user.id, jobId, doc.items, { documentNumber: number, extra: { captureId: session.captureId, docId: draft.id } });
+        if (dl.recorded) summary.push(dl.complete ? "dodáno vše" : `dodáno částečně (${dl.lines.join("; ")})`);
+        if (dl.unmatched.length) warnings.push(`Na dodacím listu jsou položky, které zakázka nemá: ${dl.unmatched.slice(0, 5).join(", ")}.`);
         if (st.confirmDelivered) {
           const r = await confirmDeliveryNoteCore(db, user.id, jobId, { date: st.documentDate || undefined, fileId: fileIds[0], stage: false, extra: { captureId: session.captureId, docId: draft.id } });
           if (r.ok) summary.push("potvrzený zákazníkem");
@@ -1599,8 +1655,18 @@ async function applyDoc(
             await filled(db.from("purchase_orders").update({ confirmed_date: doc.promisedDeliveryDate } as never).eq("id", po.id).is("confirmed_date", null).select("id"),
               `potvrzený termín objednávky ${po.number} ${new Date(doc.promisedDeliveryDate).toLocaleDateString("cs-CZ")}`);
           }
-          const r = await advancePurchaseOrderStatus(db, user.id, po, to, `podle vyfoceného dokladu`, { captureId: session.captureId, docId: draft.id });
-          if (r.ok && r.changed) summary.push(`objednávka ${po.number} → ${to === "potvrzena" ? "potvrzená" : "dodaná"}`);
+          if (to === "dodana") {
+            // převzetí po položkách (párování podle čísla výkresu); převzato vše → Dodána + pravidlo 2.7
+            const r = await receiveSupplierDlByPhoto(db, user.id, po, doc.items, { captureId: session.captureId, docId: draft.id });
+            if (!r.ok) warnings.push(r.error);
+            else {
+              if (r.summary) summary.push(r.summary);
+              if (r.hint) summary.push(r.hint);
+            }
+          } else {
+            const r = await advancePurchaseOrderStatus(db, user.id, po, to, `podle vyfoceného dokladu`, { captureId: session.captureId, docId: draft.id });
+            if (r.ok && r.changed) summary.push(`objednávka ${po.number} → potvrzená`);
+          }
         }
       } else if ((draft.type === "potvrzeni_dodavatel" || draft.type === "dodaci_list_dodavatel") && !margins) {
         warnings.push("Stav objednávky dodavateli zkontroluj v Nákupu.");
@@ -1667,8 +1733,10 @@ async function applyDoc(
       generalTolerance: st.generalTolerance, tightestTolerance: st.tightestTolerance, quantity: cleanNumber(st.quantity) ?? 0,
       documentNumber: number, captureDocId: draft.id,
     };
+    // název výkresu v dokumentech = název položky (z objednávky), jinak z razítka
+    const fileTitle = `${title}${st.title.trim() ? ` · ${st.title.trim()}` : ""}`.slice(0, 300);
     const att = await attachDocFiles(c, session, draft, jobId, {
-      kind: "vykres", title, note: st.note || undefined, aiExtracted, aiConfidence: aiUsed ? drawingData?.confidence ?? null : null,
+      kind: "vykres", title: fileTitle, note: st.note || undefined, aiExtracted, aiConfidence: aiUsed ? drawingData?.confidence ?? null : null,
       orderItemId: itemId, replaceFileId,
     }, warnings);
     const fileIds = att.ids;
@@ -1684,6 +1752,13 @@ async function applyDoc(
       if (!cur.revision && st.revision) { patch.revision = st.revision; itemChanges.push(`revize ${st.revision}`); }
       if (!cur.material && st.material) { patch.material = st.material; itemChanges.push(`materiál ${st.material}`); }
       if (!cur.name && st.title) { patch.name = st.title; itemChanges.push(`název ${st.title}`); }
+      // nová položka skupiny bez počtu (doklady ho neuvedly) → počet z výkresu
+      const link = st.link;
+      const qty = cleanNumber(st.quantity);
+      if (link.mode === "docItem" && qty && qty > 0) {
+        const row = g.job.items.find((i) => i.key === link.itemKey);
+        if (row && !(cleanNumber(row.quantity) ?? 0)) { patch.quantity = qty; itemChanges.push(`počet ${qty} ks z výkresu`); }
+      }
       if (Object.keys(patch).length) {
         const { error } = await db.from("order_items").update(patch as never).eq("id", itemId);
         if (error) itemChanges.length = 0;
@@ -1705,6 +1780,12 @@ async function applyDoc(
       if (res.status === "inserted" || res.status === "linked") {
         await db.from("job_files").update({ drawing_id: res.drawingId } as never).eq("id", fileIds[0]);
         if (itemId) await db.from("order_items").update({ drawing_id: res.drawingId } as never).eq("id", itemId).is("drawing_id", null);
+        if (res.status === "linked") {
+          // výkres už v archivu: doplnit jen prázdný název / počet kusů
+          const qty = cleanNumber(st.quantity);
+          if (st.title.trim()) await db.from("drawings").update({ title: st.title.trim() } as never).eq("id", res.drawingId).is("title", null);
+          if (qty && qty > 0) await db.from("drawings").update({ quantity: Math.round(qty) } as never).eq("id", res.drawingId).is("quantity", null);
+        }
         out.drawingId = res.drawingId;
         out.drawingArchived = res.status === "inserted";
         drawingIds[number] = res.drawingId;

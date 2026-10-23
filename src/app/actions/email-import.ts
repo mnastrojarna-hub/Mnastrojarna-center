@@ -5,6 +5,8 @@ import { parseEmailFile } from "@/lib/email/parse";
 import { ingestEmails, isMailAiEnabled, type RawEmail } from "@/lib/email/ingest";
 import { createOperatorClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { checkFeature } from "@/lib/auth/session";
+import { userActor } from "@/lib/supabase/actor-headers";
+import { logAudit } from "@/lib/audit";
 
 export interface ImportFileResult {
   fileName: string;
@@ -30,7 +32,7 @@ const MAX_SIZE = 25 * 1024 * 1024;
 /** První schránka uživatele (importovaná pošta se k ní přiřadí), jinak null. */
 async function firstOwnMailboxId(userId: string): Promise<string | null> {
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor({ id: userId }, "import") });
     const { data } = await db
       .from("mailboxes")
       .select("id")
@@ -99,7 +101,11 @@ export async function importOutlookFiles(form: FormData): Promise<ImportResult> 
       try {
         const mailboxId = await firstOwnMailboxId(user.id);
         ai = await isMailAiEnabled();
-        ingested = await ingestEmails(parsed, mailboxId, { ownerId: user.id });
+        ingested = await ingestEmails(parsed, mailboxId, { ownerId: user.id, actor: userActor(user, "import") });
+        await logAudit({
+          action: "emails_imported", entity: "emails", actor: userActor(user, "import"),
+          diff: { files: parsed.length, ingested, ai },
+        });
         if (ingested < parsed.length) {
           const dup = parsed.length - ingested;
           message = `Uloženo ${ingested} e-mailů${dup ? ` — ${dup} už v poště bylo (nebo se nepodařilo uložit)` : ""}.`;

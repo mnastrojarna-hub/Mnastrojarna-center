@@ -15,7 +15,8 @@ import { SearchSelect } from "@/components/jobs/detail/search-select";
 import { formatMoney, formatPercent } from "@/components/jobs/detail/detail-helpers";
 import { cn } from "@/lib/utils";
 import { commissionDisplay, marginHero, type CommissionTone } from "./purchasing-model";
-import { ActorStamp } from "./ui-bits";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import type { ChangeStamp } from "@/lib/jobs/flow-status";
 
 const COMMISSION_TONES: Record<CommissionTone, { box: string; amount: string; chip: string }> = {
   emerald: {
@@ -81,7 +82,7 @@ export function MarginHeroCard({
   job: JobDetail;
   data: JobPurchasing;
   /** Kdo naposledy přidělil obchodníka (historie zakázky). */
-  ownerAssigned?: { by: string | null; at: string } | null;
+  ownerAssigned?: ChangeStamp | null;
 }) {
   const { options, notify, refresh } = useJobDetail();
   const h = marginHero(data.totals);
@@ -190,7 +191,7 @@ export function MarginHeroCard({
               placeholder="Hledej jméno…"
               onSave={saveOwner}
             />
-            {ownerAssigned && owner && <ActorStamp verb="Přidělil" by={ownerAssigned.by} at={ownerAssigned.at} className="mt-0.5" />}
+            {ownerAssigned && owner && <ActorStamp verb="Přidělení" stamp={ownerAssigned} short className="mt-0.5" />}
           </div>
           <div className={cn("flex items-center gap-3 rounded-xl border px-3 py-2.5", ct.box)}>
             <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", ct.chip)}>

@@ -6,6 +6,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient, createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { sendMail, isSmtpConfigured } from "@/lib/email/send";
 import { passwordResetEmail } from "@/lib/email/templates";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
@@ -104,7 +105,8 @@ async function sendSupabaseRecovery(email: string): Promise<{ ok: boolean; error
 async function clearPasswordChangeRequired(userId: string): Promise<void> {
   if (!hasServiceKey()) return;
   try {
-    await createAdminClient().from("profiles").update({ password_change_required: false } as never).eq("id", userId);
+    await createAdminClient({ actor: userActor({ id: userId }) })
+      .from("profiles").update({ password_change_required: false } as never).eq("id", userId);
   } catch {
     // příznak nesmí shodit změnu hesla
   }
@@ -130,7 +132,7 @@ export async function requestPasswordReset(
   try {
     const db: AdminDb = createAdminClient();
     // kanál podle konfigurace, ne podle existence účtu (anti-enumerace)
-    const smtpReady = await isSmtpConfigured().catch(() => false);
+    const smtpReady = await isSmtpConfigured({ system: true }).catch(() => false);
     const channel: ResetChannel = smtpReady ? "code" : "supabase";
 
     const target = await findResetTarget(db, email);
@@ -170,7 +172,7 @@ export async function requestPasswordReset(
 
     await refreshCompanyFromSettings();
     const mail = passwordResetEmail({ code, name: target.fullName, minutes: RESET_CODE_TTL_MIN });
-    const sent = await sendMail({ to: email, subject: mail.subject, text: mail.text, html: mail.html, log: false });
+    const sent = await sendMail({ to: email, subject: mail.subject, text: mail.text, html: mail.html, log: false, from: { system: true } });
 
     if (!sent.sent) {
       // SMTP selhalo → náš kód zneplatnit (jinak by blokoval ověření OTP ze Supabase)
@@ -238,7 +240,9 @@ async function resetWithSupabaseOtp(
   const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
   if (updateError) return { ok: false, error: translateAuthError(updateError.message) };
   await clearPasswordChangeRequired(userId);
-  await logAudit({ action: "password_reset", entity: "profiles", entityId: userId, diff: { channel: "supabase_otp" } });
+  await logAudit({
+    action: "password_reset", entity: "profiles", entityId: userId, diff: { channel: "supabase_otp" }, actor: userActor({ id: userId }),
+  });
   return { ok: true, signedIn: true };
 }
 
@@ -336,7 +340,10 @@ export async function resetPasswordWithCode(
     const loginEmail = (authUser?.user?.email as string | undefined) ?? email;
     const signedIn = await signInAfterReset(loginEmail, newPassword, active.user_id);
     await clearPasswordChangeRequired(active.user_id);
-    await logAudit({ action: "password_reset", entity: "profiles", entityId: active.user_id, diff: { channel: "code" } });
+    await logAudit({
+      action: "password_reset", entity: "profiles", entityId: active.user_id, diff: { channel: "code" },
+      actor: userActor({ id: active.user_id }),
+    });
     return { ok: true, signedIn };
   } catch {
     return { ok: false, error: GENERIC_FAIL };
@@ -357,7 +364,9 @@ export async function updatePasswordAfterRecovery(newPassword: string): Promise<
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { ok: false, error: translateAuthError(error.message) };
     await clearPasswordChangeRequired(user.id);
-    await logAudit({ action: "password_reset", entity: "profiles", entityId: user.id, diff: { channel: "supabase_link" } });
+    await logAudit({
+      action: "password_reset", entity: "profiles", entityId: user.id, diff: { channel: "supabase_link" }, actor: userActor(user),
+    });
     return { ok: true };
   } catch {
     return { ok: false, error: GENERIC_FAIL };
@@ -368,7 +377,7 @@ export async function updatePasswordAfterRecovery(newPassword: string): Promise<
 export async function changeOwnPassword(
   currentPassword: string,
   newPassword: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; signedOut?: boolean }> {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "Nejsi přihlášen — přihlas se znovu." };
   if (!user.active) return { ok: false, error: "Účet není aktivní." };
@@ -394,13 +403,22 @@ export async function changeOwnPassword(
     if (hasServiceKey()) {
       const { error } = await createAdminClient().auth.admin.updateUserById(user.id, { password: newPassword });
       if (error) return { ok: false, error: translateAuthError(error.message) };
+      // Supabase po změně hesla přes admin API ukončí VŠECHNY relace uživatele (i tuhle) →
+      // hned přihlásit novým heslem, ať uživatel zůstane přihlášený; ostatní zařízení zůstanou odhlášená.
+      const supabase = await createClient();
+      const { error: reloginError } = await supabase.auth.signInWithPassword({ email: user.email, password: newPassword });
+      if (reloginError) {
+        await clearPasswordChangeRequired(user.id);
+        await logAudit({ action: "password_changed", entity: "profiles", entityId: user.id, actor: userActor(user) });
+        return { ok: true, signedOut: true };
+      }
     } else {
       const supabase = await createClient();
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) return { ok: false, error: translateAuthError(error.message) };
     }
     await clearPasswordChangeRequired(user.id);
-    await logAudit({ action: "password_changed", entity: "profiles", entityId: user.id });
+    await logAudit({ action: "password_changed", entity: "profiles", entityId: user.id, actor: userActor(user) });
     return { ok: true };
   } catch {
     return { ok: false, error: GENERIC_FAIL };
@@ -426,7 +444,7 @@ export async function updateOwnProfile(input: {
   try {
     const update = { full_name: fullName, phone: phone || null };
     if (hasServiceKey()) {
-      const db: AdminDb = createAdminClient();
+      const db: AdminDb = createAdminClient({ actor: userActor(user) });
       const { error } = await db.from("profiles").update(update).eq("id", user.id);
       if (error) return { ok: false, error: error.message };
       // jméno i v auth metadatech (e-maily ze Supabase, fallback bez profilu)
@@ -436,7 +454,10 @@ export async function updateOwnProfile(input: {
       const { error } = await supabase.from("profiles").update(update as never).eq("id", user.id);
       if (error) return { ok: false, error: error.message };
     }
-    await logAudit({ action: "profile_updated", entity: "profiles", entityId: user.id, diff: { full_name: fullName, phone: phone || null } });
+    await logAudit({
+      action: "profile_updated", entity: "profiles", entityId: user.id, diff: { full_name: fullName, phone: phone || null },
+      actor: userActor(user),
+    });
     revalidatePath("/account");
     revalidatePath("/", "layout");
     return { ok: true };

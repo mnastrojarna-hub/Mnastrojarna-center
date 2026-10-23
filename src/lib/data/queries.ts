@@ -2,7 +2,7 @@ import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { quoteStatusLabel, approvalTypeLabel } from "@/lib/data/labels";
 import type {
-  ApprovalItemRow, Quote, Customer, Drawing, ApprovalType, JobStage,
+  ApprovalItemRow, Quote, Customer, Drawing, ApprovalType,
 } from "@/lib/supabase/database.types";
 import type {
   EmailItem, ApprovalItem, QuoteItem, DrawingItem, CommissionRow, BadgeCounts,
@@ -21,6 +21,9 @@ import {
   type ContactRow, type ContactView, type CustomerRow, type CustomerView,
 } from "@/components/customers/model";
 import { SUPPLIER_SELECT, rowToSupplierView, type SupplierRow, type SupplierView } from "@/components/suppliers/model";
+import { getFlowCounts } from "@/lib/data/flow-status";
+import { pragueToday, type ChangeStamp } from "@/lib/jobs/flow-status";
+import { groupMovers, startOfPragueDay, type MoverGroup } from "@/components/dashboard/flow-overview-model";
 
 /**
  * Datová vrstva — VÝHRADNĚ reálná data ze Supabase.
@@ -66,7 +69,10 @@ export async function getEmails(): Promise<EmailItem[]> {
   return getMailEmails({ direction: "in" });
 }
 
-export async function getApprovalQueue(): Promise<ApprovalItem[]> {
+/** Položka fronty + kdo návrh připravil (AI / plánovač) — fronta ukazuje oba autory (minor 16). */
+export type ApprovalQueueItem = ApprovalItem & { proposedBy: string };
+
+export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!(await allowedAccess("dashboard"))) return [];
   const db = await supa();
   if (!db) return [];
@@ -89,7 +95,84 @@ export async function getApprovalQueue(): Promise<ApprovalItem[]> {
       : "",
     createdAt: a.created_at,
     aiConfidence: a.ai_confidence ?? 0,
+    // kdo návrh připravil: připomenutí = plánovač, ostatní (odpovědi, nabídky, poptávky dodavatelům) = AI
+    proposedBy: a.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
   }));
+}
+
+/** Naposledy vyřízené položky fronty — kdo schválil / zamítl (resolved_by) nebo „✨ AI odeslala automaticky". */
+export interface ResolvedApproval {
+  id: string;
+  title: string;
+  type: string;
+  status: "approved" | "rejected" | "auto_executed";
+  proposedBy: string;
+  stamp: ChangeStamp;
+}
+
+export async function getResolvedApprovals(limit = 6): Promise<ResolvedApproval[]> {
+  if (!(await allowedAccess("dashboard"))) return [];
+  const db = await supa();
+  if (!db) return [];
+  const { data, error } = await db
+    .from("approval_queue")
+    .select("id, type, title, status, resolved_at, resolved_by, resolver:profiles!resolved_by(id, full_name, email)")
+    .neq("status", "pending")
+    .not("resolved_at", "is", null)
+    .order("resolved_at", { ascending: false })
+    .limit(Math.max(1, Math.min(50, limit)));
+  warn("approval_queue:resolved", error);
+  type R = { id: string; type: ApprovalType; title: string; status: string; resolved_at: string; resolved_by: string | null; resolver?: { id: string; full_name: string | null; email: string | null } | { id: string; full_name: string | null; email: string | null }[] | null };
+  return ((data ?? []) as unknown as R[]).map((r) => {
+    const p = Array.isArray(r.resolver) ? r.resolver[0] ?? null : r.resolver ?? null;
+    const name = p ? (p.full_name ?? "").trim() || (p.email ?? "").trim() || null : null;
+    const auto = r.status === "auto_executed";
+    return {
+      id: r.id,
+      title: r.title,
+      type: approvalTypeLabel[r.type] ?? r.type,
+      status: auto ? "auto_executed" : r.status === "rejected" ? "rejected" : "approved",
+      proposedBy: r.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
+      stamp: {
+        by: p && name ? { id: p.id, name } : null, byName: name, at: r.resolved_at,
+        via: auto ? "automaticky" : null, kind: auto ? "ai" : name ? "user" : "system",
+      },
+    };
+  });
+}
+
+// ── Přehled toku pro AI přehled (dashboard) ─────────────────
+/** Dlaždice podrobných stavů: „fáze.klíč" → kam vede (stránka toku s filtrem). */
+export const FLOW_TILES: { key: string; label: string; href: string }[] = [
+  { key: "inquiry.prijata", label: "Poptávky k převzetí", href: "/inquiries?stav=prijata" },
+  { key: "inquiry.ceka_na_podklady", label: "Čeká na podklady", href: "/inquiries?stav=ceka_na_podklady" },
+  { key: "quote.ke_schvaleni", label: "Ke schválení", href: "/quotes?stav=ke_schvaleni" },
+  { key: "order.dorucena", label: "Objednávky k potvrzení", href: "/confirmations?stav=dorucena" },
+  { key: "order.rozpor", label: "Rozpor s nabídkou", href: "/confirmations?stav=rozpor" },
+  { key: "order.aktualizovana", label: "Změny objednávek", href: "/confirmations?stav=aktualizovana" },
+  { key: "fulfilment.castecne_dodana", label: "Částečně dodané", href: "/confirmations?stav=castecne_dodana" },
+  { key: "payment.po_splatnosti", label: "Po splatnosti", href: "/orders?segment=vse&payment=po_splatnosti" },
+];
+
+/** Počty podrobných stavů + „Co kdo dnes posunul" (události stavu za pražský dnešek). */
+export async function getFlowDashboard(): Promise<{ counts: Record<string, number>; movers: MoverGroup[]; movedToday: number }> {
+  const empty = { counts: {}, movers: [], movedToday: 0 };
+  if (!(await allowedAccess("dashboard"))) return empty;
+  const db = await supa();
+  if (!db) return empty;
+  const since = startOfPragueDay(pragueToday());
+  const [counts, ev] = await Promise.all([
+    getFlowCounts(),
+    db.from("job_events")
+      .select("job_id, message, created_at, actor_id, actor_kind, actor_name, actor:profiles!actor_id(full_name, email), job:orders!job_id(number)")
+      .in("type", ["stage", "status"])
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(500),
+  ]);
+  warn("job_events:today", ev.error);
+  const rows = (ev.data ?? []) as unknown as Parameters<typeof groupMovers>[0];
+  return { counts, movers: groupMovers(rows), movedToday: rows.length };
 }
 
 /** Starší přehled nabídek (asistent, hledání). Nové stránky používají listQuotes z lib/data/jobs. */
@@ -116,7 +199,7 @@ export async function getQuotes(): Promise<QuoteItem[]> {
       customer: q.customers?.name ?? "—",
       drawing: items[0]?.drawing_number ?? items[0]?.drawings?.drawing_number ?? "—",
       qty: items.reduce((s, it) => s + Number(it.quantity ?? 0), 0),
-      status: quoteStatusLabel[q.status] as QuoteItem["status"],
+      status: quoteStatusLabel[q.status] ?? q.status,
       value: q.total ? Number(q.total) : undefined,
       createdAt: q.created_at,
     };
@@ -241,18 +324,20 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
   if (!db) return empty;
   try {
     const { can } = await getAccess();
-    const stageCount = (stage: JobStage) =>
-      db.from("orders").select("id", { count: "exact", head: true }).eq("status", stage);
-    const [inbox, inquiries, pricing, quotes, confirmations, orders, approvals] = await Promise.all([
-      getUnreadCount(),
-      stageCount("poptavka"),
-      stageCount("naceneni"),
-      db.from("quotes").select("id", { count: "exact", head: true }).eq("status", "ke_schvaleni").eq("archived", false),
-      stageCount("objednavka"),
+    // = výchozí pohled stránky: otevřené poptávky, vše k nacenění, nabídky „Ke schválení (N)",
+    // objednávky k potvrzení (doručené, rozpor, změna) bez pozastavených a reklamací (nemají akci)
+    const [inquiries, pricing, quotes, confirmations, orders, approvals, inbox] = await Promise.all([
+      db.from("orders").select("id", { count: "exact", head: true }).in("inquiry_status", ["prijata", "v_reseni", "ceka_na_podklady"])
+        .in("status", ["poptavka", "naceneni"]),
+      db.from("orders").select("id", { count: "exact", head: true }).in("status", ["poptavka", "naceneni"]),
+      db.from("quotes").select("id", { count: "exact", head: true }).eq("state", "ke_schvaleni").eq("archived", false),
+      db.from("orders").select("id", { count: "exact", head: true }).in("order_status", ["dorucena", "rozpor", "aktualizovana"])
+        .not("status", "in", "(nerealizovano,zruseno,pozastaveno,reklamace)"),
       db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", `(${CLOSED_STAGES.join(",")})`),
       can("dashboard")
         ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
         : Promise.resolve({ count: 0 }),
+      getUnreadCount(),
     ]);
     return {
       inbox,

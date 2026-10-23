@@ -1,8 +1,9 @@
 // View-modely výroby zakázky (podrobný postup, kde se díl nachází) a konce toku
 // (potvrzený dodací list → faktura → splatnost → zaplaceno). Čisté typy — sdílí UI,
 // datová vrstva i akce.
-import type { OperationKind, OperationStatus } from "@/lib/jobs/operations";
-import type { JobStage } from "@/lib/supabase/database.types";
+import type { DeadlineState, OperationKind, OperationStatus } from "@/lib/jobs/operations";
+import type { JobStage, PurchaseOrderStatus } from "@/lib/supabase/database.types";
+import type { DeadlineSource, StepPoMode, WhoSource } from "@/lib/jobs/production-handoff-types";
 import type { PersonRef } from "@/lib/jobs/types";
 
 /** Jedna výrobní operace zakázky (soustružení u firmy XY, kalení, broušení u nás…). */
@@ -39,6 +40,38 @@ export interface JobOperation {
   updatedAt: string;
   /** Termín operace prošel a není hotovo / přeskočeno. */
   overdue: boolean;
+  /** Kdo a kdy operaci naposledy přepnul (job_operations.status_changed_*, plní DB). */
+  changedBy?: PersonRef | null;
+  changedAt?: string | null;
+  /** „automaticky" = navázalo samo (spustil changedBy). */
+  changedVia?: string | null;
+  // ── Předání do výroby (migrace 20261023150000; volitelné kvůli starším fixturám) ──
+  /** Díly zakázky v kroku (order_items.id); null = všechny. */
+  orderItemIds?: string[] | null;
+  /** Krok končí konečným termínem (zákazník) — jen poslední krok. */
+  endsAtCustomerDate?: boolean;
+  /** Jak jistý je termín (odhad / dohodnuto / požadováno / potvrzeno / změna čeká / plán dílny). */
+  deadlineState?: DeadlineState | null;
+  deadlineSource?: DeadlineSource | null;
+  /** Kdo a kdy naposledy změnil termín (plní DB). */
+  deadlineChangedBy?: PersonRef | null;
+  deadlineChangedAt?: string | null;
+  deadlineChangedVia?: string | null;
+  whoSource?: WhoSource | null;
+  /** Kdo a kdy naposledy změnil, kdo krok dělá (plní DB). */
+  whoChangedBy?: PersonRef | null;
+  whoChangedAt?: string | null;
+  whoChangedVia?: string | null;
+  supplierQuoteId?: string | null;
+  poMode?: StepPoMode | null;
+  /** „Objednáno jinak: {důvod}". */
+  poNoneReason?: string | null;
+  handoffId?: string | null;
+  /** Objednávka kroku (stav, odeslání, potvrzený termín, PDF) — null bez objednávky nebo bez práva na nákup. */
+  purchaseOrder?: {
+    id: string; number: string | null; status: PurchaseOrderStatus | null;
+    sentAt: string | null; confirmedDate: string | null; fileId: string | null;
+  } | null;
 }
 
 /** Souhrn výroby zakázky (řádek knihy, hlavička detailu) — z orders.production_*. */
@@ -73,6 +106,12 @@ export interface JobOperationInput {
   plannedEnd?: string | null;
   note?: string | null;
   purchaseOrderId?: string | null;
+  /** Krok končí konečným termínem (zákazník). */
+  endsAtCustomerDate?: boolean;
+  /** „Termín mám dohodnutý s {Firma}" (stav termínu určí server). */
+  deadlineAgreed?: boolean;
+  /** Díly v kroku; null = všechny. */
+  orderItemIds?: string[] | null;
 }
 
 /** Konec toku zakázky: domluvy, potvrzený DL, faktura, splatnost, úhrada. */

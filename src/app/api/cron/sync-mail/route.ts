@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { syncMailbox } from "@/lib/email/ingest";
 import { cronAuthStatus } from "@/lib/email/visibility";
+import { runFlowReminders } from "@/lib/email/flow-reminders";
+import { cronActor } from "@/lib/supabase/actor-headers";
 
 // IMAP klient vyžaduje Node runtime
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Vercel (Fluid compute): Hobby max 300 s, Pro 800 s — stahování má vlastní limit 220 s (zbytek příště)
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 /**
- * Automatické stahování pošty všech schránek (Vercel Cron / externí plánovač).
+ * Automatické stahování pošty všech schránek (Vercel Cron / externí plánovač) + plánovač toku
+ * (návrh „Stažená — bez odezvy" po 14 dnech čekání na podklady, připomenutí nabídky po 7 dnech).
+ * Autor: Systém (plánovač); zápisy AI analýzy pošty jako ✨ AI (e-mail).
  * Vyžaduje hlavičku `Authorization: Bearer <CRON_SECRET>` — middleware cestu
  * pouští bez přihlášení, ochranu dělá tento secret.
  */
@@ -20,8 +25,12 @@ export async function GET(req: Request) {
   if (status === 401) return NextResponse.json({ error: "Neautorizováno." }, { status: 401 });
 
   try {
-    const result = await syncMailbox({ limit: 20 });
-    return NextResponse.json(result);
+    // Na Vercel Hobby běží cron jen 1× denně → větší dávka (inkrementálně, nic se neztratí)
+    // deadline = nejzazší konec stahování; nová schránka / e-mail jen do konce − 60 s (pod maxDuration 300 s,
+    // zbývá čas i na plánovač toku). Plánovač se se známým odmítnutým heslem nepřihlašuje (manual: false).
+    const result = await syncMailbox({ limit: 50, actor: cronActor("cron-mail"), deadline: Date.now() + 240_000 });
+    const flow = await runFlowReminders().catch((err: unknown) => ({ error: err instanceof Error ? err.message : "Plánovač toku selhal" }));
+    return NextResponse.json({ ...result, flow });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Chyba synchronizace" },

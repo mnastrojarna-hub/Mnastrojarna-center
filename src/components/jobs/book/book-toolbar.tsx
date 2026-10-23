@@ -2,25 +2,27 @@
 
 import * as React from "react";
 import {
-  ArrowDownWideNarrow, ArrowUpNarrowWide, Building2, CalendarClock, CircleCheckBig, Columns3, Factory, Filter, Loader2,
-  MapPin, ReceiptText, Rows3, Search, UserRound, Wrench, X,
+  ArrowDownWideNarrow, ArrowUpNarrowWide, Building2, CalendarClock, CircleCheckBig, Columns3, Factory, Filter, History,
+  Loader2, MapPin, ReceiptText, Rows3, Search, Truck, UserRound, Wrench, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/jobs/book/native-select";
 import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { useBookNav } from "@/components/jobs/book/book-nav";
 import {
-  BOOK_SORTS, DEADLINE_FILTERS, PAYMENT_FILTERS, RESET_FILTERS, activeFilterCount, MAX_QUERY, type BookView,
+  BOOK_SORTS, DEADLINE_FILTERS, DELIVERY_FILTERS, PAYMENT_FILTERS, RESET_FILTERS, activeFilterCount, deliveryLabel, MAX_QUERY,
+  type BookView,
 } from "@/components/jobs/book/book-params";
 import { useAccess } from "@/components/access-provider";
 import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
 import type { ProductionFilterCounts } from "@/lib/jobs/production-types";
 import type { JobDeadlineFilter, JobFormOptions, JobPaymentFilter, JobSort } from "@/lib/jobs/types";
+import type { DeliveryState } from "@/lib/jobs/flow-status";
 import { cn } from "@/lib/utils";
 
 /**
  * Lišta knihy: hledání (s prodlevou, do URL), filtry obchodník / zpracovává /
- * zákazník / termín / výroba (operace, kde) / platba, řazení a přepínač
+ * zákazník / termín / výroba (operace, kde) / dodání / platba / kdo posunul stav, řazení a přepínač
  * Řádky | Tabule. Na mobilu jsou filtry schované pod tlačítkem „Filtry"
  * (s počtem aktivních).
  */
@@ -199,6 +201,31 @@ export function BookToolbar({ options, production }: { options: JobFormOptions; 
           {PAYMENT_FILTERS.map((p) => (
             <option key={p.key} value={p.key}>{p.label}</option>
           ))}
+        </NativeSelect>
+
+        <NativeSelect
+          aria-label="Dodání"
+          icon={<Truck className={params.delivery.length ? "!text-green-600" : undefined} />}
+          value={params.delivery[0] ?? ""}
+          active={params.delivery.length > 0}
+          onChange={(e) => navigate({ delivery: e.target.value ? [e.target.value as DeliveryState] : [] })}
+          wrapperClassName="lg:w-40"
+        >
+          <option value="">Dodání: vše</option>
+          {DELIVERY_FILTERS.map((d) => (
+            <option key={d} value={d}>{deliveryLabel(d)}</option>
+          ))}
+        </NativeSelect>
+
+        <NativeSelect
+          aria-label="Změnil stav"
+          icon={<History />}
+          value={params.changedBy}
+          active={params.changedBy !== ""}
+          onChange={(e) => navigate({ changedBy: e.target.value })}
+          wrapperClassName="lg:w-44"
+        >
+          {peopleOptions("Změnil: kdokoli", params.changedBy)}
         </NativeSelect>
 
         <div className="flex items-center gap-1 sm:col-span-2 lg:col-span-1">

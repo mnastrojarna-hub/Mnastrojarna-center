@@ -323,6 +323,11 @@ export interface ReviewMerge {
   drawingNumber: string;
   patch: Partial<Record<MergeField, string>>;
   apply: boolean;
+  /**
+   * Pole, která doklad PŘEPÍŠE i neprázdná — jen „quantity": objednávka zákazníka k zakázce ještě bez
+   * objednávky (počet kusů vždy podle objednávky). Server to znovu hlídá (chip + zakázka bez objednávky).
+   */
+  override?: MergeField[];
 }
 
 export interface ReviewTarget {
@@ -861,8 +866,11 @@ export function reviewItemsToInputs(items: ReviewItem[], margins: boolean): JobI
 }
 
 /** Odsouhlasená doplnění existujících položek → { id, patch } (čísla už jako čísla). */
-export function reviewMergePatches(merges: ReviewMerge[], margins: boolean): { id: string; patch: Partial<JobItemInput> }[] {
-  const out: { id: string; patch: Partial<JobItemInput> }[] = [];
+export function reviewMergePatches(
+  merges: ReviewMerge[],
+  margins: boolean,
+): { id: string; patch: Partial<JobItemInput>; overrideQuantity?: boolean }[] {
+  const out: { id: string; patch: Partial<JobItemInput>; overrideQuantity?: boolean }[] = [];
   for (const m of merges) {
     if (!m.apply || !isUuid(m.itemId)) continue;
     const patch: Partial<JobItemInput> = {};
@@ -877,7 +885,9 @@ export function reviewMergePatches(merges: ReviewMerge[], margins: boolean): { i
         patch[f] = v;
       }
     }
-    if (Object.keys(patch).length) out.push({ id: m.itemId, patch });
+    if (Object.keys(patch).length) {
+      out.push({ id: m.itemId, patch, ...(m.override?.includes("quantity") && patch.quantity ? { overrideQuantity: true } : {}) });
+    }
   }
   return out;
 }
@@ -1260,6 +1270,7 @@ export function sanitizeReviewState(
       drawingNumber: str(r.drawingNumber, 200),
       patch,
       apply: r.apply !== false,
+      ...(Array.isArray(r.override) && r.override.includes("quantity") && patch.quantity ? { override: ["quantity" as const] } : {}),
     });
   }
 

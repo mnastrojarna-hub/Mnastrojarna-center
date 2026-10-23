@@ -42,6 +42,18 @@ interface SyncState {
   text: string;
 }
 
+interface SyncResponse {
+  configured?: boolean;
+  fetched?: number;
+  ingested?: number;
+  ai?: boolean;
+  message?: string;
+  error?: string;
+  boxes?: { id: string; email: string; ok: boolean; skipped?: string; error?: string }[];
+}
+
+const AUTO_SYNC_AFTER_MS = 5 * 60_000;
+
 function initials(name: string): string {
   const parts = name.split(/[\s.@_-]+/).filter(Boolean);
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
@@ -97,30 +109,52 @@ export function InboxView({ emails, mailboxes, scope, mailboxId }: InboxViewProp
   const ownMailboxes = scope === "own" ? mailboxes : [];
   const noMailbox = scope === "own" && mailboxes.length === 0;
 
-  const sync = async () => {
+  /** Stažení pošty. `auto` = při otevření stránky (neblokuje, hlásí jen nové zprávy a chyby). */
+  const sync = async ({ auto = false }: { auto?: boolean } = {}) => {
     setSyncing(true);
-    setSyncMsg(null);
-    debug.action("inbox-sync", "Spouštím synchronizaci schránky", { mode, scope });
+    if (!auto) setSyncMsg(null);
+    debug.action("inbox-sync", "Spouštím synchronizaci schránky", { mode, scope, auto });
     try {
-      const res = await fetch("/api/emails/sync", { method: "POST" });
-      const data = await res.json();
+      const res = await fetch("/api/emails/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto }),
+      });
+      // Vercel při překročení limitu vrací HTML/504 — ne JSON
+      const data = (await res.json().catch(() => null)) as SyncResponse | null;
       debug.info("inbox-sync", "Odpověď synchronizace", { status: res.status, data });
-      if (!res.ok && !data?.message) {
-        setSyncMsg({ ok: false, text: data?.error ?? "Synchronizace selhala." });
+      if (!data) {
+        setSyncMsg({ ok: false, text: res.status === 504 ? "Server nestihl stáhnout poštu (časový limit) — zbytek se stáhne při dalším stažení, zkus to znovu." : `Synchronizace selhala (HTTP ${res.status}).` });
+      } else if (!res.ok && !data.message) {
+        setSyncMsg({ ok: false, text: data.error ?? "Synchronizace selhala." });
       } else if (data.configured) {
-        const base = `Staženo ${data.fetched ?? 0}, nových ${data.ingested ?? 0}${data.ai && canAi ? " · roztříděno AI" : ""}.`;
-        setSyncMsg({ ok: !data.message, text: data.message ? `${base} ${data.message}` : base });
-        if ((data.ingested ?? 0) > 0) router.refresh();
-      } else {
+        const ran = (data.boxes ?? []).filter((b) => !b.skipped);
+        const base = `Staženo ${data.fetched ?? 0}, nových ${data.ingested ?? 0}${data.ai && canAi ? " · roztříděno AI" : ""}${ran.length > 1 ? ` (${ran.length} schránky)` : ""}.`;
+        const failed = (data.boxes ?? []).some((b) => !b.ok);
+        if (!auto || failed || (data.ingested ?? 0) > 0) {
+          setSyncMsg({ ok: !failed && !(data.boxes ? false : data.message), text: data.message ? `${base} ${data.message}` : base });
+        }
+        router.refresh();
+      } else if (!auto) {
         setSyncMsg({ ok: false, text: data.message ?? "Schránka není nakonfigurována." });
       }
     } catch (err) {
       debug.error("inbox-sync", "Synchronizace selhala", err);
-      setSyncMsg({ ok: false, text: "Synchronizace selhala." });
+      if (!auto) setSyncMsg({ ok: false, text: "Synchronizace selhala (síť)." });
     } finally {
       setSyncing(false);
     }
   };
+
+  // Automatické stažení při otevření, je-li poslední starší než 5 min (na pozadí, UI neblokuje)
+  const autoRan = React.useRef(false);
+  React.useEffect(() => {
+    if (autoRan.current || noMailbox) return;
+    autoRan.current = true;
+    // schránka s odmítnutým heslem se automaticky nestahuje (opakované špatné přihlášení = blokace IP)
+    const stale = mailboxes.some((m) => !m.incomplete && !m.authBlocked && (!m.lastSyncAt || Date.now() - Date.parse(m.lastSyncAt) > AUTO_SYNC_AFTER_MS));
+    if (stale) void sync({ auto: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeFilter = (cat: InboxFilter) => {
     setFilter(cat);
@@ -163,7 +197,7 @@ export function InboxView({ emails, mailboxes, scope, mailboxId }: InboxViewProp
             <Button variant="outline" size="sm" onClick={() => setShowImport((s) => !s)}>
               <Upload className="h-4 w-4" /> Import z Outlooku
             </Button>
-            <Button size="sm" onClick={sync} disabled={syncing || noMailbox}>
+            <Button size="sm" onClick={() => sync()} disabled={syncing || noMailbox}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
               {syncing ? "Stahuji…" : "Stáhnout poštu"}
             </Button>
@@ -190,7 +224,10 @@ export function InboxView({ emails, mailboxes, scope, mailboxId }: InboxViewProp
 
       {/* Čí schránka */}
       {scope === "all" ? (
-        <MailboxSwitcher mailboxes={mailboxes} mailboxId={mailboxId} onSwitch={switchMailbox} />
+        <>
+          <MailboxSwitcher mailboxes={mailboxes} mailboxId={mailboxId} onSwitch={switchMailbox} />
+          <MailboxHealth mailboxes={mailboxes.filter((m) => m.incomplete || m.lastSyncError)} />
+        </>
       ) : noMailbox ? (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
@@ -214,6 +251,7 @@ export function InboxView({ emails, mailboxes, scope, mailboxId }: InboxViewProp
                 {m.email}
               </span>
             ))}
+            <MailboxHealth mailboxes={ownMailboxes} />
           </div>
           {unreadCount > 0 && (
             <span className="rounded-full bg-blue-500 px-2.5 py-0.5 text-xs font-semibold text-white">
@@ -360,6 +398,33 @@ function FilterChip({
   );
 }
 
+/** Stav stahování schránek (poslední stažení / chyba / neúplné nastavení). */
+function MailboxHealth({ mailboxes }: { mailboxes: MailboxOption[] }) {
+  const items = mailboxes
+    .map((m) =>
+      m.incomplete
+        ? { id: m.id, bad: true, text: `${m.email}: nastavení není kompletní — požádej super admina.` }
+        : m.authBlocked
+          ? { id: m.id, bad: true, text: `${m.email}: Heslo odmítnuto — oprav ho v Nastavení → E-mailové schránky (nebo požádej super admina). Automatické stahování je do opravy pozastavené.` }
+          : m.lastSyncError
+          ? { id: m.id, bad: true, text: m.lastSyncError }
+          : m.lastSyncAt
+            ? { id: m.id, bad: false, text: `${mailboxes.length > 1 ? `${m.email}: ` : ""}staženo ${relativeTime(m.lastSyncAt)}` }
+            : null,
+    )
+    .filter((x): x is { id: string; bad: boolean; text: string } => Boolean(x));
+  if (!items.length) return null;
+  return (
+    <div className="mt-0.5 space-y-0.5 text-xs" data-testid="mailbox-health">
+      {items.map((x) => (
+        <p key={x.id} suppressHydrationWarning className={cn("break-words", x.bad ? "text-red-700 dark:text-red-300" : "text-blue-900/60 dark:text-blue-200/60")}>
+          {x.text}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function MailboxSwitcher({
   mailboxes, mailboxId, onSwitch,
 }: {
@@ -391,6 +456,11 @@ function MailboxSwitcher({
               <span className={cn(active ? "text-white/80" : m.ownerName ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400")}>
                 {m.ownerName ?? "bez vlastníka"}
               </span>
+              {(m.lastSyncError || m.incomplete) && (
+                <span className={cn("text-[10px] font-medium", active ? "text-white" : "text-red-600 dark:text-red-400")} title={m.lastSyncError ?? undefined}>
+                  {m.incomplete ? "neúplné nastavení" : "chyba stahování"}
+                </span>
+              )}
             </span>
           </button>
         );

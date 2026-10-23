@@ -22,6 +22,52 @@ export function sql(query) {
   return execFileSync(path.join(ROOT, "tools/local-supabase/psql.sh"), ["-At", "-c", query], { encoding: "utf8" }).trim();
 }
 
+/** Proměnné lokálního stacku (.local-supabase/env) — URL a klíče pro přímé REST volání. */
+export function localEnv() {
+  try {
+    return Object.fromEntries(fs.readFileSync(path.join(ROOT, ".local-supabase/env"), "utf8").split("\n")
+      .filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Přímé volání PostgREST jako prohlížeč (publishable klíč): s přihlášením (`token`) nebo anonymně.
+ * Vrací { status, body } — slouží k ověření, že DB podvrh ani obejití UI nepustí.
+ */
+export async function rest(method, pathAndQuery, { token = null, body, headers = {} } = {}) {
+  const env = localEnv();
+  const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
+    method,
+    headers: {
+      apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      authorization: `Bearer ${token ?? env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}`,
+      "content-type": "application/json",
+      prefer: "return=representation",
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await r.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+  return { status: r.status, body: json };
+}
+
+/** Přihlášení účtu přes GoTrue (heslo) → access token pro `rest`. */
+export async function restLogin(user) {
+  const env = localEnv();
+  const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, "content-type": "application/json" },
+    body: JSON.stringify({ email: user.email, password: user.password }),
+  });
+  const j = await r.json();
+  if (!r.ok || !j.access_token) throw new Error(`Přihlášení ${user.email} přes GoTrue selhalo (${r.status})`);
+  return j.access_token;
+}
+
 export async function launch() {
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || undefined,

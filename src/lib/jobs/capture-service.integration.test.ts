@@ -44,14 +44,17 @@ vi.mock("@/lib/supabase/server", async () => {
       if (m) env[m[1]] = m[2];
     }
   }
-  const admin = () => sb.createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+  const headers = await import("@/lib/supabase/actor-headers");
+  // jako produkční server.ts: autor jde v hlavičkách x-actor-* (DB mu věří jen u servisní role)
+  const admin = (opts: { actor?: unknown } = {}) => sb.createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(opts.actor ? { global: { headers: headers.actorHeaders(opts.actor as never) } } : {}),
   });
   return {
     isSupabaseConfigured: () => true,
     hasServiceKey: () => true,
     createAdminClient: admin,
-    createOperatorClient: async () => admin(),
+    createOperatorClient: async (opts: { actor?: unknown } = {}) => admin(opts),
     createClient: async () => {
       throw new Error("Bez session (test).");
     },

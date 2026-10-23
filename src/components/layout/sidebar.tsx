@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
-import { navForFeatures } from "@/lib/nav";
+import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
 import type { BadgeCounts } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 
 export function isActivePath(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(href + "/");
+  return matchesNavPath(pathname, href);
 }
 
 export function Sidebar({
@@ -26,6 +26,7 @@ export function Sidebar({
   const pathname = usePathname();
   const badgeCounts: Record<string, number | undefined> = counts ?? {};
   const sections = navForFeatures(features);
+  const activeHref = activeNavHref(pathname, sections.flatMap((s) => s.items.map((i) => i.href)));
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r bg-sidebar md:flex">
@@ -44,7 +45,7 @@ export function Sidebar({
               </div>
             )}
             {section.items.map((item) => {
-              const active = isActivePath(pathname, item.href);
+              const active = item.href === activeHref;
               const count = item.badgeKey ? badgeCounts[item.badgeKey] : undefined;
               return (
                 <Link

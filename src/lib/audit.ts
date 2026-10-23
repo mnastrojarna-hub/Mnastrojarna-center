@@ -1,8 +1,12 @@
 import "server-only";
-import { createAdminClient, createClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import { resolveRequestActor } from "@/lib/supabase/actor";
+import type { ActorContext } from "@/lib/supabase/actor-headers";
 
 /**
  * Audit log — historie změn a akcí (bezpečnostní požadavek).
+ * Autor: explicitní `actor` (např. password_changed → userActor(user)), jinak přihlášený
+ * uživatel požadavku. Jméno se uloží i jako text (diff.byName), aby přežilo smazání účtu.
  * Best-effort: selhání logu nikdy neshodí samotnou akci.
  */
 export async function logAudit(input: {
@@ -10,26 +14,26 @@ export async function logAudit(input: {
   entity: string; // modul / tabulka, např. 'approval_queue', 'mailboxes'
   entityId?: string;
   diff?: Record<string, unknown>;
+  /** Explicitní autor; bez něj přihlášený uživatel (null = vědomě „Systém"). */
+  actor?: ActorContext | null;
 }): Promise<void> {
   if (!isSupabaseConfigured() || !hasServiceKey()) return;
   try {
-    let actorId: string | null = null;
-    try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      actorId = user?.id ?? null;
-    } catch {
-      // bez session (automatika) — actor zůstane null
+    const actor = input.actor !== undefined ? input.actor : await resolveRequestActor();
+    const db = createAdminClient({ actor });
+    let byName: string | null = null;
+    if (actor?.id) {
+      const { data: p } = await db.from("profiles").select("full_name, email").eq("id", actor.id).maybeSingle();
+      const prof = p as { full_name: string | null; email: string | null } | null;
+      byName = (prof?.full_name ?? "").trim() || (prof?.email ?? "").trim() || null;
     }
-    const db = createAdminClient();
+    const diff = input.diff ?? null;
     await db.from("audit_log").insert({
-      actor_id: actorId,
+      actor_id: actor?.id ?? null,
       action: input.action,
       entity: input.entity,
       entity_id: input.entityId ?? null,
-      diff: input.diff ?? null,
+      diff: byName && !(diff && "byName" in diff) ? { ...(diff ?? {}), byName } : diff,
     });
   } catch {
     // log nesmí rozbít akci

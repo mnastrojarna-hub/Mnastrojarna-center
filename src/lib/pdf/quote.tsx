@@ -4,7 +4,7 @@ import { styles } from "./theme";
 import {
   DocPage, BrandHeader, MetaStrip, Parties, PricedItemsTable, TotalsCard, Terms, NoteBox, People, d,
 } from "./components";
-import { czDate, type QuoteData } from "./types";
+import { UNAPPROVED_BANNER, czDate, type QuoteData } from "./types";
 
 const DEFAULT_INTRO = "děkujeme za Vaši poptávku. Na základě zaslaných podkladů Vám rádi nabízíme:";
 const DEFAULT_CLOSING = "Při objednání prosím uveďte číslo nabídky. Těšíme se na spolupráci!";
@@ -17,7 +17,7 @@ export function QuoteDocument({ data }: { data: QuoteData }) {
 
   return (
     <Document title={`Nabídka ${data.number}`} author={COMPANY.name} subject={data.subject ?? "Cenová nabídka"}>
-      <DocPage label={`Nabídka ${data.number}`}>
+      <DocPage label={`Nabídka ${data.number}`} watermark={data.watermark} banner={data.watermark ? UNAPPROVED_BANNER : undefined}>
         <BrandHeader title="Cenová nabídka" number={data.number} />
 
         <MetaStrip
@@ -71,7 +71,7 @@ export function QuoteDocument({ data }: { data: QuoteData }) {
           <People
             people={[
               { title: "Vypracoval", name: data.preparedBy, sub: [data.contactEmail, data.contactPhone].filter(Boolean).join("  ·  ") },
-              { title: "Schválil", name: data.approvedBy },
+              { title: "Schválil", name: data.approvedBy, sub: data.approvedBy && data.approvedAt ? czDate(data.approvedAt) : undefined },
             ]}
           />
         </View>

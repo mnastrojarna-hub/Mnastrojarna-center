@@ -18,6 +18,7 @@ import {
   PackageCheck,
   UserCog,
   ShoppingBag,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -97,6 +98,7 @@ export const navSections: NavSection[] = [
       { title: "Provize", href: "/commissions", icon: Wallet, feature: "commissions", description: "Obrat, marže, provize", color: "text-emerald-600" },
       { title: "Uživatelé", href: "/users", icon: UserCog, feature: "users", description: "Účty, role, hesla, schránky, AI", color: "text-rose-500" },
       { title: "Nastavení", href: "/settings", icon: Settings, feature: "settings", description: "Připojení, klíče, firma", color: "text-slate-500" },
+      { title: "Audit", href: "/settings/audit", icon: ScrollText, feature: "settings", description: "Kdo, kdy a co změnil", color: "text-teal-600" },
     ],
   },
 ];
@@ -108,6 +110,20 @@ export function navForFeatures(features: readonly Feature[]): NavSection[] {
   return navSections
     .map((s) => ({ ...s, items: s.items.filter((i) => features.includes(i.feature)) }))
     .filter((s) => s.items.length > 0);
+}
+
+/** Cesta patří k položce (stejná adresa, nebo podstránka). */
+export function matchesNavPath(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+/** Aktivní položka = nejdelší shoda (na /settings/audit svítí Audit, ne Nastavení). */
+export function activeNavHref(pathname: string, hrefs: readonly string[]): string | null {
+  let best: string | null = null;
+  for (const href of hrefs) {
+    if (matchesNavPath(pathname, href) && (!best || href.length > best.length)) best = href;
+  }
+  return best;
 }
 
 /** Výchozí stránka po přihlášení. */

@@ -70,7 +70,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={notify}>
       {children}
-      <div className="pointer-events-none fixed inset-x-3 bottom-24 z-[60] flex flex-col items-end gap-2 sm:inset-x-auto sm:bottom-6 sm:right-6 md:bottom-6">
+      {/* mobil: nahoře — dole by zakryl potvrzovací tlačítka dialogů (panel zespodu) */}
+      <div className="pointer-events-none fixed inset-x-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[60] flex flex-col items-end gap-2 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-auto">
         {items.map((t) => {
           const m = TONE[t.tone];
           const Icon = m.icon;

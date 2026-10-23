@@ -13,7 +13,8 @@ import { StageBadge } from "@/components/jobs/stage-badge";
 import { cn } from "@/lib/utils";
 import { BandBar } from "./band-bar";
 import {
-  ENTRY_STATUS_META, STATEMENT_STATUS_META, czDay, czk, entriesOfStatement, formatStamp, monthLabel, statementDue,
+  ENTRY_STATUS_META, STATEMENT_STATUS_META, commissionPending, commissionPendingText, czDay, czk, entriesOfStatement,
+  formatStamp, monthLabel, statementDue,
   type CommissionEntryView, type CommissionStatementView,
 } from "./model";
 
@@ -57,6 +58,8 @@ export function StatementCard({
   const all = entriesOfStatement(entries, st);
   const jobs = all.filter((e) => e.job);
   const orphans = all.filter((e) => !e.job);
+  // jen provize ze zisku čekají na nákupní cenu (provize z obratu se počítá i vyplácí)
+  const pendingCount = all.filter(commissionPending).length;
   const [expanded, setExpanded] = React.useState(false);
   const shown = expanded ? jobs : jobs.slice(0, JOBS_SHOWN);
   const collected = st.basis === "collected";
@@ -117,7 +120,12 @@ export function StatementCard({
           <Kpi label="Provize" value={czk(st.commission)} sub={st.status === "otevrena" ? "průběžně — měsíc běží" : st.status === "vyplaceno" ? "vyplaceno" : "k výplatě"} icon={Coins} tone="" big />
         </div>
 
-        {st.unknownCostJobs > 0 && (
+        {pendingCount > 0 ? (
+          <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            {pendingCount} {pendingCount === 1 ? "zakázka čeká" : pendingCount < 5 ? "zakázky čekají" : "zakázek čeká"} na nákupní cenu — provize se {pendingCount === 1 ? "jí" : "jim"} zatím nepočítá ani nevyplácí. Doplň ceny v objednávce dodavateli (nebo nákup) a provize se dopočítá sama.
+          </p>
+        ) : st.unknownCostJobs > 0 && (
           <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             {st.unknownCostJobs} {st.unknownCostJobs === 1 ? "zakázka nemá" : st.unknownCostJobs < 5 ? "zakázky nemají" : "zakázek nemá"} nákupní cenu — jejich zisk se zatím nepočítá. Doplň nákup nebo vystav objednávku dodavateli.
@@ -185,8 +193,14 @@ export function StatementCard({
 
 /** Řádek zakázky v provizích (vyúčtování i předběžné). */
 export function EntryRow({ entry: e, estimate }: { entry: CommissionEntryView; estimate?: boolean }) {
-  const meta = ENTRY_STATUS_META[e.status];
+  const pending = commissionPending(e);
+  // čekající provize není „K výplatě" (DB ji drží jako předběžnou; starší řádky taky tak ukážeme)
+  const meta = ENTRY_STATUS_META[pending && e.status === "k_vyplate" ? "predbezna" : e.status];
   const amount = estimate ? e.estimatedCommission : e.commission;
+  // náklad neznámý → žádná „0 Kč": provize čeká na nákupní cenu (a do výplaty se nepočítá)
+  const amountNode = pending
+    ? <span className="text-xs font-semibold text-amber-600 dark:text-amber-400" title="Do výplaty se nepočítá — dopočítá se po doplnění nákupních cen.">{commissionPendingText(e)}</span>
+    : <>{estimate && amount !== null ? "≈ " : ""}{amount === null ? "—" : czk(amount)}</>;
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm md:grid-cols-[minmax(0,2.2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)]">
       <div className="min-w-0">
@@ -204,15 +218,15 @@ export function EntryRow({ entry: e, estimate }: { entry: CommissionEntryView; e
         </div>
       </div>
       <div className="text-right md:hidden">
-        <div className={cn("font-bold tabular-nums", amount && amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
-          {estimate && amount !== null ? "≈ " : ""}{amount === null ? "—" : czk(amount)}
+        <div className={cn("font-bold tabular-nums", !pending && amount && amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
+          {amountNode}
         </div>
         <div className="text-[11px] text-muted-foreground">{czk(e.revenue)} · zisk {e.costKnown ? czk(e.profit) : "?"}</div>
       </div>
       <div className="hidden text-right tabular-nums md:block">{czk(e.revenue)}</div>
       <div className={cn("hidden text-right tabular-nums md:block", !e.costKnown && "text-amber-600")}>{e.costKnown ? czk(e.profit) : "nákup ?"}</div>
-      <div className={cn("hidden text-right font-bold tabular-nums md:block", amount && amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
-        {estimate && amount !== null ? "≈ " : ""}{amount === null ? "—" : czk(amount)}
+      <div className={cn("hidden text-right font-bold tabular-nums md:block", !pending && amount && amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
+        {amountNode}
       </div>
       <div className="col-span-2 flex flex-wrap justify-start gap-1 md:col-span-1 md:justify-end">
         {e.collected ? (

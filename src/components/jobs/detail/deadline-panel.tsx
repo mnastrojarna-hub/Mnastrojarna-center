@@ -5,11 +5,13 @@ import {
   CalendarClock, CalendarCheck, CalendarRange, Truck, ShieldAlert, AlertTriangle, Info, Siren, type LucideIcon,
 } from "lucide-react";
 import { deadlineInfo, DEADLINE_BADGE } from "@/lib/jobs/deadlines";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import type { ChangeStamp } from "@/lib/jobs/flow-status";
 import type { JobDetail } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { JobField } from "./inline-field";
 import {
-  DEADLINE_FIELDS, deadlineWarnings, dateTone, relativeDays, longDate, isReceived, type DeadlineField,
+  DEADLINE_COLUMNS, DEADLINE_FIELDS, deadlineWarnings, dateTone, relativeDays, longDate, isReceived, type DeadlineField,
 } from "./detail-helpers";
 
 const ICONS: Record<DeadlineField, { icon: LucideIcon; cls: string }> = {
@@ -44,8 +46,8 @@ const WARN: Record<"info" | "warn" | "danger", { icon: LucideIcon; cls: string }
   danger: { icon: Siren, cls: "border-red-300 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200" },
 };
 
-/** Panel termínů — všech pět termínů upravitelných na místě + varování. */
-export function DeadlinePanel({ job }: { job: JobDetail }) {
+/** Panel termínů — všech pět termínů upravitelných na místě + varování + kdo termín naposledy změnil. */
+export function DeadlinePanel({ job, fieldStamps }: { job: JobDetail; fieldStamps?: Record<string, ChangeStamp> }) {
   const info = deadlineInfo(job);
   const warnings = deadlineWarnings(job);
   const received = isReceived(job.stage, job.receivedAt);
@@ -102,6 +104,9 @@ export function DeadlinePanel({ job }: { job: JobDetail }) {
                 )}
                 {!value && <span className="text-[10px] leading-tight text-muted-foreground">{f.hint}</span>}
               </div>
+              {fieldStamps?.[DEADLINE_COLUMNS[f.key]] && (
+                <ActorStamp stamp={fieldStamps[DEADLINE_COLUMNS[f.key]]} verb="změna" short className="mt-0.5 max-w-full" />
+              )}
             </div>
           );
         })}

@@ -109,7 +109,15 @@ export interface QuoteData extends DocRefs {
   deliveryTerms?: string;
   /** Závěrečná věta; undefined = výchozí. */
   closing?: string;
+  /** #25: vodoznak přes každou stranu (neschválená nabídka — „NESCHVÁLENO — NEODESÍLAT“). */
+  watermark?: string;
+  /** Kdy nabídku schválil super admin (pod „Schválil“). */
+  approvedAt?: string;
 }
+
+/** Vodoznak náhledu neschválené nabídky (#25). */
+export const UNAPPROVED_WATERMARK = "NESCHVÁLENO — NEODESÍLAT";
+export const UNAPPROVED_BANNER = "Neschválená nabídka — čeká na schválení super admina. Neodesílat zákazníkovi.";
 
 export interface ConfirmationData extends DocRefs {
   number: string;

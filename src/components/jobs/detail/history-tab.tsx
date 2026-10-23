@@ -3,23 +3,27 @@
 import * as React from "react";
 import {
   Sparkles, PlusCircle, PencilLine, Paperclip, FileText, MessageCircle, Mail, Send, Loader2, ArrowRight, History,
-  type LucideIcon,
+  ListChecks, UserRound, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { StageBadge } from "@/components/jobs/stage-badge";
 import { addJobComment } from "@/app/actions/jobs";
+import { StateChip } from "@/components/flow-status/state-chip";
 import { stageMeta } from "@/lib/jobs/stages";
 import { formatTimestamp } from "@/lib/jobs/field-labels";
+import { VIA_META, actorKindIcon, actorName, lostReasonLabel, stateMeta, type FlowPhase } from "@/lib/jobs/flow-status";
 import type { JobEvent } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
-import { PersonChip } from "./inline-field";
-import { eventChanges, eventStage, eventTone, EVENT_TYPE_LABELS } from "./detail-helpers";
+import {
+  HISTORY_PHASES, autoLabel, dedupeEvents, eventChanges, eventPhase, eventStage, eventStamp, eventTone, type HistoryPhase,
+} from "./detail-helpers";
 
 const ICONS: Record<JobEvent["type"], LucideIcon> = {
   created: PlusCircle,
   stage: ArrowRight,
+  status: ListChecks,
   field: PencilLine,
   file: Paperclip,
   quote: FileText,
@@ -28,7 +32,39 @@ const ICONS: Record<JobEvent["type"], LucideIcon> = {
   email: Mail,
 };
 
-type Filter = "vse" | JobEvent["type"];
+type Filter = "vse" | HistoryPhase;
+
+const STATUS_PHASE: Record<string, FlowPhase> = { inquiry_status: "inquiry", order_status: "order" };
+
+/** Dílčí stav „z → do" jako barevné chipy (poptávka, objednávka); jinak null. */
+function statusChips(e: JobEvent): { phase: FlowPhase; from: string | null; to: string | null } | null {
+  if (e.type !== "status") return null;
+  const phase = typeof e.data?.field === "string" ? STATUS_PHASE[e.data.field] : undefined;
+  if (!phase) return null;
+  const from = typeof e.data?.from === "string" ? e.data.from : null;
+  const to = typeof e.data?.to === "string" ? e.data.to : null;
+  return stateMeta(phase, to) || stateMeta(phase, from) ? { phase, from, to } : null;
+}
+
+/** Kdo: ikona druhu (člověk / AI / systém) + jméno (nikdy prázdné) + způsob. */
+function EventAuthor({ e }: { e: JobEvent }) {
+  const stamp = eventStamp(e);
+  const KindIcon = actorKindIcon(stamp.kind);
+  const via = stamp.via && stamp.via !== "rucne" ? VIA_META[stamp.via] : null;
+  const ViaIcon = via?.icon;
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1 font-medium text-foreground">
+      <KindIcon className={cn("h-3.5 w-3.5 shrink-0", stamp.kind === "ai" ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-muted-foreground")} aria-hidden />
+      <span className="truncate">{actorName(stamp)}</span>
+      {via && ViaIcon && (
+        <span className="inline-flex shrink-0 items-center gap-0.5 font-normal text-muted-foreground" title={`Způsob: ${via.label}`}>
+          <ViaIcon className="h-3 w-3" aria-hidden />
+          <span className="sr-only">{via.label}</span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
   const st = eventStage(e);
@@ -36,6 +72,8 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
   const changes = e.type === "field" ? eventChanges(e.data) : [];
   const aiCorrected = Array.isArray(e.data?.aiCorrected) && (e.data.aiCorrected as unknown[]).length > 0;
   const note = st && typeof e.data?.note === "string" ? e.data.note : null;
+  const auto = autoLabel(e);
+  const sc = statusChips(e);
 
   return (
     <li className="relative flex gap-3 pb-5">
@@ -45,8 +83,9 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
       </span>
       <div className="min-w-0 flex-1 pt-0.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-          {e.actor ? <PersonChip name={e.actor.name} className="text-xs font-medium text-foreground" /> : <span className="font-medium">Systém</span>}
+          <EventAuthor e={e} />
           <span title={formatTimestamp(e.createdAt) ?? undefined} suppressHydrationWarning>{relativeTime(e.createdAt)}</span>
+          {auto && <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium">⚙ {auto}</span>}
           {e.type === "ai" && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-fuchsia-100 px-1.5 text-[10px] font-medium text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-300">
               <Sparkles className="h-2.5 w-2.5" /> AI
@@ -67,6 +106,16 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
             {st.from && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />}
             <StageBadge stage={st.to} size="sm" />
             {note && <span className="text-muted-foreground">— {note}</span>}
+            {typeof e.data?.reason === "string" && <span className="text-muted-foreground">· důvod: {lostReasonLabel(e.data.reason)}</span>}
+          </div>
+        ) : sc ? (
+          <div className="mt-1 space-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {sc.from && stateMeta(sc.phase, sc.from) && <StateChip meta={stateMeta(sc.phase, sc.from)!} size="xs" />}
+              {sc.from && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />}
+              {sc.to && stateMeta(sc.phase, sc.to) ? <StateChip meta={stateMeta(sc.phase, sc.to)!} size="xs" /> : <span className="text-xs text-muted-foreground">bez dokladu</span>}
+            </div>
+            <p className="break-words text-xs text-muted-foreground">{e.message}</p>
           </div>
         ) : changes.length > 0 ? (
           <div className="mt-1 text-sm">
@@ -96,18 +145,29 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
   );
 }
 
-/** Záložka Historie — kdo co kdy změnil + komentáře kolegů. */
-export function HistoryTab({ events }: { events: JobEvent[] }) {
+/** Záložka Historie — kdo co kdy změnil (vždy se jménem), filtr podle fáze a osoby + komentáře kolegů. */
+export function HistoryTab({ events: raw }: { events: JobEvent[] }) {
   const { jobId, notify, refresh } = useJobDetail();
   const [text, setText] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [filter, setFilter] = React.useState<Filter>("vse");
+  const [person, setPerson] = React.useState("");
+  const personId = React.useId();
 
-  const types = React.useMemo(() => {
-    const set = new Set(events.map((e) => e.type));
-    return (Object.keys(EVENT_TYPE_LABELS) as JobEvent["type"][]).filter((t) => set.has(t));
+  const events = React.useMemo(() => dedupeEvents(raw), [raw]);
+  const phases = React.useMemo(() => {
+    const set = new Set(events.map((e) => eventPhase(e)));
+    return HISTORY_PHASES.filter((p) => set.has(p.key));
   }, [events]);
-  const shown = filter === "vse" ? events : events.filter((e) => e.type === filter);
+  const people = React.useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of events) {
+      const n = actorName(eventStamp(e));
+      map.set(n, (map.get(n) ?? 0) + 1);
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [events]);
+  const shown = events.filter((e) => (filter === "vse" || eventPhase(e) === filter) && (!person || actorName(eventStamp(e)) === person));
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -155,21 +215,41 @@ export function HistoryTab({ events }: { events: JobEvent[] }) {
         </div>
       </form>
 
-      {types.length > 1 && (
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin">
-          {(["vse", ...types] as Filter[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setFilter(t)}
-              className={cn(
-                "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition",
-                filter === t ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-accent",
-              )}
-            >
-              {t === "vse" ? `Vše (${events.length})` : EVENT_TYPE_LABELS[t]}
-            </button>
-          ))}
+      {(phases.length > 1 || people.length > 1) && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {phases.length > 1 && (
+            <div role="group" aria-label="Fáze" className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin">
+              {([{ key: "vse", label: `Vše (${events.length})` }, ...phases] as { key: Filter; label: string }[]).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  aria-pressed={filter === t.key}
+                  onClick={() => setFilter(t.key)}
+                  className={cn(
+                    "min-h-9 shrink-0 rounded-full px-3 text-xs font-medium transition sm:min-h-7",
+                    filter === t.key ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-accent",
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {people.length > 1 && (
+            <div className="relative shrink-0">
+              <label htmlFor={personId} className="sr-only">Kdo</label>
+              <UserRound className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <select
+                id={personId}
+                value={person}
+                onChange={(e) => setPerson(e.target.value)}
+                className="h-9 w-full rounded-full border border-input bg-background pl-8 pr-3 text-xs sm:w-56"
+              >
+                <option value="">Kdokoli</option>
+                {people.map(([name, n]) => <option key={name} value={name}>{name} ({n})</option>)}
+              </select>
+            </div>
+          )}
         </div>
       )}
 

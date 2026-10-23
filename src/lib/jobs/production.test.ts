@@ -312,3 +312,51 @@ describe("texty do historie", () => {
     expect(updateEventMessage("Broušení (U nás)", ch)).toBe("Výroba: Broušení (U nás) — název odstraněn, kdo: TepKal s.r.o., termín 5. 11. 2026, poznámka");
   });
 });
+
+describe("předání do výroby: nová pole kroku (20261023150000)", () => {
+  it("řádek → view: termín, kdo, objednávka kroku, díly, konečný termín", () => {
+    const item = "11111111-1111-4111-8111-111111111111";
+    const v = rowToJobOperation(row({
+      kind: "vyroba", supplier_id: SUP, supplier: { id: SUP, name: "Frézy Novák s.r.o." }, planned_end: "2026-11-13",
+      order_item_ids: [item, "nesmysl"], ends_at_customer_date: false, deadline_state: "odhad", deadline_source: "nabidka_dodavatele",
+      deadline_changed_at: "2026-10-23T08:00:00Z", deadline_changed_by: ME, deadliner: { id: ME, full_name: "Petr Obchodník", email: "p@x.cz" },
+      who_source: "nejlevnejsi_nabidka", who_changed_at: "2026-10-23T08:00:00Z", po_mode: "vystavit", purchase_order_id: PO,
+      po: { id: PO, number: "OV-2026-012", status: "vystavena", sent_at: null, confirmed_date: null, file_id: null },
+    }), "2026-10-23");
+    expect(v).toMatchObject({
+      label: "Výroba", orderItemIds: [item], endsAtCustomerDate: false, deadlineState: "odhad", deadlineSource: "nabidka_dodavatele",
+      deadlineChangedBy: { id: ME, name: "Petr Obchodník" }, whoSource: "nejlevnejsi_nabidka", poMode: "vystavit",
+      purchaseOrderNumber: "OV-2026-012",
+      purchaseOrder: { id: PO, number: "OV-2026-012", status: "vystavena", sentAt: null, confirmedDate: null, fileId: null },
+    });
+    // starší řádky bez nových sloupců: žádná nová pole (fixture testů výroby)
+    expect("deadlineState" in rowToJobOperation(row())).toBe(false);
+    // neznámé hodnoty se zahodí
+    expect(rowToJobOperation(row({ deadline_state: "xx" as never, po_mode: "yy" as never, ends_at_customer_date: true }))).toMatchObject({ deadlineState: null, poMode: null, endsAtCustomerDate: true });
+  });
+
+  it("termín povinný (zakázka ve výrobě), konečný termín a díly ve vstupu", () => {
+    expect(validateOperationInput({ kind: "vyroba" }, false, { requireDeadline: true })).toBe("Doplň termín kroku.");
+    expect(validateOperationInput({ kind: "vyroba", plannedEnd: "2026-11-13" }, false, { requireDeadline: true })).toBeNull();
+    expect(validateOperationInput({ note: "x" }, true, { requireDeadline: true })).toBeNull();          // úprava bez termínu v patchi
+    expect(validateOperationInput({ plannedEnd: null }, true, { requireDeadline: true })).toBe("Doplň termín kroku.");
+    expect(validateOperationInput({ kind: "vyroba" })).toBeNull();                                        // bez vynucení (WP4)
+    expect(validateOperationInput({ kind: "vyroba", orderItemIds: [] })).toBe("Vyber aspoň jeden díl.");
+    expect(validateOperationInput({ kind: "vyroba", orderItemIds: ["x"] })).toBe("Neplatné díly kroku.");
+    const item = "11111111-1111-4111-8111-111111111111";
+    expect(operationInputToRow({ kind: "vyroba", endsAtCustomerDate: true, orderItemIds: [item.toUpperCase()] }))
+      .toMatchObject({ kind: "vyroba", ends_at_customer_date: true, order_item_ids: [item] });
+    expect(diffOperation({ order_item_ids: [item], ends_at_customer_date: false }, { order_item_ids: [item], ends_at_customer_date: false })).toEqual({});
+    expect(diffOperation({ order_item_ids: null }, { order_item_ids: [item] })).toEqual({ order_item_ids: [item] });
+  });
+
+  it("šablona „Výroba → tepelné zpracování → výroba“ s firmou podle pořadí kroku", () => {
+    expect(expandTemplate("vyroba_kaleni", { byIndex: [SUP, "TepKal s.r.o.", "u_nas"] })).toEqual([
+      { kind: "vyroba", supplierId: SUP },
+      { kind: "tepelne_zpracovani", supplierName: "TepKal s.r.o." },
+      { kind: "vyroba", inHouse: true },
+    ]);
+    // podle druhu (dřívější volání) dostanou obě výroby stejnou firmu
+    expect(expandTemplate("vyroba_kaleni", { vyroba: "u_nas" })?.map((o) => o.inHouse ?? false)).toEqual([true, false, true]);
+  });
+});

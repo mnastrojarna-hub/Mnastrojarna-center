@@ -310,11 +310,13 @@ describe.skipIf(!ENABLED)("akce výroby ↔ lokální Supabase (E2E)", () => {
     expect(un).toMatchObject({ ok: true, stage: "fakturovano" });
     expect(await job()).toMatchObject({ status: "fakturovano", paid_at: null, paid_amount: null });
 
+    // úhrada = finance: bez práva na marže ji nezapíše (review UX 17)
     perms.deny.add("margins");
-    const again = await a.markJobPaid(JOB, { amount: 5 });
+    expect((await a.markJobPaid(JOB, { amount: 5 })).error).toBe("K této akci nemáš oprávnění.");
     perms.deny.delete("margins");
+    const again = await a.markJobPaid(JOB, {});
     expect(again).toMatchObject({ ok: true, stage: "dokonceno", paidAt: todayIso() });
-    expect((await job()).paid_amount).toBeNull(); // bez práva na marže se částka nezapíše
+    expect((await job()).paid_amount).toBeNull(); // bez částky = celá hodnota zakázky
   }, 60_000);
 
   it("historie zakázky: výroba, stavy, bez částek", async () => {

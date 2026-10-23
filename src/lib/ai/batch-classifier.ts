@@ -115,8 +115,12 @@ export function classifyPrompt(): string {
       "jako objednávka; proforma = zálohová / proforma faktura; credit_note = dobropis; partial = dílčí dodávka " +
       "(menší množství, „částečně“); paid = razítko „zaplaceno“; complaint = reklamace / vada.\n" +
       "- title = krátce česky („Objednávka Strojmetal PO-4471“), documentNumber = číslo dokladu přesně, " +
-      "partyName = druhá strana, drawingNumbers = čísla výkresů / dílů viditelná na stránkách, pageLabels = krátký " +
+      "partyName = druhá strana, drawingNumbers = VŠECHNA čísla výkresů / dílů viditelná na stránkách, pageLabels = krátký " +
       "popis každé strany („str. 2/4 · tabulka položek“), reason = 1 věta proč, confidence 0–1.\n" +
+      "- VÝKRES: firma v razítku výkresu je ta, kdo výkres KRESLIL (projekce, konstrukce) — NENÍ to zákazník ani " +
+      "druhá strana. U vykres proto partyName VŽDY prázdné a firmu nepiš ani do title. drawingNumbers u výkresu = " +
+      "VŠECHNA čísla výkresu / dílu na listu (výkres často nese 2 čísla — číslo výkresu a číslo dílu zákazníka / " +
+      "sestavy / artiklu), hlavní číslo výkresu první; documentNumber = hlavní číslo výkresu.\n" +
       "- Do title, reason, notes, partyName ani pageLabels NIKDY nepiš ceny ani částky.\n" +
       "- fileLinks: k souborům bez náhledu přiřaď číslo výkresu, pokud ho název souboru nebo stránky jasně spojují.\n" +
       "- U druhého a dalšího okna: continuesPrevious = true jen u prvního dokladu okna, který pokračuje dokladem " +

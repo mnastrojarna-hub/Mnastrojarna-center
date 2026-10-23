@@ -2,10 +2,11 @@ import "server-only";
 import { COMPANY, DEFAULT_VAT_RATE } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { JobDetail, JobQuote, JobItem, JobQuoteItem } from "@/lib/jobs/types";
+import { quoteApprovalBlock } from "@/lib/jobs/flow-status";
 import { supplierParty } from "./components";
 import { spdVariableSymbol } from "./qr";
 import {
-  addDaysIso, leadTimeLabel, todayIso,
+  UNAPPROVED_WATERMARK, addDaysIso, leadTimeLabel, todayIso,
   type ConfirmationData, type DeliveryItem, type DeliveryNoteData, type DocItem, type DocRefs,
   type InvoiceData, type PartyInfo, type QuoteData,
 } from "./types";
@@ -145,12 +146,27 @@ export function relevantQuote(job: JobDetail): JobQuote | undefined {
     .sort((a, b) => (b.revision - a.revision) || b.createdAt.localeCompare(a.createdAt))[0];
 }
 
-/** Položky s cenami pro potvrzení / fakturu: zakázka → nabídka → souhrnný řádek. */
+/** Nabídka čeká na schválení super admina (její ceny zákazník nesmí dostat — #25). */
+export function quoteBlockedForCustomer(q: JobQuote): boolean {
+  return quoteApprovalBlock({
+    adminApprovalRequired: q.adminApprovalRequired, approvalRequired: q.approvalRequired,
+    approvedBy: q.approvedBy?.id ?? null, sentAt: q.sentAt, state: q.state,
+  }) !== null;
+}
+
+/** Nabídka vyžaduje schválení (ne-admin autor / AI v režimu se schválením). */
+function quoteNeedsApproval(q: JobQuote): boolean {
+  return Boolean(q.adminApprovalRequired || q.approvalRequired);
+}
+
+/** Položky s cenami pro potvrzení / fakturu: zakázka → nabídka (jen schválená) → souhrnný řádek. */
 export function pickPricedItems(job: JobDetail): DocItem[] {
   const jobItems = job.items.map((it) => jobItemToDoc(it));
   if (jobItems.length && jobItems.every((i) => !i.unpriced)) return jobItems;
 
-  const quote = relevantQuote(job);
+  // #25: ceny neschválené nabídky do potvrzení ani faktury nepatří
+  const relevant = relevantQuote(job);
+  const quote = relevant && !quoteBlockedForCustomer(relevant) ? relevant : undefined;
   const quoteItems = (quote?.items ?? []).map((it) => quoteItemToDoc(it, job.items));
   if (quoteItems.length && quoteItems.every((i) => !i.unpriced)) return quoteItems;
 
@@ -209,9 +225,13 @@ export async function buildQuoteDoc(
 ): Promise<QuoteData> {
   await refreshCompanyFromSettings();
   const refs = jobRefs(job);
-  const items = quote.items.length
+  const approval = quoteNeedsApproval(quote);
+  // #25: nabídka ke schválení nese jen své položky (schvaluje se obsah nabídky, ne položky zakázky)
+  const items = quote.items.length || approval
     ? quote.items.map((it) => quoteItemToDoc(it, job.items))
     : job.items.map((it) => jobItemToDoc(it));
+  // u nabídky ke schválení „Vypracoval“ = její autor (ne ten, kdo PDF zrovna vystavuje)
+  const author = approval ? u(quote.createdBy?.name) : undefined;
   return {
     ...refs,
     // Nabídka předchází objednávce — číslo objednávky na ni nepatří
@@ -232,8 +252,10 @@ export async function buildQuoteDoc(
     paymentTerms: u(quote.paymentTerms) ?? paymentTermsText(job.customerDetail?.paymentTermsDays),
     deliveryTerms: u(quote.deliveryTerms) ?? u(job.deliveryMethod),
     note: u(quote.note),
-    preparedBy: u(opts?.preparedBy) ?? u(quote.createdBy?.name) ?? u(job.pricedBy?.name) ?? refs.contactPerson,
+    preparedBy: author ?? u(opts?.preparedBy) ?? u(quote.createdBy?.name) ?? u(job.pricedBy?.name) ?? refs.contactPerson,
     approvedBy: u(quote.approvedBy?.name),
+    approvedAt: quote.approvedBy ? dateOnly(quote.approvedAt) : undefined,
+    watermark: quoteBlockedForCustomer(quote) ? UNAPPROVED_WATERMARK : undefined,
   };
 }
 

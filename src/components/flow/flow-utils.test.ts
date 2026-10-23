@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addDaysIso, amountInput, bookHref, czDay, fileKindCounts, filterFiles, filterQuotes, FLOW_STEPS, formatBytes,
-  formatPercent, isImageFile, isQuoteExpired, marginPercent, marginTone, matchesQuery, parseAmount, pricingSummary,
-  quoteCounts, type FileLike, type QuoteLike,
+  formatPercent, isImageFile, marginPercent, marginTone, matchesQuery, parseAmount, pricingSummary,
+  type FileLike, type QuoteLike,
 } from "./flow-utils";
 
 describe("kroky toku a odkazy", () => {
@@ -73,33 +73,27 @@ describe("marže", () => {
 });
 
 describe("nabídky", () => {
-  const today = "2026-10-22";
+  const now = Date.parse("2026-10-22T10:00:00Z");
   const q = (over: Partial<QuoteLike>): QuoteLike => ({
-    number: "NAB-1", title: null, status: "odeslano", validUntil: null, archived: false,
+    number: "NAB-1", title: null, display: "odeslana", stateChangedAt: "2026-10-20T10:00:00Z",
     job: { number: "Z-2026-101", title: "Hřídel" }, customer: { name: "Škoda Auto" }, ...over,
   });
 
-  it("isQuoteExpired jen u otevřených nabídek", () => {
-    expect(isQuoteExpired(q({ validUntil: "2026-10-21" }), today)).toBe(true);
-    expect(isQuoteExpired(q({ validUntil: "2026-10-22" }), today)).toBe(false);
-    expect(isQuoteExpired(q({ validUntil: "2026-10-01", status: "prijato" }), today)).toBe(false);
-    expect(isQuoteExpired(q({ validUntil: null }), today)).toBe(false);
-  });
-
-  it("filterQuotes a quoteCounts", () => {
+  it("filterQuotes: vybrané stavy, hledání bez diakritiky, uzavřené jen 30 dní", () => {
     const list = [
-      q({ number: "NAB-1", status: "odeslano", validUntil: "2026-10-01" }),
-      q({ number: "NAB-2", status: "prijato", customer: { name: "Bosch" } }),
-      q({ number: "NAB-3", status: "ke_schvaleni", archived: true }),
+      q({ number: "NAB-1", display: "vyprsela" }),
+      q({ number: "NAB-2", display: "prijata", customer: { name: "Bosch" } }),
+      q({ number: "NAB-3", display: "archivovana", stateChangedAt: "2026-08-01T10:00:00Z" }),
+      q({ number: "NAB-4", display: "ke_schvaleni" }),
     ];
-    expect(filterQuotes(list, { status: "vse", archived: false, q: "" }, today).map((x) => x.number)).toEqual(["NAB-1", "NAB-2"]);
-    expect(filterQuotes(list, { status: "vse", archived: true, q: "" }, today)).toHaveLength(3);
-    expect(filterQuotes(list, { status: "po_platnosti", archived: false, q: "" }, today).map((x) => x.number)).toEqual(["NAB-1"]);
-    expect(filterQuotes(list, { status: "vse", archived: false, q: "bosch" }, today).map((x) => x.number)).toEqual(["NAB-2"]);
-    expect(filterQuotes(list, { status: "vse", archived: false, q: "hridel z-2026" }, today)).toHaveLength(2);
-    const counts = quoteCounts(list, false, today);
-    expect(counts).toMatchObject({ vse: 2, odeslano: 1, prijato: 1, ke_schvaleni: 0, po_platnosti: 1 });
-    expect(quoteCounts(list, true, today).ke_schvaleni).toBe(1);
+    const all = ["rozpracovana", "ke_schvaleni", "schvalena", "odeslana", "pripominky", "vyprsela", "prijata", "zamitnuta", "archivovana"];
+    expect(filterQuotes(list, { states: all, q: "" }, now).map((x) => x.number)).toEqual(["NAB-1", "NAB-2", "NAB-4"]);
+    expect(filterQuotes(list, { states: ["vyprsela"], q: "" }, now).map((x) => x.number)).toEqual(["NAB-1"]);
+    expect(filterQuotes(list, { states: ["archivovana"], q: "" }, now)).toHaveLength(0);
+    expect(filterQuotes(list, { states: ["archivovana"], q: "" }, now, 120)).toHaveLength(1);
+    expect(filterQuotes(list, { states: all, q: "bosch" }, now).map((x) => x.number)).toEqual(["NAB-2"]);
+    expect(filterQuotes(list, { states: all, q: "hridel z-2026" }, now)).toHaveLength(3);
+    expect(filterQuotes([q({ display: "prijata", stateChangedAt: null })], { states: all, q: "" }, now)).toHaveLength(0);
   });
 });
 

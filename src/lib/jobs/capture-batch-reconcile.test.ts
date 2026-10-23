@@ -12,7 +12,8 @@ import { BATCH_TYPES } from "./capture-batch";
 
 const OUR = "04304080";
 const STROJ: ExtractedParty = { ...emptyParty(), name: "STROJMETAL, a. s.", ico: "45274649", contactPerson: "Ing. Dvořák" };
-const KOVO: ExtractedParty = { ...emptyParty(), name: "Kovo Plus s.r.o.", ico: "27654321" };
+// platné IČO (mod 11): IČO se špatným součtem je chyba čtení → u stejného výkresu jen dotaz, ne jiný zákazník
+const KOVO: ExtractedParty = { ...emptyParty(), name: "Kovo Plus s.r.o.", ico: "27654320" };
 const HRUBY: ExtractedParty = { ...emptyParty(), name: "Kovoobrábění Hrubý s.r.o.", ico: "25874411" };
 
 const item = (drawingNumber: string, over: Partial<ExtractedItem> = {}): ExtractedItem => ({
@@ -70,12 +71,19 @@ describe("groupBatch", () => {
     expect(r.groups[1].autoReason).toMatch(/jiný zákazník/);
   });
 
-  it("2 objednávky téhož zákazníka s jiným číslem → 2 skupiny", () => {
+  it("2 objednávky téhož zákazníka s jiným číslem → 1 skupina + „Rozdělit na samostatné zakázky“ jedním ťuknutím", () => {
     const a = rd("objednavka_zakaznik", { doc: order() });
     const b = rd("objednavka_zakaznik", { doc: order({ documentNumber: "PO-4480", customerOrderNumber: "PO-4480" }) });
     const r = groupBatch({ docs: [a, b], ourIco: OUR });
-    expect(r.groups).toHaveLength(2);
-    expect(r.groups[1].autoReason).toMatch(/další objednávka PO-4480/);
+    expect(r.groups).toHaveLength(1);
+    const w = r.warnings.find((x) => x.code === "multiple_orders")!;
+    expect(w).toMatchObject({ severity: "warn", docIds: [b.id] });
+    expect(w.message).toMatch(/Další objednávka PO-4480 s jiným číslem než PO-4471/);
+    expect(w.actions[0]).toMatchObject({ kind: "split_group", label: "Rozdělit na samostatné zakázky", docIds: [b.id] });
+    // rozdělení = přiřazení „new"
+    const split = groupBatch({ docs: [a, b], ourIco: OUR, assign: { [b.id]: "new" } });
+    expect(split.groups.map((g) => g.docIds)).toEqual([[a.id], [b.id]]);
+    expect(split.warnings.some((x) => x.code === "multiple_orders")).toBe(false);
   });
 
   it("objednávka + náš DL + naše faktura stejného zákazníka → 1 skupina", () => {
@@ -89,19 +97,86 @@ describe("groupBatch", () => {
     expect(r.groups[0].docIds).toHaveLength(3);
   });
 
-  it("podobný název bez IČO → stejná skupina + blokující konflikt; potvrzení konflikt odstraní", () => {
+  it("podobný název bez IČO → stejná skupina, jen info (bez blokujícího dotazu); rozdělit jde jedním ťuknutím", () => {
     const a = rd("objednavka_zakaznik", { doc: order({ customer: { ...emptyParty(), name: "Strojmetal Kladno a.s." } }) });
     const b = rd("faktura_my", { doc: bdoc({ docKind: "faktura", issuer: "my", documentNumber: "FV-1", customer: { ...emptyParty(), name: "Strojmetal Praha s.r.o." } }) });
     const r = groupBatch({ docs: [a, b], ourIco: OUR });
     expect(r.groups).toHaveLength(1);
-    const w = r.warnings.find((x) => x.code === "customer_conflict");
-    expect(w?.severity).toBe("block");
-    expect(w?.actions.map((x) => x.label)).toEqual(["Je to stejný zákazník", "Samostatná zakázka"]);
-    expect(groupBatch({ docs: [a, b], ourIco: OUR, customerConfirmed: ["g1"] }).warnings.some((x) => x.code === "customer_conflict")).toBe(false);
-    // „Samostatná zakázka" = přiřazení do nové skupiny
+    expect(r.warnings.some((x) => x.severity === "block")).toBe(false);
+    const w = r.warnings.find((x) => x.code === "customer_written_differently");
+    expect(w?.severity).toBe("info");
+    expect(w?.actions.map((x) => x.label)).toEqual(["Rozdělit na samostatné zakázky"]);
+    // úplně jiný název bez IČO → pořád 1 skupina, upozornění (ne blok) s potvrzením
+    const c = rd("faktura_my", { doc: bdoc({ docKind: "faktura", issuer: "my", documentNumber: "FV-2", customer: { ...emptyParty(), name: "Obráběcí centrum Beta" } }) });
+    const r2 = groupBatch({ docs: [a, c], ourIco: OUR });
+    expect(r2.groups).toHaveLength(1);
+    expect(r2.warnings.find((x) => x.code === "customer_written_differently")).toMatchObject({ severity: "warn" });
+    expect(r2.warnings.find((x) => x.code === "customer_written_differently")!.actions.map((x) => x.label)).toEqual(["Je to stejný zákazník", "Rozdělit na samostatné zakázky"]);
+    expect(groupBatch({ docs: [a, c], ourIco: OUR, customerConfirmed: ["g1"] }).warnings.find((x) => x.code === "customer_written_differently")?.severity).toBe("info");
+    // „Rozdělit" = přiřazení do nové skupiny
     const split = groupBatch({ docs: [a, b], ourIco: OUR, assign: { [b.id]: "new" } });
     expect(split.groups).toHaveLength(2);
-    expect(split.warnings.some((x) => x.code === "customer_conflict")).toBe(false);
+    expect(split.warnings.some((x) => x.code === "customer_written_differently")).toBe(false);
+  });
+
+  it("odlišné IČO na obou dokladech → samostatné skupiny; ruční sloučení chce potvrzení", () => {
+    const a = rd("objednavka_zakaznik", { doc: order() });
+    const b = rd("faktura_my", { doc: bdoc({ docKind: "faktura", issuer: "my", documentNumber: "FV-1", customer: KOVO }) });
+    const r = groupBatch({ docs: [a, b], ourIco: OUR });
+    expect(r.groups).toHaveLength(2);
+    expect(r.groups[1].autoReason).toMatch(/jiný zákazník — IČO 27654320/);
+    const merged = groupBatch({ docs: [a, b], ourIco: OUR, assign: { [b.id]: "g1" } });
+    expect(merged.groups).toHaveLength(1);
+    expect(merged.warnings.find((x) => x.code === "customer_conflict")).toMatchObject({ severity: "block" });
+    const ok = groupBatch({ docs: [a, b], ourIco: OUR, assign: { [b.id]: "g1" }, customerConfirmed: ["g1"] });
+    expect(ok.warnings.some((x) => x.code === "customer_conflict")).toBe(false);
+    // potvrzení přežije přepočet (stav skupiny → serverová kontrola uložení projde)
+    expect(ok.groups[0].customerConfirmed).toBe(true);
+    const rec = reconcile([a, b], { group: ok.groups[0] });
+    expect(rec.state.customerConfirmed).toBe(true);
+    const pages: BatchPage[] = [a, b].map((d, i) => ({ id: `p${i + 1}`, fileId: `f${i + 1}`, page: 1, source: "image", label: d.id, aiLabel: "", duplicateOf: null }));
+    const state: BatchApplyState = {
+      sort: {
+        docs: [a, b].map((d, i) => ({
+          id: d.id, type: d.type, pageIds: [`p${i + 1}`], aiType: d.type, confidence: 0.9, reason: "", title: "", documentNumber: d.documentNumber,
+          partyName: "", drawingNumbers: [], format: null, flags: [], issuerCheck: "unknown", excluded: false,
+        })),
+        excludedPageIds: [],
+      },
+      groups: [rec.state],
+      docs: rec.docStates,
+    };
+    const parties = { [a.id]: { name: STROJ.name, ico: STROJ.ico }, [b.id]: { name: KOVO.name, ico: KOVO.ico } };
+    expect(sanitizeBatchApplyState(state, { pages, margins: true, ourIco: OUR, customerParties: parties }).ok).toBe(true);
+    const unconfirmed = sanitizeBatchApplyState({ ...state, groups: [{ ...rec.state, customerConfirmed: false }] }, { pages, margins: true, ourIco: OUR, customerParties: parties });
+    expect(unconfirmed.ok).toBe(false);
+  });
+
+  it("rozdělení víc dokladů najednou („new:<doklad>“) = jedna nová skupina", () => {
+    const a = rd("objednavka_zakaznik", { doc: order() });
+    const b = rd("objednavka_zakaznik", { doc: order({ documentNumber: "PO-9", customerOrderNumber: "PO-9", items: [item("9000-01")] }) });
+    const v = rd("vykres", { documentNumber: "9000-01" });
+    const r = groupBatch({ docs: [a, b, v], ourIco: OUR });
+    expect(r.groups).toHaveLength(1);
+    const act = r.warnings.find((x) => x.code === "multiple_orders")!.actions[0];
+    expect(act.docIds).toEqual([b.id, v.id]);
+    const key = `new:${b.id}`;
+    const split = groupBatch({ docs: [a, b, v], ourIco: OUR, assign: { [b.id]: key, [v.id]: key } });
+    expect(split.groups.map((g) => g.docIds)).toEqual([[a.id], [b.id, v.id]]);
+    expect(split.groups[1].autoReason).toMatch(/rozděleno ručně/);
+  });
+
+  it("další objednávka se silnou shodou na existující zakázku → odejde k ní (primární je nová)", () => {
+    const a = rd("objednavka_zakaznik", { doc: order() });
+    const b = rd("objednavka_zakaznik", {
+      doc: order({ documentNumber: "PO-9", customerOrderNumber: "PO-9" }),
+      strongMatch: { jobId: "22222222-2222-4222-8222-222222222222", jobNumber: "Z-2026-029", reason: "podle čísla objednávky PO-9", score: 92 },
+    });
+    const r = groupBatch({ docs: [a, b], ourIco: OUR });
+    expect(r.groups).toHaveLength(2);
+    expect(r.groups[0]).toMatchObject({ targetJobId: null, docIds: [a.id] });
+    expect(r.groups[1]).toMatchObject({ targetJobId: "22222222-2222-4222-8222-222222222222", docIds: [b.id] });
+    expect(r.warnings.some((x) => x.code === "multiple_orders")).toBe(false);
   });
 
   it("silná shoda DL dodavatele s jinou zakázkou → vlastní skupina s cílem a akcí zpět", () => {

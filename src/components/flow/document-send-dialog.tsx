@@ -86,7 +86,7 @@ type Step = "preparing" | "unpriced" | "form" | "sending";
 /**
  * Odeslání dokladu zákazníkovi: (1) vytvoří PDF (uloží se do Dokumentů zakázky),
  * (2) předvyplní e-mail, (3) po kontrole odešle z mé schránky s PDF v příloze.
- * Položky bez ceny u potvrzení / faktury → varování a „Přesto vystavit".
+ * Položky bez ceny u nabídky / potvrzení / faktury → varování a „Přesto odeslat / vystavit".
  */
 export function DocumentSendDialog({
   open,
@@ -124,7 +124,7 @@ export function DocumentSendDialog({
     try {
       let f = givenFileId ? { id: givenFileId, filename: givenFilename ?? "doklad.pdf" } : null;
       if (!f) {
-        const gen = await generateJobDocument(jobId, kind, { ...(quoteId ? { quoteId } : {}), ...(force ? { force: true } : {}) });
+        const gen = await generateJobDocument(jobId, kind, { ...(quoteId ? { quoteId } : {}), ...(force ? { force: true } : {}), reuse: true });
         if (token !== run.current) return;
         if (!gen.ok || !gen.fileId) {
           if (gen.unpriced) {
@@ -165,7 +165,7 @@ export function DocumentSendDialog({
       setStep("preparing");
     }
   }
-  // PDF se generuje jednou na otevření (každé vygenerování = nová verze dokumentu)
+  // PDF se připraví jednou na otevření; beze změny obsahu se použije poslední vystavený (reuse)
   const prepareRef = React.useRef(prepare);
   prepareRef.current = prepare;
   const started = React.useRef(false);
@@ -233,7 +233,7 @@ export function DocumentSendDialog({
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Zpět — doplním ceny</Button>
-                <Button type="button" variant="default" onClick={() => void prepare(true)}>Přesto vystavit</Button>
+                <Button type="button" variant="default" onClick={() => void prepare(true)}>{kind === "nabidka" ? "Přesto odeslat" : "Přesto vystavit"}</Button>
               </div>
             </div>
           )}

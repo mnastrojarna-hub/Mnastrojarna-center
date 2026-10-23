@@ -201,7 +201,7 @@ await T("admin: Vyfotit doklad → AI předvyplní → oprava → uložení do v
   expect(res.created === false && res.jobId === job.id, "uloženo do existující (vlastní) zakázky");
   const done = await dlg.innerText();
   expect(done.includes("Doklad přiložen k zakázce v Dokumentech"), "hláška o přiloženém dokladu");
-  expect(await page.getByRole("link", { name: /Otevřít zakázku/ }).isVisible(), "odkaz Otevřít zakázku");
+  expect(await dlg.getByRole("link", { name: /Otevřít zakázku/ }).isVisible(), "odkaz Otevřít zakázku");
   await shot(page, "capture/a-done");
 
   // DB: zakázka
@@ -476,7 +476,12 @@ await T("obchodník bez AI: ruční vyplnění vedle náhledu → nová zakázka
     sql(`update profiles set ai_access = false where id = ${q(OBCHOD_ID)}`);
     cleanup.restore.push(`update profiles set ai_access = true where id = ${q(OBCHOD_ID)}`);
   }
-  expect(forAll !== "true", `ai_capture_for_all je vypnuté (${forAll}) — neměníme sdílené nastavení`);
+  // #25: „AI focení pro všechny“ je výchozí zapnuté — pro ruční režim ho test dočasně vypne (úklid ho vrátí)
+  if (forAll === "true") {
+    sql("update integration_settings set value = 'false' where key = 'ai_capture_for_all'");
+    cleanup.restore.push("update integration_settings set value = 'true' where key = 'ai_capture_for_all'");
+    await new Promise((r) => setTimeout(r, 31_000)); // server drží nastavení v mezipaměti 30 s
+  }
   const fileName = `e2e-cap-d-${RUN}.png`;
   const title = `${TAG} D ručně`;
   const rfq = `RFQ-${RUN}`;

@@ -143,7 +143,7 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
                 <span>
                   {[
                     since ? `${current?.status === "problem" ? "běží od" : "probíhá od"} ${since}` : null,
-                    stamp ? `${current?.status === "problem" ? "problém nahlásil" : "začal"} ${stamp.name}${stamp.auto ? " (navázáním)" : ""}` : null,
+                    stamp ? `${current?.status === "problem" ? "problém" : "začátek"}: ${stamp.name}${stamp.auto ? " (navázalo samo)" : ""}` : null,
                   ].filter(Boolean).join(" · ")}
                 </span>
               )}

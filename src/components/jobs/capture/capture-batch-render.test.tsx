@@ -172,6 +172,8 @@ describe("Kontrola dávky", () => {
     expect(withAccess).toContain("Zapsat do archivu výkresů");
     expect(withAccess).toContain("1.2379");
     expect(withAccess).toContain("Založit novou položku");
+    // firma z razítka = kdo kreslil, jen informace (ne zákazník)
+    expect(withAccess).toMatch(/Kreslil \(z razítka\): Strojmetal a\.s\. — jen informace/);
     const noAccess = renderToString(<CaptureDrawingForm doc={dr} state={st} onChange={noop} itemOptions={[]} drawingsAccess={false} idPrefix="t" />);
     expect(noAccess).not.toContain("Zapsat do archivu výkresů");
 

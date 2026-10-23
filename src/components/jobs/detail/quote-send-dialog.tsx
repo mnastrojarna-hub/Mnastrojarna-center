@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Send, Loader2, FileText, ExternalLink, RotateCcw, Paperclip } from "lucide-react";
+import { AlertTriangle, Send, Loader2, FileText, ExternalLink, RotateCcw, Paperclip } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ interface MailDraft {
   body: string;
 }
 
-type Step = "preparing" | "form" | "sending";
+type Step = "preparing" | "unpriced" | "form" | "sending";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,8 +31,9 @@ function invalidAddress(list: string): string | null {
 }
 
 /**
- * Odeslání nabídky zákazníkovi: vygeneruje PDF, předvyplní e-mail
- * (komu / předmět / text — vše jde upravit) a po potvrzení odešle.
+ * Odeslání nabídky zákazníkovi: připraví PDF (beze změny obsahu poslední vystavené),
+ * předvyplní e-mail (komu / předmět / text — vše jde upravit) a po potvrzení odešle.
+ * Položky bez ceny → varování s „Zpět — doplním ceny" / „Přesto odeslat".
  */
 export function QuoteSendDialog({
   open, onOpenChange, quote, fallback,
@@ -46,6 +47,7 @@ export function QuoteSendDialog({
   const { jobId, notify, refresh } = useJobDetail();
   const [step, setStep] = React.useState<Step>("preparing");
   const [error, setError] = React.useState<string | null>(null);
+  const [warning, setWarning] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const run = React.useRef(0);
@@ -60,15 +62,20 @@ export function QuoteSendDialog({
     };
   }, [fallback.to, fallback.title, fallback.contact, quote.number]);
 
-  const prepare = React.useCallback(async () => {
+  const prepare = React.useCallback(async (force = false) => {
     const token = ++run.current;
     setStep("preparing");
     setError(null);
     // výchozí text hned — i když PDF selže, uživatel nepíše od nuly
     setMail((m) => (m.subject || m.body ? m : fallbackMail()));
     try {
-      const gen = await generateJobDocument(jobId, "nabidka", { quoteId: quote.id });
+      const gen = await generateJobDocument(jobId, "nabidka", { quoteId: quote.id, reuse: true, ...(force ? { force: true } : {}) });
       if (token !== run.current) return;
+      if (!gen.ok && gen.unpriced) {
+        setWarning(gen.error ?? "Některé položky nemají cenu.");
+        setStep("unpriced");
+        return;
+      }
       if (!gen.ok || !gen.fileId) {
         setError(gen.error ?? "PDF nabídky se nepodařilo vytvořit.");
         setStep("form");
@@ -93,11 +100,12 @@ export function QuoteSendDialog({
     setWasOpen(open);
     if (open) {
       setFile(null);
+      setWarning(null);
       setMail({ to: "", cc: "", subject: "", body: "" });
       setStep("preparing");
     }
   }
-  // PDF se generuje jednou na otevření (každé volání = nová verze dokumentu)
+  // PDF se připraví jednou na otevření; beze změny obsahu se použije poslední vystavený (reuse)
   const prepareRef = React.useRef(prepare);
   prepareRef.current = prepare;
   const started = React.useRef(false);
@@ -158,6 +166,19 @@ export function QuoteSendDialog({
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
               Připravuji PDF nabídky a návrh e-mailu…
+            </div>
+          ) : step === "unpriced" ? (
+            <div role="alert" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              <p className="flex items-start gap-2 font-medium">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden /> {warning}
+              </p>
+              <p className="text-amber-800/90 dark:text-amber-200/80">
+                Položky bez ceny budou mít v nabídce „—“. Ceny doplníš v Nacenění nebo v úpravě nabídky.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-11 sm:min-h-9" onClick={() => onOpenChange(false)}>Zpět — doplním ceny</Button>
+                <Button type="button" variant="default" className="min-h-11 sm:min-h-9" onClick={() => void prepare(true)}>Přesto odeslat</Button>
+              </div>
             </div>
           ) : (
             <>

@@ -6,7 +6,9 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { ApprovalQueue } from "@/components/approval-queue";
 import { Button } from "@/components/ui/button";
-import { CategoryBadge, QuoteStatusBadge } from "@/components/status-badge";
+import { CategoryBadge } from "@/components/status-badge";
+import { StateChip } from "@/components/flow-status/state-chip";
+import { QUOTE_STATES } from "@/lib/jobs/flow-status";
 import { AiConfidence } from "@/components/ai-confidence";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
@@ -14,7 +16,8 @@ import { JobMiniList } from "@/components/customers/job-mini-list";
 import { CLOSED_STAGES, STAGES, STAGE_ORDER } from "@/lib/jobs/stages";
 import { bookKpis, segmentOfStage } from "@/components/jobs/book/book-params";
 import { requireFeature, getAccess } from "@/lib/auth/session";
-import { getEmails, getApprovalQueue, getCommissions } from "@/lib/data/queries";
+import { FLOW_TILES, getEmails, getApprovalQueue, getCommissions, getFlowDashboard, getResolvedApprovals } from "@/lib/data/queries";
+import { FlowStateTiles, MoversPanel } from "@/components/dashboard/flow-overview";
 import { getJobStageCounts, listJobs, listQuotes } from "@/lib/data/jobs";
 import { getSetupStatus } from "@/lib/setup/status";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
@@ -27,15 +30,17 @@ import { cn, formatCZK, relativeTime } from "@/lib/utils";
 export default async function DashboardPage() {
   await requireFeature("dashboard");
   const { can } = await getAccess();
-  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup] = await Promise.all([
+  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved] = await Promise.all([
     getEmails(),
     getApprovalQueue(),
     getJobStageCounts(),
     listJobs({ sort: "updated", dir: "desc", limit: 6 }),
     listJobs({ group: "aktivni", deadline: "overdue", sort: "deadline", dir: "asc", limit: 5 }),
-    listQuotes({ status: ["ke_schvaleni", "navrh_ai"] }),
+    listQuotes({ state: ["ke_schvaleni"] }),
     can("commissions") ? getCommissions("month") : Promise.resolve([]),
     getSetupStatus(),
+    getFlowDashboard(),
+    getResolvedApprovals(5),
   ]);
 
   const kpis = bookKpis(counts);
@@ -126,6 +131,9 @@ export default async function DashboardPage() {
         ))}
       </div>
 
+      {/* Podrobné stavy toku — co čeká na koho */}
+      <FlowStateTiles tiles={FLOW_TILES} counts={flow.counts} />
+
       {/* Kde jsou zakázky */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -169,7 +177,7 @@ export default async function DashboardPage() {
       <div className="grid gap-5 lg:grid-cols-5">
         <div className="space-y-5 lg:col-span-3">
           <div id="fronta" className="scroll-mt-4">
-            <ApprovalQueue initialItems={approvals} />
+            <ApprovalQueue initialItems={approvals} recent={resolved} />
           </div>
 
           <Panel
@@ -224,6 +232,8 @@ export default async function DashboardPage() {
         </div>
 
         <div className="space-y-5 lg:col-span-2">
+          <MoversPanel movers={flow.movers} total={flow.movedToday} />
+
           <Panel
             icon={<Flame />}
             tone="bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
@@ -263,7 +273,7 @@ export default async function DashboardPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-sm font-semibold">{q.number}</span>
-                          <QuoteStatusBadge status={q.status} />
+                          <StateChip meta={QUOTE_STATES[q.state ?? "ke_schvaleni"]} size="xs" ai={q.aiGenerated} />
                         </div>
                         <p className="truncate text-xs text-muted-foreground">
                           {[q.customer?.name, q.job?.number, q.createdBy ? `zadal ${q.createdBy.name}` : null].filter(Boolean).join(" · ")}

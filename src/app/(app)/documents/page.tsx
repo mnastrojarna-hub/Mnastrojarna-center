@@ -1,6 +1,7 @@
 import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, ReceiptText, Truck, type LucideIcon } from "lucide-react";
 import { requireFeature } from "@/lib/auth/session";
 import { listJobFiles, listJobs } from "@/lib/data/jobs";
+import { getFileFlowInfo } from "@/lib/data/flow-pages";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
 import { Button } from "@/components/ui/button";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
@@ -26,7 +27,8 @@ export default async function DocumentsPage() {
     listJobFiles({ includeArchived: true, limit: 2000 }),
     listJobs({ sort: "updated", dir: "desc" }),
   ]);
-  const flowFiles = files.map(toFlowFile);
+  const info = await getFileFlowInfo(files.map((f) => f.id));
+  const flowFiles = files.map((f) => toFlowFile(f, info[f.id] ?? null));
   const current = flowFiles.filter((f) => !f.archived).length;
   // aktivní zakázky nahoře, uzavřené na konci výběru
   const issueJobs = [...jobs]

@@ -92,17 +92,54 @@ Bucket **`job-files`** (doklady, fotky, výkresy a 3D modely zakázek) **vytvá�
 nahrává přes podepsané URL a soubory vydává jen přihlášeným (`/api/jobs/files/<id>`). Starší bucket
 `documents` (archiv výkresů, PDF) zakládá migrace `…_documents_storage.sql`.
 
+## E-mailové schránky (hosting90, Microsoft 365)
+
+Nastavení → **E-mailové schránky** → Přidat schránku: zvol předvolbu, vyplň e-mail a heslo a klikni na
+**„Najít nastavení automaticky"** — aplikace sama vyzkouší servery a porty a vyplní první fungující kombinaci.
+
+| Poskytovatel | Příchozí | Odchozí | Uživatel |
+| --- | --- | --- | --- |
+| **hosting90** (nastrojarstvi.com, mnastrojarna.cz i jiná doména) | IMAP `mail.hosting90.cz` 993 SSL/TLS (nebo 143 STARTTLS); POP3 995 / 110 | `smtp.hosting90.cz` 465 SSL/TLS (nebo 587 STARTTLS) | celá adresa |
+| Gmail | `imap.gmail.com` 993 | `smtp.gmail.com` 465 | celá adresa + **heslo aplikace** |
+| Microsoft 365 | Microsoft Graph (Client ID, Tenant ID, Secret) | Graph | — |
+
+- **Proč ne `mail.<vlastní doména>`:** u hosting90 vede na stejný server, ale certifikát je vystavený na
+  `mail.hosting90.cz` („neumožňuje využít SSL") — šifrované spojení s ověřením certifikátu selže na všech portech.
+  Aplikace to pozná a sama použije `mail.hosting90.cz`; uložený server se při stahování sám opraví.
+- Šifrování podle portu (993/995/465 TLS, 143/110/587 STARTTLS); heslo nikdy nejde nešifrovaně. Pokud certifikát
+  serveru nesedí na jeho název a jiný název nefunguje, aplikace nabídne „přesto šifrovat bez ověření jména" jen
+  po výslovném potvrzení.
+- POP3 schránka se stahuje bez mazání ze serveru (UIDL). Outlook (POP3) musí mít zapnuté **„Ponechat kopii zpráv na
+  serveru"**, jinak je INBOX prázdný — nejlépe přepnout i Outlook na IMAP `mail.hosting90.cz`, port 993.
+- **Microsoft 365:** Entra ID → Registrace aplikací → Nová; oprávnění API Microsoft Graph typu *Application*:
+  `Mail.Read` (a `Mail.Send` pro odesílání) → **Udělit souhlas správce**; Certifikáty a tajné kódy → nový tajný klíč
+  → zkopíruj **Value** (ne Secret ID). IMAP/SMTP s heslem M365 nepodporuje.
+- Stav stahování, poslední chyba a poslední test jsou u každé schránky (Nastavení, Přijatá pošta, Můj účet);
+  tabulka `mailbox_status` (migrace `20261023120000_schranky_diagnostika.sql`).
+
 ## Automatické stahování pošty (cron)
 
-1. Na Vercelu nastav proměnnou **`CRON_SECRET`** (libovolný dlouhý náhodný řetězec).
-2. Plánovač volá **`GET <APP_URL>/api/cron/sync-mail`** s hlavičkou `Authorization: Bearer <CRON_SECRET>`.
-   - Vercel Cron posílá hlavičku sám, stačí v `vercel.json`:
-     ```json
-     { "crons": [{ "path": "/api/cron/sync-mail", "schedule": "*/10 * * * *" }] }
-     ```
-     (na plánu Hobby jde jen 1× denně — pak použij externí plánovač, např. cron-job.org, se stejnou hlavičkou).
-   - Bez `CRON_SECRET` endpoint odpoví 503 a nic nestahuje; se špatným tajemstvím 401.
-3. Uživatelé si poštu mohou kdykoli stáhnout i ručně tlačítkem v Přijaté poště.
+1. Na Vercelu nastav proměnnou **`CRON_SECRET`** (libovolný dlouhý náhodný řetězec, např. `openssl rand -hex 32`)
+   a znovu nasaď. Bez ní `/api/cron/sync-mail` vrací **503** a nic se automaticky nestahuje.
+2. `vercel.json` v repu obsahuje cron **`17 5 * * *`** (1× denně v 5:17 UTC) — to je maximum plánu **Hobby**
+   (častější výraz, např. `*/10 * * * *`, na Hobby **shodí nasazení**). Vercel Cron posílá
+   `Authorization: Bearer <CRON_SECRET>` sám. Na plánu **Pro** lze dát `*/5 * * * *`.
+3. Častěji i na Hobby — externí plánovač volá `GET https://<APP_URL>/api/cron/sync-mail` s hlavičkou
+   `Authorization: Bearer <CRON_SECRET>`, např. Supabase `pg_cron` + `pg_net` (SQL editor):
+   ```sql
+   create extension if not exists pg_cron; create extension if not exists pg_net;
+   select vault.create_secret('<CRON_SECRET>', 'mail_cron_secret');
+   select cron.schedule('sync-mail', '*/5 * * * *', $$
+     select net.http_get(url := 'https://mnastrojarna-center.vercel.app/api/cron/sync-mail',
+       headers := jsonb_build_object('Authorization', 'Bearer ' ||
+         (select decrypted_secret from vault.decrypted_secrets where name = 'mail_cron_secret')),
+       timeout_milliseconds := 290000) $$);
+   -- kontrola: select * from cron.job_run_details order by start_time desc limit 5;
+   ```
+   (nebo cron-job.org se stejnou hlavičkou).
+4. Navíc se pošta stáhne sama při otevření Přijaté pošty (je-li poslední stažení starší než 5 min) a kdykoli
+   tlačítkem „Stáhnout poštu". Stahuje se inkrementálně (IMAP UID / POP3 UIDL) — nic se neztratí ani při
+   denním cronu; dávka, která se nestihne v časovém limitu (`maxDuration` 300 s), se dostáhne příště.
 
 ## Bezpečnost dat
 

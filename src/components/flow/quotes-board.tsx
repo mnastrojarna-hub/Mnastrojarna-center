@@ -3,65 +3,45 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Archive, BadgeCheck, Ban, CheckCircle2, Eye, FileText, Loader2, MoreHorizontal, Search, Send, ThumbsUp,
-  CalendarX, UserRound, X, ArrowRight,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Archive, ArchiveRestore, ArrowRight, Eye, FileText, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ConfirmDialog } from "@/components/jobs/detail/confirm-dialog";
+import { Button } from "@/components/ui/button";
 import { ToastProvider, useNotify } from "@/components/jobs/detail/toast";
 import { StageDot } from "@/components/jobs/stage-badge";
+import { StateChip } from "@/components/flow-status/state-chip";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import { CountChips, type CountChip } from "@/components/flow-status/count-chips";
+import { setJobQuoteArchived } from "@/app/actions/jobs";
 import {
-  acceptJobQuote, approveJobQuote, markJobQuoteSent, rejectJobQuote, setJobQuoteArchived,
-} from "@/app/actions/jobs";
-import { stageMeta } from "@/lib/jobs/stages";
-import type { JobStage, QuoteStatus } from "@/lib/supabase/database.types";
+  FLOW_PALETTE, OPEN_QUOTE, QUOTE_ORDER, QUOTE_STATES, VIA_META, approvalReasons, lostReasonLabel, type ChangeStamp, type QuoteDisplayState,
+} from "@/lib/jobs/flow-status";
+import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
-import { DocumentSendDialog } from "./document-send-dialog";
 import { FlowEmpty } from "./flow-header";
-import {
-  czDay, filterQuotes, isQuoteExpired, quoteCounts, quoteStatusUi, QUOTE_STATUS_UI, type QuoteFilterKey,
-} from "./flow-utils";
+import { FlowActionBar, FlowProposalChip } from "./flow-actions";
+import { czDay, filterQuotes } from "./flow-utils";
+import { STATE_PARAM, actionPalette, parseStateParam, stateParamValue, type FlowQuoteInfo } from "./flow-state";
 
-/** Nabídka pro přehled (jen čistá data ze serveru). */
-export interface FlowQuote {
+/** Nabídka pro přehled (čistá data ze serveru) + podrobný stav, autoři a akce. */
+export interface FlowQuote extends Omit<FlowQuoteInfo, "id"> {
   id: string;
   number: string;
   revision: number;
   title: string | null;
-  status: QuoteStatus;
   total: number | null;
   currency: string;
   validUntil: string | null;
   leadTimeDays: number | null;
-  createdBy: { id: string; name: string } | null;
-  approvedBy: { id: string; name: string } | null;
-  approvedAt: string | null;
-  sentAt: string | null;
   createdAt: string;
   archived: boolean;
-  accepted: boolean;
   aiGenerated: boolean;
   itemCount: number;
+  createdBy: { id: string; name: string } | null;
   job: { id: string; number: string; title: string; stage: JobStage } | null;
   customer: { id: string; name: string } | null;
+  /** Jediná otevřená nabídka zakázky (zamítnutí zakázku uzavře). */
+  onlyOpen: boolean;
 }
-
-const CHIPS: { key: QuoteFilterKey; label: string; tone: string; solid: string }[] = [
-  { key: "vse", label: "Vše", tone: "bg-muted text-foreground", solid: "bg-foreground text-background" },
-  { key: "ke_schvaleni", label: "Ke schválení", tone: QUOTE_STATUS_UI.ke_schvaleni.badge, solid: QUOTE_STATUS_UI.ke_schvaleni.solid },
-  { key: "odeslano", label: "Odesláno", tone: QUOTE_STATUS_UI.odeslano.badge, solid: QUOTE_STATUS_UI.odeslano.solid },
-  { key: "po_platnosti", label: "Po platnosti", tone: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300", solid: "bg-red-600 text-white" },
-  { key: "prijato", label: "Přijato", tone: QUOTE_STATUS_UI.prijato.badge, solid: QUOTE_STATUS_UI.prijato.solid },
-  { key: "zamitnuto", label: "Zamítnuto", tone: QUOTE_STATUS_UI.zamitnuto.badge, solid: QUOTE_STATUS_UI.zamitnuto.solid },
-  { key: "navrh_ai", label: "Návrh AI", tone: QUOTE_STATUS_UI.navrh_ai.badge, solid: QUOTE_STATUS_UI.navrh_ai.solid },
-];
 
 function money(value: number | null, currency: string): string {
   if (value === null || value === undefined) return "bez ceny";
@@ -72,7 +52,17 @@ function money(value: number | null, currency: string): string {
   }
 }
 
-export function QuotesBoard(props: { quotes: FlowQuote[]; today: string }) {
+/** Počty chipů: z DB (flow_counts), bez nich z načtených nabídek. */
+function chipsOf(quotes: FlowQuote[], counts: Record<string, number> | null): CountChip[] {
+  const local: Record<string, number> = {};
+  if (!counts) for (const q of filterQuotes(quotes, { states: QUOTE_ORDER, q: "" })) local[q.display] = (local[q.display] ?? 0) + 1;
+  return QUOTE_ORDER.map((k) => ({
+    key: k, phase: "quote", label: QUOTE_STATES[k].label, count: counts ? counts[`quote.${k}`] ?? 0 : local[k] ?? 0,
+    palette: QUOTE_STATES[k].palette, open: OPEN_QUOTE.includes(k),
+  }));
+}
+
+export function QuotesBoard(props: { quotes: FlowQuote[]; today: string; counts: Record<string, number> | null; initialStates?: string | null }) {
   return (
     <ToastProvider>
       <Board {...props} />
@@ -80,60 +70,51 @@ export function QuotesBoard(props: { quotes: FlowQuote[]; today: string }) {
   );
 }
 
-function Board({ quotes, today }: { quotes: FlowQuote[]; today: string }) {
-  const [status, setStatus] = React.useState<QuoteFilterKey>("vse");
-  const [archived, setArchived] = React.useState(false);
+function Board({
+  quotes, today, counts, initialStates,
+}: {
+  quotes: FlowQuote[];
+  today: string;
+  counts: Record<string, number> | null;
+  initialStates?: string | null;
+}) {
+  const [states, setStates] = React.useState<string[]>(() => parseStateParam(initialStates, QUOTE_ORDER, OPEN_QUOTE));
   const [q, setQ] = React.useState("");
+  const chips = React.useMemo(() => chipsOf(quotes, counts), [quotes, counts]);
+  const shown = React.useMemo(() => filterQuotes(quotes, { states, q }), [quotes, states, q]);
 
-  const counts = React.useMemo(() => quoteCounts(quotes, archived, today), [quotes, archived, today]);
-  const archivedCount = React.useMemo(() => quotes.filter((x) => x.archived).length, [quotes]);
-  const shown = React.useMemo(() => filterQuotes(quotes, { status, archived, q }, today), [quotes, status, archived, q, today]);
+  function change(keys: string[]) {
+    const next = keys.length ? keys : [...OPEN_QUOTE];
+    setStates(next);
+    try {
+      const url = new URL(window.location.href);
+      const value = stateParamValue(next, OPEN_QUOTE);
+      if (value) url.searchParams.set(STATE_PARAM, value);
+      else url.searchParams.delete(STATE_PARAM);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search.replace(/%2C/g, ",")}`);
+    } catch {
+      // adresa se neaktualizuje — filtr funguje dál
+    }
+  }
 
   return (
     <div className="space-y-3">
-      <div className="space-y-3 rounded-2xl border bg-card p-3 shadow-sm">
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 scrollbar-thin">
-          {CHIPS.filter((c) => c.key !== "navrh_ai" || counts.navrh_ai > 0).map((c) => {
-            const on = status === c.key;
-            return (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => setStatus(c.key)}
-                aria-pressed={on}
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98]",
-                  on ? cn(c.solid, "shadow-sm") : cn(c.tone, "hover:brightness-95"),
-                )}
-              >
-                {c.label}
-                <span className={cn("rounded-full px-1.5 text-[10.5px] tabular-nums", on ? "bg-white/25" : "bg-background/60 dark:bg-black/20")}>
-                  {counts[c.key] ?? 0}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Hledej číslo nabídky, zakázku, zákazníka…"
-              className="h-10 pl-8"
-              aria-label="Hledat v nabídkách"
-            />
-            {q && (
-              <button type="button" aria-label="Vymazat hledání" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={archived} onCheckedChange={setArchived} aria-label="Zobrazit archivované" />
-            Zobrazit archivované{archivedCount ? ` (${archivedCount})` : ""}
-          </label>
+      <div className="space-y-2 rounded-2xl border bg-card p-3 shadow-sm">
+        <CountChips chips={chips} selected={states} onChange={change} label="Stav nabídky" />
+        <div className="relative">
+          <Search aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Hledej číslo nabídky, zakázku, zákazníka…"
+            className="h-11 pl-8 sm:h-10"
+            aria-label="Hledat v nabídkách"
+          />
+          {q && (
+            <button type="button" aria-label="Vymazat hledání" onClick={() => setQ("")} className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -146,83 +127,92 @@ function Board({ quotes, today }: { quotes: FlowQuote[]; today: string }) {
           {quotes.length === 0 ? (
             <>Nabídka vznikne v <Link href="/pricing" className="font-medium text-primary hover:underline">Nacenění</Link> tlačítkem „Vytvořit nabídku z ceny“, nebo v kartě zakázky v záložce Nabídky.</>
           ) : (
-            <>Zkus jiný stav nahoře, vymaž hledání nebo zapni „Zobrazit archivované“.</>
+            <>Zkus jiný stav nahoře (uzavřené jsou ve „Více“ za posledních 30 dní) nebo vymaž hledání.</>
           )}
         </FlowEmpty>
       ) : (
         <ul className="space-y-2">
-          {shown.map((quote) => (
-            <QuoteRow key={quote.id} quote={quote} today={today} />
-          ))}
+          {shown.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} />)}
         </ul>
       )}
     </div>
   );
 }
 
-type Busy = null | "approve" | "markSent" | "archive";
+/** Proč nabídka čeká na schválení (AI, žádost autora, limit — čtyři oči). */
+function approvalHint(quote: FlowQuote): string | null {
+  const r = approvalReasons(quote.facts);
+  if (r.ai) return "kontrola AI";
+  if (r.requested) return "žádost o schválení";
+  return r.limit ? "nad limitem" : null;
+}
+
+function sentVerb(s: ChangeStamp): string {
+  if (s.via === "email") return "Odesláno e-mailem";
+  if (s.via === "foto") return "Odesláno (z fotky)";
+  if (s.via === "rucne") return "Odesláno jinak";
+  return s.via ? `Odesláno ${VIA_META[s.via]?.label ?? ""}`.trim() : "Odesláno";
+}
+
+/** „Zadáno · X“, „Schváleno · Y“, „Odesláno e-mailem · Z“, „Přijato · W“, „Zamítnuto — Cena · V“. */
+function stampsOf(quote: FlowQuote): { verb: string; stamp: ChangeStamp }[] {
+  const s = quote.stamps;
+  const out: { verb: string; stamp: ChangeStamp | null }[] = [
+    { verb: quote.aiGenerated ? "Připravila AI" : "Zadáno", stamp: s.created },
+    { verb: "Předáno ke schválení", stamp: quote.facts.approvalRequestedAt ? s.approvalRequested : null },
+    { verb: "Schváleno", stamp: s.approved },
+    { verb: s.sent ? sentVerb(s.sent) : "Odesláno", stamp: s.sent },
+    { verb: "Přijato", stamp: s.accepted },
+    { verb: quote.lostReason ? `Zamítnuto — ${lostReasonLabel(quote.lostReason)}` : "Zamítnuto", stamp: s.rejected },
+  ];
+  return out.filter((x): x is { verb: string; stamp: ChangeStamp } => Boolean(x.stamp));
+}
 
 function QuoteRow({ quote, today }: { quote: FlowQuote; today: string }) {
   const router = useRouter();
   const notify = useNotify();
-  const [busy, setBusy] = React.useState<Busy>(null);
-  const [dialog, setDialog] = React.useState<null | "send" | "accept" | "reject">(null);
-  const [reason, setReason] = React.useState("");
-  const ui = quoteStatusUi(quote.status);
-  const expired = isQuoteExpired(quote, today);
-  const open = quote.status === "navrh_ai" || quote.status === "ke_schvaleni";
-  const canAccept = (quote.status === "odeslano" || quote.status === "ke_schvaleni") && !quote.accepted;
-  const canReject = quote.status !== "prijato" && quote.status !== "zamitnuto";
-  const canSend = !quote.archived && Boolean(quote.job) && (open || quote.status === "odeslano");
+  const display: QuoteDisplayState = quote.display;
+  const meta = QUOTE_STATES[display];
   const pdfHref = quote.job ? `/api/pdf/job/${quote.job.id}?type=nabidka&quoteId=${quote.id}` : null;
   const jobHref = quote.job ? `/orders/${quote.job.id}?tab=nabidky` : null;
+  const awaiting = display === "ke_schvaleni";
+  const stamps = stampsOf(quote);
 
-  async function run(kind: Exclude<Busy, null>, fn: () => Promise<{ ok: boolean; error?: string }>, done: string) {
-    if (busy) return;
-    setBusy(kind);
+  async function toggleArchive() {
     try {
-      const res = await fn();
-      if (!res.ok) notify("error", res.error ?? "Akce se nepovedla.");
-      else {
-        notify("success", done);
-        router.refresh();
-      }
+      const res = await setJobQuoteArchived(quote.id, !quote.archived);
+      if (!res.ok) return notify("error", res.error ?? "Akce se nepovedla.");
+      notify("success", quote.archived ? `Nabídka ${quote.number} obnovena z archivu.` : `Nabídka ${quote.number} archivována.`);
+      router.refresh();
     } catch {
       notify("error", "Spojení se nepovedlo — zkus to znovu.");
-    } finally {
-      setBusy(null);
     }
   }
 
   return (
-    <li className={cn("relative overflow-hidden rounded-xl border bg-card p-3 pl-4 shadow-sm transition hover:shadow-md", quote.archived && "opacity-70")}>
-      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", expired ? "bg-red-500" : ui.dot)} />
+    <li
+      className={cn("relative overflow-hidden rounded-xl border bg-card p-3 pl-4 shadow-sm transition hover:shadow-md", display === "archivovana" && "opacity-75")}
+      data-quote-state={display}
+    >
+      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", FLOW_PALETTE[meta.palette].dot)} />
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-mono text-sm font-bold tracking-tight">{quote.number}</span>
             {quote.revision > 1 && (
               <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground">verze {quote.revision}</span>
             )}
-            <span title={ui.hint} className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", ui.badge)}>
-              <span className={cn("h-1.5 w-1.5 rounded-full", ui.dot)} /> {ui.label}
-            </span>
-            {quote.accepted && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 text-[10.5px] font-semibold text-white">
-                <CheckCircle2 className="h-3 w-3" /> Přijatá nabídka zakázky
-              </span>
-            )}
-            {expired && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10.5px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                <CalendarX className="h-3 w-3" /> Platnost vypršela {czDay(quote.validUntil, { short: true, today })}
-              </span>
-            )}
-            {quote.archived && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
-                <Archive className="h-3 w-3" /> archiv
-              </span>
-            )}
+            <StateChip
+              meta={meta}
+              ai={quote.aiGenerated}
+              hint={display === "vyprsela" && quote.validUntil ? `platila do ${czDay(quote.validUntil, { short: true, today })}`
+                : display === "ke_schvaleni" ? approvalHint(quote) : null}
+              data-flow-state={`quote.${display}`}
+            />
           </div>
+          {quote.proposal && quote.job && (
+            <FlowProposalChip jobId={quote.job.id} proposal={quote.proposal.value} stamp={quote.proposal.stamp} canDecide={quote.proposal.canDecide} />
+          )}
           {quote.job ? (
             <Link href={jobHref!} className="group flex min-w-0 items-center gap-1.5 text-sm hover:underline">
               <StageDot stage={quote.job.stage} />
@@ -234,168 +224,57 @@ function QuoteRow({ quote, today }: { quote: FlowQuote; today: string }) {
           )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {quote.customer && <span className="font-medium text-foreground/80">{quote.customer.name}</span>}
-            <span className="inline-flex items-center gap-1" title="Kdo nabídku zadal">
-              <UserRound className="h-3.5 w-3.5" /> {quote.createdBy?.name ?? "—"}
-            </span>
-            {quote.approvedBy ? (
-              <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400" title={quote.approvedAt ? `Schváleno ${czDay(quote.approvedAt)}` : "Schváleno"}>
-                <BadgeCheck className="h-3.5 w-3.5" /> schválil {quote.approvedBy.name}
-              </span>
-            ) : open ? (
-              <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
-                <BadgeCheck className="h-3.5 w-3.5" /> zatím neschváleno
-              </span>
-            ) : null}
-            {quote.sentAt && (
-              <span className="inline-flex items-center gap-1">
-                <Send className="h-3.5 w-3.5 text-violet-500" /> odesláno {czDay(quote.sentAt, { short: true, today })}
-              </span>
-            )}
             {quote.validUntil && (
-              <span className={cn(expired && "font-semibold text-red-600 dark:text-red-400")}>
+              <span className={cn(display === "vyprsela" && "font-semibold text-rose-700 dark:text-rose-300")}>
                 platná do {czDay(quote.validUntil, { short: true, today })}
               </span>
             )}
-            <span>vytvořeno {czDay(quote.createdAt, { short: true, today })}</span>
+            {quote.leadTimeDays !== null && <span>lhůta {quote.leadTimeDays} dní</span>}
+            {quote.facts.sentAt && !quote.stamps.sent && <span>odesláno {czDay(quote.facts.sentAt.slice(0, 10), { short: true, today })}</span>}
+            {awaiting && <span className="font-medium text-violet-700 dark:text-violet-300">zatím neschváleno</span>}
           </div>
+          {stamps.length > 0 && (
+            <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5">
+              {stamps.map((x) => <ActorStamp key={x.verb} stamp={x.stamp} verb={x.verb} short />)}
+            </div>
+          )}
+          {(quote.feedback || (display === "zamitnuta" && quote.rejectedReason)) && (
+            <p className="line-clamp-2 text-xs text-foreground/80">
+              <span className="font-medium">{quote.feedback ? "Připomínky:" : "Poznámka:"}</span> {quote.feedback ?? quote.rejectedReason}
+              {quote.competitorPrice !== null && <> · konkurence {money(quote.competitorPrice, quote.currency)}</>}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:justify-end">
           <span className={cn("mr-auto text-base font-bold tabular-nums md:mr-2", quote.total === null && "text-sm font-medium text-amber-600 dark:text-amber-400")}>
             {money(quote.total, quote.currency)}
           </span>
-          {!quote.archived && open && !quote.approvedBy && (
-            <Button type="button" size="sm" variant="success" disabled={Boolean(busy)} onClick={() => void run("approve", () => approveJobQuote(quote.id), `Nabídka ${quote.number} schválena.`)}>
-              {busy === "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />} Schválit
-            </Button>
-          )}
-          {canSend && quote.status !== "odeslano" && (
-            <Button type="button" size="sm" variant="send" onClick={() => setDialog("send")}>
-              <Send className="h-4 w-4" /> Odeslat
-            </Button>
-          )}
-          {!quote.archived && quote.status === "odeslano" && canAccept && (
-            <Button type="button" size="sm" variant="success" onClick={() => setDialog("accept")}>
-              <ThumbsUp className="h-4 w-4" /> Přijata
-            </Button>
-          )}
           {pdfHref && (
-            <Button asChild type="button" size="sm" variant="outline" title="Náhled PDF (nic se neukládá)">
-              <a href={pdfHref} target="_blank" rel="noopener noreferrer">
+            <Button asChild type="button" size="sm" variant="outline" className="min-h-11 sm:min-h-9" title="Náhled PDF (nic se neukládá)">
+              <a href={pdfHref} target="_blank" rel="noopener noreferrer" aria-label={`PDF náhled ${quote.number}`}>
                 <Eye className="h-4 w-4 text-violet-600 dark:text-violet-400" /> PDF
               </a>
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" size="icon-sm" variant="ghost" aria-label={`Další akce nabídky ${quote.number}`} disabled={Boolean(busy)}>
-                {busy && busy !== "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Nabídka {quote.number}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {canSend && (
-                <DropdownMenuItem onSelect={() => setDialog("send")}>
-                  <Send className="text-red-500" /> {quote.status === "odeslano" ? "Odeslat znovu e-mailem" : "Odeslat e-mailem"}
-                </DropdownMenuItem>
-              )}
-              {!quote.archived && open && (
-                <DropdownMenuItem onSelect={() => void run("markSent", () => markJobQuoteSent(quote.id), `Nabídka ${quote.number} označena jako odeslaná.`)}>
-                  <Send className="text-violet-500" /> Označit jako odeslanou (poslal jsem jinak)
-                </DropdownMenuItem>
-              )}
-              {!quote.archived && canAccept && (
-                <DropdownMenuItem onSelect={() => setDialog("accept")}>
-                  <ThumbsUp className="text-green-600" /> Zákazník přijal
-                </DropdownMenuItem>
-              )}
-              {!quote.archived && canReject && (
-                <DropdownMenuItem onSelect={() => setDialog("reject")}>
-                  <Ban className="text-red-500" /> Zákazník zamítl
-                </DropdownMenuItem>
-              )}
-              {pdfHref && (
-                <DropdownMenuItem asChild>
-                  <a href={pdfHref} target="_blank" rel="noopener noreferrer"><Eye className="text-violet-500" /> Náhled PDF</a>
-                </DropdownMenuItem>
-              )}
-              {jobHref && (
-                <DropdownMenuItem asChild>
-                  <Link href={jobHref}><ArrowRight /> Otevřít zakázku {quote.job?.number}</Link>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => void run(
-                  "archive",
-                  () => setJobQuoteArchived(quote.id, !quote.archived),
-                  quote.archived ? `Nabídka ${quote.number} obnovena z archivu.` : `Nabídka ${quote.number} archivována.`,
-                )}
-              >
-                <Archive /> {quote.archived ? "Obnovit z archivu" : "Archivovat"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <FlowActionBar
+            target={{
+              jobId: quote.job?.id ?? null, jobNumber: quote.job?.number ?? quote.number, quote: quote.facts, today,
+              onlyOpenQuote: quote.onlyOpen,
+            }}
+            next={quote.next}
+            menu={quote.menu}
+            palette={quote.next ? actionPalette(quote.next.key) : undefined}
+            menuLabel={`Další akce nabídky ${quote.number}`}
+            className="w-full md:w-auto"
+            extraMenu={[
+              ...(jobHref ? [{ label: `Otevřít zakázku ${quote.job?.number ?? ""}`, icon: ArrowRight, href: jobHref }] : []),
+              ...(pdfHref ? [{ label: "Náhled PDF", icon: Eye, href: pdfHref, external: true }] : []),
+              { label: quote.archived ? "Obnovit z archivu" : "Archivovat", icon: quote.archived ? ArchiveRestore : Archive, onSelect: () => void toggleArchive() },
+            ]}
+          />
         </div>
       </div>
-
-      {quote.job && (
-        <DocumentSendDialog
-          open={dialog === "send"}
-          onOpenChange={(o) => setDialog(o ? "send" : null)}
-          jobId={quote.job.id}
-          kind="nabidka"
-          quoteId={quote.id}
-          title={`Odeslat nabídku ${quote.number} zákazníkovi`}
-          onSent={({ to }) => {
-            notify("success", `Nabídka ${quote.number} odeslána na ${to}.`);
-            router.refresh();
-          }}
-        />
-      )}
-      <ConfirmDialog
-        open={dialog === "accept"}
-        onOpenChange={(o) => setDialog(o ? "accept" : null)}
-        icon={ThumbsUp}
-        tone="bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300"
-        title={`Zákazník přijal nabídku ${quote.number}?`}
-        confirmLabel="Ano, přijata"
-        confirmVariant="success"
-        onConfirm={async () => {
-          const res = await acceptJobQuote(quote.id);
-          if (!res.ok) return res.error ?? "Nabídku se nepodařilo označit jako přijatou.";
-          notify("success", `Nabídka ${quote.number} přijata — zakázka je v Objednávkách.`, quote.job ? { label: "Potvrdit objednávku", href: "/confirmations" } : undefined);
-          router.refresh();
-          return null;
-        }}
-      >
-        Hodnota zakázky se nastaví podle nabídky a zakázka se posune do stavu{" "}
-        <span className={cn("font-semibold", stageMeta("objednavka").text)}>Objednávka</span>. Pak stačí objednávku potvrdit.
-      </ConfirmDialog>
-      <ConfirmDialog
-        open={dialog === "reject"}
-        onOpenChange={(o) => {
-          setDialog(o ? "reject" : null);
-          if (!o) setReason("");
-        }}
-        icon={Ban}
-        tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-        title={`Zákazník zamítl nabídku ${quote.number}?`}
-        confirmLabel="Označit jako zamítnutou"
-        confirmVariant="destructive"
-        onConfirm={async () => {
-          const res = await rejectJobQuote(quote.id, reason.trim() || undefined);
-          if (!res.ok) return res.error ?? "Nabídku se nepodařilo zamítnout.";
-          notify("info", `Nabídka ${quote.number} zamítnuta. Zakázku můžeš v knize přepnout na „Nerealizováno“.`);
-          setReason("");
-          router.refresh();
-          return null;
-        }}
-      >
-        <span className="block pb-2">Proč? (nepovinné — pomůže příště s cenou)</span>
-        <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Drahé, dlouhý termín, objednali jinde…" />
-      </ConfirmDialog>
     </li>
   );
 }

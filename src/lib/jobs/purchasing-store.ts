@@ -2,10 +2,14 @@ import "server-only";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { fetchSupplierQuote } from "@/lib/data/purchasing";
 import {
-  PURCHASE_ORDER_STATUS_META, canChangePurchaseOrderStatus, cleanPurchaseItems, resolveSupplierQuoteTotal,
-  supplierQuoteInputToRow, type PurchaseItemRowInput,
+  PURCHASE_ORDER_STATUS_META, canChangePurchaseOrderStatus, cleanPurchaseItems, isItemReceived, purchaseDeliveryAdvances,
+  resolveSupplierQuoteTotal, supplierQuoteInputToRow, type PurchaseItemRowInput, type StageRuleOperation,
 } from "@/lib/jobs/purchasing";
-import type { SupplierQuoteInput } from "@/lib/jobs/purchasing-types";
+import type { PurchaseReceiptInput, SupplierQuoteInput } from "@/lib/jobs/purchasing-types";
+import { OPERATION_KINDS, OPERATION_STATUSES } from "@/lib/jobs/operations";
+import { isForward, isJobStage } from "@/lib/jobs/stages";
+import { withChangeNote } from "@/lib/supabase/actor-headers";
+import type { JobStage } from "@/lib/supabase/database.types";
 import {
   cleanText, describeChanges, diffJob, fetchPaged, fieldEventMessage, isUuid, todayIso, type JobChange,
 } from "@/lib/jobs/mapping";
@@ -235,7 +239,7 @@ export async function findPurchaseOrderByNumber(db: JobsDb, number: string, jobI
 
 const STATUS_RANK: Record<PurchaseOrderStatus, number> = { navrh: 0, vystavena: 1, odeslana: 2, potvrzena: 3, dodana: 4, zrusena: -1 };
 
-/** Posun objednávky vydané jen dopředu (potvrzena / dodana) + událost bez cen. */
+/** Posun objednávky vydané jen dopředu (potvrzena / dodana) + událost bez cen; dodaná → dopady do zakázky (2.7). */
 export async function advancePurchaseOrderStatus(
   db: JobsDb,
   userId: string,
@@ -243,7 +247,7 @@ export async function advancePurchaseOrderStatus(
   to: "potvrzena" | "dodana",
   note: string,
   extra: Row = {},
-): Promise<{ ok: true; changed: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true; changed: boolean; stage?: JobStage; hint?: string } | { ok: false; error: string }> {
   if (STATUS_RANK[po.status] < 0 || STATUS_RANK[po.status] >= STATUS_RANK[to]) return { ok: true, changed: false };
   if (!canChangePurchaseOrderStatus(po.status, to)) return { ok: true, changed: false };
   const row: Row = { status: to };
@@ -260,5 +264,148 @@ export async function advancePurchaseOrderStatus(
     data: { purchaseOrderId: po.id, number: po.number, statusFrom: po.status, statusTo: to, fields: ["status"], ...extra },
     actorId: userId,
   });
-  return { ok: true, changed: true };
+  if (to !== "dodana") return { ok: true, changed: true };
+  const eff = await applyPurchaseDelivered(db, userId, { id: po.id, jobId: po.jobId, number: po.number }, { note, markItems: true });
+  return { ok: true, changed: true, ...(eff.stage ? { stage: eff.stage } : {}), ...(eff.hint ? { hint: eff.hint } : {}) };
+}
+
+// ── Převzetí od dodavatele (2.7) ────────────────────────────
+interface PoItemRow {
+  id: string;
+  quantity: number | string;
+  received_quantity: number | string | null;
+  receipt_closed: boolean | null;
+  name: string | null;
+  drawing_number: string | null;
+  unit: string | null;
+}
+
+function n(v: unknown): number {
+  const x = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function plural(count: number, one: string, few: string, many: string): string {
+  return count === 1 ? one : count >= 2 && count <= 4 ? few : many;
+}
+
+async function loadPoItems(db: JobsDb, poId: string): Promise<PoItemRow[]> {
+  const { data } = await db
+    .from("purchase_order_items")
+    .select("id, quantity, received_quantity, receipt_closed, name, drawing_number, unit")
+    .eq("purchase_order_id", poId)
+    .order("position");
+  return (data ?? []) as PoItemRow[];
+}
+
+/**
+ * Zapíše převzaté množství po položkách (celkem, ne přírůstek) a případné uzavření s menším
+ * množstvím. Vrací, zda je převzato vše (pak má volající objednávku posunout na „dodana").
+ * Kdo převzal doplní DB (received_changed_by) z hlavičky autora.
+ */
+export async function receivePurchaseItems(
+  db: JobsDb,
+  poId: string,
+  receipts: PurchaseReceiptInput[],
+): Promise<{ ok: true; complete: boolean; done: number; total: number; changed: number; lines: string[] } | { ok: false; error: string }> {
+  const items = await loadPoItems(db, poId);
+  if (!items.length) return { ok: false, error: "Objednávka nemá položky — zapiš ji jako dodanou celou." };
+  const byId = new Map(items.map((it) => [it.id, it]));
+  let changed = 0;
+  const lines: string[] = [];
+  for (const r of receipts) {
+    const it = byId.get(r.itemId);
+    if (!it) return { ok: false, error: "Položka nepatří k této objednávce." };
+    const qty = Number(r.received);
+    if (!Number.isFinite(qty) || qty < 0 || qty > 1e9) return { ok: false, error: "Převzaté množství musí být číslo 0 a víc." };
+    const close = Boolean(r.close);
+    const reason = cleanText(r.closeReason, 300);
+    if (close && !reason) return { ok: false, error: "U uzavření s menším množstvím napiš důvod (např. zmetky)." };
+    const before = n(it.received_quantity);
+    const wasClosed = Boolean(it.receipt_closed);
+    if (Math.abs(before - qty) < 1e-9 && wasClosed === close) continue;
+    const row: Row = { received_quantity: Math.round(qty * 1000) / 1000, receipt_closed: close, receipt_closed_reason: close ? reason : null };
+    const { error } = await db.from("purchase_order_items").update(row as never).eq("id", it.id).eq("purchase_order_id", poId);
+    if (error) return { ok: false, error: error.message };
+    it.received_quantity = row.received_quantity as number;
+    it.receipt_closed = close;
+    changed += 1;
+    const label = it.drawing_number || it.name || "položka";
+    lines.push(`${label} ${row.received_quantity}/${n(it.quantity)} ${it.unit || "ks"}${close ? ` (uzavřeno: ${reason})` : ""}`);
+  }
+  const done = items.filter((it) => isItemReceived({ quantity: n(it.quantity), receivedQuantity: n(it.received_quantity), receiptClosed: Boolean(it.receipt_closed) })).length;
+  return { ok: true, complete: done === items.length, done, total: items.length, changed, lines };
+}
+
+/**
+ * Dopady dodané objednávky dodavateli (2.7, M6):
+ *  • navázaná výrobní operace → „hotovo";
+ *  • zakázka do „Dodáno k nám" jen podle purchaseDeliveryAdvances (bez operací: vše dodáno;
+ *    s operacemi: hotovo vše a poslední je kooperace; materiál stav neposouvá).
+ * markItems = dopsat plné množství u položek, které ještě nejsou převzaté celé (ruční „Dodáno k nám" = přišlo vše).
+ * Stavovou událost zakázky zapíše DB (autor z hlavičky, poznámka z x-change-note).
+ */
+export async function applyPurchaseDelivered(
+  db: JobsDb,
+  userId: string,
+  po: { id: string; jobId: string; number: string },
+  opts: { note?: string; markItems?: boolean } = {},
+): Promise<{ stage?: JobStage; hint?: string; operationsDone: number }> {
+  if (opts.markItems) {
+    const items = await loadPoItems(db, po.id);
+    for (const it of items) {
+      if (it.receipt_closed || n(it.received_quantity) + 1e-9 >= n(it.quantity)) continue;
+      await db.from("purchase_order_items").update({ received_quantity: n(it.quantity) } as never).eq("id", it.id);
+    }
+  }
+
+  const { data: opsData } = await db
+    .from("job_operations")
+    .select("id, position, status, in_house, purchase_order_id, kind, title")
+    .eq("job_id", po.jobId)
+    .order("position");
+  const ops = (opsData ?? []) as { id: string; position: number; status: string; in_house: boolean; purchase_order_id: string | null; kind: string; title: string | null }[];
+  let operationsDone = 0;
+  for (const op of ops) {
+    if (op.purchase_order_id !== po.id || op.status === "hotovo" || op.status === "preskoceno") continue;
+    const { data: upd } = await db.from("job_operations").update({ status: "hotovo" } as never).eq("id", op.id).eq("status", op.status).select("id");
+    if (!((upd ?? []) as unknown[]).length) continue;
+    operationsDone += 1;
+    const name = op.title?.trim() || OPERATION_KINDS[op.kind as keyof typeof OPERATION_KINDS]?.label || "operace";
+    await logJobEvent(db, {
+      jobId: po.jobId, type: "field",
+      message: `Výroba: ${name} → ${OPERATION_STATUSES.hotovo.label} (objednávka ${po.number} dodána)`,
+      data: { production: "status", operationId: op.id, from: op.status, to: "hotovo", purchaseOrderId: po.id, auto: true },
+      actorId: userId, entity: "operation", entityId: op.id,
+    });
+    op.status = "hotovo";
+  }
+
+  const { data: jobData } = await db.from("orders").select("id, status").eq("id", po.jobId).maybeSingle();
+  const status = (jobData as { status: string } | null)?.status;
+  if (!status || !isJobStage(status)) return { operationsDone };
+  if (!isForward(status, "dodano_k_nam")) {
+    return { operationsDone, ...(["pozastaveno", "reklamace"].includes(status) ? { hint: "Zakázka je ve zvláštním stavu — posuň ji ručně." } : {}) };
+  }
+  const { data: poData } = await db.from("purchase_orders").select("id, status").eq("job_id", po.jobId);
+  const orders = (poData ?? []) as { id: string; status: PurchaseOrderStatus }[];
+  const rule = purchaseDeliveryAdvances({
+    deliveredPoId: po.id,
+    orders,
+    operations: ops.map((o): StageRuleOperation => ({ id: o.id, position: o.position, status: o.status, inHouse: o.in_house, purchaseOrderId: o.purchase_order_id })),
+  });
+  if (rule.advance) {
+    const note = opts.note?.trim() || `objednávka ${po.number} dodána`;
+    const { error } = await withChangeNote(
+      db.from("orders").update({ status: "dodano_k_nam" } as never).eq("id", po.jobId).eq("status", status),
+      note,
+    );
+    if (error) return { operationsDone, hint: `Stav zakázky se nepodařilo posunout: ${error.message}` };
+    return { operationsDone, stage: "dodano_k_nam", hint: "Zakázka přesunuta do stavu Dodáno k nám." };
+  }
+  if (rule.reason === "ceka_objednavky") {
+    return { operationsDone, hint: `Čeká se ještě na ${rule.pendingOrders} ${plural(rule.pendingOrders, "objednávku", "objednávky", "objednávek")} — stav zakázky zůstává.` };
+  }
+  if (rule.reason === "material") return { operationsDone, hint: "Materiál převzat — stav zakázky se nemění (pokračuje výroba)." };
+  return { operationsDone, hint: operationsDone ? "Kooperace hotová — výroba pokračuje dalšími operacemi." : "Stav zakázky zůstává — zbývají výrobní operace." };
 }

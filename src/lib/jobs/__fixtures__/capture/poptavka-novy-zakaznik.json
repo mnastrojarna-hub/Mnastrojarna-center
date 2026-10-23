@@ -55,6 +55,7 @@
   "currency": "",
   "paymentTerms": "",
   "deliveryTerms": "",
+  "deliveryLeadTime": null,
   "note": "",
   "summary": "Poptávka RFQ-26-0412 od nového zákazníka Hydraulika Morava s.r.o. na těleso ventilu a víko, 400 ks, termín do 15. 12. 2026.",
   "confidence": 0.88,

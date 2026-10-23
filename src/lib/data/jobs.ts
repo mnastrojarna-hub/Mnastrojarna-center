@@ -2,7 +2,7 @@ import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
-import type { JobStage, JobFileKind, QuoteStatus } from "@/lib/supabase/database.types";
+import type { JobStage, JobFileKind, QuoteState, QuoteStatus } from "@/lib/supabase/database.types";
 import type {
   JobListItem, JobDetail, JobFilters, JobFormOptions, JobQuote, JobFile,
 } from "@/lib/jobs/types";
@@ -10,6 +10,7 @@ import type { CustomerMatchCandidate } from "@/lib/jobs/capture-types";
 import type { JobMatchCandidateExt } from "@/lib/jobs/matching";
 import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { isJobStage } from "@/lib/jobs/stages";
+import { isQuoteState } from "@/lib/jobs/flow-status";
 import {
   JOB_LIST_SELECT, JOB_DETAIL_SELECT, JOB_QUOTE_SELECT, QUOTE_LIST_SELECT, JOB_FILE_SELECT,
   JOB_FILE_LIST_SELECT, JOB_EVENT_SELECT, JOB_COUNT_SELECT, MATCH_JOB_SELECT, MATCH_CUSTOMER_SELECT,
@@ -53,7 +54,7 @@ export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]>
   const s = await session("orders");
   if (!s) return [];
   try {
-    for (const id of [filters.ownerId, filters.assigneeId, filters.customerId, filters.supplierId]) {
+    for (const id of [filters.ownerId, filters.assigneeId, filters.customerId, filters.supplierId, filters.changedBy]) {
       if (id !== undefined && id !== "" && !isUuid(id)) return [];
     }
     const stages = resolveStageFilter(filters);
@@ -64,6 +65,11 @@ export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]>
       if (filters.assigneeId) query = query.eq("assignee_id", filters.assigneeId);
       if (filters.customerId) query = query.eq("customer_id", filters.customerId);
       if (filters.supplierId) query = query.eq("supplier_id", filters.supplierId);
+      // „Změnil": poslední změna hlavního stavu nebo dílčího stavu (poptávka, objednávka) tímto účtem
+      if (filters.changedBy) {
+        const id = filters.changedBy;
+        query = query.or(`stage_changed_by.eq.${id},inquiry_status_changed_by.eq.${id},order_status_changed_by.eq.${id}`);
+      }
       return query.order("created_at", { ascending: false }).order("id");
     };
     const { data, error } = await fetchPaged<JobRow>((from, to) => build().range(from, to), MAX_ROWS);
@@ -73,6 +79,7 @@ export async function listJobs(filters: JobFilters = {}): Promise<JobListItem[]>
     const items = data.map((r) => rowToJobListItem(r, s.view));
     const filtered = filterJobs(items, {
       q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
+      inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery,
     });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
@@ -176,7 +183,7 @@ export type QuoteListItem = JobQuote & {
 };
 
 export async function listQuotes(
-  opts: { status?: QuoteStatus[]; includeArchived?: boolean; q?: string } = {},
+  opts: { status?: QuoteStatus[]; state?: QuoteState[]; includeArchived?: boolean; q?: string } = {},
 ): Promise<QuoteListItem[]> {
   const s = await session("workflow", "orders");
   if (!s) return [];
@@ -185,6 +192,8 @@ export async function listQuotes(
     const build = () => {
       let query = s.db.from("quotes").select(QUOTE_LIST_SELECT);
       if (statuses.length) query = query.in("status", statuses);
+      const states = (opts.state ?? []).filter(isQuoteState);
+      if (states.length) query = query.in("state", states);
       if (!opts.includeArchived) query = query.eq("archived", false);
       return query.order("created_at", { ascending: false }).order("id");
     };
@@ -282,6 +291,7 @@ interface MatchJobRow {
   } | { id: string; name: string; ico: string | null; dic: string | null; email: string | null; contacts?: { email: string | null }[] | null }[] | null;
   items?: { drawing_number: string | null }[] | null;
   quotes?: { number: string | null; items?: { drawing_number: string | null }[] | null }[] | null;
+  quote_docs?: { kind: string | null; doc_no: string | null }[] | null;
 }
 
 interface MatchCustomerRow {
@@ -344,7 +354,10 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
         customerInquiryNumber: r.customer_inquiry_number ?? null,
         supplierId: r.supplier_id ?? null,
         supplierOrderNumber: r.supplier_order_number ?? null,
-        quoteNumbers: uniqueStrings((r.quotes ?? []).map((q) => q.number)),
+        quoteNumbers: uniqueStrings([
+          ...(r.quotes ?? []).map((q) => q.number),
+          ...(r.quote_docs ?? []).filter((f) => f.kind === "nabidka").map((f) => f.doc_no),
+        ]),
         drawingNumbers: uniqueStrings([
           ...(r.items ?? []).map((i) => i.drawing_number),
           ...(r.quotes ?? []).flatMap((q) => (q.items ?? []).map((i) => i.drawing_number)),

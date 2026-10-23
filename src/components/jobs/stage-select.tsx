@@ -1,22 +1,31 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Loader2, ArrowRight } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { StageBadge } from "@/components/jobs/stage-badge";
-import { setJobStage } from "@/app/actions/jobs";
-import { STAGE_ORDER, SIDE_STAGES, nextStage, stageMeta } from "@/lib/jobs/stages";
+import { ReasonDialog } from "@/components/flow-status/reason-dialog";
+import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
+import { useAccess } from "@/components/access-provider";
+import { moveJobStage } from "@/app/actions/flow-status";
+import { previewJobStage } from "@/app/actions/job-flow";
+import { STAGE_ORDER, SIDE_STAGES, stageMeta } from "@/lib/jobs/stages";
+import {
+  reasonRequired, stageEffect, stageEffectText, transitionFeature, type FlowFacts, type QuoteFacts,
+} from "@/lib/jobs/flow-status";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 
 /** Tok zakázky včetně volitelných kroků (sklad, montáž) v pořadí knihy. */
-const FLOW_STAGES: JobStage[] = STAGE_ORDER.filter((s) => !SIDE_STAGES.includes(s));
+export const FLOW_STAGES: JobStage[] = STAGE_ORDER.filter((s) => !SIDE_STAGES.includes(s));
 
-function StageRow({ stage, current }: { stage: JobStage; current: boolean }) {
+const NEGATIVE: JobStage[] = ["nerealizovano", "zruseno"];
+
+function StageRow({ stage, current, hint }: { stage: JobStage; current: boolean; hint?: string | null }) {
   const m = stageMeta(stage);
   const Icon = m.icon;
   return (
@@ -26,7 +35,7 @@ function StageRow({ stage, current }: { stage: JobStage; current: boolean }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn("block text-sm font-medium leading-tight", current && m.text)}>{m.label}</span>
-        <span className="block truncate text-[11px] leading-tight text-muted-foreground">{m.description}</span>
+        <span className="block truncate text-[11px] leading-tight text-muted-foreground">{hint ?? m.description}</span>
       </span>
       {current && <Check className={cn("!size-4 shrink-0", m.text)} />}
     </>
@@ -34,8 +43,81 @@ function StageRow({ stage, current }: { stage: JobStage; current: boolean }) {
 }
 
 /**
- * Barevný výběr stavu zakázky. Změna se projeví hned (optimisticky),
- * při chybě se vrátí zpět a ukáže důvod.
+ * Dialog ruční korekce hlavního stavu (R9): náhled dopadu (nabídky, dílčí stavy, varování),
+ * u negativních konců povinný důvod, vždy volitelná poznámka (jde do historie s autorem).
+ * Fakta toku (flow, quotes) dávají náhled hned; bez nich si ho dialog načte ze serveru.
+ */
+export function StageCorrectionDialog({
+  open, onOpenChange, jobId, from, to, flow, quotes, onDone, title,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  jobId: string;
+  from: JobStage;
+  to: JobStage | null;
+  flow?: FlowFacts | null;
+  quotes?: QuoteFacts[] | null;
+  /** Po úspěšné korekci (stav z DB). */
+  onDone?: (stage: JobStage) => void;
+  title?: string;
+}) {
+  // otisk = výchozí stav: po korekci se musí změnit (jinak pojistka stránku načte znovu)
+  const settle = useSettledRefresh(250, `${jobId}:${from}`);
+  const [remote, setRemote] = React.useState<{ to: JobStage; lines: string[]; error?: string } | null>(null);
+  const local = React.useMemo(() => {
+    if (!to || !flow) return null;
+    return stageEffectText(stageEffect({ ...flow, stage: from }, quotes ?? [], { kind: "stage", to }));
+  }, [to, flow, quotes, from]);
+
+  React.useEffect(() => {
+    if (!open || !to || flow) return;
+    let alive = true;
+    setRemote(null);
+    previewJobStage(jobId, to)
+      .then((r) => {
+        if (alive) setRemote({ to, lines: r.ok ? r.lines ?? [] : [], error: r.ok ? undefined : r.error });
+      })
+      .catch(() => alive && setRemote({ to, lines: [], error: "Náhled dopadu se nepodařilo načíst." }));
+    return () => { alive = false; };
+  }, [open, to, flow, jobId]);
+
+  if (!to) return null;
+  const needsReason = reasonRequired("job", to);
+  const loading = !flow && (!remote || remote.to !== to);
+  const lines = local ?? (remote?.to === to ? remote.lines : []);
+  const effect = loading ? ["Načítám, co se stane…"] : lines.length ? lines : ["Jen se změní hlavní stav — doklady ani nabídky se nemění."];
+  const fromLabel = stageMeta(from).label;
+  const toLabel = stageMeta(to).label;
+
+  return (
+    <ReasonDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title ?? `Korekce stavu: ${fromLabel} → ${toLabel}`}
+      description={needsReason
+        ? "Uzavření zakázky — vyber důvod. Zapíše se do historie s tvým jménem."
+        : "Ruční změna bez dokladu. Běžně stav posouvají akce a doklady samy; korekce se zapíše do historie s tvým jménem."}
+      phase={needsReason ? "job" : undefined}
+      to={to}
+      reasons={needsReason ? undefined : []}
+      destructive={NEGATIVE.includes(to)}
+      confirmLabel={needsReason ? `Uzavřít: ${toLabel}` : `Změnit na ${toLabel}`}
+      notePlaceholder="Proč měníš stav ručně (nepovinné)"
+      effect={[...effect, ...(remote?.to === to && remote.error ? [remote.error] : [])]}
+      onConfirm={async ({ reason, note }) => {
+        const res = await moveJobStage(jobId, to, { reason, note });
+        if (!res.ok) return { ok: false, error: res.error ?? "Stav se nepodařilo změnit." };
+        onDone?.(res.stage ?? to);
+        settle();
+        return { ok: true };
+      }}
+    />
+  );
+}
+
+/**
+ * Barevný stav zakázky s menu „Korekce stavu…" — výběr cílového stavu otevře dialog s náhledem
+ * dopadu (StageCorrectionDialog). Primární posun dělají akce dalšího kroku (nextAction).
  */
 export function StageSelect({
   jobId,
@@ -43,81 +125,67 @@ export function StageSelect({
   onChanged,
   size = "md",
   disabled,
+  flow,
+  quotes,
 }: {
   jobId: string;
   stage: JobStage;
   onChanged?: (stage: JobStage) => void;
   size?: "sm" | "md";
   disabled?: boolean;
+  /** Fakta toku pro okamžitý náhled dopadu (jinak se načte ze serveru). */
+  flow?: FlowFacts | null;
+  quotes?: QuoteFacts[] | null;
 }) {
-  const router = useRouter();
-  const [current, setCurrent] = React.useState<JobStage>(stage);
-  const [synced, setSynced] = React.useState<JobStage>(stage);
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const { can, features } = useAccess();
+  const [target, setTarget] = React.useState<JobStage | null>(null);
+  const [open, setOpen] = React.useState(false);
+  // oprávnění se na klient dostanou až po načtení layoutu — do té doby nic neskrývat
+  const known = features.length > 0;
 
-  // nový stav ze serveru (router.refresh) přepíše lokální
-  if (stage !== synced) {
-    setSynced(stage);
-    setCurrent(stage);
-  }
-
-  async function choose(next: JobStage) {
-    if (next === current || busy) return;
-    const prev = current;
-    setCurrent(next);
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await setJobStage(jobId, next);
-      if (!res.ok) {
-        setCurrent(prev);
-        setError(res.error ?? "Stav se nepodařilo změnit.");
-        return;
-      }
-      onChanged?.(next);
-      router.refresh();
-    } catch {
-      setCurrent(prev);
-      setError("Stav se nepodařilo změnit — zkus to znovu.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const item = (s: JobStage) => (
-    <DropdownMenuItem
-      key={s}
-      onSelect={() => void choose(s)}
-      className={cn("items-center gap-2.5 py-1.5", s === current && "bg-accent/60")}
-    >
-      <StageRow stage={s} current={s === current} />
-    </DropdownMenuItem>
-  );
+  const item = (s: JobStage) => {
+    const allowed = !known || can(transitionFeature("job", s));
+    return (
+      <DropdownMenuItem
+        key={s}
+        disabled={s === stage || !allowed}
+        onSelect={() => {
+          if (s === stage || !allowed) return;
+          setTarget(s);
+          setOpen(true);
+        }}
+        className={cn("items-center gap-2.5 py-1.5", s === stage && "bg-accent/60 opacity-100")}
+      >
+        <StageRow stage={s} current={s === stage} hint={allowed ? null : "Uzavřít smí obchodník nebo admin — navrhni v menu ⋯"} />
+      </DropdownMenuItem>
+    );
+  };
 
   return (
     <div className="inline-flex flex-col items-start gap-1">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={disabled || busy}>
+        <DropdownMenuTrigger asChild disabled={disabled}>
           <button
             type="button"
-            aria-label={`Stav zakázky: ${stageMeta(current).label} — změnit`}
+            aria-label={`Stav zakázky: ${stageMeta(stage).label} — změnit`}
+            title="Korekce stavu…"
             className={cn(
               "group inline-flex items-center gap-1 rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60",
               !disabled && "hover:brightness-95 active:scale-[0.98]",
             )}
           >
-            <StageBadge stage={current} size={size === "sm" ? "sm" : "md"} className="pr-1.5" />
-            <span className={cn("-ml-1 inline-flex items-center", stageMeta(current).text)}>
-              {busy ? (
-                <Loader2 className={cn("animate-spin", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")} />
-              ) : (
-                <ChevronDown className={cn("transition-transform group-data-[state=open]:rotate-180", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")} />
-              )}
+            <StageBadge stage={stage} size={size === "sm" ? "sm" : "md"} className="pr-1.5" />
+            <span className={cn("-ml-1 inline-flex items-center", stageMeta(stage).text)}>
+              <ChevronDown className={cn("transition-transform group-data-[state=open]:rotate-180", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden />
             </span>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="max-h-[70vh] w-72 overflow-y-auto">
+        <DropdownMenuContent align="start" className="max-h-[70vh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto">
+          <DropdownMenuLabel className="space-y-0.5">
+            <span className="block">Korekce stavu…</span>
+            <span className="block text-[11px] font-normal text-muted-foreground">Bez dokladu — ukážu, co se stane, a zapíšu tvoje jméno.</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuLabel>Tok zakázky</DropdownMenuLabel>
           {FLOW_STAGES.map(item)}
           <DropdownMenuSeparator />
@@ -125,77 +193,101 @@ export function StageSelect({
           {SIDE_STAGES.map(item)}
         </DropdownMenuContent>
       </DropdownMenu>
-      {error && (
-        <p role="alert" className="max-w-xs text-xs text-red-600 dark:text-red-400">
-          {error}
-        </p>
-      )}
+      <StageCorrectionDialog
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) setTarget(null);
+        }}
+        jobId={jobId}
+        from={stage}
+        to={target}
+        flow={flow}
+        quotes={quotes}
+        onDone={(s) => onChanged?.(s)}
+      />
     </div>
   );
 }
 
-/** Tlačítko „Posunout: další krok" v barvě cílového stavu. Bez dalšího kroku se nevykreslí. */
-export function NextStageButton({
-  jobId,
-  stage,
-  onChanged,
-  className,
+/**
+ * Výběr cílového stavu pro „Korekce stavu…" z menu akcí (bez rozbalovacího odznaku):
+ * mřížka stavů → StageCorrectionDialog.
+ */
+export function StagePickerDialog({
+  open, onOpenChange, jobId, stage, flow, quotes, onDone,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   jobId: string;
   stage: JobStage;
-  onChanged?: (stage: JobStage) => void;
-  className?: string;
+  flow?: FlowFacts | null;
+  quotes?: QuoteFacts[] | null;
+  onDone?: (stage: JobStage) => void;
 }) {
-  const router = useRouter();
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const target = nextStage(stage);
-  if (!target) return null;
-  const m = stageMeta(target);
-  const Icon = m.icon;
-
-  async function advance() {
-    if (!target || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await setJobStage(jobId, target);
-      if (!res.ok) {
-        setError(res.error ?? "Stav se nepodařilo změnit.");
-        return;
-      }
-      onChanged?.(target);
-      router.refresh();
-    } catch {
-      setError("Stav se nepodařilo změnit — zkus to znovu.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="inline-flex flex-col items-start gap-1">
+  const { can, features } = useAccess();
+  const [target, setTarget] = React.useState<JobStage | null>(null);
+  const known = features.length > 0;
+  const id = React.useId();
+  React.useEffect(() => { if (open) setTarget(null); }, [open]);
+  const pick = (s: JobStage) => {
+    const allowed = !known || can(transitionFeature("job", s));
+    const m = stageMeta(s);
+    return (
       <button
+        key={s}
         type="button"
-        onClick={() => void advance()}
-        disabled={busy}
-        title={m.description}
+        disabled={s === stage || !allowed}
+        onClick={() => setTarget(s)}
         className={cn(
-          "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-medium shadow-sm transition",
-          "hover:brightness-110 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-60",
-          m.solid,
-          className,
+          "flex min-h-11 items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          s === stage && "border-foreground/30 bg-accent/60",
+        )}
+        aria-label={`${m.label}${s === stage ? " (aktuální)" : ""}`}
+      >
+        <StageRow stage={s} current={s === stage} />
+      </button>
+    );
+  };
+  if (target) {
+    return (
+      <StageCorrectionDialog
+        open={open}
+        onOpenChange={(o) => {
+          if (!o) setTarget(null);
+          onOpenChange(o);
+        }}
+        jobId={jobId}
+        from={stage}
+        to={target}
+        flow={flow}
+        quotes={quotes}
+        onDone={onDone}
+      />
+    );
+  }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        aria-describedby={`${id}-desc`}
+        className={cn(
+          "bottom-0 left-0 top-auto max-h-[90dvh] max-w-none translate-x-0 overflow-y-auto rounded-b-none pb-[max(1rem,env(safe-area-inset-bottom))]",
+          "sm:bottom-auto sm:left-1/2 sm:top-[10%] sm:max-w-xl sm:-translate-x-1/2 sm:rounded-xl",
         )}
       >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-        Posunout: {m.label}
-        <ArrowRight className="h-4 w-4" />
-      </button>
-      {error && (
-        <p role="alert" className="max-w-xs text-xs text-red-600 dark:text-red-400">
-          {error}
-        </p>
-      )}
-    </div>
+        <div className="space-y-3 p-4 sm:p-5">
+          <div className="pr-8">
+            <DialogTitle>Korekce stavu — vyber nový stav</DialogTitle>
+            <p id={`${id}-desc`} className="mt-1 text-sm text-muted-foreground">
+              Ruční změna bez dokladu. Dalším krokem uvidíš, co se stane s nabídkami a dílčími stavy.
+            </p>
+          </div>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {FLOW_STAGES.map(pick)}
+            {SIDE_STAGES.map(pick)}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_META, isPurchaseOrderStatus, purchaseOrderTransitions,
-  canChangePurchaseOrderStatus, isPurchaseOrderEditable, cleanPurchaseItems, purchaseItemsTotal, unpricedItemCount,
+  canChangePurchaseOrderStatus, isPurchaseOrderEditable, canFillPurchasePrices, applyPurchasePrices, cleanPurchaseItems, purchaseItemsTotal, unpricedItemCount,
   resolveSupplierQuoteTotal, rowsTotal, easterSunday, czechHolidays, isWorkingDay, addWorkingDays, addCalendarDays,
   resolveQuoteDeliveryDate, pickRequiredDate, defaultDeliveryAddress, purchaseOrderNote, purchaseOrderFileName,
   buildPurchaseOrderDraft, itemsFromJob, validatePurchaseOrderDraft, supplierQuoteInputToRow, purchasingTotals,
-  issueStageHint, parseEmailList, purchaseOrderEmail, splitAddress, rowToSupplierQuoteView, rowToPurchaseOrderView,
+  issueStageHint, parseEmailList, purchaseOrderEmail, purchaseOrderChangeEmail, purchaseOrderCancelEmail, purchaseOrderHoldEmail, splitAddress, rowToSupplierQuoteView, rowToPurchaseOrderView,
   rowToPurchaseOrderListItem, rowToCommissionView, filterPurchaseOrders, draftToPurchaseOrderView,
   DEFAULT_DELIVERY_TERMS, DEFAULT_PAYMENT_TERMS, REQUIRED_DATE_SOURCE_LABELS,
   type DraftJob, type PurchaseOrderDbRow, type SupplierQuoteDbRow,
@@ -109,6 +109,17 @@ describe("stavy objednávky vydané", () => {
 });
 
 describe("položky a součty", () => {
+  it("cenu položky jde doplnit i po odeslání (jen ne u zrušené); mění se jen ceny a součet", () => {
+    expect((["navrh", "vystavena", "odeslana", "potvrzena", "dodana"] as const).every(canFillPurchasePrices)).toBe(true);
+    expect(canFillPurchasePrices("zrusena")).toBe(false);
+    const items = [{ id: "a", quantity: 10, unitPrice: 100 }, { id: "b", quantity: 4, unitPrice: null }];
+    expect(applyPurchasePrices(items, [{ itemId: "b", unitPrice: "250,50" }])).toEqual({ changes: [{ id: "b", unitPrice: 250.5 }], total: 2002 });
+    expect(applyPurchasePrices(items, [{ itemId: "a", unitPrice: null }])).toEqual({ changes: [{ id: "a", unitPrice: null }], total: 0 });
+    expect(applyPurchasePrices(items, [{ itemId: "x", unitPrice: 1 }])).toEqual({ error: "Položka nepatří k objednávce." });
+    expect(applyPurchasePrices(items, [{ itemId: "b", unitPrice: "abc" }])).toEqual({ error: "Neplatná cena položky." });
+    expect(applyPurchasePrices(items, [{ itemId: "b", unitPrice: -5 }])).toEqual({ error: "Cena položky nesmí být záporná." });
+  });
+
   it("vyčistí a očísluje položky, prázdné řádky vynechá", () => {
     const r = cleanPurchaseItems([
       { drawingNumber: " VK-1 ", quantity: "12,5" as unknown as number, unitPrice: "1 180,50" as unknown as number, unit: "" },
@@ -407,6 +418,26 @@ describe("marže a doporučení stavu", () => {
     expect(t.margin).toBe(0.3127);
   });
 
+  it("objednávka s položkou bez ceny = náklad neznámý (jako DB job_cost) — žádný zisk ani marže", () => {
+    const t = purchasingTotals({
+      revenue: 58_200, plannedCost: 37_400,
+      purchaseOrders: [
+        { status: "vystavena", total: 2_100, number: "OV-2026-013", items: [{ unitPrice: 8.75 }] },
+        { status: "odeslana", total: 8_000, number: "OV-2026-012", items: [{ unitPrice: 40 }, { unitPrice: null }] },
+        { status: "zrusena", total: 0, number: "OV-2026-011", items: [{ unitPrice: null }] },
+      ],
+    });
+    expect(t).toEqual({
+      revenue: 58_200, purchaseOrdersTotal: 10_100, plannedCost: 37_400, cost: null, costSource: "neuplna", profit: null, margin: null,
+      incompleteCost: 10_100, unpricedItems: 1, unpricedPurchaseOrders: ["OV-2026-012"],
+    });
+    // po doplnění ceny je náklad zase známý
+    expect(purchasingTotals({ revenue: 58_200, plannedCost: null, purchaseOrders: [{ status: "odeslana", total: 12_000, items: [{ unitPrice: 40 }, { unitPrice: 42 }] }] }))
+      .toMatchObject({ cost: 12_000, costSource: "objednavky", profit: 46_200 });
+    // jen příznak (přehled bez položek)
+    expect(purchasingTotals({ revenue: 1, plannedCost: null, purchaseOrders: [{ status: "vystavena", total: 0, hasUnpriced: true }] }).costSource).toBe("neuplna");
+  });
+
   it("bez obratu / nákladu", () => {
     expect(purchasingTotals({ revenue: null, plannedCost: null, purchaseOrders: [] }))
       .toMatchObject({ cost: null, costSource: null, profit: null, margin: null });
@@ -520,7 +551,8 @@ describe("řádky DB → view", () => {
       job: { id: JOB_ID, number: "Z-2026-105", stage: "potvrzeno" }, customer: { id: "c1", name: "Strojmetal" },
       itemCount: 1, drawingNumbers: ["VK-2291"],
     });
-    expect("items" in li).toBe(false);
+    expect(li.items).toHaveLength(1);
+    expect(li.receipt).toEqual({ done: 0, total: 1, partial: false });
     expect(filterPurchaseOrders([li], "hruby vk-2291")).toHaveLength(1);
     expect(filterPurchaseOrders([li], "strojmetal ov-2026-004")).toHaveLength(1);
     expect(filterPurchaseOrders([li], "tepkal")).toHaveLength(0);
@@ -543,3 +575,38 @@ describe("řádky DB → view", () => {
       .toBe("predbezna");
   });
 });
+
+describe("předání do výroby: vazba položek na díly a e-maily změny / storna / pozastavení", () => {
+  it("cleanPurchaseItems drží order_item_id jen s platnou vazbou (nabídky dodavatelů ji nemají)", () => {
+    const item = "11111111-1111-4111-8111-111111111111";
+    const r = cleanPurchaseItems([
+      { drawingNumber: "PR-7075-20", name: "Příruba — tepelné zpracování", quantity: 240, unit: "kg", unitPrice: 8.75, orderItemId: item.toUpperCase() },
+      { drawingNumber: "PR-7075-21", name: "Pouzdro", quantity: 100, orderItemId: "nesmysl" },
+    ]);
+    expect("rows" in r && r.rows[0]).toMatchObject({ order_item_id: item, unit: "kg", quantity: 240 });
+    expect("rows" in r && "order_item_id" in r.rows[1]).toBe(false);
+  });
+
+  it("změna, storno a pozastavení objednávky — předmět, termín, podpis odesílatele", () => {
+    const sender = { number: "OV-2026-012", companyName: "Mnástrojárna s.r.o.", senderName: "Petr Obchodník", senderEmail: "obchod@mnastrojarna.cz", senderPhone: "777 123 456" };
+    const ch = purchaseOrderChangeEmail({ ...sender, revision: 2, requiredDate: "2026-11-16", previousRequiredDate: "2026-11-13", reason: "posun konečného termínu" });
+    expect(ch.subject).toBe("Změna objednávky OV-2026-012 (změna 2) — Mnástrojárna s.r.o.");
+    expect(ch.body).toContain("Požadovaný termín dodání se mění z 13. 11. 2026 na 16. 11. 2026 (pondělí).");
+    expect(ch.body).toContain("Důvod: posun konečného termínu");
+    expect(ch.body.endsWith("Petr Obchodník\nMnástrojárna s.r.o.\ntel. 777 123 456 · obchod@mnastrojarna.cz")).toBe(true);
+    const cancel = purchaseOrderCancelEmail({ ...sender, reason: "Zákazník zakázku zrušil" });
+    expect(cancel.subject).toBe("Storno objednávky OV-2026-012 — Mnástrojárna s.r.o.");
+    expect(cancel.body).toContain("rušíme naši objednávku č. OV-2026-012 — Zákazník zakázku zrušil.");
+    const hold = purchaseOrderHoldEmail(sender);
+    expect(hold.subject).toBe("Pozastavení objednávky OV-2026-012 — Mnástrojárna s.r.o.");
+    expect(hold.body).toContain("prosíme o pozastavení naší objednávky č. OV-2026-012.");
+    for (const m of [ch, cancel, hold]) expect(m.body).not.toMatch(/Kč|mezitermín/i);
+  });
+
+  it("provize zakázky čeká na nákupní cenu (čísla objednávek), jen když náklad není známý", () => {
+    const base = { owner_id: "o", period: "2026-10-01", revenue: 50_000, commission: 0, status: "predbezna", base: "margin" };
+    expect(rowToCommissionView({ ...base, cost_known: false, cost_pending_po: ["OV-2026-012"] }, "Petr").pendingPurchaseOrders).toEqual(["OV-2026-012"]);
+    expect("pendingPurchaseOrders" in rowToCommissionView({ ...base, cost_known: true, cost_pending_po: ["OV-2026-012"] }, "Petr")).toBe(false);
+  });
+});
+

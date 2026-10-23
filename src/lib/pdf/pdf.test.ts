@@ -6,7 +6,9 @@ import {
   renderInvoicePdf, renderQuotePdf, renderDeliveryNotePdf, renderConfirmationPdf,
   sampleInvoice, sampleQuote, sampleDeliveryNote, sampleConfirmation,
 } from "./render";
-import { computeTotals, czDate, czk, leadTimeLabel, addDaysIso, isPlaceholder, type DocItem } from "./types";
+import { computeTotals, czDate, czk, leadTimeLabel, addDaysIso, isPlaceholder, UNAPPROVED_BANNER, UNAPPROVED_WATERMARK, type DocItem } from "./types";
+import { QuoteDocument } from "./quote";
+import { isValidElement, type ReactNode } from "react";
 import {
   buildQuoteDoc, buildConfirmationDoc, buildDeliveryNoteDoc, buildInvoiceDoc, pdfFileName, pickPricedItems,
   confirmationNumber, unpricedCount,
@@ -392,5 +394,89 @@ describe("doklady ze zakázky", () => {
     const buf = await renderInvoicePdf(doc);
     isPdf(buf);
     save("zakazka-faktura.pdf", buf);
+  });
+});
+
+// ── #25 neschválená nabídka: vodoznak, autor, ceny jen ze schválené ──
+/** Všechny texty stromu dokladu (rozbalí funkční komponenty — PDF komponenty jsou čisté funkce). */
+function treeText(node: ReactNode): string[] {
+  const out: string[] = [];
+  const walk = (n: unknown): void => {
+    if (n === null || n === undefined || typeof n === "boolean") return;
+    if (typeof n === "string" || typeof n === "number") { out.push(String(n)); return; }
+    if (Array.isArray(n)) { n.forEach(walk); return; }
+    if (isValidElement(n)) {
+      const el = n as { type: unknown; props: Record<string, unknown> };
+      if (typeof el.type === "function") {
+        try { walk((el.type as (p: unknown) => unknown)(el.props)); } catch { /* komponenta s hooky — přeskočit */ }
+        return;
+      }
+      walk(el.props.children);
+    }
+  };
+  walk(node);
+  return out;
+}
+
+function pendingQuote(over: Partial<JobQuote> = {}): JobQuote {
+  return {
+    ...fixtureQuote(), status: "ke_schvaleni" as JobQuote["status"], state: "ke_schvaleni", accepted: false, sentAt: null,
+    approvedBy: null, approvedAt: null, adminApprovalRequired: true, approvalRequired: true,
+    createdBy: person("u3", "Petr Obchodník"), ...over,
+  };
+}
+
+describe("neschválená nabídka (#25)", () => {
+  it("vodoznak jen u nabídky, kterou zákazník ještě nesmí dostat", async () => {
+    const job = fixtureJob();
+    const pending = await buildQuoteDoc({ ...job, quotes: [pendingQuote()] }, pendingQuote(), { preparedBy: "Super Admin" });
+    expect(pending.watermark).toBe(UNAPPROVED_WATERMARK);
+    expect(pending.watermark).toBe("NESCHVÁLENO — NEODESÍLAT");
+    // „Vypracoval“ = autor nabídky, ne ten, kdo náhled otevřel
+    expect(pending.preparedBy).toBe("Petr Obchodník");
+    expect(pending.approvedBy).toBeUndefined();
+    const texts = treeText(QuoteDocument({ data: pending }));
+    expect(texts).toContain("NESCHVÁLENO — NEODESÍLAT");
+    expect(texts).toContain(UNAPPROVED_BANNER);
+    const buf = await renderQuotePdf(pending);
+    isPdf(buf);
+    save("zakazka-nabidka-neschvalena.pdf", buf);
+
+    // schválená nabídka ne-admina: bez vodoznaku, „Schválil“ s datem
+    const approvedQ = pendingQuote({ state: "schvalena", approvedBy: person("u1", "Jan Semorád"), approvedAt: "2026-10-23T07:30:00Z" });
+    const approved = await buildQuoteDoc({ ...job, quotes: [approvedQ] }, approvedQ);
+    expect(approved.watermark).toBeUndefined();
+    expect(approved.approvedBy).toBe("Jan Semorád");
+    expect(approved.approvedAt).toBe("2026-10-23");
+    const at = treeText(QuoteDocument({ data: approved }));
+    expect(at).not.toContain("NESCHVÁLENO — NEODESÍLAT");
+    expect(at.join(" ")).toContain(czDate("2026-10-23"));
+    isPdf(await renderQuotePdf(approved));
+
+    // nabídka super admina bez nutnosti schválení: bez vodoznaku
+    const own = await buildQuoteDoc(job, job.quotes[0]);
+    expect(own.watermark).toBeUndefined();
+    // AI nabídka v režimu se schválením, neodeslaná, neschválená → vodoznak
+    const ai = pendingQuote({ adminApprovalRequired: false, aiGenerated: true });
+    expect((await buildQuoteDoc({ ...job, quotes: [ai] }, ai)).watermark).toBe(UNAPPROVED_WATERMARK);
+  });
+
+  it("nabídka ke schválení nebere položky zakázky (schvaluje se obsah nabídky)", async () => {
+    const job = fixtureJob();
+    const empty = pendingQuote({ items: [] });
+    const doc = await buildQuoteDoc({ ...job, quotes: [empty] }, empty);
+    expect(doc.items).toEqual([]);
+    // nabídka super admina bez položek dál bere položky zakázky
+    const adminEmpty = { ...fixtureQuote(), items: [] };
+    expect((await buildQuoteDoc({ ...job, quotes: [adminEmpty] }, adminEmpty)).items).toHaveLength(1);
+  });
+
+  it("potvrzení / faktura neberou ceny z neschválené nabídky", () => {
+    const job = { ...fixtureJob(), acceptedQuoteId: null, quotes: [pendingQuote()] };
+    const items = pickPricedItems(job);
+    expect(items.some((i) => i.unitPrice === 1180)).toBe(false);
+    // schválená ano
+    const ok = { ...job, quotes: [pendingQuote({ state: "schvalena", approvedBy: person("u1", "Jan Semorád") })] };
+    expect(pickPricedItems(ok)[0]).toMatchObject({ unitPrice: 1180 });
   });
 });

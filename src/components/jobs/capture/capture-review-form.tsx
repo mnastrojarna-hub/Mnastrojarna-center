@@ -743,9 +743,10 @@ function ItemsSection({
                   className="mt-0.5 h-4 w-4 shrink-0 accent-teal-600"
                 />
                 <span className="min-w-0">
-                  <span className="font-medium">Doplnit k položce {m.label}</span>
+                  <span className="font-medium">{m.override?.length ? "Upravit položku" : "Doplnit k položce"} {m.label}</span>
                   <span className="block text-xs text-muted-foreground">
-                    {(Object.entries(m.patch) as [MergeField, string][]).map(([f, v]) => `${MERGE_FIELD_LABELS[f]}: ${v}`).join(" · ")}
+                    {(Object.entries(m.patch) as [MergeField, string][])
+                      .map(([f, v]) => `${MERGE_FIELD_LABELS[f]}: ${v}${m.override?.includes(f) ? " (platí objednávka)" : ""}`).join(" · ")}
                   </span>
                 </span>
                 {model.aiUsed && <AiMark className="ml-auto shrink-0" label="" />}

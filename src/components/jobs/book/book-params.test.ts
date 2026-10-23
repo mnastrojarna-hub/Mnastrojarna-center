@@ -4,7 +4,7 @@ import {
   isPatchActive, activeFilterCount, isFiltered, segmentCounts, bookKpis, boardStages, groupByStage,
   moveJobStage, todayInPrague, dateFromIso, shortDate, initials, avatarTone, AVATAR_TONES, countLabel,
   normalizeStages, segmentOfStage, defaultStageFor, firstParam, sumValue, DEFAULT_PARAMS, RESET_FILTERS,
-  KPI_PATCHES, ORDER_STAGES, INQUIRY_STAGES, BOOK_SEGMENTS, PAYMENT_FILTERS, isProductionStepKey, type BookParams,
+  KPI_PATCHES, ORDER_STAGES, INQUIRY_STAGES, BOOK_SEGMENTS, PAYMENT_FILTERS, isProductionStepKey, canonicalBookHref, type BookParams,
 } from "./book-params";
 import { STAGE_ORDER } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
@@ -165,7 +165,7 @@ describe("výroba a platba", () => {
     expect(bad.location).toHaveLength(300);
     expect(isProductionStepKey("frezovani")).toBe(true);
     expect(isProductionStepKey("")).toBe(false);
-    expect(PAYMENT_FILTERS.map((f) => f.key)).toEqual(["po_splatnosti", "nezaplaceno", "zaplaceno"]);
+    expect(PAYMENT_FILTERS.map((f) => f.key)).toEqual(["po_splatnosti", "nezaplaceno", "ceka_na_uhradu", "castecne_zaplaceno", "zaplaceno"]);
   });
 
   it("adresa je idempotentní i s diakritikou a mezerami", () => {
@@ -192,6 +192,22 @@ describe("výroba a platba", () => {
     expect(next.payment).toBe("po_splatnosti");
     expect(isPatchActive(next, KPI_PATCHES.overdueInvoices)).toBe(true);
     expect(isPatchActive(DEFAULT_PARAMS, KPI_PATCHES.overdueInvoices)).toBe(false);
+  });
+
+  it("kanonická adresa (pojistka navigace): požadavek = to, co vrátí server", () => {
+    const p = applyBookPatch(DEFAULT_PARAMS, { q: "  hřídel  ", inquiry: ["v_reseni", "prijata"], segment: "poptavky" });
+    const href = bookHref(p);
+    expect(canonicalBookHref(href)).toBe(bookHref(parseBookParams(Object.fromEntries(new URL(href, "http://x").searchParams))));
+    expect(canonicalBookHref("/orders?segment=nesmysl&poptavka=v_reseni,xx")).toBe(bookHref(parseBookParams({ poptavka: "v_reseni" })));
+    expect(canonicalBookHref(bookHref(DEFAULT_PARAMS))).toBe(bookHref(DEFAULT_PARAMS));
+  });
+
+  it("ostatní dlaždice jsou celý pohled — zbylý filtr platby zruší", () => {
+    const overdueInv = applyBookPatch(DEFAULT_PARAMS, KPI_PATCHES.overdueInvoices);
+    const value = applyBookPatch(overdueInv, KPI_PATCHES.value);
+    expect([value.segment, value.sort, value.dir, value.payment]).toEqual(["objednavky", "value", "desc", null]);
+    expect(isPatchActive(overdueInv, KPI_PATCHES.ordersRunning)).toBe(false);
+    expect(applyBookPatch(overdueInv, KPI_PATCHES.overdue).payment).toBeNull();
   });
 });
 

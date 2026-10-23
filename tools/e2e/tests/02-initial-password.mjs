@@ -27,8 +27,12 @@ await T("Vít: přihlášení heslem 123456 → výzva ke změně → nové hesl
   await page.getByText(/Heslo je změněné/).waitFor({ timeout: 15_000 });
   const flag = sql(`select password_change_required from profiles where email = '${VIT.email}'`);
   expect(flag === "f", `příznak zrušen, je ${flag}`);
+  // po změně hesla zůstane přihlášený (Supabase ukončí staré relace — aplikace přihlásí novým heslem)
+  await page.waitForTimeout(1500);
+  expect(!new URL(page.url()).pathname.startsWith("/login"), `po změně hesla zůstal přihlášený (je na ${page.url()})`);
   await page.goto(`${BASE}/orders`);
   await page.waitForTimeout(800);
+  expect(new URL(page.url()).pathname.startsWith("/orders"), `Kniha zakázek po změně hesla (je na ${page.url()})`);
   expect(!(await page.getByText("Nejdřív si nastav vlastní heslo").isVisible()), "výzva zmizela");
   await shot(page, "02-after");
   // zpět do výchozího stavu

@@ -1,11 +1,12 @@
 import {
   OPERATION_KINDS, OPERATION_KIND_ORDER, OPERATION_STATUSES, OPERATION_TEMPLATES,
-  isOperationKind, isOperationStatus, productionLabel,
+  isDeadlineState, isOperationKind, isOperationStatus, productionLabel,
   type OperationKind, type OperationStatus,
 } from "@/lib/jobs/operations";
+import type { DeadlineSource, StepPoMode, WhoSource } from "@/lib/jobs/production-handoff-types";
 import { CLOSED_STAGES, isJobStage } from "@/lib/jobs/stages";
 import { cleanDate, cleanNumber, cleanText, isUuid, one, personRef, todayIso, type PersonEmbed } from "@/lib/jobs/mapping";
-import type { JobOperationRow } from "@/lib/supabase/database.types";
+import type { JobOperationRow, PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type {
   JobClosingInfo, JobOperation, JobOperationInput, JobProductionSummary, ProductionFilterCounts,
 } from "@/lib/jobs/production-types";
@@ -32,14 +33,37 @@ export const OPERATION_SELECT = [
   "*",
   "supplier:suppliers!supplier_id(id, name)",
   "creator:profiles!created_by(id, full_name, email)",
-  "po:purchase_orders!purchase_order_id(id, number)",
+  "po:purchase_orders!purchase_order_id(id, number, status, sent_at, confirmed_date, file_id)",
+  "changer:profiles!status_changed_by(id, full_name, email)",
+  "deadliner:profiles!deadline_changed_by(id, full_name, email)",
+  "whoer:profiles!who_changed_by(id, full_name, email)",
 ].join(", ");
 
 export type JobOperationDbRow = JobOperationRow & {
   supplier?: Embed<{ id: string; name: string }>;
   creator?: Embed<PersonEmbed>;
-  po?: Embed<{ id: string; number: string | null }>;
+  po?: Embed<{ id: string; number: string | null; status?: string | null; sent_at?: string | null; confirmed_date?: string | null; file_id?: string | null }>;
+  changer?: Embed<PersonEmbed>;
+  deadliner?: Embed<PersonEmbed>;
+  whoer?: Embed<PersonEmbed>;
 };
+
+const DEADLINE_SOURCES: DeadlineSource[] = [
+  "nabidka_dodavatele", "lhuta_dodavatele", "potvrzeni_dodavatele", "termin_zakaznika", "posledni_dodavatel", "odhad", "rucne", "ai", "import",
+];
+const WHO_SOURCES: WhoSource[] = [
+  "objednavka", "nejlevnejsi_nabidka", "nabidka", "posledni_vykres", "posledni_operace", "technologie", "rucne", "ai", "import",
+];
+const PO_MODES: StepPoMode[] = ["vystavit", "existujici", "neobjednavat", "pri_predani"];
+
+const PO_STATUSES: PurchaseOrderStatus[] = ["navrh", "vystavena", "odeslana", "potvrzena", "dodana", "zrusena"];
+function isPurchaseOrderStatus(v: unknown): v is PurchaseOrderStatus {
+  return typeof v === "string" && (PO_STATUSES as string[]).includes(v);
+}
+
+function oneOf<T extends string>(list: readonly T[], v: unknown): T | null {
+  return typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : null;
+}
 
 export const CLOSING_SELECT = [
   "id, status, customer_note, delivery_note_confirmed_at, delivery_note_number, invoice_number, invoice_date",
@@ -165,7 +189,88 @@ export function rowToJobOperation(row: JobOperationDbRow, today: string = todayI
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     overdue: isOperationOverdue({ status, plannedEnd }, today),
+    ...(row.status_changed_at
+      ? { changedBy: personRef(row.changer), changedAt: row.status_changed_at, changedVia: row.status_changed_via ?? null }
+      : {}),
+    ...("ends_at_customer_date" in row || "deadline_state" in row ? handoffFields(row) : {}),
   };
+}
+
+/** Pole předání do výroby (sloupce z migrace 20261023150000). */
+function handoffFields(row: JobOperationDbRow): Partial<JobOperation> {
+  const po = one(row.po);
+  const ids = Array.isArray(row.order_item_ids) ? row.order_item_ids.filter((x) => isUuid(x)) : null;
+  return {
+    orderItemIds: ids && ids.length ? ids : null,
+    endsAtCustomerDate: Boolean(row.ends_at_customer_date),
+    deadlineState: isDeadlineState(row.deadline_state) ? row.deadline_state : null,
+    deadlineSource: oneOf(DEADLINE_SOURCES, row.deadline_source),
+    deadlineChangedBy: personRef(row.deadliner),
+    deadlineChangedAt: row.deadline_changed_at ?? null,
+    deadlineChangedVia: row.deadline_changed_via ?? null,
+    whoSource: oneOf(WHO_SOURCES, row.who_source),
+    whoChangedBy: personRef(row.whoer),
+    whoChangedAt: row.who_changed_at ?? null,
+    whoChangedVia: row.who_changed_via ?? null,
+    supplierQuoteId: row.supplier_quote_id ?? null,
+    poMode: oneOf(PO_MODES, row.po_mode),
+    poNoneReason: cleanText(row.po_none_reason, 500),
+    handoffId: row.handoff_id ?? null,
+    purchaseOrder: po && po.id
+      ? {
+        id: po.id,
+        number: po.number ?? null,
+        status: isPurchaseOrderStatus(po.status) ? po.status : null,
+        sentAt: po.sent_at ?? null,
+        confirmedDate: cleanDate(po.confirmed_date),
+        fileId: po.file_id ?? null,
+      }
+      : null,
+  };
+}
+
+// ── Připravenost kroku (= SQL production_step_ready / production_step_startable) ──
+type ReadyRef = {
+  inHouse: boolean;
+  supplier?: { id: string } | null;
+  supplierId?: string | null;
+  supplierName?: string | null;
+  plannedEnd: string | null;
+  purchaseOrderId?: string | null;
+  poMode?: StepPoMode | null;
+};
+
+/** Ví se, kdo krok dělá (u nás / dodavatel z adresáře / firma mimo adresář). */
+export function hasWho(op: Pick<ReadyRef, "inHouse" | "supplier" | "supplierId" | "supplierName">): boolean {
+  return Boolean(op.inHouse || op.supplier?.id || op.supplierId || (op.supplierName ?? "").trim());
+}
+
+/** Krok má kdo a termín. */
+export function isStepReady(op: ReadyRef): boolean {
+  return hasWho(op) && cleanDate(op.plannedEnd) !== null;
+}
+
+/** Krok jde spustit: připravený a (u nás, nebo má objednávku, nebo „objednáno jinak"). */
+export function isStepStartable(op: ReadyRef): boolean {
+  return isStepReady(op) && (op.inHouse || Boolean(op.purchaseOrderId) || op.poMode === "neobjednavat");
+}
+
+/**
+ * Název kroku pro zobrazení: vlastní název; u druhu „Výroba" číslování „Výroba 1 / Výroba 2"
+ * (pořadí mezi nepřeskočenými výrobami), jen když má postup víc kroků; jinak popisek druhu.
+ * `route` = všechny kroky zakázky (stačí pořadí, druh a stav). Nikdy se neukládá.
+ */
+export function stepLabel(
+  op: { id: string; kind: OperationKind; title?: string | null; status?: OperationStatus },
+  route: { id: string; kind: OperationKind; status?: OperationStatus; position: number; createdAt?: string }[],
+): string {
+  const title = (op.title ?? "").trim();
+  if (title) return title;
+  if (op.kind !== "vyroba") return OPERATION_KINDS[op.kind].label;
+  const live = sortOperations(route.filter((o) => o.status !== "preskoceno" || o.id === op.id));
+  if (live.length <= 1) return OPERATION_KINDS.vyroba.label;
+  const k = live.filter((o) => o.kind === "vyroba").findIndex((o) => o.id === op.id);
+  return k >= 0 ? `${OPERATION_KINDS.vyroba.label} ${k + 1}` : OPERATION_KINDS.vyroba.label;
 }
 
 /** Seřazení podle pořadí (při shodě podle založení). */
@@ -230,8 +335,15 @@ function badDate(v: unknown): boolean {
   return v !== undefined && v !== null && v !== "" && cleanDate(v) === null;
 }
 
-/** Chyba vstupu operace (česky), jinak null. `partial` = úprava (druh nepovinný). */
-export function validateOperationInput(input: Partial<JobOperationInput> | null | undefined, partial = false): string | null {
+/**
+ * Chyba vstupu operace (česky), jinak null. `partial` = úprava (druh nepovinný).
+ * `requireDeadline` = termín povinný (zakázka ve výrobě; vynucení až s branami předání).
+ */
+export function validateOperationInput(
+  input: Partial<JobOperationInput> | null | undefined,
+  partial = false,
+  opts: { requireDeadline?: boolean } = {},
+): string | null {
   if (!input || typeof input !== "object") return "Chybí údaje operace.";
   if (!partial || input.kind !== undefined) {
     if (!isOperationKind(input.kind)) return "Neznámý druh operace.";
@@ -249,6 +361,13 @@ export function validateOperationInput(input: Partial<JobOperationInput> | null 
   const start = cleanDate(input.plannedStart);
   const end = cleanDate(input.plannedEnd);
   if (start && end && start > end) return "Začátek operace je po jejím termínu.";
+  if (opts.requireDeadline && !end && (!partial || input.plannedEnd !== undefined)) return "Doplň termín kroku.";
+  if (input.endsAtCustomerDate !== undefined && typeof input.endsAtCustomerDate !== "boolean") return "Neplatná volba konečného termínu.";
+  if (input.deadlineAgreed !== undefined && typeof input.deadlineAgreed !== "boolean") return "Neplatná volba dohodnutého termínu.";
+  if (input.orderItemIds !== undefined && input.orderItemIds !== null) {
+    if (!Array.isArray(input.orderItemIds) || input.orderItemIds.some((x) => !isUuid(x))) return "Neplatné díly kroku.";
+    if (!input.orderItemIds.length) return "Vyber aspoň jeden díl.";
+  }
   if (input.note !== undefined && input.note !== null && typeof input.note !== "string") return "Neplatná poznámka.";
   if (typeof input.note === "string" && input.note.length > OPERATION_NOTE_MAX) return "Poznámka je příliš dlouhá.";
   if (input.purchaseOrderId !== undefined && input.purchaseOrderId !== null && input.purchaseOrderId !== "" && !isUuid(input.purchaseOrderId)) {
@@ -294,12 +413,17 @@ export function operationInputToRow(input: Partial<JobOperationInput>, partial =
   if (input.plannedEnd !== undefined) row.planned_end = cleanDate(input.plannedEnd);
   if (input.note !== undefined) row.note = cleanText(input.note, OPERATION_NOTE_MAX);
   if (input.purchaseOrderId !== undefined) row.purchase_order_id = isUuid(input.purchaseOrderId) ? input.purchaseOrderId.toLowerCase() : null;
+  if (input.endsAtCustomerDate !== undefined) row.ends_at_customer_date = input.endsAtCustomerDate === true;
+  if (input.orderItemIds !== undefined) {
+    const ids = Array.isArray(input.orderItemIds) ? input.orderItemIds.filter((x) => isUuid(x)).map((x) => x.toLowerCase()) : [];
+    row.order_item_ids = ids.length ? ids : null;
+  }
   return row;
 }
 
 const OPERATION_COLUMNS = [
   "kind", "title", "in_house", "supplier_id", "supplier_name", "status",
-  "planned_start", "planned_end", "note", "purchase_order_id",
+  "planned_start", "planned_end", "note", "purchase_order_id", "ends_at_customer_date", "order_item_ids",
 ] as const;
 
 /** Jen skutečně změněné sloupce operace. */
@@ -311,8 +435,11 @@ export function diffOperation(before: Row, patch: Row): Row {
     const b = patch[k] ?? null;
     if (k === "planned_start" || k === "planned_end") {
       if (cleanDate(a) === cleanDate(b)) continue;
-    } else if (k === "in_house") {
+    } else if (k === "in_house" || k === "ends_at_customer_date") {
       if (Boolean(a) === Boolean(b)) continue;
+    } else if (k === "order_item_ids") {
+      const norm = (v: unknown) => (Array.isArray(v) && v.length ? [...v].map(String).sort().join(",") : "");
+      if (norm(a) === norm(b)) continue;
     } else if (a === b) continue;
     out[k] = patch[k];
   }
@@ -392,17 +519,20 @@ export function insertPositions(
 
 // ── Šablony ─────────────────────────────────────────────────
 /**
- * Šablona → operace. `supplierByKind`: id dodavatele, „u_nas", nebo název firmy
- * mimo adresář. Neznámá šablona → null.
+ * Šablona → operace. Kdo: id dodavatele, „u_nas", nebo název firmy mimo adresář —
+ * podle druhu (`supplierByKind`), nebo podle pořadí kroku v šabloně (`{ byIndex: [...] }`),
+ * aby dvě „Výroby" v jedné šabloně mohly dělat různé firmy. Pořadí má přednost. Neznámá šablona → null.
  */
 export function expandTemplate(
   templateKey: string,
-  supplierByKind?: Partial<Record<OperationKind, string | null>> | null,
+  supplierByKind?: Partial<Record<OperationKind, string | null>> | { byIndex: (string | null | undefined)[] } | null,
 ): JobOperationInput[] | null {
   const tpl = OPERATION_TEMPLATES.find((t) => t.key === templateKey);
   if (!tpl) return null;
-  return tpl.kinds.map((kind) => {
-    const who = cleanText(supplierByKind?.[kind], 300);
+  const byIndex = supplierByKind && "byIndex" in supplierByKind && Array.isArray(supplierByKind.byIndex) ? supplierByKind.byIndex : null;
+  const byKind = supplierByKind && !byIndex ? (supplierByKind as Partial<Record<OperationKind, string | null>>) : null;
+  return tpl.kinds.map((kind, i) => {
+    const who = cleanText(byIndex ? byIndex[i] : byKind?.[kind], 300);
     if (!who) return { kind };
     if (who === IN_HOUSE_KEY) return { kind, inHouse: true };
     if (isUuid(who)) return { kind, supplierId: who.toLowerCase() };

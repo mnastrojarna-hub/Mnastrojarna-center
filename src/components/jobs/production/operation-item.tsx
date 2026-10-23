@@ -75,7 +75,7 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
   const { advance, advancing, busy } = useOperationActions(op);
   const stamp = operationStatusStamp(events, op as JobOperation & ChangedByFields);
   const by = stamp
-    ? stampLabel(stamp.auto ? "Začato navázáním" : STATUS_STAMP[op.status], stamp, today)
+    ? stampLabel(stamp.auto ? "Navázalo samo · spustil" : STATUS_STAMP[op.status], stamp, today)
     : op.createdBy
       ? `Přidal ${op.createdBy.name}${dayLabel(op.createdAt, today) ? ` · ${dayLabel(op.createdAt, today)}` : ""}`
       : null;

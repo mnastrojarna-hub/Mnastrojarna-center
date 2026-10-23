@@ -45,14 +45,17 @@ vi.mock("@/lib/supabase/server", async () => {
       if (m) env[m[1]] = m[2];
     }
   }
-  const admin = () => sb.createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
+  const headers = await import("@/lib/supabase/actor-headers");
+  // jako produkční server.ts: autor jde v hlavičkách x-actor-* (DB mu věří jen u servisní role)
+  const admin = (opts: { actor?: unknown } = {}) => sb.createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(opts.actor ? { global: { headers: headers.actorHeaders(opts.actor as never) } } : {}),
   });
   return {
     isSupabaseConfigured: () => true,
     hasServiceKey: () => true,
     createAdminClient: admin,
-    createOperatorClient: async () => admin(),
+    createOperatorClient: async (opts: { actor?: unknown } = {}) => admin(opts),
     createClient: async () => {
       throw new Error("Bez session (test).");
     },
@@ -192,9 +195,18 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
       await db.from("orders").delete().in("id", created);
     }
     await db.from("drawings").delete().in("drawing_number", ["4711-02", "4711-03", "9999-77"]).gte("created_at", startedAt);
-    await db.from("customers").delete().eq("ico", "27654321").gte("created_at", startedAt);
+    await db.from("customers").delete().in("ico", ["27654320", "27654321"]).gte("created_at", startedAt);
     await db.from("customers").delete().like("name", `${TAG}%`);
     await db.from("orders").delete().like("number", `${TAG}%`);
+    // záznamy auditu o smazání vlastních testovacích řádků (20k zákazníků, 5k zakázek) — audit nezaplevelit
+    for (const [entity, col] of [["customers", "name"], ["orders", "number"]] as const) {
+      for (let i = 0; i < 30; i++) {
+        const { data } = await db.from("audit_log").select("id").eq("entity", entity).like(`diff->row->>${col}`, `${TAG}%`).limit(1000);
+        const ids = ((data ?? []) as { id: number }[]).map((r) => r.id);
+        if (!ids.length) break;
+        await db.from("audit_log").delete().in("id", ids);
+      }
+    }
     for (const id of captureIds) {
       const { data } = await db.from("capture_sessions").select("data").eq("id", id).maybeSingle();
       const fs = ((data as { data?: { files?: { path: string; sortPath?: string }[] } } | null)?.data?.files ?? []);
@@ -322,7 +334,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     const ids = res.groups.map((g) => g.jobId!);
     const { data } = await db.from("orders").select("id, customer:customers!customer_id(name, ico)").in("id", ids);
     const icos = ((data ?? []) as unknown as { customer: { ico: string } }[]).map((r) => r.customer.ico).sort();
-    expect(icos).toEqual(["27654321", "45274649"]);
+    expect(icos).toEqual(["27654320", "45274649"]);
     expect(res.groups.find((g) => g.customerName?.startsWith("Kovo"))?.customerCreated).toBe(true);
   }, 120_000);
 

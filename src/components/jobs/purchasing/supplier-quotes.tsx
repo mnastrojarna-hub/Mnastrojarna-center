@@ -16,19 +16,27 @@ import { ConfirmDialog } from "@/components/jobs/detail/confirm-dialog";
 import { formatMoney, formatPercent, formatQty, longDate } from "@/components/jobs/detail/detail-helpers";
 import { cn } from "@/lib/utils";
 import { compareSupplierQuotes } from "./purchasing-model";
-import { ActorStamp } from "./ui-bits";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import type { ChangeStamp } from "@/lib/jobs/flow-status";
+
+/** Kdo nabídku zapsal (created_by + čas založení). */
+function createdStamp(q: SupplierQuoteView): ChangeStamp {
+  return {
+    by: q.createdBy, byName: q.createdBy?.name ?? null, at: q.createdAt,
+    via: q.source === "foto" ? "foto" : q.source === "email" ? "email" : q.source === "ai" ? "ai" : null,
+    kind: q.source === "ai" ? "ai" : q.createdBy ? "user" : "system",
+  };
+}
 
 /** Karta nabídky dodavatele — vítězná má zelený rámeček a odznak. */
 export function SupplierQuoteCard({
-  quote, today, onEdit, onDelete, cheapest, selectedBy,
+  quote, today, onEdit, onDelete, cheapest,
 }: {
   quote: SupplierQuoteView;
   today: string;
   onEdit: () => void;
   onDelete: () => void;
   cheapest?: boolean;
-  /** Kdo nabídku vybral jako vítěznou (historie zakázky). */
-  selectedBy?: { by: string | null; at: string } | null;
 }) {
   const { notify, refresh } = useJobDetail();
   const [busy, setBusy] = React.useState<null | "select" | "unselect">(null);
@@ -134,8 +142,10 @@ export function SupplierQuoteCard({
         {quote.note && <p className="line-clamp-2 text-xs text-muted-foreground">{quote.note}</p>}
 
         <div className="flex flex-col gap-0.5">
-          <ActorStamp verb="Zadal" by={quote.createdBy?.name} at={quote.createdAt} />
-          {quote.selected && selectedBy && <ActorStamp verb="Vybráno jako vítězná —" by={selectedBy.by} at={selectedBy.at} icon={Trophy} className="text-green-700 dark:text-green-400" />}
+          <ActorStamp verb={quote.source === "foto" ? "Zapsána z fotky" : "Zapsána"} stamp={createdStamp(quote)} />
+          {quote.selected && quote.selectedStamp && (
+            <ActorStamp verb="Vítězná" stamp={quote.selectedStamp} className="text-green-700 dark:text-green-400" />
+          )}
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
@@ -311,13 +321,12 @@ export function PendingCapturedQuotes({ items }: { items: PendingCapturedQuote[]
 
 /** Sekce nabídek dodavatelů: čekající z focení, srovnání, karty, prázdný stav. */
 export function SupplierQuotesSection({
-  quotes, today, onAdd, onEdit, selectedBy, pendingCaptured = [],
+  quotes, today, onAdd, onEdit, pendingCaptured = [],
 }: {
   quotes: SupplierQuoteView[];
   today: string;
   onAdd: () => void;
   onEdit: (q: SupplierQuoteView) => void;
-  selectedBy?: Map<string, { by: string | null; at: string }>;
   /** Nabídky vyfocené bez práva na marže (JobPurchasing.pendingCaptured). */
   pendingCaptured?: PendingCapturedQuote[];
 }) {
@@ -360,7 +369,6 @@ export function SupplierQuotesSection({
             quote={q}
             today={today}
             cheapest={q.id === cheapestId}
-            selectedBy={selectedBy?.get(q.id) ?? null}
             onEdit={() => onEdit(q)}
             onDelete={() => setToDelete(q)}
           />

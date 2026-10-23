@@ -7,7 +7,9 @@ import {
   toSentItemFromApproval, mergeSentItems, NO_MAILBOX,
   type EmailListRow, type SentMailRow, type ApprovalSentRow, type MailViewer, type MailboxOption,
 } from "@/lib/email/visibility";
-import type { EmailCategory } from "@/lib/supabase/database.types";
+import type { EmailCategory, MailboxConfig, MailboxProvider } from "@/lib/supabase/database.types";
+import { getMailboxStatuses, isAuthBlocked } from "@/lib/email/mailbox-status";
+import { mailboxMissing } from "@/lib/email/mail-config";
 import type { EmailItem, SentItem } from "@/lib/data/types";
 
 /**
@@ -80,7 +82,7 @@ export async function getMailboxesForUser(): Promise<MailboxOption[]> {
   if (!db) return [];
   let q = db
     .from("mailboxes")
-    .select("id, email, display_name, owner_id, owner:profiles!owner_id(full_name, email)")
+    .select("id, email, display_name, owner_id, provider, config, owner:profiles!owner_id(full_name, email)")
     .order("email");
   if (!scope.all) q = q.eq("owner_id", scope.userId);
   const { data, error } = await q;
@@ -88,16 +90,25 @@ export async function getMailboxesForUser(): Promise<MailboxOption[]> {
   if (error || !data) return [];
   type Row = {
     id: string; email: string; display_name: string | null; owner_id: string | null;
+    provider: MailboxProvider; config: MailboxConfig | null;
     owner?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
   };
-  return (data as Row[]).map((m) => {
+  const rows = data as Row[];
+  const statuses = await getMailboxStatuses(rows.map((m) => m.id));
+  return rows.map((m) => {
     const owner = one(m.owner);
+    const st = statuses.get(m.id);
+    // hesla ani konfigurace do prohlížeče nejdou — jen příznak „neúplná"
     return {
       id: m.id,
       email: m.email,
       displayName: m.display_name,
       ownerId: m.owner_id,
       ownerName: (owner?.full_name ?? "").trim() || owner?.email || null,
+      lastSyncAt: st?.last_sync_ok_at ?? null,
+      lastSyncError: st?.last_sync_error ?? null,
+      authBlocked: isAuthBlocked(st, { provider: m.provider, email: m.email, config: m.config }),
+      incomplete: mailboxMissing(m.provider, m.config ?? {}).length > 0,
     };
   });
 }

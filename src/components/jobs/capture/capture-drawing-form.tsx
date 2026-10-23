@@ -21,8 +21,14 @@ const FIELDS: { key: TextKey; label: string; cls?: string; mono?: boolean; input
   { key: "dimensions", label: "Rozměry" },
   { key: "generalTolerance", label: "Obecné tolerance" },
   { key: "tightestTolerance", label: "Nejpřesnější tolerance" },
-  { key: "quantity", label: "Množství (z výkresu)", inputMode: "decimal" },
+  { key: "quantity", label: "Počet kusů", inputMode: "decimal" },
 ];
+
+/** Odkud je počet kusů / název (objednávka > nabídka > poptávka > výkres) — dokud ho člověk nezmění. */
+function sourceOf(doc: DrawingReview, state: DrawingReviewState, key: TextKey): string {
+  const src = key === "quantity" ? doc.sources?.quantity : key === "title" ? doc.sources?.title : undefined;
+  return src && state[key].trim() === doc.initial[key].trim() ? src : "";
+}
 
 /** Hodnota z AI pro porovnání (✨ dokud ji člověk nezmění). */
 function aiValue(doc: DrawingReview, key: TextKey): string {
@@ -72,6 +78,7 @@ export function CaptureDrawingForm({
           const id = `${idPrefix}-${f.key}`;
           const ai = aiValue(doc, f.key);
           const isAi = Boolean(ai) && state[f.key].trim() === ai;
+          const src = sourceOf(doc, state, f.key);
           return (
             <div key={f.key} className={f.cls}>
               <FieldLabel htmlFor={id} extra={isAi ? <AiMark /> : undefined}>{f.label}</FieldLabel>
@@ -85,10 +92,22 @@ export function CaptureDrawingForm({
                 autoComplete="off"
                 disabled={disabled}
               />
+              {src && <p className="mt-0.5 text-[11px] text-sky-700 dark:text-sky-300" data-testid={`capture-drawing-${f.key}-source`}>{src}</p>}
             </div>
           );
         })}
       </div>
+
+      {(doc.drawing.drawingNumbers?.length ?? 0) > 1 && (
+        <p className="text-xs text-muted-foreground" data-testid="capture-drawing-numbers">
+          Čísla na výkresu: <span className="font-mono">{doc.drawing.drawingNumbers!.join(" · ")}</span>
+        </p>
+      )}
+      {doc.drawing.customerName && (
+        <p className="text-xs text-muted-foreground" data-testid="capture-drawing-author">
+          Kreslil (z razítka): {doc.drawing.customerName} — jen informace, zákazník se bere ze zakázky.
+        </p>
+      )}
 
       <div>
         <FieldLabel htmlFor={`${idPrefix}-link`}>Patří k položce</FieldLabel>

@@ -1,4 +1,7 @@
-import type { JobStage, JobFileKind, PriorityLevel, QuoteStatus } from "@/lib/supabase/database.types";
+import type { JobStage, JobFileKind, PriorityLevel } from "@/lib/supabase/database.types";
+import {
+  CAUSE_LABELS, quoteApprovalBlock, quoteDisplayState, quoteStateOf, type ChangeStamp, type FlowCause, type QuoteDisplayState, type QuoteState,
+} from "@/lib/jobs/flow-status";
 import type {
   JobDetail, JobEvent, JobFile, JobItem, JobItemInput, JobQuote, JobQuoteInput, JobQuoteItemInput,
 } from "@/lib/jobs/types";
@@ -197,6 +200,20 @@ export const DEADLINE_FIELDS: { key: DeadlineField; label: string; hint: string 
   { key: "maxToleratedDate", label: "Max. tolerovaný", hint: "Poslední záchrana — pak je průšvih." },
 ];
 
+/** Sloupec orders pro „kdo termín změnil" (data.changes událostí field). */
+export const DEADLINE_COLUMNS: Record<DeadlineField, string> = {
+  customerRequiredDate: "customer_required_date",
+  dueDate: "due_date",
+  expectedDeliveryDate: "expected_delivery_date",
+  supplierPromisedDate: "supplier_promised_date",
+  maxToleratedDate: "max_tolerated_date",
+};
+
+/** Klíčová pole zakázky s „změnil X · kdy" (M12): termíny, hodnota, lidé, zákazník. */
+export const FIELD_STAMP_COLUMNS: string[] = [
+  ...Object.values(DEADLINE_COLUMNS), "value", "owner_id", "assignee_id", "customer_id",
+];
+
 export type DeadlineFields = Pick<JobDetail, "stage" | DeadlineField> & { receivedAt?: string | null };
 
 /** Díly už dorazily k nám — slib dodavatele se dál nehlídá. */
@@ -269,61 +286,77 @@ export const PRIORITY_META: Record<PriorityLevel, { label: string; active: strin
 export const PRIORITY_ORDER: PriorityLevel[] = ["nizka", "stredni", "vysoka"];
 
 // ── Nabídky ─────────────────────────────────────────────────
-export interface QuoteStatusMeta {
-  label: string;
-  badge: string;
-  dot: string;
-  /** Proužek karty. */
-  bar: string;
-  hint: string;
-}
-
-export const QUOTE_STATUS_META: Record<QuoteStatus, QuoteStatusMeta> = {
-  navrh_ai: {
-    label: "Návrh AI", badge: "bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300",
-    dot: "bg-slate-400", bar: "bg-slate-300 dark:bg-slate-600", hint: "Připravila AI — zkontroluj a schval.",
-  },
-  ke_schvaleni: {
-    label: "Ke schválení", badge: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
-    dot: "bg-amber-500", bar: "bg-amber-400", hint: "Čeká na schválení a odeslání zákazníkovi.",
-  },
-  odeslano: {
-    label: "Odesláno", badge: "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300",
-    dot: "bg-violet-500", bar: "bg-violet-500", hint: "Odešla zákazníkovi — čekáme na odpověď.",
-  },
-  prijato: {
-    label: "Přijato", badge: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
-    dot: "bg-green-500", bar: "bg-green-500", hint: "Zákazník nabídku přijal.",
-  },
-  zamitnuto: {
-    label: "Zamítnuto", badge: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
-    dot: "bg-red-500", bar: "bg-red-400", hint: "Zákazník nabídku nepřijal.",
-  },
-};
-
-export function quoteStatusMeta(status: string): QuoteStatusMeta {
-  return QUOTE_STATUS_META[status as QuoteStatus] ?? QUOTE_STATUS_META.ke_schvaleni;
+/**
+ * Zobrazený podrobný stav nabídky (QUOTE_STATES — jediná definice stavů nabídky). Nabídky bez
+ * sloupce state (starší fixtury) se odvodí ze status stejně jako quote_state_of v DB.
+ */
+export function quoteDisplayOf(
+  q: Pick<JobQuote, "status" | "approvedBy" | "archived" | "sentAt" | "validUntil"> & Partial<Pick<JobQuote, "state" | "approvalRequired" | "feedback">>,
+  today: string = isoToday(),
+): QuoteDisplayState {
+  const state: QuoteState = q.state ?? quoteStateOf({
+    status: q.status, approvedBy: q.approvedBy?.id ?? null, archived: q.archived, approvalRequired: Boolean(q.approvalRequired),
+    feedbackAt: q.feedback ? q.sentAt ?? null : null, sentAt: q.sentAt,
+  });
+  return quoteDisplayState({ state, validUntil: q.validUntil }, today);
 }
 
 export type QuoteAction =
-  | "approve" | "edit" | "send" | "markSent" | "accept" | "reject" | "revision" | "archive" | "unarchive"
+  | "approve" | "requestApproval" | "unapprove" | "returnToAuthor" | "edit" | "send" | "markSent" | "feedback"
+  | "answerNoChange" | "accept" | "reject" | "propose" | "reopen" | "extend" | "revision" | "archive" | "unarchive"
   | "pdf" | "delete";
 
-/** Které akce nabídka v daném stavu nabízí (pořadí = pořadí tlačítek). */
-export function quoteActions(q: Pick<JobQuote, "status" | "approvedBy" | "archived" | "accepted">, opts: { canDelete: boolean }): QuoteAction[] {
+/**
+ * Které akce nabídka v daném stavu nabízí (pořadí = pořadí tlačítek; přechody dle QUOTE_TRANSITIONS).
+ * #25: schvaluje jen super admin (canApprove / approver); odeslat podle `sendBlock` (quoteSendBlock — null = smí);
+ * bez `sendBlock` platí: s právem na marže a jen schválená / bez nutnosti schválení. „Předat ke schválení“ zaniklo.
+ */
+export function quoteActions(
+  q: Pick<JobQuote, "status" | "approvedBy" | "archived" | "accepted" | "sentAt" | "validUntil">
+    & Partial<Pick<JobQuote, "state" | "approvalRequired" | "feedback" | "adminApprovalRequired" | "returnedAt">>,
+  opts: {
+    canDelete: boolean; margins?: boolean; canApprove?: boolean; today?: string;
+    /** Výsledek quoteSendBlock pro přihlášeného (null = smí odeslat). */
+    sendBlock?: string | null;
+    /** Super admin s dialogem „Vrátit k přepracování…“ (25-C). */
+    canReturn?: boolean;
+    /** Smí schvalovat / zrušit schválení (quote_approval = jen super admin). Výchozí = `canDelete`
+     *  (mazání je také jen super admina) — starší volající (karta nabídky) `approver` nepředávají. */
+    approver?: boolean;
+  },
+): QuoteAction[] {
   const out: QuoteAction[] = [];
-  const open = q.status === "navrh_ai" || q.status === "ke_schvaleni";
-  if (!q.archived) {
-    if (open && !q.approvedBy) out.push("approve");
-    if (open || q.status === "odeslano") out.push("send");
-    if (open) out.push("markSent", "edit");
-    if ((q.status === "odeslano" || q.status === "ke_schvaleni") && !q.accepted) out.push("accept");
-    if (q.status !== "prijato" && q.status !== "zamitnuto") out.push("reject");
-    out.push("revision");
+  const margins = opts.margins ?? true;
+  const approver = opts.approver ?? opts.canDelete;
+  // #25: „Schválit“ jen schvalovatel — i když volající bez kontextu toku pošle canApprove = margins
+  const canApprove = (opts.canApprove ?? margins) && approver;
+  const shown = quoteDisplayOf(q, opts.today);
+  const st: QuoteState = shown === "vyprsela" ? (q.state ?? "odeslana") : shown;
+  const approvalOk = quoteApprovalBlock({
+    adminApprovalRequired: q.adminApprovalRequired, approvalRequired: q.approvalRequired, approvedBy: q.approvedBy, sentAt: q.sentAt,
+    state: q.state,
+  }) === null;
+  const maySend = opts.sendBlock !== undefined ? opts.sendBlock === null : margins && approvalOk;
+  if (!q.archived && st !== "archivovana") {
+    const draft = st === "rozpracovana" || st === "ke_schvaleni" || st === "schvalena";
+    if (st === "ke_schvaleni" && canApprove) out.push("approve");
+    if (st === "ke_schvaleni" && opts.canReturn && !q.returnedAt) out.push("returnToAuthor");
+    if ((st === "schvalena" || st === "rozpracovana") && maySend) out.push("send", "markSent");
+    if ((st === "odeslana" || st === "pripominky") && maySend) out.push("send");
+    if (draft) out.push("edit");
+    if (st === "schvalena" && approver) out.push("unapprove");
+    if ((st === "odeslana" || st === "pripominky") && !q.accepted) out.push("accept");
+    if (st === "odeslana") out.push("feedback");
+    if (st === "pripominky" && margins) out.push("answerNoChange");
+    if (shown === "vyprsela" || st === "odeslana" || st === "pripominky") out.push("extend");
+    if (st === "odeslana" || st === "pripominky") out.push(margins ? "reject" : "propose");
+    if (st === "zamitnuta" && margins) out.push("reopen");
+    if (st !== "prijata") out.push("revision");
   }
   out.push("pdf");
-  out.push(q.archived ? "unarchive" : "archive");
-  if (opts.canDelete) out.push("delete");
+  if (q.archived) out.push("unarchive");
+  else if (st !== "prijata") out.push("archive");
+  if (opts.canDelete && !q.sentAt) out.push("delete");
   return out;
 }
 
@@ -349,6 +382,7 @@ export function primaryQuote<T extends Pick<JobQuote, "id" | "archived" | "creat
 export const EVENT_TONES: Record<JobEvent["type"], string> = {
   created: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
   stage: "bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300",
+  status: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
   field: "bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300",
   file: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   quote: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
@@ -360,6 +394,7 @@ export const EVENT_TONES: Record<JobEvent["type"], string> = {
 export const EVENT_TYPE_LABELS: Record<JobEvent["type"], string> = {
   created: "Založení",
   stage: "Stav",
+  status: "Dílčí stav",
   field: "Změny",
   file: "Dokumenty",
   quote: "Nabídky",
@@ -407,6 +442,82 @@ export function eventChanges(data: Record<string, unknown> | null | undefined): 
     const from = typeof r.fromText === "string" ? r.fromText : formatFieldValue(field, r.from);
     const to = typeof r.toText === "string" ? r.toText : formatFieldValue(field, r.to);
     out.push({ field, label, from: sensitive ? "" : from, to: sensitive ? "" : to, sensitive });
+  }
+  return out;
+}
+
+/** Razítko autora události (druh, způsob, agent, jméno uložené v době zápisu) — pro actorName. */
+export function eventStamp(e: Pick<JobEvent, "actor" | "createdAt" | "data"> & Partial<Pick<JobEvent, "actorKind" | "actorName" | "via" | "agent">>): ChangeStamp {
+  const d = e.data ?? {};
+  return {
+    by: e.actor ?? null,
+    byName: e.actorName ?? null,
+    at: e.createdAt,
+    via: e.via ?? null,
+    kind: e.actorKind ?? (e.actor ? "user" : "system"),
+    agent: e.agent ?? null,
+    cause: typeof d.cause === "string" ? d.cause : null,
+    note: typeof d.note === "string" ? d.note : null,
+  };
+}
+
+/** Automatický posun: „Automaticky (výroba začala)". */
+export function autoLabel(e: Pick<JobEvent, "data">): string | null {
+  const d = e.data ?? {};
+  if (d.auto !== true) return null;
+  const cause = typeof d.cause === "string" ? CAUSE_LABELS[d.cause as FlowCause] ?? d.cause : null;
+  return cause ? `Automaticky (${cause})` : "Automaticky";
+}
+
+/** Fáze historie (filtr): podle entity / typu / dat události. */
+export type HistoryPhase = "stavy" | "poptavka" | "nabidky" | "objednavka" | "vyroba" | "dodani" | "platby" | "dokumenty" | "komunikace" | "zmeny";
+
+export const HISTORY_PHASES: { key: HistoryPhase; label: string }[] = [
+  { key: "stavy", label: "Stav zakázky" },
+  { key: "poptavka", label: "Poptávka" },
+  { key: "nabidky", label: "Nabídky" },
+  { key: "objednavka", label: "Objednávka" },
+  { key: "vyroba", label: "Výroba" },
+  { key: "dodani", label: "Dodání" },
+  { key: "platby", label: "Faktura & platby" },
+  { key: "dokumenty", label: "Dokumenty" },
+  { key: "komunikace", label: "Komentáře & e-maily" },
+  { key: "zmeny", label: "Změny polí" },
+];
+
+export function eventPhase(e: Pick<JobEvent, "type" | "data"> & Partial<Pick<JobEvent, "entity">>): HistoryPhase {
+  const d = e.data ?? {};
+  const entity = e.entity ?? (typeof d.entity === "string" ? d.entity : null);
+  const prod = typeof d.production === "string" ? d.production : null;
+  if (e.type === "stage") return "stavy";
+  if (entity === "inquiry") return "poptavka";
+  if (e.type === "quote" || entity === "quote") return "nabidky";
+  if (entity === "order" || (entity === "proposal" && d.phase === "order")) return "objednavka";
+  if (entity === "delivery" || prod === "delivery_note" || prod === "delivery" || prod === "delivery_closed" || prod === "partial_delivery") return "dodani";
+  if (entity === "payment" || prod === "invoice" || prod === "paid" || prod === "payment" || prod === "payment_deleted") return "platby";
+  if (prod || typeof d.operationId === "string" || entity === "operation" || typeof d.purchaseOrderId === "string") return "vyroba";
+  if (e.type === "status") return entity === "proposal" ? "stavy" : "objednavka";
+  if (e.type === "file") return "dokumenty";
+  if (e.type === "comment" || e.type === "email") return "komunikace";
+  return "zmeny";
+}
+
+/**
+ * Sloučené události se nezdvojují: DB zapisuje změnu stavu sama a starší aplikační záznam slučuje;
+ * kdyby přesto vznikly dva záznamy stejného posunu do 2 min, ukáže se jen jeden (přednost má text aplikace).
+ */
+export function dedupeEvents<T extends Pick<JobEvent, "id" | "type" | "data" | "createdAt">>(events: T[]): T[] {
+  const out: T[] = [];
+  for (const e of events) {
+    if (e.type === "stage") {
+      const twin = out.findIndex((x) => x.type === "stage" && x.data?.from === e.data?.from && x.data?.to === e.data?.to
+        && Math.abs(Date.parse(x.createdAt) - Date.parse(e.createdAt)) <= 120_000);
+      if (twin >= 0) {
+        if (out[twin].data?.origin === "db" && e.data?.origin !== "db") out[twin] = e;
+        continue;
+      }
+    }
+    out.push(e);
   }
   return out;
 }
@@ -744,6 +855,20 @@ export const DETAIL_TABS: DetailTab[] = ["prehled", "vyroba", "polozky", "nabidk
 
 export function isDetailTab(v: unknown): v is DetailTab {
   return typeof v === "string" && (DETAIL_TABS as string[]).includes(v);
+}
+
+/** id obalu záložek karty zakázky (posun do zorného pole po odkazové akci / ?tab=). */
+export const DETAIL_TABS_ID = "zalozky-zakazky";
+
+/** Anglické aliasy záložek (odkazy akcí toku: ?tab=items / quotes / production / purchasing). */
+const TAB_ALIASES: Record<string, DetailTab> = {
+  overview: "prehled", items: "polozky", quotes: "nabidky", production: "vyroba", purchasing: "nakup",
+  documents: "dokumenty", history: "historie",
+};
+
+export function detailTabOf(v: unknown): DetailTab | null {
+  if (isDetailTab(v)) return v;
+  return typeof v === "string" ? TAB_ALIASES[v] ?? null : null;
 }
 
 /** Výběr z možností vyhledávání (bez diakritiky, prefix má přednost). */

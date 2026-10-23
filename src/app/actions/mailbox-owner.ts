@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
 
@@ -19,7 +20,7 @@ export async function setMailboxOwner(
     return { ok: false, error: "Nejdřív dokonči připojení Supabase (servisní klíč)." };
   }
   try {
-    const db = createAdminClient();
+    const db = createAdminClient({ actor: userActor(access.user) });
     const { error } = await db.from("mailboxes").update({ owner_id: ownerId } as never).eq("id", mailboxId);
     if (error) return { ok: false, error: error.message };
     // Přijatou poštu schránky převezme nový vlastník (odeslaná zůstává odesílateli)

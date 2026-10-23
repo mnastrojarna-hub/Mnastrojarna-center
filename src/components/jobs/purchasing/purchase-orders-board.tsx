@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ShoppingBag, Search, X, Factory, CalendarClock, CalendarCheck, Send, AlertTriangle, ListChecks, Clock3, BadgeCheck,
-  PackageCheck, Ban, Inbox, ArrowUpRight, ClipboardList, type LucideIcon,
+  PackageCheck, Ban, Inbox, ArrowUpRight, ClipboardList, CircleDotDashed, type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,17 +17,16 @@ import { formatMoney, longDate } from "@/components/jobs/detail/detail-helpers";
 import { PageHero } from "@/components/commissions/page-hero";
 import { cn } from "@/lib/utils";
 import { PurchaseOrderActions } from "./purchase-order-actions";
-import { ActsLine } from "./purchase-orders-section";
+import { PurchaseExtraChips, PurchaseStepsLine } from "./purchase-orders-section";
 import { PurchaseOrderStatusBadge } from "./ui-bits";
-import {
-  isPurchaseOrderLate, matchesPurchaseFilter, orderActs, purchaseActivity, type ActivityEvent, type PurchaseFilter,
-} from "./purchasing-model";
+import { isPurchaseOrderLate, matchesPurchaseFilter, type PurchaseFilter } from "./purchasing-model";
 
 const FILTERS: { key: PurchaseFilter; label: string; icon: LucideIcon; tone: string; active: string }[] = [
   { key: "vse", label: "Aktivní", icon: ListChecks, tone: "bg-lime-100 text-lime-800 dark:bg-lime-500/15 dark:text-lime-300", active: "border-lime-500 ring-2 ring-lime-500/30" },
   { key: "k_odeslani", label: "K odeslání", icon: Send, tone: "bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300", active: "border-sky-500 ring-2 ring-sky-500/30" },
   { key: "ceka", label: "Čeká na potvrzení", icon: Clock3, tone: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300", active: "border-amber-500 ring-2 ring-amber-500/30" },
   { key: "potvrzena", label: "Potvrzené", icon: BadgeCheck, tone: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300", active: "border-indigo-500 ring-2 ring-indigo-500/30" },
+  { key: "castecne", label: "Částečně dodané", icon: CircleDotDashed, tone: "bg-lime-100 text-lime-800 dark:bg-lime-500/15 dark:text-lime-300", active: "border-lime-500 ring-2 ring-lime-500/30" },
   { key: "dodana", label: "Dodané", icon: PackageCheck, tone: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300", active: "border-green-500 ring-2 ring-green-500/30" },
   { key: "po_terminu", label: "Po termínu", icon: AlertTriangle, tone: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300", active: "border-red-500 ring-2 ring-red-500/30" },
   { key: "zrusena", label: "Zrušené", icon: Ban, tone: "bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300", active: "border-zinc-500 ring-2 ring-zinc-500/30" },
@@ -38,7 +37,7 @@ function isFilter(v: unknown): v is PurchaseFilter {
 }
 
 /** Přehled „Objednávky dodavatelům" napříč zakázkami: stavy, hledání, PDF a odeslání. */
-export function PurchaseOrdersBoard(props: { items: PurchaseOrderListItem[]; events: ActivityEvent[]; today: string; initialFilter?: string; initialQuery?: string }) {
+export function PurchaseOrdersBoard(props: { items: PurchaseOrderListItem[]; today: string; initialFilter?: string; initialQuery?: string }) {
   return (
     <ToastProvider>
       <Board {...props} />
@@ -47,14 +46,13 @@ export function PurchaseOrdersBoard(props: { items: PurchaseOrderListItem[]; eve
 }
 
 function Board({
-  items, events, today, initialFilter, initialQuery,
-}: { items: PurchaseOrderListItem[]; events: ActivityEvent[]; today: string; initialFilter?: string; initialQuery?: string }) {
+  items, today, initialFilter, initialQuery,
+}: { items: PurchaseOrderListItem[]; today: string; initialFilter?: string; initialQuery?: string }) {
   const router = useRouter();
   const notify = useNotify();
   const [refreshing, startRefresh] = React.useTransition();
   const [filter, setFilter] = React.useState<PurchaseFilter>(isFilter(initialFilter) ? initialFilter : "vse");
   const [query, setQuery] = React.useState(initialQuery ?? "");
-  const activity = React.useMemo(() => purchaseActivity(events), [events]);
   const refresh = React.useCallback(() => startRefresh(() => router.refresh()), [router]);
 
   const stats = React.useMemo(() => FILTERS.map((f) => {
@@ -100,7 +98,7 @@ function Board({
         }
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
         {FILTERS.map((f) => {
           const st = stats.find((s) => s.key === f.key);
           const Icon = f.icon;
@@ -169,7 +167,7 @@ function Board({
       ) : (
         <ul className="space-y-2">
           {visible.map((po) => (
-            <OrderRow key={po.id} po={po} today={today} acts={orderActs(po, activity)} notify={notify} onChanged={refresh} />
+            <OrderRow key={po.id} po={po} today={today} notify={notify} onChanged={refresh} />
           ))}
         </ul>
       )}
@@ -178,11 +176,10 @@ function Board({
 }
 
 function OrderRow({
-  po, today, acts, notify, onChanged,
+  po, today, notify, onChanged,
 }: {
   po: PurchaseOrderListItem;
   today: string;
-  acts: ReturnType<typeof orderActs>;
   notify: ReturnType<typeof useNotify>;
   onChanged: () => void;
 }) {
@@ -197,11 +194,7 @@ function OrderRow({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={cn("font-mono text-sm font-bold", cancelled && "line-through")}>{po.number}</span>
             <PurchaseOrderStatusBadge status={po.status} />
-            {late && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                <AlertTriangle className="h-3 w-3" /> po termínu
-              </span>
-            )}
+            <PurchaseExtraChips order={po} today={today} />
           </div>
           <p className="flex items-center gap-1 truncate text-sm font-medium">
             <Factory className="h-3.5 w-3.5 shrink-0 text-orange-600" /> {po.supplier?.name ?? "Dodavatel"}
@@ -247,7 +240,7 @@ function OrderRow({
           <PurchaseOrderActions order={po} notify={notify} onChanged={onChanged} />
         </div>
 
-        {acts.length > 0 && <ActsLine acts={acts} className="lg:col-span-4" />}
+        <PurchaseStepsLine order={po} className="lg:col-span-4" />
       </div>
     </li>
   );

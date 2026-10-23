@@ -13,6 +13,17 @@ import { useAutomation } from "@/components/automation-provider";
 import { OUTBOUND_APPROVAL_TYPES, type ApprovalItem } from "@/lib/data/types";
 import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
 import { relativeTime, cn } from "@/lib/utils";
+import { ActorStamp } from "@/components/flow-status/actor-stamp";
+import type { ResolvedApproval } from "@/lib/data/queries";
+
+/** Položka fronty; proposedBy = kdo návrh připravil („✨ AI", „Systém (plánovač)"). */
+type QueueItem = ApprovalItem & { proposedBy?: string };
+
+const RESOLVED_LABEL: Record<ResolvedApproval["status"], string> = {
+  approved: "Schváleno",
+  rejected: "Zamítnuto",
+  auto_executed: "Odesláno automaticky",
+};
 
 function agentKeyForType(rawType: ApprovalItem["rawType"]): string {
   switch (rawType) {
@@ -38,7 +49,7 @@ function ApprovalRow({
   compact,
   onResolved,
 }: {
-  item: ApprovalItem;
+  item: QueueItem;
   compact: boolean;
   onResolved: (id: string) => void;
 }) {
@@ -113,7 +124,7 @@ function ApprovalRow({
                 příjemce: <span className="font-medium text-foreground">{target}</span>
               </span>
             )}
-            <span>· {relativeTime(item.createdAt)}</span>
+            <span>· {item.proposedBy ? `připravil ${item.proposedBy} · ` : ""}{relativeTime(item.createdAt)}</span>
             {item.body && (
               <button
                 onClick={() => setOpen((o) => !o)}
@@ -197,9 +208,12 @@ function ApprovalRow({
 export function ApprovalQueue({
   compact = false,
   initialItems = [],
+  recent = [],
 }: {
   compact?: boolean;
-  initialItems?: ApprovalItem[];
+  initialItems?: QueueItem[];
+  /** Naposledy vyřízené — oba autoři: kdo připravil a kdo schválil / zamítl. */
+  recent?: ResolvedApproval[];
 }) {
   const { mode } = useAutomation();
   const router = useRouter();
@@ -248,6 +262,26 @@ export function ApprovalQueue({
         {items.map((item) => (
           <ApprovalRow key={item.id} item={item} compact={compact} onResolved={onResolved} />
         ))}
+
+        {recent.length > 0 && (
+          <div className="border-t pt-3">
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Naposledy vyřízeno</p>
+            <ul className="space-y-1.5" aria-label="Naposledy vyřízené položky fronty">
+              {recent.map((r) => (
+                <li key={r.id} className="flex min-w-0 flex-col gap-0.5 rounded-md bg-muted/30 px-2.5 py-1.5 text-xs sm:flex-row sm:items-center sm:gap-2">
+                  <span className="truncate font-medium">{r.title}</span>
+                  <span className="text-[11px] text-muted-foreground sm:ml-auto">připravil {r.proposedBy} ·</span>
+                  <ActorStamp
+                    verb={RESOLVED_LABEL[r.status]}
+                    stamp={r.status === "auto_executed" ? { ...r.stamp, by: null, byName: null, kind: "ai" } : r.stamp}
+                    short
+                    className={cn(r.status === "rejected" && "text-red-700 dark:text-red-300")}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

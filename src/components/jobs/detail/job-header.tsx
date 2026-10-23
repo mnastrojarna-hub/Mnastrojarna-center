@@ -12,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { StageBadge } from "@/components/jobs/stage-badge";
-import { StageSelect, NextStageButton } from "@/components/jobs/stage-select";
+import { StageSelect } from "@/components/jobs/stage-select";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { deleteJob } from "@/app/actions/jobs";
 import { stageMeta } from "@/lib/jobs/stages";
@@ -26,13 +26,15 @@ import { DocumentsMenu } from "./documents-menu";
 import { ConfirmDialog } from "./confirm-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty } from "./detail-helpers";
 import { ProductionHeaderBadges } from "@/components/jobs/production/production-chip";
+import { FlowActionBar, FlowNextHint, FlowProposalLine, FlowStageChip, FlowTrail, StageStamp } from "./flow-header";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 export function JobToolbar({ job }: { job: JobDetail }) {
   const { perms } = useJobDetail();
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   return (
-    <div className="sticky top-0 z-30 -mx-4 border-b bg-background/95 px-4 py-2 shadow-sm backdrop-blur sm:-mx-6 sm:px-6">
+    // -top-5 = horní odsazení <main> (pt-5): lišta se přilepí bez mezery, kterou by prosvítal obsah
+    <div className="sticky -top-5 z-30 -mx-4 border-b bg-background/95 px-4 py-2 shadow-sm backdrop-blur sm:-mx-6 sm:px-6">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
@@ -183,7 +185,10 @@ function Stat({ icon: Icon, tone, label, children }: { icon: typeof Banknote; to
   );
 }
 
-/** Hlavička karty: barva stavu, číslo, název (upravitelný), zákazník, stav, priorita. */
+/**
+ * Hlavička karty: barva stavu, číslo, název (upravitelný), zákazník, stav s autorem poslední změny,
+ * jediné primární tlačítko (sloveso dalšího kroku) + menu „⋯", řádek průběhu fází, priorita.
+ */
 export function JobHeader({ job }: { job: JobDetail }) {
   const { save } = useJobDetail();
   const m = stageMeta(job.stage);
@@ -251,15 +256,20 @@ export function JobHeader({ job }: { job: JobDetail }) {
           </div>
 
           <div className="flex flex-col items-start gap-2 lg:items-end">
-            <div className="flex flex-wrap items-center gap-2">
-              <StageSelect jobId={job.id} stage={job.stage} />
-              <NextStageButton jobId={job.id} stage={job.stage} />
+            <div className="flex flex-col items-start gap-0.5 lg:items-end">
+              <StageSelect jobId={job.id} stage={job.stage} flow={job.flow} quotes={job.flowQuotes} />
+              <StageStamp className="max-w-[18rem]" />
             </div>
+            <FlowStageChip />
+            <FlowProposalLine className="lg:justify-end" />
+            <FlowActionBar className="lg:justify-end" />
             <ProductionHeaderBadges job={job} className="lg:justify-end" />
-            <p className="max-w-xs text-xs text-muted-foreground lg:text-right">{m.description}</p>
+            <FlowNextHint fallback={m.description} className="max-w-xs text-xs text-muted-foreground lg:text-right" />
             <PrioritySwitch value={job.priority} />
           </div>
         </div>
+
+        <FlowTrail />
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <Stat icon={Banknote} tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" label="Hodnota (bez DPH)">

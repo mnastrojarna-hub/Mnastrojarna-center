@@ -9,13 +9,17 @@ import { Input } from "@/components/ui/input";
 import { signIn, signOut } from "@/app/auth/actions";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
+import { prefillEmail } from "@/lib/auth/login-diagnosis";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string; email?: string }>;
 }) {
-  const { error, reset } = await searchParams;
+  const { error, reset, email: emailParam } = await searchParams;
+  // Po neúspěšném pokusu zůstane v poli e-mail, který uživatel opravdu odeslal
+  // (prohlížeč ho jinak přepíše uloženým účtem — typicky super admina).
+  const email = prefillEmail(emailParam);
   const configured = isSupabaseConfigured();
 
   // Aktivní přihlášený uživatel rovnou do Knihy zakázek. Neaktivní zůstane
@@ -70,7 +74,7 @@ export default async function LoginPage({
             </form>
           )}
 
-          <form action={signIn} className="space-y-4">
+          <form key={`${error ?? ""}|${email}`} action={signIn} className="space-y-4">
             <div className="space-y-1.5">
               <label htmlFor="email" className="text-sm font-medium">E-mail</label>
               <div className="relative">
@@ -82,6 +86,9 @@ export default async function LoginPage({
                   inputMode="email"
                   autoComplete="username"
                   autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  defaultValue={email}
                   placeholder="jmeno@mnastrojarna.cz"
                   className="h-11 pl-9 text-base sm:text-sm"
                   required

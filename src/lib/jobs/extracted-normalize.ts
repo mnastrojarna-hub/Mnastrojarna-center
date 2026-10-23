@@ -1,5 +1,5 @@
 import type {
-  CaptureDocKind, DocIssuer, ExtractedBusinessDoc, ExtractedItem, ExtractedParty,
+  CaptureDocKind, DocIssuer, ExtractedBusinessDoc, ExtractedItem, ExtractedLeadFrom, ExtractedLeadTime, ExtractedLeadUnit, ExtractedParty,
 } from "@/lib/jobs/capture-types";
 
 /**
@@ -184,7 +184,7 @@ export function emptyExtracted(): ExtractedBusinessDoc {
     customerOrderNumber: "", customerInquiryNumber: "", ourQuoteNumber: "", ourJobNumber: "",
     ourOrderConfirmationNumber: "", supplierNumberAtCustomer: "",
     requiredDeliveryDate: "", promisedDeliveryDate: "",
-    items: [], totalWithoutVat: 0, currency: "", paymentTerms: "", deliveryTerms: "",
+    items: [], totalWithoutVat: 0, currency: "", paymentTerms: "", deliveryTerms: "", deliveryLeadTime: null,
     note: "", summary: "", confidence: 0, needsClarification: [],
   };
 }
@@ -227,6 +227,34 @@ function normalizeStringList(v: unknown): string[] {
   return arr.map((x) => cleanText(x)).filter(Boolean);
 }
 
+const LEAD_UNIT_ALIASES: [RegExp, ExtractedLeadUnit][] = [
+  [/^(pracovni|prac|working|business|work|arbeitstag|werktag)/, "pracovni_dny"],
+  [/^(tyd|tyden|woch|week|wk|w$)/, "tydny"],
+  [/^(mesic|mes|monat|month|mo$)/, "mesice"],
+  [/^(dn|den|kalendarni|tag|day|d$)/, "dny"],
+];
+const LEAD_FROM_ALIASES: [RegExp, ExtractedLeadFrom][] = [
+  [/^(potvrz|confirm|auftragsbest|bestellbest|oc$)/, "potvrzeni"],
+  [/^(podklad|vykres|dokument|data|dat$|zeichnung|unterlagen|drawing|document|schvalen|approval|freigabe)/, "podklady"],
+  [/^(objedn|order|po$|aro|auftrag|bestell|zakazk)/, "objednavka"],
+  [/^(jine|jiny|other|sonst|zaplac|platb|zaloh|payment|deposit)/, "jine"],
+];
+
+/** Strukturovaná dodací lhůta z AI: { value, unit, from, text }; bez hodnoty i textu = null. */
+export function normalizeLeadTimeField(raw: unknown): ExtractedLeadTime | null {
+  if (!isObj(raw)) return null;
+  const value = nonNegative(pick(raw, "value"));
+  const text = cleanText(pick(raw, "text"));
+  const u = fold(cleanText(pick(raw, "unit"))).replace(/[\s.-]+/g, "_");
+  const unit = LEAD_UNIT_ALIASES.find(([re]) => re.test(u))?.[1] ?? null;
+  const fr = fold(cleanText(pick(raw, "from"))).replace(/[\s.-]+/g, "_");
+  const unstated = !fr || /^(neuvedeno|neuveden[aoy]?|none|null|unknown|n_a|na|\?)$/.test(fr);
+  const from = unstated ? null : LEAD_FROM_ALIASES.find(([re]) => re.test(fr))?.[1] ?? "jine";
+  if (!(value > 0) && !text) return null;
+  // hodnota bez známé jednotky se nepoužije (jen text) — špatná lhůta je horší než žádná
+  return { value: value > 0 && unit ? Math.round(value * 10) / 10 : 0, unit: unit ?? "dny", from, text };
+}
+
 /**
  * Hlavní vstup: cokoli → úplný ExtractedBusinessDoc.
  * Přijme i JSON řetězec (např. text odpovědi AI).
@@ -260,6 +288,7 @@ export function normalizeExtracted(raw: unknown): ExtractedBusinessDoc {
     currency: normalizeCurrency(pick(o, "currency")),
     paymentTerms: cleanText(pick(o, "paymentTerms")),
     deliveryTerms: cleanText(pick(o, "deliveryTerms")),
+    deliveryLeadTime: normalizeLeadTimeField(pick(o, "deliveryLeadTime")),
     note: cleanMultiline(pick(o, "note")),
     summary: cleanMultiline(pick(o, "summary")),
     confidence: normalizeConfidence(pick(o, "confidence")),

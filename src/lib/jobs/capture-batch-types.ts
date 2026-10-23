@@ -52,6 +52,12 @@ export interface BatchFile extends CaptureFileRef {
   format: CadFormat | null;
   /** Název ZIPu, ze kterého soubor pochází. */
   fromZip: string | null;
+  /**
+   * Balík, ze kterého soubor pochází: ZIP „zip:<cesta ZIPu v úložišti>" (capture-files), později e-mail
+   * s přílohami „mail:<id>"; bez něj = název ZIPu (fromZip, starší relace). Doklady jednoho balíku
+   * = jeden zákazník (bundleKeyOf v capture-batch.ts).
+   */
+  bundle?: string | null;
   splittable: boolean;
   aiReadable: boolean;
   /** „PDF je zaheslované — vyplň ručně" */
@@ -140,9 +146,19 @@ export interface BatchSortModel {
 export interface DrawingExtract {
   drawingNumber: string; revision: string; title: string; material: string; dimensions: string;
   weightKg: number; generalTolerance: string; tightestTolerance: string; surface: string;
-  heatTreatment: string; surfaceTreatment: string; quantity: number; customerName: string;
+  heatTreatment: string; surfaceTreatment: string; quantity: number;
+  /**
+   * Firma z razítka = kdo výkres kreslil (projekce / konstrukce), NE zákazník — jen informace,
+   * nikdy k párování ani jako zákazník zakázky / archivu (zákazník se bere ze zakázky).
+   */
+  customerName: string;
   drawingDate: string; sheet: string; scale: string; notes: string; summary: string;
   confidence: number; needsClarification: string[];
+  /** Všechna čísla výkresu / dílu na listu (1. = drawingNumber); starší vytěžení je nemají. */
+  drawingNumbers?: string[];
+  /** Číslo objednávky zákazníka / naší nabídky, je-li výslovně na listu. */
+  customerOrderNumber?: string;
+  ourQuoteNumber?: string;
 }
 export interface ModelMeta { format: CadFormat | null; drawingNumber: string; revision: string; title: string }
 export type BatchDocExtract =
@@ -221,6 +237,8 @@ export type BatchDocReview =
       duplicateOf: DuplicateRef | null; initial: BusinessDocState }
   | { kind: "drawing"; docId: string; groupKey: string; aiUsed: boolean; reason: string | null;
       drawing: DrawingExtract; duplicateOf: DuplicateRef | null; archiveConflict: string | null;
+      /** Odkud je počet kusů / název výkresu („z objednávky PO-…", „název z objednávky PO-…"). */
+      sources?: { quantity?: string; title?: string };
       initial: DrawingReviewState }
   | { kind: "model"; docId: string; groupKey: string; meta: ModelMeta; duplicateOf: DuplicateRef | null;
       initial: ModelReviewState }
@@ -250,13 +268,23 @@ export type BatchWarningCode =
   | "duplicate_doc" | "already_saved" | "target_conflict" | "group_uncertain" | "issuer_mismatch"
   | "sort_uncertain" | "unlinked_drawing" | "unlinked_model" | "supplier_item_unmatched" | "price_hidden"
   | "purchasing_pending" | "not_in_purchasing" | "drawing_archive_conflict" | "split_failed" | "ai_failed"
-  | "pages_truncated" | "proforma" | "credit_note" | "partial_delivery" | "complaint";
+  | "pages_truncated" | "proforma" | "credit_note" | "partial_delivery" | "complaint" | "whole_order"
+  /** Další objednávka / poptávka s jiným číslem ve stejné skupině (1 zakázka, rozdělit 1 ťuknutím). */
+  | "multiple_orders"
+  /** Zákazník napsán jinak bez IČO — 1 zakázka, jen upozornění. */
+  | "customer_written_differently"
+  /** Objednávka bez reálného termínu → termín z nabídky / poptávky (nebo rozdíl proti nabídce). */
+  | "deadline_from_quote"
+  /** Výkres bez spárované položky a bez počtu kusů. */
+  | "drawing_quantity_missing";
 export type BatchWarningActionKind =
   | "same_customer" | "split_group" | "move_to_group" | "exclude_doc" | "restore_page" | "set_type"
   | "skip_duplicate" | "save_version";
 export interface BatchWarningAction {
   kind: BatchWarningActionKind; label: string;
   docId?: string; groupKey?: string; pageId?: string; type?: BatchDocType;
+  /** split_group: doklady, které odejdou společně do nové zakázky (přiřazení „new:<první>"). */
+  docIds?: string[];
 }
 export interface BatchWarning {
   /** Stabilní: `${code}:${docIds.join(",")}` */

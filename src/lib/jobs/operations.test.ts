@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { OPERATION_KINDS, OPERATION_KIND_ORDER, OPERATION_TEMPLATES, nextOperationStatus, productionLabel, isOperationKind } from "./operations";
+import { DEADLINE_STATE_META, OPERATION_KINDS, OPERATION_KIND_ORDER, OPERATION_TEMPLATES, isDeadlineState, nextOperationStatus, productionLabel, isOperationKind } from "./operations";
 
 describe("výrobní operace", () => {
   it("každý druh má popisek, ikonu a barvy; pořadí pokrývá všechny druhy", () => {
@@ -23,5 +23,16 @@ describe("výrobní operace", () => {
     expect(productionLabel("brouseni", "U nás")).toBe("Broušení · U nás");
     expect(productionLabel("hotovo", null)).toBe("Výroba hotová");
     expect(productionLabel(null, null)).toBeNull();
+  });
+  it("„Výroba“ je první druh (rose), šablona výroba → kalení → výroba, stavy termínu", () => {
+    expect(OPERATION_KIND_ORDER[0]).toBe("vyroba");
+    expect(OPERATION_KINDS.vyroba).toMatchObject({ label: "Výroba", dot: "bg-rose-500" });
+    expect(OPERATION_TEMPLATES.find((t) => t.key === "vyroba_kaleni")?.kinds).toEqual(["vyroba", "tepelne_zpracovani", "vyroba"]);
+    expect(productionLabel("vyroba", "Frézy Novák")).toBe("Výroba · Frézy Novák");
+    expect(Object.keys(DEADLINE_STATE_META).sort()).toEqual(["dohodnuto", "odhad", "plan", "potvrzeno", "pozadovano", "zmena_ceka"]);
+    expect(DEADLINE_STATE_META.potvrzeno.tone).toBe("green");
+    expect(DEADLINE_STATE_META.pozadovano.tone).toBe("amber");
+    expect(isDeadlineState("odhad")).toBe(true);
+    expect(isDeadlineState("dohodnut")).toBe(false);
   });
 });

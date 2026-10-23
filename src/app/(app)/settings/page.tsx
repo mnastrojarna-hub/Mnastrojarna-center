@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import Link from "next/link";
 import {
-  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles,
+  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
 import { OutlookImport } from "@/components/outlook-import";
+import { ApprovalLimitCard } from "@/components/settings/approval-limit-card";
 import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
 import { requireFeature } from "@/lib/auth/session";
 import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
@@ -29,7 +30,9 @@ export default async function SettingsPage() {
   const serviceKey = hasServiceKey();
   const { url } = getSupabaseEnv();
   // Parametry kalkulace se ladí v Nacenění / Ladění & korekce, AI přístup v Uživatelích — tady jen systém
-  const systemSettings = settings.filter((s) => s.category !== "pricing" && s.category !== "ai_access");
+  const systemSettings = settings.filter((s) => s.category !== "pricing" && s.category !== "ai_access" && s.key !== "quote_approval_limit");
+  const limitRaw = settings.find((s) => s.key === "quote_approval_limit")?.value ?? "";
+  const approvalLimit = limitRaw && Number(limitRaw) > 0 ? Number(limitRaw) : null;
   // Vlastník schránky = uživatel, který vidí její poštu
   const mailboxUsers = users.map((u) => ({ id: u.id, full_name: u.full_name || u.email || "Bez jména", email: u.email }));
   // MailboxManager bere { mailboxes, users } (výběr vlastníka schránky); cast drží kompatibilitu i se starší signaturou
@@ -93,6 +96,39 @@ export default async function SettingsPage() {
           <IntegrationSettingsEditor settings={systemSettings} />
         </CardContent>
       </Card>
+
+      {/* Schvalování nabídek (čtyři oči nad limitem) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Schvalování nabídek
+          </CardTitle>
+          <CardDescription>
+            Kdy musí nabídku před odesláním zkontrolovat druhý člověk. Kdo a kdy schválil, je vidět u každé nabídky.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ApprovalLimitCard initial={approvalLimit} />
+        </CardContent>
+      </Card>
+
+      {/* Audit — samostatná stránka */}
+      <Link href="/settings/audit" className="group block">
+        <Card className="transition-all group-hover:-translate-y-0.5 group-hover:border-teal-500/30 group-hover:shadow-md">
+          <CardContent className="flex items-center gap-4 p-5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600">
+              <ScrollText className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">Audit — kdo, kdy a co změnil</div>
+              <div className="text-sm text-muted-foreground">
+                Všechny změny nastavení, uživatelů, adresáře a mazání s autorem — filtr podle osoby, entity a období.
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* Uživatelé — samostatná stránka */}
       <Link href="/users" className="group block">

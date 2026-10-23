@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
 import { sendMail } from "@/lib/email/send";
@@ -38,7 +39,7 @@ async function guard(): Promise<{ user: CurrentUser; db: AdminDb } | { error: st
   if (!isSupabaseConfigured() || !hasServiceKey()) {
     return { error: "Nejdřív dokonči připojení Supabase (servisní klíč)." };
   }
-  return { user: access.user, db: createAdminClient() };
+  return { user: access.user, db: createAdminClient({ actor: userActor(access.user) }) };
 }
 
 async function loadTarget(db: AdminDb, id: string): Promise<(GuardTarget & { email: string | null; full_name: string }) | null> {
@@ -181,7 +182,7 @@ export async function createUser(
         text: mail.text,
         html: mail.html,
         log: false,
-        from: { ownerId: g.user.id },
+        from: { system: true }, // systémový e-mail (firemní schránka), ne ze schránky admina
       });
       welcomeSent = sent.sent;
       if (!sent.sent) warnings.push(`Uvítací e-mail se nepodařilo odeslat: ${sent.reason ?? "chyba"}`);
@@ -309,6 +310,17 @@ export async function setUserPassword(id: string, password: string): Promise<Res
 }
 
 /** Smaže účet. Nikdy sebe, nikdy posledního aktivního super admina, ne s historií provizí. */
+/** Kolik změn v historii účet udělal (události zakázek, nabídky, objednávky dodavatelům, fronta schvalování). */
+async function accountHistoryCount(db: AdminDb, id: string): Promise<number> {
+  const counts = await Promise.all([
+    db.from("job_events").select("id", { count: "exact", head: true }).eq("actor_id", id),
+    db.from("quotes").select("id", { count: "exact", head: true }).eq("created_by", id),
+    db.from("purchase_orders").select("id", { count: "exact", head: true }).eq("created_by", id),
+    db.from("approval_queue").select("id", { count: "exact", head: true }).eq("resolved_by", id),
+  ]);
+  return counts.reduce((s, r) => s + ((r as { count: number | null }).count ?? 0), 0);
+}
+
 export async function deleteUser(id: string): Promise<Result> {
   const g = await guard();
   if ("error" in g) return { ok: false, error: g.error };
@@ -328,6 +340,15 @@ export async function deleteUser(id: string): Promise<Result> {
       return {
         ok: false,
         error: "Uživatel má záznamy provizí — místo smazání ho deaktivuj, historie tak zůstane zachovaná.",
+      };
+    }
+
+    // Účet s historií změn (zakázky, nabídky, schvalování…) → jen deaktivace: „kdo to udělal" musí zůstat čitelné
+    const history = await accountHistoryCount(db, id);
+    if (history > 0) {
+      return {
+        ok: false,
+        error: `Účet má v historii ${history} ${history === 1 ? "záznam" : history < 5 ? "záznamy" : "záznamů"} změn — místo smazání ho deaktivuj, ať u nich zůstane jméno a přihlášení se zablokuje.`,
       };
     }
 

@@ -96,7 +96,8 @@ describe("správa uživatelů — render", () => {
   });
   it("výběr role ukazuje popisy", () => {
     const html = render(<RolePicker value="obchodnik" onChange={() => {}} />);
-    expect(html).toContain("Kniha zakázek, zákazníci, dodavatelé, vlastní pošta, marže a vlastní provize.");
+    // #25: nový popis role (ROLE_DESCRIPTIONS)
+    expect(html).toContain("Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize.");
   });
 });
 

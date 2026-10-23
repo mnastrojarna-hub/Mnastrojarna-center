@@ -3,7 +3,7 @@ import type { JobItem } from "@/lib/jobs/types";
 import type {
   PurchaseItem, PurchaseItemInput, PurchaseSupplierRef, SupplierQuoteView, PurchaseOrderView,
   PurchaseOrderListItem, JobCommissionView, JobPurchasingTotals, SupplierQuoteInput, SupplierQuoteSource,
-  PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseItemsSource, RequiredDateSource,
+  PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseItemsSource, RequiredDateSource, PurchaseOrderStamps,
 } from "@/lib/jobs/purchasing-types";
 import {
   cleanText, cleanDate, cleanNumber, cleanMoney, cleanCurrency, isUuid, one, personRef, searchNormalize, todayIso,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/jobs/mapping";
 import { STAGES, isJobStage, stageRank } from "@/lib/jobs/stages";
 import { czDate, czWeekday } from "@/lib/pdf/types";
+import { stampFromRow, type ChangeStamp, type PurchaseExtraState } from "@/lib/jobs/flow-status";
 
 /**
  * Nákupní strana zakázky — čistá logika (bez DB): stavy objednávek vydaných,
@@ -91,6 +92,37 @@ export function isPurchaseOrderEditable(status: PurchaseOrderStatus): boolean {
   return status === "navrh" || status === "vystavena";
 }
 
+/**
+ * Doplnit nákupní cenu položky jde i u odeslané / potvrzené / dodané objednávky (dodavatel nacení
+ * „bez ceny" položky až po odeslání); jen ne u zrušené. Mění se jen cena, ne položky.
+ * Bez toho by provize zakázky ze zisku čekala na nákupní cenu navždy (job_cost.known = false).
+ */
+export function canFillPurchasePrices(status: PurchaseOrderStatus): boolean {
+  return status !== "zrusena";
+}
+
+/**
+ * Jen ceny položek (id → cena za jednotku; null = zatím bez ceny). Vrací nové ceny a součet
+ * objednávky, nebo českou chybu. Položky, množství ani pořadí se nemění.
+ */
+export function applyPurchasePrices(
+  items: { id: string; quantity: number; unitPrice: number | null }[],
+  prices: { itemId: string; unitPrice: unknown }[],
+): { changes: { id: string; unitPrice: number | null }[]; total: number } | { error: string } {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const next = new Map(items.map((i) => [i.id, i.unitPrice]));
+  for (const p of prices) {
+    if (!byId.has(p.itemId)) return { error: "Položka nepatří k objednávce." };
+    const raw = p.unitPrice;
+    const price = raw === null || raw === undefined || raw === "" ? null : cleanMoney(raw);
+    if (price === null && raw !== null && raw !== undefined && raw !== "") return { error: "Neplatná cena položky." };
+    if (price !== null && price < 0) return { error: "Cena položky nesmí být záporná." };
+    next.set(p.itemId, price === null ? null : r2(price));
+  }
+  const changes = items.filter((i) => next.get(i.id) !== i.unitPrice).map((i) => ({ id: i.id, unitPrice: next.get(i.id) ?? null }));
+  return { changes, total: purchaseItemsTotal(items.map((i) => ({ quantity: i.quantity, unitPrice: next.get(i.id) ?? null }))) };
+}
+
 export const SUPPLIER_QUOTE_SOURCES: SupplierQuoteSource[] = ["manual", "foto", "email", "ai"];
 
 export function isSupplierQuoteSource(v: unknown): v is SupplierQuoteSource {
@@ -127,6 +159,8 @@ export interface PurchaseItemRowInput {
   unit: string;
   unit_price: number | null;
   note: string | null;
+  /** Vazba na díl zakázky — jen u objednávky dodavateli (purchase_order_items), klíč chybí, když vazba není. */
+  order_item_id?: string;
 }
 
 export const MAX_PURCHASE_ITEMS = 300;
@@ -169,6 +203,7 @@ export function cleanPurchaseItems(
       unit: cleanText(raw.unit, 20) ?? "ks",
       unit_price: price,
       note: cleanText(raw.note, 1000),
+      ...(isUuid(raw.orderItemId) ? { order_item_id: raw.orderItemId.toLowerCase() } : {}),
     });
   }
   if (!rows.length && !opts.allowEmpty) return { error: "Přidej alespoň jednu položku." };
@@ -656,13 +691,34 @@ export function supplierQuoteInputToRow(
 }
 
 // ── Součty, marže, provize ──────────────────────────────────
+/**
+ * Náklad, zisk a marže zakázky — stejné pravidlo jako DB job_cost (20261023150000):
+ * aktivní objednávky dodavatelům, bez nich odhad; objednávka s položkou BEZ CENY = náklad neznámý
+ * (`costSource: "neuplna"`, zisk null) — provize ze zisku pak „čeká na nákupní cenu".
+ */
 export function purchasingTotals(input: {
   revenue: number | null;
   plannedCost: number | null;
-  purchaseOrders: { status: PurchaseOrderStatus; total: number }[];
+  purchaseOrders: { status: PurchaseOrderStatus; total: number; number?: string | null; hasUnpriced?: boolean; items?: { unitPrice?: number | null }[] }[];
 }): JobPurchasingTotals {
   const active = input.purchaseOrders.filter((p) => p.status !== "zrusena");
   const purchaseOrdersTotal = r2(active.reduce((s, p) => s + (Number.isFinite(p.total) ? p.total : 0), 0));
+  const unpricedOf = (p: (typeof active)[number]) => (p.items ? unpricedItemCount(p.items) : p.hasUnpriced ? 1 : 0);
+  const incomplete = active.filter((p) => p.hasUnpriced || unpricedOf(p) > 0);
+  if (incomplete.length) {
+    return {
+      revenue: input.revenue,
+      purchaseOrdersTotal,
+      plannedCost: input.plannedCost,
+      cost: null,
+      costSource: "neuplna",
+      profit: null,
+      margin: null,
+      incompleteCost: purchaseOrdersTotal,
+      unpricedItems: incomplete.reduce((s, p) => s + Math.max(1, unpricedOf(p)), 0),
+      unpricedPurchaseOrders: incomplete.map((p) => p.number ?? "").filter(Boolean),
+    };
+  }
   const cost = active.length ? purchaseOrdersTotal : input.plannedCost;
   const costSource = active.length ? "objednavky" : input.plannedCost !== null ? "odhad" : null;
   const profit = input.revenue !== null && cost !== null ? r2(input.revenue - cost) : null;
@@ -762,6 +818,100 @@ export function purchaseOrderEmail(input: {
   };
 }
 
+/** Odesílatel a firma do podpisu e-mailu dodavateli. */
+export interface SupplierMailSender {
+  number: string;
+  companyName: string;
+  senderName?: string | null;
+  senderEmail?: string | null;
+  senderPhone?: string | null;
+  companyWeb?: string | null;
+}
+
+function supplierSignature(input: SupplierMailSender): string[] {
+  return [
+    input.senderName,
+    input.companyName,
+    [input.senderPhone ? `tel. ${input.senderPhone}` : "", input.senderEmail ?? ""].filter(Boolean).join(" · "),
+    input.companyWeb,
+  ]
+    .map((s) => (s ?? "").trim())
+    .filter(Boolean);
+}
+
+/** Změna odeslané objednávky (nový termín / položky) — PDF změny v příloze. */
+export function purchaseOrderChangeEmail(input: SupplierMailSender & {
+  revision: number;
+  requiredDate?: string | null;
+  previousRequiredDate?: string | null;
+  reason?: string | null;
+}): { subject: string; body: string } {
+  const req = cleanDate(input.requiredDate);
+  const prev = cleanDate(input.previousRequiredDate);
+  const reason = (input.reason ?? "").trim();
+  const lines = [
+    "Dobrý den,",
+    "",
+    `posíláme změnu naší objednávky č. ${input.number} (změna ${input.revision}) — aktuální znění je v příloze.`,
+  ];
+  if (req && prev && req !== prev) lines.push(`Požadovaný termín dodání se mění z ${czDate(prev)} na ${czDate(req)} (${czWeekday(req)}).`);
+  else if (req) lines.push(`Požadovaný termín dodání: ${czDate(req)} (${czWeekday(req)}).`);
+  if (reason) lines.push(`Důvod: ${reason}`);
+  lines.push(
+    "",
+    "Prosíme o potvrzení změny — stačí odpovědět na tento e-mail.",
+    "",
+    "Děkujeme za pochopení.",
+    "",
+    "S pozdravem",
+    "",
+  );
+  return {
+    subject: `Změna objednávky ${input.number} (změna ${input.revision}) — ${input.companyName}`,
+    body: [...lines, ...supplierSignature(input)].join("\n"),
+  };
+}
+
+/** Storno objednávky u dodavatele. */
+export function purchaseOrderCancelEmail(input: SupplierMailSender & { reason?: string | null }): { subject: string; body: string } {
+  const reason = (input.reason ?? "").trim();
+  const lines = [
+    "Dobrý den,",
+    "",
+    `rušíme naši objednávku č. ${input.number}${reason ? ` — ${reason}` : ""}.`,
+    "Prosíme, nepokračujte ve výrobě a potvrďte nám storno odpovědí na tento e-mail. Pokud už vznikly náklady, dejte nám prosím vědět.",
+    "",
+    "Děkujeme a omlouváme se za komplikace.",
+    "",
+    "S pozdravem",
+    "",
+  ];
+  return {
+    subject: `Storno objednávky ${input.number} — ${input.companyName}`,
+    body: [...lines, ...supplierSignature(input)].join("\n"),
+  };
+}
+
+/** Pozastavení objednávky u dodavatele (zakázka čeká). */
+export function purchaseOrderHoldEmail(input: SupplierMailSender & { reason?: string | null }): { subject: string; body: string } {
+  const reason = (input.reason ?? "").trim();
+  const lines = [
+    "Dobrý den,",
+    "",
+    `prosíme o pozastavení naší objednávky č. ${input.number}${reason ? ` — ${reason}` : ""}.`,
+    "Ve výrobě zatím nepokračujte; jakmile bude možné pokračovat, ozveme se s novým termínem.",
+    "",
+    "Děkujeme za pochopení.",
+    "",
+    "S pozdravem",
+    "",
+  ];
+  return {
+    subject: `Pozastavení objednávky ${input.number} — ${input.companyName}`,
+    body: [...lines, ...supplierSignature(input)].join("\n"),
+  };
+}
+
 // ── Adresa dodavatele (jedno pole → řádky pro PDF) ──────────
 /** „Průmyslová 12, 530 02 Pardubice" → { street, zip, city }. */
 export function splitAddress(address: string | null | undefined): { street?: string; zip?: string; city?: string; extra: string[] } {
@@ -794,6 +944,7 @@ export const SUPPLIER_QUOTE_SELECT = [
   "*",
   SUPPLIER_EMBED,
   `creator:profiles!created_by(${PERSON})`,
+  `selector:profiles!selected_by(${PERSON})`,
   "items:supplier_quote_items!supplier_quote_id(*)",
 ].join(", ");
 
@@ -801,8 +952,13 @@ export const PURCHASE_ORDER_SELECT = [
   "*",
   SUPPLIER_EMBED,
   `creator:profiles!created_by(${PERSON})`,
+  `status_changer:profiles!status_changed_by(${PERSON})`,
+  `sender:profiles!sent_by(${PERSON})`,
+  `confirmer:profiles!confirmed_by(${PERSON})`,
+  `deliverer:profiles!delivered_by(${PERSON})`,
+  `canceller:profiles!cancelled_by(${PERSON})`,
   "quote:supplier_quotes!supplier_quote_id(id, number, quote_date)",
-  "items:purchase_order_items!purchase_order_id(*)",
+  `items:purchase_order_items!purchase_order_id(*, receiver:profiles!received_changed_by(${PERSON}))`,
 ].join(", ");
 
 export const PURCHASE_ORDER_LIST_SELECT = [
@@ -832,6 +988,13 @@ export interface PurchaseItemDbRow {
   unit?: string | null;
   unit_price?: number | string | null;
   note?: string | null;
+  received_quantity?: number | string | null;
+  received_changed_at?: string | null;
+  received_changed_by?: string | null;
+  receipt_closed?: boolean | null;
+  receipt_closed_reason?: string | null;
+  order_item_id?: string | null;
+  receiver?: Embed<PersonEmbed>;
 }
 
 export interface SupplierQuoteDbRow {
@@ -853,8 +1016,11 @@ export interface SupplierQuoteDbRow {
   created_by?: string | null;
   created_at: string;
   updated_at?: string | null;
+  selected_at?: string | null;
+  selected_by?: string | null;
   supplier?: Embed<SupplierEmbedRow>;
   creator?: Embed<PersonEmbed>;
+  selector?: Embed<PersonEmbed>;
   items?: PurchaseItemDbRow[] | null;
 }
 
@@ -878,10 +1044,26 @@ export interface PurchaseOrderDbRow {
   file_id?: string | null;
   created_by?: string | null;
   sent_at?: string | null;
+  sent_by?: string | null;
+  status_changed_at?: string | null;
+  status_changed_by?: string | null;
+  status_changed_via?: string | null;
+  confirmed_at?: string | null;
+  confirmed_by?: string | null;
+  delivered_at?: string | null;
+  delivered_by?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
   created_at: string;
   updated_at?: string | null;
   supplier?: Embed<SupplierEmbedRow>;
   creator?: Embed<PersonEmbed>;
+  status_changer?: Embed<PersonEmbed>;
+  sender?: Embed<PersonEmbed>;
+  confirmer?: Embed<PersonEmbed>;
+  deliverer?: Embed<PersonEmbed>;
+  canceller?: Embed<PersonEmbed>;
   quote?: Embed<{ id: string; number: string | null; quote_date: string | null }>;
   items?: PurchaseItemDbRow[] | null;
   job?: Embed<{
@@ -903,6 +1085,7 @@ export interface CommissionDbRow {
   status?: string | null;
   cost_known?: boolean | null;
   updated_at?: string | null;
+  cost_pending_po?: string[] | null;
 }
 
 function num(v: unknown): number | null {
@@ -936,6 +1119,10 @@ export function rowToPurchaseItem(row: PurchaseItemDbRow): PurchaseItem {
     unit: row.unit ?? "ks",
     unitPrice: num(row.unit_price),
     note: row.note ?? null,
+    receivedQuantity: num(row.received_quantity) ?? 0,
+    receiptClosed: Boolean(row.receipt_closed),
+    receiptClosedReason: row.receipt_closed_reason ?? null,
+    orderItemId: row.order_item_id ?? null,
   };
 }
 
@@ -965,11 +1152,105 @@ export function rowToSupplierQuoteView(row: SupplierQuoteDbRow): SupplierQuoteVi
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
     items: itemsOf(row.items),
+    selectedStamp: row.selected ? poStamp(row.selected_at, row.selected_by, row.selector) : null,
   };
+}
+
+/**
+ * Razítko kroku objednávky ze sloupců (at + by + embed profilu). Krok, který se stal bez
+ * přihlášeného účtu (přímý zápis, starší data), je „Systém"; via jen u změny stavu.
+ */
+function poStamp(at: string | null | undefined, byId: string | null | undefined, person: Embed<PersonEmbed>, via?: string | null): ChangeStamp | null {
+  const fields: Record<string, unknown> = { s_at: at ?? null, s_by: byId ?? null, s_via: via ?? null };
+  return stampFromRow(fields, "s", personRef(person));
+}
+
+/** Kdo co s objednávkou udělal — ze sloupců DB (ne z historie). */
+export function purchaseOrderStamps(row: PurchaseOrderDbRow): PurchaseOrderStamps {
+  const status = row.status;
+  let received: ChangeStamp | null = null;
+  for (const it of row.items ?? []) {
+    const st = poStamp(it.received_changed_at, it.received_changed_by, it.receiver);
+    if (st && (!received || (st.at ?? "") > (received.at ?? ""))) received = st;
+  }
+  return {
+    created: poStamp(row.created_at, row.created_by, row.creator),
+    status: poStamp(row.status_changed_at, row.status_changed_by, row.status_changer, row.status_changed_via),
+    sent: row.sent_at ? poStamp(row.sent_at, row.sent_by, row.sender) : null,
+    confirmed: status === "potvrzena" || row.confirmed_at ? poStamp(row.confirmed_at, row.confirmed_by, row.confirmer) : null,
+    delivered: status === "dodana" ? poStamp(row.delivered_at, row.delivered_by, row.deliverer) : null,
+    cancelled: status === "zrusena" ? poStamp(row.cancelled_at, row.cancelled_by, row.canceller) : null,
+    received,
+  };
+}
+
+/** Převzato vše (položka převzatá v plném množství nebo uzavřená s menším). */
+export function isItemReceived(it: Pick<PurchaseItem, "quantity" | "receivedQuantity" | "receiptClosed">): boolean {
+  return Boolean(it.receiptClosed) || (it.receivedQuantity ?? 0) + 1e-9 >= it.quantity;
+}
+
+/** Převzetí po položkách: „1/2 položek", částečně = něco převzato, ale ne vše. */
+export function purchaseReceipt(items: Pick<PurchaseItem, "quantity" | "receivedQuantity" | "receiptClosed">[]): { done: number; total: number; partial: boolean } {
+  const total = items.length;
+  const done = items.filter(isItemReceived).length;
+  const any = items.some((it) => (it.receivedQuantity ?? 0) > 0 || it.receiptClosed);
+  return { done, total, partial: any && done < total };
+}
+
+/** Odvozený stav objednávky dodavateli navíc k enumu (1.8): částečně dodaná / po termínu. */
+export function purchaseExtraStates(
+  po: Pick<PurchaseOrderView, "status" | "requiredDate" | "confirmedDate"> & { receipt?: { partial: boolean } | null },
+  today: string,
+): PurchaseExtraState[] {
+  const out: PurchaseExtraState[] = [];
+  if ((po.status === "odeslana" || po.status === "potvrzena" || po.status === "vystavena") && po.receipt?.partial) out.push("castecne_dodana");
+  const due = po.confirmedDate ?? po.requiredDate;
+  if (po.status !== "dodana" && po.status !== "zrusena" && po.status !== "navrh" && due && due < today) out.push("po_terminu");
+  return out;
+}
+
+/** Výrobní operace pro pravidlo „Dodáno k nám" (2.7). */
+export interface StageRuleOperation {
+  id: string;
+  position: number;
+  status: string;
+  inHouse: boolean;
+  purchaseOrderId: string | null;
+}
+
+/**
+ * Pravidlo 2.7 (M6) — posune dodání objednávky dodavateli zakázku do „Dodáno k nám"?
+ *  • bez operací: všechny nezrušené objednávky dodané;
+ *  • s operacemi: všechny hotové / přeskočené a POSLEDNÍ nepřeskočená je kooperace
+ *    (po kooperaci nezbývá vlastní operace) — navázané operace dodaných PO se počítají jako hotové;
+ *  • objednávka bez navázané operace (materiál) u zakázky s operacemi stav neposouvá.
+ */
+export function purchaseDeliveryAdvances(input: {
+  deliveredPoId: string;
+  orders: { id: string; status: PurchaseOrderStatus }[];
+  operations: StageRuleOperation[];
+}): { advance: boolean; pendingOrders: number; reason: "vse_dodano" | "ceka_objednavky" | "material" | "zbyva_vyroba" | "kooperace_hotova" } {
+  const pending = input.orders.filter((o) => o.id !== input.deliveredPoId && o.status !== "zrusena" && o.status !== "dodana").length;
+  if (!input.operations.length) {
+    return pending ? { advance: false, pendingOrders: pending, reason: "ceka_objednavky" } : { advance: true, pendingOrders: 0, reason: "vse_dodano" };
+  }
+  const delivered = new Set(input.orders.filter((o) => o.status === "dodana").map((o) => o.id));
+  delivered.add(input.deliveredPoId);
+  const ops = [...input.operations].sort((a, b) => a.position - b.position).map((o) => ({
+    ...o,
+    status: o.purchaseOrderId && delivered.has(o.purchaseOrderId) && o.status !== "preskoceno" ? "hotovo" : o.status,
+  }));
+  const linked = ops.some((o) => o.purchaseOrderId === input.deliveredPoId);
+  if (!linked) return { advance: false, pendingOrders: pending, reason: "material" };
+  const allDone = ops.every((o) => o.status === "hotovo" || o.status === "preskoceno");
+  const last = [...ops].reverse().find((o) => o.status !== "preskoceno");
+  if (allDone && last && !last.inHouse) return { advance: true, pendingOrders: pending, reason: "kooperace_hotova" };
+  return { advance: false, pendingOrders: pending, reason: "zbyva_vyroba" };
 }
 
 export function rowToPurchaseOrderView(row: PurchaseOrderDbRow): PurchaseOrderView {
   const quote = one(row.quote);
+  const items = itemsOf(row.items);
   return {
     id: row.id,
     jobId: row.job_id,
@@ -992,12 +1273,16 @@ export function rowToPurchaseOrderView(row: PurchaseOrderDbRow): PurchaseOrderVi
     createdBy: personRef(row.creator),
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
-    items: itemsOf(row.items),
+    items,
+    cancelReason: row.cancel_reason ?? null,
+    stamps: purchaseOrderStamps(row),
+    receipt: purchaseReceipt(items),
   };
 }
 
 export function rowToPurchaseOrderListItem(row: PurchaseOrderDbRow): PurchaseOrderListItem {
-  const { items, ...view } = rowToPurchaseOrderView(row);
+  const view = rowToPurchaseOrderView(row);
+  const items = view.items;
   const job = one(row.job);
   const customer = job ? one(job.customer) : null;
   const drawingNumbers: string[] = [];
@@ -1032,6 +1317,9 @@ export function rowToCommissionView(row: CommissionDbRow, ownerName: string): Jo
     costKnown: row.cost_known !== false,
     period: row.period,
     updatedAt: row.updated_at ?? null,
+    ...(Array.isArray(row.cost_pending_po) && row.cost_pending_po.length && row.cost_known === false
+      ? { pendingPurchaseOrders: row.cost_pending_po.filter((x) => typeof x === "string" && x) }
+      : {}),
   };
 }
 

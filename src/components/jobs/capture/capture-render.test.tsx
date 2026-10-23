@@ -178,6 +178,7 @@ describe("Vyfotit doklad — vykreslení", () => {
         ok: true, created: false, aiUsed: true, jobId: JOB_ID, jobNumber: "Z-2026-101", docLabel: "Objednávka zákazníka",
         stageFrom: "nabidka", stageTo: "objednavka", filled: ["Číslo objednávky zákazníka"], itemsAdded: 1, itemsMerged: 1,
         fileKind: "objednavka", warnings: ["Stránku x.jpg se nepodařilo přiložit."], autoApplied: true,
+        flowNotes: ["Změna objednávky zapsána jako revize 2 (3 rozdíly) — položky se nepřepsaly, potvrď změnu."],
       }}
       onJobPage={false} onAnother={noop} onClose={noop}
     />);
@@ -186,5 +187,7 @@ describe("Vyfotit doklad — vykreslení", () => {
     expect(done).toContain("Upravit v zakázce");
     expect(done).toContain("Vyfotit další doklad");
     expect(done).toContain("se nepodařilo přiložit");
+    expect(done).toContain("revize 2 (3 rozdíly)");
+    expect(done).toContain("border-indigo-200");
   });
 });

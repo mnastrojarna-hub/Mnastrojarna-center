@@ -55,6 +55,7 @@
   "currency": "CZK",
   "paymentTerms": "30 dní od vystavení faktury",
   "deliveryTerms": "DAP Kladno",
+  "deliveryLeadTime": null,
   "note": "Ručně připsáno: prosíme atest 3.1 k materiálu.",
   "summary": "Objednávka 4795-2026 od Strojmetal a.s. na 2 položky upínek (VK-2291, VK-2292) po 50 ks dle naší nabídky NAB-2026-031, požadovaný termín 27. 11. 2026.",
   "confidence": 0.93,

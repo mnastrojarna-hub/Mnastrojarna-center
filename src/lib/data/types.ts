@@ -89,7 +89,8 @@ export interface QuoteItem {
   customer: string;
   drawing: string;
   qty: number;
-  status: "Návrh AI" | "Ke schválení" | "Odesláno" | "Přijato" | "Zamítnuto";
+  /** Popisek stavu nabídky (QUOTE_STATES přes quoteStatusLabel, např. „Odeslaná"). */
+  status: string;
   value?: number;
   createdAt: string;
 }

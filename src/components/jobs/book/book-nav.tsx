@@ -3,13 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { applyBookPatch, bookHref, type BookParams, type BookPatch } from "@/components/jobs/book/book-params";
+import { applyBookPatch, bookHref, canonicalBookHref, type BookParams, type BookPatch } from "@/components/jobs/book/book-params";
 
 /**
  * Navigace knihy přes URL: filtry, záložky i řazení mění parametry adresy
  * v přechodu (transition) — stará data zůstanou vidět (ztlumená), dokud nedorazí
  * nová, takže nic neposkakuje. Výběr se ukáže hned (optimisticky).
+ * Pojistka: když přechod routeru uvízne (nová stránka nedorazí do NAV_GUARD_MS),
+ * adresa se načte klasicky — filtr tak vždy zabere.
  */
+
+/** Do kdy musí dorazit nová stránka knihy, jinak klasické načtení adresy. */
+export const NAV_GUARD_MS = 6000;
 
 interface BookNav {
   /** Aktuální parametry (včetně právě požadovaných, ještě nenačtených). */
@@ -27,10 +32,20 @@ export function BookNavProvider({ params, children }: { params: BookParams; chil
   const [requested, setRequested] = React.useState<BookParams | null>(null);
   const requestedRef = React.useRef<BookParams | null>(null);
   const paramsRef = React.useRef(params);
+  const guard = React.useRef<{ href: string; timer: number } | null>(null);
 
   React.useEffect(() => {
     paramsRef.current = params;
+    // stránka s požadovanými parametry dorazila → pojistka není potřeba
+    if (guard.current && bookHref(params) === guard.current.href) {
+      window.clearTimeout(guard.current.timer);
+      guard.current = null;
+    }
   }, [params]);
+
+  React.useEffect(() => () => {
+    if (guard.current) window.clearTimeout(guard.current.timer);
+  }, []);
 
   // po dokončení všech přechodů platí to, co přišlo ze serveru
   React.useEffect(() => {
@@ -47,6 +62,17 @@ export function BookNavProvider({ params, children }: { params: BookParams; chil
       const href = bookHref(next);
       requestedRef.current = next;
       setRequested(next);
+      if (guard.current) window.clearTimeout(guard.current.timer);
+      const target = canonicalBookHref(href);
+      guard.current = bookHref(paramsRef.current) === target ? null : {
+        href: target,
+        timer: window.setTimeout(() => {
+          if (guard.current?.href !== target) return;
+          guard.current = null;
+          if (opts?.replace) window.location.replace(href);
+          else window.location.assign(href);
+        }, NAV_GUARD_MS),
+      };
       startTransition(() => {
         if (opts?.replace) router.replace(href, { scroll: false });
         else router.push(href, { scroll: false });

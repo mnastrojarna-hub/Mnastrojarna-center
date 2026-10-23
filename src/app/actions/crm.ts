@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
 import { fetchPaged, isUuid, translateDbError } from "@/lib/jobs/mapping";
@@ -122,7 +123,7 @@ export async function createCustomer(
   const mapped = customerColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const dup = await findDuplicate(db, mapped.cols);
     if (dup) return { ok: false, error: `Tento zákazník už v adresáři je: ${dup.label}.`, duplicateId: dup.id };
 
@@ -151,7 +152,7 @@ export async function updateCustomer(
   const mapped = customerColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data: current } = await db.from("customers").select("id, customer_number").eq("id", id).maybeSingle();
     if (!current) return { ok: false, error: "Zákazník neexistuje (možná ho někdo smazal)." };
 
@@ -196,7 +197,7 @@ export async function saveCustomerContact(
     is_primary: Boolean(input.isPrimary),
   };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     let id = contactId;
     if (contactId) {
       const { data, error } = await db.from("customer_contacts").update(row as never)
@@ -225,7 +226,7 @@ export async function deleteCustomerContact(customerId: string, contactId: strin
   if (!isUuid(customerId) || !isUuid(contactId)) return { ok: false, error: "Neplatný kontakt." };
   if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { error } = await db.from("customer_contacts").delete().eq("id", contactId).eq("customer_id", customerId);
     if (error) return { ok: false, error: translateDbError(error.message) };
     revalidatePath(`/customers/${customerId}`);
@@ -278,7 +279,7 @@ export async function createSupplier(input: SupplierFormValues): Promise<ActionR
   const mapped = supplierColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data: existing } = await db.from("suppliers").select("id, name, ico, dic");
     const hit = matchCustomer((existing ?? []) as CustomerLookupRow[], {
       name: String(mapped.cols.name),
@@ -308,7 +309,7 @@ export async function updateSupplier(id: string, input: SupplierFormValues): Pro
   const mapped = supplierColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data, error } = await db.from("suppliers").update(mapped.cols as never).eq("id", id).select("id").maybeSingle();
     if (error) return { ok: false, error: translateDbError(error.message) };
     if (!data) return { ok: false, error: "Dodavatel neexistuje (možná ho někdo smazal)." };
@@ -345,7 +346,7 @@ export async function updateCustomerPricingProfile(input: {
   const oneOf = <T extends string>(v: string | undefined, allowed: readonly T[]): T | null =>
     v && (allowed as readonly string[]).includes(v) ? (v as T) : null;
   try {
-    const db = await createOperatorClient();
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { error } = await db
       .from("customers")
       .update({

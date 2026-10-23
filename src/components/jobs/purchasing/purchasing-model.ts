@@ -1,8 +1,10 @@
-import type { JobDetail, JobItem } from "@/lib/jobs/types";
+import type { JobDetail, JobEvent, JobItem } from "@/lib/jobs/types";
 import type {
   JobCommissionView, JobPurchasingTotals, PurchaseItem, PurchaseItemInput, PurchaseOrderDraftInput, PurchaseOrderView,
-  SupplierQuoteInput, SupplierQuoteView,
+  PurchaseReceiptInput, SupplierQuoteInput, SupplierQuoteView,
 } from "@/lib/jobs/purchasing-types";
+import { purchaseExtraStates } from "@/lib/jobs/purchasing";
+import { dayDiff, type ChangeStamp, type Progress, type PurchaseExtraState } from "@/lib/jobs/flow-status";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import { parseDecimal, isInvalidDecimal, decimalInput, formatMoney, formatPercent } from "@/components/jobs/detail/detail-helpers";
 import { formatRate, periodSlash } from "@/components/commissions/model";
@@ -342,6 +344,12 @@ export interface MarginHero {
   missingRevenue: boolean;
 }
 
+/** „objednávka OV-2026-012 má položku bez ceny" (bez čísel jen obecně). */
+function pendingText(numbers: string[] | undefined): string {
+  if (!numbers?.length) return "objednávka má položku bez ceny";
+  return numbers.length === 1 ? `objednávka ${numbers[0]} má položku bez ceny` : `objednávky ${numbers.join(", ")} mají položky bez ceny`;
+}
+
 export function marginHero(t: JobPurchasingTotals): MarginHero {
   const missingRevenue = t.revenue === null || t.revenue <= 0;
   const missingCost = t.cost === null;
@@ -352,7 +360,8 @@ export function marginHero(t: JobPurchasingTotals): MarginHero {
   return {
     revenue: t.revenue,
     cost: t.cost,
-    costLabel: t.costSource === "objednavky" ? "objednávky dodavatelům" : t.costSource === "odhad" ? "odhad (plánovaný nákup)" : "zatím neznámý",
+    costLabel: t.costSource === "objednavky" ? "objednávky dodavatelům" : t.costSource === "odhad" ? "odhad (plánovaný nákup)"
+      : t.costSource === "neuplna" ? `neúplná — ${pendingText(t.unpricedPurchaseOrders)}` : "zatím neznámý",
     profit: t.profit,
     margin: t.margin,
     tone,
@@ -405,7 +414,9 @@ export function commissionDisplay(
     if (!c.costKnown) {
       return {
         amount: null, estimate: true, title: "Pásmová provize z inkasa",
-        detail: "Předběžná — doplň nákupní cenu, ať jde odhadnout zisk. Finální částka až po inkasu.",
+        detail: c.pendingPurchaseOrders?.length
+          ? `Čeká na nákupní cenu (${c.pendingPurchaseOrders.join(", ")}) — po doplnění cen se odhad dopočítá sám. Finální částka až po inkasu.`
+          : "Předběžná — doplň nákupní cenu, ať jde odhadnout zisk. Finální částka až po inkasu.",
         status: "predbezna", tone: "amber",
       };
     }
@@ -422,7 +433,10 @@ export function commissionDisplay(
   if (!c.costKnown && c.base !== "revenue") {
     return {
       amount: null, estimate: false, title: STATUS_TITLES[c.status],
-      detail: `${how} — dopočítá se po doplnění nákupní ceny.`, status: c.status, tone: "amber",
+      detail: c.pendingPurchaseOrders?.length
+        ? `${how} — čeká na nákupní cenu (${c.pendingPurchaseOrders.join(", ")}); dopočítá se sama po doplnění cen.`
+        : `${how} — dopočítá se po doplnění nákupní ceny.`,
+      status: c.status, tone: "amber",
     };
   }
   return {
@@ -461,15 +475,16 @@ export const TRANSITION_LABELS: Record<PurchaseOrderStatus, string> = {
   zrusena: "Zrušit objednávku",
 };
 
-export type PurchaseFilter = "vse" | "k_odeslani" | "ceka" | "potvrzena" | "dodana" | "zrusena" | "po_terminu";
+export type PurchaseFilter = "vse" | "k_odeslani" | "ceka" | "potvrzena" | "castecne" | "dodana" | "zrusena" | "po_terminu";
 
 /** Filtr přehledu objednávek. */
 export function matchesPurchaseFilter(
-  po: Pick<PurchaseOrderView, "status" | "requiredDate" | "confirmedDate">,
+  po: Pick<PurchaseOrderView, "status" | "requiredDate" | "confirmedDate"> & { receipt?: { partial: boolean } | null },
   filter: PurchaseFilter,
   today: string,
 ): boolean {
   switch (filter) {
+    case "castecne": return po.status !== "dodana" && po.status !== "zrusena" && Boolean(po.receipt?.partial);
     case "vse": return po.status !== "zrusena";
     case "k_odeslani": return po.status === "navrh" || po.status === "vystavena";
     case "ceka": return po.status === "odeslana";
@@ -480,90 +495,130 @@ export function matchesPurchaseFilter(
   }
 }
 
-// ── Kdo co udělal (historie zakázky) ────────────────────────
-/** Událost historie zakázky (job_events) — stačí typ, data, autor a čas. */
-export interface ActivityEvent {
-  type: string;
-  data: Record<string, unknown> | null;
-  actor: { name: string } | null;
-  createdAt: string;
+// ── Kdo co udělal (razítka ze sloupců DB, ne z historie) ─────
+export interface PurchaseStep {
+  key: "vystavena" | "odeslana" | "potvrzena" | "prevzato" | "dodana" | "zrusena";
+  /** Stav / krok bez rodového slovesa: „Vystavena · Vít Volný · před 5 min". */
+  label: string;
+  stamp: ChangeStamp;
 }
 
-export type PurchaseActKind =
-  | "vystavena" | "odeslana_email" | "odeslana" | "potvrzena" | "dodana" | "zrusena" | "obnovena" | "navrh" | "upravena";
-
-export interface PurchaseAct {
-  kind: PurchaseActKind;
-  /** Sloveso pro „Vystavil Vít Volný · 22. 10. 14:05". */
-  verb: string;
-  by: string | null;
-  at: string;
-}
-
-export const PURCHASE_ACT_VERBS: Record<PurchaseActKind, string> = {
-  vystavena: "Vystavil",
-  odeslana_email: "Odeslal dodavateli",
-  odeslana: "Označil jako odeslanou",
-  potvrzena: "Potvrzení zapsal",
-  dodana: "Dodání zapsal",
-  zrusena: "Zrušil",
-  obnovena: "Obnovil",
-  navrh: "Vrátil do návrhu",
-  upravena: "Upravil",
-};
-
-const STATUS_ACT: Record<string, PurchaseActKind> = {
-  odeslana: "odeslana", potvrzena: "potvrzena", dodana: "dodana", zrusena: "zrusena", vystavena: "obnovena", navrh: "navrh",
-};
-
-export interface PurchaseActivity {
-  /** Úkony nad objednávkou dodavateli, od nejstaršího. */
-  orders: Map<string, PurchaseAct[]>;
-  /** Kdo vybral vítěznou nabídku (poslední výběr). */
-  quoteSelected: Map<string, { by: string | null; at: string }>;
-  /** Kdo naposledy přidělil obchodníka zakázky. */
-  ownerAssigned: { by: string | null; at: string } | null;
-}
-
-/** Z historie zakázky vytáhne, který účet co u nákupu udělal. */
-export function purchaseActivity(events: ActivityEvent[]): PurchaseActivity {
-  const orders = new Map<string, PurchaseAct[]>();
-  const quoteSelected = new Map<string, { by: string | null; at: string }>();
-  let ownerAssigned: { by: string | null; at: string } | null = null;
-  const sorted = [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  for (const e of sorted) {
-    const d = e.data ?? {};
-    const by = e.actor?.name ?? null;
-    const changes = Array.isArray(d.changes) ? (d.changes as { field?: string }[]) : null;
-    if (changes) {
-      if (changes.some((c) => c?.field === "owner_id")) ownerAssigned = { by, at: e.createdAt };
-      continue; // změny polí zakázky (dodavatel, nákup…) nejsou úkonem objednávky
-    }
-    const poId = typeof d.purchaseOrderId === "string" ? d.purchaseOrderId : null;
-    if (e.type === "quote" && typeof d.supplierQuoteId === "string" && d.action === "selected") {
-      quoteSelected.set(d.supplierQuoteId, { by, at: e.createdAt });
-    }
-    if (!poId || e.type === "quote") continue;
-    let kind: PurchaseActKind | null = null;
-    if (e.type === "email") kind = "odeslana_email";
-    else if (e.type === "field") {
-      if (Array.isArray(d.fields)) kind = typeof d.statusTo === "string" ? STATUS_ACT[d.statusTo] ?? "upravena" : "upravena";
-      else if (typeof d.number === "string") kind = "vystavena";
-    }
-    if (!kind) continue;
-    const list = orders.get(poId) ?? [];
-    list.push({ kind, verb: PURCHASE_ACT_VERBS[kind], by, at: e.createdAt });
-    orders.set(poId, list);
+/**
+ * Kroky objednávky dodavateli s autorem, od nejstaršího. Plní DB triggery atomicky se změnou
+ * (status_changed_*, sent_by, confirmed_*, delivered_*, cancelled_*, received_changed_*).
+ */
+export function purchaseSteps(
+  po: Pick<PurchaseOrderView, "status" | "stamps" | "receipt" | "cancelReason">,
+): PurchaseStep[] {
+  const s = po.stamps;
+  if (!s) return [];
+  const out: PurchaseStep[] = [];
+  if (s.created) out.push({ key: "vystavena", label: "Vystavena", stamp: s.created });
+  if (s.sent) out.push({ key: "odeslana", label: "Odeslána", stamp: s.sent });
+  if (s.confirmed) out.push({ key: "potvrzena", label: "Potvrzena dodavatelem", stamp: s.confirmed });
+  if (s.received && po.receipt && po.status !== "dodana") {
+    out.push({ key: "prevzato", label: `Převzato ${po.receipt.done}/${po.receipt.total} ${po.receipt.total === 1 ? "položky" : "položek"}`, stamp: s.received });
   }
-  return { orders, quoteSelected, ownerAssigned };
+  if (s.delivered) out.push({ key: "dodana", label: "Dodána k nám", stamp: s.delivered });
+  if (s.cancelled) out.push({ key: "zrusena", label: po.cancelReason ? `Zrušena — ${po.cancelReason}` : "Zrušena", stamp: s.cancelled });
+  return out.sort((a, b) => (a.stamp.at ?? "").localeCompare(b.stamp.at ?? ""));
 }
 
-/** Úkony objednávky; bez historie aspoň „Vystavil" z autora objednávky. */
-export function orderActs(
-  po: Pick<PurchaseOrderView, "id" | "createdBy" | "createdAt">,
-  activity: PurchaseActivity | null,
-): PurchaseAct[] {
-  const acts = activity?.orders.get(po.id) ?? [];
-  if (acts.some((a) => a.kind === "vystavena")) return acts;
-  return [{ kind: "vystavena", verb: PURCHASE_ACT_VERBS.vystavena, by: po.createdBy?.name ?? null, at: po.createdAt }, ...acts];
+/** Kdo naposledy přidělil obchodníka zakázky (poslední událost se změnou owner_id). */
+export function ownerAssignedStamp(events: Pick<JobEvent, "type" | "data" | "actor" | "createdAt" | "actorKind" | "actorName" | "via" | "agent">[]): ChangeStamp | null {
+  let best: (typeof events)[number] | null = null;
+  for (const e of events) {
+    const changes = Array.isArray(e.data?.changes) ? (e.data.changes as { field?: string }[]) : null;
+    if (!changes?.some((c) => c?.field === "owner_id")) continue;
+    if (!best || e.createdAt > best.createdAt) best = e;
+  }
+  if (!best) return null;
+  return {
+    by: best.actor ?? null,
+    byName: best.actorName ?? best.actor?.name ?? null,
+    at: best.createdAt,
+    via: best.via ?? null,
+    kind: best.actorKind ?? (best.actor ? "user" : "system"),
+    agent: best.agent ?? null,
+  };
+}
+
+/** Další krok objednávky dodavateli (primární tlačítko = sloveso). */
+export type PurchaseNextStep = "poslat" | "potvrzeno" | "prevzit" | "prevzit_zbytek" | null;
+
+export function purchaseNextStep(po: Pick<PurchaseOrderView, "status"> & { receipt?: { partial: boolean } | null }): PurchaseNextStep {
+  if (po.status === "navrh" || po.status === "vystavena") return "poslat";
+  if (po.status === "odeslana") return po.receipt?.partial ? "prevzit_zbytek" : "potvrzeno";
+  if (po.status === "potvrzena") return po.receipt?.partial ? "prevzit_zbytek" : "prevzit";
+  return null;
+}
+
+// ── Převzetí od dodavatele po položkách ─────────────────────
+export interface ReceiptDraft {
+  itemId: string;
+  drawingNumber: string;
+  name: string;
+  unit: string;
+  /** Objednané množství. */
+  quantity: number;
+  /** Dosud převzato. */
+  before: number;
+  /** Převzato celkem (text formuláře). */
+  received: string;
+  close: boolean;
+  reason: string;
+}
+
+/** Koncepty převzetí: předvyplněno celé objednané množství (stačí potvrdit), uzavřené zůstanou. */
+export function receiptDraftsFrom(items: PurchaseItem[]): ReceiptDraft[] {
+  return items.filter((it): it is PurchaseItem & { id: string } => Boolean(it.id)).map((it) => {
+    const before = it.receivedQuantity ?? 0;
+    const closed = Boolean(it.receiptClosed);
+    return {
+      itemId: it.id,
+      drawingNumber: it.drawingNumber ?? "",
+      name: it.name ?? "",
+      unit: it.unit || "ks",
+      quantity: it.quantity,
+      before,
+      received: decimalInput(closed ? before : Math.max(before, it.quantity)) || "0",
+      close: closed,
+      reason: closed ? it.receiptClosedReason ?? "" : "",
+    };
+  });
+}
+
+export function validateReceiptDrafts(drafts: ReceiptDraft[]): string | null {
+  if (!drafts.length) return "Objednávka nemá položky k převzetí.";
+  for (const [i, d] of drafts.entries()) {
+    const label = d.drawingNumber || d.name || `Položka ${i + 1}`;
+    const q = parseDecimal(d.received);
+    if (q === null || q < 0) return `${label}: zadej převzaté množství (0 a víc).`;
+    if (d.close && q + 1e-9 < d.quantity && !d.reason.trim()) return `${label}: napiš důvod uzavření s menším množstvím.`;
+  }
+  return null;
+}
+
+export function receiptDraftsToInput(drafts: ReceiptDraft[]): PurchaseReceiptInput[] {
+  return drafts.map((d) => {
+    const received = parseDecimal(d.received) ?? 0;
+    const close = d.close && received + 1e-9 < d.quantity;
+    return { itemId: d.itemId, received, ...(close ? { close: true, closeReason: d.reason.trim() } : {}) };
+  });
+}
+
+/** Odvozené stavy navíc k enumu pro chipy (částečně dodaná s průběhem, po termínu). */
+export function purchaseChips(
+  po: Pick<PurchaseOrderView, "status" | "requiredDate" | "confirmedDate"> & { receipt?: { done: number; total: number; partial: boolean } | null },
+  today: string,
+): { key: PurchaseExtraState; progress: Progress | null; hint: string | null }[] {
+  return purchaseExtraStates(po, today).map((key) => {
+    if (key === "castecne_dodana" && po.receipt) {
+      const { done, total } = po.receipt;
+      return { key, progress: { done, total, pct: total ? Math.round((done / total) * 100) : 0, label: `${done}/${total} ${total === 1 ? "položky" : "položek"}` }, hint: null };
+    }
+    const due = po.confirmedDate ?? po.requiredDate;
+    const days = due ? dayDiff(due, today) : 0;
+    return { key, progress: null, hint: days > 0 ? `+${days} ${days === 1 ? "den" : days < 5 ? "dny" : "dní"}` : null };
+  });
 }

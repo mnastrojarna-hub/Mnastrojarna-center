@@ -1,0 +1,26 @@
+{
+  "drawingNumber": "IT-VK-9402",
+  "revision": "A",
+  "title": "Pouzdro",
+  "material": "C45",
+  "dimensions": "120 × 80 × 25 mm",
+  "weightKg": 1.9,
+  "generalTolerance": "ISO 2768-mK",
+  "tightestTolerance": "±0,01",
+  "surface": "Ra 0,8",
+  "heatTreatment": "kalit 58+2 HRC",
+  "surfaceTreatment": "",
+  "quantity": 0,
+  "customerName": "Projekce Novák s.r.o.",
+  "drawingDate": "2026-09-30",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "notes": "",
+  "summary": "Výkres pouzdra IT-VK-9402 (díl IT-SM-9402-B).",
+  "confidence": 0.9,
+  "needsClarification": [],
+  "drawingNumbers": [
+    "IT-VK-9402",
+    "IT-SM-9402-B"
+  ]
+}

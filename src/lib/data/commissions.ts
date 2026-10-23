@@ -140,6 +140,7 @@ interface EntryRow {
   status?: string | null;
   cost_known?: boolean | null;
   collected?: boolean | null;
+  cost_pending_po?: string[] | null;
   job?: Embed<{
     id: string; number: string | null; title: string | null; status: string; paid_at?: string | null;
     customer?: Embed<{ id: string; name: string }>;
@@ -174,6 +175,9 @@ function rowToEntry(r: EntryRow): CommissionEntryView {
     status: isCommissionStatus(r.status) ? r.status : "predbezna",
     costKnown: r.cost_known !== false,
     collected: Boolean(r.collected),
+    ...(r.cost_known === false && Array.isArray(r.cost_pending_po) && r.cost_pending_po.length
+      ? { costPendingPo: r.cost_pending_po.filter((x) => typeof x === "string" && x) }
+      : {}),
   };
 }
 

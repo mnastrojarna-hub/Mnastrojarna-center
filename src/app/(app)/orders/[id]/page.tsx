@@ -2,6 +2,8 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireFeature, getAccess } from "@/lib/auth/session";
+import { getFieldStamps, getJobStamps, listJobPayments, listOrderRevisions } from "@/lib/data/flow-status";
+import { FIELD_STAMP_COLUMNS } from "@/components/jobs/detail/detail-helpers";
 import { getJob, getJobFormOptions } from "@/lib/data/jobs";
 import { getJobProduction } from "@/lib/data/production";
 import { getJobPurchasing } from "@/lib/data/purchasing";
@@ -20,12 +22,13 @@ export async function generateMetadata({ params }: Pick<Params, "params">): Prom
   return { title: job ? `${job.number} — ${job.title} | Kniha zakázek` : "Zakázka nenalezena" };
 }
 
-/** Karta zakázky — vše k jedné zakázce: stav, termíny, položky, nabídky, dokumenty, historie. */
+/** Karta zakázky — vše k jedné zakázce: stav (kdo · kdy), další krok, termíny, položky, nabídky, dokumenty, historie. */
 export default async function JobDetailPage({ params, searchParams }: Params) {
-  await requireFeature("orders");
+  const user = await requireFeature("orders");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const [job, options, access, production, purchasing] = await Promise.all([
+  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions] = await Promise.all([
     loadJob(id), getJobFormOptions(), getAccess(), getJobProduction(id), getJobPurchasing(id),
+    getJobStamps(id), getFieldStamps(id, FIELD_STAMP_COLUMNS), listJobPayments(id), listOrderRevisions(id),
   ]);
   if (!job) notFound();
 
@@ -39,6 +42,11 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
         aiCapture: access.can("ai_capture"),
       }}
       initialTab={typeof sp.tab === "string" ? sp.tab : undefined}
+      initialAction={typeof sp.akce === "string" ? sp.akce : null}
+      flow={{
+        stamps, fieldStamps, payments, revisions,
+        access: { features: access.features, userId: user.id, role: user.role },
+      }}
       production={production}
       purchasing={purchasing}
     />

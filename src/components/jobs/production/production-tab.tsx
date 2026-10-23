@@ -25,6 +25,8 @@ import { TemplateDialog, CompleteDeliveryDialog } from "./template-dialog";
 import { NoteDialog } from "./note-dialog";
 import { CustomerNoteCard } from "./customer-note-card";
 import { ClosingCard } from "./closing-card";
+import { DeliveryCard } from "./delivery-card";
+import type { JobFlowData } from "@/components/jobs/detail/job-detail-view";
 
 export interface JobProductionData {
   operations: JobOperation[];
@@ -37,7 +39,7 @@ export interface JobProductionData {
  * postup (linka metra s jedním tlačítkem Začít / Hotovo), domluvy se
  * zákazníkem a konec toku — potvrzený dodací list → faktura → zaplaceno.
  */
-export function ProductionTab({ job, data }: { job: JobDetail; data: JobProductionData | null }) {
+export function ProductionTab({ job, data, flow }: { job: JobDetail; data: JobProductionData | null; flow?: JobFlowData | null }) {
   const { perms, options, notify, refresh, refreshing } = useJobDetail();
   const { userId } = useAccess();
   const today = todayInPrague();
@@ -107,7 +109,16 @@ export function ProductionTab({ job, data }: { job: JobDetail; data: JobProducti
 
           <div className="min-w-0 space-y-4">
             <CustomerNoteCard jobId={job.id} note={note} />
-            {data?.closing && <ClosingCard job={job} closing={data.closing} margins={perms.margins} />}
+            <DeliveryCard job={job} />
+            {data?.closing && (
+              <ClosingCard
+                job={job}
+                closing={data.closing}
+                margins={perms.margins}
+                payments={flow?.payments}
+                stamps={flow?.stamps ?? null}
+              />
+            )}
           </div>
         </div>
       </div>

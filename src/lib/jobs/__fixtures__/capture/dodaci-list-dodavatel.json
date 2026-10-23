@@ -44,6 +44,7 @@
   "currency": "",
   "paymentTerms": "",
   "deliveryTerms": "Osobní odběr",
+  "deliveryLeadTime": null,
   "note": "Razítko a podpis převzetí: 20. 10. 2026, J. Malá",
   "summary": "Dodací list DL-2026-0877 od Kovoobrábění Hrubý s.r.o. — dodáno 200 ks přírub PR-7075-20 k naší objednávce OBJ-2026-045.",
   "confidence": 0.9,

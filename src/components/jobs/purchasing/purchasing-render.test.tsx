@@ -11,7 +11,7 @@ vi.mock("@/app/actions/purchasing", () => ({
   createSupplierQuote: vi.fn(), updateSupplierQuote: vi.fn(), deleteSupplierQuote: vi.fn(), selectWinningSupplierQuote: vi.fn(),
   unselectSupplierQuote: vi.fn(), draftPurchaseOrder: vi.fn(), issuePurchaseOrder: vi.fn(), updatePurchaseOrder: vi.fn(),
   regeneratePurchaseOrderPdf: vi.fn(), draftPurchaseOrderEmail: vi.fn(), sendPurchaseOrder: vi.fn(), assignJobOwner: vi.fn(),
-  importCapturedSupplierQuote: vi.fn(),
+  importCapturedSupplierQuote: vi.fn(), setPurchaseReceived: vi.fn(),
 }));
 vi.mock("@/app/actions/jobs", () => ({ updateJob: vi.fn(), setJobStage: vi.fn() }));
 vi.mock("@/lib/jobs/upload-client", () => ({ uploadJobFiles: vi.fn(), uploadJobFile: vi.fn() }));
@@ -26,6 +26,10 @@ import type {
 } from "@/lib/jobs/purchasing-types";
 
 const person = (id: string, name: string) => ({ id, name });
+const stamp = (name: string | null, at: string) => ({
+  by: name ? person(`u-${name}`, name) : null, byName: name, at, via: null, kind: name ? ("user" as const) : ("system" as const),
+});
+const NO_STAMPS = { created: null, status: null, sent: null, confirmed: null, delivered: null, cancelled: null, received: null };
 
 function job(over: Partial<JobDetail> = {}): JobDetail {
   return {
@@ -115,13 +119,10 @@ describe("Nákup & marže — render", () => {
     expect(html).toContain("Petr Obchodník");
   });
 
-  it("nabídky s vítězem: zelený odznak, srovnání, nejlevnější, kdo vybral", () => {
-    const j = job({
-      events: [{ id: "e1", type: "quote", message: "Vybrána vítězná", data: { supplierQuoteId: "q1", action: "selected" }, actor: person("u0", "Admin"), createdAt: "2026-10-03T08:00:00Z" }],
-    });
-    const html = render(j, data({
+  it("nabídky s vítězem: zelený odznak, srovnání, nejlevnější, kdo vybral (ze sloupce selected_by)", () => {
+    const html = render(job(), data({
       supplierQuotes: [
-        quote({ id: "q1", selected: true }),
+        quote({ id: "q1", selected: true, selectedStamp: stamp("Vít Volný", "2026-10-03T08:00:00Z") }),
         quote({ id: "q2", supplier: supplierRef("s2", "Frézy Hrubý"), supplierName: "Frézy Hrubý", number: "H-9", total: 27_500, deliveryDate: "2026-11-05" }),
       ],
       totals: { revenue: 48_000, purchaseOrdersTotal: 0, plannedCost: 30_000, cost: 30_000, costSource: "odhad", profit: 18_000, margin: 0.375 },
@@ -133,8 +134,9 @@ describe("Nákup & marže — render", () => {
     expect(html).toContain("+2 500 Kč");
     expect(html).toContain("Vybrat jako vítěznou");
     expect(html).toContain("Zrušit výběr");
-    expect(html).toContain("Vybráno jako vítězná —");
-    expect(html).toContain("Zadal");
+    expect(html).toContain("Vítězná · Vít Volný");
+    expect(html).toContain("Zapsána · Admin");
+    expect(html).not.toMatch(/Zadal|Vybral/);
     expect(html).toContain("Vítěz");
     expect(html).toContain("18 000 Kč");
     expect(html).toContain("marže 37,5 %");
@@ -144,15 +146,15 @@ describe("Nákup & marže — render", () => {
     expect(html).not.toContain("Doplň nákupní cenu");
   });
 
-  it("objednávky dodavatelům: stav, akce dle stavu, kdo vystavil a odeslal", () => {
-    const j = job({
-      events: [
-        { id: "e1", type: "field", message: "Vystavena", data: { purchaseOrderId: "po1", number: "OV-2026-004", itemCount: 1 }, actor: person("u2", "Vít Volný"), createdAt: "2026-10-05T09:00:00Z" },
-        { id: "e2", type: "email", message: "Odesláno", data: { purchaseOrderId: "po1" }, actor: person("u1", "Petr Obchodník"), createdAt: "2026-10-05T10:00:00Z" },
+  it("objednávky dodavatelům: stav, akce dle stavu, kdo vystavil, odeslal a zrušil (ze sloupců)", () => {
+    const html = render(job(), data({
+      purchaseOrders: [
+        order({ stamps: { ...NO_STAMPS, created: stamp("Vít Volný", "2026-10-05T09:00:00Z"), sent: stamp("Petr Obchodník", "2026-10-05T10:00:00Z") } }),
+        order({
+          id: "po2", number: "OV-2026-003", status: "zrusena", sentAt: null, cancelReason: "Objednáno jinde",
+          stamps: { ...NO_STAMPS, created: stamp(null, "2026-10-04T09:00:00Z"), cancelled: stamp("Petr Obchodník", "2026-10-06T09:00:00Z") },
+        }),
       ],
-    });
-    const html = render(j, data({
-      purchaseOrders: [order(), order({ id: "po2", number: "OV-2026-003", status: "zrusena", sentAt: null })],
       totals: { revenue: 48_000, purchaseOrdersTotal: 30_000, plannedCost: null, cost: 30_000, costSource: "objednavky", profit: 18_000, margin: 0.375 },
       commission: commission({ status: "k_vyplate" }),
     }));
@@ -161,9 +163,11 @@ describe("Nákup & marže — render", () => {
     expect(html).toContain("Zrušena");
     expect(html).toContain("Dodavatel potvrdil");
     expect(html).toContain("/api/jobs/files/f9");
-    expect(html).toContain("Vystavil");
-    expect(html).toContain("Vít Volný");
-    expect(html).toContain("Odeslal dodavateli");
+    expect(html).toContain("Vystavena · V. Volný");
+    expect(html).toContain("Odeslána · P. Obchodník");
+    expect(html).toContain("Zrušena — Objednáno jinde · P. Obchodník");
+    expect(html.replace(/<[^>]+>/g, "")).toContain("Vystavena · Systém ·"); // jméno a čas jsou zvlášť (zkracuje se jméno)
+    expect(html).not.toMatch(/Vystavil|Odeslal|Zrušil/);
     expect(html).toContain("Vystavit další objednávku");
     expect(html).toContain("objednávky dodavatelům");
     expect(html).toContain("Provize k výplatě");
@@ -215,10 +219,50 @@ describe("Nabídky z focení čekající na Nákup", () => {
   });
 });
 
+describe("Objednávky dodavatelům — převzetí a stavy navíc", () => {
+  it("potvrzená s položkami → Převzít zboží; částečně převzatá → Převzít zbytek + chip 1/2 položek; po termínu +N", () => {
+    const items = [
+      { id: "y1", position: 0, drawingNumber: "VL-12", name: "Vodicí lišta", material: null, quantity: 12, unit: "ks", unitPrice: 2500, note: null, receivedQuantity: 12 },
+      { id: "y2", position: 1, drawingNumber: "VL-13", name: "Lišta krátká", material: null, quantity: 4, unit: "ks", unitPrice: 900, note: null, receivedQuantity: 0 },
+    ];
+    const html = render(job(), data({
+      purchaseOrders: [
+        order({ status: "potvrzena" }),
+        order({
+          id: "po3", number: "OV-2026-007", status: "potvrzena", requiredDate: "2020-01-01", items,
+          receipt: { done: 1, total: 2, partial: true },
+          stamps: { ...NO_STAMPS, received: stamp("Pavel Dílna", "2026-10-07T09:00:00Z") },
+        }),
+      ],
+    }));
+    expect(html).toContain("Převzít zboží");
+    expect(html).toContain("Převzít zbytek");
+    expect(html).toContain("Částečně dodaná");
+    expect(html).toContain("1/2 položek");
+    expect(html).toContain("Po termínu");
+    expect(html).toContain("Převzato 1/2 položek · P. Dílna");
+    expect(html).toContain("12/12 ks");
+    expect(html).toContain("0/4 ks");
+    // barvy celé (Tailwind JIT): lime částečně, rose po termínu
+    expect(html).toContain("ring-lime-300");
+    expect(html).toContain("ring-rose-400");
+    // autor viditelný jako text na všech šířkách (žádné hidden sm:inline)
+    expect(html).toContain("text-[11px]");
+  });
+
+  it("dodaná objednávka nemá primární krok ani chip částečně", () => {
+    const html = render(job(), data({
+      purchaseOrders: [order({ status: "dodana", receipt: { done: 1, total: 1, partial: false }, stamps: { ...NO_STAMPS, delivered: stamp("Petr Obchodník", "2026-10-08T09:00:00Z") } })],
+    }));
+    expect(html).toContain("Dodána k nám · P. Obchodník");
+    expect(html).not.toContain("Převzít zboží");
+    expect(html).not.toContain("Částečně dodaná");
+  });
+});
+
 describe("Objednávky dodavatelům — přehled", () => {
   const item = (over: Partial<PurchaseOrderListItem> = {}): PurchaseOrderListItem => {
-    const { items: _items, ...rest } = order();
-    void _items;
+    const rest = order({ stamps: { ...NO_STAMPS, created: stamp("Vít Volný", "2026-10-05T09:00:00Z") } });
     return {
       ...rest, job: { id: "j1", number: "Z-2026-105", title: "Vodicí lišty", stage: "ve_vyrobe" }, customer: { id: "c1", name: "StrojMetal s.r.o." },
       itemCount: 1, drawingNumbers: ["VL-12"], ...over,
@@ -228,7 +272,6 @@ describe("Objednávky dodavatelům — přehled", () => {
     const html = renderToString(
       <PurchaseOrdersBoard
         items={[item(), item({ id: "po2", number: "OV-2026-005", status: "vystavena", sentAt: null, requiredDate: "2020-01-01" })]}
-        events={[{ type: "field", data: { purchaseOrderId: "po1", number: "OV-2026-004" }, actor: { name: "Vít Volný" }, createdAt: "2026-10-05T09:00:00Z" }]}
         today="2026-10-22"
       />,
     ).replace(/<!-- -->/g, "").replace(/[  ]/g, " ");
@@ -236,14 +279,14 @@ describe("Objednávky dodavatelům — přehled", () => {
     expect(html).toContain("K odeslání");
     expect(html).toContain("Po termínu");
     expect(html).toContain("OV-2026-005");
-    expect(html).toContain("po termínu");
+    expect(html).toContain("Po termínu");
     expect(html).toContain("/orders/j1?tab=nakup");
     expect(html).toContain("StrojMetal s.r.o.");
     expect(html).toContain("Poslat e-mailem");
-    expect(html).toContain("Vystavil");
+    expect(html).toContain("Vystavena · V. Volný");
     expect(html).toContain("60 000 Kč");
 
-    const empty = renderToString(<PurchaseOrdersBoard items={[]} events={[]} today="2026-10-22" />).replace(/<!-- -->/g, "");
+    const empty = renderToString(<PurchaseOrdersBoard items={[]} today="2026-10-22" />).replace(/<!-- -->/g, "");
     expect(empty).toContain("Zatím žádná objednávka dodavateli");
   });
 });

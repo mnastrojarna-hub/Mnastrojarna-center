@@ -100,14 +100,40 @@ export function BrandHeader({
   );
 }
 
-/** Stránka A4 dokladu: obsah + zkrácená hlavička od 2. strany + patička se stránkováním. */
-export function DocPage({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * Stránka A4 dokladu: obsah + zkrácená hlavička od 2. strany + patička se stránkováním.
+ * S `watermark` (#25 neschválená nabídka) šikmý vodoznak přes každou stranu a červený pruh na 1. straně.
+ */
+export function DocPage({ label, watermark, banner, children }: { label: string; watermark?: string; banner?: string; children: ReactNode }) {
   return (
     <Page size="A4" style={styles.page}>
       <RunningHeader label={label} />
+      {watermark && banner ? (
+        <View style={{ backgroundColor: C.red, borderRadius: 3, paddingVertical: 5, paddingHorizontal: 9, marginBottom: 8 }}>
+          <Text style={{ color: "#FFFFFF", fontSize: 9.5, fontWeight: 700 }}>{banner}</Text>
+        </View>
+      ) : null}
       <View style={styles.body}>{children}</View>
       <DocFooter />
+      {watermark ? <Watermark text={watermark} /> : null}
     </Page>
+  );
+}
+
+/** Šikmý vodoznak přes celou stranu (fixed = na každé straně). */
+export function Watermark({ text }: { text: string }) {
+  return (
+    <View fixed style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+      <Text
+        style={{
+          // A4 = 595 pt na šířku: 24 znaků po 40 pt otočených o −30° se vejde i s okraji (54 pt ořízlo krajní písmena)
+          fontFamily: "Roboto", fontWeight: 700, fontSize: 40, color: C.red, opacity: 0.14,
+          transform: "rotate(-30deg)", textAlign: "center", width: 595,
+        }}
+      >
+        {text}
+      </Text>
+    </View>
   );
 }
 

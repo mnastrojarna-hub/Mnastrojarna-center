@@ -47,8 +47,11 @@ insert into suppliers (id, name, country, email, technologies, materials, lead_d
   ('d4000000-0000-0000-0000-000000000003', 'CoatTech CZ', 'CZ', 'info@coattech.cz', '{"PVD povlaky"}', '{}', 6, 4.4, null);
 
 -- ── Schránky (vlastník = uživatel) ─────────────────────────
+-- Obchodník odesílá nabídky / doklady ze SVÉ schránky (bez SMTP by se neodeslalo — žádná záloha na
+-- cizí / firemní adresu) → odchozí server = lokální mail catcher (bez TLS jen na localhostu).
 insert into mailboxes (id, provider, email, display_name, config, active, owner_id)
-select 'd5000000-0000-0000-0000-000000000001'::uuid, 'imap'::mailbox_provider, 'obchod@mnastrojarna.test', 'Obchod — Petr', '{}'::jsonb, true, obchod_id from u
+select 'd5000000-0000-0000-0000-000000000001'::uuid, 'imap'::mailbox_provider, 'obchod@mnastrojarna.test', 'Obchod — Petr',
+  '{"smtp_host": "127.0.0.1", "smtp_port": 54325, "smtp_user": "obchod@mnastrojarna.test", "smtp_password": "test"}'::jsonb, true, obchod_id from u
 union all
 select 'd5000000-0000-0000-0000-000000000002', 'imap', 'dilna@mnastrojarna.test', 'Dílna — Jana', '{}'::jsonb, true, dilna_id from u
 union all

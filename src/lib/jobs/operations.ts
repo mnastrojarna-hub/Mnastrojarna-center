@@ -1,6 +1,6 @@
 import {
   Disc3, Cog, Gem, Flame, SprayCan, Zap, Sparkles, Drill, Wrench, Layers, Puzzle, Ruler, Truck,
-  PackageCheck, CircleDot, Clock, Loader, CircleCheck, AlertTriangle, SkipForward,
+  PackageCheck, CircleDot, Clock, Loader, CircleCheck, AlertTriangle, SkipForward, Factory,
   type LucideIcon,
 } from "lucide-react";
 
@@ -11,6 +11,7 @@ import {
  */
 
 export type OperationKind =
+  | "vyroba"
   | "soustruzeni" | "frezovani" | "brouseni" | "tepelne_zpracovani" | "povrchova_uprava"
   | "dratove_rezani" | "elektroeroze" | "vrtani" | "svarovani" | "plech" | "montaz"
   | "kontrola" | "doprava" | "kompletni_dodavka" | "jine";
@@ -29,6 +30,8 @@ export interface OperationKindMeta {
 }
 
 export const OPERATION_KINDS: Record<OperationKind, OperationKindMeta> = {
+  // „Výroba" = obecný výrobní krok (obrábění u jedné firmy); „Výroba 1 / 2" se čísluje až při zobrazení
+  vyroba: { key: "vyroba", label: "Výroba", short: "Výroba", icon: Factory, badge: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300", solid: "bg-rose-600 text-white", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" },
   soustruzeni: { key: "soustruzeni", label: "Soustružení", short: "Soustruh", icon: Disc3, badge: "bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300", solid: "bg-sky-500 text-white", dot: "bg-sky-500", text: "text-sky-600 dark:text-sky-400" },
   frezovani: { key: "frezovani", label: "Frézování", short: "Fréza", icon: Cog, badge: "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300", solid: "bg-blue-600 text-white", dot: "bg-blue-600", text: "text-blue-600 dark:text-blue-400" },
   brouseni: { key: "brouseni", label: "Broušení", short: "Bruska", icon: Gem, badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300", solid: "bg-indigo-500 text-white", dot: "bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400" },
@@ -48,7 +51,7 @@ export const OPERATION_KINDS: Record<OperationKind, OperationKindMeta> = {
 
 /** Pořadí v nabídce „Přidat operaci" (nejčastější první). */
 export const OPERATION_KIND_ORDER: OperationKind[] = [
-  "soustruzeni", "frezovani", "tepelne_zpracovani", "brouseni", "povrchova_uprava", "dratove_rezani",
+  "vyroba", "soustruzeni", "frezovani", "tepelne_zpracovani", "brouseni", "povrchova_uprava", "dratove_rezani",
   "elektroeroze", "vrtani", "svarovani", "plech", "montaz", "kontrola", "doprava", "kompletni_dodavka", "jine",
 ];
 
@@ -78,11 +81,37 @@ export function nextOperationStatus(status: OperationStatus): OperationStatus | 
 /** Šablony postupů pro rychlé založení. */
 export const OPERATION_TEMPLATES: { key: string; label: string; kinds: OperationKind[] }[] = [
   { key: "komplet", label: "Kompletní dodávka (jedna firma)", kinds: ["kompletni_dodavka"] },
+  { key: "vyroba_kaleni", label: "Výroba → tepelné zpracování → výroba", kinds: ["vyroba", "tepelne_zpracovani", "vyroba"] },
   { key: "soustruzeny", label: "Soustružený díl — kalený a broušený", kinds: ["soustruzeni", "tepelne_zpracovani", "brouseni", "povrchova_uprava"] },
   { key: "frezovany", label: "Frézovaný díl — kalený a broušený", kinds: ["frezovani", "tepelne_zpracovani", "brouseni", "povrchova_uprava"] },
   { key: "nastroj", label: "Nástroj (soustruh → fréza → kalení → bruska → drát)", kinds: ["soustruzeni", "frezovani", "tepelne_zpracovani", "brouseni", "dratove_rezani", "kontrola"] },
   { key: "svarenec", label: "Svařenec (plech → svár → obrábění → povrch)", kinds: ["plech", "svarovani", "frezovani", "povrchova_uprava"] },
 ];
+
+// ── Termín kroku: jak je jistý (job_operations.deadline_state) ──
+export type DeadlineState = "odhad" | "dohodnuto" | "pozadovano" | "potvrzeno" | "zmena_ceka" | "plan";
+
+export interface DeadlineStateMeta {
+  key: DeadlineState;
+  /** Krátký popisek do štítku („odhad", „potvrzeno"). */
+  label: string;
+  /** grey = jen odhad / plán, green = dohodnuto / potvrzeno, amber = čeká na dodavatele. */
+  tone: "grey" | "green" | "amber";
+  badge: string;
+}
+
+export const DEADLINE_STATE_META: Record<DeadlineState, DeadlineStateMeta> = {
+  odhad: { key: "odhad", label: "odhad", tone: "grey", badge: "bg-muted text-muted-foreground" },
+  plan: { key: "plan", label: "plán dílny", tone: "grey", badge: "bg-muted text-muted-foreground" },
+  dohodnuto: { key: "dohodnuto", label: "dohodnuto", tone: "green", badge: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300" },
+  potvrzeno: { key: "potvrzeno", label: "potvrzeno", tone: "green", badge: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300" },
+  pozadovano: { key: "pozadovano", label: "čeká na potvrzení", tone: "amber", badge: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
+  zmena_ceka: { key: "zmena_ceka", label: "změna čeká", tone: "amber", badge: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
+};
+
+export function isDeadlineState(v: unknown): v is DeadlineState {
+  return typeof v === "string" && v in DEADLINE_STATE_META;
+}
 
 export function isOperationKind(v: unknown): v is OperationKind {
   return typeof v === "string" && v in OPERATION_KINDS;
