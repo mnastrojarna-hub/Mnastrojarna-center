@@ -1,7 +1,8 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { useCommandPalette } from "@/components/command-palette";
 import { AutomationModeToggle } from "@/components/automation-mode-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -14,7 +15,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { signOut } from "@/app/auth/actions";
+import { endSession } from "@/app/auth/actions";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { CurrentUser } from "@/lib/data/current-user";
 import type { Feature } from "@/lib/auth/permissions";
 
@@ -60,11 +62,7 @@ export function Topbar({ user, features }: { user: CurrentUser | null; features:
             {has("settings") && <DropdownMenuItem asChild><Link href="/setup">Průvodce nastavením</Link></DropdownMenuItem>}
             <DropdownMenuSeparator />
             {user ? (
-              <form action={signOut}>
-                <DropdownMenuItem asChild className="text-destructive focus:text-destructive">
-                  <button type="submit" className="w-full cursor-pointer">Odhlásit se</button>
-                </DropdownMenuItem>
-              </form>
+              <SignOutItem />
             ) : (
               <DropdownMenuItem asChild><Link href="/login">Přihlásit se</Link></DropdownMenuItem>
             )}
@@ -72,5 +70,30 @@ export function Topbar({ user, features }: { user: CurrentUser | null; features:
         </DropdownMenu>
       </div>
     </header>
+  );
+}
+
+/**
+ * Odhlášení přímo z položky menu. (Formulář uvnitř menu se neodeslal — Radix menu
+ * po výběru položky zmizí ze stránky dřív, než prohlížeč formulář odešle.)
+ */
+function SignOutItem() {
+  const [pending, start] = React.useTransition();
+  return (
+    <DropdownMenuItem
+      className="text-destructive focus:text-destructive"
+      disabled={pending}
+      onSelect={(e) => {
+        e.preventDefault();
+        start(async () => {
+          // relace v prohlížeči i na serveru (cookies), pak jedno čisté přesměrování na /login
+          await Promise.allSettled([createBrowserClient().auth.signOut(), endSession()]);
+          window.location.assign("/login");
+        });
+      }}
+    >
+      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      Odhlásit se
+    </DropdownMenuItem>
   );
 }
