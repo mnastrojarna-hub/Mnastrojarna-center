@@ -145,10 +145,10 @@ await T("/settings: limit schválení nabídek → /settings/audit „Změněno 
     await first.waitFor({ timeout: 10_000 });
     const t = norm(await first.innerText());
     expect(t.includes("Změněno nastavení") && t.includes(`→ ${value}`) && t.includes(ADMIN), `záznam s autorem a změnou (${t.slice(0, 200)})`);
-    expect(await page.getByLabel("Osoba").inputValue() === ID.admin, "filtr osoby z adresy");
+    expect(await page.getByRole("region", { name: "Filtr auditu" }).getByLabel("Osoba").inputValue() === ID.admin, "filtr osoby z adresy");
     // jiná osoba → záznam zmizí
     await waitHydrated(page, "main select[aria-label='Osoba']");
-    await page.getByLabel("Osoba").selectOption({ value: "system" });
+    await page.getByRole("region", { name: "Filtr auditu" }).getByLabel("Osoba").selectOption({ value: "system" });
     await eventually(async () => expect(!norm(await page.locator("main").innerText()).includes(`→ ${value}`), "filtr Systém záznam admina nezobrazí"));
     await shot(page, S("02-audit"));
   } finally {

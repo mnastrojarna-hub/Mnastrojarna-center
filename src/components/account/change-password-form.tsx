@@ -30,7 +30,10 @@ export function ChangePasswordForm({ email }: { email: string }) {
     try {
       const res = await changeOwnPassword(current, next);
       if (!res.ok) setStatus({ ok: false, text: res.error ?? "Heslo se nepodařilo změnit." });
-      else {
+      else if (res.signedOut) {
+        // relace skončila se změnou hesla a nové přihlášení se nepovedlo → přihlásit znovu
+        router.push(`/login?reset=1&email=${encodeURIComponent(email)}`);
+      } else {
         setStatus({ ok: true, text: "Heslo je změněné. Příště se přihlas novým heslem." });
         setCurrent("");
         setNext("");

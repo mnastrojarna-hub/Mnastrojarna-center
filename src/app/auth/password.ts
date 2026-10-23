@@ -377,7 +377,7 @@ export async function updatePasswordAfterRecovery(newPassword: string): Promise<
 export async function changeOwnPassword(
   currentPassword: string,
   newPassword: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; signedOut?: boolean }> {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "Nejsi přihlášen — přihlas se znovu." };
   if (!user.active) return { ok: false, error: "Účet není aktivní." };
@@ -403,6 +403,15 @@ export async function changeOwnPassword(
     if (hasServiceKey()) {
       const { error } = await createAdminClient().auth.admin.updateUserById(user.id, { password: newPassword });
       if (error) return { ok: false, error: translateAuthError(error.message) };
+      // Supabase po změně hesla přes admin API ukončí VŠECHNY relace uživatele (i tuhle) →
+      // hned přihlásit novým heslem, ať uživatel zůstane přihlášený; ostatní zařízení zůstanou odhlášená.
+      const supabase = await createClient();
+      const { error: reloginError } = await supabase.auth.signInWithPassword({ email: user.email, password: newPassword });
+      if (reloginError) {
+        await clearPasswordChangeRequired(user.id);
+        await logAudit({ action: "password_changed", entity: "profiles", entityId: user.id, actor: userActor(user) });
+        return { ok: true, signedOut: true };
+      }
     } else {
       const supabase = await createClient();
       const { error } = await supabase.auth.updateUser({ password: newPassword });
