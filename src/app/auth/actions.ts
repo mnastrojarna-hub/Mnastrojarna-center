@@ -3,17 +3,34 @@
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { normalizeEmail } from "@/lib/auth/reset-code";
+import {
+  INACTIVE,
+  describeInvalidCredentials,
+  isInvalidCredentials,
+  loginError,
+  loginRedirectUrl,
+  type LoginAccountState,
+} from "@/lib/auth/login-diagnosis";
+import { logAudit } from "@/lib/audit";
 
-const INACTIVE = "Účet není aktivní. Požádej super admina o aktivaci.";
-
-/** Srozumitelná česká chyba přihlášení. */
-function loginError(message: string): string {
-  const m = message.toLowerCase();
-  if (m.includes("invalid login credentials")) return "Nesprávný e-mail nebo heslo.";
-  if (m.includes("email not confirmed")) return "E-mail ještě není potvrzený — požádej super admina o aktivaci účtu.";
-  if (m.includes("banned")) return INACTIVE;
-  if (m.includes("rate limit") || m.includes("too many")) return "Příliš mnoho pokusů — chvíli počkej a zkus to znovu.";
-  return message;
+/** Stav účtu podle e-mailu (service key) — pro přesnou hlášku po špatném heslu. */
+async function accountState(email: string): Promise<(LoginAccountState & { id?: string }) | null> {
+  if (!hasServiceKey()) return null;
+  try {
+    const db = createAdminClient();
+    const { data, error } = await db
+      .from("profiles")
+      .select("id, active, password_change_required")
+      .eq("email", email)
+      .limit(1)
+      .maybeSingle();
+    if (error) return null;
+    const p = data as { id: string; active: boolean | null; password_change_required: boolean | null } | null;
+    if (!p) return { exists: false, active: false, initialPassword: false };
+    return { id: p.id, exists: true, active: p.active !== false, initialPassword: p.password_change_required === true };
+  } catch {
+    return null;
+  }
 }
 
 export async function signIn(formData: FormData) {
@@ -24,13 +41,27 @@ export async function signIn(formData: FormData) {
     redirect("/setup");
   }
   if (!email || !password) {
-    redirect(`/login?error=${encodeURIComponent("Vyplň e-mail a heslo.")}`);
+    redirect(loginRedirectUrl("Vyplň e-mail a heslo.", email));
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
-    redirect(`/login?error=${encodeURIComponent(loginError(error?.message ?? "Přihlášení se nepovedlo."))}`);
+    let message = loginError(error?.message ?? "Přihlášení se nepovedlo.");
+    if (isInvalidCredentials(error?.message)) {
+      const state = await accountState(email);
+      message = describeInvalidCredentials(email, state);
+      // pokus o přihlášení do existujícího účtu → audit (kdo kdy zkoušel, proč neprošlo)
+      if (state?.exists) {
+        await logAudit({
+          action: "login_failed",
+          entity: "profiles",
+          entityId: state.id,
+          diff: { email, reason: state.active ? "wrong_password" : "inactive", initial_password: state.initialPassword },
+        });
+      }
+    }
+    redirect(loginRedirectUrl(message, email));
   }
 
   // Neaktivní účet (registrace bez pozvánky / deaktivace) se nepustí dál
@@ -54,7 +85,7 @@ export async function signIn(formData: FormData) {
     }
     if (!active) {
       await supabase.auth.signOut();
-      redirect(`/login?error=${encodeURIComponent(INACTIVE)}`);
+      redirect(loginRedirectUrl(INACTIVE, email));
     }
   }
 
