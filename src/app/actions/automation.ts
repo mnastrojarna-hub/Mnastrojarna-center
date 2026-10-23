@@ -10,6 +10,8 @@ type Result = { ok: boolean; error?: string };
 const NEED = "Pro uložení doplň servisní klíč Supabase nebo se přihlas jako super admin.";
 
 const MODES: AutomationMode[] = ["full", "approval"];
+/** Moduly, které jdou nastavit (řádek se případně založí — např. „capture" přibyl později). */
+const MODULES = ["categorize", "spam", "reply", "quote", "supplier_request", "order_match", "drawing_extract", "capture"];
 
 export async function setGlobalMode(mode: AutomationMode): Promise<Result> {
   const auth = await checkFeature("ai_tuning");
@@ -38,14 +40,13 @@ export async function setGlobalMode(mode: AutomationMode): Promise<Result> {
 export async function setModuleMode(module: string, mode: AutomationMode): Promise<Result> {
   const auth = await checkFeature("ai_tuning");
   if ("error" in auth) return { ok: false, error: auth.error };
-  if (!MODES.includes(mode) || typeof module !== "string" || !module) return { ok: false, error: "Neplatný režim." };
+  if (!MODES.includes(mode) || typeof module !== "string" || !MODULES.includes(module)) return { ok: false, error: "Neplatný režim." };
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const db = await createOperatorClient();
     const { data, error } = await db
       .from("automation_settings")
-      .update({ mode } as never)
-      .eq("module", module)
+      .upsert({ module, mode, updated_by: auth.user.id, updated_at: new Date().toISOString() } as never, { onConflict: "module" })
       .select("module");
     if (error) return { ok: false, error: error.message };
     if (!data || data.length === 0) return { ok: false, error: hasServiceKey() ? "Modul nenalezen." : NEED };

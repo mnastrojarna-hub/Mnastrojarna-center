@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 type Mode = "full" | "approval";
 
-// Klíče odpovídají DB tabulce automation_settings (migrace 0006).
+// Klíče odpovídají DB tabulce automation_settings (migrace 0006); „capture" čte foto dokladu (getModuleMode).
 const modules = [
   { key: "categorize", label: "Kategorizace e-mailů", desc: "Třídění příchozí pošty do kategorií", recommended: "full" },
   { key: "spam", label: "Filtrování spamu", desc: "Automatické odstranění spamu", recommended: "full" },
@@ -16,6 +16,7 @@ const modules = [
   { key: "supplier_request", label: "Poptávky dodavatelům", desc: "Odeslání poptávky materiálu", recommended: "approval" },
   { key: "order_match", label: "Párování objednávek", desc: "Spárování objednávky s nabídkou", recommended: "full" },
   { key: "drawing_extract", label: "Extrakce z výkresů", desc: "Čtení metadat z PDF/STEP/DXF", recommended: "full" },
+  { key: "capture", label: "Foto dokladů", desc: "Roztřídění a uložení vyfocených dokladů bez kontroly (jen při jisté shodě)", recommended: "approval" },
 ] as const;
 
 export function AutomationSettings({ initial }: { initial?: Record<string, Mode> }) {
