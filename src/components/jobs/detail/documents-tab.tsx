@@ -27,6 +27,11 @@ import { useJobDetail } from "./detail-context";
 import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
+import { anonApi } from "@/components/anonymize/anon-api";
+import {
+  AnonFileBadge, AnonMenuItems, AnonSummaryLine, ForSupplierLink, ReviewDownloadDialog, SendQueueNotice, SupplierPackButton, supplierReady, supplierSummary,
+} from "@/components/anonymize/anon-file-menu";
+import { AnonymizeEditor } from "@/components/anonymize/anonymize-editor";
 
 /** Doklady, které jde z karty poslat zákazníkovi e-mailem (PDF v příloze). */
 const SENDABLE: Partial<Record<JobFileKind, { kind: JobDocumentKind; what: string }>> = {
@@ -78,7 +83,7 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
 }
 
 function FileRow({
-  file, all, quotes, onEdit, onDelete, onPreview, onSend,
+  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload,
 }: {
   file: JobFile;
   all: JobFile[];
@@ -88,12 +93,18 @@ function FileRow({
   onPreview: (f: JobFile) => void;
   /** Poslat doklad zákazníkovi e-mailem (jen doklady a s právem na dokumenty). */
   onSend?: (f: JobFile) => void;
+  /** Anonymizace pro dodavatele (editor oblastí, zařazení / schválení / přeskočení, stažení ke kontrole). */
+  onAnonEdit?: (f: JobFile) => void;
+  onAnonAction?: (f: JobFile, action: "enqueue" | "approve" | "skip") => void;
+  onReviewDownload?: (f: JobFile) => void;
 }) {
   const { perms, notify, refresh, startUpload } = useJobDetail();
   const [busy, setBusy] = React.useState(false);
   const versionInput = React.useRef<HTMLInputElement>(null);
   const replaced = replacedByLabel(file, all);
   const quote = file.quoteId ? quotes.find((q) => q.id === file.quoteId) : null;
+  /** Má hotovou / ke kontrole kopii pro dodavatele → stažení originálu se označí „interně". */
+  const forSupplier = supplierReady(file);
 
   async function toggleArchive() {
     setBusy(true);
@@ -138,6 +149,7 @@ function FileRow({
           )}
           {replaced && <span className="rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground">{replaced}</span>}
           {quote && <span className="rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-medium text-violet-800 dark:bg-violet-500/15 dark:text-violet-300">k nabídce {quote.number}</span>}
+          {!file.archived && <AnonFileBadge file={file} />}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {file.title && <span className="max-w-[14rem] truncate">{file.filename}</span>}
@@ -147,15 +159,19 @@ function FileRow({
           </span>
         </div>
         {file.note && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{file.note}</p>}
+        {!file.archived && <AnonSummaryLine file={file} />}
+        {forSupplier && onReviewDownload && (
+          <div className="mt-1"><ForSupplierLink file={file} onReviewDownload={onReviewDownload} /></div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <Button asChild variant="ghost" size="icon-sm" className="hidden sm:inline-flex">
-          <a href={fileUrl(file.id)} target="_blank" rel="noopener noreferrer" aria-label="Otevřít" title="Otevřít">
+          <a href={fileUrl(file.id)} target="_blank" rel="noopener noreferrer" aria-label={forSupplier ? "Otevřít originál (interně)" : "Otevřít"} title={forSupplier ? "Otevřít originál (interně)" : "Otevřít"}>
             <ExternalLink className="h-4 w-4" />
           </a>
         </Button>
         <Button asChild variant="ghost" size="icon-sm">
-          <a href={fileUrl(file.id, true)} aria-label="Stáhnout" title="Stáhnout">
+          <a href={fileUrl(file.id, true)} aria-label={forSupplier ? "Stáhnout originál (interně)" : "Stáhnout"} title={forSupplier ? "Originál (interně) — dodavateli posílej „Pro dodavatele“" : "Stáhnout"}>
             <Download className="h-4 w-4" />
           </a>
         </Button>
@@ -165,18 +181,23 @@ function FileRow({
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuContent align="end" className="w-64">
+            {/* u anonymizovaného výkresu nahoře kopie pro dodavatele, originál až pod ní (interně) */}
+            {!file.archived && onAnonEdit && onAnonAction && onReviewDownload && (
+              <AnonMenuItems file={file} onEdit={onAnonEdit} onAction={onAnonAction} onReviewDownload={onReviewDownload} />
+            )}
             <DropdownMenuItem asChild>
-              <a href={fileUrl(file.id)} target="_blank" rel="noopener noreferrer"><ExternalLink /> Otevřít</a>
+              <a href={fileUrl(file.id)} target="_blank" rel="noopener noreferrer"><ExternalLink /> {forSupplier ? "Otevřít originál (interně)" : "Otevřít"}</a>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <a href={fileUrl(file.id, true)}><Download /> Stáhnout</a>
+              <a href={fileUrl(file.id, true)}><Download /> {forSupplier ? "Stáhnout originál (interně)" : "Stáhnout"}</a>
             </DropdownMenuItem>
             {onSend && !file.archived && SENDABLE[file.kind] && (
               <DropdownMenuItem onSelect={() => onSend(file)}>
                 <Send /> Poslat zákazníkovi e-mailem…
               </DropdownMenuItem>
             )}
+            <DropdownMenuSeparator />
             {!file.archived && (
               <DropdownMenuItem onSelect={() => versionInput.current?.click()}>
                 <Upload /> Nahrát novou verzi
@@ -386,6 +407,36 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
   const [editing, setEditing] = React.useState<JobFile | null>(null);
   const [deleting, setDeleting] = React.useState<JobFile | null>(null);
   const [preview, setPreview] = React.useState<number | null>(null);
+  const [anonEditing, setAnonEditing] = React.useState<JobFile | null>(null);
+  const [reviewDl, setReviewDl] = React.useState<JobFile | null>(null);
+
+  // výkresy v anonymizaci → obnovovat, dokud nedoběhne (nejvýš ~5 min)
+  const anonBusy = files.some((f) => !f.archived && (f.anon?.status === "pending" || f.anon?.status === "processing"));
+  React.useEffect(() => {
+    if (!anonBusy) return;
+    let n = 0;
+    const t = window.setInterval(() => { n += 1; if (n > 50) window.clearInterval(t); else refresh(); }, 6000);
+    return () => window.clearInterval(t);
+  }, [anonBusy, refresh]);
+
+  async function anonAction(f: JobFile, action: "enqueue" | "approve" | "skip") {
+    if (action === "enqueue") {
+      const r = await anonApi.enqueue({ fileIds: [f.id], force: true });
+      if (!r.ok) return notify("error", r.error);
+      // server soubor nezařadil (není kandidát, nákupní doklad…) → říct proč, ne „anonymizuje se"
+      const st = r.data.statuses[f.id];
+      const why = r.data.skipped.find((s) => s.id === f.id)?.reason;
+      if (st !== "pending") notify("error", why ?? (st === "unsupported" ? "Formát nelze anonymizovat — pošli PDF, DXF nebo STEP." : "Soubor se nepodařilo zařadit."));
+      else if (r.data.backfill?.includes(f.id)) notify("success", `${f.filename}: starší výkres — zpracuje se v rámci denního limitu.`);
+      else notify("success", `${f.filename}: anonymizuje se…`);
+      refresh();
+      return;
+    }
+    const r = action === "approve" ? await anonApi.approve(f.id) : await anonApi.skip(f.id, "Náš výkres — neanonymizovat");
+    if (!r.ok) return notify("error", r.error);
+    notify("success", action === "approve" ? "Anonymizace schválena — výkres může jít dodavateli." : "Výkres se nebude anonymizovat.");
+    refresh();
+  }
 
   const groups = groupFiles(files);
   const archivedCount = files.filter((f) => f.archived).length;
@@ -395,11 +446,19 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
     if (i >= 0) setPreview(i);
   };
   const visibleGroups = groups.filter((g) => g.current.length || (showArchive && g.archived.length));
+  const supplierLine = supplierSummary(files);
 
   return (
     <div className="space-y-4">
       <UploadDropzone />
       <UploadQueue />
+      <SendQueueNotice jobId={jobId} refreshKey={files.map((f) => `${f.id}:${f.anon?.status ?? ""}`).join(",")} files={files} onEdit={setAnonEditing} />
+      {supplierLine && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2 text-sm" data-testid="anon-supplier-bar">
+          <span className="text-muted-foreground">{supplierLine}</span>
+          <SupplierPackButton jobId={jobId} files={files} onEdit={setAnonEditing} />
+        </div>
+      )}
 
       {visibleGroups.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border bg-card px-4 py-10 text-center">
@@ -428,7 +487,10 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
                 <ul className="divide-y">
                   {list.map((f) => (
                     f.locked ? <LockedFileRow key={f.id} file={f} /> : (
-                      <FileRow key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview} onSend={canSend ? setSending : undefined} />
+                      <FileRow
+                        key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview}
+                        onSend={canSend ? setSending : undefined} onAnonEdit={setAnonEditing} onAnonAction={(x, a) => void anonAction(x, a)} onReviewDownload={setReviewDl}
+                      />
                     )
                   ))}
                 </ul>
@@ -487,6 +549,16 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
           Když jde jen o starou verzi, stačí ji <em>archivovat</em>.
         </ConfirmDialog>
       )}
+      {anonEditing && (
+        <AnonymizeEditor
+          open
+          onOpenChange={(o) => { if (!o) { setAnonEditing(null); refresh(); } }}
+          fileId={anonEditing.id}
+          sourceName={anonEditing.filename}
+          title={`Anonymizace — ${anonEditing.title || anonEditing.filename}`}
+        />
+      )}
+      {reviewDl && <ReviewDownloadDialog file={reviewDl} onClose={() => setReviewDl(null)} onEdit={setAnonEditing} />}
       {preview !== null && visibleImages[preview] && (
         <Lightbox images={visibleImages} index={preview} onIndex={setPreview} onClose={() => setPreview(null)} />
       )}

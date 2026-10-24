@@ -191,16 +191,26 @@ export async function rasterToJpeg(r: Raster, quality = 85): Promise<Uint8Array>
 }
 
 /** RGB → šedá, když obraz nemá barvu (sken bez barev). */
-export function maybeGray(r: Raster): Raster {
+/**
+ * Barevný rastr bez barvy → šedý (menší soubor). opts.minPixels = absolutní práh sytých pixelů (vykreslené
+ * vektorové PDF bez šumu: malá červená revize zůstane červená); bez něj podíl vzorku (fotky mají barevný šum).
+ */
+export function maybeGray(r: Raster, opts: { minPixels?: number } = {}): Raster {
   if (r.channels === 1) return r;
   let colored = 0, total = 0;
-  const step = Math.max(1, Math.floor((r.width * r.height) / 200_000));
-  for (let i = 0; i < r.width * r.height; i += step) {
-    const o = i * 3;
-    total++;
-    if (Math.max(r.data[o], r.data[o + 1], r.data[o + 2]) - Math.min(r.data[o], r.data[o + 1], r.data[o + 2]) > 48) colored++;
+  if (opts.minPixels) {
+    for (let i = 0, o = 0; i < r.width * r.height; i++, o += 3) {
+      if (Math.max(r.data[o], r.data[o + 1], r.data[o + 2]) - Math.min(r.data[o], r.data[o + 1], r.data[o + 2]) > 48 && ++colored >= opts.minPixels) return r;
+    }
+  } else {
+    const step = Math.max(1, Math.floor((r.width * r.height) / 200_000));
+    for (let i = 0; i < r.width * r.height; i += step) {
+      const o = i * 3;
+      total++;
+      if (Math.max(r.data[o], r.data[o + 1], r.data[o + 2]) - Math.min(r.data[o], r.data[o + 1], r.data[o + 2]) > 48) colored++;
+    }
+    if (colored / Math.max(1, total) > 0.002) return r;
   }
-  if (colored / Math.max(1, total) > 0.002) return r;
   const g = new Uint8Array(r.width * r.height);
   for (let i = 0, o = 0; i < g.length; i++, o += 3) g[i] = (r.data[o] * 299 + r.data[o + 1] * 587 + r.data[o + 2] * 114 + 500) / 1000;
   return { width: r.width, height: r.height, channels: 1, data: g };

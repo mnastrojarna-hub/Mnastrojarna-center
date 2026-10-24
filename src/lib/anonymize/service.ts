@@ -8,7 +8,8 @@ import { logUsage, spentToday } from "./budget";
 import { isAnonCandidate, isUnsupportedExt, sourceFormat } from "./candidate";
 import { accToDecide, decideAnonStatus, mergeBatch, type DecideInput } from "./decide";
 import { isFakeAnon, termsPrompt, usageUsd, type AiCallConfig } from "./detect-ai";
-import { anonFilename, outputExt } from "./filename";
+import { anonFilename, outputExt, rebaseTwinFilename } from "./filename";
+import { userFacingFailure } from "./failure-text";
 import { describeSummary, summarize } from "./regions";
 import {
   ANON_COLS, SUBJECT_SELECT, afterSettled, claim, event, label, loadSettings, priceDocIds, subjectOf,
@@ -99,7 +100,14 @@ export interface RunContext {
   forceAi?: boolean;
   /** false = běh bez AI (jen pravidla → review), např. uživatel bez práva AI čtení. */
   allowAi?: boolean;
+  /** Uložení editoru: uživatel potvrdil zásah do chráněného pole (číslo výkresu, materiál, kóta). */
+  confirmKeep?: boolean;
 }
+
+/** Ruční úprava zasahuje do chráněného / technického údaje → bez potvrzení zůstává ke kontrole. */
+export const KEEP_TOUCH_CODES = new Set<AnonWarning["code"]>(["ai_removed_text", "keep_overlap"]);
+export const KEEP_TOUCH_REASON = "Úprava zasahuje do chráněného údaje (číslo výkresu, materiál, kóta) — zkontroluj náhled „Po“ a schval.";
+
 
 export interface AnonRunResult {
   id: string;
@@ -380,7 +388,13 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
         .eq("anon_summary->>srcSha", sha).eq("anon_config_hash", cfgHash).eq("anon_terms_hash", tHash).in("anon_status", ["done", "review"]).neq("id", s.id).limit(1);
       const tw = ((twin ?? []) as SubjectRow[])[0];
       if (tw?.anon_path && tw.anon_sha256) {
-        const newPath = `${s.outPrefix}${crypto.randomUUID()}-${String(tw.anon_filename ?? "vykres.pdf")}`;
+        // náhradní název „<zakázka>-V<n>" z cizí zakázky → vlastní zakázka a pořadí (číslo výkresu zůstává)
+        let twinName = (tw.anon_filename as string | null) ?? null;
+        if (twinName && tw.job_id && tw.job_id !== s.jobId) {
+          const { data: tj } = await db.from("orders").select("number").eq("id", String(tw.job_id)).maybeSingle();
+          twinName = rebaseTwinFilename(twinName, (tj as { number: string | null } | null)?.number ?? null, await drawingIndex(db, s));
+        }
+        const newPath = `${s.outPrefix}${crypto.randomUUID()}-${String(twinName ?? "vykres.pdf")}`;
         const { error: cpErr } = await db.storage.from("job-files").copy(String(tw.anon_path), newPath);
         if (!cpErr) {
           const regions = ((tw.anon_regions ?? []) as AnonRegion[]).map((r) => ({ ...r, source: "cache" as const }));
@@ -388,7 +402,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
           const summary = { ...((tw.anon_summary ?? {}) as AnonSummary), srcSha: sha, cachedFrom: tw.id } as AnonSummary;
           const actor = runActor(s, ctx, true);
           await finish(db, s, {
-            anon_status: st, anon_path: newPath, anon_filename: tw.anon_filename, anon_mime: tw.anon_mime, anon_size: tw.anon_size, anon_sha256: tw.anon_sha256,
+            anon_status: st, anon_path: newPath, anon_filename: twinName, anon_mime: tw.anon_mime, anon_size: tw.anon_size, anon_sha256: tw.anon_sha256,
             anon_method: tw.anon_method, anon_pages: tw.anon_pages, anon_regions: regions, anon_summary: summary, anon_confidence: tw.anon_confidence,
             anon_reason: st === "review" ? (tw.anon_reason ?? "Režim se schválením — zkontroluj anonymizaci.") : null, anon_config_hash: cfgHash, anon_terms_hash: tHash,
             anon_ai_cache: { ref: sha }, anon_at: new Date().toISOString(), anon_by: actor.id, anon_actor_kind: actor.kind, anon_via: baseVia, anon_usage: asUsage(null, 0),
@@ -477,9 +491,16 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     let reason = decision.reason;
     let reviewed: Record<string, unknown> = {};
     if (ctx.manualSave && (status === "review" || status === "done")) {
-      status = "done";
-      reason = null;
-      reviewed = { anon_reviewed_at: new Date().toISOString(), anon_reviewed_by: ctx.actor.id };
+      const touchesKeep = decision.warnings.some((w) => KEEP_TOUCH_CODES.has(w.code));
+      if (touchesKeep && !ctx.confirmKeep) {
+        // zásah do chráněného pole bez potvrzení → ke kontrole (schválení = potvrzení člověkem)
+        status = "review";
+        reason = KEEP_TOUCH_REASON;
+      } else {
+        status = "done";
+        reason = null;
+        reviewed = { anon_reviewed_at: new Date().toISOString(), anon_reviewed_by: ctx.actor.id };
+      }
     }
     if (status === "skipped") {
       await finish(db, s, {
@@ -494,7 +515,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       return { id: s.id, table, status: "skipped", reason: "Není výkres" };
     }
     if (status === "failed" || status === "pending" || !out.bytes) {
-      const r = reason ?? "Výstup se nepodařilo vytvořit.";
+      const r = userFacingFailure(reason ?? "Výstup se nepodařilo vytvořit.", fmt);
       const retry: AnonStatus = status === "pending" ? "pending" : "failed";
       // nový pokus začne od první strany (části předchozích dávek pryč)
       await finish(db, s, { anon_status: retry, anon_reason: r, anon_at: new Date().toISOString(), anon_usage: usage, ...(out.method === "raster_pdf" ? { anon_pages: null } : {}) });
@@ -532,7 +553,10 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     return { id: s.id, table, status, reason, summary };
   } catch (err) {
     const failure = classifyAiError(err);
-    const message = err instanceof Error ? err.message.slice(0, 300) : "Neočekávaná chyba.";
+    const raw = err instanceof Error ? err.message.slice(0, 300) : "Neočekávaná chyba.";
+    // surová (anglická) chyba jen do logu serveru, uživatel dostane českou větu s radou
+    console.error(`[anonymize] ${table}/${row.id}: ${raw}`);
+    const message = userFacingFailure(raw, sourceFormat(s.filename, s.mime));
     const attempts = row.anon_attempts ?? 1;
     const status: AnonStatus = attempts < 3 && failure !== "auth" && failure !== "spend_limit" ? "pending" : "failed";
     try {
@@ -599,7 +623,10 @@ export function validateManualRegions(input: unknown): AnonRegion[] | null {
 }
 
 /** Uloží ruční sadu oblastí (optimistický zámek přes anon_at) a vypálí znovu bez AI → done. */
-export async function saveManualRegions(db: AnonDb, table: AnonTable, id: string, regions: AnonRegion[], expectedAt: string | null, actor: ActorContext, deadline: number): Promise<AnonRunResult | { conflict: true } | { notFound: true }> {
+export async function saveManualRegions(
+  db: AnonDb, table: AnonTable, id: string, regions: AnonRegion[], expectedAt: string | null, actor: ActorContext, deadline: number,
+  opts: { confirmKeep?: boolean } = {},
+): Promise<AnonRunResult | { conflict: true } | { notFound: true }> {
   const { data } = await db.from(table).select(SUBJECT_SELECT[table]).eq("id", id).maybeSingle();
   const row = data as unknown as SubjectRow | null;
   if (!row) return { notFound: true };
@@ -607,16 +634,17 @@ export async function saveManualRegions(db: AnonDb, table: AnonTable, id: string
   const prevManual = (row.anon_regions ?? []).filter((r) => r.manual);
   const auto = (row.anon_regions ?? []).filter((r) => !r.manual);
   const nextRow: SubjectRow = { ...row, anon_regions: [...auto, ...regions], anon_pages: null };
-  const res = await anonymizeOne(db, table, nextRow, { actor, deadline, manual: true, manualSave: true });
+  const res = await anonymizeOne(db, table, nextRow, { actor, deadline, manual: true, manualSave: true, confirmKeep: opts.confirmKeep === true });
   const added = regions.filter((r) => r.manual === "added" && !prevManual.some((p) => p.id === r.id)).length;
   const removed = regions.filter((r) => r.manual === "removed" && !prevManual.some((p) => p.id === r.id)).length;
-  if (res.status === "done") {
+  if (res.status === "done" || res.status === "review") {
     const s = subjectOf(table, row);
     // seznam ručních zásahů zůstává (manual:*) — při přepočtu se nepřepočítávají
     const { data: cur } = await db.from(table).select("anon_regions").eq("id", id).maybeSingle();
     const curRegions = ((cur as { anon_regions: AnonRegion[] | null } | null)?.anon_regions ?? []).filter((r) => !r.manual);
     await db.from(table).update({ anon_regions: [...curRegions, ...regions] }).eq("id", id);
-    await event(db, s, actor, `Anonymizace upravena ručně (+${added}, −${removed})`, { added, removed });
+    const note = res.status === "review" ? " — ke kontrole: zasahuje do chráněného údaje" : opts.confirmKeep ? " (potvrzen zásah do chráněného údaje)" : "";
+    await event(db, s, actor, `Anonymizace upravena ručně (+${added}, −${removed})${note}`, { added, removed, anonStatus: res.status, ...(opts.confirmKeep ? { confirmKeep: true } : {}) });
   }
   return res;
 }

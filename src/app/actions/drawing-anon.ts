@@ -7,7 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { settingsFromRow, settingsToRow, configHash, type AnonSettings } from "@/lib/anonymize/settings";
-import { anonRunnerStatus, appOrigin, approve, enqueue, kick, skip, type AnonDb, type AnonTable } from "@/lib/anonymize/queue";
+import { anonRunnerStatus, appOrigin, approve, enqueue, kick, promoteLegacy, skip, type AnonDb, type AnonTable } from "@/lib/anonymize/queue";
 import { cancelSend, enqueueSend, sendWithoutPending, validateSendRequest, type SendKind, type SendPayload } from "@/lib/anonymize/send-queue";
 import { assertJobFileAccess } from "@/lib/jobs/job-file-access";
 import { getAccess } from "@/lib/auth/session";
@@ -108,8 +108,10 @@ export async function queueDrawingAnonymize(input: { fileIds?: string[]; jobIds?
   }
   // i soubory ze zakázek (jobIds) projdou kontrolou po souborech (nákupní doklady, neschválené nabídky…)
   const allow = table === "job_files" ? async (id: string) => (await canSee(c.db, id)) === null : undefined;
-  const res = await enqueue(c.db, { table, fileIds, jobIds, force: input?.force === true, priority: 0, via: "rucne", allow });
-  const pending = Object.entries(res.statuses).filter(([, s]) => s === "pending").map(([id]) => id);
+  // staré výkresy (backfill) ručně předřadí (mimo denní limit) jen super admin
+  const res = await enqueue(c.db, { table, fileIds, jobIds, force: input?.force === true, priority: 0, via: "rucne", allow, keepBackfill: c.user.role !== "super_admin" });
+  const backfill = new Set(res.backfill ?? []);
+  const pending = Object.entries(res.statuses).filter(([id, s]) => s === "pending" && !backfill.has(id)).map(([id]) => id);
   if (pending.length) await kick({ origin: await origin(), table, ids: pending.slice(0, 5), manualBy: c.user.id }).catch(() => undefined);
   revalidate();
   return { ok: true, queued: res.queued, statuses: res.statuses };
@@ -204,4 +206,36 @@ export async function sendQueuedWithoutPending(id: string): Promise<Result> {
   if (!UUID_RE.test(id)) return { ok: false, error: "Odeslání nenalezeno." };
   const r = await sendWithoutPending(c.db, id, c.user.id, c.user.role === "super_admin");
   return r.ok ? { ok: true } : { ok: false, error: r.error ?? "Odeslání selhalo." };
+}
+
+/** Režim anonymizace (automation_settings modul drawing_anonymize): plná automatika / se schválením. Jen super admin. */
+export async function setAnonMode(mode: "full" | "approval"): Promise<Result> {
+  const c = await begin("settings");
+  if ("error" in c) return { ok: false, error: c.error as string };
+  if (c.user.role !== "super_admin") return { ok: false, error: "Režim anonymizace mění jen super admin." };
+  if (mode !== "full" && mode !== "approval") return { ok: false, error: "Neplatný režim." };
+  const { data: prev } = await c.db.from("automation_settings").select("mode").eq("module", "drawing_anonymize").maybeSingle();
+  const { error } = await c.db.from("automation_settings").upsert(
+    { module: "drawing_anonymize", mode, enabled: true, updated_by: c.user.id, updated_at: new Date().toISOString() } as never,
+    { onConflict: "module" },
+  );
+  if (error) return { ok: false, error: error.message };
+  const from = (prev as { mode: string } | null)?.mode ?? null;
+  if (from !== mode) await logAudit({ action: "automation_mode_changed", entity: "automation_settings", entityId: "drawing_anonymize", diff: { module: "drawing_anonymize", from, to: mode }, actor: c.actor });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+/** „Zpracovat staré výkresy (n)": backfill (priorita 9) → priorita 5 a šťouchnout; běží v rámci denního limitu. Jen super admin. */
+export async function queueLegacyDrawings(): Promise<Result<{ queued: number }>> {
+  const c = await begin("settings");
+  if ("error" in c) return { ok: false, error: c.error as string };
+  if (c.user.role !== "super_admin") return { ok: false, error: "Zpracování starých výkresů spouští jen super admin." };
+  const { ids, error } = await promoteLegacy(c.db, { limit: 200 });
+  if (error) return { ok: false, error };
+  if (!ids.length) return { ok: true, queued: 0 };
+  await kick({ origin: await origin(), table: "job_files", ids: ids.slice(0, 5) }).catch(() => undefined);
+  await logAudit({ action: "drawing_anon_backfill", entity: "drawing_anon_settings", entityId: "1", diff: { count: ids.length }, actor: c.actor });
+  revalidatePath("/settings");
+  return { ok: true, queued: ids.length };
 }

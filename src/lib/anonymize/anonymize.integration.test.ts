@@ -438,6 +438,29 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     expect((await row(f2.id as string)).anon_status).toBe("done");
   }, 180_000);
 
+  it("ruční obdélník přes číslo výkresu: bez potvrzení ke kontrole, s potvrzením done", async () => {
+    const { A3 } = await import("./__fixtures__/samples");
+    const job = await newJob();
+    const f = await addFile(job, "k.pdf", (await makeVectorDrawing({ company: "KEEP a.s." })).pdf, "application/pdf");
+    fake.setFakeAnonHandler((req) => req.call === "vector" ? { data: { pages: [{ index: 1, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] }], confidence: 0.95 }, model: "claude-x" } : null);
+    await run(f.id as string);
+    const [W, H] = A3;
+    const tbx = W - 20 - 520;
+    const overNumber = { id: "m-keep", page: 1, x: (tbx + 130) / W, y: (H - 20 - 28 - 16) / H, w: 110 / W, h: 22 / H, category: "other" as const, source: "manual" as const, zone: "body" as const, manual: "added" as const };
+    const actor = userActor({ id: adminId });
+    const r0 = await row(f.id as string);
+    const res = await s.saveManualRegions(localAdmin(actor), "job_files", f.id as string, [overNumber], String(r0.anon_at), actor, Date.now() + 200_000);
+    expect("status" in res && res.status).toBe("review");
+    const r1 = await row(f.id as string);
+    expect(r1.anon_status).toBe("review");
+    expect(String(r1.anon_reason)).toMatch(/chráněného údaje/);
+    expect(r1.anon_reviewed_by).toBeNull();
+    // potvrzení zásahu (editor: „Přesto smazat") → done + reviewed
+    const res2 = await s.saveManualRegions(localAdmin(actor), "job_files", f.id as string, [overNumber], String(r1.anon_at), actor, Date.now() + 200_000, { confirmKeep: true });
+    expect("status" in res2 && res2.status).toBe("done");
+    expect((await row(f.id as string)).anon_reviewed_by).toBe(adminId);
+  }, 180_000);
+
   it("fronta odeslání: pending → čeká; po done odejde s anonymní kopií (sha); review → blocked → schválit → odesláno; podvržený objekt → selže", async () => {
     const { enqueueSend, flushSendQueue } = await import("./send-queue");
     const job = await newJob();

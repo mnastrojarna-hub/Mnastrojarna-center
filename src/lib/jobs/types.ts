@@ -232,6 +232,32 @@ export interface JobFile {
    * na schválení / vystavené před posledním schválením.
    */
   locked?: FileLock;
+  /** Anonymizace výkresu pro dodavatele (null = netýká se — náš doklad, jiný typ souboru). */
+  anon?: JobFileAnon | null;
+}
+
+export type JobFileAnonStatus = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";
+
+/** Stav anonymizace dokumentu pro UI (odznak, menu) — bez textů smazaných oblastí. */
+export interface JobFileAnon {
+  status: JobFileAnonStatus;
+  /** Anonymní název kopie („D-1234_B.pdf"). */
+  filename: string | null;
+  at: string | null;
+  /** Kdo anonymizaci provedl (profil) — u AI ten, kdo soubor nahrál. */
+  by: string | null;
+  actorKind: "user" | "ai" | "system" | null;
+  reason: string | null;
+  /** Člověk výsledek zkontroloval / schválil. */
+  reviewed: boolean;
+  reviewedAt: string | null;
+  /** Počty smazaných oblastí po kategoriích (company, person, path…). */
+  counts: Record<string, number>;
+  total: number;
+  warnings: { code: string; message: string }[];
+  /** Vyřazené stránky (dopis, faktura ve smíšeném PDF). */
+  excludedPages: number[];
+  method: string | null;
 }
 
 export type FileLock = "price" | "unapproved" | "stale" | null;

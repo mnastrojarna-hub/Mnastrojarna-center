@@ -84,7 +84,8 @@ export function subjectOf(table: AnonTable, row: SubjectRow): Subject {
   const uid = String(row.user_id ?? "");
   return {
     table, id: row.id, row, bucket: "job-files", storagePath: str(row.storage_path), sourcePath: str(row.anon_source_path) ?? str(row.storage_path),
-    hasMaster: Boolean(row.anon_source_path), filename: String(row.filename ?? "vykres"), mime: str(row.mime_type), kind: "vykres",
+    // samostatný nástroj nahrává nezmenšený originál (File z výběru / fotoaparátu) → je to master
+    hasMaster: true, filename: String(row.filename ?? "vykres"), mime: str(row.mime_type), kind: "vykres",
     origin: "upload", issuer: null, jobId: null, uploadedBy: uid || null, extracted: null, outPrefix: `capture/${uid}/anon/out/`,
   };
 }
@@ -120,7 +121,12 @@ export interface EnqueueResult {
   queued: number;
   statuses: Record<string, AnonStatus | null>;
   skipped: { id: string; reason: string }[];
+  /** Staré výkresy (backfill, priorita ≥ 9), které zůstaly v pořadí backfillu (bez ručního spuštění). */
+  backfill?: string[];
 }
+
+/** Priorita backfillu starých výkresů (migrace / „Zpracovat staré výkresy"). */
+export const BACKFILL_PRIORITY = 9;
 
 /** Ruční / hromadné zařazení (force = i done/review/skipped). */
 /** Nákupní doklady (#25) mezi soubory — DB pravidlo job_file_price_ids; chyba DB = všechny (fail closed). */
@@ -135,9 +141,14 @@ export async function enqueue(db: AnonDb, input: {
   table?: AnonTable; fileIds?: string[]; jobIds?: string[]; force?: boolean; priority?: number; via?: string;
   /** Smí volající soubor zařadit (stejná kontrola jako otevření dokumentu)? Platí i pro soubory ze zakázek (jobIds). */
   allow?: (id: string) => Promise<boolean>;
+  /**
+   * Čekající staré výkresy (backfill) nechat v pořadí backfillu — priorita a „via" se nemění a soubor
+   * se nevrací jako ručně zařazený (běží v rámci denního limitu). Pro volající, kteří nejsou super admin.
+   */
+  keepBackfill?: boolean;
 }): Promise<EnqueueResult> {
   const table = input.table ?? "job_files";
-  const out: EnqueueResult = { queued: 0, statuses: {}, skipped: [] };
+  const out: EnqueueResult = { queued: 0, statuses: {}, skipped: [], backfill: [] };
   let rows: SubjectRow[] = [];
   if (input.fileIds?.length) {
     const { data } = await db.from(table).select(SUBJECT_SELECT[table]).in("id", input.fileIds.slice(0, 200));
@@ -171,6 +182,12 @@ export async function enqueue(db: AnonDb, input: {
     const may = input.force || st === null || st === "failed" || st === "pending" || (st === "processing" && isLockExpired(r));
     if (!may) { out.statuses[r.id] = st; continue; }
     const unsupported = isUnsupportedExt(s.filename);
+    const backfill = Boolean(input.keepBackfill) && st === "pending" && (r.anon_priority ?? 0) >= BACKFILL_PRIORITY && !unsupported;
+    if (backfill) {
+      out.statuses[r.id] = "pending";
+      out.backfill!.push(r.id);
+      continue;
+    }
     const { error } = await db.from(table).update({
       anon_status: unsupported ? "unsupported" : "pending", anon_priority: input.priority ?? 0, anon_attempts: 0, anon_lock_until: null,
       anon_reason: unsupported ? "Formát nelze anonymizovat — pošli dodavateli PDF, DXF nebo STEP." : null,
@@ -181,6 +198,25 @@ export async function enqueue(db: AnonDb, input: {
     if (!unsupported) out.queued++;
   }
   return out;
+}
+
+/**
+ * „Zpracovat staré výkresy": čekající backfill (priorita ≥ 9) → priorita 5 (běží automatikou v rámci
+ * denního limitu, via backfill). Volitelně jen v daných zakázkách. Vrací povýšená id.
+ */
+export async function promoteLegacy(db: AnonDb, opts: { jobIds?: string[]; limit?: number } = {}): Promise<{ ids: string[]; error?: string }> {
+  let q = db.from("job_files").select("id").eq("anon_status", "pending").gte("anon_priority", BACKFILL_PRIORITY).eq("archived", false)
+    .order("created_at", { ascending: false }).limit(Math.min(500, opts.limit ?? 200));
+  if (opts.jobIds) {
+    if (!opts.jobIds.length) return { ids: [] };
+    q = q.in("job_id", opts.jobIds.slice(0, 200));
+  }
+  const { data, error: selErr } = await q;
+  if (selErr) return { ids: [], error: selErr.message };
+  const ids = ((data ?? []) as { id: string }[]).map((r) => r.id);
+  if (!ids.length) return { ids };
+  const { error } = await db.from("job_files").update({ anon_priority: 5, anon_via: "backfill" }).in("id", ids);
+  return error ? { ids: [], error: error.message } : { ids };
 }
 
 function isLockExpired(r: SubjectRow): boolean {
@@ -349,6 +385,12 @@ export async function skip(db: AnonDb, table: AnonTable, id: string, actor: Acto
   const { data } = await db.from(table).select(SUBJECT_SELECT[table]).eq("id", id).maybeSingle();
   const row = data as unknown as SubjectRow | null;
   if (!row) return { ok: false, error: "Soubor nenalezen." };
+  if (table === "job_files") {
+    const s0 = subjectOf(table, row);
+    if (!isAnonCandidate(s0.kind, s0.filename, s0.mime, s0.origin, s0.issuer)) {
+      return { ok: false, error: "Soubor se neanonymizuje (náš doklad nebo jiný druh) — není co přeskočit." };
+    }
+  }
   let who = "";
   if (actor.id) {
     const { data: p } = await db.from("profiles").select("full_name, email").eq("id", actor.id).maybeSingle();

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { logAudit } from "@/lib/audit";
 import { userActor } from "@/lib/supabase/actor-headers";
-import { pickShareFile, SHARE_FILE_SELECT, verifyShareBytes, type FileRowWithAnon } from "./share";
+import { pickShareFile, SHARE_FILE_SELECT, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "./share";
 
 /**
  * Fronta odeslání čekajících na anonymizaci (spec §5.5, M15). Server action NIKDY nevykresluje:
@@ -149,10 +149,11 @@ export async function queueReadiness(db: AnonDb, row: Pick<SendQueueRow, "file_i
   const { data } = await db.from("job_files").select(SHARE_FILE_SELECT).in("id", row.file_ids);
   const rows = (data ?? []) as FileRowWithAnon[];
   const reviewed = new Set(row.payload.reviewedFileIds ?? []);
+  const price = await sharePriceDocIds(db as never, row.file_ids);
   for (const id of row.file_ids) {
     const f = rows.find((r) => r.id === id);
     if (!f) { out.blocked.push({ id, message: "Výkres byl smazán." }); continue; }
-    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id) });
+    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()) });
     if (d.ok) out.ready.push(id);
     else if (d.reason === "pending") out.pending.push(id);
     else out.blocked.push({ id, message: d.message });
@@ -181,6 +182,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
   const { data } = await db.from("job_files").select(SHARE_FILE_SELECT).in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
   const rows = (data ?? []) as FileRowWithAnon[];
   const reviewed = new Set(p.reviewedFileIds ?? []);
+  const price = await sharePriceDocIds(db as never, ids);
   const attachments: { filename: string; content: Buffer; contentType?: string }[] = [];
   const names = new Set<string>();
   /** Externí originály, které odešly (audit). */
@@ -191,7 +193,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
     if (!f) return { status: "blocked", reason: "Příloha byla smazána." };
     // pojistka: příloha musí patřit k zakázce řádku fronty (kontrola i při zařazení — validateSendRequest)
     if (!row.job_id || String(f.job_id ?? "").toLowerCase() !== row.job_id.toLowerCase()) return { status: "blocked", reason: "Příloha nepatří k zakázce." };
-    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id) });
+    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()) });
     if (!d.ok) return { status: d.reason === "pending" ? "waiting" : "blocked", reason: d.message };
     const bytes = await verifyShareBytes(db as never, d, f);
     if (d.audit) originals.push(id);

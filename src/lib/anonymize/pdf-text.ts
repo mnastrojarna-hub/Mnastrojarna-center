@@ -1,6 +1,6 @@
 import "server-only";
 import { buildLines, quadBox, substringQuad } from "./lines";
-import { isRevisionAnchor, isTitleAnchor } from "./rules";
+import { isCompanyRow, isRevisionAnchor, isTitleAnchor } from "./rules";
 import { textQuality, type TextQuality } from "./text-quality";
 import { loadPdfjs, type PdfDocument, type PdfPage } from "./pdf-node";
 import type { Box, TextItem, TextLine, Zone } from "./types";
@@ -112,6 +112,7 @@ export function computeZones(lines: readonly { text: string; box: Box }[], W: nu
       if ((x0 + x1) / 2 > W / 2) x1 = W;
       if ((y0 + y1) / 2 > H / 2 && H - y1 < 0.15 * H) y1 = H;
       titleBlock = { x: Math.max(0, x0), y: Math.max(0, y0), w: Math.min(W, x1) - Math.max(0, x0), h: Math.min(H, y1) - Math.max(0, y0) };
+      titleBlock = extendTitleBlockUp(titleBlock, lines, H);
     }
   }
   let revisions: Box | null = null;
@@ -121,6 +122,30 @@ export function computeZones(lines: readonly { text: string; box: Box }[], W: nu
     revisions = revisions ? union(revisions, b) : b;
   }
   return { titleBlock, guess, revisions, anchors: anchors.length };
+}
+
+/**
+ * Řádek firmy („Zákazník: ACME Forge GmbH", „STROJMETAL a.s.") bývá v horní části razítka výš než
+ * popisky + rezerva → zónu razítka protáhnout nahoru o takové řádky (svisle ≤ 12 % výšky stránky nad
+ * horním okrajem, vodorovně z větší části nad razítkem), řetězově nejvýš 3×.
+ */
+export function extendTitleBlockUp(tb: Box, lines: readonly { text: string; box: Box }[], H: number): Box {
+  let z = tb;
+  for (let k = 0; k < 3; k++) {
+    const cur = z;
+    const ext = lines.filter((l) => {
+      const b = l.box;
+      if (b.y + b.h / 2 >= cur.y) return false; // už uvnitř / pod horním okrajem
+      if (cur.y - b.y > 0.12 * H) return false;
+      const ox = Math.max(0, Math.min(b.x + b.w, cur.x + cur.w) - Math.max(b.x, cur.x));
+      if (ox < 0.5 * Math.min(b.w, cur.w)) return false;
+      return isCompanyRow(l.text);
+    });
+    if (!ext.length) break;
+    const top = Math.max(0, Math.min(...ext.map((l) => l.box.y)) - 0.01 * H);
+    z = { x: cur.x, y: top, w: cur.w, h: cur.y + cur.h - top };
+  }
+  return z;
 }
 
 function union(a: Box, b: Box): Box {

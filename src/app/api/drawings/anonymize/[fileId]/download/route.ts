@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { anonGuard, json, loadSubject, tableParam } from "@/lib/anonymize/route-helpers";
-import { pickShareFile, verifyShareBytes, ShareVerifyError, type FileRowWithAnon } from "@/lib/anonymize/share";
+import { pickShareFile, sharePriceDocIds, verifyShareBytes, ShareVerifyError, type FileRowWithAnon } from "@/lib/anonymize/share";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,12 +23,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ fileId: 
   const r = loaded.row;
   const row: FileRowWithAnon = {
     id: r.id, job_id: (r.job_id as string | null) ?? null, kind: (r.kind as string | null) ?? (table === "job_files" ? null : "vykres"),
-    filename: String(r.filename ?? "vykres"), mime_type: (r.mime_type as string | null) ?? null, storage_path: (r.storage_path as string | null) ?? null,
+    // archiv výkresů nemá sloupec filename → název z cesty (kandidát se pozná podle přípony)
+    filename: String(r.filename ?? (r.storage_path ? String(r.storage_path).split("/").pop() : "") ?? "vykres") || "vykres", mime_type: (r.mime_type as string | null) ?? null, storage_path: (r.storage_path as string | null) ?? null,
     origin: (r.origin as string | null) ?? (table === "job_files" ? null : "upload"), issuer: (r.issuer as string | null) ?? null,
     anon_status: r.anon_status, anon_path: r.anon_path, anon_filename: (r.anon_filename as string | null) ?? null,
     anon_mime: (r.anon_mime as string | null) ?? null, anon_sha256: (r.anon_sha256 as string | null) ?? null, anon_reason: (r.anon_reason as string | null) ?? null,
   };
-  const d = pickShareFile(row, { reviewedByCaller: url.searchParams.get("reviewed") === "1" });
+  const priceDocument = table === "job_files" && (await sharePriceDocIds(guard.db as never, [r.id])).has(r.id.toLowerCase());
+  const d = pickShareFile(row, { reviewedByCaller: url.searchParams.get("reviewed") === "1", priceDocument });
   if (!d.ok) return json({ error: d.message, reason: d.reason }, 409);
   if (d.source !== "anon") return json({ error: "Soubor nemá anonymizovanou kopii." }, 409);
   const bucket = table === "drawings" ? "documents" : "job-files";

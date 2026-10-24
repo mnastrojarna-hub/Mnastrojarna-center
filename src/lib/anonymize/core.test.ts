@@ -235,6 +235,16 @@ describe("pickShareFile (matice)", () => {
     expect(pickShareFile(row({ kind: "faktura", origin: "generated", anon_status: null }))).toMatchObject({ ok: true, source: "original" });
     expect(pickShareFile(row({ kind: "faktura", origin: "generated", anon_status: null }))).not.toHaveProperty("audit");
   });
+  it("soubor, který už není kandidát (přeřazený na nabídku dodavatele), anonymní kopii nesdílí", () => {
+    const supplierQuote = { kind: "nabidka", issuer: "dodavatel", origin: "email", filename: "nabidka-dodavatele.pdf" };
+    expect(pickShareFile(row({ ...supplierQuote, anon_status: "done" }))).toMatchObject({ ok: false, reason: "excluded" });
+    expect(pickShareFile(row({ ...supplierQuote, anon_status: "review" }), { reviewedByCaller: true })).toMatchObject({ ok: false, reason: "excluded" });
+    expect(pickShareFile(row({ kind: "faktura", anon_status: "done" }))).toMatchObject({ ok: false, reason: "excluded" });
+  });
+  it("nákupní doklad (cena dodavatele) → anonymní kopie nikdy, i se stavem done", () => {
+    expect(pickShareFile(row(), { priceDocument: true })).toMatchObject({ ok: false, reason: "excluded" });
+    expect(pickShareFile(row({ anon_status: "review" }), { priceDocument: true, reviewedByCaller: true })).toMatchObject({ ok: false, reason: "excluded" });
+  });
   it("ne-kandidát bez stavu s potvrzením → originál", () => {
     expect(pickShareFile(row({ kind: "faktura", anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: true, source: "original" });
   });

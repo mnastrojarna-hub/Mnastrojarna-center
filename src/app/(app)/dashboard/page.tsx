@@ -21,6 +21,8 @@ import {
 import { FlowStateTiles, MoversPanel } from "@/components/dashboard/flow-overview";
 import { getJobStageCounts, listJobs } from "@/lib/data/jobs";
 import { getSetupStatus } from "@/lib/setup/status";
+import { getAnonReviewCount } from "@/lib/data/anonymize";
+import { EyeOff } from "lucide-react";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
 
 /**
@@ -43,6 +45,7 @@ export default async function DashboardPage() {
     getFlowDashboard(),
     getResolvedApprovals(5),
   ]);
+  const anonReview = await getAnonReviewCount();
   // #25: dlaždice = fronta AI + ruční nabídky kolegů (oba panely níže je vypíšou)
   const waitingApproval = approvals.length + quotes.length;
   // chip „Ke schválení“ = stejné nabídky jako panel níže (ruční kolegů + AI ve frontě), ne vrácené autorovi
@@ -114,6 +117,21 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {anonReview > 0 && (
+        <Link
+          href="/inquiries#anonymizace"
+          data-testid="dashboard-anon-review"
+          className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm transition hover:shadow-md dark:border-rose-500/20 dark:bg-rose-500/10"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"><EyeOff className="h-4 w-4" /></span>
+          <span className="min-w-0 flex-1">
+            <strong className="text-rose-800 dark:text-rose-200">{anonReview} {anonReview === 1 ? "výkres" : anonReview < 5 ? "výkresy" : "výkresů"} ke kontrole anonymizace</strong>
+            <span className="block text-xs text-muted-foreground">Před odesláním dodavateli zkontroluj, že je smazaná firma, jména, logo a cesty.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
       )}
 
       {/* Dlaždice → filtr v Knize zakázek */}

@@ -54,7 +54,7 @@ const REVIEW_CODES = new Set<AnonWarning["code"]>([
   "no_ai", "model_fallback", "coords_out_of_image", "low_resolution", "no_master", "low_px_per_mm", "customer_standard",
   "term_in_keep", "area_cap", "keep_overlap", "verify_leak", "verify_keep_missing", "verify_new_graphic", "no_title_block",
   "dxf_graphics", "dxf_layer_term", "step_suspicious", "residue", "ai_failed", "approval_mode", "low_confidence",
-  "text_layer_untrusted", "ai_removed_text", "truncated", "no_terms", "cut_uncertain",
+  "text_layer_untrusted", "ai_removed_text", "truncated", "no_terms", "cut_uncertain", "hidden_text", "plot_stamp",
 ]);
 
 /** Fakta jedné dávky stránek PDF (pdf-pipeline → service). */

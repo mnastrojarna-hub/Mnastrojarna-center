@@ -67,13 +67,13 @@ export async function pageIsColor(page: PdfPage): Promise<boolean> {
   const s = Math.min(1, Math.sqrt(600_000 / (vp.width * vp.height)));
   const w = Math.max(1, Math.ceil(vp.width * s)), h = Math.max(1, Math.ceil(vp.height * s));
   const px = await renderBand(page, s, w, 0, h);
-  let colored = 0, total = 0;
+  // absolutní práh (pár desítek sytých pixelů) — malá červená revize / poznámka stránku obarví
+  let colored = 0;
   for (let i = 0; i < px.length; i += 4) {
-    total++;
     const mx = Math.max(px[i], px[i + 1], px[i + 2]), mn = Math.min(px[i], px[i + 1], px[i + 2]);
-    if (mx - mn > 48) colored++;
+    if (mx - mn > 48 && ++colored >= 20) return true;
   }
-  return total > 0 && colored / total > 0.0005;
+  return false;
 }
 
 /** Vykreslí stránku po pásech přímo do šedé (1 kanál) nebo RGB (3 kanály) bez alfy. */
@@ -464,6 +464,53 @@ export function inkFraction(r: Raster, box: Box, bg = 255): number {
   let dark = 0, total = 0;
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { total++; if (grayAt(r, x, y) < thr) dark++; }
   return total ? dark / total : 0;
+}
+
+/**
+ * Podíl pixelů s KONTRASTEM proti místnímu pozadí (medián okolí po kanálech): žlutý, světle šedý
+ * nebo bílý text na tmavém pruhu je inkoust; bílý text na bílém / zakrytý / průhledný není.
+ * Šedá: |Δ| ≥ minDelta, barva: max. rozdíl kanálu ≥ 2 × minDelta nebo |Δ jasu| ≥ minDelta.
+ */
+export function contrastInkFraction(r: Raster, box: Box, minDelta = 24): number {
+  const pad = Math.max(2, 0.5 * Math.min(box.h, 60));
+  const x0 = Math.max(0, Math.floor(box.x)), y0 = Math.max(0, Math.floor(box.y));
+  const x1 = Math.min(r.width, Math.ceil(box.x + box.w)), y1 = Math.min(r.height, Math.ceil(box.y + box.h));
+  if (x1 <= x0 || y1 <= y0) return 0;
+  const ex0 = Math.max(0, Math.floor(box.x - pad)), ey0 = Math.max(0, Math.floor(box.y - pad));
+  const ex1 = Math.min(r.width, Math.ceil(box.x + box.w + pad)), ey1 = Math.min(r.height, Math.ceil(box.y + box.h + pad));
+  const c = r.channels;
+  const step = Math.max(1, Math.floor(Math.sqrt(((ex1 - ex0) * (ey1 - ey0)) / 20_000)));
+  const hists = Array.from({ length: c }, () => new Uint32Array(256));
+  let n = 0;
+  for (let y = ey0; y < ey1; y += step) {
+    for (let x = ex0; x < ex1; x += step) {
+      const o = (y * r.width + x) * c;
+      for (let ch = 0; ch < c; ch++) hists[ch][r.data[o + ch]]++;
+      n++;
+    }
+  }
+  const bg = hists.map((h) => {
+    let acc = 0;
+    for (let v = 0; v < 256; v++) { acc += h[v]; if (acc >= n / 2) return v; }
+    return 255;
+  });
+  const bgGray = c === 1 ? bg[0] : (bg[0] * 299 + bg[1] * 587 + bg[2] * 114) / 1000;
+  let ink = 0, total = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      total++;
+      const o = (y * r.width + x) * c;
+      if (c === 1) {
+        if (Math.abs(r.data[o] - bg[0]) >= minDelta) ink++;
+        continue;
+      }
+      let maxCh = 0;
+      for (let ch = 0; ch < c; ch++) maxCh = Math.max(maxCh, Math.abs(r.data[o + ch] - bg[ch]));
+      const g = (r.data[o] * 299 + r.data[o + 1] * 587 + r.data[o + 2] * 114) / 1000;
+      if (maxCh >= 2 * minDelta || Math.abs(g - bgGray) >= minDelta) ink++;
+    }
+  }
+  return total ? ink / total : 0;
 }
 
 function insideAny(x: number, y: number, boxes: readonly Box[]): boolean {

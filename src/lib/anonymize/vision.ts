@@ -342,6 +342,7 @@ export async function runVision(input: VisionInput): Promise<VisionOutput> {
   aiRegions.splice(0, aiRegions.length, ...filterToggles(aiRegions.map((r) => ({ ...r, rule: r.category === "person" ? "person_drawn" : r.category })), input.ctx.redact));
 
   const pr = rulePage(textLines, input.ctx, { keepValues: input.keepValues });
+  for (const w of pr.warnings) warnings.push({ ...w, page: input.page });
   for (const k of pr.keep) {
     const it = items.get(k.lineId);
     if (it) keep.push({ page: input.page, box: quadBox(substringQuad(it, k.start, k.end, 0)), field: k.field, value: k.value });

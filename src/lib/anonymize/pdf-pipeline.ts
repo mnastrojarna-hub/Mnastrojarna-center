@@ -9,7 +9,7 @@ import { itemFrame, lineRangeToItems, quadBox, substringQuad } from "./lines";
 import { openPdf, PDF_MAX_IMAGE_PX, type PdfDocument, type PdfPage } from "./pdf-node";
 import { preparePdf } from "./pdf-prepare";
 import {
-  backgroundLevel, buildRasterPdf, burnGraphic, burnRectKeepLines, checkPdfOutput, encodeFlate, encodeJpeg, fillRect, inkFraction,
+  backgroundLevel, buildRasterPdf, burnGraphic, burnRectKeepLines, checkPdfOutput, contrastInkFraction, encodeFlate, encodeJpeg, fillRect, inkFraction,
   PAGE_BUDGET_BYTES, MIN_DPI, renderPageRaster, renderRegion, ringResidue, targetDpi, type OutPage, type Raster,
 } from "./pdf-raster";
 import { extractPage, looksLikeCadProducer, MAX_PDF_PAGES, PAGES_PER_RUN, type PdfPageInfo } from "./pdf-text";
@@ -338,14 +338,15 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
   }
 }
 
+/** Barevná stránka? Stačí pár desítek sytých pixelů (červená revize, poznámka) — absolutní práh, ne podíl. */
+export const COLOR_MIN_PIXELS = 20;
 function previewIsColor(r: Raster): boolean {
-  let colored = 0, total = 0;
-  for (let i = 0; i < r.width * r.height; i += 2) {
+  let colored = 0;
+  for (let i = 0; i < r.width * r.height; i++) {
     const o = i * 3;
-    total++;
-    if (Math.max(r.data[o], r.data[o + 1], r.data[o + 2]) - Math.min(r.data[o], r.data[o + 1], r.data[o + 2]) > 48) colored++;
+    if (Math.max(r.data[o], r.data[o + 1], r.data[o + 2]) - Math.min(r.data[o], r.data[o + 1], r.data[o + 2]) > 48 && ++colored >= COLOR_MIN_PIXELS) return true;
   }
-  return colored / Math.max(1, total) > 0.0005;
+  return false;
 }
 
 type PageCtx = { info: PdfPageInfo; page: PdfPage; color: boolean; preview: Raster; ps: number; vision: boolean; rulesDrawing: boolean; cachedBefore: boolean };
@@ -369,6 +370,7 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
   const pr = rulePage(info.lines, input.ctx, { keepValues: input.keepValues });
   if (pr.customerStandardLines.length) res.customerStandard = true;
   if (pr.termInKeep) res.termInKeep = true;
+  for (const w of pr.warnings) res.warnings.push({ ...w, page: info.page });
   const lineById = new Map(info.lines.map((l) => [l.id, l]));
   const itemById = new Map(info.items.map((i) => [i.id, i]));
   const hits: LineHit[] = [...pr.hits];
@@ -577,12 +579,33 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     const important = keptItems.filter((it) => zoneOfBox(ptBox(it), info) !== "body");
     const body = keptItems.filter((it) => zoneOfBox(ptBox(it), info) === "body");
     const sample = [...important, ...body.filter((_, i) => i % Math.max(1, Math.ceil(body.length / 200)) === 0)];
+    // inkoust = kontrast proti místnímu pozadí (žlutý / světle šedý / bílý na tmavém je vidět).
+    // Chybějící písma = VĚTŠINA položek nebo keep pole bez inkoustu; ojedinělé položky bez inkoustu
+    // (bílý, zakrytý, průhledný text) → varování ke kontrole, ne selhání.
+    // Písmo, které se nevykreslilo, se projeví na VŠECH svých položkách → po písmech: ≥ 3 položky
+    // ve vzorku a ≥ 90 % bez inkoustu = chybějící písmo (i když je to menšina stránky).
     let failed = 0;
-    for (const it of sample) if (inkFraction(raster, toPx(ptBox(it), s), bg) < 0.005) failed++;
-    const keepFailed = keep.some((k) => !pxRects.some((r) => intersects(toPx(k.box, s), r.box)) && inkFraction(raster, toPx(k.box, s), bg) < 0.005);
-    if (sample.length && (failed > Math.max(0, sample.length * 0.01) || keepFailed)) {
+    const byFont = new Map<string, { n: number; fail: number }>();
+    for (const it of sample) {
+      const miss = contrastInkFraction(raster, toPx(ptBox(it), s)) < 0.005;
+      if (miss) failed++;
+      const f = byFont.get(it.fontName ?? "?") ?? { n: 0, fail: 0 };
+      f.n++;
+      if (miss) f.fail++;
+      byFont.set(it.fontName ?? "?", f);
+    }
+    const fontFailed = [...byFont.values()].some((f) => f.n >= 3 && f.fail >= 0.9 * f.n);
+    const keepFailed = keep.some((k) => !pxRects.some((r) => intersects(toPx(k.box, s), r.box)) && contrastInkFraction(raster, toPx(k.box, s)) < 0.005);
+    if (sample.length && (failed > sample.length * 0.5 || keepFailed || fontFailed)) {
       result.inkFailed = true;
       return result;
+    }
+    if (failed > 0) {
+      res.warnings.push({
+        code: "hidden_text",
+        message: `Část textu výkresu se nevykreslila (${failed} z ${sample.length} ${sample.length === 1 ? "údaje" : "údajů"} — bílý, zakrytý nebo skrytý text) — zkontroluj náhled.`,
+        page: info.page,
+      });
     }
 
     // zbytky kolem smazaných položek (dotahy, diakritika) → rozšířit o 0,15 em, max. 2×
@@ -604,7 +627,7 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     if (result.residue) res.warnings.push({ code: "residue", message: "Kolem smazaného místa zůstaly zbytky — zkontroluj.", page: info.page });
 
     // kódování v rozpočtu 2,5 MB / strana; barva jen když po vypálení zůstala (červené logo zmizelo → šedá)
-    const enc = raster.channels === 3 ? maybeGray(raster) : raster;
+    const enc = raster.channels === 3 ? maybeGray(raster, { minPixels: 40 }) : raster;
     let img = await encodeFlate(enc);
     if (img.data.length > PAGE_BUDGET_BYTES) {
       const j = await encodeJpeg(enc, 85);

@@ -5,7 +5,8 @@ import path from "node:path";
 /**
  * Server action NIKDY nevykresluje (B4): statický importní graf src/app/actions/** nesmí vést do
  * rendereru anonymizace (pdf.js, canvas, sharp — pdf-node, pdf-text, pdf-raster, pdf-pipeline, image,
- * vision, photo-pipeline) ani do service.ts. Dynamické `await import()` se nepočítají (běží jen v routách).
+ * vision, photo-pipeline) ani do service.ts. Dynamický `import()` přímo v souboru akce je zakázaný také
+ * (ESLint no-restricted-syntax + test níže); v knihovnách se dynamické importy nepočítají (běží jen v routách).
  */
 
 const ROOT = path.resolve(__dirname, "../../..");
@@ -69,6 +70,26 @@ describe("importní graf server actions", () => {
     const rel = [...g.files].map((f) => path.relative(SRC, f).replace(/\.tsx?$/, ""));
     for (const bad of FORBIDDEN) expect(rel, `${file} → ${bad}`).not.toContain(bad);
     for (const p of FORBIDDEN_PKGS) expect([...g.pkgs].some((x) => x === p || x.startsWith(`${p}/`)), `${file} → ${p}`).toBe(false);
+  });
+
+  it.each(actions)("%s nemá ani dynamický import() rendereru", (file) => {
+    const src = readFileSync(path.join(SRC, "app/actions", file), "utf8");
+    for (const m of src.matchAll(/import\(\s*["']([^"']+)["']\s*\)/g)) {
+      const spec = m[1];
+      expect(FORBIDDEN_PKGS.some((p) => spec === p || spec.startsWith(`${p}/`)), `${file} → import(${spec})`).toBe(false);
+      const r = resolveImport(path.join(SRC, "app/actions", file), spec);
+      if (!r) continue;
+      const rel = path.relative(SRC, r).replace(/\.tsx?$/, "");
+      expect(FORBIDDEN, `${file} → import(${spec})`).not.toContain(rel);
+    }
+  });
+
+  it("detektor dynamických importů funguje (sonda)", () => {
+    const probe = 'export async function a() { return import("@/lib/anonymize/pdf-node"); }';
+    const specs = [...probe.matchAll(/import\(\s*["']([^"']+)["']\s*\)/g)].map((m) => m[1]);
+    expect(specs).toEqual(["@/lib/anonymize/pdf-node"]);
+    const r = resolveImport(path.join(SRC, "app/actions/x.ts"), specs[0]);
+    expect(FORBIDDEN).toContain(path.relative(SRC, r!).replace(/\.tsx?$/, ""));
   });
 
   it("akce anonymizace existuje a používá frontu (queue.ts), ne službu", () => {

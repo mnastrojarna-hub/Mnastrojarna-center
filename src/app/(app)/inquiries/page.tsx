@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calculator, FilePlus, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { Calculator, EyeOff, FilePlus, Inbox, MessageSquareQuote, Mail } from "lucide-react";
 import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
 import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
@@ -24,6 +24,11 @@ import { toFlowEmails } from "@/components/flow/flow-data";
 import { QuickInquiryDialog } from "@/components/flow/quick-inquiry-dialog";
 import { bookHref, todayPrague } from "@/components/flow/flow-utils";
 import { CLOSED_JOB_KEYS, STATE_PARAM, actionPalette, parseStateParam } from "@/components/flow/flow-state";
+import { getAnonPending, getAnonReviewList, getJobAnonBadges } from "@/lib/data/anonymize";
+import { AnonymizeToolButton } from "@/components/anonymize/anonymize-tool-dialog";
+import { JobAnonBadge } from "@/components/anonymize/anon-badge";
+import { AnonReviewChip, AnonReviewList, type AnonReviewRowView } from "@/components/anonymize/anon-review-section";
+import type { AnonUiStatus } from "@/components/anonymize/anon-status";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +64,30 @@ export default async function InquiriesPage({
     : allEmails;
   // bez podrobných stavů (DB je nemá) aspoň poptávky podle hlavního stavu
   const jobs = ids ? all.filter((j) => ids.has(j.id)) : all.filter((j) => j.stage === "poptavka");
-  const states = await getFlowJobStates(jobs.map((j) => j.id));
+  const [states, anonBadges, anonReview, anonPending] = await Promise.all([
+    getFlowJobStates(jobs.map((j) => j.id)),
+    getJobAnonBadges(jobs.map((j) => j.id)),
+    getAnonReviewList({ scope, limit: 30 }),
+    getAnonPending(scope),
+  ]);
+  const reviewRows: AnonReviewRowView[] = anonReview.map((r) => ({
+    id: r.id, jobId: r.jobId, jobNumber: r.jobNumber, jobTitle: r.jobTitle, filename: r.filename, anonFilename: r.anonFilename,
+    status: r.status as AnonUiStatus, reason: r.reason, counts: (r.summary?.counts ?? {}) as Record<string, number>, at: r.at,
+    total: typeof r.summary?.total === "number" ? r.summary.total : null, crop: r.crop, page: r.page,
+  }));
+  // „Ke kontrole anonymizace": s položkami nahoře (nad seznamem poptávek), jen čekající → dole
+  const anonSection = (reviewRows.length > 0 || anonPending.count > 0) ? (
+    <FlowSection
+      id="anonymizace"
+      icon={EyeOff}
+      iconClass="bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+      title="Ke kontrole anonymizace"
+      description="Výkresy pro dodavatele, u kterých si AI nebyla jistá (nebo se anonymizace nepovedla). Zkontroluj náhled a schval."
+      count={reviewRows.length}
+    >
+      <AnonReviewList items={reviewRows} pendingFileIds={anonPending.fileIds} pendingCount={anonPending.count} />
+    </FlowSection>
+  ) : null;
   const chips = chipsForTab("inquiries", counts);
   const openCount = Object.keys(counts).length ? OPEN_INQUIRY.reduce((s, k) => s + (counts[`inquiry.${k}`] ?? 0), 0) : jobs.length;
   const isDefault = selected.length === OPEN_INQUIRY.length && OPEN_INQUIRY.every((k) => selected.includes(k));
@@ -84,11 +112,13 @@ export default async function InquiriesPage({
           <>
             <CaptureButton label="Vyfotit poptávku" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
             <QuickInquiryDialog customers={options.customers} label="Nová poptávka" className="flex-1 sm:flex-none" />
+            <AnonymizeToolButton className="flex-1 sm:flex-none" />
             <BookLink href={bookHref("poptavky", ["poptavka"])} className="w-full sm:w-auto" />
           </>
         }
       >
         <FlowScopeBar scope={scopeBarData(scope)} />
+        {reviewRows.length > 0 && <AnonReviewChip count={reviewRows.length} />}
       </FlowHeader>
 
       {canPrice ? (
@@ -105,6 +135,8 @@ export default async function InquiriesPage({
           U každého stavu vidíš, kdo ho nastavil.
         </FlowHint>
       )}
+
+      {reviewRows.length > 0 && anonSection}
 
       <ToastProvider>
         <FlowSection
@@ -129,6 +161,7 @@ export default async function InquiriesPage({
               jobs={jobs}
               today={today}
               renderState={(j) => (states[j.id] ? <FlowRowState state={states[j.id]} tab="inquiries" /> : null)}
+              renderBadge={(j) => <JobAnonBadge badge={anonBadges[j.id]} />}
               renderAction={(j) => {
                 const st = states[j.id];
                 if (!st) {
@@ -160,6 +193,8 @@ export default async function InquiriesPage({
           )}
         </FlowSection>
       </ToastProvider>
+
+      {reviewRows.length === 0 && anonSection}
 
       {mail && (
         <FlowSection

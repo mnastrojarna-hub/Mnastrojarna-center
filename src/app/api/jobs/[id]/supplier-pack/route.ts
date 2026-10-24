@@ -2,7 +2,7 @@ import { zipSync, strToU8 } from "fflate";
 import { logAudit } from "@/lib/audit";
 import { anonGuard, isUuid, json } from "@/lib/anonymize/route-helpers";
 import { dedupeNames, cleanNamePart } from "@/lib/anonymize/filename";
-import { pickShareFile, SHARE_FILE_SELECT, verifyShareBytes, type FileRowWithAnon } from "@/lib/anonymize/share";
+import { pickShareFile, SHARE_FILE_SELECT, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "@/lib/anonymize/share";
 import { assertJobFileAccess } from "@/lib/jobs/job-file-access";
 
 export const runtime = "nodejs";
@@ -35,6 +35,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!job) return json({ error: "Zakázka nenalezena." }, 404);
   const { data } = await guard.db.from("job_files").select(SHARE_FILE_SELECT).eq("job_id", jobId).in("id", files);
   const rows = (data ?? []) as FileRowWithAnon[];
+  // nákupní doklady (ceny dodavatele) nikdy do balíčku — bez ohledu na oprávnění k maržím
+  const price = await sharePriceDocIds(guard.db as never, files);
 
   const entries: { name: string; bytes: Uint8Array }[] = [];
   const missing: { id: string; filename: string; reason: string }[] = [];
@@ -44,7 +46,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!row) { missing.push({ id, filename: "?", reason: "Soubor nepatří k zakázce." }); continue; }
     const chk = await assertJobFileAccess(guard.db as never, id, guard.access, "send");
     if (!chk.ok) { missing.push({ id, filename: row.filename, reason: chk.error }); continue; }
-    const d = pickShareFile(row, { reviewedByCaller: reviewed.has(id), confirmNotCustomerMaterial: confirmed.has(id) });
+    const d = pickShareFile(row, { reviewedByCaller: reviewed.has(id), confirmNotCustomerMaterial: confirmed.has(id), priceDocument: price.has(id.toLowerCase()) });
     if (!d.ok) { missing.push({ id, filename: d.reason === "pending" ? "(anonymizuje se)" : row.anon_filename ?? "výkres", reason: d.message }); continue; }
     try {
       const bytes = await verifyShareBytes(guard.db as never, d, row);

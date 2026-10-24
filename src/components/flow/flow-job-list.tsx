@@ -62,9 +62,12 @@ export function FlowJobRow({
   action,
   state,
   extra,
+  badge,
 }: {
   job: JobListItem;
   today: string;
+  /** Doplňkový odznak v horním řádku (anonymizace výkresů „Výkresy 3/3 ✓"). */
+  badge?: React.ReactNode;
   /** Akce vpravo (další krok + menu). */
   action?: React.ReactNode;
   /** Dílčí stav fáze (chipy) a kdo ho nastavil. */
@@ -93,6 +96,7 @@ export function FlowJobRow({
             </span>
           )}
           <DeadlineChip job={job} today={today} />
+          {badge}
           {job.aiFilled && (
             <span title="Údaje vyplnila AI — zkontroluj je" className="inline-flex text-violet-500 dark:text-violet-400">
               <Sparkles className="h-3.5 w-3.5" />
@@ -149,6 +153,7 @@ export function FlowJobList({
   today,
   renderAction,
   renderState,
+  renderBadge,
 }: {
   jobs: JobListItem[];
   today: string;
@@ -156,11 +161,13 @@ export function FlowJobList({
   renderAction?: (job: JobListItem) => React.ReactNode;
   /** Dílčí stav a autor řádku. */
   renderState?: (job: JobListItem) => React.ReactNode;
+  /** Odznak řádku (anonymizace výkresů). */
+  renderBadge?: (job: JobListItem) => React.ReactNode;
 }) {
   return (
     <ul className="space-y-2">
       {jobs.map((j) => (
-        <FlowJobRow key={j.id} job={j} today={today} action={renderAction?.(j)} state={renderState?.(j)} />
+        <FlowJobRow key={j.id} job={j} today={today} action={renderAction?.(j)} state={renderState?.(j)} badge={renderBadge?.(j)} />
       ))}
     </ul>
   );

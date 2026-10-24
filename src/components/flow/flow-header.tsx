@@ -56,7 +56,7 @@ export function FlowHeader({
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 lg:max-w-[58%] lg:shrink-0 lg:justify-end">{actions}</div>}
       </div>
       {step !== undefined && step !== null && <FlowStrip current={step} canPrice={canPrice} className="relative mt-4" />}
       {children && <div className="relative mt-4">{children}</div>}

@@ -11,7 +11,7 @@
  */
 
 import { escapeRegExp, mapRangeBack, normalizeWithMap, normalizeText, type NormText } from "./text";
-import type { AnonCategory, Box, KeepField, LineHit, TextLine, Zone } from "./types";
+import type { AnonCategory, AnonWarning, Box, KeepField, LineHit, TextLine, Zone } from "./types";
 
 // ── Diakritika: CAD písma bývají bez háčků („Cislo vykresu", „Schvalil") ──
 
@@ -125,6 +125,35 @@ const COMPANY_LABEL_ALT = [...COMPANY_LABEL_WORDS].sort((a, b) => b.length - a.l
 const COMPANY_LABEL_RE = new RegExp(foldSource(String.raw`(?<![\p{L}\p{N}])(?:${COMPANY_LABEL_ALT})\.?(?![\p{L}\p{N}])\s*[:：]`), "giu");
 /** Popisek na začátku řádku bez dvojtečky (hodnota začíná velkým písmenem — kontrola v kódu, flag i by \p{Lu} zrušil) nebo samotný popisek. */
 const COMPANY_LABEL_START_RE = new RegExp(foldSource(String.raw`^\s*(?:${COMPANY_LABEL_ALT})\.?(?![\p{L}\p{N}])`), "iu");
+
+/**
+ * Popisky VLASTNÍKA / zákazníka (ne výrobce či dodavatele dílu): „Zákazník: ACME Forge GmbH" s právní
+ * formou se maže i mimo razítko (řádek nad razítkem, poznámka). „Výrobce: SKF GmbH" mimo razítko zůstává.
+ */
+const OWNER_LABEL_WORDS = [
+  "Zákazník", "Odběratel", "Odberateľ", "Objednatel", "Objednávateľ", "Klient", "Investor", "Majitel", "Vlastník",
+  "Kunde", "Auftraggeber", "Besteller", "Abnehmer", "Eigentümer", "Bauherr",
+  "Customer", "Client", "Owner",
+  "Zamawiający", "Odbiorca", "Inwestor",
+  "Megrendelő", "Vevő", "Ügyfél",
+];
+const OWNER_LABEL_RE = new RegExp(foldSource(String.raw`(?<![\p{L}\p{N}])(?:${[...OWNER_LABEL_WORDS].sort((a, b) => b.length - a.length).map((w) => escapeRegExp(w)).join("|")})\.?(?![\p{L}\p{N}])\s*[:：]`), "giu");
+
+/** Popisek vlastníka výkresu na začátku řádku („Zákazník:", „Firma:", „Company:") — ne Výrobce / Dodavatel. */
+const OWNER_ROW_START_RE = new RegExp(foldSource(String.raw`^\s*(?:${[...OWNER_LABEL_WORDS, "Firma", "Společnost", "Company", "Firm", "Unternehmen", "Projektant", "Konstruktion"].sort((a, b) => b.length - a.length).map((w) => escapeRegExp(w)).join("|")})\.?(?![\p{L}\p{N}])\s*[:：]`), "iu");
+/** Řádek kusovníku (pozice na začátku nebo počet kusů) — nikdy není řádkem vlastníka. */
+const BOM_ROW_RE = /^\s*\d{1,3}[.)]?\s|\b\d+(?:[.,]\d+)?\s*(?:ks|kus[ůy]?|pcs?|stk|stück|szt)\b/iu;
+
+/**
+ * Řádek VLASTNÍKA výkresu nad razítkem („Zákazník: ACME Forge GmbH", „Firma: STROJMETAL a.s.") —
+ * rozšíření zóny razítka nahoru. Jen popisek vlastníka s dvojtečkou na začátku řádku; právní forma
+ * sama (výrobce v kusovníku „SKF GmbH") ani popisky výrobce / dodavatele zónu nerozšíří.
+ */
+export function isCompanyRow(text: string): boolean {
+  const t = String(text ?? "");
+  if (BOM_ROW_RE.test(t)) return false;
+  return OWNER_ROW_START_RE.test(t);
+}
 
 /** Obecná slova v názvech firem — samostatně nejsou termínem (normalizovaně, bez diakritiky). */
 const TERM_WORD_STOP = new Set([
@@ -584,6 +613,17 @@ export function ruleLine(text: string, zone: Zone, ctx: RuleContext): LineRuleRe
       }
     } else {
       res.candidate = true;
+      // „Zákazník: ACME Forge GmbH" mimo razítko — popisek vlastníka + právní forma = firma (pravidlo)
+      const first = Math.min(...legal.map((l) => l.start));
+      for (const m of text.matchAll(OWNER_LABEL_RE)) {
+        const e = (m.index ?? 0) + m[0].length;
+        if (e > first) continue;
+        const v = trimRange(text, { start: e, end: nextLabelStart(text, e) });
+        if (!v || v.end <= first) continue;
+        const value = text.slice(v.start, v.end);
+        if (isTechnicalText(value.replace(LEGAL_DOTTED_RE, " ").replace(LEGAL_CAPS_RE, " ")) || containsKeepTerm(value, ctx.keepTerms)) continue;
+        hits.push({ start: v.start, end: v.end, category: "company", rule: "company_label" });
+      }
     }
   }
 
@@ -734,6 +774,8 @@ export interface PageRuleResult {
   candidateLines: string[];
   /** Keep pole obsahuje termín / zkratku firmy → review. */
   termInKeep: boolean;
+  /** Varování pravidel (např. tiskárna v plot stampu smazaná s cestou). */
+  warnings: AnonWarning[];
 }
 
 function overlapX(a: Box, b: Box): number {
@@ -768,8 +810,78 @@ export function neighborLine(lines: readonly TextLine[], from: TextLine, maxRigh
   return best?.l ?? null;
 }
 
+/** Pravidla cest, která tvoří plot stamp (cesta / soubor CAD — ne odkaz do cloudu v poznámce). */
+const STAMP_PATH_RULES = new Set(["path_win", "path_unc", "path_unix", "path_file", "path_cadfile", "path_cadname", "path_vault", "path_pdm"]);
+/** Popisek mřížky rámu („A", „12") — není částí plot stampu a řetěz nepřerušuje. */
+const STAMP_DATETIME_RE = /^\s*(?:\d{1,2}\.\s?\d{1,2}\.\s?\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})(?:[\sT,]+\d{1,2}:\d{2}(?::\d{2})?)?\s*$|^\s*\d{1,2}:\d{2}(?::\d{2})?\s*$/u;
+const GRID_LABEL_RE = /^\s*[\p{L}\p{N}]{1,2}\s*$/u;
+/** Přihlašovací jméno („jnovak", „FIRMA\jnovak") — malá písmena, bez mezer. */
+const STAMP_LOGIN_RE = /^\s*(?:[\w-]+\\)?[a-z][a-z0-9._-]{2,30}\s*$/u;
+/** „User: jnovak", „Uživatel: novak". */
+const STAMP_USER_LABEL_RE = folded(/^\s*(?:user|uživatel|benutzer|login|autor|author)\s*[:=]\s*(?:[\w-]+\\)?[\p{L}][\p{L}\p{N}._-]{1,30}\s*$/iu);
+/** Tiskárna / plotter („Plot: HP DesignJet T830", „Printed by …", „Tisk: …"). */
+const STAMP_PRINTER_RE = folded(/^\s*(?:plot(?:ted)?|plotter|printed|printer|print|gedruckt|geplottet|drucker|tisk|tiskárna|vytištěno)\b[^\n]{0,50}$/iu);
+
+export type StampPartKind = "datetime" | "login" | "printer";
+
+/** Co je samostatná položka plot stampu (jinak null — řetěz končí). */
+export function stampPartKind(text: string): StampPartKind | null {
+  const t = String(text ?? "");
+  if (t.length > 60) return null;
+  if (STAMP_DATETIME_RE.test(t)) return "datetime";
+  if (STAMP_USER_LABEL_RE.test(t)) return "login";
+  if (STAMP_LOGIN_RE.test(t) && !isTechnicalText(t)) return "login";
+  if (STAMP_PRINTER_RE.test(t) && !isTechnicalText(t.replace(/^\s*\S+\s*[:=]?/u, ""))) return "printer";
+  return null;
+}
+
+/**
+ * Ostatní části plot stampu na stejném účaří (stejné natočení a podobná výška písma), navazující
+ * v řetězu s mezerou ≤ 40 em: JEN datum/čas, přihlašovací jméno nebo tiskárna (nikdy víceslovná
+ * poznámka ani technický text — v žádné zóně). Řetěz končí na první jiné položce (přes ni nepokračuje);
+ * popisek mřížky rámu („A", „12") řetěz nepřeruší. Další cesty plot stampu (pathIds) řetěz prodlouží.
+ * Jen mimo razítko a revize (tam jsou na stejném účaří sousední buňky tabulky).
+ */
+export function plotStampSiblings(
+  lines: readonly TextLine[], stamp: TextLine,
+  opts: { maxGapEm?: number; pathIds?: ReadonlySet<string>; keepIds?: ReadonlySet<string> } = {},
+): { line: TextLine; kind: StampPartKind }[] {
+  const maxGapEm = opts.maxGapEm ?? 40;
+  const em = Math.max(stamp.fontSize, 0.5);
+  const vertical = Math.abs(Math.abs(stamp.rot) - 90) < 10;
+  const along = (b: Box): [number, number] => (vertical ? [b.y, b.y + b.h] : [b.x, b.x + b.w]);
+  const across = (b: Box) => (vertical ? b.x + b.w / 2 : b.y + b.h);
+  const base = across(stamp.box);
+  const row = lines.filter((l) => l.id !== stamp.id && l.page === stamp.page && l.rot === stamp.rot && l.text.trim()
+    && Math.abs(across(l.box) - base) < (vertical ? 0.6 : 0.4) * em
+    && l.fontSize >= 0.75 * em && l.fontSize <= 1.34 * em)
+    .sort((a, b) => along(a.box)[0] - along(b.box)[0]);
+  const out: { line: TextLine; kind: StampPartKind }[] = [];
+  const [s0, s1] = along(stamp.box);
+  const walk = (dir: 1 | -1) => {
+    let edge = dir === 1 ? s1 : s0;
+    const seq = dir === 1 ? row.filter((l) => along(l.box)[0] >= s0) : row.filter((l) => along(l.box)[1] <= s1).reverse();
+    for (const l of seq) {
+      const [b0, b1] = along(l.box);
+      const gap = dir === 1 ? b0 - edge : edge - b1;
+      if (gap > maxGapEm * em) break;
+      if (GRID_LABEL_RE.test(l.text)) continue; // mřížka rámu: neodstraňuje se, řetěz nepřeruší
+      if (l.zone === "title_block" || l.zone === "revisions") break;
+      if (opts.pathIds?.has(l.id)) { edge = dir === 1 ? Math.max(edge, b1) : Math.min(edge, b0); continue; }
+      if (opts.keepIds?.has(l.id) || isTitleAnchor(l.text)) break;
+      const kind = stampPartKind(l.text);
+      if (!kind) break;
+      out.push({ line: l, kind });
+      edge = dir === 1 ? Math.max(edge, b1) : Math.min(edge, b0);
+    }
+  };
+  walk(1);
+  walk(-1);
+  return out;
+}
+
 export function rulePage(lines: readonly TextLine[], ctx: RuleContext, opts: { keepValues?: Partial<Record<KeepField, string>> } = {}): PageRuleResult {
-  const out: PageRuleResult = { hits: [], keep: [], customerStandardLines: [], candidateLines: [], termInKeep: false };
+  const out: PageRuleResult = { hits: [], keep: [], customerStandardLines: [], candidateLines: [], termInKeep: false, warnings: [] };
   const byId = new Map(lines.map((l) => [l.id, l]));
   const push = (lineId: string, h: RawHit, source: LineHit["source"] = "rule") => {
     out.hits.push({ lineId, start: h.start, end: h.end, category: h.category, rule: h.rule, source, ...(h.wholeItem ? { wholeItem: true } : {}) });
@@ -813,6 +925,28 @@ export function rulePage(lines: readonly TextLine[], ctx: RuleContext, opts: { k
           if (n && !looksLikeLabelOnly(n.text)) out.keep.push({ lineId: n.id, field: k.field, start: 0, end: n.text.length, value: n.text });
         }
       }
+    }
+  }
+
+  // plot stamp složený z oddělených položek („cesta   datum   uživatel") → celý (mimo razítko a revize);
+  // jen datum/čas, login a tiskárna — poznámky a technický text na stejném účaří zůstanou
+  if (ctx.redact.path) {
+    const stampIds = new Set(out.hits.filter((h) => h.category === "path" && STAMP_PATH_RULES.has(h.rule)).map((h) => h.lineId));
+    const keepIds = new Set(out.keep.map((k) => k.lineId));
+    const added = new Set<string>();
+    let printers = 0;
+    for (const id of stampIds) {
+      const l = byId.get(id);
+      if (!l || l.zone === "title_block" || l.zone === "revisions") continue;
+      for (const { line: n, kind } of plotStampSiblings(lines, l, { pathIds: stampIds, keepIds })) {
+        if (stampIds.has(n.id) || added.has(n.id)) continue;
+        added.add(n.id);
+        if (kind === "printer") printers++;
+        push(n.id, { start: 0, end: n.text.length, category: "path", rule: "plot_stamp", wholeItem: true });
+      }
+    }
+    if (printers) {
+      out.warnings.push({ code: "plot_stamp", message: "S cestou na disk se smazala i tiskárna / plotter z plot stampu — zkontroluj, že nešlo o poznámku." });
     }
   }
 

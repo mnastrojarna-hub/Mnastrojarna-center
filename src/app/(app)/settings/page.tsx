@@ -1,8 +1,10 @@
 import type { ComponentProps } from "react";
 import Link from "next/link";
 import {
-  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText,
+  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText, EyeOff,
 } from "lucide-react";
+import { DrawingAnonSettings } from "@/components/settings/drawing-anon-settings";
+import { getAnonSettingsPanel } from "@/lib/data/anonymize";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +13,7 @@ import { IntegrationSettingsEditor } from "@/components/integration-settings-edi
 import { MailboxManager } from "@/components/mailbox-manager";
 import { OutlookImport } from "@/components/outlook-import";
 import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
-import { requireFeature } from "@/lib/auth/session";
+import { getAccess, requireFeature } from "@/lib/auth/session";
 import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 
@@ -20,10 +22,12 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   // Data se čtou servisním klíčem → nejdřív oprávnění
   await requireFeature("settings");
-  const [settings, mailboxes, users] = await Promise.all([
+  const [settings, mailboxes, users, anon, access] = await Promise.all([
     getIntegrationSettingsMeta(),
     getMailboxes(),
     getUsers(),
+    getAnonSettingsPanel(),
+    getAccess(),
   ]);
   const configured = isSupabaseConfigured();
   const serviceKey = hasServiceKey();
@@ -110,6 +114,24 @@ export default async function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Anonymizace výkresů pro dodavatele */}
+      {anon && (
+        <Card id="anonymizace">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <EyeOff className="h-4 w-4 text-muted-foreground" /> Anonymizace výkresů
+            </CardTitle>
+            <CardDescription>
+              Z výkresů pro dodavatele se smaže firma, kdo kreslil, logo a cesty na disk — technické údaje zůstanou.
+              Běží automaticky u výkresů z e-mailu, fotek i nahraných souborů; ručně tlačítkem v Poptávkách.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DrawingAnonSettings {...anon} canEdit={access.user?.role === "super_admin"} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Audit — samostatná stránka */}
       <Link href="/settings/audit" className="group block">

@@ -37,8 +37,12 @@ export async function POST(req: Request) {
       return (await assertJobFileAccess(guard.db as never, id, guard.access, "view")).ok;
     }
     : undefined;
-  const res = await enqueue(guard.db, { table, fileIds, jobIds, force: body.force === true, priority: 0, via: "rucne", allow });
-  const queuedIds = Object.entries(res.statuses).filter(([, s]) => s === "pending").map(([id]) => id);
+  // staré výkresy (backfill) smí ručně předřadit (mimo denní limit) jen super admin
+  const res = await enqueue(guard.db, {
+    table, fileIds, jobIds, force: body.force === true, priority: 0, via: "rucne", allow, keepBackfill: guard.user.role !== "super_admin",
+  });
+  const backfill = new Set(res.backfill ?? []);
+  const queuedIds = Object.entries(res.statuses).filter(([id, s]) => s === "pending" && !backfill.has(id)).map(([id]) => id);
   if (queuedIds.length) {
     const origin = appOrigin(req.url);
     const k = await kick({ origin, table, ids: queuedIds.slice(0, 5), manualBy: guard.user.id });

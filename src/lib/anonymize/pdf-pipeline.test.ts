@@ -80,7 +80,9 @@ describe("anonymizace vektorového PDF", () => {
     const chk = await checkPdfOutput(out, [{ widthPt: sample.width, heightPt: sample.height }]);
     expect(chk.problems).toEqual([]);
     const raw = Buffer.from(out).toString("latin1");
-    expect(raw).toContain("/DeviceGray");
+    // vektorové logo z křivek najde jen AI (§2.2) — bez AI zůstává (výsledek ke kontrole) a je červené,
+    // takže výstup zůstává barevný (malé barevné prvky už se nepřevádějí na šedou); šedou hlídá pdf-robustness
+    expect(raw).toContain("/DeviceRGB");
     expect(raw).toContain("/Predictor 15");
     for (const word of ["STROJMETAL", "Novak", "Kladno", "SOLIDWORKS", "kusovnik"]) expect(raw.includes(word), word).toBe(false);
 

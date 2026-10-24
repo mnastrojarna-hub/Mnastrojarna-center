@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { Box, Briefcase, FileBox, FileImage, FileText, Paperclip, PencilRuler, Search, SearchX } from "lucide-react";
+import { Box, Briefcase, Download, FileBox, FileImage, FileText, Paperclip, PencilRuler, Search, SearchX } from "lucide-react";
+import { FileAnonBadge } from "@/components/anonymize/anon-badge";
+import type { AnonUiStatus } from "@/components/anonymize/anon-status";
+import { getDrawingAnonStatuses } from "@/lib/data/anonymize";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { DrawingUpload } from "@/components/drawing-upload";
@@ -42,6 +45,7 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
         return tokens.every((t) => h.includes(t));
       })
     : all;
+  const anon = await getDrawingAnonStatuses(drawings.slice(0, 500).map((d) => ({ id: d.id, jobFileId: d.jobFileId })));
 
   return (
     <div className="space-y-5">
@@ -82,6 +86,7 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
                         <span className="font-mono text-sm font-semibold">{d.number}</span>
                         <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">rev. {d.revision}</span>
                         <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", t.badge)}>{t.label}</span>
+                        {anon[d.id] && <FileAnonBadge status={anon[d.id].status as AnonUiStatus} reviewed={anon[d.id].reviewed} reason={anon[d.id].reason} />}
                       </div>
                       <p className="truncate text-xs text-muted-foreground">
                         {[d.title || null, d.customer !== "—" ? d.customer : null, d.material !== "—" ? d.material : null, d.dimensions !== "—" ? d.dimensions : null, d.qty ? `${d.qty} ks` : null]
@@ -107,6 +112,15 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
                           aria-label={`Soubor výkresu ${d.number}`}
                         >
                           <Paperclip className="h-3 w-3" /> soubor
+                        </a>
+                      )}
+                      {anon[d.id]?.status === "done" && (
+                        <a
+                          href={`/api/drawings/anonymize/${anon[d.id].fileId}/download${anon[d.id].table === "drawings" ? "?table=drawings" : ""}`}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                          aria-label={`Stáhnout výkres ${d.number} pro dodavatele (anonymizovaný)`}
+                        >
+                          <Download className="h-3 w-3" /> pro dodavatele
                         </a>
                       )}
                       <span className="text-[11px] text-muted-foreground">{formatDate(d.uploadedAt)}</span>

@@ -9,7 +9,8 @@ const MAX_SIDE = 2400;
 
 /**
  * Serverový náhled ORIGINÁLU pro editor (žádný pdf.js v prohlížeči): PNG ≤ 2400 px.
- * ?page=n (PDF), ?box=x,y,w,h (normalizovaný výřez v plném rozlišení, např. razítko).
+ * ?page=n (PDF), ?box=x,y,w,h (normalizovaný výřez v plném rozlišení, např. razítko),
+ * ?variant=anon (anonymizovaná kopie „Po" — stránky výstupu).
  */
 export async function GET(req: Request, { params }: { params: Promise<{ fileId: string }> }) {
   const { fileId } = await params;
@@ -20,13 +21,29 @@ export async function GET(req: Request, { params }: { params: Promise<{ fileId: 
   const loaded = await loadSubject(guard, table, fileId, "view");
   if (loaded instanceof Response) return loaded;
   const r = loaded.row;
-  const path = String(r.anon_source_path ?? r.storage_path ?? "");
-  if (!path) return json({ error: "Soubor nenalezen." }, 404);
+  // ?variant=anon → náhled anonymizované kopie („Po"), jinak originál („Před")
+  const anonVariant = url.searchParams.get("variant") === "anon";
+  const path = anonVariant ? String(r.anon_path ?? "") : String(r.anon_source_path ?? r.storage_path ?? "");
+  if (!path) return json({ error: anonVariant ? "Anonymizovaná kopie zatím není." : "Soubor nenalezen." }, 404);
   const bucket = table === "drawings" ? "documents" : "job-files";
   const { data: blob, error } = await guard.db.storage.from(bucket).download(path);
   if (error || !blob) return json({ error: "Soubor se nepodařilo načíst." }, 404);
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+  const srcPage = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+  // „Po" obsahuje jen zahrnuté stránky → strana originálu n = strana výstupu (pořadí v included) + 1
+  let page = srcPage;
+  if (anonVariant) {
+    const included = ((r.anon_pages as { included?: number[] } | null)?.included ?? []).filter((n) => Number.isInteger(n));
+    if (included.length) {
+      const at = included.indexOf(srcPage);
+      if (at < 0) return json({ error: "Strana je vyřazená — dodavatel ji nedostane.", excluded: true }, 404);
+      page = at + 1;
+    }
+  }
+  // šířka náhledu (miniatura v seznamu ke kontrole ≈ 320 px; editor plných 2400 px)
+  const maxSide = Math.max(160, Math.min(MAX_SIDE, Math.round(Number(url.searchParams.get("w") ?? MAX_SIDE) || MAX_SIDE)));
+  // URL nese verzi (v = anon_at) → krátká soukromá cache prohlížeče
+  const cacheControl = url.searchParams.get("v") ? "private, max-age=300" : "private, no-store";
   const boxParam = (url.searchParams.get("box") ?? "").split(",").map(Number);
   const box = boxParam.length === 4 && boxParam.every((v) => Number.isFinite(v) && v >= 0 && v <= 1) && boxParam[2] > 0 && boxParam[3] > 0
     ? { x: boxParam[0], y: boxParam[1], w: Math.min(boxParam[2], 1 - boxParam[0]), h: Math.min(boxParam[3], 1 - boxParam[1]) } : null;
@@ -43,12 +60,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ fileId: 
         if (page > pdf.numPages) return json({ error: "Stránka neexistuje." }, 404);
         const p = await pdf.getPage(page);
         const vp = p.getViewport({ scale: 1 });
-        const target = box ? MAX_SIDE / Math.max(vp.width * box.w, vp.height * box.h) : MAX_SIDE / Math.max(vp.width, vp.height);
+        const target = box ? maxSide / Math.max(vp.width * box.w, vp.height * box.h) : maxSide / Math.max(vp.width, vp.height);
         const scale = Math.min(target, Math.sqrt(40e6 / (vp.width * vp.height)));
         const raster = await renderPageRaster(p, scale, true);
         let img = rawSharp(sharp, raster);
         if (box) img = img.extract({ left: Math.floor(box.x * raster.width), top: Math.floor(box.y * raster.height), width: Math.max(1, Math.floor(box.w * raster.width)), height: Math.max(1, Math.floor(box.h * raster.height)) });
-        png = await img.resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+        png = await img.resize({ width: maxSide, height: maxSide, fit: "inside", withoutEnlargement: true }).png().toBuffer();
       } finally {
         await pdf.destroy();
       }
@@ -59,12 +76,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ fileId: 
         const W = meta.width ?? 1, H = meta.height ?? 1;
         img = sharp(await img.toBuffer()).extract({ left: Math.floor(box.x * W), top: Math.floor(box.y * H), width: Math.max(1, Math.floor(box.w * W)), height: Math.max(1, Math.floor(box.h * H)) });
       }
-      png = await img.resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+      png = await img.resize({ width: maxSide, height: maxSide, fit: "inside", withoutEnlargement: true }).png().toBuffer();
     } else {
       return json({ error: "Náhled pro tento formát není k dispozici." }, 415);
     }
-    return new NextResponse(new Uint8Array(png), { headers: { "Content-Type": "image/png", "Cache-Control": "private, no-store" } });
+    return new NextResponse(new Uint8Array(png), { headers: { "Content-Type": "image/png", "Cache-Control": cacheControl } });
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : "Náhled se nepodařilo vytvořit." }, 500);
+    console.error(`[anonymize:preview] ${fileId}: ${err instanceof Error ? err.message : String(err)}`);
+    return json({ error: "Náhled se nepodařilo vytvořit (soubor může být poškozený)." }, 500);
   }
 }

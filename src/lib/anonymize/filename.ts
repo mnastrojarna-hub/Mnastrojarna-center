@@ -82,3 +82,19 @@ export function outputExt(method: "raster_pdf" | "image" | "image_pdf" | "dxf" |
       return /^png$/i.test(srcExt) ? "png" : "jpg";
   }
 }
+
+/**
+ * Název převzatý z kopie stejného souboru v JINÉ zakázce (cache výstupu): náhradní název
+ * „<zakázka>-V<n>" nesmí nést číslo cizí zakázky → přepočítá se na vlastní zakázku a pořadí.
+ * Název z čísla výkresu („D-1234_B.pdf") zůstává.
+ */
+export function rebaseTwinFilename(name: string | null | undefined, twinJobNumber: string | null | undefined, own: { jobNumber: string | null; index: number }): string | null {
+  if (!name) return null;
+  const twin = cleanNamePart(twinJobNumber);
+  if (!twin) return name;
+  const m = new RegExp(`^${twin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-V\\d+((?:_l\\d+)?\\.[A-Za-z0-9]+)$`).exec(name);
+  if (!m) return name;
+  const job = cleanNamePart(own.jobNumber) || "vykres";
+  const idx = own.index > 0 ? Math.floor(own.index) : 1;
+  return `${job}-V${idx}${m[1]}`;
+}

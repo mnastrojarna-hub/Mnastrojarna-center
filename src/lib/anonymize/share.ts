@@ -35,6 +35,8 @@ export interface ShareOptions {
   isSuperAdmin?: boolean;
   /** Archiv výkresů (bucket documents) — jiný prefix anon cesty. */
   archive?: boolean;
+  /** Nákupní doklad (#25 — cena dodavatele, DB job_file_price_ids): anonymizovaná kopie se nikdy nesdílí. */
+  priceDocument?: boolean;
 }
 
 export type ShareDecision =
@@ -75,6 +77,13 @@ export function pickShareFile(row: FileRowWithAnon, opts: ShareOptions = {}): Sh
 
   const candidate = isAnonCandidate(row.kind, row.filename, row.mime_type, row.origin, row.issuer);
   const status = row.anon_status;
+  // nákupní doklad s cenou dodavatele / soubor přeřazený mimo výkresy: dřívější anonymní kopie neplatí
+  if (opts.priceDocument && status !== null && status !== "skipped") {
+    return { ok: false, reason: "excluded", message: "Nákupní doklad s cenou dodavatele — anonymizovaná kopie se nesdílí." };
+  }
+  if (!candidate && status !== null && status !== "skipped") {
+    return { ok: false, reason: "excluded", message: "Soubor už není výkres zákazníka — anonymizovaná kopie neplatí." };
+  }
   if (!candidate && status === null) {
     // externí soubor, který se neanonymizuje (ZIP, DOCX, XLSX z e-mailu zákazníka, doklad dodavatele…):
     // ven jen po potvrzení „není to podklad zákazníka" a vždy s auditem
@@ -176,6 +185,18 @@ interface QueryLike extends StorageLike {
   from(table: string): {
     select(cols: string): { in(col: string, vals: string[]): PromiseLike<{ data: unknown[] | null; error: { message: string } | null }> };
   };
+  rpc?(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+}
+
+/**
+ * Nákupní doklady (#25, DB pravidlo job_file_price_ids) mezi soubory — bez ohledu na oprávnění volajícího;
+ * chyba DB = všechny (fail closed). Klient bez rpc (testy) = žádné.
+ */
+export async function sharePriceDocIds(db: Pick<QueryLike, "rpc">, ids: string[]): Promise<Set<string>> {
+  if (!ids.length || !db.rpc) return new Set();
+  const { data, error } = await db.rpc("job_file_price_ids", { p_ids: ids });
+  if (error) return new Set(ids.map((x) => x.toLowerCase()));
+  return new Set(((data ?? []) as string[]).map((x) => String(x).toLowerCase()));
 }
 
 /** Přílohy pro dodavatele: každý soubor přes pickShareFile + verifyShareBytes. */
@@ -186,13 +207,14 @@ export async function collectSupplierAttachments(db: QueryLike, fileIds: string[
   const { data, error } = await db.from("job_files").select(SHARE_FILE_SELECT).in("id", ids);
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as FileRowWithAnon[];
+  const price = await sharePriceDocIds(db, ids);
   for (const id of ids) {
     const row = rows.find((r) => r.id === id);
     if (!row) {
       out.blocked.push({ fileId: id, reason: "excluded", message: "Soubor nenalezen." });
       continue;
     }
-    const d = pickShareFile(row, { ...opts, ...(opts.perFile?.[id] ?? {}) });
+    const d = pickShareFile(row, { ...opts, ...(opts.perFile?.[id] ?? {}), priceDocument: price.has(id.toLowerCase()) });
     if (!d.ok) {
       if (d.reason === "pending") out.pending.push(id);
       else out.blocked.push({ fileId: id, reason: d.reason, message: d.message });
