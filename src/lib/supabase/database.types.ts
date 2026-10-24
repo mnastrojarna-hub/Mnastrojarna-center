@@ -111,7 +111,7 @@ export interface Supplier {
   updated_at: string;
 }
 
-export interface Drawing {
+export interface Drawing extends AnonColumns {
   id: string;
   drawing_number: string;
   revision: string;
@@ -500,7 +500,125 @@ export interface OrderItem {
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
-export interface JobFileRow {
+/** Anonymizace výkresů (migrace 20261023159000) — sloupce anon_* na job_files a drawings. Logika: src/lib/anonymize/**. */
+export type AnonStatusDb = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";
+export interface AnonColumns {
+  anon_status: AnonStatusDb | null;
+  anon_priority: number;
+  anon_source_path: string | null;
+  anon_path: string | null;
+  anon_filename: string | null;
+  anon_mime: string | null;
+  anon_size: number | null;
+  anon_sha256: string | null;
+  anon_method: "raster_pdf" | "image" | "image_pdf" | "dxf" | "step" | null;
+  anon_pages: Record<string, unknown> | null;
+  anon_regions: Record<string, unknown>[] | null;
+  anon_summary: Record<string, unknown> | null;
+  anon_confidence: number | null;
+  anon_reason: string | null;
+  anon_config_hash: string | null;
+  anon_terms_hash: string | null;
+  anon_ai_cache: Record<string, unknown> | null;
+  anon_at: string | null;
+  anon_by: string | null;
+  anon_actor_kind: "user" | "ai" | "system" | null;
+  anon_via: string | null;
+  anon_reviewed_at: string | null;
+  anon_reviewed_by: string | null;
+  anon_attempts: number;
+  anon_lock_until: string | null;
+  anon_usage: Record<string, unknown> | null;
+}
+
+export interface DrawingAnonAdhocRow extends Omit<AnonColumns, "anon_status"> {
+  id: string;
+  user_id: string;
+  storage_path: string;
+  content_sha256: string | null;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  anon_status: AnonStatusDb | "uploading";
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+}
+
+export interface DrawingAnonTextRow {
+  id: string;
+  job_file_id: string | null;
+  drawing_id: string | null;
+  adhoc_id: string | null;
+  region_id: string;
+  category: string;
+  text: string;
+  created_at: string;
+}
+
+export interface DrawingAnonAiCacheRow {
+  src_sha256: string;
+  config_hash: string;
+  method: string | null;
+  cache: Record<string, unknown>;
+  model: string | null;
+  created_at: string;
+}
+
+/** Útrata AI anonymizace po bězích (denní limit automatiky). */
+export interface DrawingAnonUsageLogRow {
+  id: number;
+  created_at: string;
+  subject_table: string;
+  subject_id: string;
+  via: string | null;
+  manual: boolean;
+  usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  calls: number;
+}
+
+export interface AnonSendQueueRow {
+  id: string;
+  kind: "purchase_order" | "job_document" | "supplier_inquiry";
+  job_id: string | null;
+  ref_id: string | null;
+  payload: Record<string, unknown>;
+  file_ids: string[];
+  status: "waiting" | "sending" | "sent" | "blocked" | "cancelled" | "failed";
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  attempts: number;
+}
+
+export interface DrawingAnonSettingsRow {
+  id: number;
+  enabled: boolean;
+  auto_capture: boolean;
+  auto_upload: boolean;
+  auto_email: boolean;
+  hires_capture: boolean;
+  redact: Record<string, boolean>;
+  extra_terms: string[];
+  keep_terms: string[];
+  include_crm_customer: boolean;
+  fill_pdf: "white" | "black";
+  fill_photo: "background" | "white" | "black";
+  max_dpi: number;
+  max_mpx: number;
+  verify_photos: boolean;
+  daily_usd: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface JobFileRow extends AnonColumns {
   id: string;
   job_id: string;
   kind: JobFileKind;
@@ -1066,6 +1184,13 @@ export interface Database {
     Views: {
       job_flow_v: { Row: JobFlowRow; Relationships: [] };
     };
+      // anonymizace výkresů (migrace 20261023159000)
+      drawing_anon_adhoc: Tbl<DrawingAnonAdhocRow>;
+      drawing_anon_texts: Tbl<DrawingAnonTextRow>;
+      drawing_anon_ai_cache: Tbl<DrawingAnonAiCacheRow>;
+      drawing_anon_usage_log: Tbl<DrawingAnonUsageLogRow>;
+      anon_send_queue: Tbl<AnonSendQueueRow>;
+      drawing_anon_settings: Tbl<DrawingAnonSettingsRow>;
     Functions: {
       next_doc_number: { Args: { p_prefix: string }; Returns: string };
       next_job_number: { Args: Record<string, never>; Returns: string };
@@ -1117,6 +1242,11 @@ export interface Database {
         Args: { p_quote: string; p_reason: string; p_note?: string | null; p_competitor_price?: number | null; p_close_job?: boolean };
         Returns: JobStage;
       };
+      anon_is_candidate: { Args: { p_kind: string; p_filename: string; p_mime: string | null; p_origin: string | null; p_issuer: string | null }; Returns: boolean };
+      anon_unsupported_ext: { Args: { p_filename: string }; Returns: boolean };
+      claim_drawing_anon: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: JobFileRow[] };
+      claim_drawing_anon_drawings: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: Drawing[] };
+      claim_drawing_anon_adhoc: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: DrawingAnonAdhocRow[] };
     };
     Enums: {
       user_role: UserRole;
