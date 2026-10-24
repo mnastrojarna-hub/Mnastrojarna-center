@@ -253,7 +253,7 @@ describe("validace předání (validateHandoff)", () => {
     const two = validateHandoff({ kind: "predani", steps: [step({ plannedEnd: "2026-11-23" }), step({ plannedEnd: "2026-11-24", po: { mode: "pri_predani" } })] }, ctx);
     expect(two.filter((i) => i.acceptLate).map((i) => `${i.code}@${i.step}`)).toEqual(["interim_after_final@1", "last_after_final@2"]);
     expect(issues.find((i) => i.code === "last_after_final")?.message)
-      .toBe("Výroba skončí 23. 11. — 3 dny po konečném termínu (zákazník) 20. 11.; max. tolerovaný 25. 11.. Domluv nový termín se zákazníkem.");
+      .toBe("Výroba skončí 23. 11. — 3 dny po konečném termínu (zákazník) 20. 11.; max. tolerovaný 25. 11. — domluv nový termín se zákazníkem.");
     expect(issues.filter((i) => i.acceptLate).every((i) => i.level === "warning")).toBe(true);
     expect(canSubmitHandoff(issues, false)).toBe(false);
     expect(canSubmitHandoff(issues, true)).toBe(true);
@@ -391,6 +391,24 @@ describe("objednávky kroků a automatické odeslání", () => {
       "dodavatel nemá v adresáři e-mail", "nemáš nastavenou schránku pro odesílání",
     ]);
     expect(autoSendBlockers({ unpricedItems: 1, quoteExpired: false, partialCoverage: false, whoSource: "objednavka", supplierEmail: "a@b.cz", senderUsable: true })).toEqual(["1 položka bez ceny"]);
+  });
+  it("„dražší“ jen když levnější srovnatelná nabídka opravdu je (review)", () => {
+    const ok = { unpricedItems: 0, quoteExpired: false, partialCoverage: false, supplierEmail: "a@b.cz", senderUsable: true };
+    expect(autoSendBlockers({ ...ok, whoSource: "rucne", cheaperQuote: true })).toEqual(["ručně zvolená dražší firma"]);
+    expect(autoSendBlockers({ ...ok, whoSource: "rucne", cheaperQuote: false, hasQuote: false })).toEqual(["firma bez nabídky (zvolená ručně)"]);
+    expect(autoSendBlockers({ ...ok, whoSource: "rucne", cheaperQuote: false, hasQuote: true })).toEqual(["ručně zvolená firma"]);
+    expect(autoSendBlockers({ ...ok, whoSource: "posledni_vykres", cheaperQuote: false })).toEqual(["firma podle historie (bez nabídky)"]);
+    expect(autoSendBlockers({ ...ok, whoSource: "nabidka", cheaperQuote: false, hasQuote: true })).toEqual(["nabídka bez srovnatelné ceny — porovnej ručně"]);
+  });
+  it("další krok nesmí skončit dřív než běžící krok před ním (review: dodavatel potvrdil později)", () => {
+    const step: HandoffValidationStep = {
+      kind: "tepelne_zpracovani", who: { type: "supplier", id: "s1", name: "TepKal" }, plannedEnd: "2026-11-20", endsAtCustomerDate: false,
+      deadlineAgreed: false, po: { mode: "vystavit" }, start: true,
+    };
+    const ctx: HandoffValidationContext = { today: TODAY, stage: "ve_vyrobe", dueDate: "2026-12-18", customerRequiredDate: null, previousEnd: { date: "2026-11-25", label: "Výroba 1" } };
+    const issues = validateHandoff({ kind: "dalsi_krok", steps: [step] }, ctx);
+    expect(issues.find((x) => x.code === "deadline_order")?.message).toBe("Krok 1 končí 20. 11. — dřív než předchozí krok Výroba 1 (25. 11.). Kroky jdou po sobě — posuň termín.");
+    expect(validateHandoff({ kind: "dalsi_krok", steps: [{ ...step, plannedEnd: "2026-11-26" }] }, ctx).some((x) => x.code === "deadline_order")).toBe(false);
   });
   it("kód chyby z DB", () => {
     expect(handoffErrorCode({ hint: "STEP_CHANGED", message: "x" })).toBe("STEP_CHANGED");

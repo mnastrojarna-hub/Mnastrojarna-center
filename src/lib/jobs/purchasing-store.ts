@@ -19,6 +19,7 @@ import { czDate } from "@/lib/pdf/types";
 import type { CustomerMatchCandidate, ExtractedParty } from "@/lib/jobs/capture-types";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import { COMPANY } from "@/lib/company";
+import { operationFamily, operationKindsOfText } from "@/lib/jobs/production-suggest";
 
 /**
  * Jádra nákupu (nabídky dodavatelů, vítěz, objednávky vydané) — sdílí server actions Nákupu
@@ -140,6 +141,12 @@ export async function insertSupplierQuote(
     if (!f) return { ok: false, error: "Dokument nepatří k této zakázce." };
   }
   const insert: Row = { ...row, job_id: jobId, total, selected: false, created_by: userId };
+  // nabídka z focení / e-mailu: na co je (druhy kroků) předvyplní AI z textu nabídky, jen když míří do jedné
+  // rodiny („Frézování + kalení" nic nevyplní); ručně zadaná nabídka si druhy volí v dialogu
+  if (insert.operation_kinds === undefined && (captureId || ["foto", "email", "ai"].includes(String(insert.source ?? "")))) {
+    const kinds = operationKindsOfText([input.note, ...items.rows.map((r) => r.name)].filter(Boolean).join("\n"));
+    if (kinds.length && new Set(kinds.map(operationFamily)).size === 1) insert.operation_kinds = kinds;
+  }
   if (captureId && captureDocId) {
     insert.capture_id = captureId;
     insert.capture_doc_id = captureDocId;
@@ -366,12 +373,19 @@ export async function applyPurchaseDelivered(
     .order("position");
   const ops = (opsData ?? []) as { id: string; position: number; status: string; in_house: boolean; purchase_order_id: string | null; kind: string; title: string | null }[];
   let operationsDone = 0;
+  const failures: string[] = [];
   for (const op of ops) {
     if (op.purchase_order_id !== po.id || op.status === "hotovo" || op.status === "preskoceno") continue;
-    const { data: upd } = await db.from("job_operations").update({ status: "hotovo" } as never).eq("id", op.id).eq("status", op.status).select("id");
+    const name = op.title?.trim() || OPERATION_KINDS[op.kind as keyof typeof OPERATION_KINDS]?.label || "operace";
+    const { data: upd, error: updErr } = await db.from("job_operations").update({ status: "hotovo" } as never).eq("id", op.id).eq("status", op.status).select("id");
+    if (updErr) {
+      // nespolknout: krok zůstal otevřený (např. brána „kdo to udělal") — uživatel to musí vědět
+      console.error(`[purchasing] Krok ${name} se po dodání objednávky ${po.number} nepodařilo uzavřít: ${updErr.message}`);
+      failures.push(`Krok ${name} se nepodařilo uzavřít: ${updErr.message}`);
+      continue;
+    }
     if (!((upd ?? []) as unknown[]).length) continue;
     operationsDone += 1;
-    const name = op.title?.trim() || OPERATION_KINDS[op.kind as keyof typeof OPERATION_KINDS]?.label || "operace";
     await logJobEvent(db, {
       jobId: po.jobId, type: "field",
       message: `Výroba: ${name} → ${OPERATION_STATUSES.hotovo.label} (objednávka ${po.number} dodána)`,
@@ -381,11 +395,30 @@ export async function applyPurchaseDelivered(
     op.status = "hotovo";
   }
 
+  const eff = await deliveryStageEffect(db, po, ops, operationsDone, opts);
+  // další krok výroby (C.7): bezpečný krok u dodavatele se předá sám, jinak upozornění „K předání dalšímu kroku"
+  let next: { hint?: string } = {};
+  if (operationsDone > 0 && !eff.stage) {
+    const { autoAdvanceAfterDelivery } = await import("@/lib/jobs/production-handoff-store");
+    next = await autoAdvanceAfterDelivery(db, userId, po.jobId);
+  }
+  const hint = [...failures, eff.hint, next.hint].filter(Boolean).join(" ");
+  return { operationsDone, ...(eff.stage ? { stage: eff.stage } : {}), ...(hint ? { hint } : {}) };
+}
+
+/** Pravidlo 2.7 po dodání objednávky: zakázka do „Dodáno k nám", nebo vysvětlení, proč ne. */
+async function deliveryStageEffect(
+  db: JobsDb,
+  po: { id: string; jobId: string; number: string },
+  ops: { id: string; position: number; status: string; in_house: boolean; purchase_order_id: string | null }[],
+  operationsDone: number,
+  opts: { note?: string },
+): Promise<{ stage?: JobStage; hint?: string }> {
   const { data: jobData } = await db.from("orders").select("id, status").eq("id", po.jobId).maybeSingle();
   const status = (jobData as { status: string } | null)?.status;
-  if (!status || !isJobStage(status)) return { operationsDone };
+  if (!status || !isJobStage(status)) return {};
   if (!isForward(status, "dodano_k_nam")) {
-    return { operationsDone, ...(["pozastaveno", "reklamace"].includes(status) ? { hint: "Zakázka je ve zvláštním stavu — posuň ji ručně." } : {}) };
+    return ["pozastaveno", "reklamace"].includes(status) ? { hint: "Zakázka je ve zvláštním stavu — posuň ji ručně." } : {};
   }
   const { data: poData } = await db.from("purchase_orders").select("id, status").eq("job_id", po.jobId);
   const orders = (poData ?? []) as { id: string; status: PurchaseOrderStatus }[];
@@ -400,12 +433,12 @@ export async function applyPurchaseDelivered(
       db.from("orders").update({ status: "dodano_k_nam" } as never).eq("id", po.jobId).eq("status", status),
       note,
     );
-    if (error) return { operationsDone, hint: `Stav zakázky se nepodařilo posunout: ${error.message}` };
-    return { operationsDone, stage: "dodano_k_nam", hint: "Zakázka přesunuta do stavu Dodáno k nám." };
+    if (error) return { hint: `Stav zakázky se nepodařilo posunout: ${error.message}` };
+    return { stage: "dodano_k_nam", hint: "Zakázka přesunuta do stavu Dodáno k nám." };
   }
   if (rule.reason === "ceka_objednavky") {
-    return { operationsDone, hint: `Čeká se ještě na ${rule.pendingOrders} ${plural(rule.pendingOrders, "objednávku", "objednávky", "objednávek")} — stav zakázky zůstává.` };
+    return { hint: `Čeká se ještě na ${rule.pendingOrders} ${plural(rule.pendingOrders, "objednávku", "objednávky", "objednávek")} — stav zakázky zůstává.` };
   }
-  if (rule.reason === "material") return { operationsDone, hint: "Materiál převzat — stav zakázky se nemění (pokračuje výroba)." };
-  return { operationsDone, hint: operationsDone ? "Kooperace hotová — výroba pokračuje dalšími operacemi." : "Stav zakázky zůstává — zbývají výrobní operace." };
+  if (rule.reason === "material") return { hint: "Materiál převzat — stav zakázky se nemění (pokračuje výroba)." };
+  return { hint: operationsDone ? "Kooperace hotová — výroba pokračuje dalšími operacemi." : "Stav zakázky zůstává — zbývají výrobní operace." };
 }

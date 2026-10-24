@@ -23,7 +23,9 @@ export type PurchaseOrderStatus = "navrh" | "vystavena" | "odeslana" | "potvrzen
 export type CommissionStatus = "predbezna" | "k_vyplate" | "vyplaceno";
 export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
-export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder";
+export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder"
+  // objednávka dodavateli vystavená při předání do výroby (migrace 20261023150000)
+  | "purchase_order";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "edited" | "auto_executed";
 export type MailboxProvider = "outlook" | "imap" | "gmail";
 
@@ -823,6 +825,8 @@ export interface ApprovalItemRow {
   resolved_by: string | null;
   resolved_at: string | null;
   created_at: string;
+  /** Objednávka dodavateli (řádek „purchase_order"; migrace 20261023150000). */
+  purchase_order_id?: string | null;
 }
 
 export interface CommissionEntry {

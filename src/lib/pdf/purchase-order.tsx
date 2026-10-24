@@ -145,7 +145,9 @@ function Instructions({ data, hasDrawing }: { data: PurchaseOrderData; hasDrawin
   const points = [
     `Prosíme o potvrzení objednávky a termínu dodání do ${confirmDaysText(days)}${email ? ` na ${email}` : ""}.`,
     `Číslo objednávky ${data.number} uvádějte na dodacím listu i faktuře.`,
-    hasDrawing ? "Vyrábějte dle výkresové dokumentace v uvedené revizi, odchylky předem konzultujte." : null,
+    data.workInstruction !== undefined
+      ? data.workInstruction || null
+      : hasDrawing ? "Vyrábějte dle výkresové dokumentace v uvedené revizi, odchylky předem konzultujte." : null,
   ].filter((p): p is string => Boolean(p));
   return (
     <View
@@ -194,15 +196,44 @@ function SignBox({
   );
 }
 
+/**
+ * Cena u závazné objednávky bez cen: žádné „Celkem 0,00 Kč" — místo součtu „dle Vaší nabídky / prosíme
+ * o nacenění"; u části položek bez ceny je součet jen z naceněných (s upozorněním).
+ */
+function UnpricedCard({ data }: { data: PurchaseOrderData }) {
+  return (
+    <View style={[styles.totalsCard, { justifyContent: "center" }]} wrap={false}>
+      <Text style={styles.totalGrandLabel}>Cena</Text>
+      <Text style={{ fontSize: 10, fontWeight: "bold", color: C.ink, marginTop: 4, lineHeight: 1.35 }}>
+        {data.supplierQuoteNumber ? `dle Vaší nabídky č. ${data.supplierQuoteNumber}` : "k nacenění dodavatelem"}
+      </Text>
+      <Text style={[styles.totalHint, { marginTop: 4 }]}>Prosíme o nacenění v potvrzení objednávky.</Text>
+    </View>
+  );
+}
+
+export function unpricedSummary(items: DocItem[]): { all: boolean; count: number } {
+  const count = items.filter((i) => i.unpriced).length;
+  return { all: items.length > 0 && count === items.length, count };
+}
+
 export function PurchaseOrderDocument({ data }: { data: PurchaseOrderData }) {
   const cur = data.currency || "CZK";
   const intro = data.intro === undefined ? defaultIntro(data) : data.intro;
   const hasDrawing = data.items.some((i) => i.drawingNumber);
+  const unpriced = unpricedSummary(data.items);
+  const partHint = unpriced.count && !unpriced.all
+    ? `Součet bez ${unpriced.count} ${plural(unpriced.count, "položky", "položek", "položek")} bez ceny — prosíme o jejich nacenění v potvrzení.`
+    : undefined;
+  const totalsHint = [partHint, data.totalsHint].filter(Boolean).join(" · ") || undefined;
+  const change = data.revision && data.revision > 1
+    ? `Změna č. ${data.revision}${data.revisionDate ? ` · ze dne ${czDate(data.revisionDate)}` : ""}`
+    : null;
 
   return (
-    <Document title={`Objednávka ${data.number}`} author={COMPANY.name} subject="Objednávka dodavateli">
-      <DocPage label={`Objednávka ${data.number}`}>
-        <BrandHeader title="Objednávka" number={data.number} kicker="Objednávka dodavateli" />
+    <Document title={`Objednávka ${data.number}${change ? ` (${change})` : ""}`} author={COMPANY.name} subject="Objednávka dodavateli">
+      <DocPage label={`Objednávka ${data.number}${change ? ` · změna ${data.revision}` : ""}`}>
+        <BrandHeader title="Objednávka" number={data.number} kicker={change ?? "Objednávka dodavateli"} />
 
         <MetaStrip
           items={[
@@ -244,7 +275,7 @@ export function PurchaseOrderDocument({ data }: { data: PurchaseOrderData }) {
               </View>
             ) : null}
           </View>
-          <TotalsCard items={data.items} currency={cur} hint={data.totalsHint} />
+          {unpriced.all ? <UnpricedCard data={data} /> : <TotalsCard items={data.items} currency={cur} hint={totalsHint} />}
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 16 }} wrap={false}>

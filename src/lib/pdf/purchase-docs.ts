@@ -3,7 +3,7 @@ import { COMPANY, DEFAULT_VAT_RATE } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { JobDetail, JobItem } from "@/lib/jobs/types";
 import type { PurchaseItem, PurchaseOrderView, PurchaseSupplierRef } from "@/lib/jobs/purchasing-types";
-import { CONFIRM_WITHIN_WORKING_DAYS, defaultDeliveryAddress, splitAddress } from "@/lib/jobs/purchasing";
+import { CONFIRM_WITHIN_WORKING_DAYS, ourDeliveryAddressOf, splitAddress } from "@/lib/jobs/purchasing";
 import { supplierParty } from "./components";
 import { isCzechCountry, type DocItem, type PartyInfo } from "./types";
 import type { PurchaseOrderData } from "./purchase-types";
@@ -62,11 +62,24 @@ export async function buildPurchaseOrderDoc(
   job: Pick<JobDetail, "number" | "items" | "owner">,
   po: PurchaseOrderView,
   supplier: PurchaseSupplierRef | null = po.supplier,
-  opts: { preparedBy?: string | null; contactEmail?: string | null; contactPhone?: string | null } = {},
+  opts: {
+    preparedBy?: string | null; contactEmail?: string | null; contactPhone?: string | null;
+    /** Úvod / pokyn k provedení podle druhu kroku (tepelné zpracování, povrch…); undefined = výchozí. */
+    intro?: string; workInstruction?: string;
+    /** Změna objednávky (revize ≥ 2) a její datum. */
+    revision?: number | null; revisionDate?: string | null;
+  } = {},
 ): Promise<PurchaseOrderData> {
   await refreshCompanyFromSettings();
   const vatRate = purchaseVatRate(supplier);
   const preparedBy = u(opts.preparedBy) ?? u(po.createdBy?.name) ?? u(job.owner?.name);
+  const extra: Partial<PurchaseOrderData> = {};
+  if (opts.intro !== undefined) extra.intro = opts.intro;
+  if (opts.workInstruction !== undefined) extra.workInstruction = opts.workInstruction;
+  if (opts.revision && opts.revision > 1) {
+    extra.revision = opts.revision;
+    if (u(opts.revisionDate)) extra.revisionDate = u(opts.revisionDate);
+  }
   return {
     number: po.number,
     issueDate: po.orderDate,
@@ -81,7 +94,7 @@ export async function buildPurchaseOrderDoc(
     supplierQuoteNumber: u(po.supplierQuote?.number),
     supplierQuoteDate: u(po.supplierQuote?.quoteDate),
     supplierReference: u(po.supplierReference),
-    deliveryAddress: u(po.deliveryAddress) ?? defaultDeliveryAddress(COMPANY),
+    deliveryAddress: u(po.deliveryAddress) ?? ourDeliveryAddressOf(COMPANY),
     deliveryTerms: u(po.deliveryTerms),
     paymentTerms: u(po.paymentTerms),
     note: u(po.note),
@@ -90,5 +103,6 @@ export async function buildPurchaseOrderDoc(
     contactPhone: u(opts.contactPhone) ?? u(COMPANY.phone),
     confirmWithinDays: CONFIRM_WITHIN_WORKING_DAYS,
     totalsHint: vatRate === 0 ? "Plnění bez české DPH" : undefined,
+    ...extra,
   };
 }

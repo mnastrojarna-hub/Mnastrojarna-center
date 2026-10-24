@@ -80,12 +80,19 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!db) return [];
   const { data, error } = await db
     .from("approval_queue")
-    .select("*")
+    .select("*, po:purchase_orders!purchase_order_id(id, creator:profiles!created_by(id, full_name, email))")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   warn("approval_queue", error);
   if (error || !data) return [];
-  return (data as ApprovalItemRow[]).map((a) => ({
+  type PoEmbed = { creator?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null };
+  // objednávku dodavateli připravil ten, kdo zakázku předal do výroby (purchase_orders.created_by), ne AI
+  const poCreator = (a: ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null }): string | null => {
+    const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
+    const c = po ? (Array.isArray(po.creator) ? po.creator[0] ?? null : po.creator ?? null) : null;
+    return c ? (c.full_name ?? "").trim() || (c.email ?? "").trim() || null : null;
+  };
+  return (data as (ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null })[]).map((a) => ({
     id: a.id,
     rawType: a.type as ApprovalType,
     type: approvalTypeLabel[a.type as ApprovalType] ?? a.type,
@@ -97,8 +104,9 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
       : "",
     createdAt: a.created_at,
     aiConfidence: a.ai_confidence ?? 0,
-    // kdo návrh připravil: připomenutí = plánovač, ostatní (odpovědi, nabídky, poptávky dodavatelům) = AI
-    proposedBy: a.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
+    // kdo návrh připravil: připomenutí = plánovač, objednávka = kdo předal do výroby, ostatní (odpovědi,
+    // nabídky, poptávky dodavatelům) = AI
+    proposedBy: a.type === "reminder" ? "Systém (plánovač)" : a.type === "purchase_order" ? poCreator(a) ?? "Systém" : "✨ AI",
     quoteHref: a.type === "quote" && (a.quote_id || a.order_id)
       ? a.order_id ? `/orders/${a.order_id}?tab=nabidky` : "/quotes"
       : null,
@@ -137,7 +145,7 @@ export async function getResolvedApprovals(limit = 6): Promise<ResolvedApproval[
       title: r.title,
       type: approvalTypeLabel[r.type] ?? r.type,
       status: auto ? "auto_executed" : r.status === "rejected" ? "rejected" : "approved",
-      proposedBy: r.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
+      proposedBy: r.type === "reminder" ? "Systém (plánovač)" : r.type === "purchase_order" ? "Předání do výroby" : "✨ AI",
       stamp: {
         by: p && name ? { id: p.id, name } : null, byName: name, at: r.resolved_at,
         via: auto ? "automaticky" : null, kind: auto ? "ai" : name ? "user" : "system",

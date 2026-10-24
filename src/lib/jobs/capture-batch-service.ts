@@ -43,7 +43,9 @@ import { docNumbersEqual, matchCustomer, matchJob, matchParty, type JobMatchCand
 import { recordTrainingExample } from "@/lib/jobs/training";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { withChangeNote } from "@/lib/supabase/actor-headers";
-import { autoCaptureCtx, captureStageGuard, receiveSupplierDlByPhoto, recordPhotoDelivery } from "@/lib/jobs/capture-flow";
+import {
+  autoCaptureCtx, captureHandoffActor, captureProductionHandoff, captureStageGuard, receiveSupplierDlByPhoto, recordPhotoDelivery,
+} from "@/lib/jobs/capture-flow";
 import { issuerKey, type OrderChange } from "@/lib/jobs/capture-flow-rules";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import {
@@ -1312,6 +1314,11 @@ async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown)
           stageDeferred = job.stage;
           job.stage = base;
         }
+        // do výroby nikdy rovnou — „Potvrzená objednávka" a pak předání do výroby (B.4)
+        if (job.stage === "ve_vyrobe") {
+          stageDeferred = "ve_vyrobe";
+          job.stage = "potvrzeno";
+        }
       }
       const runGroup = () => applyBusinessDoc(c, {
         captureId: session.captureId, userId: user.id, files: [], aiUsed: Boolean(primary?.aiUsed), doc: gd.doc,
@@ -1395,7 +1402,21 @@ async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown)
       // revize objednávky stav nemění; dodání a nákup jen podle pravidel 2.7 (částečné dodání / materiál stav neposune)
       const guard = from && isForward(from, to) && !done.orderRevision ? await captureStageGuard(c.db, done.jobId, to) : null;
       let moved: JobStage | null = null;
-      if (guard && !guard.ok) {
+      if (guard?.ok && from && to === "ve_vyrobe") {
+        // do výroby jen předáním (kdo + termín; objednávka dodavatele se použije, AI žádnou nevystaví) — B.4
+        const conf = gdocs.find((d) => state.sort.docs.find((x) => x.id === d.id)?.type === "potvrzeni_dodavatel" && d.extract?.kind === "business");
+        const cdoc = conf?.extract?.kind === "business" ? conf.extract.doc : null;
+        const h = await captureProductionHandoff(c.db, captureHandoffActor(c, auto), done.jobId, cdoc ? {
+          customerOrderNumber: cdoc.customerOrderNumber, promisedDeliveryDate: cdoc.promisedDeliveryDate,
+          documentNumber: cdoc.documentNumber, supplier: cdoc.supplier,
+        } : null, auto ? "auto" : "review");
+        if (h.moved && h.stage) {
+          if (!done.created) gres.stageFrom = from;
+          gres.stageTo = h.stage;
+          moved = h.stage;
+        }
+        if (h.warning) result.warnings.push(`${done.jobNumber}: ${h.warning}`);
+      } else if (guard && !guard.ok) {
         result.warnings.push(`${done.jobNumber}: ${guard.warning}`);
       } else if (guard?.ok && from) {
         // událost o změně stavu zapíše DB (autor z hlavičky klienta, poznámka x-change-note)

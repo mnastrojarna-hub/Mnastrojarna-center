@@ -296,7 +296,7 @@ export function inferSentKind(subject: string | null | undefined): SentKind {
 export function sentKindFromApproval(type: ApprovalType): SentKind {
   if (type === "quote") return "quote";
   if (type === "reminder") return "reminder";
-  if (type === "supplier_request") return "supplier";
+  if (type === "supplier_request" || type === "purchase_order") return "supplier";
   return "email";
 }
 
@@ -455,7 +455,7 @@ export interface ApprovalSentRow {
   resolved_at?: string | null;
 }
 
-export const SENT_APPROVAL_TYPES: ApprovalType[] = ["email_reply", "quote", "supplier_request", "reminder"];
+export const SENT_APPROVAL_TYPES: ApprovalType[] = ["email_reply", "quote", "supplier_request", "purchase_order", "reminder"];
 
 export function toSentItemFromApproval(row: ApprovalSentRow): SentItem | null {
   if (!SENT_APPROVAL_TYPES.includes(row.type)) return null;

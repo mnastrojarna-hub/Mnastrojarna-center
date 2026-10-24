@@ -8,6 +8,8 @@ import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
 import { scopeBarData } from "@/components/flow/flow-scope-copy";
 
 export const dynamic = "force-dynamic";
+// odeslání objednávek / storna dodavatelům (PDF + e-mail) běží ve funkci stránky
+export const maxDuration = 60;
 export const metadata: Metadata = { title: "Objednávky dodavatelům" };
 
 type Search = Promise<Record<string, string | string[] | undefined>>;

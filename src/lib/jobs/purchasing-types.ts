@@ -269,6 +269,8 @@ export interface PurchaseOrderDraftInput {
   deliveryAddress?: string;
   note?: string;
   items: PurchaseItemInput[];
+  /** Kroky výroby zakázky, které objednávka pokrývá (job_operations.purchase_order_id; jen čekající / běžící kroky). */
+  operationIds?: string[];
 }
 
 export type PurchaseItemsSource = "nabidka_dodavatele" | "zakazka" | "souhrn";
@@ -311,8 +313,16 @@ export interface PurchaseOrderPatch {
   deliveryAddress?: string;
   note?: string;
   currency?: string;
-  /** Jen dokud objednávka neodešla (návrh / vystavena). */
+  /**
+   * Jen dokud objednávka neodešla (návrh / vystavena). U odeslané / potvrzené / dodané se přijmou jen
+   * stejné položky se změněnou cenou (= `prices`).
+   */
   items?: PurchaseItemInput[];
+  /**
+   * Doplnění / oprava nákupní ceny položek (id položky → cena za MJ; null = bez ceny) — i u odeslané,
+   * potvrzené a dodané objednávky (dodavatel nacení „bez ceny" položky až po odeslání); ne u zrušené.
+   */
+  prices?: { itemId: string; unitPrice: number | null }[];
   /** Důvod zrušení (status = zrusena). */
   cancelReason?: string;
 }

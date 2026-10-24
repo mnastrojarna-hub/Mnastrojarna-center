@@ -66,6 +66,7 @@ export const COMPANY_SETTING_KEYS = [
   "company_iban",
   "company_bank_name",
   "company_registration",
+  "company_delivery_address",
 ] as const;
 
 /** Ověří existenci tabulek přes admin klienta (vyžaduje servisní klíč). */

@@ -154,6 +154,8 @@ const COMPANY_FIELDS: { key: string; label: string; placeholder?: string; span2?
   { key: "company_iban", label: "IBAN", placeholder: "CZ.." },
   { key: "company_bank_name", label: "Banka", placeholder: "Komerční banka, a.s." },
   { key: "company_registration", label: "Zápis v OR (spisová značka)", placeholder: "C 245678, Městský soud v Praze", span2: true },
+  // kam nám dodavatelé vozí díly (objednávky dodavatelům); prázdné = korespondenční adresa provozovny
+  { key: "company_delivery_address", label: "Dodací adresa (provozovna) — na objednávky dodavatelům", placeholder: "MNástrojárna s.r.o., Mezná 9, 393 01 Mezná", span2: true },
 ];
 
 function CompanyStep({

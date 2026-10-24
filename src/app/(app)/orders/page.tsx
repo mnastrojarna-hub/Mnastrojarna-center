@@ -26,6 +26,9 @@ import { paymentStateOf } from "@/lib/jobs/mapping";
 /** Kolik řádků vykreslit najednou (víc = zpřesnit hledání). */
 const ROW_LIMIT = 300;
 
+// předání do výroby z Knihy: jedno odeslání = PDF objednávek + e-maily dodavatelům (akce běží ve funkci stránky)
+export const maxDuration = 60;
+
 export default async function OrdersPage({
   searchParams,
 }: {

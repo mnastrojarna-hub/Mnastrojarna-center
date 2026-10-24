@@ -33,6 +33,8 @@ function agentKeyForType(rawType: ApprovalItem["rawType"]): string {
     case "email_reply": return "email";
     case "quote": return "quote";
     case "supplier_request": return "quote";
+    // objednávka dodavateli = šablona serveru, ne AI návrh (žádné učení z úprav)
+    case "purchase_order": return "purchase_order";
     case "categorization": return "email";
     default: return "confirmation";
   }
@@ -42,6 +44,7 @@ const typeIcon: Partial<Record<ApprovalItem["rawType"], React.ReactNode>> = {
   email_reply: <Mail className="h-4 w-4" />,
   quote: <FileText className="h-4 w-4" />,
   supplier_request: <Factory className="h-4 w-4" />,
+  purchase_order: <Factory className="h-4 w-4" />,
   categorization: <Tag className="h-4 w-4" />,
   reminder: <Mail className="h-4 w-4" />,
   order_match: <FileText className="h-4 w-4" />,

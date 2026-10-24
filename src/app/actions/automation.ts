@@ -13,7 +13,7 @@ const NEED = "Pro uložení doplň servisní klíč Supabase nebo se přihlas ja
 
 const MODES: AutomationMode[] = ["full", "approval"];
 /** Moduly, které jdou nastavit (řádek se případně založí — např. „capture" přibyl později). */
-const MODULES = ["categorize", "spam", "reply", "quote", "supplier_request", "order_match", "drawing_extract", "capture"];
+const MODULES = ["categorize", "spam", "reply", "quote", "supplier_request", "order_match", "drawing_extract", "capture", "purchase_order"];
 
 /** Režim automatiky je systémové nastavení: ladění AI + nastavení (super admin). */
 async function begin(): Promise<{ user: { id: string } } | { error: string }> {

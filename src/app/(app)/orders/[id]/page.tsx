@@ -10,6 +10,8 @@ import { getJobPurchasing } from "@/lib/data/purchasing";
 import { JobDetailView } from "@/components/jobs/detail/job-detail-view";
 
 export const dynamic = "force-dynamic";
+// předání do výroby: jedno odeslání = PDF objednávek + e-maily dodavatelům (akce běží ve funkci stránky)
+export const maxDuration = 60;
 
 // metadata i stránka čtou stejnou zakázku — jeden dotaz na požadavek
 const loadJob = cache(getJob);

@@ -3,15 +3,23 @@ import { createOperatorClient } from "@/lib/supabase/server";
 import { aiActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { stageRank, isJobStage } from "@/lib/jobs/stages";
-import { advancePurchaseOrderStatus, receivePurchaseItems, type PurchaseOrderRef } from "@/lib/jobs/purchasing-store";
+import { advancePurchaseOrderStatus, findPurchaseOrderByNumber, receivePurchaseItems, type PurchaseOrderRef } from "@/lib/jobs/purchasing-store";
 import { purchaseDeliveryAdvances, type StageRuleOperation } from "@/lib/jobs/purchasing";
 import { pragueToday } from "@/lib/jobs/flow-status";
 import {
   deliveryUpdates, isOrderRevision, orderChanges, orderedShare, quoteMismatch, receiptUpdates,
   type DeliveryItem, type OrderChange, type QuoteForCheck, type StoredOrder,
 } from "@/lib/jobs/capture-flow-rules";
-import type { ExtractedBusinessDoc, ExtractedItem } from "@/lib/jobs/capture-types";
+import type { ExtractedBusinessDoc, ExtractedItem, ExtractedParty } from "@/lib/jobs/capture-types";
 import type { FlowProposal, JobStage, OrderMismatch, PurchaseOrderStatus } from "@/lib/supabase/database.types";
+import {
+  deriveHandoffKind, loadHandoffContext, productionHandoffCore, stepInputFromOperation, type HandoffActor,
+} from "@/lib/jobs/production-handoff-store";
+import { isStepStartable } from "@/lib/jobs/production";
+import { matchParty } from "@/lib/jobs/matching";
+import { cleanDate } from "@/lib/jobs/mapping";
+import { shortDay } from "@/lib/jobs/production-suggest";
+import type { HandoffInput, HandoffStepInput } from "@/lib/jobs/production-handoff-types";
 
 /**
  * Foto dokladu → podrobné stavy toku a „kdo to udělal" (spec 2.8). Autor jde v hlavičce
@@ -288,4 +296,134 @@ export async function receiveSupplierDlByPhoto(
   const r = await advancePurchaseOrderStatus(db, userId, po, "dodana", "podle vyfoceného dodacího listu", extra);
   if (!r.ok) return r;
   return { ok: true, summary: `objednávka ${po.number} → dodaná`, ...(r.stage ? { stage: r.stage } : {}), ...(r.hint ? { hint: r.hint } : {}) };
+}
+
+// ── Potvrzení dodavatele → předání do výroby (B.4) ──────────
+/** Co z vyfoceného dokladu předání potřebuje (potvrzení dodavatele k naší objednávce). */
+export interface CaptureHandoffDoc {
+  /** Naše číslo objednávky (OV-…) na potvrzení dodavatele. */
+  customerOrderNumber?: string | null;
+  /** Termín, který dodavatel potvrdil. */
+  promisedDeliveryDate?: string | null;
+  documentNumber?: string | null;
+  supplier?: ExtractedParty | null;
+}
+
+export const CAPTURE_HANDOFF_WAITING = "Zakázka čeká na předání do výroby — chybí kdo nebo termín.";
+
+/** Kdo předává z focení: účet, který fotil (plná automatika = ✨ AI za něj — autora nese klient db). */
+export function captureHandoffActor(
+  c: { user: { id: string; fullName: string; role?: string }; margins: boolean; access?: { can: (f: "mail_all") => boolean } },
+  auto?: boolean,
+): HandoffActor {
+  const mailAll = c.access ? c.access.can("mail_all") : c.user.role === "super_admin";
+  return { id: c.user.id, fullName: c.user.fullName, margins: c.margins, mailAll, via: auto ? "ai" : "foto" };
+}
+
+const OPEN_PO_STATUSES: PurchaseOrderStatus[] = ["navrh", "vystavena", "odeslana", "potvrzena"];
+
+/**
+ * Focení / e-mail chce zakázku „Ve výrobě" (potvrzení dodavatele) — nikdy přímý zápis stavu, vždy přes
+ * předání do výroby (kdo + termín, RPC production_apply):
+ *  1. plán připravený (běžící krok, nebo první čekající spustitelný) → předání bez nových kroků;
+ *  2. potvrzení s naším číslem objednávky (OV-…) → krok té objednávky (nebo nový „Výroba"), kdo = dodavatel
+ *     objednávky, termín = potvrzený, objednávka se použije (žádná druhá);
+ *  3. bez čísla, ale zakázka má otevřenou objednávku stejného dodavatele → jako 2;
+ *  4. nic nesedí → jen při kontrole člověkem („Uložit" = souhlas): krok u dodavatele z dokladu, „objednáno
+ *     mimo systém" — AI NIKDY nevystaví objednávku; v plné automatice → 5;
+ *  5. jinak stav zůstává + upozornění „Zakázka čeká na předání do výroby".
+ */
+export async function captureProductionHandoff(
+  db: JobsDb,
+  actor: HandoffActor,
+  jobId: string,
+  doc: CaptureHandoffDoc | null,
+  consent: "review" | "auto",
+): Promise<{ moved: boolean; stage?: JobStage; warning?: string; note?: string }> {
+  const ctx = await loadHandoffContext(db, jobId);
+  if (!ctx) return { moved: false, warning: "Zakázka nenalezena." };
+  if (ctx.job.status === "ve_vyrobe") return { moved: false };
+  const derived = deriveHandoffKind(ctx.job.status, ctx.ops);
+  if ("error" in derived) return { moved: false, warning: `${derived.error} Stav zakázky zůstává.` };
+  if (derived.kind !== "predani") return { moved: false };
+
+  const live = ctx.ops.filter((o) => o.status !== "preskoceno");
+  const running = live.find((o) => o.status === "probiha" || o.status === "problem") ?? null;
+  const firstWaiting = live.find((o) => o.status === "ceka") ?? null;
+  const date = cleanDate(doc?.promisedDeliveryDate ?? null);
+  let steps: HandoffStepInput[] | null = null;
+  let who: string | null = null;
+  let due: string | null = null;
+
+  // 2 + 3: naše objednávka podle čísla, jinak otevřená objednávka téhož dodavatele
+  let po = doc?.customerOrderNumber ? await findPurchaseOrderByNumber(db, doc.customerOrderNumber, jobId) : null;
+  if (po && (po.status === "zrusena" || po.jobId !== jobId)) po = null;
+  let ctxPo = po ? ctx.purchaseOrders.find((p) => p.id === po!.id) ?? null : null;
+  if (!ctxPo && !po && doc?.supplier && (doc.supplier.name.trim() || doc.supplier.ico.trim())) {
+    const open = ctx.purchaseOrders.filter((p) => OPEN_PO_STATUSES.includes(p.status) && p.supplierId);
+    const cands = open.map((p) => {
+      const s = ctx.suppliers.get(p.supplierId as string);
+      return { id: p.id, name: s?.name ?? p.supplierName, ico: s?.ico ?? null, dic: null, email: s?.email ?? null, contactEmails: [], customerNumber: null, supplierNumberAtCustomer: null };
+    });
+    const hit = cands.length ? matchParty(doc.supplier, cands) : null;
+    if (hit && hit.score >= 80) ctxPo = open.find((p) => p.id === hit.id) ?? null;
+  }
+
+  // připravený krok spustí focení jen bez nové objednávky: u nás, „objednáno jinak", nebo s platnou objednávkou
+  // (krok se zrušenou objednávkou / „objedná se při předání" by vystavil novou — to AI nikdy nedělá, B.4)
+  const waitingPo = firstWaiting?.purchaseOrderId && firstWaiting.purchaseOrder && firstWaiting.purchaseOrder.status !== "zrusena"
+    ? firstWaiting.purchaseOrderId : null;
+  const waitingSafe = Boolean(firstWaiting && (firstWaiting.inHouse || firstWaiting.poMode === "neobjednavat" || waitingPo));
+  if (running) {
+    steps = [];                                                     // 1: krok už běží
+  } else if (firstWaiting && waitingSafe && isStepStartable(firstWaiting) && (!ctxPo || firstWaiting.purchaseOrderId === ctxPo.id)) {
+    steps = [stepInputFromOperation(firstWaiting, {                 // 1: připravený plán
+      start: true,
+      po: firstWaiting.inHouse ? { mode: null }
+        : waitingPo ? { mode: "existujici", existingId: waitingPo }
+          : { mode: "neobjednavat", noneReason: firstWaiting.poNoneReason ?? "Objednáno jinak" },
+    })];
+    who = firstWaiting.location;
+    due = firstWaiting.plannedEnd;
+  } else if (ctxPo && OPEN_PO_STATUSES.includes(ctxPo.status)) {
+    const end = date ?? ctxPo.confirmedDate ?? ctxPo.requiredDate;
+    const linkedOp = live.find((o) => o.status === "ceka" && o.purchaseOrderId === ctxPo!.id) ?? null;
+    const supplierWho = ctxPo.supplierId ? { type: "supplier" as const, id: ctxPo.supplierId, name: ctxPo.supplierName } : null;
+    if (end && supplierWho) {
+      const over: Partial<HandoffStepInput> = {
+        start: true, who: supplierWho, plannedEnd: end, deadlineSource: date ? "potvrzeni_dodavatele" : linkedOp?.deadlineSource ?? "potvrzeni_dodavatele",
+        whoSource: "objednavka", po: { mode: "existujici", existingId: ctxPo.id },
+      };
+      steps = linkedOp ? [stepInputFromOperation(linkedOp, over)] : [{
+        kind: "vyroba", who: supplierWho, plannedEnd: end, endsAtCustomerDate: false, deadlineAgreed: false,
+        deadlineSource: "potvrzeni_dodavatele", whoSource: "objednavka", start: true, po: { mode: "existujici", existingId: ctxPo.id },
+      }];
+      who = ctxPo.supplierName;
+      due = end;
+    }
+  } else if (consent === "review" && doc?.supplier && doc.supplier.name.trim() && date) {
+    // 4: nic nesedí — jen se souhlasem člověka (AI objednávku nevystavuje)
+    const cands = [...ctx.suppliers.values()].map((s) => ({ id: s.id, name: s.name, ico: s.ico, dic: null, email: s.email, contactEmails: [], customerNumber: null, supplierNumberAtCustomer: null }));
+    const hit = cands.length ? matchParty(doc.supplier, cands) : null;
+    const sup = hit && hit.score >= 80 ? ctx.suppliers.get(hit.id) ?? null : null;
+    steps = [{
+      kind: "vyroba", who: sup ? { type: "supplier", id: sup.id, name: sup.name } : { type: "free", name: doc.supplier.name.trim().slice(0, 300) },
+      plannedEnd: date, endsAtCustomerDate: false, deadlineAgreed: false, deadlineSource: "potvrzeni_dodavatele", whoSource: "ai", start: !firstWaiting,
+      po: { mode: "neobjednavat", noneReason: `Objednáno mimo systém — potvrzení dodavatele${doc.documentNumber ? ` ${doc.documentNumber}` : ""}`.slice(0, 500) },
+    }];
+    who = sup?.name ?? doc.supplier.name.trim();
+    due = date;
+  }
+  if (!steps) return { moved: false, warning: CAPTURE_HANDOFF_WAITING };
+
+  const input: HandoffInput = {
+    token: crypto.randomUUID(), kind: "predani", expectedStage: ctx.job.status, expectedRouteVersion: ctx.routeVersion,
+    steps, acceptLate: true, note: "podle vyfoceného potvrzení dodavatele",
+  };
+  const res = await productionHandoffCore(db, actor, jobId, input, { source: "capture", ctx });
+  if (!res.ok) return { moved: false, warning: `${CAPTURE_HANDOFF_WAITING} (${res.error})` };
+  return {
+    moved: res.result.stage === "ve_vyrobe", stage: res.result.stage,
+    note: who || due ? `Předáno do výroby: ${[who, due ? `do ${shortDay(due)}` : null].filter(Boolean).join(" · ")}` : "Předáno do výroby",
+  };
 }

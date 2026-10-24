@@ -2,7 +2,7 @@ import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/auth/session";
 import type { JobsDb } from "@/lib/jobs/events";
-import { fetchPaged, isUuid, todayIso } from "@/lib/jobs/mapping";
+import { cleanDate, fetchPaged, isUuid, todayIso } from "@/lib/jobs/mapping";
 import {
   CLOSING_SELECT, OPERATION_SELECT, computeClosingInfo, countProductionFilters, rowToJobOperation,
   sortOperations, summaryFromJob, type ClosingDbRow, type JobOperationDbRow,
@@ -83,27 +83,58 @@ export async function getJobClosingInfo(jobId: string): Promise<JobClosingInfo |
   }
 }
 
+/** Co smí uživatel v předání do výroby (ceny, potvrzení termínu zákazníkovi, převzetí, odeslání objednávek). */
+export interface ProductionHandoffAccess {
+  canSeePrices: boolean;
+  canConfirmCustomerDate: boolean;
+  canReceive: boolean;
+  canSend: boolean;
+  canCancelSent: boolean;
+}
+
+/** Konečný termín (zákazník): potvrzený (due_date), jinak požadavek zákazníka; max. tolerovaný. */
+export interface ProductionFinalDate {
+  date: string | null;
+  source: "due_date" | "customer_required_date" | null;
+  maxTolerated: string | null;
+}
+
 /** Vše pro záložku „Výroba" v detailu zakázky jedním voláním. */
 export async function getJobProduction(jobId: string): Promise<{
   operations: JobOperation[];
   summary: JobProductionSummary;
   closing: JobClosingInfo | null;
+  /** Předání do výroby (spec §F.6, §A.6). */
+  handoff: { permissions: ProductionHandoffAccess; finalDate: ProductionFinalDate };
 } | null> {
   const s = await session();
   if (!s || !isUuid(jobId)) return null;
   try {
-    const [operations, closing, job] = await Promise.all([
+    const [ops, closing, job] = await Promise.all([
       fetchJobOperations(s.db, jobId),
       fetchJobClosingInfo(s.db, jobId, s.margins),
       s.db
         .from("orders")
-        .select("id, production_step, production_location, production_done, production_total, production_problem")
+        .select("id, production_step, production_location, production_done, production_total, production_problem, due_date, customer_required_date, max_tolerated_date")
         .eq("id", jobId)
         .maybeSingle(),
     ]);
     warn("summary", job.error);
     if (!job.data) return null;
-    return { operations, summary: summaryFromJob(job.data as Parameters<typeof summaryFromJob>[0]), closing };
+    const row = job.data as Parameters<typeof summaryFromJob>[0] & { due_date?: string | null; customer_required_date?: string | null; max_tolerated_date?: string | null };
+    // PDF objednávky kroku je nákupní doklad — bez práva na marže se na něj ani neodkazuje
+    const operations = s.margins ? ops : ops.map((o) => (o.purchaseOrder ? { ...o, purchaseOrder: { ...o.purchaseOrder, fileId: null } } : o));
+    const due = cleanDate(row.due_date);
+    const req = cleanDate(row.customer_required_date);
+    return {
+      operations,
+      summary: summaryFromJob(row),
+      closing,
+      handoff: {
+        permissions: { canSeePrices: s.margins, canConfirmCustomerDate: s.margins, canReceive: s.margins, canSend: s.margins, canCancelSent: s.margins },
+        finalDate: { date: due ?? req, source: due ? "due_date" : req ? "customer_required_date" : null, maxTolerated: cleanDate(row.max_tolerated_date) },
+      },
+    };
   } catch (err) {
     console.error(`[data:production:job] ${err instanceof Error ? err.message : String(err)}`);
     return null;

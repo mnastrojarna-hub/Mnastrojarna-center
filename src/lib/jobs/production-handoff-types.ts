@@ -38,7 +38,9 @@ export type HandoffIssueCode =
   | "who_missing" | "deadline_missing" | "deadline_invalid" | "deadline_past" | "deadline_order" | "start_after_end"
   | "interim_after_final" | "final_not_last" | "final_mismatch" | "final_missing" | "final_unconfirmed" | "last_after_final"
   | "final_past" | "no_buffer" | "non_working_day" | "po_reason_missing" | "po_duplicate" | "start_multiple"
-  | "item_scope_empty" | "items_unassigned" | "quantity_mismatch" | "too_many" | "no_customer_order";
+  | "item_scope_empty" | "items_unassigned" | "quantity_mismatch" | "too_many" | "no_customer_order"
+  /** Postup jako celek (konečný termín se změnil, výroba skončí po konečném termínu) — routeHealth. */
+  | "route_health";
 
 export interface HandoffIssue {
   code: HandoffIssueCode;
@@ -182,6 +184,8 @@ export interface HandoffResult {
     id: string; number: string; supplierName: string; fileId: string | null; pdf: "ok" | "chyba";
     send: "ceka_na_schvaleni" | "odeslano" | "neodeslano"; sendError?: string; queueId: string | null;
   }[];
+  /** Ukončení výroby: storno odeslaných objednávek dodavatelům (odesláno hned / čeká ve frontě). */
+  stornos?: { id: string; number: string; send: "odeslano" | "ceka_ve_fronte"; sendError?: string }[];
   issues: HandoffIssue[];
 }
 

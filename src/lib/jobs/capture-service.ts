@@ -29,7 +29,7 @@ import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { docNumbersEqual } from "@/lib/jobs/matching";
 import { findPurchaseOrderByNumber } from "@/lib/jobs/purchasing-store";
 import {
-  autoCaptureCtx, captureStageGuard, checkPhotoOrderMismatch, confirmOrderByPhoto, markQuoteSentByPhoto, photoOrderRevision,
+  autoCaptureCtx, captureHandoffActor, captureProductionHandoff, captureStageGuard, checkPhotoOrderMismatch, confirmOrderByPhoto, markQuoteSentByPhoto, photoOrderRevision,
   proposeFromCapture, receiveSupplierDlByPhoto, recordPhotoDelivery, registerPhotoOrderRevision,
 } from "@/lib/jobs/capture-flow";
 import { issuerKey, looksLikeCancellation, type OrderChange } from "@/lib/jobs/capture-flow-rules";
@@ -775,7 +775,8 @@ export async function applyBusinessDoc(
 
   if (target.mode === "new" && captureKey) {
     // dávka: zakázka bez položek, hned klíč relace, položky s klíčem (opakování je nezdvojí)
-    const stage: JobStage = state.stage === "keep" ? "poptavka" : state.stage;
+    // (do výroby nikdy rovnou — „Potvrzená objednávka" a pak předání do výroby, B.4)
+    const stage: JobStage = state.stage === "keep" ? "poptavka" : state.stage === "ve_vyrobe" ? "potvrzeno" : state.stage;
     const totals = computeItemTotals(items.map((it) => ({ quantity: it.quantity, unitPrice: it.unitPrice, purchaseUnitPrice: margins ? it.purchaseUnitPrice : null })));
     const extra: Record<string, unknown> = {};
     if (input.value === undefined && totals.value !== null) extra.value = totals.value;
@@ -804,7 +805,7 @@ export async function applyBusinessDoc(
     itemsAdded = ins.added;
     for (const k of REVIEW_FIELD_KEYS) if ((input as Record<string, unknown>)[k] !== undefined) written.push(k);
   } else if (target.mode === "new") {
-    const stage: JobStage = state.stage === "keep" ? "poptavka" : state.stage;
+    const stage: JobStage = state.stage === "keep" ? "poptavka" : state.stage === "ve_vyrobe" ? "potvrzeno" : state.stage;
     const res = await createJob(
       { ...input, customerId, supplierId, stage, items, ...(customerOwnerId ? { ownerId: customerOwnerId } : {}) },
       { source: "foto", aiFilled: aiUsed, aiConfidence: aiUsed ? doc.confidence : undefined },
@@ -934,6 +935,15 @@ export async function applyBusinessDoc(
       const guard = now === state.stage ? null : await captureStageGuard(db, jobId, state.stage);
       if (now === state.stage) {
         stageTo = state.stage;
+      } else if (state.stage === "ve_vyrobe") {
+        // do výroby jen předáním (kdo + termín; objednávka dodavatele se použije, AI žádnou nevystaví) — B.4
+        const h = await captureProductionHandoff(db, captureHandoffActor(c, opts.auto), jobId, {
+          customerOrderNumber: input.customerOrderNumber ?? doc.customerOrderNumber, promisedDeliveryDate: doc.promisedDeliveryDate,
+          documentNumber: documentNumberFor(state, doc.documentNumber), supplier: doc.supplier,
+        }, opts.auto ? "auto" : "review");
+        if (h.moved && h.stage) stageTo = h.stage;
+        if (h.note) flowNotes.push(h.note);
+        if (h.warning) flowNotes.push(h.warning);
       } else if (guard && !guard.ok) {
         flowNotes.push(guard.warning);
       } else {
@@ -944,6 +954,17 @@ export async function applyBusinessDoc(
         else stageTo = state.stage;
       }
     }
+  }
+
+  // nová zakázka z potvrzení dodavatele: založená jako „Potvrzená objednávka" → předání do výroby (B.4)
+  if (created && !createdEarlier && opts.stage !== false && state.stage === "ve_vyrobe") {
+    const h = await captureProductionHandoff(db, captureHandoffActor(c, opts.auto), jobId, {
+      customerOrderNumber: input.customerOrderNumber ?? doc.customerOrderNumber, promisedDeliveryDate: doc.promisedDeliveryDate,
+      documentNumber: documentNumberFor(state, doc.documentNumber), supplier: doc.supplier,
+    }, opts.auto ? "auto" : "review");
+    if (h.moved && h.stage) stageTo = h.stage;
+    if (h.note) flowNotes.push(h.note);
+    if (h.warning) flowNotes.push(h.warning);
   }
 
   // stránky dokladu → k zakázce (první stránka = hlavní dokument s daty z AI)

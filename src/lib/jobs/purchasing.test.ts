@@ -3,7 +3,7 @@ import {
   PURCHASE_ORDER_STATUSES, PURCHASE_ORDER_STATUS_META, isPurchaseOrderStatus, purchaseOrderTransitions,
   canChangePurchaseOrderStatus, isPurchaseOrderEditable, canFillPurchasePrices, applyPurchasePrices, cleanPurchaseItems, purchaseItemsTotal, unpricedItemCount,
   resolveSupplierQuoteTotal, rowsTotal, easterSunday, czechHolidays, isWorkingDay, addWorkingDays, addCalendarDays,
-  resolveQuoteDeliveryDate, pickRequiredDate, defaultDeliveryAddress, purchaseOrderNote, purchaseOrderFileName,
+  resolveQuoteDeliveryDate, pickRequiredDate, defaultDeliveryAddress, ourDeliveryAddressOf, deliveryTermsFor, purchaseOrderNote, purchaseOrderFileName,
   buildPurchaseOrderDraft, itemsFromJob, validatePurchaseOrderDraft, supplierQuoteInputToRow, purchasingTotals,
   issueStageHint, parseEmailList, purchaseOrderEmail, purchaseOrderChangeEmail, purchaseOrderCancelEmail, purchaseOrderHoldEmail, splitAddress, rowToSupplierQuoteView, rowToPurchaseOrderView,
   rowToPurchaseOrderListItem, rowToCommissionView, filterPurchaseOrders, draftToPurchaseOrderView,
@@ -215,6 +215,28 @@ describe("výchozí texty", () => {
     expect(defaultDeliveryAddress({ name: "Mnástrojárna s.r.o.", address: { street: "Mezná 9", zip: "393 01", city: "Mezná" } }))
       .toBe("Mnástrojárna s.r.o.\nMezná 9\n393 01 Mezná");
     expect(defaultDeliveryAddress({ name: "X", address: {} })).toBe("X");
+  });
+
+  it("naše dodací adresa: nastavení (čárky → řádky), jinak provozovna (korespondenční), jinak sídlo; DAP podle místa (review)", () => {
+    const company = {
+      name: "MNástrojárna s.r.o.", address: { street: "Varšavská 715/36", zip: "120 00", city: "Praha 2" },
+      correspondence: { street: "Mezná 9", zip: "393 01", city: "Mezná" },
+    };
+    expect(ourDeliveryAddressOf(company)).toBe("MNástrojárna s.r.o.\nMezná 9\n393 01 Mezná");
+    expect(ourDeliveryAddressOf(company, "  ")).toBe("MNástrojárna s.r.o.\nMezná 9\n393 01 Mezná");
+    expect(ourDeliveryAddressOf(company, "MNástrojárna s.r.o., Dílna 2, 393 01 Mezná")).toBe("MNástrojárna s.r.o.\nDílna 2\n393 01 Mezná");
+    expect(ourDeliveryAddressOf({ name: "X", address: { street: "A 1", zip: "100 00", city: "Praha" } })).toBe("X\nA 1\n100 00 Praha");
+    expect(deliveryTermsFor("MNástrojárna s.r.o.\nMezná 9\n393 01 Mezná")).toBe("DAP Mezná");
+    expect(deliveryTermsFor("TepKal s.r.o.\nKalicí 5, 602 00 Brno")).toBe("DAP Brno");
+    expect(deliveryTermsFor("")).toBe(DEFAULT_DELIVERY_TERMS);
+  });
+
+  it("e-mail objednávky bez nabídky dodavatele: výkresy pošleme samostatně (review)", () => {
+    const base = { number: "OV-2026-1", companyName: "MNástrojárna s.r.o.", requiredDate: "2026-11-20" };
+    expect(purchaseOrderEmail({ ...base, drawingsSeparately: true }).body).toContain("Výkresovou dokumentaci k položkám Vám pošleme samostatně");
+    expect(purchaseOrderEmail({ ...base, drawingsSeparately: true, supplierQuoteNumber: "N-1" }).body).not.toContain("Výkresovou dokumentaci");
+    expect(purchaseOrderEmail(base).body).not.toContain("Výkresovou dokumentaci");
+    expect(purchaseOrderNote("Z-1", ["A"], "Dle výkresů")).toBe("Objednávka k naší zakázce Z-1. Dle výkresů: A.");
   });
 
   it("poznámka: naše zakázka + výkresy, bez duplicit", () => {

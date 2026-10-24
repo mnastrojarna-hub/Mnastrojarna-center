@@ -362,6 +362,8 @@ export interface HandoffValidationContext {
   openPurchaseOrders?: { id: string; number: string; supplierId: string | null; supplierName: string; linked: boolean }[];
   /** Index kroku (0…) → nabídka je na jiné množství. */
   quantityMismatch?: Record<number, { quoted: number; ordered: number; unit: string }>;
+  /** Konec kroku před prvním krokem dialogu (běžící krok) — kroky jdou po sobě i přes něj. */
+  previousEnd?: { date: string; label: string } | null;
 }
 
 function isIso(v: unknown): v is string {
@@ -466,12 +468,17 @@ export function validateHandoff(state: HandoffValidationState, ctx: HandoffValid
             message: `Krok ${n} končí ${shortDay(end)} — dřív než krok ${n - 1} (${shortDay(prev.plannedEnd)}). Kroky jdou po sobě.`,
           });
         }
+      } else if (ctx.previousEnd && isIso(ctx.previousEnd.date) && end < ctx.previousEnd.date && k !== "zaznam") {
+        push({
+          code: "deadline_order", level: "warning", step: n,
+          message: `Krok ${n} končí ${shortDay(end)} — dřív než předchozí krok ${ctx.previousEnd.label} (${shortDay(ctx.previousEnd.date)}). Kroky jdou po sobě — posuň termín.`,
+        });
       }
       // poslední krok hlásí „Výroba skončí … po konečném termínu" níže (jedno varování, ne dvě)
       if (effectiveFinal && !s.endsAtCustomerDate && k !== "zaznam" && i < steps.length - 1 && end > effectiveFinal) {
         push({
           code: "interim_after_final", level: "warning", acceptLate: true, step: n,
-          message: `Krok ${n}: mezitermín ${shortDay(end)} je až po konečném termínu (zákazník) ${shortDay(effectiveFinal)}.`,
+          message: `Krok ${n}: mezitermín ${shortDay(end)} je až po konečném termínu (zákazník) ${shortDay(effectiveFinal)}`,
         });
       }
       if (s.endsAtCustomerDate && finalDate && end !== finalDate && !state.updateCustomerDate) {
@@ -515,7 +522,7 @@ export function validateHandoff(state: HandoffValidationState, ctx: HandoffValid
       const max = cleanDate(ctx.maxToleratedDate);
       push({
         code: "last_after_final", level: "warning", acceptLate: true, step: steps.length,
-        message: `Výroba skončí ${shortDay(last.plannedEnd)} — ${daysText(calendarDaysBetween(effectiveFinal, last.plannedEnd))} po konečném termínu (zákazník) ${shortDay(effectiveFinal)}${max ? `; max. tolerovaný ${shortDay(max)}` : ""}. Domluv nový termín se zákazníkem.`,
+        message: `Výroba skončí ${shortDay(last.plannedEnd)} — ${daysText(calendarDaysBetween(effectiveFinal, last.plannedEnd))} po konečném termínu (zákazník) ${shortDay(effectiveFinal)}${max ? `; max. tolerovaný ${shortDay(max)}` : ""} — domluv nový termín se zákazníkem.`,
       });
     } else if (last.plannedEnd === effectiveFinal && !last.endsAtCustomerDate) {
       push({ code: "no_buffer", level: "warning", step: steps.length, message: "Poslední krok končí v den dodání zákazníkovi — nezbývá čas na dopravu." });
@@ -729,13 +736,26 @@ export function autoSendBlockers(input: {
   whoSource: WhoSource | null | undefined;
   supplierEmail: string | null | undefined;
   senderUsable: boolean;
+  /**
+   * Existuje k dílům srovnatelně levnější nabídka jiné firmy? undefined = neznámo (staré volání → „dražší");
+   * false = „dražší" by lhalo: firma bez nabídky / podle historie / nabídka bez srovnatelné ceny.
+   */
+  cheaperQuote?: boolean;
+  /** Krok má nabídku vybrané firmy (jen pro text, když není levnější). */
+  hasQuote?: boolean;
 }): string[] {
   const out: string[] = [];
   const n = input.unpricedItems;
   if (n > 0) out.push(`${n} ${n === 1 ? "položka" : n < 5 ? "položky" : "položek"} bez ceny`);
   if (input.quoteExpired) out.push("nabídka vypršela");
   if (input.partialCoverage) out.push("nabídka pokrývá jen část dílů");
-  if (!input.whoSource || !["nejlevnejsi_nabidka", "objednavka"].includes(input.whoSource)) out.push("ručně zvolená dražší firma");
+  if (!input.whoSource || !["nejlevnejsi_nabidka", "objednavka"].includes(input.whoSource)) {
+    const ws = input.whoSource ?? null;
+    if (input.cheaperQuote !== false) out.push("ručně zvolená dražší firma");
+    else if (ws === "nabidka") out.push("nabídka bez srovnatelné ceny — porovnej ručně");
+    else if (ws === "posledni_vykres" || ws === "posledni_operace" || ws === "technologie") out.push("firma podle historie (bez nabídky)");
+    else out.push(input.hasQuote ? "ručně zvolená firma" : "firma bez nabídky (zvolená ručně)");
+  }
   if (!(input.supplierEmail ?? "").trim()) out.push("dodavatel nemá v adresáři e-mail");
   if (!input.senderUsable) out.push("nemáš nastavenou schránku pro odesílání");
   return out;

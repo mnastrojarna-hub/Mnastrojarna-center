@@ -7,7 +7,7 @@
 //  * položky a poznámka objednávky dodavateli pro krok.
 import { OPERATION_KINDS, type OperationKind } from "@/lib/jobs/operations";
 import {
-  SUPPLIER_BUFFER_WORKING_DAYS, addCalendarDays, addWorkingDays, purchaseOrderNote, r2,
+  SUPPLIER_BUFFER_WORKING_DAYS, addCalendarDays, addWorkingDays, isWorkingDay, purchaseOrderNote, r2,
 } from "@/lib/jobs/purchasing";
 import type { PurchaseItemInput } from "@/lib/jobs/purchasing-types";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
@@ -49,6 +49,16 @@ function lower(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
+/** „Naposledy dělal {výrobu / povrchovou úpravu / kontrolu…}" — 4. pád názvu druhu kroku. */
+const KIND_ACCUSATIVE: Partial<Record<OperationKind, string>> = {
+  vyroba: "výrobu", povrchova_uprava: "povrchovou úpravu", kontrola: "kontrolu / měření", doprava: "dopravu",
+  kompletni_dodavka: "kompletní dodávku", jine: "jinou operaci",
+};
+
+export function kindAccusative(kind: OperationKind): string {
+  return KIND_ACCUSATIVE[kind] ?? lower(kindLabel(kind));
+}
+
 // ── Druhy kroků z textu / technologií (D.2) ─────────────────
 const TEXT_RULES: [RegExp, OperationKind][] = [
   [/dlouhoto[čc]|swiss|soustru[žz]|\bturn/, "soustruzeni"],
@@ -60,7 +70,10 @@ const TEXT_RULES: [RegExp, OperationKind][] = [
   [/laser|vodn[íi] paprs|waterjet|p[áa]len[íi]|plazm|plamen|ohraň|ohran/, "plech"],
   [/sva[řr]|\bweld/, "svarovani"],
   [/mont[áa][žz]|\bassembl/, "montaz"],
-  [/\bkal(en|ení|it|ít|ený)|žíh|zih|cement|nitrid|popou|tepeln/, "tepelne_zpracovani"],
+  // „kalit / kalení / kalený / zakalit / zakalení / prokalit / prokalení / vykalit" (ne „kalibrace", ne „nekalit",
+  // ne „kalendář / kalendářních dnů"); „zušlechtit / zušlechtění"; \b v JS regexu zná jen ASCII písmena —
+  // hranice slova proto přes Unicode (\p{L})
+  [/(?<!\p{L})(?:za|pro|vy|do|po)?kal(?:en(?!d)|it|ít|í(?!\p{L}))|zušlecht|zuslecht|žíh|zih|cement|nitrid|popou|tepeln/u, "tepelne_zpracovani"],
   // jen slova úpravy, ne požadavky dílu („povrch Ra 0,8") ani materiál („chromniklová ocel")
   [/povrchov[áa]\s+úp|povrchov[ěe]\s+upr|zinek|zinko|pozink|elox|černěn|cernen|\bchrom(ov|át|at)|\bchrom\b|\bpochrom|tvrdochrom|\bnikl(ov|en)|\bponikl|\blak|fosf|\bpvd|\bcvd|povlak|tryskán|tryskan/, "povrchova_uprava"],
   [/kompletn[íi] dod[áa]vk|na kl[íi][čc]/, "kompletni_dodavka"],
@@ -658,7 +671,7 @@ function historySuggestion(input: SuggestWhoInput): WhoSuggestion | null {
     const name = op.supplierName ?? "";
     if (name || op.supplierId) {
       const who: StepWho = op.supplierId ? { type: "supplier", id: op.supplierId, name } : { type: "free", name };
-      return blank("posledni_operace", who, `Naposledy dělal ${lower(kindLabel(op.kind))}${mat}: ${name} (${op.jobNumber})`);
+      return blank("posledni_operace", who, `Naposledy dělal ${kindAccusative(op.kind)}${mat}: ${name} (${op.jobNumber})`);
     }
   }
   // c) technologie dodavatelů (jedna rodina), hodnocení ↓, lhůta ↑
@@ -695,6 +708,11 @@ export interface DeadlineSuggestion {
  * na dopravu, když krok dělá jiná firma) → termín z nabídky / lhůta z nabídky → obvyklá lhůta
  * dodavatele → konečný termín − 3 pracovní dny (poslední krok) → odhad +5 pracovních dní.
  */
+/** Lhůta v kalendářních dnech nesmí skončit o víkendu / svátku → nejbližší další pracovní den. */
+export function workingDayOnOrAfter(iso: string): string {
+  return isWorkingDay(iso) ? iso : addWorkingDays(iso, 1);
+}
+
 export function suggestStepDeadline(input: {
   today: string;
   previousEnd?: string | null;
@@ -718,11 +736,11 @@ export function suggestStepDeadline(input: {
     return { date: q.deliveryDate, source: "nabidka_dodavatele", caption: `z nabídky (termín ${shortDay(q.deliveryDate)})`, state };
   }
   if (q?.leadTimeDays && q.leadTimeDays > 0) {
-    return { date: addCalendarDays(base, Math.round(q.leadTimeDays)), source: "nabidka_dodavatele", caption: `z nabídky (${leadTimeLabel(q.leadTimeDays)})${suffix}`, state };
+    return { date: workingDayOnOrAfter(addCalendarDays(base, Math.round(q.leadTimeDays))), source: "nabidka_dodavatele", caption: `z nabídky (${leadTimeLabel(q.leadTimeDays)})${suffix}`, state };
   }
   if (input.supplierLeadDays && input.supplierLeadDays > 0) {
     return {
-      date: addCalendarDays(base, Math.round(input.supplierLeadDays)), source: "lhuta_dodavatele",
+      date: workingDayOnOrAfter(addCalendarDays(base, Math.round(input.supplierLeadDays))), source: "lhuta_dodavatele",
       caption: `obvyklá lhůta dodavatele (${leadTimeLabel(input.supplierLeadDays)})${suffix}`, state,
     };
   }
@@ -760,6 +778,18 @@ function heatText(i: SuggestItem): string | null {
 
 function uniq<T>(xs: T[]): T[] {
   return [...new Set(xs)];
+}
+
+/**
+ * Díly kroku tepelného zpracování / povrchové úpravy bez vybraných dílů (krok ze šablony): jen díly,
+ * které mají úpravu na výkresu. null = všechny díly (úpravu mají všechny, žádný, nebo jiný druh kroku).
+ */
+export function familyScopeOf(kind: OperationKind, items: SuggestItem[]): string[] | null {
+  const fam = operationFamily(kind);
+  const xs = fam === "tepelne" ? items.filter((i) => heatText(i))
+    : fam === "povrch" ? items.filter((i) => (i.surfaceTreatment ?? "").trim()) : [];
+  if (!xs.length || xs.length === items.length) return null;
+  return xs.map((i) => i.id);
 }
 
 function shortName(name: string): string {
@@ -1013,8 +1043,11 @@ export function stepPurchaseOrderNote(input: {
   stepNo: number;
   stepCount: number;
   next?: { label: string; elsewhere: boolean } | null;
+  /** Druh kroku: u tepelného zpracování / povrchu ne „Výroba dle výkresů", ale „Dle výkresů". */
+  kind?: OperationKind | null;
 }): string {
-  const parts = [purchaseOrderNote(input.jobNumber, input.drawings)];
+  const fam = input.kind ? operationFamily(input.kind) : "obrabeni";
+  const parts = [purchaseOrderNote(input.jobNumber, input.drawings, fam === "obrabeni" || fam === "komplet" ? "Výroba dle výkresů" : "Dle výkresů")];
   parts.push(input.stepCount > 1 ? `Operace: ${input.stepLabel} (krok ${input.stepNo} ze ${input.stepCount}).` : `Operace: ${input.stepLabel}.`);
   if (input.next && input.next.elsewhere) parts.push(`Navazuje: ${input.next.label} — termín prosíme dodržet.`);
   return parts.filter(Boolean).join(" ");

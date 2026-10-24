@@ -58,6 +58,8 @@ export const OUTBOUND_APPROVAL_TYPES: ApprovalType[] = [
   "email_reply",
   "quote",
   "supplier_request",
+  // objednávka dodavateli: resolveApproval ji vyřídí vlastní větví (dřív než obecné odeslání)
+  "purchase_order",
   "reminder",
 ];
 
