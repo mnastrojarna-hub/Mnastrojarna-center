@@ -71,7 +71,8 @@ export async function getEmails(): Promise<EmailItem[]> {
 }
 
 /** Položka fronty + kdo návrh připravil (AI / plánovač) — fronta ukazuje oba autory (minor 16). */
-export type ApprovalQueueItem = ApprovalItem & { proposedBy: string };
+/** quoteHref = odkaz „Otevřít nabídku“ u řádku nabídky (#25: karta zakázky → Nabídky). */
+export type ApprovalQueueItem = ApprovalItem & { proposedBy: string; quoteHref?: string | null };
 
 export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!(await allowedAccess("dashboard"))) return [];
@@ -98,6 +99,9 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
     aiConfidence: a.ai_confidence ?? 0,
     // kdo návrh připravil: připomenutí = plánovač, ostatní (odpovědi, nabídky, poptávky dodavatelům) = AI
     proposedBy: a.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
+    quoteHref: a.type === "quote" && (a.quote_id || a.order_id)
+      ? a.order_id ? `/orders/${a.order_id}?tab=nabidky` : "/quotes"
+      : null,
   }));
 }
 
@@ -351,9 +355,8 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
       quotes: can("quote_approval") ? n("quotes_pending") : n("quotes_ready") + n("quotes_returned"),
       confirmations: n("confirmations"),
       orders: orders.count ?? 0,
-      // fronta AI návrhů (= panel AI přehledu). Ruční nabídky kolegů (quotes_pending_manual) se přičtou,
-      // až je AI přehled vypíše (25-C, QuoteApprovalList) — do té doby je hlásí odznak „Nabídky".
-      approvals: can("dashboard") ? (approvals.count ?? 0) : 0,
+      // AI přehled = fronta AI návrhů + ruční nabídky kolegů ke schválení (panel „Nabídky ke schválení")
+      approvals: can("dashboard") ? (approvals.count ?? 0) + n("quotes_pending_manual") : 0,
     };
   } catch {
     return empty;
@@ -366,6 +369,8 @@ export interface PendingQuoteApproval {
   number: string | null;
   jobId: string | null;
   jobNumber: string | null;
+  /** Název zakázky (řádek fronty říká, k čemu nabídka je). */
+  jobTitle?: string | null;
   customerName: string | null;
   authorName: string | null;
   total: number | null;
@@ -389,7 +394,7 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
     const { data, error } = await fetchPaged<Record<string, unknown>>((from, to) => db.from("quotes")
       .select([
         "id, number, job_id, total, currency, updated_at, created_at",
-        "job:orders!job_id(id, number, status, customer:customers!customer_id(name))",
+        "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name))",
         "customer:customers!customer_id(name)",
         "creator:profiles!created_by(full_name, email)",
         "items:quote_items!quote_id(unit_price)",
@@ -417,7 +422,7 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
     for (const r of data) {
       const id = String(r.id);
       if (queued.has(id)) continue;
-      const job = first(r.job as Embed<{ id: string; number: string | null; status: string; customer?: Embed<{ name: string }> }>);
+      const job = first(r.job as Embed<{ id: string; number: string | null; title?: string | null; status: string; customer?: Embed<{ name: string }> }>);
       if (job && closed.includes(job.status)) continue;
       const creator = first(r.creator as Embed<{ full_name: string | null; email: string | null }>);
       const items = (Array.isArray(r.items) ? r.items : []) as { unit_price: number | string | null }[];
@@ -427,6 +432,7 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
         number: (r.number as string | null) ?? null,
         jobId: job?.id ?? ((r.job_id as string | null) ?? null),
         jobNumber: job?.number ?? null,
+        jobTitle: job?.title?.trim() || null,
         customerName: first(r.customer as Embed<{ name: string }>)?.name ?? first(job?.customer)?.name ?? null,
         authorName: (creator?.full_name ?? "").trim() || (creator?.email ?? "").trim() || null,
         total: total !== null && Number.isFinite(total) ? total : null,

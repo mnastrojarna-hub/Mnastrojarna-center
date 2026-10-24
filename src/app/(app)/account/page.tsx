@@ -1,11 +1,11 @@
 import Link from "next/link";
 import {
-  BadgeCheck, Crown, Briefcase, Wrench, Mail, KeyRound, UserRound, ShieldCheck, Sparkles, Inbox, Check,
+  BadgeCheck, Crown, Briefcase, Wrench, Mail, KeyRound, UserRound, ShieldCheck, Sparkles, Inbox, Check, Eye,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { requireUser, getAccess } from "@/lib/auth/session";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS, FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, FEATURE_LABELS, can, type Feature } from "@/lib/auth/permissions";
 import { loadAccountData } from "@/components/account/data";
 import { ProfileForm } from "@/components/account/profile-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
@@ -24,10 +24,32 @@ const ROLE_ICONS: Record<UserRole, React.ComponentType<{ className?: string }>> 
 
 /** Funkce, které má smysl ukazovat uživateli (technické podfunkce vynecháme). */
 const SHOWN_FEATURES: Feature[] = [
-  "orders", "workflow", "documents", "customers", "suppliers", "mail", "mail_all", "ai_capture",
-  "margins", "commissions", "commissions_all", "dashboard", "ai_assistant", "drawings", "knowledge",
-  "ai_tuning", "users", "settings",
+  "orders", "workflow", "flow_all", "documents", "customers", "suppliers", "mail", "mail_all", "ai_capture",
+  "pricing", "quote_approval", "margins", "commissions", "commissions_all", "dashboard", "ai_assistant", "drawings",
+  "knowledge", "ai_tuning", "users", "settings",
 ];
+
+/** Karta „Co vidím“ (#25, pravidlo 7): Kniha zakázek vs. Obchodní tok, schvalování, Nacenění, focení, provize. */
+function whatISee(hasAi: boolean): React.ReactNode[] {
+  return [
+  <><strong>Kniha zakázek</strong> = výroba a celý život zakázky. Vidí ji každý — všechny zakázky a vše v nich (nákupní ceny, marže a nákupní doklady jen obchodník a super admin).</>,
+  <><strong>Obchodní tok</strong> (Poptávky, Nabídky, Potvrzení objednávek, Objednávky dodavatelům, Dokumenty) = tvoje práce z pošty: zakázky, kde jsi obchodník nebo je zpracováváš, které jsi založil(a), a doklady z tvé schránky. Super admin vidí tok všech.</>,
+  <><strong>Nabídky</strong> od kohokoli kromě super admina musí před odesláním schválit super admin. Po schválení je odešleš sám.</>,
+  <><strong>Nacenění</strong> zatím dělá jen super admin.</>,
+  hasAi
+    ? <><strong>Vyfotit doklad</strong> může každý — AI fotku přečte a zařadí.</>
+    : <><strong>Vyfotit doklad</strong> může každý — fotku přiložíš k zakázce a údaje vyplníš ručně.</>,
+  <><strong>Provize</strong> vidíš jen své. · <strong>Pošta</strong>: jen tvoje schránky.</>,
+  ];
+}
+
+/** Proč AI čtení nemá (skutečný důvod — ne vždy pomůže super admin). */
+function aiOffReason(access: Awaited<ReturnType<typeof getAccess>>): string {
+  const permitted = can(access.user, "ai_capture", { ...access.ctx, aiEnabled: true, aiConfigured: true });
+  if (!permitted) return "Automatické čtení AI ti může zapnout super admin.";
+  if (!access.ctx.aiEnabled) return "AI je teď vypnutá v Nastavení (hlavní vypínač).";
+  return "AI zatím není připojená — chybí Claude API klíč (doplní super admin v Nastavení).";
+}
 
 function SectionIcon({ icon: Icon, tone }: { icon: React.ComponentType<{ className?: string }>; tone: string }) {
   return (
@@ -128,8 +150,7 @@ export default async function AccountPage() {
               {!hasAi && user.role !== "super_admin" && (
                 <p className="rounded-lg bg-violet-500/5 p-3 text-xs text-muted-foreground">
                   <Sparkles className="mr-1 inline h-3.5 w-3.5 text-violet-500" />
-                  Fotky dokladů přikládáš k zakázkám a údaje vyplňuješ ručně — AI se z nich učí. Automatické čtení
-                  AI ti může zapnout super admin.
+                  Fotky dokladů přikládáš k zakázkám a údaje vyplňuješ ručně — AI se z nich učí. {aiOffReason(access)}
                 </p>
               )}
               <div className="grid grid-cols-2 gap-3 border-t pt-3 text-xs text-muted-foreground">
@@ -142,6 +163,25 @@ export default async function AccountPage() {
                   {data.lastSeenAt ? relativeTime(data.lastSeenAt) : "—"}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card data-what-i-see>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <SectionIcon icon={Eye} tone="bg-violet-500/10 text-violet-600 dark:text-violet-400" /> Co vidím
+              </CardTitle>
+              <CardDescription>Kniha zakázek je společná, obchodní tok je tvůj.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground [&_strong]:text-foreground">
+                {whatISee(hasAi).map((line, i) => (
+                  <li key={i} className="flex gap-2">
+                    <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+                    <span className="min-w-0">{line}</span>
+                  </li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
 

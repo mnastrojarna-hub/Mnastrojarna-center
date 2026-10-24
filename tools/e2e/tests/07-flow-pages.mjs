@@ -87,7 +87,8 @@ async function flowPage(page, path, title) {
   await page.waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'), null, { timeout: 30_000 });
 }
 const row = (page, j) => page.locator("main li").filter({ has: page.locator(`a[href="/orders/${j.id}"]`) }).first();
-const quoteRow = (page, q) => page.locator("main li").filter({ has: page.locator("span.font-mono", { hasText: new RegExp(`^${q.number}$`) }) }).first();
+// #25: řádky sekce „Ke schválení“ ([data-pending-quote]) nejsou řádky tabule
+const quoteRow = (page, q) => page.locator("main li:not([data-pending-quote])").filter({ has: page.locator("span.font-mono", { hasText: new RegExp(`^${q.number}$`) }) }).first();
 /** Počet chipu „<štítek> N“ ve skupině. */
 async function chipCount(page, group, label) {
   const b = page.getByRole("group", { name: group }).getByRole("button", { name: new RegExp(`^${label}\\s*\\d+$`) }).first();

@@ -91,7 +91,9 @@ describe("správa uživatelů — render", () => {
     expect(render(<AddUserDialog mailboxes={mailboxes} owners={{ "u-sales": "Petra" }} />)).toContain("Přidat uživatele");
     const ai = render(<AiAccessCard aiEnabled aiCaptureForAll={false} aiConfigured={false} usersWithAi={1} activeUsers={2} />);
     expect(ai).toContain("AI zapnuto (hlavní vypínač)");
-    expect(ai).toContain("AI čtení dokladů z fotky pro všechny uživatele");
+    // #25: nový text karty (§6)
+    expect(ai).toContain("AI focení pro všechny uživatele");
+    expect(ai).toContain("Výchozí: zapnuto — AI přečte fotku dokladu každému aktivnímu uživateli (2).");
     expect(ai).toContain("Není nastaven klíč Claude API");
   });
   it("výběr role ukazuje popisy", () => {

@@ -126,32 +126,50 @@ await T("/purchasing: Zrušit objednávku jedním ťuknutím s důvodem → Zru�
 });
 
 // ═════════════════════════ AUDIT ═════════════════════════
-await T("/settings: limit schválení nabídek → /settings/audit „Změněno nastavení“ s autorem; filtr osoba / entita / období", async (context) => {
+await T("/settings: limit schválení vyřazen (#25) · /settings/audit „Změněno nastavení“ s autorem; filtr osoba / entita / období", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.admin);
+  // změna nastavení opravdu přes UI (editor „API klíče, firemní údaje a integrace“) → audit s autorem
+  const KEY = "company_bank_name";
+  const before = sql(`select coalesce(value, '∅') from integration_settings where key = ${lit(KEY)}`);
+  const value = `E2E banka ${TAG}`;
+  const startedAt = sql("select now()::text");
   try {
+    // #25 (§13): limit částky se nepoužívá — nastavení ukazuje jen vysvětlení, žádné pole
     await page.goto(`${BASE}/settings`);
     await page.locator("main h1").filter({ hasText: "Nastavení" }).first().waitFor({ timeout: 30_000 });
-    await waitHydrated(page, "main input[placeholder='nevyplněno = vypnuto']");
-    const value = String(500_000 + (Date.now() % 1000));
-    await page.locator("main input[placeholder='nevyplněno = vypnuto']").fill(value);
-    await page.getByRole("button", { name: "Uložit limit" }).click();
-    await waitToast(page, /Limit uložen/);
-    expect(sql(`select value from integration_settings where key = 'quote_approval_limit'`) === value, "DB: limit uložen");
+    const retired = page.locator("main [data-approval-limit-retired]");
+    await retired.waitFor({ timeout: 15_000 });
+    expect(norm(await retired.innerText()).includes("limit částky se už nepoužívá"), "nastavení: limit vyřazen (vysvětlení)");
+    expect(await page.locator("main input[placeholder='nevyplněno = vypnuto']").count() === 0 && await page.getByRole("button", { name: "Uložit limit" }).count() === 0, "nastavení: pole limitu zmizelo");
+
+    await waitHydrated(page, `main input#${KEY}`);
+    await page.locator(`main input#${KEY}`).fill(value);
+    await page.getByRole("button", { name: "Uložit klíče" }).click();
+    await page.locator("main").getByText("Uloženo.", { exact: true }).waitFor({ timeout: 15_000 });
+    expect(sql(`select value from integration_settings where key = ${lit(KEY)}`) === value, "DB: hodnota uložena z UI");
+    const au = sql(`select actor_id::text || '|' || ((diff->'keys') ? ${lit(KEY)})::text from audit_log
+      where action = 'settings_updated' and entity = 'integration_settings' and created_at >= ${lit(startedAt)}::timestamptz
+      order by created_at desc limit 1`);
+    expect(au === `${ID.admin}|true`, `audit: změna nastavení zapsaná aplikací s autorem (${au})`);
 
     await page.goto(`${BASE}/settings/audit?osoba=${ID.admin}&entita=integration_settings&obdobi=dnes`);
     await page.locator("main h1").filter({ hasText: "Audit" }).first().waitFor({ timeout: 30_000 });
     const first = page.locator('main ol[aria-label="Záznamy auditu"] > li').first();
     await first.waitFor({ timeout: 10_000 });
     const t = norm(await first.innerText());
-    expect(t.includes("Změněno nastavení") && t.includes(`→ ${value}`) && t.includes(ADMIN), `záznam s autorem a změnou (${t.slice(0, 200)})`);
+    expect(t.includes("Změněno nastavení") && t.includes(ADMIN), `záznam s autorem (${t.slice(0, 200)})`);
     expect(await page.getByRole("region", { name: "Filtr auditu" }).getByLabel("Osoba").inputValue() === ID.admin, "filtr osoby z adresy");
-    // jiná osoba → záznam zmizí
+    // jiná osoba → záznamy admina zmizí
     await waitHydrated(page, "main select[aria-label='Osoba']");
     await page.getByRole("region", { name: "Filtr auditu" }).getByLabel("Osoba").selectOption({ value: "system" });
-    await eventually(async () => expect(!norm(await page.locator("main").innerText()).includes(`→ ${value}`), "filtr Systém záznam admina nezobrazí"));
+    await eventually(async () => {
+      const rows = await page.locator('main ol[aria-label="Záznamy auditu"] > li').allInnerTexts();
+      expect(!rows.some((r) => norm(r).includes("Změněno nastavení") && norm(r).includes(ADMIN)), "filtr Systém záznam admina nezobrazí");
+    });
     await shot(page, S("02-audit"));
   } finally {
+    sql(`update integration_settings set value = ${before === "∅" ? "null" : lit(before)} where key = ${lit(KEY)}`);
     restoreLimit();
   }
 });

@@ -20,6 +20,7 @@ import { JobDetailProvider } from "@/components/jobs/detail/detail-context";
 import { PurchasingTab } from "./purchasing-tab";
 import { PurchaseOrdersBoard } from "./purchase-orders-board";
 import { SupplierQuotesSection } from "./supplier-quotes";
+import { maskPurchaseOrderListItem } from "@/lib/auth/price-visibility";
 import type { JobDetail, JobFormOptions } from "@/lib/jobs/types";
 import type {
   JobCommissionView, JobPurchasing, PurchaseOrderListItem, PurchaseOrderView, SupplierQuoteView,
@@ -107,6 +108,19 @@ function render(j: JobDetail, d: JobPurchasing): string {
 }
 
 describe("Nákup & marže — render", () => {
+  it("#25 cizí provize skrytá; obchodník zakázky jen pro čtení (mění super admin)", () => {
+    const html = renderToString(
+      <JobDetailProvider jobId="j1" perms={{ ...PERMS, canDelete: false, ownerEditable: false }} options={options}>
+        <PurchasingTab job={job()} data={data({ commission: null, commissionHidden: true })} />
+      </JobDetailProvider>,
+    ).replace(/<!-- -->/g, "");
+    expect(html).toContain("Provize vidí jen obchodník zakázky a super admin.");
+    expect(html).not.toContain("Provize zatím nevznikla");
+    expect(html).toContain('data-field="owner-readonly"');
+    expect(html).toContain("Obchodníka zakázky mění jen super admin.");
+    expect(html).not.toContain("Přidělit obchodníka…");
+  });
+
   it("bez nabídek a objednávek: nápověda, prázdné stavy, Vystavit objednávku", () => {
     const html = render(job(), data());
     expect(html).toContain("Obrat");
@@ -288,5 +302,26 @@ describe("Objednávky dodavatelům — přehled", () => {
 
     const empty = renderToString(<PurchaseOrdersBoard items={[]} today="2026-10-22" />).replace(/<!-- -->/g, "");
     expect(empty).toContain("Zatím žádná objednávka dodavateli");
+  });
+
+  it("#25 bez práva na ceny (zaměstnanec): „—“ místo částek, bez PDF / odeslání / převzetí, odkaz do Výroby, poznámka", () => {
+    const masked = [item(), item({ id: "po2", number: "OV-2026-005", status: "potvrzena" })].map(maskPurchaseOrderListItem);
+    const html = renderToString(<PurchaseOrdersBoard items={masked} today="2026-10-22" canSeePrices={false} />)
+      .replace(/<!-- -->/g, "").replace(/[  ]/g, " ");
+    expect(html).toContain("Ceny objednávek vidí obchodník a super admin.");
+    expect(html).toContain("OV-2026-005");
+    expect(html).not.toMatch(/\d\s?Kč/); // žádná částka (ani 0 Kč z maskovaných dat)
+    expect(html).not.toContain("Poslat e-mailem");
+    expect(html).not.toContain("Převzít zboží");
+    expect(html).not.toContain("/api/pdf/purchase-order");
+    expect(html).not.toContain("tab=nakup");
+    expect(html).toContain("/orders/j1?tab=vyroba");
+    expect(html).toContain("Vystavena · V. Volný");
+    // místo částky tichý zámek „cena skrytá“ (ne osamělá tučná pomlčka)
+    expect(html.match(/data-price-hidden/g)?.length).toBe(2);
+    expect(html).toContain("cena skrytá");
+    // bez výslovného údaje stačí maskovaná data
+    const auto = renderToString(<PurchaseOrdersBoard items={masked} today="2026-10-22" />);
+    expect(auto).toContain("Ceny objednávek vidí obchodník a super admin.");
   });
 });

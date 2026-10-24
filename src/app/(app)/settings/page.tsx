@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
 import { OutlookImport } from "@/components/outlook-import";
-import { ApprovalLimitCard } from "@/components/settings/approval-limit-card";
 import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
 import { requireFeature } from "@/lib/auth/session";
 import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
@@ -31,8 +30,6 @@ export default async function SettingsPage() {
   const { url } = getSupabaseEnv();
   // Parametry kalkulace se ladí v Nacenění / Ladění & korekce, AI přístup v Uživatelích — tady jen systém
   const systemSettings = settings.filter((s) => s.category !== "pricing" && s.category !== "ai_access" && s.key !== "quote_approval_limit");
-  const limitRaw = settings.find((s) => s.key === "quote_approval_limit")?.value ?? "";
-  const approvalLimit = limitRaw && Number(limitRaw) > 0 ? Number(limitRaw) : null;
   // Vlastník schránky = uživatel, který vidí její poštu
   const mailboxUsers = users.map((u) => ({ id: u.id, full_name: u.full_name || u.email || "Bez jména", email: u.email }));
   // MailboxManager bere { mailboxes, users } (výběr vlastníka schránky); cast drží kompatibilitu i se starší signaturou
@@ -97,18 +94,20 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Schvalování nabídek (čtyři oči nad limitem) */}
+      {/* Schvalování nabídek (#25: limit částky zrušen — kolegy schvaluje super admin vždy) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Schvalování nabídek
           </CardTitle>
           <CardDescription>
-            Kdy musí nabídku před odesláním zkontrolovat druhý člověk. Kdo a kdy schválil, je vidět u každé nabídky.
+            Kdo a kdy nabídku schválil, je vidět u každé nabídky. Fronta „Ke schválení“ je v Nabídkách a v AI přehledu.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ApprovalLimitCard initial={approvalLimit} />
+          <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-approval-limit-retired>
+            Nabídky kolegů schvaluje super admin vždy, tvoje nabídky schválení nepotřebují — limit částky se už nepoužívá.
+          </p>
         </CardContent>
       </Card>
 

@@ -479,6 +479,10 @@ describe("menuActions", () => {
     const returned = { ...pending, returnedAt: "2026-10-23T08:00:00Z", returnNote: "doplň termín" };
     expect(nextAction(f, deriveFlow(f, [returned], TODAY), workerAuthor)).toEqual({ key: "quote.edit", label: "Upravit podle připomínek" });
     expect(nextAction(f, deriveFlow(f, [returned], TODAY), WORKER)).toBeNull();
+    // super admin vrácenou primárně neschvaluje (čeká se na autora); „Schválit“ zůstává v menu
+    expect(nextAction(f, deriveFlow(f, [pending], TODAY), ADMIN)?.key).toBe("quote.approve");
+    expect(nextAction(f, deriveFlow(f, [returned], TODAY), ADMIN)).toBeNull();
+    expect(menuActions(f, deriveFlow(f, [returned], TODAY), ADMIN)).toContain("quote.approve");
   });
 });
 

@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Building2, Contact, Loader2, MapPin, Pencil, Plus, ReceiptText, Save, UserRound,
+  Building2, Contact, Loader2, Lock, MapPin, Pencil, Plus, ReceiptText, Save, UserRound,
 } from "lucide-react";
+import { useAccess } from "@/components/access-provider";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,10 +54,14 @@ export function CustomerDialog({
   openAfterCreate?: boolean;
 }) {
   const router = useRouter();
+  const { role } = useAccess();
   const editing = Boolean(customer);
+  // #25: obchodníka zákazníka vybírá jen super admin; zaměstnanec obchodníkem zákazníka není (bez předvyplnění)
+  const ownerEditable = role === "super_admin";
+  const presetOwner = role === "zamestnanec" ? "" : defaultOwnerId ?? "";
   const initial = React.useMemo<CustomerFormValues>(
-    () => (customer ? customerFormFromView(customer) : { ...EMPTY_CUSTOMER_FORM, ownerId: defaultOwnerId ?? "" }),
-    [customer, defaultOwnerId],
+    () => (customer ? customerFormFromView(customer) : { ...EMPTY_CUSTOMER_FORM, ownerId: presetOwner }),
+    [customer, presetOwner],
   );
   const [open, setOpen] = React.useState(false);
   const [values, setValues] = React.useState<CustomerFormValues>(initial);
@@ -192,14 +197,26 @@ export function CustomerDialog({
               >
                 {input("customerNumber", { placeholder: editing ? customer?.customerNumber ?? "ZK…" : "přidělí se samo" })}
               </Field>
-              <Field id="cust-ownerId" label="Obchodník" hint={owner ? `Zákazníka má na starosti ${owner.name}.` : "Kdo zákazníka obchodně vede."}>
-                <SelectInput id="cust-ownerId" value={values.ownerId} onChange={(e) => set("ownerId", e.target.value)}>
-                  <option value="">— bez obchodníka —</option>
-                  {owners.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </SelectInput>
-              </Field>
+              {ownerEditable ? (
+                <Field id="cust-ownerId" label="Obchodník" hint={owner ? `Zákazníka má na starosti ${owner.name}.` : "Kdo zákazníka obchodně vede."}>
+                  <SelectInput id="cust-ownerId" value={values.ownerId} onChange={(e) => set("ownerId", e.target.value)}>
+                    <option value="">— bez obchodníka —</option>
+                    {owners.map((o) => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
+                    ))}
+                  </SelectInput>
+                </Field>
+              ) : (
+                <div className="space-y-1" data-field="owner-readonly">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    Obchodník <Lock className="h-3 w-3" aria-label="jen pro čtení" />
+                  </span>
+                  <p className="flex min-h-10 items-center rounded-md border border-dashed px-3 text-sm text-muted-foreground">
+                    {owner?.name ?? (values.ownerId ? "—" : "— bez obchodníka —")}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">Obchodníka zákazníka mění jen super admin.</p>
+                </div>
+              )}
             </FormSection>
 
             <FormSection icon={<Contact />} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title="Kontakt" hint="Další kontaktní osoby přidáš na kartě zákazníka.">

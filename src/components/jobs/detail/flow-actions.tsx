@@ -32,6 +32,9 @@ import { cn } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
 import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { QuoteSendDialog } from "./quote-send-dialog";
+import { QuoteReturnDialog } from "@/components/flow/quote-return-dialog";
+import { QuoteApproveSendDialog } from "@/components/flow/quote-approve-send-dialog";
+import { approvedToast } from "@/components/flow/quote-approval-copy";
 import { DETAIL_TABS_ID, addDaysIso, type DetailTab } from "./detail-helpers";
 import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
 
@@ -65,6 +68,8 @@ interface FlowActionsValue {
   canUndo: (key: FlowActionKey) => boolean;
   /** Počítadlo pokynů „Vytvořit nabídku" (záložka Nabídky otevře editor). */
   newQuoteSignal: number;
+  /** Toast po „Schválit“ aktivní nabídky (§13: „Nabídka {č.} schválena — {autor} ji teď může odeslat.“). */
+  approveToast: string;
 }
 
 const FlowActionsContext = React.createContext<FlowActionsValue | null>(null);
@@ -110,6 +115,11 @@ const DIRECT_OK: Partial<Record<FlowActionKey, string>> = {
   "order.reopen": "Objednávka obnovena.",
 };
 
+/** Toast po schválení z karty: „Nabídka {č.} schválena — {autor} ji teď může odeslat.“ */
+function approvedToastOf(q: JobQuote | null): string {
+  return approvedToast(q?.number ?? null, q?.createdBy?.name ?? null);
+}
+
 export function FlowActionsProvider({
   job, stamps, revisions, access, setTab, initialAction, children,
 }: {
@@ -138,7 +148,10 @@ export function FlowActionsProvider({
     isSuperAdmin: role === "super_admin",
     assigneeId: job.assignee?.id ?? null,
     assigneeName: job.assignee?.name ?? null,
-  }), [features, userId, role, job.assignee]);
+    ownerId: job.owner?.id ?? null,
+    // karta umí dialog „Vrátit k přepracování…“ (#25)
+    withReturn: true,
+  }), [features, userId, role, job.assignee, job.owner]);
 
   const facts = React.useMemo(() => (job.flow ? { ...job.flow, stage: job.stage } : null), [job.flow, job.stage]);
   const quotes = React.useMemo(() => job.flowQuotes ?? [], [job.flowQuotes]);
@@ -157,7 +170,9 @@ export function FlowActionsProvider({
     reopenOrderTo: facts?.orderConfirmedRevision ? "potvrzena" as const : "dorucena" as const,
     waitingNote: facts?.waitingNote ?? null,
     force,
-  }), [jobId, activeQuoteId, facts?.orderConfirmedRevision, facts?.waitingNote]);
+    // „Schválit“ projde jen nabídka, jakou uživatel na kartě vidí (mezitím upravenou server odmítne)
+    expectedUpdatedAt: quotes.find((q) => q.id === (quoteId ?? activeQuoteId))?.updatedAt ?? null,
+  }), [jobId, activeQuoteId, facts?.orderConfirmedRevision, facts?.waitingNote, quotes]);
 
   const runDirect = React.useCallback(async (key: FlowActionKey, opts: { quoteId?: string } = {}) => {
     const res = await runDirectAction(key, directCtx(opts.quoteId));
@@ -183,12 +198,13 @@ export function FlowActionsProvider({
       void runDirect(key, opts).then((res) => {
         if (!res) return;
         if (!res.ok) notify("error", res.error ?? "Akce se nepovedla.");
+        else if (key === "quote.approve") notify("success", approvedToastOf(job.quotes.find((q) => q.id === (opts.quoteId ?? activeQuoteId)) ?? null));
         else if (DIRECT_OK[key] && !res.needsConfirm) notify("success", DIRECT_OK[key]!);
       }).catch(() => notify("error", "Spojení se nepovedlo — zkus to znovu."));
       return;
     }
     setDialog({ key, quoteId: opts.quoteId });
-  }, [setTab, perms.margins, runDirect, notify]);
+  }, [setTab, perms.margins, runDirect, notify, job.quotes, activeQuoteId]);
 
   const undo = React.useCallback(async (key: FlowActionKey) => {
     const res = await undoDirectAction(key, directCtx());
@@ -210,15 +226,19 @@ export function FlowActionsProvider({
     try {
       const url = new URL(window.location.href);
       url.searchParams.delete("akce");
-      window.history.replaceState(window.history.state, "", url.toString());
+      url.searchParams.delete("nova");
+      // bez stavu Next.js → router si novou adresu převezme (jinak by ji router.refresh vrátil i s ?nova=1
+      // a obnovení stránky by editor / dialog otevřelo znovu)
+      window.history.replaceState(null, "", url.toString());
     } catch {
       // adresa je jen pohodlí
     }
   }, [initialAction, ctx, features.length, run]);
 
+  const approveToast = approvedToastOf(job.quotes.find((q) => q.id === activeQuoteId) ?? null);
   const value = React.useMemo<FlowActionsValue>(() => ({
-    facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal,
-  }), [facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal]);
+    facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal, approveToast,
+  }), [facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal, approveToast]);
 
   const close = (o: boolean) => !o && setDialog(null);
   const quoteOf = (id?: string | null): JobQuote | null => job.quotes.find((q) => q.id === (id ?? activeQuoteId)) ?? null;
@@ -305,20 +325,6 @@ function FlowDialog({
   const qLabel = quote ? `${quote.number}${quote.revision > 1 && !/-R?\d+$/i.test(quote.number) ? ` r${quote.revision}` : ""}` : "nabídka";
   const others = quotes.filter((q) => q.id !== qid && !q.archived && (q.status === "navrh_ai" || q.status === "ke_schvaleni" || q.status === "odeslano"));
   const effectOf = (change: Parameters<typeof stageEffect>[2]) => stageEffectText(stageEffect(facts, quotes, change));
-  const [approving, setApproving] = React.useState(key === "quote.approveSend");
-  const [approveError, setApproveError] = React.useState<string | null>(null);
-
-  // „Schválit a odeslat": nejdřív schválit (jeden zápis), pak e-mail s nabídkou
-  React.useEffect(() => {
-    if (key !== "quote.approveSend" || !qid) return;
-    let alive = true;
-    setQuoteState(qid, "schvalena").then((r) => {
-      if (!alive) return;
-      if (!r.ok && r.quoteState !== "schvalena") setApproveError(r.error ?? "Schválení se nepovedlo.");
-      setApproving(false);
-    }).catch(() => alive && (setApproveError("Spojení se nepovedlo — zkus to znovu."), setApproving(false)));
-    return () => { alive = false; };
-  }, [key, qid]);
 
   const confirmJob = {
     id: job.id, number: job.number, title: job.title, customerName: job.customer?.name ?? null,
@@ -359,7 +365,10 @@ function FlowDialog({
       success: "Připomínky zapsány — další krok je nová verze nabídky.",
     },
     "quote.unapprove": {
-      title: `Vrátit k úpravě — ${qLabel}`, description: "Schválení se zruší, nabídka bude zase rozpracovaná.",
+      title: `Vrátit k úpravě — ${qLabel}`,
+      description: quote?.adminApprovalRequired || quote?.aiGenerated
+        ? "Schválení se zruší — nabídka bude zase neschválená a odeslat ji půjde až po novém schválení."
+        : "Schválení se zruší, nabídka bude zase rozpracovaná.",
       reasons: [], destructive: false, noteLabel: "Co upravit", confirmLabel: "Vrátit k úpravě",
       run: ({ note }) => setQuoteState(qid ?? "", "rozpracovana", { note }), success: "Nabídka vrácena k úpravě.",
     },
@@ -440,19 +449,13 @@ function FlowDialog({
   const latest = [...revisions].sort((a, b) => b.revision - a.revision)[0] ?? null;
 
   switch (key) {
-    case "quote.send":
     case "quote.approveSend":
+      // #25: schválení + PDF + e-mail jedním krokem na serveru (zavřením se nic neschválí)
+      return quote ? (
+        <QuoteApproveSendDialog open onOpenChange={onClose} jobId={jobId} quoteId={quote.id} number={qLabel} updatedAt={quote.updatedAt ?? null} onDone={onDone} />
+      ) : <MissingQuote onClose={onClose} />;
+    case "quote.send":
       if (!quote) return <MissingQuote onClose={onClose} />;
-      if (approving || approveError) {
-        return (
-          <Dialog open onOpenChange={onClose}>
-            <DialogContent aria-describedby={undefined} className="w-[calc(100%-1.5rem)] sm:max-w-md">
-              <DialogHead icon={Loader2} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title={`Schvaluji nabídku ${qLabel}…`} />
-              <div className="p-5"><ErrorBox error={approveError} /></div>
-            </DialogContent>
-          </Dialog>
-        );
-      }
       return (
         <QuoteSendDialog
           open
@@ -463,6 +466,17 @@ function FlowDialog({
       );
     case "quote.extend":
       return quote ? <ExtendDialog quote={quote} onClose={onClose} onDone={onDone} /> : <MissingQuote onClose={onClose} />;
+    case "quote.returnToAuthor":
+      return quote ? (
+        <QuoteReturnDialog
+          open
+          onOpenChange={onClose}
+          quoteId={quote.id}
+          number={qLabel}
+          author={quote.createdBy?.name ?? null}
+          onDone={onDone}
+        />
+      ) : <MissingQuote onClose={onClose} />;
     case "order.confirm":
     case "order.sendConfirmation":
       return (

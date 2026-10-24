@@ -454,6 +454,8 @@ async function applyQuote(
 export async function approveAndSendQuote(
   quoteId: string,
   email?: { to: string; cc?: string; subject: string; body: string } | null,
+  /** Ze seznamu / karty: schválí jen nezměněnou nabídku (quotes.updated_at, §15.11). */
+  opts: { expectedUpdatedAt?: string | null } = {},
 ): Promise<FlowResult> {
   const c = await begin("quote_approval");
   if ("error" in c) return fail(c.error);
@@ -464,7 +466,7 @@ export async function approveAndSendQuote(
     const quote = quoteFactsFromRow(row);
     const jobId = typeof row.job_id === "string" ? row.job_id : null;
     if (quote.state !== "schvalena" && quote.state !== "rozpracovana") {
-      const approved = await applyQuote(c, quoteId, "schvalena", {}, null);
+      const approved = await applyQuote(c, quoteId, "schvalena", { expectedUpdatedAt: opts.expectedUpdatedAt ?? null }, null);
       if (!approved.ok) return approved;
     }
     if (email && jobId) {

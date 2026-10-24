@@ -1,5 +1,8 @@
-import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, ReceiptText, Truck, type LucideIcon } from "lucide-react";
-import { requireFeature } from "@/lib/auth/session";
+import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, Lock, ReceiptText, Truck, type LucideIcon } from "lucide-react";
+import { getAccess, requireFeature } from "@/lib/auth/session";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
+import { PRICE_DOCS_NOTE } from "@/components/flow/file-lock";
 import { listJobFiles, listJobs } from "@/lib/data/jobs";
 import { getFileFlowInfo } from "@/lib/data/flow-pages";
 import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
@@ -26,6 +29,7 @@ export default async function DocumentsPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireFeature("documents");
+  const { can } = await getAccess();
   // #25: dokumenty jen „moje" (super admin všichni, nebo „Jen moje"); obsah nákupních dokladů zamčený
   const scope = await getFlowScope(await flowWhoFrom((await props?.searchParams) ?? {}));
   const [files, jobs] = await Promise.all([
@@ -60,14 +64,21 @@ export default async function DocumentsPage(props: {
             <BookLink href={bookHref("vse")} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
       <FlowHint>
         <strong>Tip:</strong> klikni na barevný druh nahoře a uvidíš jen faktury, jen výkresy… Číslo zakázky u dokumentu tě
         vezme rovnou do její karty. Nový doklad z mobilu? Stačí <em>Vyfotit doklad</em> — AI ho přečte a zařadí ke správné zakázce.
       </FlowHint>
+      {!can("margins") && (
+        <p className="flex items-start gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {PRICE_DOCS_NOTE}
+        </p>
+      )}
 
-      <DocumentsBrowser files={flowFiles} today={today} />
+      {scope?.error ? null : <DocumentsBrowser files={flowFiles} today={today} />}
 
       <FlowSection
         id="vystavit"

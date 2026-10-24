@@ -1,8 +1,11 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, X, Mail, FileText, Factory, Tag, Bot, Send, Pencil, Loader2, ChevronDown, GraduationCap } from "lucide-react";
+import {
+  ArrowRight, Check, X, Mail, FileText, Factory, Tag, Bot, Send, Pencil, Loader2, ChevronDown, GraduationCap, ShieldAlert,
+} from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +19,8 @@ import { relativeTime, cn } from "@/lib/utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ResolvedApproval } from "@/lib/data/queries";
 
-/** Položka fronty; proposedBy = kdo návrh připravil („✨ AI", „Systém (plánovač)"). */
-type QueueItem = ApprovalItem & { proposedBy?: string };
+/** Položka fronty; proposedBy = kdo návrh připravil („✨ AI", „Systém (plánovač)"); quoteHref = „Otevřít nabídku". */
+type QueueItem = ApprovalItem & { proposedBy?: string; quoteHref?: string | null };
 
 const RESOLVED_LABEL: Record<ResolvedApproval["status"], string> = {
   approved: "Schváleno",
@@ -119,6 +122,20 @@ function ApprovalRow({
           )}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="secondary">{item.type}</Badge>
+            {item.rawType === "quote" && (
+              // #25: AI nabídka čeká na super admina — do té doby ji nejde odeslat
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-900 ring-1 ring-inset ring-amber-400 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-400/50"
+                title="Čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi."
+              >
+                <ShieldAlert className="h-3.5 w-3.5" aria-hidden /> Neschválená
+              </span>
+            )}
+            {item.quoteHref && (
+              <Link href={item.quoteHref} className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">
+                Otevřít nabídku <ArrowRight className="h-3 w-3" aria-hidden />
+              </Link>
+            )}
             {isOutbound && target && (
               <span className="truncate">
                 příjemce: <span className="font-medium text-foreground">{target}</span>
@@ -228,7 +245,8 @@ export function ApprovalQueue({
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
-          <CardTitle className="text-base">Čeká na tvé schválení</CardTitle>
+          {/* #25: ruční nabídky kolegů má panel „Nabídky ke schválení“ nad touto kartou — tady jen AI akce */}
+          <CardTitle className="text-base">AI akce ke schválení</CardTitle>
           {items.length > 0 && <Badge variant="warning">{items.length}</Badge>}
         </div>
         {mode === "full" && (
@@ -255,7 +273,7 @@ export function ApprovalQueue({
 
         {items.length === 0 && (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            Vše vyřízeno. 🎉 Žádné čekající akce.
+            Žádné AI akce nečekají.
           </div>
         )}
 

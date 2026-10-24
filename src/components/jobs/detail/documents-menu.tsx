@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { generateJobDocument, type JobDocumentKind } from "@/app/actions/job-documents";
 import type { JobQuote } from "@/lib/jobs/types";
+import { quoteApprovalBlock } from "@/lib/jobs/flow-status";
 import { cn } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
 import { primaryQuote } from "./detail-helpers";
@@ -24,7 +25,8 @@ const DOCS: { kind: JobDocumentKind; label: string; hint: string; icon: LucideIc
 export function DocumentsMenu({
   quotes, acceptedQuoteId, variant = "outline", size, className, compact,
 }: {
-  quotes: Pick<JobQuote, "id" | "number" | "archived" | "createdAt" | "revision" | "status">[];
+  quotes: (Pick<JobQuote, "id" | "number" | "archived" | "createdAt" | "revision" | "status">
+    & Partial<Pick<JobQuote, "state" | "adminApprovalRequired" | "approvalRequired" | "approvedBy" | "sentAt">>)[];
   acceptedQuoteId: string | null;
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
@@ -37,6 +39,11 @@ export function DocumentsMenu({
   // potvrzení / faktura s neoceněnými položkami → „Přesto vystavit"
   const [unpriced, setUnpriced] = React.useState<{ kind: JobDocumentKind; message: string } | null>(null);
   const quote = primaryQuote(quotes, acceptedQuoteId);
+  // #25: PDF neschválené nabídky k odeslání nejde vystavit (server to odmítne také) — náhled s vodoznakem ano
+  const quoteBlocked = Boolean(quote) && quoteApprovalBlock({
+    adminApprovalRequired: quote!.adminApprovalRequired, approvalRequired: quote!.approvalRequired,
+    approvedBy: quote!.approvedBy ?? null, sentAt: quote!.sentAt ?? null, state: quote!.state ?? null,
+  }) !== null;
 
   /** Vrací chybu (pro dialog „Přesto vystavit") nebo null. */
   async function generate(kind: JobDocumentKind, force = false): Promise<string | null> {
@@ -81,7 +88,7 @@ export function DocumentsMenu({
       onConfirm={async () => (unpriced ? generate(unpriced.kind, true) : null)}
     >
       <p className="text-sm text-muted-foreground">
-        {unpriced?.message} Doplň ceny v záložce Položky, nebo doklad vystav i tak (neoceněné položky budou bez ceny).
+        {unpriced?.message} Neoceněné položky budou v dokladu bez ceny.
       </p>
     </ConfirmDialog>
     <DropdownMenu>
@@ -98,10 +105,12 @@ export function DocumentsMenu({
         {DOCS.map((d) => {
           const Icon = d.icon;
           const needsQuote = d.kind === "nabidka" && !quote;
+          const unapproved = d.kind === "nabidka" && quoteBlocked;
           return (
             <DropdownMenuItem
               key={d.kind}
-              disabled={needsQuote}
+              disabled={needsQuote || unapproved}
+              title={unapproved ? "Odeslat půjde po schválení super adminem." : undefined}
               onSelect={() => void generate(d.kind)}
               className="items-center gap-2.5 py-2"
             >
@@ -111,7 +120,10 @@ export function DocumentsMenu({
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium leading-tight">{d.label}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {needsQuote ? "Nejdřív vytvoř nabídku (záložka Nabídky)" : d.kind === "nabidka" && quote ? `z nabídky ${quote.number}` : d.hint}
+                  {needsQuote
+                    ? "Nejdřív vytvoř nabídku (záložka Nabídky)"
+                    : unapproved ? "Neschválená — vystavíš po schválení super adminem"
+                    : d.kind === "nabidka" && quote ? `z nabídky ${quote.number}` : d.hint}
                 </span>
               </span>
             </DropdownMenuItem>

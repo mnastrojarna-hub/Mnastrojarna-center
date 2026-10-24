@@ -261,7 +261,7 @@ export async function getJobFormOptions(): Promise<JobFormOptions> {
   try {
     const [users, customers, suppliers] = await Promise.all([
       s.db.from("profiles").select("id, full_name, email, role").eq("active", true).order("full_name"),
-      fetchPaged((from, to) => s.db.from("customers").select("id, name, customer_number, ico").order("name").order("id").range(from, to), 20_000),
+      fetchPaged((from, to) => s.db.from("customers").select("id, name, customer_number, ico, owner_id").order("name").order("id").range(from, to), 20_000),
       fetchPaged((from, to) => s.db.from("suppliers").select("id, name").order("name").order("id").range(from, to), 20_000),
     ]);
     warn("options:users", users.error);
@@ -273,11 +273,12 @@ export async function getJobFormOptions(): Promise<JobFormOptions> {
         name: (u.full_name ?? "").trim() || (u.email ?? "").trim() || "Neznámý uživatel",
         role: u.role,
       })),
-      customers: ((customers.data ?? []) as { id: string; name: string; customer_number: string | null; ico: string | null }[]).map((c) => ({
+      customers: ((customers.data ?? []) as { id: string; name: string; customer_number: string | null; ico: string | null; owner_id?: string | null }[]).map((c) => ({
         id: c.id,
         name: c.name,
         customerNumber: c.customer_number ?? null,
         ico: c.ico ?? null,
+        ownerId: c.owner_id ?? null,
       })),
       suppliers: ((suppliers.data ?? []) as { id: string; name: string }[]).map((x) => ({ id: x.id, name: x.name })),
     };

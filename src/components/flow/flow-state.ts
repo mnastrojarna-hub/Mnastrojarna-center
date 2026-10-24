@@ -34,6 +34,8 @@ export interface FlowJobState {
   facts: FlowFacts;
   snapshot: FlowSnapshot;
   quotes: QuoteFacts[];
+  /** Kdo připravil aktivní nabídku (jméno do toastu po schválení / vrácení). */
+  quoteAuthor?: string | null;
   stamps: FlowRowStamps;
   next: NextStep;
   menu: FlowActionKey[];
@@ -250,9 +252,11 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
     next = r.hasJob && canSend ? step("quote.send") : null;
     if (r.hasJob && canSend) { add("quote.send"); add("quote.markSent"); }
   } else if (st === "ke_schvaleni") {
-    // #25: neschválenou schválí jen super admin
-    next = canApprove ? step("quote.approve") : q.returnedAt && q.createdBy === ctx.userId && r.hasJob
-      ? { key: "quote.edit", label: "Upravit podle připomínek" } : null;
+    // #25: neschválenou schválí jen super admin; vrácenou upraví autor (super admin ji primárně
+    // neschvaluje — čeká se na autora, „Schválit“ zůstává v menu)
+    next = q.returnedAt
+      ? (q.createdBy === ctx.userId && r.hasJob ? { key: "quote.edit", label: "Upravit podle připomínek" } : null)
+      : canApprove ? step("quote.approve") : null;
     if (canApprove) { add("quote.approve"); if (r.hasJob) add("quote.approveSend"); }
     if (mayReturn) add("quote.returnToAuthor");
   } else if (st === "schvalena") {

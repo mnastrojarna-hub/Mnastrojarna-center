@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Calculator, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { Calculator, FilePlus, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { listJobs, getJobFormOptions } from "@/lib/data/jobs";
 import { getEmails } from "@/lib/data/queries";
@@ -38,6 +40,8 @@ export default async function InquiriesPage({
   const sp = (await searchParams) ?? {};
   const { can } = await getAccess();
   const mail = can("mail");
+  // #25: Nacenění zatím jen super admin — ostatní nabídku vytvoří ručně v kartě zakázky
+  const canPrice = can("pricing");
   const selected = parseStateParam(sp[STATE_PARAM], INQUIRY_ORDER, OPEN_INQUIRY);
   const withClosed = selected.some((k) => CLOSED_JOB_KEYS.includes(k));
   // #25: obchodní tok jen „moje" (super admin všichni, nebo „Jen moje")
@@ -75,6 +79,7 @@ export default async function InquiriesPage({
           <>Zákazník chce díl — tady je každá poptávka: kdo ji převzal, co chybí a jak dopadla. Přijde e-mailem (AI ji pozná sama), vyfotíš ji, nebo ji zadáš ručně.</>
         }
         step="poptavka"
+        canPrice={canPrice}
         actions={
           <>
             <CaptureButton label="Vyfotit poptávku" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
@@ -82,14 +87,24 @@ export default async function InquiriesPage({
             <BookLink href={bookHref("poptavky", ["poptavka"])} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
-      <FlowHint>
-        <strong>Jak dál:</strong> novou poptávku <em>Převezmi</em> (budeš její řešitel), chybí-li výkres nebo množství, dej{" "}
-        <em>Čeká na podklady</em> — až podklady přijdou, stav skončí sám. Pak{" "}
-        <Link href="/pricing" className="font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300">Nacenit</Link>.
-        U každého stavu vidíš, kdo ho nastavil.
-      </FlowHint>
+      {canPrice ? (
+        <FlowHint>
+          <strong>Jak dál:</strong> novou poptávku <em>Převezmi</em> (budeš její řešitel), chybí-li výkres nebo množství, dej{" "}
+          <em>Čeká na podklady</em> — až podklady přijdou, stav skončí sám. Pak{" "}
+          <Link href="/pricing" className="font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300">Nacenit</Link>.
+          U každého stavu vidíš, kdo ho nastavil.
+        </FlowHint>
+      ) : (
+        <FlowHint>
+          <strong>Jak dál:</strong> novou poptávku <em>Převezmi</em> (budeš ji zpracovávat), chybí-li výkres nebo množství, dej{" "}
+          <em>Čeká na podklady</em>. Pak <em>Vytvoř nabídku</em> v kartě zakázky — super admin ji schválí a ty ji odešleš.
+          U každého stavu vidíš, kdo ho nastavil.
+        </FlowHint>
+      )}
 
       <ToastProvider>
         <FlowSection
@@ -100,7 +115,7 @@ export default async function InquiriesPage({
           count={jobs.length}
         >
           <FlowStateFilter chips={chips} selected={selected} fallback={OPEN_INQUIRY} label="Stav poptávky" />
-          {jobs.length === 0 ? (
+          {scope?.error ? null : jobs.length === 0 ? (
             <FlowEmpty
               icon={Inbox}
               iconClass="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"
@@ -117,9 +132,13 @@ export default async function InquiriesPage({
               renderAction={(j) => {
                 const st = states[j.id];
                 if (!st) {
-                  return (
+                  return canPrice ? (
                     <Button asChild size="sm" className="min-h-11 w-full bg-amber-500 text-amber-950 shadow-sm hover:bg-amber-500/90 sm:min-h-9 sm:w-auto">
                       <Link href={`/pricing?job=${j.id}`}><Calculator className="h-4 w-4" /> Nacenit</Link>
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" className="min-h-11 w-full bg-violet-700 text-white shadow-sm hover:bg-violet-800 sm:min-h-9 sm:w-auto">
+                      <Link href={`/orders/${j.id}?tab=nabidky&nova=1`}><FilePlus className="h-4 w-4" /> Vytvořit nabídku</Link>
                     </Button>
                   );
                 }
@@ -128,10 +147,12 @@ export default async function InquiriesPage({
                     target={{
                       jobId: j.id, jobNumber: j.number, facts: st.facts, quotes: st.quotes, quote: st.snapshot.activeQuote,
                       today, onlyOpenQuote: st.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
+                      quoteAuthor: st.quoteAuthor ?? null,
                     }}
                     next={st.next}
                     menu={st.menu}
                     palette={st.next ? actionPalette(st.next.key) : undefined}
+                    canPrice={canPrice}
                   />
                 );
               }}

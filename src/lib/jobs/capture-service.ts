@@ -734,7 +734,7 @@ export async function applyBusinessDoc(
     const found = await findOrCreateCustomer(db, {
       ...p,
       supplierNumberAtCustomer: !supplierSide && doc.supplierNumberAtCustomer ? doc.supplierNumberAtCustomer : undefined,
-      ownerId: user.id,
+      ownerId: user.role === "zamestnanec" ? null : user.id, // #25: zaměstnanec obchodníkem zákazníka není
     });
     if (!found) return failResult("Zákazníka se nepodařilo založit.", aiUsed);
     customerId = found.id;

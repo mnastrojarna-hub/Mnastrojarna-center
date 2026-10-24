@@ -1,4 +1,6 @@
 import { BadgeCheck, Mail, PackageCheck, ShoppingCart } from "lucide-react";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { getJob, listJobOrderRefs, listJobs } from "@/lib/data/jobs";
 import { getEmails } from "@/lib/data/queries";
@@ -41,6 +43,7 @@ export default async function ConfirmationsPage({
   const sp = (await searchParams) ?? {};
   const { can } = await getAccess();
   const mail = can("mail");
+  const canPrice = can("pricing");
   const selected = parseStateParam(sp[STATE_PARAM], ALL_KEYS, CONFIRM_QUEUE);
   // #25: obchodní tok jen „moje" (super admin všichni, nebo „Jen moje")
   const scope = await getFlowScope(await flowWhoFrom(sp));
@@ -93,13 +96,16 @@ export default async function ConfirmationsPage({
           <>Zákazník objednal — potvrď mu termín dodání. Jedním klikem se vystaví PDF potvrzení k aktuální revizi objednávky a odejde zákazníkovi. Změnu objednávky potvrdíš (nebo odmítneš) stejně snadno.</>
         }
         step="potvrzeni"
+        canPrice={canPrice}
         actions={
           <>
             <CaptureButton label="Vyfotit objednávku" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
             <BookLink href={bookHref("objednavky", ["objednavka"])} className="flex-1 sm:flex-none" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
       <FlowHint>
         <strong>Přišla objednávka na papíře nebo v PDF?</strong> Vyfoť ji — AI ji spáruje s nabídkou a pozná rozdíly
@@ -116,7 +122,7 @@ export default async function ConfirmationsPage({
           count={jobs.length}
         >
           <FlowStateFilter chips={chips} selected={selected} fallback={CONFIRM_QUEUE} label="Stav objednávky" />
-          {jobs.length === 0 ? (
+          {scope?.error ? null : jobs.length === 0 ? (
             <FlowEmpty
               icon={BadgeCheck}
               iconClass="bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"
@@ -149,11 +155,12 @@ export default async function ConfirmationsPage({
                       confirm: confirmById.get(j.id) ? { ...confirmById.get(j.id)!, orderStatus: st.facts.orderStatus, orderRevision: st.facts.orderRevision } : null,
                       revision: revisions[j.id] ?? null, orderChangeStamp: st.stamps.orderChange,
                       proposal: st.facts.proposal ? { value: st.facts.proposal, stamp: st.stamps.proposal, canDecide: st.canDecideProposal } : null,
-                      today,
+                      today, quoteAuthor: st.quoteAuthor ?? null,
                     }}
                     next={st.next}
                     menu={st.menu}
                     palette={st.next ? actionPalette(st.next.key) : undefined}
+                    canPrice={canPrice}
                   />
                 );
               }}

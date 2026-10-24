@@ -24,7 +24,7 @@ describe("#25 navigace podle role", () => {
   const hrefsOf = (role: AccessSubject["role"]) =>
     navForFeatures(allowedFeatures({ role, aiAccess: false, active: true }, ctx)).flatMap((s) => s.items.map((i) => i.href));
 
-  it("Nacenění jen super admin; Objednávky dodavatelům zatím jen s nákupními cenami", () => {
+  it("Nacenění jen super admin; Objednávky dodavatelům všem (bez cen jen přehled)", () => {
     expect(hrefsOf("super_admin")).toEqual(expect.arrayContaining(["/pricing", "/purchasing", "/inquiries", "/quotes", "/documents"]));
     const sales = hrefsOf("obchodnik");
     expect(sales).not.toContain("/pricing");
@@ -32,8 +32,8 @@ describe("#25 navigace podle role", () => {
     const worker = hrefsOf("zamestnanec");
     expect(worker).not.toContain("/pricing");
     expect(worker).toEqual(expect.arrayContaining(["/inquiries", "/quotes", "/documents", "/orders"]));
-    // přehled bez cen a akcí přijde s 25-C — do té doby zaměstnanec /purchasing nemá (data jsou už maskovaná)
-    expect(worker).not.toContain("/purchasing");
+    // 25-C: přehled bez cen, PDF a akcí (data maskuje server)
+    expect(worker).toContain("/purchasing");
     expect(worker).not.toContain("/commissions");
   });
 

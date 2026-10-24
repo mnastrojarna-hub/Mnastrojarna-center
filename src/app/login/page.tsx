@@ -9,14 +9,16 @@ import { Input } from "@/components/ui/input";
 import { signIn, signOut } from "@/app/auth/actions";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { prefillEmail } from "@/lib/auth/login-diagnosis";
+import { prefillEmail, safeNextPath } from "@/lib/auth/login-diagnosis";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; reset?: string; email?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string; email?: string; next?: string }>;
 }) {
-  const { error, reset, email: emailParam } = await searchParams;
+  const { error, reset, email: emailParam, next: nextParam } = await searchParams;
+  // odkaz, ze kterého přihlášení přišlo (např. „Otevřít nabídku“ z e-mailu) — po přihlášení tam
+  const next = safeNextPath(nextParam);
   // Po neúspěšném pokusu zůstane v poli e-mail, který uživatel opravdu odeslal
   // (prohlížeč ho jinak přepíše uloženým účtem — typicky super admina).
   const email = prefillEmail(emailParam);
@@ -25,7 +27,7 @@ export default async function LoginPage({
   // Aktivní přihlášený uživatel rovnou do Knihy zakázek. Neaktivní zůstane
   // tady (jinak by se točil mezi /login a /orders) a může se odhlásit.
   const user = configured ? await getSessionUser() : null;
-  if (user?.active) redirect("/orders");
+  if (user?.active) redirect(next ?? "/orders");
   const inactiveSession = Boolean(user && !user.active);
 
   return (
@@ -75,6 +77,7 @@ export default async function LoginPage({
           )}
 
           <form key={`${error ?? ""}|${email}`} action={signIn} className="space-y-4">
+            {next && <input type="hidden" name="next" value={next} />}
             <div className="space-y-1.5">
               <label htmlFor="email" className="text-sm font-medium">E-mail</label>
               <div className="relative">

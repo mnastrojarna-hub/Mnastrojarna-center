@@ -3,8 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  TrendingUp, TrendingDown, Wallet, ShoppingCart, Briefcase, AlertTriangle, Coins, Minus, Equal, ArrowUpRight,
+  TrendingUp, TrendingDown, Wallet, ShoppingCart, Briefcase, AlertTriangle, Coins, Minus, Equal, ArrowUpRight, Lock,
 } from "lucide-react";
+
+export const COMMISSION_HIDDEN = "Provize vidí jen obchodník zakázky a super admin.";
 import { assignJobOwner } from "@/app/actions/purchasing";
 import type { JobDetail } from "@/lib/jobs/types";
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
@@ -84,11 +86,15 @@ export function MarginHeroCard({
   /** Kdo naposledy přidělil obchodníka (historie zakázky). */
   ownerAssigned?: ChangeStamp | null;
 }) {
-  const { options, notify, refresh } = useJobDetail();
+  const { options, notify, refresh, perms } = useJobDetail();
   const h = marginHero(data.totals);
   const cur = job.currency;
   const owner = data.owner ?? job.owner;
-  const c = commissionDisplay(data.commission, { hasOwner: Boolean(owner), currency: cur });
+  // #25: obchodníka mění jen super admin; cizí provizi vidí jen obchodník zakázky a super admin
+  const ownerEditable = perms.ownerEditable ?? perms.canDelete;
+  const c = data.commissionHidden
+    ? { amount: null, estimate: false, title: "Provize", detail: COMMISSION_HIDDEN, status: null, tone: "slate" as const }
+    : commissionDisplay(data.commission, { hasOwner: Boolean(owner), currency: cur });
   const ct = COMMISSION_TONES[c.tone];
 
   const userOptions = React.useMemo(() => {
@@ -180,17 +186,28 @@ export function MarginHeroCard({
 
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border bg-card/80 px-3 py-2.5 shadow-sm">
-            <SearchSelect
-              label="Obchodník (provize dle jeho smlouvy)"
-              icon={Briefcase}
-              iconClass="text-emerald-600"
-              value={owner?.id ?? null}
-              valueLabel={owner?.name}
-              options={userOptions}
-              emptyLabel="Přidělit obchodníka…"
-              placeholder="Hledej jméno…"
-              onSave={saveOwner}
-            />
+            {ownerEditable ? (
+              <SearchSelect
+                label="Obchodník (provize dle jeho smlouvy)"
+                icon={Briefcase}
+                iconClass="text-emerald-600"
+                value={owner?.id ?? null}
+                valueLabel={owner?.name}
+                options={userOptions}
+                emptyLabel="Přidělit obchodníka…"
+                placeholder="Hledej jméno…"
+                onSave={saveOwner}
+              />
+            ) : (
+              <div className="min-w-0" data-field="owner-readonly">
+                <div className="mb-0.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Briefcase className="h-3.5 w-3.5 text-emerald-600" aria-hidden /> Obchodník (provize dle jeho smlouvy)
+                  <Lock className="h-3 w-3" aria-label="jen pro čtení" />
+                </div>
+                <div className="truncate text-sm font-medium">{owner?.name ?? "—"}</div>
+                <p className="text-[11px] text-muted-foreground">Obchodníka zakázky mění jen super admin.</p>
+              </div>
+            )}
             {ownerAssigned && owner && <ActorStamp verb="Přidělení" stamp={ownerAssigned} short className="mt-0.5" />}
           </div>
           <div className={cn("flex items-center gap-3 rounded-xl border px-3 py-2.5", ct.box)}>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, ArrowRight, Eye, FileText, Search, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRight, Eye, FileText, Search, Undo2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToastProvider, useNotify } from "@/components/jobs/detail/toast";
@@ -62,7 +62,13 @@ function chipsOf(quotes: FlowQuote[], counts: Record<string, number> | null): Co
   }));
 }
 
-export function QuotesBoard(props: { quotes: FlowQuote[]; today: string; counts: Record<string, number> | null; initialStates?: string | null }) {
+export function QuotesBoard(props: {
+  quotes: FlowQuote[]; today: string; counts: Record<string, number> | null; initialStates?: string | null;
+  /** Smí do Nacenění (#25 jen super admin) — odkazy a prázdný stav podle toho. */
+  canPrice?: boolean;
+  /** Schvaluje nabídky (super admin) — texty „čeká na tvé schválení“. */
+  approver?: boolean;
+}) {
   return (
     <ToastProvider>
       <Board {...props} />
@@ -71,12 +77,14 @@ export function QuotesBoard(props: { quotes: FlowQuote[]; today: string; counts:
 }
 
 function Board({
-  quotes, today, counts, initialStates,
+  quotes, today, counts, initialStates, canPrice = false, approver = false,
 }: {
   quotes: FlowQuote[];
   today: string;
   counts: Record<string, number> | null;
   initialStates?: string | null;
+  canPrice?: boolean;
+  approver?: boolean;
 }) {
   const [states, setStates] = React.useState<string[]>(() => parseStateParam(initialStates, QUOTE_ORDER, OPEN_QUOTE));
   const [q, setQ] = React.useState("");
@@ -125,26 +133,31 @@ function Board({
           title={quotes.length === 0 ? "Zatím žádné nabídky" : "Žádná nabídka neodpovídá filtru"}
         >
           {quotes.length === 0 ? (
-            <>Nabídka vznikne v <Link href="/pricing" className="font-medium text-primary hover:underline">Nacenění</Link> tlačítkem „Vytvořit nabídku z ceny“, nebo v kartě zakázky v záložce Nabídky.</>
+            canPrice ? (
+              <>Nabídka vznikne v <Link href="/pricing" className="font-medium text-primary hover:underline">Nacenění</Link> tlačítkem „Vytvořit nabídku z ceny“, nebo v kartě zakázky v záložce Nabídky.</>
+            ) : (
+              <>Nabídka vznikne v kartě zakázky v záložce Nabídky (tlačítko „Vytvořit nabídku“ u poptávky).</>
+            )
           ) : (
             <>Zkus jiný stav nahoře (uzavřené jsou ve „Více“ za posledních 30 dní) nebo vymaž hledání.</>
           )}
         </FlowEmpty>
       ) : (
         <ul className="space-y-2">
-          {shown.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} />)}
+          {shown.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} canPrice={canPrice} approver={approver} />)}
         </ul>
       )}
     </div>
   );
 }
 
-/** Proč nabídka čeká na schválení (AI, žádost autora, limit — čtyři oči). */
-function approvalHint(quote: FlowQuote): string | null {
+/** Proč nabídka čeká na schválení (#25): vrácená autorovi, kontrola AI, nebo ji připravil kolega. */
+export function approvalHint(quote: Pick<FlowQuote, "facts" | "createdBy">): string | null {
+  if (quote.facts.returnedAt) return "vráceno autorovi";
   const r = approvalReasons(quote.facts);
   if (r.ai) return "kontrola AI";
-  if (r.requested) return "žádost o schválení";
-  return r.limit ? "nad limitem" : null;
+  if (r.author) return quote.createdBy?.name ? `připravil(a) ${quote.createdBy.name}` : "připravil kolega";
+  return null;
 }
 
 function sentVerb(s: ChangeStamp): string {
@@ -168,7 +181,7 @@ function stampsOf(quote: FlowQuote): { verb: string; stamp: ChangeStamp }[] {
   return out.filter((x): x is { verb: string; stamp: ChangeStamp } => Boolean(x.stamp));
 }
 
-function QuoteRow({ quote, today }: { quote: FlowQuote; today: string }) {
+function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; today: string; canPrice: boolean; approver: boolean }) {
   const router = useRouter();
   const notify = useNotify();
   const display: QuoteDisplayState = quote.display;
@@ -194,7 +207,7 @@ function QuoteRow({ quote, today }: { quote: FlowQuote; today: string }) {
       className={cn("relative overflow-hidden rounded-xl border bg-card p-3 pl-4 shadow-sm transition hover:shadow-md", display === "archivovana" && "opacity-75")}
       data-quote-state={display}
     >
-      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", FLOW_PALETTE[meta.palette].dot)} />
+      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", awaiting ? "bg-amber-500" : FLOW_PALETTE[meta.palette].dot)} />
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -231,8 +244,21 @@ function QuoteRow({ quote, today }: { quote: FlowQuote; today: string }) {
             )}
             {quote.leadTimeDays !== null && <span>lhůta {quote.leadTimeDays} dní</span>}
             {quote.facts.sentAt && !quote.stamps.sent && <span>odesláno {czDay(quote.facts.sentAt.slice(0, 10), { short: true, today })}</span>}
-            {awaiting && <span className="font-medium text-violet-700 dark:text-violet-300">zatím neschváleno</span>}
+            {awaiting && !quote.facts.returnedAt && (
+              <span className="font-medium text-amber-800 dark:text-amber-300">
+                {approver ? "čeká na tvé schválení — odeslat půjde po schválení" : "čeká na schválení super admina — odeslat ji zatím nejde"}
+              </span>
+            )}
           </div>
+          {awaiting && quote.facts.returnedAt && (
+            <p className="flex min-w-0 items-start gap-1.5 text-xs text-rose-800 dark:text-rose-200">
+              <Undo2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="min-w-0 break-words">
+                <span className="font-semibold">{quote.facts.returnNote ? "Vráceno k přepracování:" : "Vráceno k přepracování"}</span>
+                {quote.facts.returnNote ? ` ${quote.facts.returnNote}` : ""}
+              </span>
+            </p>
+          )}
           {stamps.length > 0 && (
             <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5">
               {stamps.map((x) => <ActorStamp key={x.verb} stamp={x.stamp} verb={x.verb} short />)}
@@ -260,8 +286,9 @@ function QuoteRow({ quote, today }: { quote: FlowQuote; today: string }) {
           <FlowActionBar
             target={{
               jobId: quote.job?.id ?? null, jobNumber: quote.job?.number ?? quote.number, quote: quote.facts, today,
-              onlyOpenQuote: quote.onlyOpen,
+              onlyOpenQuote: quote.onlyOpen, quoteAuthor: quote.createdBy?.name ?? null,
             }}
+            canPrice={canPrice}
             next={quote.next}
             menu={quote.menu}
             palette={quote.next ? actionPalette(quote.next.key) : undefined}

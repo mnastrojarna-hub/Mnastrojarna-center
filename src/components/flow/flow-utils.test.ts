@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addDaysIso, amountInput, bookHref, czDay, fileKindCounts, filterFiles, filterQuotes, FLOW_STEPS, formatBytes,
-  formatPercent, isImageFile, marginPercent, marginTone, matchesQuery, parseAmount, pricingSummary,
+  formatPercent, isImageFile, marginPercent, marginTone, matchesQuery, parseAmount, pricingSummary, visibleFlowSteps,
   type FileLike, type QuoteLike,
 } from "./flow-utils";
 
@@ -15,6 +15,11 @@ describe("kroky toku a odkazy", () => {
   it("tok má 5 kroků v pořadí poptávka → potvrzení", () => {
     expect(FLOW_STEPS.map((s) => s.key)).toEqual(["poptavka", "naceneni", "nabidka", "objednavka", "potvrzeni"]);
     expect(FLOW_STEPS.find((s) => s.key === "objednavka")?.href).toBe("/orders?segment=objednavky&stages=objednavka");
+  });
+
+  it("#25 krok Nacenění jen s právem pricing", () => {
+    expect(visibleFlowSteps(false).map((s) => s.key)).toEqual(["poptavka", "nabidka", "objednavka", "potvrzeni"]);
+    expect(visibleFlowSteps(true).map((s) => s.key)).toEqual(FLOW_STEPS.map((s) => s.key));
   });
 });
 

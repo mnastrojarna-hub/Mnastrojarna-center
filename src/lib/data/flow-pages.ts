@@ -38,6 +38,8 @@ async function session() {
     const db = await createOperatorClient();
     const ctx: ActionCtx = {
       can: access.can, userId: access.user.id, isSuperAdmin: access.user.role === "super_admin", assigneeId: null,
+      // stránky toku umí dialog „Vrátit k přepracování…“ (FlowActionBar, #25)
+      withReturn: true,
     };
     return { db, access, ctx };
   } catch (err) {
@@ -82,8 +84,8 @@ export async function getFlowJobStates(jobIds: string[]): Promise<Record<string,
   try {
     for (const part of chunks(ids)) {
       const [jobs, quotes, sq, ops, pos] = await Promise.all([
-        s.db.from("orders").select(`${FLOW_ORDER_COLUMNS}, ${JOB_STAMP_COLUMNS}`).in("id", part),
-        s.db.from("quotes").select(FLOW_QUOTE_COLUMNS).in("job_id", part),
+        s.db.from("orders").select(`${FLOW_ORDER_COLUMNS}, owner_id, ${JOB_STAMP_COLUMNS}`).in("id", part),
+        s.db.from("quotes").select(`${FLOW_QUOTE_COLUMNS}, creator:profiles!created_by${P}`).in("job_id", part),
         s.db.from("supplier_quotes").select("job_id").in("job_id", part).is("total", null),
         s.db.from("job_operations").select("job_id").in("job_id", part),
         s.db.from("purchase_orders").select("job_id").in("job_id", part).neq("status", "zrusena"),
@@ -96,9 +98,12 @@ export async function getFlowJobStates(jobIds: string[]): Promise<Record<string,
       const withOps = new Set(((ops.data ?? []) as { job_id: string }[]).map((r) => r.job_id));
       const withPos = new Set(((pos.data ?? []) as { job_id: string }[]).map((r) => r.job_id));
       const byJob = new Map<string, QuoteFacts[]>();
+      // autor nabídky (toast „… schválena — {autor} ji teď může odeslat.“)
+      const authors = new Map<string, string | null>();
       for (const r of (quotes.data ?? []) as Row[]) {
         const jid = String(r.job_id);
         byJob.set(jid, [...(byJob.get(jid) ?? []), quoteFactsFromRow(r)]);
+        authors.set(String(r.id), person(r.creator)?.name ?? null);
       }
       for (const r of (jobs.data ?? []) as Row[]) {
         const id = String(r.id);
@@ -109,7 +114,11 @@ export async function getFlowJobStates(jobIds: string[]): Promise<Record<string,
         });
         const qs = byJob.get(id) ?? [];
         const snapshot = deriveFlow(facts, qs, today);
-        const ctx: ActionCtx = { ...s.ctx, assigneeId: facts.assigneeId ?? null, assigneeName: assignee?.name ?? null };
+        // obchodník i řešitel zakázky smí odeslat schválenou nabídku (stejně jako server a karta zakázky)
+        const ctx: ActionCtx = {
+          ...s.ctx, assigneeId: facts.assigneeId ?? null, assigneeName: assignee?.name ?? null,
+          ownerId: typeof r.owner_id === "string" ? r.owner_id : null,
+        };
         const proposal = r.flow_proposal ? stampFromRow(r, "flow_proposal", person(r.prop_by)) : null;
         if (proposal && (r.flow_proposal as FlowProposal).kind === "ai") proposal.kind = "ai";
         out[id] = {
@@ -117,6 +126,7 @@ export async function getFlowJobStates(jobIds: string[]): Promise<Record<string,
           facts,
           snapshot,
           quotes: qs,
+          quoteAuthor: snapshot.activeQuote ? authors.get(snapshot.activeQuote.id) ?? null : null,
           stamps: {
             stage: stampFromRow(r, "stage_changed", person(r.stager)),
             inquiry: stampFromRow(r, "inquiry_status_changed", person(r.inq_by)),
@@ -218,6 +228,15 @@ export async function getFlowQuoteInfo(quoteIds: string[]): Promise<Record<strin
       const rows = (data ?? []) as Row[];
       const jobIds = [...new Set(rows.map((r) => r.job_id).filter((v): v is string => typeof v === "string"))];
       const proposals = new Map<string, { value: FlowProposal; stamp: ChangeStamp | null }>();
+      // obchodník a řešitel zakázky — smí odeslat schválenou nabídku (quoteSendBlock jako server / karta)
+      const jobPeople = new Map<string, { ownerId: string | null; assigneeId: string | null }>();
+      if (jobIds.length) {
+        const { data: people, error: pErr } = await s.db.from("orders").select("id, owner_id, assignee_id").in("id", jobIds);
+        warn("quote-job-people", pErr);
+        for (const j of (people ?? []) as { id: string; owner_id: string | null; assignee_id: string | null }[]) {
+          jobPeople.set(j.id, { ownerId: j.owner_id ?? null, assigneeId: j.assignee_id ?? null });
+        }
+      }
       if (jobIds.length) {
         const { data: jobs, error: jErr } = await s.db.from("orders")
           .select(`id, flow_proposal, flow_proposal_at, flow_proposal_by, prop_by:profiles!flow_proposal_by${P}`)
@@ -242,7 +261,10 @@ export async function getFlowQuoteInfo(quoteIds: string[]): Promise<Record<strin
         const display = quoteDisplayState(facts, today);
         const hasJob = typeof r.job_id === "string";
         const current = hasJob && !facts.archived && (latest.get(r.job_id as string) ?? 0) <= facts.revision;
-        const { next, menu } = quoteRowActions({ quote: facts, display, hasJob, current }, s.ctx);
+        const jp = hasJob ? jobPeople.get(r.job_id as string) : undefined;
+        const { next, menu } = quoteRowActions({
+          quote: facts, display, hasJob, current, jobOwnerId: jp?.ownerId ?? null, jobAssigneeId: jp?.assigneeId ?? null,
+        }, s.ctx);
         const via = at(r, "sent_via") as ChangeVia | null;
         const p = proposals.get(facts.id);
         out[facts.id] = {

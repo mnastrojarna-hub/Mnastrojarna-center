@@ -27,24 +27,35 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty } from "./detail-helpers";
 import { ProductionHeaderBadges } from "@/components/jobs/production/production-chip";
 import { FlowActionBar, FlowNextHint, FlowProposalLine, FlowStageChip, FlowTrail, StageStamp } from "./flow-header";
+import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
+import { approvalHint, jobApprovalFlag } from "./approval";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 export function JobToolbar({ job }: { job: JobDetail }) {
   const { perms } = useJobDetail();
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const approval = jobApprovalFlag(job.flowQuotes, job.quotes);
   return (
     // -top-5 = horní odsazení <main> (pt-5): lišta se přilepí bez mezery, kterou by prosvítal obsah
     <div className="sticky -top-5 z-30 -mx-4 border-b bg-background/95 px-4 py-2 shadow-sm backdrop-blur sm:-mx-6 sm:px-6">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
           <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
             <Link href="/orders" aria-label="Zpět do Knihy zakázek" title="Kniha zakázek">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <span className="shrink-0 font-mono text-sm font-bold tracking-tight">{job.number}</span>
+          {/* číslo se raději zkrátí (celé v title), štítek schválení zůstane vždy vidět */}
+          <span className="min-w-0 truncate font-mono text-sm font-bold tracking-tight" title={job.number}>{job.number}</span>
           <StageBadge stage={job.stage} size="xs" short className="hidden min-[400px]:inline-flex sm:hidden" />
           <StageBadge stage={job.stage} size="sm" className="hidden sm:inline-flex" />
+          {approval && approval.flag.kind !== "approved" && (
+            <>
+              {/* mobil: jen ikona (text v title / pro čtečky), od sm krátký text — nikdy useknutý */}
+              <QuoteApprovalFlag flag={approval.flag} size="xs" iconOnly className="shrink-0 sm:hidden" />
+              <QuoteApprovalFlag flag={approval.flag} size="xs" short className="hidden shrink-0 sm:inline-flex" />
+            </>
+          )}
           <span className="hidden min-w-0 truncate text-sm text-muted-foreground lg:inline">{job.title}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -191,6 +202,7 @@ function Stat({ icon: Icon, tone, label, children }: { icon: typeof Banknote; to
  */
 export function JobHeader({ job }: { job: JobDetail }) {
   const { save } = useJobDetail();
+  const approval = jobApprovalFlag(job.flowQuotes, job.quotes);
   const m = stageMeta(job.stage);
   const currentQuotes = job.quotes.filter((q) => !q.archived).length;
   const currentFiles = job.files.filter((f) => !f.archived).length;
@@ -260,11 +272,15 @@ export function JobHeader({ job }: { job: JobDetail }) {
               <StageSelect jobId={job.id} stage={job.stage} flow={job.flow} quotes={job.flowQuotes} />
               <StageStamp className="max-w-[18rem]" />
             </div>
-            <FlowStageChip />
+            <FlowStageChip hidePendingQuote={approval?.flag.kind === "pending"} />
+            {approval && (
+              // #25: neschválenou nabídku vidí všichni, ale výrazně označenou; po schválení razítko kdo a kdy
+              <QuoteApprovalFlag flag={approval.flag} suffix={approval.suffix} wrap className="lg:self-end" />
+            )}
             <FlowProposalLine className="lg:justify-end" />
             <FlowActionBar className="lg:justify-end" />
             <ProductionHeaderBadges job={job} className="lg:justify-end" />
-            <FlowNextHint fallback={m.description} className="max-w-xs text-xs text-muted-foreground lg:text-right" />
+            <FlowNextHint fallback={approvalHint(approval?.flag.kind) ?? m.description} className="max-w-xs text-xs text-muted-foreground lg:text-right" />
             <PrioritySwitch value={job.priority} />
           </div>
         </div>

@@ -201,6 +201,28 @@ export function findSameCustomer(options: JobFormOptions["customers"], name: str
   return options.find((c) => normalizeName(c.name) === n) ?? null;
 }
 
+/**
+ * Koho server dosadí jako Obchodníka nové zakázky, když ho uživatel nevolí (#25, jen super admin volí):
+ * aktivní obchodník vybraného zákazníka, jinak zakládající obchodník; zaměstnanec → nikdo.
+ * Jen náhled pro pole „Obchodník“ jen pro čtení — rozhoduje server (createJob).
+ */
+export function ownerPreview(
+  state: Pick<JobFormState, "customerMode" | "customerId" | "customerName">,
+  options: Pick<JobFormOptions, "customers" | "users">,
+  viewer: { userId: string | null; role: string | null },
+): string {
+  const isSales = viewer.role === "obchodnik" || viewer.role === "super_admin";
+  const me = viewer.userId ? options.users.find((u) => u.id === viewer.userId)?.name ?? null : null;
+  const fallback = isSales && me ? `${me} (ty)` : "— bez obchodníka —";
+  if (state.customerMode === "existing") {
+    if (!state.customerId) return "obchodník zákazníka (doplní se sám)";
+    const owner = options.customers.find((c) => c.id === state.customerId)?.ownerId ?? null;
+    const name = owner ? options.users.find((u) => u.id === owner)?.name ?? null : null;
+    return name ? `${name} (obchodník zákazníka)` : fallback;
+  }
+  return state.customerName.trim() ? fallback : "obchodník zákazníka (doplní se sám)";
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**

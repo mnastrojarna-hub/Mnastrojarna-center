@@ -65,9 +65,8 @@ export const navSections: NavSection[] = [
       { title: "Nacenění", href: "/pricing", icon: Calculator, feature: "pricing", badgeKey: "pricing", description: "Zakázky čekající na cenu", color: "text-amber-500" },
       { title: "Nabídky", href: "/quotes", icon: FileText, feature: "workflow", badgeKey: "quotes", description: "Všechny nabídky — kdo zadal, kdo schválil", color: "text-violet-500" },
       { title: "Potvrzení objednávek", href: "/confirmations", icon: PackageCheck, feature: "workflow", badgeKey: "confirmations", description: "Objednávky k potvrzení", color: "text-orange-500" },
-      // #25: data už jsou „moje" a bez práva na nákupní ceny maskovaná (listPurchaseOrders); pro všechny
-      // („workflow") se položka i stránka otevřou až s přehledem bez cen a akcí (25-C, purchase-orders-board)
-      { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "margins", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
+      // #25: pro všechny — „moje" a bez práva na nákupní ceny maskované (bez cen, PDF a akcí)
+      { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "workflow", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
       { title: "Dokumenty", href: "/documents", icon: ReceiptText, feature: "documents", description: "Faktury, nabídky, dodací listy, výkresy", color: "text-emerald-500" },
     ],
   },

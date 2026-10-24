@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/page-header";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { NewJobDialog } from "@/components/jobs/new-job-dialog";
 import { BookNavProvider, BookPending } from "@/components/jobs/book/book-nav";
-import { AccessBanner } from "@/components/jobs/book/access-banner";
+import { AccessBanner, BookHint } from "@/components/jobs/book/access-banner";
 import { KpiStrip } from "@/components/jobs/book/kpi-strip";
 import { SegmentTabs, StageChips } from "@/components/jobs/book/segment-tabs";
 import { BookToolbar } from "@/components/jobs/book/book-toolbar";
@@ -18,7 +18,7 @@ import {
   isFiltered, parseBookParams, segmentCounts, sumValue, todayInPrague,
 } from "@/components/jobs/book/book-params";
 import { requireFeature, getAccess } from "@/lib/auth/session";
-import { FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
+import { FEATURE_HINTS, FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
 import { listJobs, getJobStageCounts, getJobFormOptions } from "@/lib/data/jobs";
 import { listOperationLocations } from "@/lib/data/production";
 import { paymentStateOf } from "@/lib/jobs/mapping";
@@ -59,14 +59,17 @@ export default async function OrdersPage({
   const overdueInvoices = running.filter((j) => paymentStateOf(j, today) === "po_splatnosti").length;
   const filtered = isFiltered(params);
   const defaultStage = defaultStageFor(params.segment);
-  const newJobInitial = { stage: defaultStage, ownerId: user.id };
+  // #25: obchodníka zakázky volí jen super admin — ostatním ho doplní server (obchodník zákazníka)
+  const ownerEditable = user.role === "super_admin";
+  const newJobInitial = { stage: defaultStage, ownerId: ownerEditable ? user.id : null };
   const segment = bookSegment(params.segment);
   const rows = jobs.slice(0, ROW_LIMIT);
 
   return (
     <BookNavProvider params={params}>
       <div className="space-y-5">
-        {pristup && <AccessBanner label={pristup} />}
+        {pristup && <AccessBanner label={pristup} hint={FEATURE_HINTS[pristupKey as Feature] ?? null} />}
+        <BookHint />
 
         <PageHeader
           title="Kniha zakázek"

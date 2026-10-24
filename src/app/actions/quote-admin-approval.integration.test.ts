@@ -546,7 +546,9 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
       expect((await data.getJob(mineJob))?.files.find((f) => f.id === price)?.locked).toBe("price");
 
       const pos = await purchasing.listPurchaseOrders({}, { scope });
-      expect(pos.map((p) => p.id).sort()).toEqual([poMine, poCreated].sort());
+      // sdílená lokální DB: jiné běhy můžou mít další „moje“ objednávky dílny — hlídáme jen svoje fixtures
+      const poIds = [poMine, poCreated, poForeign];
+      expect(pos.filter((p) => poIds.includes(p.id)).map((p) => p.id).sort()).toEqual([poMine, poCreated].sort());
       expect(pos.every((p) => p.pricesHidden === true && p.total === 0 && p.fileId === null)).toBe(true);
       const json = JSON.stringify(pos);
       expect(json).not.toContain("12345");
@@ -628,9 +630,9 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     expect(ab.quotes).toBe(Number(adminBadge.quotes_pending));
     expect(ab.pricing).toBe(Number(adminBadge.pricing));
     const { count: queued } = await svc.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending");
-    // AI přehled = fronta AI (ruční nabídky kolegů hlásí odznak „Nabídky", dokud je panel nevypíše — 25-C)
-    expect(ab.approvals).toBe(queued ?? 0);
+    // AI přehled = fronta AI + ruční nabídky kolegů (panel „Nabídky ke schválení“, 25-C)
     expect(Number(adminBadge.quotes_pending_manual)).toBeGreaterThanOrEqual(1);
+    expect(ab.approvals).toBe((queued ?? 0) + Number(adminBadge.quotes_pending_manual));
     const pending = await queries.listPendingQuoteApprovals();
     expect(pending.find((p) => p.quoteId === quote.id)).toMatchObject({
       number: quote.number, jobId, authorName: who.users.sales.fullName, unpriced: false, total: 2000,
@@ -736,6 +738,23 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     as("admin");
     expect((await crm.updateCustomer(own.id!, { ...EMPTY_CUSTOMER_FORM, name: name(6), ownerId: id("admin") })).ok).toBe(true);
     expect((await svc.from("customers").select("owner_id").eq("id", own.id!).single()).data).toMatchObject({ owner_id: id("admin") });
+
+    // 25-C: úprava zakázky s cizím obchodníkem + nový zákazník → odmítnuto DŘÍV, než zákazník vznikne
+    const ownerless = await newJob({ owner_id: id("admin") });
+    as("sales");
+    expect((await jobs.updateJob(ownerless, { ownerId: id("sales"), customerName: name(7) })).error)
+      .toBe("Obchodníka zakázky mění jen super admin.");
+    expect(await byName(name(7))).toEqual([]);
+    // 25-C: zaměstnanec Obchodníkem zákazníka nebude — ani sebe, ani cizího
+    as("worker");
+    expect((await crm.createCustomer({ ...EMPTY_CUSTOMER_FORM, name: name(8), ownerId: id("sales") })).error)
+      .toBe("Obchodníka zákazníka mění jen super admin.");
+    expect(await byName(name(8))).toEqual([]);
+    const self = await crm.createCustomer({ ...EMPTY_CUSTOMER_FORM, name: name(9), ownerId: id("worker") });
+    expect(self.ok, self.error).toBe(true);
+    customerIds.push(self.id!);
+    expect((await svc.from("customers").select("owner_id").eq("id", self.id!).single()).data).toMatchObject({ owner_id: null });
+    as("admin");
   }, 60_000);
 
   it("přílohy e-mailu v Dokumentech: vystavitel podle e-mailu — faktura dodavatele zamčená, poptávka zákazníka ne", async () => {

@@ -1,5 +1,6 @@
 import type { JobFileKind, JobStage } from "@/lib/supabase/database.types";
 import type { QuoteDisplayState } from "@/lib/jobs/flow-status";
+import type { Feature } from "@/lib/auth/permissions";
 
 /**
  * Obchodní tok (Poptávky → Nacenění → Nabídky → Potvrzení, Dokumenty) — čistá logika
@@ -17,6 +18,13 @@ export interface FlowStep {
   /** Stav zakázky, jehož barvu krok nese. */
   stage: JobStage;
   hint: string;
+  /** Krok jen pro toho, kdo má právo (Nacenění = `pricing`, #25 jen super admin). */
+  feature?: Feature;
+}
+
+/** Kroky toku, které uživatel vidí (bez Nacenění, když nesmí naceňovat). */
+export function visibleFlowSteps(canPrice: boolean): FlowStep[] {
+  return FLOW_STEPS.filter((s) => s.feature !== "pricing" || canPrice);
 }
 
 /** Odkaz do Knihy zakázek s předvybranou záložkou a stavy. */
@@ -29,7 +37,7 @@ export function bookHref(segment: "objednavky" | "poptavky" | "dokoncene" | "ner
 
 export const FLOW_STEPS: FlowStep[] = [
   { key: "poptavka", label: "Poptávka", href: "/inquiries", stage: "poptavka", hint: "Zákazník poptal díl" },
-  { key: "naceneni", label: "Nacenění", href: "/pricing", stage: "naceneni", hint: "Doplníme ceny" },
+  { key: "naceneni", label: "Nacenění", href: "/pricing", stage: "naceneni", hint: "Doplníme ceny", feature: "pricing" },
   { key: "nabidka", label: "Nabídka", href: "/quotes", stage: "nabidka", hint: "Pošleme nabídku" },
   { key: "objednavka", label: "Objednávka", href: bookHref("objednavky", ["objednavka"]), stage: "objednavka", hint: "Zákazník objednal" },
   { key: "potvrzeni", label: "Potvrzení", href: "/confirmations", stage: "potvrzeno", hint: "Potvrdíme termín" },

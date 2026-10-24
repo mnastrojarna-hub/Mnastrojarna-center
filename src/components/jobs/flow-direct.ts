@@ -17,6 +17,11 @@ export interface DirectCtx {
   waitingNote?: string | null;
   /** Převzít i od jiného řešitele (po potvrzení). */
   force?: boolean;
+  /**
+   * updated_at nabídky, jak ji uživatel viděl — „Schválit“ projde jen nezměněná nabídka
+   * (mezitím upravenou server odmítne „Nabídku mezitím někdo upravil…“). null = nevíme (stará data).
+   */
+  expectedUpdatedAt?: string | null;
 }
 
 export type DirectResult = { ok: boolean; error?: string; needsConfirm?: string };
@@ -46,6 +51,7 @@ export async function runDirectAction(key: FlowActionKey, c: DirectCtx): Promise
   if (q || key === "quote.newRevision") {
     if (!c.quoteId) return { ok: false, error: "Zakázka nemá aktivní nabídku." };
     if (key === "quote.newRevision") return newJobQuoteRevision(c.quoteId);
+    if (key === "quote.approve") return setQuoteState(c.quoteId, "schvalena", { expectedUpdatedAt: c.expectedUpdatedAt ?? null });
     return setQuoteState(c.quoteId, q!);
   }
   return null;

@@ -217,3 +217,95 @@ describe("dialogy — korekce s náhledem dopadu, dodání po položkách", () =
     expect(html).toContain("Uzavřít s menším množstvím");
   });
 });
+
+describe("#25 karta zakázky — neschválená nabídka", () => {
+  const PETR = { id: "u1", name: "Petr Obchodník" };
+  const ADMIN = { id: "u9", name: "Jan Semorád" };
+  const pendingFacts: QuoteFacts = {
+    id: "q2", number: "NAB-2026-040", revision: 1, status: "ke_schvaleni", state: "ke_schvaleni", approvedBy: null, approvalRequired: true,
+    adminApprovalRequired: true, createdBy: "u1", archived: false, sentAt: null, validUntil: "2099-01-01", aiGenerated: false,
+    supersededBy: null, total: 5000, createdAt: ago(60),
+  };
+  const jobQuote = (over: Partial<JobDetail["quotes"][number]> = {}): JobDetail["quotes"][number] => ({
+    id: "q2", number: "NAB-2026-040", revision: 1, title: "Příruby", status: "ke_schvaleni", total: 5000, currency: "CZK",
+    validUntil: "2099-01-01", leadTimeDays: 14, deliveryTerms: null, paymentTerms: null, note: null, createdBy: PETR,
+    approvedBy: null, approvedAt: null, sentAt: null, createdAt: ago(60), archived: false, aiGenerated: false, accepted: false,
+    items: [{ id: "qi1", position: 0, drawingNumber: "PR-1", revision: null, name: "Příruba", description: null, material: null, quantity: 10, unit: "ks", unitPrice: 500, purchaseUnitPrice: null, note: null }] as never,
+    state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, ...over,
+  });
+  const pendingJob = (over: Partial<JobDetail> = {}) => detail({
+    stage: "nabidka", flow: facts({ stage: "nabidka", orderStatus: null, orderRevision: 0 }), flowQuotes: [pendingFacts],
+    quotes: [jobQuote()], ...over,
+  });
+
+  it("obchodník: štítek v liště i hlavičce, zamčené „Odeslat zákazníkovi“ s vysvětlením, Schválil = čeká; Obchodník jen pro čtení", () => {
+    const html = render(<JobDetailView job={pendingJob()} options={options} perms={PERMS} initialTab="nabidky" flow={{ stamps: STAMPS, access: ACCESS }} />);
+    // lišta (ikona na mobilu + krátce od sm) + hlavička a karta nabídky (celý text i na mobilu, zalomí se)
+    expect(html.match(/data-approval="pending"/g)?.length).toBe(4);
+    expect(flat(html)).toContain("Neschválená — čeká na schválení super admina");
+    expect(html).toContain('title="Nabídka NAB-2026-040 čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi."');
+    expect(html).toMatch(/title="Odeslat půjde po schválení super adminem\."><button[^>]*disabled=""/);
+    expect(flat(html)).toContain("Odeslat půjde po schválení super adminem.");
+    expect(flat(html)).toContain("čeká na schválení super admina");
+    expect(flat(html)).not.toContain("Schválit");
+    expect(flat(html)).not.toContain("Vrátit k přepracování");
+    // „co dál“ místo zavádějícího popisu fáze; v hlavičce ani kartě žádný druhý fialový „Neschválená“ chip
+    expect(flat(html)).toContain("Nabídka čeká na schválení super admina — pak ji půjde odeslat zákazníkovi.");
+    expect(flat(html)).not.toContain("Neschválená · NAB-2026-040");
+    // Doklady → Nabídka zamčená (menu se v SSR nerozbalí — kontrola jen, že karta nerozbitá)
+    const overview = render(<JobDetailView job={pendingJob()} options={options} perms={{ ...PERMS, ownerEditable: false }} flow={{ stamps: STAMPS, access: ACCESS }} />);
+    expect(overview).toContain('data-field="owner-readonly"');
+    expect(flat(overview)).toContain("Obchodníka zakázky mění jen super admin.");
+  });
+
+  it("super admin: „Schválit“ a „Vrátit k přepracování…“; vrácená nabídka s důvodem a kdo vrátil", () => {
+    const admin = { features: ["orders", "workflow", "margins", "documents", "quote_approval"] as never[], userId: "u9", role: "super_admin" as const };
+    let html = render(<JobDetailView job={pendingJob()} options={options} perms={{ ...PERMS, canDelete: true }} initialTab="nabidky" flow={{ stamps: STAMPS, access: admin }} />);
+    expect(flat(html)).toContain("Schválit");
+    expect(flat(html)).toContain("Vrátit k přepracování…");
+    // super admin schvaluje sám: „čeká na tvé schválení“, zámek „Nejdřív schval…“, „Schválit a odeslat“ i v kartě
+    expect(flat(html)).toContain("čeká na tvé schválení");
+    expect(flat(html)).toContain("Nejdřív schval — pak půjde odeslat.");
+    expect(flat(html)).not.toContain("Odeslat půjde po schválení super adminem.");
+    expect(flat(html)).toContain("Schválit a odeslat");
+    expect(flat(html)).toContain("Další krok: Schválit");
+    const returned = { returnedAt: "2026-10-23T09:00:00Z", returnNote: "Doplň cenu dopravy", returnedBy: ADMIN };
+    // vrácenou super admin primárně neschvaluje — čeká se na autora
+    const adminReturned = render(
+      <JobDetailView
+        job={pendingJob({ flowQuotes: [{ ...pendingFacts, ...returned }], quotes: [jobQuote(returned)] })}
+        options={options} perms={PERMS} initialTab="nabidky" flow={{ stamps: STAMPS, access: admin }}
+      />,
+    );
+    expect(flat(adminReturned)).not.toContain("Další krok: Schválit");
+    expect(flat(adminReturned)).toContain("Nabídka je vrácená autorovi k přepracování — čeká na jeho úpravu.");
+    expect(flat(adminReturned)).toContain("vráceno autorovi k přepracování");
+    expect(flat(adminReturned)).toContain("Nejdřív schval — pak půjde odeslat.");
+    html = render(
+      <JobDetailView
+        job={pendingJob({ flowQuotes: [{ ...pendingFacts, ...returned }], quotes: [jobQuote(returned)] })}
+        options={options} perms={PERMS} initialTab="nabidky" flow={{ stamps: STAMPS, access: ACCESS }}
+      />,
+    );
+    expect(html).toContain('data-approval="returned"');
+    expect(flat(html)).toContain("Vráceno k přepracování: Doplň cenu dopravy — J. Semorád · 23. 10. 2026");
+    expect(html).toContain('role="note"');
+  });
+
+  it("po schválení: zelené razítko „Připravil(a) … · Schválil … · datum“ v hlavičce i v kartě nabídky, odeslání odemčené", () => {
+    const approved = { state: "schvalena" as const, approvedBy: "u9" };
+    const html = render(
+      <JobDetailView
+        job={pendingJob({
+          flowQuotes: [{ ...pendingFacts, ...approved }],
+          quotes: [jobQuote({ state: "schvalena", approvedBy: ADMIN, approvedAt: "2026-10-23T10:00:00Z" })],
+        })}
+        options={options} perms={PERMS} initialTab="nabidky" flow={{ stamps: STAMPS, access: ACCESS }}
+      />,
+    );
+    expect(html.match(/data-approval="approved"/g)?.length).toBe(2);
+    expect(flat(html)).toContain("Připravil(a) P. Obchodník · Schválil J. Semorád · 23. 10. 2026");
+    expect(flat(html)).toContain("Odeslat zákazníkovi");
+    expect(html).not.toContain("Odeslat půjde po schválení super adminem.");
+  });
+});

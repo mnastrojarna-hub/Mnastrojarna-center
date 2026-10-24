@@ -426,7 +426,8 @@ export interface JobQuoteInput {
 /** Výběrové seznamy pro formuláře zakázky. */
 export interface JobFormOptions {
   users: (PersonRef & { role: string })[];
-  customers: { id: string; name: string; customerNumber: string | null; ico: string | null }[];
+  /** ownerId = obchodník zákazníka (nová zakázka ho dostane, když obchodníka nevybírá super admin). */
+  customers: { id: string; name: string; customerNumber: string | null; ico: string | null; ownerId?: string | null }[];
   suppliers: { id: string; name: string }[];
 }
 

@@ -31,6 +31,9 @@ import { ConfirmOrderDialog, type ConfirmJob, type ConfirmMode } from "./confirm
 import { DocumentSendDialog } from "./document-send-dialog";
 import { DecideChangeDialog, ExtendQuoteDialog, MismatchEditDialog, ProposalDecisionDialog, ResolveMismatchDialog } from "./order-dialogs";
 import { flowActionHref, pageMenu, type NextStep, type OrderRevisionView } from "./flow-state";
+import { QuoteReturnDialog } from "./quote-return-dialog";
+import { QuoteApproveSendDialog } from "./quote-approve-send-dialog";
+import { approvedToast } from "./quote-approval-copy";
 
 /**
  * Akce řádku stránky toku: jedno primární tlačítko (sloveso dalšího kroku) + menu „⋯“.
@@ -59,10 +62,12 @@ export interface FlowActionTarget {
   proposal?: { value: FlowProposal; stamp: ChangeStamp | null; canDecide: boolean } | null;
   /** Jediná otevřená nabídka zakázky — zamítnutí zakázku uzavře. */
   onlyOpenQuote?: boolean;
+  /** Autor nabídky (toast schválení / vrácení — #25). */
+  quoteAuthor?: string | null;
   today: string;
 }
 
-type DialogKey = FlowActionKey | "take.confirm" | "quote.sendAfterApprove" | "order.acceptAsIs" | "order.sendAfterChange";
+type DialogKey = FlowActionKey | "take.confirm" | "order.acceptAsIs" | "order.sendAfterChange";
 
 const DIRECT_DONE: Partial<Record<FlowActionKey, string>> = {
   "inquiry.take": "Poptávka převzata — je v řešení.",
@@ -87,8 +92,10 @@ export interface ExtraMenuItem {
 }
 
 export function FlowActionBar({
-  target, next, menu, exclude = [], palette, size = "sm", className, extraMenu = [], menuLabel,
+  target, next, menu, exclude = [], palette, size = "sm", className, extraMenu = [], menuLabel, canPrice = false,
 }: {
+  /** Smí do Nacenění (#25 jen super admin) — „Vytvořit nabídku“ jinak vede rovnou do editoru nabídky. */
+  canPrice?: boolean;
   target: FlowActionTarget;
   next: NextStep;
   menu: FlowActionKey[];
@@ -166,7 +173,7 @@ export function FlowActionBar({
         back = () => setQuoteState(q.id, "rozpracovana");
       } else if (q && key === "quote.approve") {
         const before = q.state;
-        res = await setQuoteState(q.id, "schvalena");
+        res = await setQuoteState(q.id, "schvalena", { expectedUpdatedAt: q.updatedAt ?? null });
         back = async () => {
           const r = await setQuoteState(q.id, "rozpracovana");
           if (r.ok && before === "ke_schvaleni" && r.quoteState === "rozpracovana") return setQuoteState(q.id, "ke_schvaleni");
@@ -177,24 +184,9 @@ export function FlowActionBar({
       } else if (q && key === "quote.newRevision") {
         res = await newJobQuoteRevision(q.id);
       }
-      const r = await guard(res, DIRECT_DONE[key]);
+      const text = key === "quote.approve" && q ? approvedToast(q.number, target.quoteAuthor ?? null) : DIRECT_DONE[key];
+      const r = await guard(res, text);
       if (r.ok && back) offerUndo(key, back);
-    } catch {
-      notify("error", "Spojení se nepovedlo — zkus to znovu.");
-    } finally {
-      setPending(null);
-    }
-  }
-
-  async function approveThenSend() {
-    if (!q) return;
-    setPending("quote.approveSend");
-    try {
-      if (q.state !== "schvalena") {
-        const r = await setQuoteState(q.id, "schvalena");
-        if (!r.ok) return void notify("error", r.error ?? "Nabídku se nepodařilo schválit.");
-      }
-      setDialog("quote.sendAfterApprove");
     } catch {
       notify("error", "Spojení se nepovedlo — zkus to znovu.");
     } finally {
@@ -210,7 +202,6 @@ export function FlowActionBar({
   function open(key: FlowActionKey) {
     setUndo(null);
     if (DIRECT_KEYS.includes(key)) return void direct(key);
-    if (key === "quote.approveSend") return void approveThenSend();
     if (key === "order.registerChange") setChangeNumber("");
     if (key === "quote.reject") setCompetitor("");
     setDialog(key);
@@ -219,7 +210,7 @@ export function FlowActionBar({
   const close = (o: boolean) => {
     if (o) return;
     // navazující dialog po už provedeném zápisu (schváleno → odeslat, změna potvrzena → potvrzení): obnovit až teď
-    if (dialog === "quote.sendAfterApprove" || dialog === "order.sendAfterChange") router.refresh();
+    if (dialog === "order.sendAfterChange") router.refresh();
     setDialog(null);
   };
   const effectOf = (change: Parameters<typeof stageEffect>[2]): string[] => {
@@ -232,7 +223,7 @@ export function FlowActionBar({
   const confirmMode: ConfirmMode = dialog === "order.sendConfirmation" || dialog === "order.sendAfterChange" ? "send" : "confirm";
   const qName = q ? quoteLabel(q) : "";
   const primaryMeta = primary ? FLOW_ACTIONS[primary.key] : null;
-  const href = primary && jobId ? flowActionHref(primary.key, jobId) : null;
+  const href = primary && jobId ? flowActionHref(primary.key, jobId, { canPrice }) : null;
   // hover celým literálem palety → twMerge přebije hover:bg-foreground/90 výchozí varianty
   const tone = palette ? FLOW_PALETTE[palette] : null;
   const btnCls = cn("min-h-11 w-full gap-1.5 sm:min-h-9 sm:w-auto", tone && cn(tone.solid, tone.hover));
@@ -242,7 +233,7 @@ export function FlowActionBar({
   const menuItem = (k: FlowActionKey) => {
     const a = FLOW_ACTIONS[k];
     const Icon = a.icon;
-    const to = jobId ? flowActionHref(k, jobId) : null;
+    const to = jobId ? flowActionHref(k, jobId, { canPrice }) : null;
     return (
       <DropdownMenuItem
         key={k}
@@ -389,7 +380,7 @@ export function FlowActionBar({
         <>
           {jobId && (
             <DocumentSendDialog
-              open={dialog === "quote.send" || dialog === "quote.sendAfterApprove"}
+              open={dialog === "quote.send"}
               onOpenChange={close}
               jobId={jobId}
               kind="nabidka"
@@ -398,6 +389,26 @@ export function FlowActionBar({
               onSent={({ to }) => refresh(`Nabídka ${q.number ?? ""} odeslána na ${to}.`)}
             />
           )}
+          {jobId && dialog === "quote.approveSend" && (
+            // #25: schválení + vystavení PDF + e-mail jedním krokem na serveru (zavřením se nic neschválí)
+            <QuoteApproveSendDialog
+              open
+              onOpenChange={close}
+              jobId={jobId}
+              quoteId={q.id}
+              number={qName}
+              updatedAt={q.updatedAt ?? null}
+              onDone={(text) => refresh(text)}
+            />
+          )}
+          <QuoteReturnDialog
+            open={dialog === "quote.returnToAuthor"}
+            onOpenChange={close}
+            quoteId={q.id}
+            number={qName}
+            author={target.quoteAuthor ?? null}
+            onDone={(text) => refresh(text)}
+          />
           <ReasonDialog
             open={dialog === "quote.markSent"}
             onOpenChange={close}

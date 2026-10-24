@@ -306,18 +306,24 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     delete row.status;
     if (!margins) delete row.purchase_cost;
 
+    // #25: obchodníka zakázky mění jen super admin („Zpracovává" smí každý) — kontrola PŘED založením
+    // zákazníka níže (jinak by po odmítnutí zůstal založený zákazník)
+    const isAdmin = user.role === "super_admin";
+    if (!isAdmin && row.owner_id !== undefined && diffJob(before, { owner_id: row.owner_id }).length) return fail(OWNER_ADMIN_ONLY);
+
     if (rest.customerId === undefined) {
       const name = cleanText(rest.customerName, 300);
       if (name) {
-        const found = await findOrCreateCustomer(db, { name, ownerId: (before.owner_id as string | null) ?? user.id });
+        // nový zákazník: obchodník zakázky, jinak zakládající obchodník / super admin; zaměstnanec obchodníkem není
+        const isSales = isAdmin || user.role === "obchodnik";
+        const found = await findOrCreateCustomer(db, { name, ownerId: (before.owner_id as string | null) ?? (isSales ? user.id : null) });
         if (!found) return fail("Zákazníka se nepodařilo dohledat ani založit.");
         row.customer_id = found.id;
       }
     }
 
     const changes = diffJob(before, row);
-    // #25: obchodníka zakázky mění jen super admin („Zpracovává" smí každý)
-    if (user.role !== "super_admin" && changes.some((ch) => ch.field === "owner_id")) return fail(OWNER_ADMIN_ONLY);
+    if (!isAdmin && changes.some((ch) => ch.field === "owner_id")) return fail(OWNER_ADMIN_ONLY);
     const fromStage = isJobStage(before.status) ? before.status : null;
     const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
     if (stageTo && reasonRequired("job", stageTo)) return fail(CLOSE_NEEDS_REASON);

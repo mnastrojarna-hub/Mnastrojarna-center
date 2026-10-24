@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, BrainCircuit, FileText } from "lucide-react";
+import { ArrowRight, BrainCircuit, FileText, ShieldAlert } from "lucide-react";
+import { listPendingQuoteApprovals } from "@/lib/data/queries";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
+import { QuoteApprovalList } from "@/components/flow/quote-approval-list";
+import { czWaits } from "@/components/flow/quote-approval-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { listQuotes } from "@/lib/data/jobs";
 import { getFlowCounts } from "@/lib/data/flow-status";
@@ -8,7 +13,7 @@ import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
 import { mineParam } from "@/lib/auth/flow-scope";
 import { Button } from "@/components/ui/button";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
-import { BookLink, FlowHeader, FlowHint } from "@/components/flow/flow-header";
+import { BookLink, FlowHeader, FlowHint, FlowSection } from "@/components/flow/flow-header";
 import { QuotesBoard } from "@/components/flow/quotes-board";
 import { toFlowQuote } from "@/components/flow/flow-data";
 import { bookHref, todayPrague } from "@/components/flow/flow-utils";
@@ -30,8 +35,14 @@ export default async function QuotesPage({
   const { can } = await getAccess();
   // #25: nabídky jen „moje" (super admin všichni, nebo „Jen moje"); fronta „Ke schválení" vždy všech
   const scope = await getFlowScope(await flowWhoFrom(sp));
+  const canPrice = can("pricing");
+  const approver = can("quote_approval");
   const list = await listQuotes({ includeArchived: true }, { scope });
-  const [info, counts] = await Promise.all([getFlowQuoteInfo(list.map((q) => q.id)), getFlowCounts({ mine: mineParam(scope) })]);
+  const [info, counts, pending] = await Promise.all([
+    getFlowQuoteInfo(list.map((q) => q.id)),
+    getFlowCounts({ mine: mineParam(scope) }),
+    approver ? listPendingQuoteApprovals() : Promise.resolve([]),
+  ]);
   const today = todayPrague();
   const openByJob = new Map<string, number>();
   for (const q of list) {
@@ -42,7 +53,10 @@ export default async function QuotesPage({
   const quotes = list.map((q) => toFlowQuote(q, info[q.id], { today, onlyOpen: Boolean(q.job && openByJob.get(q.job.id) === 1) }));
   const hasCounts = Object.keys(counts).length > 0;
   const n = (k: string) => (hasCounts ? counts[`quote.${k}`] ?? 0 : quotes.filter((q) => q.display === k).length);
-  const toApprove = n("ke_schvaleni");
+  // #25: „čeká na schválení“ = stejné číslo jako sekce „Ke schválení“ a odznak (vrácené autorovi se nepočítají)
+  const pendingMine = quotes.filter((q) => q.display === "ke_schvaleni" && !q.archived);
+  const toApprove = approver ? pending.length : pendingMine.filter((q) => !q.facts.returnedAt).length;
+  const returned = approver ? 0 : pendingMine.filter((q) => q.facts.returnedAt).length;
   const waiting = n("odeslana");
   const expired = n("vyprsela");
   const active = quotes.filter((q) => !q.archived && q.display !== "prijata" && q.display !== "zamitnuta").length;
@@ -59,38 +73,71 @@ export default async function QuotesPage({
         description={
           <>
             Každá nabídka zákazníkovi na jednom místě — kdo ji připravil, kdo schválil, kdy a jak odešla a do kdy platí.
-            {toApprove || waiting || expired ? " " : ""}
-            {toApprove ? <><strong>{toApprove}</strong> čeká na schválení. </> : null}
+            {toApprove || returned || waiting || expired ? " " : ""}
+            {toApprove ? <><strong>{toApprove}</strong> {czWaits(toApprove)} {approver ? "na tvé schválení" : "na schválení super admina"}. </> : null}
+            {returned ? <><strong>{returned}</strong> {returned === 1 ? "vrácena" : returned <= 4 ? "vráceny" : "vráceno"} k přepracování. </> : null}
             {waiting ? <><strong>{waiting}</strong> čeká na odpověď zákazníka. </> : null}
             {expired ? <><strong className="text-rose-700 dark:text-rose-300">{expired}</strong> už po platnosti.</> : null}
           </>
         }
         step="nabidka"
+        canPrice={canPrice}
         actions={
           <>
             <CaptureButton label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
-            <Button asChild variant="outline" className="flex-1 sm:flex-none">
-              <Link href="/pricing">Nacenit poptávku</Link>
-            </Button>
+            {canPrice ? (
+              <Button asChild variant="outline" className="flex-1 sm:flex-none">
+                <Link href="/pricing">Nacenit poptávku</Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline" className="flex-1 sm:flex-none">
+                <Link href="/inquiries">Vytvořit nabídku k poptávce</Link>
+              </Button>
+            )}
             <BookLink href={bookHref("poptavky", ["nabidka"])} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
-      <FlowHint>
-        <strong>Postup:</strong> nabídku od AI (nebo nad limitem) nejdřív <em>Schval</em> — jinak ji nejde odeslat.
-        Pak <em>Odeslat nabídku</em> (PDF se vytvoří samo a odejde z tvé schránky). Až zákazník odpoví:{" "}
-        <em>Zákazník objednal</em>, <em>Připomínky</em> (nová verze), nebo <em>Zamítnout</em> s důvodem.
-      </FlowHint>
+      {approver ? (
+        <FlowHint>
+          <strong>Postup:</strong> nabídky od kolegů a od AI čekají na tvé schválení — <em>Schválit</em>, rovnou{" "}
+          <em>Schválit a odeslat</em>, nebo <em>Vrátit k přepracování</em>. Tvoje vlastní nabídky schválení nepotřebují.
+        </FlowHint>
+      ) : (
+        <FlowHint>
+          <strong>Postup:</strong> nabídku vytvoříš v kartě zakázky (záložka Nabídky). Než odejde zákazníkovi, schválí ji super admin —
+          do té doby je označená „Neschválená“ a odeslat ji nejde. Po schválení ji odešleš tlačítkem <em>Odeslat nabídku</em>.
+        </FlowHint>
+      )}
 
-      <QuotesBoard
-        quotes={quotes}
-        today={today}
-        counts={hasCounts ? counts : null}
-        initialStates={Array.isArray(raw) ? raw.join(",") : raw ?? null}
-      />
+      {approver && (
+        // #25: fronta super admina — vždy všech (i při „Jen moje“)
+        <FlowSection
+          id="ke-schvaleni"
+          icon={ShieldAlert}
+          iconClass="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+          title={`Ke schválení (${pending.length})`}
+          description="Nabídky od kolegů a od AI. Bez schválení je nejde odeslat."
+        >
+          <QuoteApprovalList items={pending} />
+        </FlowSection>
+      )}
 
-      {can("ai_pricing") && (
+      {scope?.error ? null : (
+        <QuotesBoard
+          quotes={quotes}
+          today={today}
+          counts={hasCounts ? counts : null}
+          initialStates={Array.isArray(raw) ? raw.join(",") : raw ?? null}
+          canPrice={canPrice}
+          approver={approver}
+        />
+      )}
+
+      {can("ai_pricing") && canPrice && (
         <Link
           href="/pricing"
           className="flex items-center gap-2.5 rounded-xl border border-dashed p-3 text-sm text-muted-foreground transition hover:bg-accent"

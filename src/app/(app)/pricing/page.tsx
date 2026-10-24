@@ -22,6 +22,8 @@ import { BookLink, FlowEmpty, FlowHeader, FlowHint, FlowSection } from "@/compon
 import { PricingBoard } from "@/components/flow/pricing-board";
 import { toPricingJob } from "@/components/flow/flow-data";
 import { bookHref, todayPrague } from "@/components/flow/flow-utils";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { formatCZK, relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -83,6 +85,7 @@ export default async function PricingPage({
           <>Doplň ceny k poptávkám — u každé položky prodejní cenu{margins ? ", nákup a hned uvidíš marži" : ""}. Z hotové ceny vytvoříš jedním klikem nabídku pro zákazníka.</>
         }
         step="naceneni"
+        canPrice
         actions={
           <>
             <CaptureButton label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
@@ -92,7 +95,9 @@ export default async function PricingPage({
             <BookLink href={bookHref("poptavky", ["poptavka", "naceneni"])} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
       <FlowHint>
         <strong>Nacenění dělá člověk — AI se z tvých cen učí.</strong> Klikni na zakázku, vyplň ceny za kus

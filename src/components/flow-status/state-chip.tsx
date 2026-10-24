@@ -1,7 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { CHIP_BASE, CHIP_ICON, FLOW_PALETTE, pillHueOf, type FlowStateMeta, type PhaseChip, type Progress } from "@/lib/jobs/flow-status";
+import { ShieldAlert } from "lucide-react";
 import { ProgressPill } from "./progress-pill";
+import { APPROVAL_TONE } from "./quote-approval-flag";
 
 export interface StateChipProps {
   meta: FlowStateMeta;
@@ -28,11 +30,13 @@ export const StateChip = React.forwardRef<HTMLButtonElement & HTMLSpanElement, S
   { meta, label, hint, progress, ai, size = "sm", short, onClick, className, ...rest },
   ref,
 ) {
-  const Icon = meta.icon;
+  // #25: „Neschválená“ všude výrazně jako štítek schválení (jantarová + štít) — fialová by vypadala jako „Schválená“
+  const pendingApproval = meta.phase === "quote" && meta.key === "ke_schvaleni";
+  const Icon = pendingApproval ? ShieldAlert : meta.icon;
   const text = short ? meta.short : label ?? meta.label;
   const classes = cn(
     CHIP_BASE,
-    FLOW_PALETTE[meta.palette].badge,
+    pendingApproval ? APPROVAL_TONE.pending : FLOW_PALETTE[meta.palette].badge,
     size === "xs" && "px-1.5 text-[11px]",
     onClick && "cursor-pointer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     className,

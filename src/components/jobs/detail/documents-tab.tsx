@@ -3,8 +3,9 @@
 import * as React from "react";
 import {
   ExternalLink, Download, MoreHorizontal, Upload, Pencil, Archive, ArchiveRestore, Trash2, Sparkles, FileText,
-  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send,
+  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send, Lock,
 } from "lucide-react";
+import { fileLockText } from "@/components/flow/file-lock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -347,6 +348,33 @@ function Lightbox({ images, index, onIndex, onClose }: { images: JobFile[]; inde
   );
 }
 
+/**
+ * Zamčený dokument (#25): řádek s druhem, názvem, autorem a datem zůstává, obsah ne — bez náhledu,
+ * otevření, stažení a odeslání (server je odmítne také), jen text proč.
+ */
+function LockedFileRow({ file }: { file: JobFile }) {
+  const k = FILE_KINDS[file.kind] ?? FILE_KINDS.ostatni;
+  return (
+    <li className={cn("flex items-center gap-3 px-3 py-2.5", file.archived && "bg-muted/30 opacity-70")} data-locked={file.locked ?? undefined}>
+      <span aria-hidden className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-lg opacity-70", k.badge)}>
+        <Lock className="h-6 w-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="min-w-0 truncate text-sm font-medium text-muted-foreground">{file.title || file.filename}</span>
+          <span className="rounded bg-muted px-1.5 py-px text-[10px] font-semibold text-muted-foreground">v{file.version}</span>
+        </div>
+        <p className="mt-0.5 flex items-start gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+          <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden /> <span className="min-w-0">{fileLockText(file.locked)}</span>
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground" title={formatTimestamp(file.createdAt) ?? undefined} suppressHydrationWarning>
+          {file.uploadedBy?.name ?? "systém"} · {relativeTime(file.createdAt)}
+        </p>
+      </div>
+    </li>
+  );
+}
+
 /** Záložka Dokumenty — po druzích, s verzemi a archivem. */
 export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick<JobQuote, "id" | "number">[] }) {
   const { jobId, notify, refresh } = useJobDetail();
@@ -361,7 +389,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
 
   const groups = groupFiles(files);
   const archivedCount = files.filter((f) => f.archived).length;
-  const visibleImages = files.filter((f) => isImageFile(f) && (showArchive || !f.archived));
+  const visibleImages = files.filter((f) => !f.locked && isImageFile(f) && (showArchive || !f.archived));
   const openPreview = (f: JobFile) => {
     const i = visibleImages.findIndex((x) => x.id === f.id);
     if (i >= 0) setPreview(i);
@@ -399,7 +427,9 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
                 </header>
                 <ul className="divide-y">
                   {list.map((f) => (
-                    <FileRow key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview} onSend={canSend ? setSending : undefined} />
+                    f.locked ? <LockedFileRow key={f.id} file={f} /> : (
+                      <FileRow key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview} onSend={canSend ? setSending : undefined} />
+                    )
                   ))}
                 </ul>
               </section>

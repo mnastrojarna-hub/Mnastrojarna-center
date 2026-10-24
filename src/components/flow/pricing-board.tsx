@@ -232,11 +232,13 @@ export function PricingBoard({
                     jobId: job.id, jobNumber: job.number, facts: job.flow.facts, quotes: job.flow.quotes,
                     quote: job.flow.snapshot.activeQuote, today,
                     onlyOpenQuote: job.flow.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
+                    quoteAuthor: job.flow.quoteAuthor ?? null,
                   }}
                   next={job.flow.next}
                   menu={job.flow.menu}
                   exclude={[...BOARD_ACTIONS]}
                   palette={job.flow.next ? actionPalette(job.flow.next.key) : undefined}
+                  canPrice
                 />
               </div>
             )}

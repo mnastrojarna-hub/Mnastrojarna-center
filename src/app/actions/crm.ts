@@ -128,6 +128,8 @@ export async function createCustomer(
   if (auth.user.role !== "super_admin" && mapped.cols.owner_id && mapped.cols.owner_id !== auth.user.id) {
     return { ok: false, error: CUSTOMER_OWNER_ADMIN_ONLY };
   }
+  // zaměstnanec obchodníkem zákazníka není — jím založený zákazník je bez obchodníka (přidělí super admin)
+  if (auth.user.role === "zamestnanec") mapped.cols.owner_id = null;
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
     const dup = await findDuplicate(db, mapped.cols);
