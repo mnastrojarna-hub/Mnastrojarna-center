@@ -1184,10 +1184,6 @@ export interface Database {
       job_payments: Tbl<JobPaymentRow>;
       job_order_revisions: Tbl<JobOrderRevisionRow>;
       production_handoffs: Tbl<ProductionHandoffRow>;
-    };
-    Views: {
-      job_flow_v: { Row: JobFlowRow; Relationships: [] };
-    };
       // anonymizace výkresů (migrace 20261023159000)
       drawing_anon_adhoc: Tbl<DrawingAnonAdhocRow>;
       drawing_anon_texts: Tbl<DrawingAnonTextRow>;
@@ -1195,6 +1191,10 @@ export interface Database {
       drawing_anon_usage_log: Tbl<DrawingAnonUsageLogRow>;
       anon_send_queue: Tbl<AnonSendQueueRow>;
       drawing_anon_settings: Tbl<DrawingAnonSettingsRow>;
+    };
+    Views: {
+      job_flow_v: { Row: JobFlowRow; Relationships: [] };
+    };
     Functions: {
       next_doc_number: { Args: { p_prefix: string }; Returns: string };
       next_job_number: { Args: Record<string, never>; Returns: string };
@@ -1242,15 +1242,15 @@ export interface Database {
         Returns: number;
       };
       flow_decide_order_change: { Args: { p_job: string; p_accept: boolean; p_note?: string | null }; Returns: undefined };
-      flow_reject_quote: {
-        Args: { p_quote: string; p_reason: string; p_note?: string | null; p_competitor_price?: number | null; p_close_job?: boolean };
-        Returns: JobStage;
-      };
       anon_is_candidate: { Args: { p_kind: string; p_filename: string; p_mime: string | null; p_origin: string | null; p_issuer: string | null }; Returns: boolean };
       anon_unsupported_ext: { Args: { p_filename: string }; Returns: boolean };
       claim_drawing_anon: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: JobFileRow[] };
       claim_drawing_anon_drawings: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: Drawing[] };
       claim_drawing_anon_adhoc: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: DrawingAnonAdhocRow[] };
+      flow_reject_quote: {
+        Args: { p_quote: string; p_reason: string; p_note?: string | null; p_competitor_price?: number | null; p_close_job?: boolean };
+        Returns: JobStage;
+      };
     };
     Enums: {
       user_role: UserRole;
