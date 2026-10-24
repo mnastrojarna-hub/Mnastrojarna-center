@@ -296,7 +296,7 @@ export function inferSentKind(subject: string | null | undefined): SentKind {
 export function sentKindFromApproval(type: ApprovalType): SentKind {
   if (type === "quote") return "quote";
   if (type === "reminder") return "reminder";
-  if (type === "supplier_request") return "supplier";
+  if (type === "supplier_request" || type === "purchase_order") return "supplier";
   return "email";
 }
 
@@ -455,7 +455,7 @@ export interface ApprovalSentRow {
   resolved_at?: string | null;
 }
 
-export const SENT_APPROVAL_TYPES: ApprovalType[] = ["email_reply", "quote", "supplier_request", "reminder"];
+export const SENT_APPROVAL_TYPES: ApprovalType[] = ["email_reply", "quote", "supplier_request", "purchase_order", "reminder"];
 
 export function toSentItemFromApproval(row: ApprovalSentRow): SentItem | null {
   if (!SENT_APPROVAL_TYPES.includes(row.type)) return null;
@@ -569,10 +569,54 @@ export interface EmailForJob {
   snippet: string | null;
 }
 
+/**
+ * Kdo zakázku z e-mailu vlastní (#25 §5): obchodník / super admin, kterému patří schránka → Obchodník;
+ * zaměstnanec, kterému patří schránka → Zpracovává (Obchodník = obchodník zákazníka, jinak klikající
+ * obchodník / super admin, jinak nikdo); schránka bez vlastníka (info@) → obchodník zákazníka, jinak klikající.
+ */
+export function jobPeopleFromEmail(input: {
+  mailboxOwner: { id: string; role: string } | null;
+  customerOwnerId: string | null;
+  actor: { id: string; role: string };
+}): { ownerId: string | null; assigneeId: string | null } {
+  const sales = (r: string) => r === "obchodnik" || r === "super_admin";
+  const box = input.mailboxOwner;
+  if (box && sales(box.role)) return { ownerId: box.id, assigneeId: null };
+  if (box) {
+    return { ownerId: input.customerOwnerId ?? (sales(input.actor.role) ? input.actor.id : null), assigneeId: box.id };
+  }
+  return { ownerId: input.customerOwnerId ?? input.actor.id, assigneeId: null };
+}
+
+/** Kategorie e-mailu, jejichž přílohy vystavil dodavatel (nabídka, faktura — fail closed). */
+const SUPPLIER_MAIL_CATEGORIES: readonly DbEmailCategory[] = ["nabidka_dodavatele", "faktura"];
+/** Kategorie, jejichž přílohy od ZÁKAZNÍKA jsou podklady (poptávka, objednávka, reklamace, výkresy). */
+const CUSTOMER_MAIL_CATEGORIES: readonly DbEmailCategory[] = [
+  "poptavka", "objednavka", "potvrzeni_objednavky", "reklamace", "technicka_dokumentace",
+];
+
+/**
+ * Kdo vystavil přílohy e-mailu, které se kopírují do Dokumentů zakázky (#25 §4.2):
+ * dodavatel (nabídka dodavatele, faktura, nebo e-mail jen od dodavatele) → nákupní doklad, zaměstnanci
+ * zamčený; zákazník (poptávka, objednávka, reklamace, technická dokumentace od zákazníka) → podklad,
+ * ne nákupní doklad; jinak null (u cenových druhů pak platí „neznámý vystavitel" = zamčeno).
+ */
+export function attachmentIssuer(email: {
+  category: DbEmailCategory | null | undefined;
+  supplierId?: string | null;
+  customerId?: string | null;
+}): "dodavatel" | "zakaznik" | null {
+  const category = email.category ?? null;
+  if (category && SUPPLIER_MAIL_CATEGORIES.includes(category)) return "dodavatel";
+  if (email.supplierId && !email.customerId) return "dodavatel";
+  if (email.customerId && !email.supplierId && category && CUSTOMER_MAIL_CATEGORIES.includes(category)) return "zakaznik";
+  return null;
+}
+
 /** Řádek nové zakázky (orders) z e-mailu — bez čísla a id uživatele se nevolá. */
 export function buildJobFromEmail(
   email: EmailForJob,
-  input: { number: string; actorId: string; customerId?: string | null },
+  input: { number: string; actorId: string; customerId?: string | null; ownerId?: string | null; assigneeId?: string | null },
 ): Record<string, unknown> {
   const stage = jobStageForEmailCategory(email.category);
   const date = pragueDate(email.received_at);
@@ -588,7 +632,8 @@ export function buildJobFromEmail(
     source: "email",
     email_id: email.id,
     created_by: input.actorId,
-    owner_id: input.actorId,
+    owner_id: input.ownerId !== undefined ? input.ownerId : input.actorId,
+    ...(input.assigneeId ? { assignee_id: input.assigneeId } : {}),
     note: note ? note.slice(0, 2000) : null,
   };
 }

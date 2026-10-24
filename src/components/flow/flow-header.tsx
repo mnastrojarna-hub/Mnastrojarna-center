@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Lightbulb, BookOpen, type LucideIcon } from "lucide-react";
 import { stageMeta } from "@/lib/jobs/stages";
 import { cn } from "@/lib/utils";
-import { FLOW_STEPS, FLOW_TONES, type FlowStepKey, type FlowTone } from "./flow-utils";
+import { FLOW_TONES, visibleFlowSteps, type FlowStepKey, type FlowTone } from "./flow-utils";
 
 /**
  * Hlavička stránky obchodního toku: barevná dlaždice v barvě kroku, popis, akce
@@ -18,8 +18,11 @@ export function FlowHeader({
   countLabel,
   actions,
   step,
+  canPrice = false,
   children,
 }: {
+  /** Krok „Nacenění“ v proužku jen pro toho, kdo smí naceňovat (#25: super admin). */
+  canPrice?: boolean;
   tone: FlowTone;
   icon: LucideIcon;
   title: string;
@@ -53,21 +56,24 @@ export function FlowHeader({
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-2 lg:max-w-[58%] lg:shrink-0 lg:justify-end">{actions}</div>}
       </div>
-      {step !== undefined && step !== null && <FlowStrip current={step} className="relative mt-4" />}
+      {step !== undefined && step !== null && <FlowStrip current={step} canPrice={canPrice} className="relative mt-4" />}
       {children && <div className="relative mt-4">{children}</div>}
     </section>
   );
 }
 
 /** Proužek toku: aktuální krok plnou barvou, ostatní jemně; vodorovně posuvný na mobilu. */
-export function FlowStrip({ current, className }: { current: FlowStepKey | null; className?: string }) {
-  const at = FLOW_STEPS.findIndex((s) => s.key === current);
+export function FlowStrip({
+  current, className, canPrice = false,
+}: { current: FlowStepKey | null; className?: string; canPrice?: boolean }) {
+  const steps = visibleFlowSteps(canPrice);
+  const at = steps.findIndex((s) => s.key === current);
   return (
     <nav aria-label="Obchodní tok" className={cn("-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin", className)}>
       <ol className="flex w-max items-center gap-1 sm:w-auto">
-        {FLOW_STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const m = stageMeta(s.stage);
           const Icon = m.icon;
           const active = s.key === current;

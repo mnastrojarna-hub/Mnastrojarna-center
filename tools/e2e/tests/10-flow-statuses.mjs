@@ -187,28 +187,44 @@ await T("poptávka: Převzít → V řešení · Petr Obchodník; Čeká na podk
 });
 
 // ═════════════════════════ 2. NACENĚNÍ ═════════════════════════
-await T("nacenění: /pricing uloží ceny → Nacenění (jen dopředu) + nacenil; „Vytvořit nabídku z ceny“ → Neschválená · autor", async (context) => {
+await T("nacenění: /pricing (jen super admin) uloží ceny → Nacenění (jen dopředu) + nacenil; obchodník v kartě „Vytvořit nabídku“ → Neschválená · autor", async (context) => {
   const page = await context.newPage();
+  // #25: Nacenění jen super admin — obchodníka stránka vrátí do Knihy s vysvětlením
   await login(page, USERS.obchod);
   await page.goto(`${BASE}/pricing?job=${J.id}`);
-  const li = page.locator(`main li#job-${J.id}`);
-  await li.waitFor({ timeout: 20_000 });
-  await waitHydrated(page, `li#job-${J.id} button[aria-expanded]`);
-  const lt = norm(await li.innerText());
-  expect(lt.includes("V řešení") && (lt.includes(SHORT.obchod) || lt.includes(NAME.obchod)), `karta Nacenění: V řešení + kdo (${lt.slice(0, 300)})`);
-  await li.getByLabel("Položka 1: prodejní cena za kus").fill("1500");
-  await li.getByLabel("Položka 2: prodejní cena za kus").fill("400");
-  await li.getByRole("button", { name: "Uložit nacenění" }).click();
-  await li.getByText("Uloženo — AI se z tvých cen učí.").waitFor({ timeout: 20_000 });
+  await page.waitForURL(/\/orders\?pristup=pricing/, { timeout: 20_000 });
+  await withContext(browser, errors, async (ac) => {
+    const ap = await ac.newPage();
+    await login(ap, USERS.admin);
+    await ap.goto(`${BASE}/pricing?job=${J.id}`);
+    const li = ap.locator(`main li#job-${J.id}`);
+    await li.waitFor({ timeout: 20_000 });
+    await waitHydrated(ap, `li#job-${J.id} button[aria-expanded]`);
+    const lt = norm(await li.innerText());
+    expect(lt.includes("V řešení") && (lt.includes(SHORT.obchod) || lt.includes(NAME.obchod)), `karta Nacenění: V řešení + kdo (${lt.slice(0, 300)})`);
+    await li.getByLabel("Položka 1: prodejní cena za kus").fill("1500");
+    await li.getByLabel("Položka 2: prodejní cena za kus").fill("400");
+    await li.getByRole("button", { name: "Uložit nacenění" }).click();
+    await li.getByText("Uloženo — AI se z tvých cen učí.").waitFor({ timeout: 20_000 });
+  });
   await eventually(() => {
     const o = row(J);
-    expect(o.status === "naceneni" && o.priced_by === ID.obchod && o.stage_changed_by === ID.obchod, `DB: Nacenění, nacenil a posunul obchodník (${o.status})`);
+    expect(o.status === "naceneni" && o.priced_by === ID.admin && o.stage_changed_by === ID.admin, `DB: Nacenění, nacenil a posunul super admin (${o.status})`);
   });
-  expectEvent(lastEvent(J, "type = 'stage'"), { actor: "obchod", startsWith: "Stav: Poptávka → Nacenění" });
+  expectEvent(lastEvent(J, "type = 'stage'"), { actor: "admin", startsWith: "Stav: Poptávka → Nacenění" });
   expect(flowRow(J).pricing_key === "naceneno" && row(J).inquiry_status === "v_reseni", "job_flow_v: Naceněno, poptávka V řešení");
-  await li.getByLabel("Dodací lhůta (dní)").fill("20");
-  await li.getByRole("button", { name: "Vytvořit nabídku z ceny" }).click();
-  await li.locator('[role="status"]').filter({ hasText: /Nabídka NAB-\S+ je vytvořená/ }).waitFor({ timeout: 20_000 });
+  // nabídku připraví obchodník ručně v kartě zakázky (záložka Nabídky)
+  await openJob(page, J, "?tab=nabidky");
+  const panel = page.locator("main [role=tabpanel][data-state=active]");
+  await panel.getByRole("button", { name: "Vytvořit nabídku z 2 položek" }).click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("heading", { name: "Nová nabídka" }).waitFor({ timeout: 10_000 });
+  const prices = dlg.locator('table input[aria-label="Cena za MJ"]');
+  await prices.nth(0).fill("1500");
+  await prices.nth(1).fill("400");
+  await dlg.getByLabel(/Dodací lhůta/).fill("20");
+  await dlg.getByRole("button", { name: "Vytvořit nabídku", exact: true }).click();
+  await eventually(() => expect(sql(`select count(*) from quotes where job_id = ${lit(J.id)}`) === "1", "nabídka vytvořená"));
   const q = sql(`select state || '|' || created_by || '|' || coalesce(state_changed_by::text, '-') || '|' || approval_required from quotes where job_id = ${lit(J.id)}`);
   // #25: nabídku obchodníka schvaluje super admin → Neschválená
   expect(q === `ke_schvaleni|${ID.obchod}|${ID.obchod}|true`, `DB nabídka: Neschválená, zadal obchodník, čeká na super admina (${q})`);
@@ -657,7 +673,9 @@ await T("invarianty: každá událost zakázek má autora se jménem; automatick
     else expect(RANK[to] > RANK[from], `automatický posun jen dopředu: ${a}`);
   }
   const o = row(J);
-  for (const col of ["stage_changed_by", "inquiry_status_changed_by", "order_status_changed_by", "confirmed_by", "invoiced_by", "priced_by"]) {
+  // #25: nacenil super admin (Nacenění jen on), ostatní kroky obchodník
+  expect(o.priced_by === ID.admin, `priced_by = super admin (${o.priced_by})`);
+  for (const col of ["stage_changed_by", "inquiry_status_changed_by", "order_status_changed_by", "confirmed_by", "invoiced_by"]) {
     expect(o[col] === ID.obchod, `${col} = obchodník (${o[col]})`);
   }
 });

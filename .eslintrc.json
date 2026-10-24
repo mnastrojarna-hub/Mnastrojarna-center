@@ -21,5 +21,70 @@
         "message": "Servisní klíč patří jen na server — v klientské komponentě (\"use client\") server.ts neimportuj."
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/app/actions/**/*.ts", "src/app/actions/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/lib/anonymize/pdf-*",
+                  "@/lib/anonymize/image",
+                  "@/lib/anonymize/image.*",
+                  "@/lib/anonymize/vision",
+                  "@/lib/anonymize/vision.*",
+                  "@/lib/anonymize/photo-pipeline",
+                  "@/lib/anonymize/photo-pipeline.*",
+                  "@/lib/anonymize/service",
+                  "@/lib/anonymize/service.*",
+                  "**/lib/anonymize/pdf-*",
+                  "**/lib/anonymize/image",
+                  "**/lib/anonymize/image.*",
+                  "**/lib/anonymize/vision",
+                  "**/lib/anonymize/vision.*",
+                  "**/lib/anonymize/photo-pipeline",
+                  "**/lib/anonymize/photo-pipeline.*",
+                  "**/lib/anonymize/service",
+                  "**/lib/anonymize/service.*",
+                  "sharp",
+                  "pdfjs-dist",
+                  "pdfjs-dist/*",
+                  "@napi-rs/canvas",
+                  "@napi-rs/canvas/*"
+                ],
+                "message": "Server action nikdy nevykresluje — renderer anonymizace (pdf.js, canvas, sharp) jen v routách /api/drawings/anonymize/** (spec §3.2). Použij @/lib/anonymize/queue."
+              }
+            ]
+          }
+        ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Program > VariableDeclaration > VariableDeclarator[init.callee.name=/^create(Admin|Operator)Client$/]",
+            "message": "Klient Supabase vytvářej pro každé volání (nese autora změny v hlavičkách) — nikdy ho nesdílej v modulu."
+          },
+          {
+            "selector": "Program > VariableDeclaration > VariableDeclarator[init.argument.callee.name=/^create(Admin|Operator)Client$/]",
+            "message": "Klient Supabase vytvářej pro každé volání (nese autora změny v hlavičkách) — nikdy ho nesdílej v modulu."
+          },
+          {
+            "selector": "Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[init.callee.name=/^create(Admin|Operator)Client$/]",
+            "message": "Klient Supabase vytvářej pro každé volání (nese autora změny v hlavičkách) — nikdy ho nesdílej v modulu."
+          },
+          {
+            "selector": "Program:has(> ExpressionStatement[directive='use client']) ImportDeclaration[source.value='@/lib/supabase/server']",
+            "message": "Servisní klíč patří jen na server — v klientské komponentě (\"use client\") server.ts neimportuj."
+          },
+          {
+            "selector": "ImportExpression[source.value=/lib.anonymize.(pdf-|image|vision|photo-pipeline|service)|^sharp$|^pdfjs-dist|^@napi-rs.canvas/]",
+            "message": "Server action nikdy nevykresluje — ani dynamický import() rendereru anonymizace (pdf.js, canvas, sharp). Použij @/lib/anonymize/queue."
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -1,9 +1,10 @@
+import { specViewFromRow } from "@/lib/jobs/drawing-spec";
 import type {
-  ActorKind, ChangeVia, JobStage, JobFileKind, JobSource, PriorityLevel, QuoteStatus,
+  ActorKind, ChangeVia, DocIssuerKey, JobStage, JobFileKind, JobFileOrigin, JobSource, PriorityLevel, QuoteStatus,
 } from "@/lib/supabase/database.types";
 import type {
   JobInput, JobItemInput, JobQuoteItemInput, JobQuoteInput, JobListItem, JobDetail, JobItem,
-  JobQuote, JobQuoteItem, JobFile, JobEvent, JobEventType, JobFilters, JobCustomerDetail,
+  JobQuote, JobQuoteItem, JobFile, JobFileAnon, JobFileAnonStatus, JobEvent, JobEventType, JobFilters, JobCustomerDetail,
   JobCustomerRef, PersonRef, JobSort, JobPaymentFilter,
 } from "@/lib/jobs/types";
 import { STAGE_ORDER, CLOSED_STAGES, isJobStage, stageGroup, STAGES } from "@/lib/jobs/stages";
@@ -569,7 +570,9 @@ export const QUOTE_LIST_SELECT = [
 
 export const JOB_FILE_SELECT = [
   "id, job_id, kind, title, filename, mime_type, size_bytes, storage_path, version, archived, replaced_by",
-  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by",
+  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin",
+  // anonymizace výkresů (odznak, menu) — bez anon_ai_cache (velké, jen pro službu)
+  "anon_status, anon_filename, anon_at, anon_by, anon_actor_kind, anon_reason, anon_reviewed_at, anon_reviewed_by, anon_summary, anon_pages, anon_method",
   `uploader:profiles!uploaded_by(${PERSON})`,
 ].join(", ");
 
@@ -727,6 +730,22 @@ export interface ItemRow {
   delivered_quantity?: number | string | null;
   delivery_closed?: boolean | null;
   delivery_closed_reason?: string | null;
+  // materiál, hmotnost, TZ / PÚ z výkresu (migrace 20261023130000 + 20261023158000)
+  material_group?: string | null;
+  material_designation?: string | null;
+  weight_kg?: number | string | null;
+  weight_source?: string | null;
+  blank_weight_kg?: number | string | null;
+  blank_dims?: string | null;
+  blank_shape?: string | null;
+  heat_status?: string | null;
+  heat_steps?: unknown;
+  heat_treatment?: string | null;
+  hardness?: string | null;
+  surface_status?: string | null;
+  surface_steps?: unknown;
+  surface_treatment?: string | null;
+  drawing_notes?: string | null;
 }
 
 export interface QuoteRow {
@@ -802,9 +821,25 @@ export interface FileRow {
   note?: string | null;
   created_at: string;
   uploaded_by?: string | null;
+  issuer?: string | null;
+  origin?: string | null;
+  anon_status?: string | null;
+  anon_filename?: string | null;
+  anon_at?: string | null;
+  anon_by?: string | null;
+  anon_actor_kind?: string | null;
+  anon_reason?: string | null;
+  anon_reviewed_at?: string | null;
+  anon_reviewed_by?: string | null;
+  anon_summary?: Record<string, unknown> | null;
+  anon_pages?: Record<string, unknown> | null;
+  anon_method?: string | null;
   uploader?: Embed<PersonEmbed>;
   job?: Embed<{ id: string; number: string | null; title: string | null; customer?: Embed<{ name: string }> }>;
 }
+
+const FILE_ISSUERS: readonly DocIssuerKey[] = ["my", "zakaznik", "dodavatel"];
+const FILE_ORIGINS: readonly JobFileOrigin[] = ["generated", "upload", "capture", "email", "import"];
 
 export interface EventRow {
   id: string;
@@ -1019,6 +1054,7 @@ export function rowToJobItem(row: ItemRow, opts: ViewOptions): JobItem {
     note: row.note ?? null,
     ...(row.delivered_quantity !== undefined ? { deliveredQuantity: num(row.delivered_quantity) ?? 0 } : {}),
     ...(row.delivery_closed !== undefined ? { deliveryClosed: Boolean(row.delivery_closed), deliveryClosedReason: row.delivery_closed_reason ?? null } : {}),
+    ...(row.material_group !== undefined || row.heat_status !== undefined ? { spec: specViewFromRow(row as Record<string, unknown>) } : {}),
   };
 }
 
@@ -1111,6 +1147,44 @@ export function rowToJobFile(row: FileRow): JobFile {
     aiConfidence: num(row.ai_confidence),
     note: row.note ?? null,
     hasAiData: Boolean(ai && typeof ai === "object" && Object.keys(ai).length > 0),
+    issuer: FILE_ISSUERS.includes(row.issuer as DocIssuerKey) ? (row.issuer as DocIssuerKey) : null,
+    origin: FILE_ORIGINS.includes(row.origin as JobFileOrigin) ? (row.origin as JobFileOrigin) : null,
+    anon: rowToFileAnon(row),
+  };
+}
+
+const ANON_STATUSES: readonly JobFileAnonStatus[] = ["pending", "processing", "done", "review", "failed", "unsupported", "skipped"];
+
+/** Stav anonymizace dokumentu (null = netýká se). Texty smazaných oblastí sem nikdy nepatří. */
+export function rowToFileAnon(row: FileRow): JobFileAnon | null {
+  const status = ANON_STATUSES.includes(row.anon_status as JobFileAnonStatus) ? (row.anon_status as JobFileAnonStatus) : null;
+  if (!status) return null;
+  const sum = row.anon_summary && typeof row.anon_summary === "object" ? row.anon_summary : null;
+  const countsRaw = sum && typeof sum.counts === "object" && sum.counts ? (sum.counts as Record<string, unknown>) : {};
+  const counts: Record<string, number> = {};
+  for (const [k, v] of Object.entries(countsRaw)) if (typeof v === "number" && v > 0) counts[k] = v;
+  const warnings = Array.isArray(sum?.warnings)
+    ? (sum!.warnings as unknown[]).flatMap((w) => (w && typeof w === "object" && typeof (w as { message?: unknown }).message === "string"
+      ? [{ code: String((w as { code?: unknown }).code ?? ""), message: String((w as { message: string }).message).slice(0, 300) }] : [])).slice(0, 20)
+    : [];
+  const pages = row.anon_pages && typeof row.anon_pages === "object" ? row.anon_pages : null;
+  const excluded = Array.isArray(pages?.excluded)
+    ? (pages!.excluded as unknown[]).flatMap((e) => (e && typeof e === "object" && typeof (e as { page?: unknown }).page === "number" ? [(e as { page: number }).page] : []))
+    : [];
+  return {
+    status,
+    filename: row.anon_filename ?? null,
+    at: row.anon_at ?? null,
+    by: row.anon_by ?? null,
+    actorKind: row.anon_actor_kind === "user" || row.anon_actor_kind === "ai" || row.anon_actor_kind === "system" ? row.anon_actor_kind : null,
+    reason: row.anon_reason ?? null,
+    reviewed: Boolean(row.anon_reviewed_at),
+    reviewedAt: row.anon_reviewed_at ?? null,
+    counts,
+    total: typeof sum?.total === "number" ? sum.total : Object.values(counts).reduce((a, b) => a + b, 0),
+    warnings,
+    excludedPages: excluded,
+    method: row.anon_method ?? null,
   };
 }
 

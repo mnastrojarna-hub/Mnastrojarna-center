@@ -18,5 +18,25 @@
   "notes": "",
   "summary": "Výkres upínací desky 4711-02 rev. B.",
   "confidence": 0.9,
-  "needsClarification": []
+  "needsClarification": [],
+  "materialGroup": "nastrojova_ocel",
+  "overallDims": [],
+  "shapeHint": "hranol",
+  "blankDimensions": "",
+  "heatStatus": "uvedeno",
+  "heatSteps": [
+    {
+      "kind": "kaleni",
+      "value": "58+2",
+      "unit": "HRC",
+      "depthMm": "",
+      "note": ""
+    }
+  ],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "drawingNotes": [
+    "Obecné tolerance ISO 2768-mK",
+    "Nekótované hrany sražené 0,5 × 45°"
+  ]
 }

@@ -16,7 +16,8 @@ export default async function CustomersPage() {
       <PageHeader
         title="Zákazníci"
         description="Adresář firem — čísla zákazníků, kontakty a celá historie zakázek. Vidí a upravuje celý tým."
-        actions={<CustomerDialog owners={owners} defaultOwnerId={user.id} className="flex-1 sm:flex-none" />}
+        // #25: zaměstnanec obchodníkem zákazníka není — nový zákazník bez předvyplněného obchodníka
+        actions={<CustomerDialog owners={owners} defaultOwnerId={user.role === "zamestnanec" ? undefined : user.id} className="flex-1 sm:flex-none" />}
       />
       <p className="flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-500/10 dark:text-rose-300">
         <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0" />

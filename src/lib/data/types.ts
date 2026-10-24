@@ -1,4 +1,5 @@
 // View-modely pro UI (české popisky). Plní se výhradně reálnými daty ze Supabase.
+import type { DrawingSpecView } from "@/lib/jobs/drawing-spec";
 import type { ApprovalType } from "@/lib/supabase/database.types";
 import { MAIN_FLOW, STAGES } from "@/lib/jobs/stages";
 
@@ -57,6 +58,8 @@ export const OUTBOUND_APPROVAL_TYPES: ApprovalType[] = [
   "email_reply",
   "quote",
   "supplier_request",
+  // objednávka dodavateli: resolveApproval ji vyřídí vlastní větví (dřív než obecné odeslání)
+  "purchase_order",
   "reminder",
 ];
 
@@ -131,6 +134,10 @@ export interface DrawingItem {
   jobId: string | null;
   jobNumber: string | null;
   jobFileId: string | null;
+  /** Název dílu (z razítka / objednávky). */
+  title?: string | null;
+  /** Materiál, hmotnost, TZ / PÚ, poznámky z výkresu (štítky); null = nic neuvedeno. */
+  spec?: DrawingSpecView | null;
 }
 
 export interface CommissionRow {

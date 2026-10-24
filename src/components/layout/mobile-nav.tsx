@@ -7,17 +7,40 @@ import { ClipboardList, Inbox, MessageSquareQuote, Camera, Menu } from "lucide-r
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
+import type { BadgeCounts } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Spodní lišta na mobilu: Zakázky, Poptávky, VYFOTIT doklad (hlavní akce),
- * Pošta a Menu se všemi sekcemi, na které má uživatel právo.
+ * Číslo na „Menu“ (#25): super admin = vše, co čeká na jeho rozhodnutí (AI přehled: fronta AI + nabídky
+ * kolegů ke schválení — „approvals“ je obsahuje bez dvojího počítání), ostatní = moje nabídky
+ * (schválené k odeslání + vrácené k přepracování).
  */
-export function MobileNav({ features }: { features: Feature[] }) {
+export function mobileMenuCount(features: readonly Feature[], counts: Partial<BadgeCounts> | null | undefined): number {
+  if (!counts) return 0;
+  if (features.includes("quote_approval") && features.includes("dashboard")) return Math.max(0, counts.approvals ?? 0);
+  return Math.max(0, counts.quotes ?? 0);
+}
+
+function CountBadge({ n, className }: { n: number; className?: string }) {
+  if (!n) return null;
+  return (
+    <span className={cn("min-w-[1.125rem] rounded-full bg-primary px-1 text-center text-[10px] font-bold leading-[1.125rem] text-primary-foreground tabular-nums", className)}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
+/**
+ * Spodní lišta na mobilu: Zakázky, Poptávky, VYFOTIT doklad (hlavní akce),
+ * Pošta a Menu se všemi sekcemi, na které má uživatel právo (s počty jako v postranním menu).
+ */
+export function MobileNav({ features, counts }: { features: Feature[]; counts?: Partial<BadgeCounts> | null }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const sections = navForFeatures(features);
   const activeHref = activeNavHref(pathname, sections.flatMap((s) => s.items.map((i) => i.href)));
+  const badgeCounts: Record<string, number | undefined> = counts ?? {};
+  const menuCount = mobileMenuCount(features, counts);
 
   React.useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -73,10 +96,12 @@ export function MobileNav({ features }: { features: Feature[] }) {
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className="flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-medium text-muted-foreground"
+          aria-label={menuCount ? `Menu — ${menuCount} čeká` : "Menu"}
+          className="relative flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-medium text-muted-foreground"
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-5 w-5" aria-hidden />
           Menu
+          <CountBadge n={menuCount} className="absolute -top-0.5 right-0.5 ring-2 ring-background" />
         </button>
       </nav>
 
@@ -92,19 +117,23 @@ export function MobileNav({ features }: { features: Feature[] }) {
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  {section.items.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg border p-2.5 text-sm font-medium",
-                        item.href === activeHref ? "border-primary/40 bg-primary/5 text-primary" : "hover:bg-accent",
-                      )}
-                    >
-                      <item.icon className={cn("h-4 w-4 shrink-0", item.color)} />
-                      <span className="truncate">{item.title}</span>
-                    </Link>
-                  ))}
+                  {section.items.map((item) => {
+                    const n = item.badgeKey ? badgeCounts[item.badgeKey] ?? 0 : 0;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex min-h-11 min-w-0 items-center gap-2 rounded-lg border p-2.5 text-sm font-medium",
+                          item.href === activeHref ? "border-primary/40 bg-primary/5 text-primary" : "hover:bg-accent",
+                        )}
+                      >
+                        <item.icon className={cn("h-4 w-4 shrink-0", item.color)} />
+                        <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                        <CountBadge n={n} className="shrink-0" />
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             ))}

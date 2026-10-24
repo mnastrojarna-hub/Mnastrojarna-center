@@ -1,6 +1,8 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { FLOW_WHO_COOKIE } from "@/lib/auth/flow-scope";
 import { createClient, createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { normalizeEmail } from "@/lib/auth/reset-code";
 import {
@@ -9,6 +11,7 @@ import {
   isInvalidCredentials,
   loginError,
   loginRedirectUrl,
+  safeNextPath,
   type LoginAccountState,
 } from "@/lib/auth/login-diagnosis";
 import { logAudit } from "@/lib/audit";
@@ -36,12 +39,14 @@ async function accountState(email: string): Promise<(LoginAccountState & { id?: 
 export async function signIn(formData: FormData) {
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const password = String(formData.get("password") ?? "");
+  // odkaz, ze kterého přihlášení přišlo (jen cesta v aplikaci — jinak Kniha zakázek)
+  const next = safeNextPath(String(formData.get("next") ?? ""));
 
   if (!isSupabaseConfigured()) {
     redirect("/setup");
   }
   if (!email || !password) {
-    redirect(loginRedirectUrl("Vyplň e-mail a heslo.", email));
+    redirect(loginRedirectUrl("Vyplň e-mail a heslo.", email, next));
   }
 
   const supabase = await createClient();
@@ -61,7 +66,7 @@ export async function signIn(formData: FormData) {
         });
       }
     }
-    redirect(loginRedirectUrl(message, email));
+    redirect(loginRedirectUrl(message, email, next));
   }
 
   // Neaktivní účet (registrace bez pozvánky / deaktivace) se nepustí dál
@@ -85,24 +90,35 @@ export async function signIn(formData: FormData) {
     }
     if (!active) {
       await supabase.auth.signOut();
-      redirect(loginRedirectUrl(INACTIVE, email));
+      redirect(loginRedirectUrl(INACTIVE, email, next));
     }
   }
 
-  redirect("/orders");
+  redirect(next ?? "/orders");
 }
 
 /** Ukončí relaci na serveru (smaže auth cookies) bez přesměrování — přesměruje volající. */
 export async function endSession(): Promise<void> {
+  await clearViewerCookies();
   if (!isSupabaseConfigured()) return;
   const supabase = await createClient();
   await supabase.auth.signOut();
 }
 
 export async function signOut() {
+  await clearViewerCookies();
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
     await supabase.auth.signOut();
   }
   redirect("/login");
+}
+
+/** Volby vázané na přihlášeného (super admin „Jen moje“) nesmí přežít odhlášení — další účet začne od výchozích. */
+async function clearViewerCookies(): Promise<void> {
+  try {
+    (await cookies()).delete(FLOW_WHO_COOKIE);
+  } catch {
+    // mimo požadavek (testy) — nic
+  }
 }

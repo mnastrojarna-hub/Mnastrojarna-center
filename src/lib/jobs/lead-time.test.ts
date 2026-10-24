@@ -25,11 +25,15 @@ const CASES: [string, Want | null][] = [
   ["2–3 měsíce od objednání", { days: 90, months: 3, range: [60, 90], from: "objednavka" }],
   ["čtyři týdny od objednání", { days: 28, from: "objednavka" }],
   ["cca 5 tydnu", { days: 35 }],
-  ["8 týdnů od dodání výkresů a schválení", { days: 56, from: "podklady" }],
+  ["8 týdnů od dodání výkresů", { days: 56, from: "podklady" }],
+  ["8 týdnů od dodání výkresů a schválení", null], // „a schválení" za OD = mimo gramatiku
   ["Platnost nabídky 30 dní, dodací lhůta 4 týdny", { days: 28 }],
   ["Splatnost 14 dní. Dodání 10 pracovních dní od objednávky.", { days: 10, unit: "pracovni", from: "objednavka" }],
-  ["ihned", { days: 3, unit: "pracovni", range: [0, 3] }],
-  ["skladem", { days: 3, unit: "pracovni", range: [0, 3] }],
+  // okamžitá dodávka jen s dodací kotvou
+  ["ihned", null],
+  ["skladem", null],
+  ["Dodání ihned", { days: 3, unit: "pracovni", range: [0, 3] }],
+  ["Dodací lhůta: skladem", { days: 3, unit: "pracovni", range: [0, 3] }],
   ["dle dohody", null],
   ["Termín po dohodě", null],
   ["", null],
@@ -49,9 +53,10 @@ const CASES: [string, Want | null][] = [
   ["15 business days from order confirmation", { days: 15, unit: "pracovni", from: "potvrzeni" }],
   ["Payment 30 days net, lead time 2 weeks", { days: 14 }],
   ["2 months", { days: 60, months: 2 }],
-  ["from stock", { days: 3, unit: "pracovni", range: [0, 3] }],
+  ["from stock", null],
+  ["Delivery: from stock", { days: 3, unit: "pracovni", range: [0, 3] }],
   ["to be agreed", null],
-  ["30d", { days: 30 }],
+  ["30d", null],
   ["Platnost nabídky: 30 dní", null],
   ["Zahlungsziel: 30 Tage", null],
 ];
@@ -76,8 +81,9 @@ describe("parseLeadTime — reálné formulace", () => {
       expect(r!.text.length).toBeGreaterThan(0);
     });
   }
-  it("text = nalezený úsek", () => {
-    expect(parseLeadTime("Dodací lhůta: do 4 týdnů od objednání, platnost 30 dní")?.text).toBe("4 týdnů od objednání");
+  it("text = celá gramatická klauzule + navazující klauzule téže věty (kontrola člověkem vidí kontext)", () => {
+    expect(parseLeadTime("Dodací lhůta: do 4 týdnů od objednání, platnost 30 dní")?.text).toBe("Dodací lhůta: do 4 týdnů od objednání, platnost 30 dní");
+    expect(parseLeadTime("Dodací lhůta: do 4 týdnů od objednání. Platnost 30 dní")?.text).toBe("Dodací lhůta: do 4 týdnů od objednání");
   });
 });
 

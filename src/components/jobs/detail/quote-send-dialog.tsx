@@ -49,6 +49,7 @@ export function QuoteSendDialog({
   const [error, setError] = React.useState<string | null>(null);
   const [warning, setWarning] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
+  const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const run = React.useRef(0);
 
@@ -77,6 +78,8 @@ export function QuoteSendDialog({
         return;
       }
       if (!gen.ok || !gen.fileId) {
+        // #25: neschválená nabídka — vysvětlit, opakovat nemá smysl
+        setBlocked(gen.code === "approval");
         setError(gen.error ?? "PDF nabídky se nepodařilo vytvořit.");
         setStep("form");
         return;
@@ -101,6 +104,7 @@ export function QuoteSendDialog({
     if (open) {
       setFile(null);
       setWarning(null);
+      setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
       setStep("preparing");
     }
@@ -173,14 +177,14 @@ export function QuoteSendDialog({
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden /> {warning}
               </p>
               <p className="text-amber-800/90 dark:text-amber-200/80">
-                Položky bez ceny budou mít v nabídce „—“. Ceny doplníš v Nacenění nebo v úpravě nabídky.
+                Položky bez ceny budou mít v dokladu „—“. Ceny doplníš v úpravě nabídky (karta zakázky → Nabídky).
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" className="min-h-11 sm:min-h-9" onClick={() => onOpenChange(false)}>Zpět — doplním ceny</Button>
                 <Button type="button" variant="default" className="min-h-11 sm:min-h-9" onClick={() => void prepare(true)}>Přesto odeslat</Button>
               </div>
             </div>
-          ) : (
+          ) : blocked ? null : (
             <>
               {file ? (
                 <a

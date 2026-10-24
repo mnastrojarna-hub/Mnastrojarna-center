@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import { checkFeature } from "@/lib/auth/session";
+import { checkFeature, getAccess } from "@/lib/auth/session";
+import { assertJobFileAccess, fileLock, FILE_PRICE_KIND, FILE_PRICE_VIEW } from "@/lib/jobs/job-file-access";
 import { userActor } from "@/lib/supabase/actor-headers";
 import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
@@ -125,8 +126,22 @@ export async function registerJobFile(input: {
   if ((input.origin as string | null | undefined) === "generated") return fail("Neplatný původ dokumentu.");
   // #25: doklad dodavatele k naší nabídce nepatří (jinak by se poslal jako „naše nabídka“ mimo schválení)
   if (input.issuer === "dodavatel" && input.quoteId) return fail("Nabídka dodavatele nepatří k naší nabídce.");
+  // #25: nahradit (= archivovat) smí jen dokument, jehož obsah smí upravit (nákupní doklad jen s „margins")
+  const access = await getAccess();
+  if (input.replaceFileId) {
+    const checked = await assertJobFileAccess(c.db, input.replaceFileId, access, "edit");
+    if (!checked.ok) return fail(checked.error);
+  }
+  const replaceBlock = async (file: FileRow): Promise<string | null> => {
+    const lock = await fileLock(c.db, {
+      id: file.id, kind: file.kind, issuer: file.issuer ?? null, origin: file.origin ?? null,
+      quoteId: file.quote_id ?? null, createdAt: file.created_at,
+    }, access);
+    return lock === "price" ? FILE_PRICE_VIEW : null;
+  };
   // jádro (lib/jobs/job-files-store) — nové volby (vazba položky, relace focení) jen pro serverový kód
   return registerJobFileCore(c.db, c.user.id, {
+    replaceBlock, dupOnlyOwn: true,
     jobId: input.jobId, path: input.path, filename: input.filename, mimeType: input.mimeType, size: input.size,
     kind: input.kind, title: input.title, quoteId: input.quoteId, note: input.note, replaceFileId: input.replaceFileId,
     aiExtracted: input.aiExtracted, aiConfidence: input.aiConfidence, silent: input.silent, noAutoVersion: input.noAutoVersion,
@@ -139,6 +154,8 @@ export async function setJobFileArchived(fileId: string, archived: boolean): Pro
   if ("error" in c) return fail(c.error);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
   try {
+    const checked = await assertJobFileAccess(c.db, fileId, await getAccess(), "edit");
+    if (!checked.ok) return fail(checked.error);
     const file = await loadFile(c.db, fileId);
     if (!file) return fail(FILE_NOT_FOUND);
     const { error } = await c.db.from("job_files").update({ archived: Boolean(archived) } as never).eq("id", fileId);
@@ -166,10 +183,19 @@ export async function updateJobFile(
   if (!patch || typeof patch !== "object") return fail("Chybí změny.");
   if (patch.kind !== undefined && !isJobFileKind(patch.kind)) return fail("Neznámý druh dokumentu.");
   try {
+    const access = await getAccess();
+    const checked = await assertJobFileAccess(c.db, fileId, access, "edit");
+    if (!checked.ok) return fail(checked.error);
     const file = await loadFile(c.db, fileId);
     if (!file) return fail(FILE_NOT_FOUND);
     const update: Record<string, unknown> = {};
-    if (patch.kind !== undefined && patch.kind !== file.kind) update.kind = patch.kind;
+    if (patch.kind !== undefined && patch.kind !== file.kind) {
+      // #25: druh vystaveného dokladu (náš PDF) se nemění; nabídka / objednávka dodavateli = nákupní strana
+      if (file.origin === "generated") return fail("Druh vystaveného dokladu nejde změnit.");
+      const sensitive: string[] = ["nabidka", "objednavka_vydana"];
+      if (!access.can("margins") && (sensitive.includes(file.kind) || sensitive.includes(patch.kind))) return fail(FILE_PRICE_KIND);
+      update.kind = patch.kind;
+    }
     if (patch.title !== undefined && cleanText(patch.title, 300) !== (file.title ?? null)) update.title = cleanText(patch.title, 300);
     if (patch.note !== undefined && cleanText(patch.note, 2000) !== (file.note ?? null)) update.note = cleanText(patch.note, 2000);
     if (!Object.keys(update).length) return { ok: true };
@@ -251,7 +277,10 @@ export async function getJobFileUrl(
   if ("error" in c) return fail(c.error);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
   try {
-    const file = await loadFile(c.db, fileId);
+    // #25: nákupní doklad / neschválená či zastaralá nabídka — obsah zamčený
+    const checked = await assertJobFileAccess(c.db, fileId, await getAccess(), "view");
+    if (!checked.ok) return fail(checked.error);
+    const file = checked.file;
     if (!file?.storage_path) return fail(FILE_NOT_FOUND);
     const { data, error } = await c.db.storage
       .from(BUCKET)

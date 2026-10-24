@@ -6,6 +6,8 @@ import { getRecentPricingCalculations } from "@/lib/data/pricing-data";
 import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowJobStates, listFlowStateJobIds } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
+import { mineParam } from "@/lib/auth/flow-scope";
 import { PRICING_ORDER, chipsForTab } from "@/lib/jobs/flow-status";
 import { ToastProvider } from "@/components/jobs/detail/toast";
 import { FlowStateFilter } from "@/components/flow/flow-state-filter";
@@ -20,6 +22,8 @@ import { BookLink, FlowEmpty, FlowHeader, FlowHint, FlowSection } from "@/compon
 import { PricingBoard } from "@/components/flow/pricing-board";
 import { toPricingJob } from "@/components/flow/flow-data";
 import { bookHref, todayPrague } from "@/components/flow/flow-utils";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { formatCZK, relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +37,10 @@ export default async function PricingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireFeature("workflow");
+  // #25: Nacenění zatím jen super admin (ostatní → Kniha s vysvětlením „pristup=pricing")
+  const user = await requireFeature("pricing");
   const sp = await searchParams;
+  const scope = await getFlowScope(await flowWhoFrom(sp));
   const { can } = await getAccess();
   const margins = can("margins");
   const ai = can("ai_pricing");
@@ -43,9 +49,9 @@ export default async function PricingPage({
   const selected = parseStateParam(sp[STATE_PARAM], PRICING_ORDER, PRICING_ORDER);
   const filtered = selected.length < PRICING_ORDER.length;
   const [all, counts, stateIds] = await Promise.all([
-    listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" }),
-    getFlowCounts(),
-    filtered ? listFlowStateJobIds([{ phase: "pricing", keys: selected }]) : Promise.resolve(null),
+    listJobs({ stages: ["poptavka", "naceneni"], sort: "deadline", dir: "asc" }, { scope }),
+    getFlowCounts({ mine: mineParam(scope) }),
+    filtered ? listFlowStateJobIds([{ phase: "pricing", keys: selected }], { scope }) : Promise.resolve(null),
   ]);
   const wanted = typeof sp.job === "string" ? sp.job : null;
   const list = stateIds ? all.filter((j) => stateIds.has(j.id) || j.id === wanted) : all;
@@ -79,6 +85,7 @@ export default async function PricingPage({
           <>Doplň ceny k poptávkám — u každé položky prodejní cenu{margins ? ", nákup a hned uvidíš marži" : ""}. Z hotové ceny vytvoříš jedním klikem nabídku pro zákazníka.</>
         }
         step="naceneni"
+        canPrice
         actions={
           <>
             <CaptureButton label="Vyfotit doklad" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
@@ -88,7 +95,9 @@ export default async function PricingPage({
             <BookLink href={bookHref("poptavky", ["poptavka", "naceneni"])} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
       <FlowHint>
         <strong>Nacenění dělá člověk — AI se z tvých cen učí.</strong> Klikni na zakázku, vyplň ceny za kus

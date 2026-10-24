@@ -4,7 +4,7 @@ import * as React from "react";
 import {
   FilePlus2, CheckCircle2, Send, ThumbsUp, ThumbsDown, Pencil, MailCheck, CopyPlus, Archive, ArchiveRestore,
   FileSearch, Trash2, MoreHorizontal, Loader2, ChevronDown, Clock, CalendarDays, UserRound, BadgeCheck,
-  FileText, ShieldQuestion, MessageSquareWarning, CalendarPlus, Undo, Hand, type LucideIcon,
+  FileText, ShieldQuestion, MessageSquareWarning, CalendarPlus, Undo, Undo2, Hand, Lock, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +15,12 @@ import { setQuoteState } from "@/app/actions/flow-status";
 import { StateChip } from "@/components/flow-status/state-chip";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import {
-  FLOW_PALETTE, QUOTE_STATES, VIA_META, approvalReasons, canApproveQuote, lostReasonLabel, type FlowActionKey,
+  FLOW_PALETTE, QUOTE_STATES, VIA_META, approvalReasons, canApproveQuote, lostReasonLabel, quoteSendBlock, sendViewerOf,
+  type FlowActionKey,
 } from "@/lib/jobs/flow-status";
+import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
+import { approvedToast, returnedSuffix } from "@/components/flow/quote-approval-copy";
+import { quoteApprovedStamp, quoteCardFlag } from "./approval";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
@@ -45,6 +49,7 @@ type Dialogs =
 
 const MENU: Partial<Record<QuoteAction, { label: string; icon: LucideIcon; cls?: string }>> = {
   edit: { label: "Upravit nabídku", icon: Pencil },
+  returnToAuthor: { label: "Vrátit k přepracování…", icon: Undo2 },
   markSent: { label: "Odesláno jinak…", icon: MailCheck },
   feedback: { label: "Zákazník má připomínky…", icon: MessageSquareWarning },
   answerNoChange: { label: "Odpovědět bez změny", icon: Send },
@@ -71,6 +76,7 @@ const FLOW_KEY: Partial<Record<QuoteAction, FlowActionKey>> = {
   propose: "quote.propose",
   requestApproval: "quote.requestApproval",
   approve: "quote.approve",
+  returnToAuthor: "quote.returnToAuthor",
 };
 
 function QuoteCard({
@@ -83,8 +89,19 @@ function QuoteCard({
   const meta = QUOTE_STATES[shown];
   const facts = flow?.quotes.find((q) => q.id === quote.id) ?? null;
   const canApprove = facts && flow ? canApproveQuote(facts, flow.ctx, approvalReasons(facts)) : perms.margins;
-  const actions = quoteActions(quote, { canDelete: perms.canDelete, margins: perms.margins, canApprove });
+  const approver = flow ? flow.ctx.can("quote_approval") : undefined;
+  // #25: odeslat podle stejných pravidel jako server (schválení + kdo smí); bez kontextu toku starší pravidlo
+  const sendBlock = facts && flow ? quoteSendBlock(facts, sendViewerOf(flow.ctx)) : undefined;
+  const actions = quoteActions(quote, {
+    canDelete: perms.canDelete, margins: perms.margins, canApprove, approver, sendBlock, canReturn: approver,
+  });
   const has = (a: QuoteAction) => actions.includes(a);
+  const awaiting = !quote.archived && shown === "ke_schvaleni";
+  const returned = awaiting && Boolean(quote.returnedAt);
+  const flag = awaiting ? quoteCardFlag(quote) : null;
+  const stamp = quoteApprovedStamp(quote);
+  // super admin schvaluje sám — „po schválení super adminem“ by mu radilo čekat na sebe
+  const sendLockText = approver ?"Nejdřív schval — pak půjde odeslat." : "Odeslat půjde po schválení super adminem.";
   const pdfHref = `/api/pdf/job/${jobId}?type=nabidka&quoteId=${quote.id}`;
   const runFlow = (a: QuoteAction) => {
     const key = FLOW_KEY[a];
@@ -120,7 +137,7 @@ function QuoteCard({
   }
 
   const preview = quote.items.slice(0, compact ? 2 : 4);
-  const menuActions = actions.filter((a) => MENU[a] && (a !== "requestApproval"));
+  const menuActions = actions.filter((a) => MENU[a] && a !== "requestApproval" && a !== "returnToAuthor");
 
   return (
     <article className={cn("relative overflow-hidden rounded-xl border bg-card shadow-sm", quote.archived && "opacity-75", quote.accepted && "ring-2 ring-green-500/40")}>
@@ -132,13 +149,16 @@ function QuoteCard({
               <FileText className="h-4 w-4 text-violet-500" />
               <span className="font-mono text-sm font-bold">{quote.number}</span>
               <span className="rounded bg-muted px-1.5 py-px text-[11px] font-medium text-muted-foreground">rev. {quote.revision}</span>
-              <QuoteStateBadge quote={quote} />
+              {/* #25: čekající nabídku označuje výrazný štítek pod číslem — fialový chip by „Neschválená“ jen opakoval */}
+              {!(flag && flag.kind === "pending") && <QuoteStateBadge quote={quote} />}
               {quote.accepted && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">
                   <CheckCircle2 className="h-3 w-3" /> Přijatá — platí pro zakázku
                 </span>
               )}
             </div>
+            {flag && flag.kind === "pending" && <QuoteApprovalFlag flag={flag} wrap />}
+            {!awaiting && stamp && <QuoteApprovalFlag flag={{ kind: "approved", quoteId: quote.id, number: quote.number, label: stamp }} />}
             {quote.title && <p className="truncate text-sm font-medium">{quote.title}</p>}
             <ActorStamp stamp={quote.stateStamp} verb={meta.label} short className="max-w-full" />
           </div>
@@ -169,14 +189,18 @@ function QuoteCard({
           <div className="min-w-0">
             <dt className="flex items-center gap-1 text-muted-foreground"><BadgeCheck className="h-3 w-3 text-violet-500" /> Schválil</dt>
             <dd>
-              {quote.approvedBy ? (
+              {quote.approvedBy && !awaiting ? (
                 <span className="flex flex-wrap items-center gap-x-1">
                   <PersonChip name={quote.approvedBy.name} className="text-xs" />
                   {quote.approvedAt && <span className="text-muted-foreground">{longDate(quote.approvedAt)}</span>}
                 </span>
-              ) : shown === "ke_schvaleni" ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-px font-medium text-violet-800 dark:bg-violet-500/15 dark:text-violet-300">
-                  čeká na schválení
+              ) : returned ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-px font-medium text-rose-900 dark:bg-rose-500/15 dark:text-rose-200">
+                  vráceno autorovi k přepracování
+                </span>
+              ) : awaiting ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-px font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
+                  {approver ? "čeká na tvé schválení" : "čeká na schválení super admina"}
                 </span>
               ) : (
                 <span className="text-muted-foreground">{quote.sentAt ? "bez schválení" : "nevyžaduje se"}</span>
@@ -184,6 +208,20 @@ function QuoteCard({
             </dd>
           </div>
         </dl>
+
+        {returned && (
+          // #25: super admin vrátil nabídku autorovi — důvod, kdo a kdy
+          <div role="note" className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100">
+            <Undo2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <p className="min-w-0 whitespace-pre-wrap break-words">
+              <strong className="font-semibold">{quote.returnNote ? "Vráceno k přepracování:" : "Vráceno k přepracování"}</strong>
+              {quote.returnNote ? ` ${quote.returnNote}` : ""}
+              {returnedSuffix(quote.returnedBy?.name ?? null, quote.returnedAt ?? null) && (
+                <span className="text-rose-800/80 dark:text-rose-200/80"> {returnedSuffix(quote.returnedBy?.name ?? null, quote.returnedAt ?? null)}</span>
+              )}
+            </p>
+          </div>
+        )}
 
         {(quote.sentAt || quote.feedback || quote.rejectedReason || quote.lostReason) && (
           <div className="space-y-1 text-xs">
@@ -227,9 +265,37 @@ function QuoteCard({
 
         <div className="flex flex-wrap items-center gap-2">
           {has("approve") && (
-            <Button size="sm" variant="success" disabled={Boolean(busy)} onClick={() => void run("approve", () => setQuoteState(quote.id, "schvalena"), `Nabídka ${quote.number} schválena — můžeš ji odeslat.`)}>
+            <Button
+              size="sm"
+              variant="success"
+              disabled={Boolean(busy)}
+              onClick={() => void run(
+                "approve",
+                () => setQuoteState(quote.id, "schvalena", { expectedUpdatedAt: quote.updatedAt ?? null }),
+                approvedToast(quote.number, quote.createdBy?.name ?? null, { authorId: quote.createdBy?.id ?? null, userId: flow?.ctx.userId ?? null }),
+              )}
+            >
               {busy === "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Schválit
             </Button>
+          )}
+          {has("approve") && flow && quote.total !== null && (
+            // #25: rovnou schválit, vystavit PDF a odeslat (dialog s návrhem e-mailu)
+            <Button size="sm" variant="send" disabled={Boolean(busy)} onClick={() => flow.run("quote.approveSend", { quoteId: quote.id })}>
+              <Send className="h-4 w-4" /> Schválit a odeslat
+            </Button>
+          )}
+          {has("returnToAuthor") && (
+            <Button size="sm" variant="outline" disabled={Boolean(busy)} onClick={() => runFlow("returnToAuthor")}>
+              <Undo2 className="h-4 w-4 text-rose-600" /> Vrátit k přepracování…
+            </Button>
+          )}
+          {awaiting && !has("send") && (
+            // #25: neschválenou nabídku nejde odeslat — zamčené tlačítko s vysvětlením (i na dotyku)
+            <span className="inline-flex" title={sendLockText}>
+              <Button size="sm" variant="outline" disabled aria-describedby={`send-lock-${quote.id}`}>
+                <Lock className="h-4 w-4" /> Odeslat zákazníkovi
+              </Button>
+            </span>
           )}
           {has("requestApproval") && !has("send") && (
             <Button size="sm" variant="outline" disabled={Boolean(busy)} onClick={() => void run("requestApproval", () => setQuoteState(quote.id, "ke_schvaleni"), `Nabídka ${quote.number} předána ke schválení.`)}>
@@ -276,7 +342,11 @@ function QuoteCard({
             </DropdownMenu>
           )}
         </div>
-        {!quote.archived && shown !== "prijata" && shown !== "zamitnuta" && (
+        {awaiting && !has("send") ? (
+          <p id={`send-lock-${quote.id}`} className="flex items-center gap-1 text-[11px] font-medium text-amber-800 dark:text-amber-300">
+            <Lock className="h-3 w-3 shrink-0" aria-hidden /> {sendLockText}
+          </p>
+        ) : !quote.archived && shown !== "prijata" && shown !== "zamitnuta" && (
           <p className="text-[11px] text-muted-foreground">{meta.description}</p>
         )}
       </div>

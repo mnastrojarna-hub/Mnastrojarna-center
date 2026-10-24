@@ -346,6 +346,45 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     }
   }, 60_000);
 
+  it("potvrzení dodavatele s naším číslem objednávky → předání do výroby (krok té objednávky, termín z potvrzení, žádná nová objednávka)", async () => {
+    h.user = admin;
+    process.env.AI_FAKE_CAPTURE = path.join(FIXTURES, "potvrzeni-dodavatel.json");
+    const { data: sup } = await db.from("suppliers").select("id").eq("name", "Kovoobrábění Hrubý s.r.o.").limit(1).maybeSingle();
+    expect(sup).toBeTruthy();
+    const supplierId = (sup as { id: string }).id;
+    await db.from("purchase_orders").delete().eq("number", "OV-2026-E2E-POT");
+    const { data: job, error: jobErr } = await db.from("orders").insert({
+      number: `Z-E2E-POT-${Date.now().toString(36)}`, title: "Potvrzení dodavatele → výroba", source: "manual", status: "potvrzeno",
+      order_date: "2026-10-20", owner_id: sales.id, due_date: "2026-12-18",
+    }).select("id").single();
+    expect(jobErr).toBeNull();
+    const jid = (job as { id: string }).id;
+    jobIds.push(jid);
+    const { data: po, error: poErr } = await db.from("purchase_orders").insert({
+      job_id: jid, number: "OV-2026-E2E-POT", supplier_id: supplierId, status: "odeslana", order_date: "2026-10-21", required_date: "2026-11-20", currency: "CZK",
+    }).select("id").single();
+    expect(poErr).toBeNull();
+    const poId = (po as { id: string }).id;
+
+    const res = await s.analyzeCapture({ files: [await upload("pot-1.jpg")], jobId: jid });
+    expect(res.ok, res.ok ? "" : res.error).toBe(true);
+    if (!res.ok) return;
+    const m = single(res).model;
+    expect(m.initial).toMatchObject({ chip: "potvrzeni_dodavatel", stage: "ve_vyrobe", targetKey: jid });
+    const saved = await s.applyCapture({ captureId: m.captureId, state: m.initial });
+    expect(saved.ok, saved.error).toBe(true);
+    expect(saved).toMatchObject({ stageFrom: "potvrzeno", stageTo: "ve_vyrobe" });
+
+    const { data: ops } = await db.from("job_operations").select("status, supplier_id, purchase_order_id, po_mode, planned_end, deadline_source, handoff_id").eq("job_id", jid);
+    expect(ops).toHaveLength(1);
+    expect(ops![0]).toMatchObject({ status: "probiha", supplier_id: supplierId, purchase_order_id: poId, po_mode: "existujici", planned_end: "2026-11-27", deadline_source: "potvrzeni_dodavatele" });
+    expect(ops![0].handoff_id).toBeTruthy();
+    const { data: pos } = await db.from("purchase_orders").select("id").eq("job_id", jid);
+    expect(pos).toHaveLength(1);                                    // AI žádnou objednávku nevystaví
+    const { data: handoffs } = await db.from("production_handoffs").select("kind, created_by").eq("job_id", jid);
+    expect(handoffs).toEqual([{ kind: "predani", created_by: admin.id }]);
+  }, 60_000);
+
   it("bezpečnost: cizí cesty, neplatné soubory, zahození dokladu", async () => {
     h.user = sales;
     const mine = await upload("x.jpg");

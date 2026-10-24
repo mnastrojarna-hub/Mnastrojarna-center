@@ -2,11 +2,12 @@ import { describe, it, expect } from "vitest";
 import * as React from "react";
 import { renderToString } from "react-dom/server";
 import { nextChipSelection } from "@/components/flow-status/count-chips";
+import { czWaits } from "@/components/flow/quote-approval-copy";
 import {
-  ActorStamp, CountChips, FlowStatusChip, NextActionButton, ProgressPill, ProposalChip, ReasonDialog, StateChip, StateMenu,
+  ActorStamp, CountChips, FlowStatusChip, NextActionButton, ProgressPill, ProposalChip, QuoteApprovalFlag, ReasonDialog, StateChip, StateMenu,
 } from "@/components/flow-status";
 import {
-  DELIVERY_STATES, FLOW_PALETTE, INQUIRY_STATES, chipsForTab, deriveFlow, primaryChip, type FlowFacts,
+  DELIVERY_STATES, FLOW_PALETTE, INQUIRY_STATES, QUOTE_STATES, chipsForTab, deriveFlow, primaryChip, quoteApprovalFlag, type FlowFacts, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 
 // Smoke test sdílených komponent podrobných stavů (bez Next.js runtime): render na serveru, texty, role a třídy.
@@ -129,5 +130,57 @@ describe("komponenty podrobných stavů", () => {
 
   it("ReasonDialog zavřený nic nevykreslí", () => {
     expect(html(<ReasonDialog open={false} onOpenChange={() => undefined} title="Odmítnout" phase="inquiry" to="odmitnuta" onConfirm={() => undefined} />)).toBe("");
+  });
+
+  it("#25 QuoteApprovalFlag: čeká / vráceno / schváleno, krátký text pod sm, celý v title", () => {
+    const q = (over: Partial<QuoteFacts>): QuoteFacts => ({
+      id: "q1", number: "NAB-2026-040", revision: 1, status: "ke_schvaleni", state: "ke_schvaleni", approvedBy: null, approvalRequired: true,
+      createdBy: "u2", archived: false, sentAt: null, validUntil: null, aiGenerated: false, supersededBy: null, adminApprovalRequired: true, ...over,
+    });
+    const pending = html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({})])} />);
+    expect(pending).toContain('data-approval="pending"');
+    expect(pending).toContain("Neschválená — čeká na schválení super admina");
+    expect(pending).toMatch(/class="[^"]*sm:hidden[^"]*">Neschválená</);
+    expect(pending).toContain('title="Nabídka NAB-2026-040 čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi."');
+    expect(pending).toContain("<svg");
+    expect(pending).toContain("bg-amber-50");
+    const short = html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({})])} short />);
+    expect(text(short)).toBe("Neschválená");
+    // wrap = celý text i na mobilu (zalomí se); iconOnly = jen ikona, text pro čtečky a v title
+    const wrapped = html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({})])} wrap />);
+    expect(text(wrapped)).toBe("Neschválená — čeká na schválení super admina");
+    expect(wrapped).toContain("whitespace-normal");
+    expect(wrapped).not.toContain("sm:hidden");
+    const icon = html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({})])} iconOnly />);
+    expect(icon).toMatch(/<span class="sr-only">Nabídka NAB-2026-040 čeká na schválení super admina/);
+    expect(icon).toContain("<svg");
+
+    const returned = html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({ returnedAt: "2026-10-23T09:00:00Z", returnNote: "Doplň výkres" })])} suffix="— S. Admin · 23. 10. 2026" />);
+    expect(returned).toContain('data-approval="returned"');
+    expect(text(returned)).toContain("Vráceno k přepracování: Doplň výkres — S. Admin · 23. 10. 2026");
+    expect(returned).toMatch(/sm:hidden[^"]*">Vráceno</);
+
+    const approved = html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({ state: "schvalena", approvedBy: "u9" })], { author: "Petr Obchodník", approver: "Jan Semorád", at: "2026-10-23T10:00:00Z" })} />);
+    expect(approved).toContain('data-approval="approved"');
+    expect(text(approved)).toBe("Připravil(a) P. Obchodník · Schválil J. Semorád · 23. 10. 2026");
+    expect(approved).toContain("bg-emerald-50");
+    expect(html(<QuoteApprovalFlag flag={null} />)).toBe("");
+    // withNumber: štítek místo chipu stavu nabídky nese i číslo
+    expect(text(html(<QuoteApprovalFlag flag={quoteApprovalFlag([q({})])} short withNumber />))).toBe("Neschválená · NAB-2026-040");
+  });
+
+  it("#25 review: chip „Neschválená“ všude jantarový se štítem (ne fialový jako „Schválená“)", () => {
+    const pending = html(<StateChip meta={QUOTE_STATES.ke_schvaleni} hint="NAB-2026-040" />);
+    expect(pending).toContain("bg-amber-50");
+    expect(pending).toContain("ring-amber-400");
+    expect(pending).not.toContain("ring-violet-400");
+    expect(pending).toContain("lucide-shield-alert");
+    const approved = html(<StateChip meta={QUOTE_STATES.schvalena} />);
+    expect(approved).not.toContain("bg-amber-50");
+    expect(approved).not.toContain("lucide-shield-alert");
+  });
+
+  it("#25 review: shoda čeká / čekají", () => {
+    expect([0, 1, 2, 3, 4, 5, 11].map(czWaits)).toEqual(["čeká", "čeká", "čekají", "čekají", "čekají", "čeká", "čeká"]);
   });
 });

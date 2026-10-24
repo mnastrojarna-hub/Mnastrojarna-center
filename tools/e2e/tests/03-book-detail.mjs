@@ -522,9 +522,13 @@ await T("nová zakázka: obchodník vyplní vše (zákazník, čísla, 7 termín
   };
   for (const [label, v] of Object.entries(dates)) await dlg.getByLabel(label, { exact: true }).fill(v);
   // lidé
-  const ownerSel = dlg.getByLabel("Obchodník", { exact: true });
-  expect((await ownerSel.inputValue()) === ID.obchod, "obchodník předvyplněn = já");
-  expect((await ownerSel.locator("option:checked").innerText()).includes("(já)"), "volba „(já)“");
+  // #25: obchodníka zakázky volí jen super admin — obchodníkovi ho doplní server (obchodník zákazníka)
+  const ownerRo = dlg.locator('[data-field="owner-readonly"]');
+  expect((await dlg.getByLabel("Obchodník", { exact: true }).count()) === 0, "obchodník nemá výběr Obchodníka");
+  const ownerRoText = (await ownerRo.innerText()).replace(/\s+/g, " ");
+  // vybraný zákazník má obchodníka → pole ho jmenuje (server ho dosadí sám)
+  const custOwnerName = sql(`select coalesce(nullif(trim(full_name), ''), email) from profiles where id = ${lit(ID.obchod)}`).trim();
+  expect(ownerRoText.includes(`${custOwnerName} (obchodník zákazníka)`) && ownerRoText.includes("Obchodníka zakázky mění jen super admin."), `Obchodník jen pro čtení (${ownerRoText})`);
   await dlg.getByLabel("Zpracovává", { exact: true }).selectOption(ID.dilna);
   // položky (2)
   await dlg.getByRole("button", { name: /Přidat první položku/ }).click();

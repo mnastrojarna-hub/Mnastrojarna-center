@@ -1,7 +1,11 @@
-import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, ReceiptText, Truck, type LucideIcon } from "lucide-react";
-import { requireFeature } from "@/lib/auth/session";
+import { BadgeCheck, Eye, FileOutput, FileText, FolderOpen, Lock, ReceiptText, Truck, type LucideIcon } from "lucide-react";
+import { getAccess, requireFeature } from "@/lib/auth/session";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
+import { PRICE_DOCS_NOTE } from "@/components/flow/file-lock";
 import { listJobFiles, listJobs } from "@/lib/data/jobs";
 import { getFileFlowInfo } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
 import { Button } from "@/components/ui/button";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
@@ -21,11 +25,16 @@ const SAMPLES: { type: string; title: string; desc: string; icon: LucideIcon; to
 ];
 
 /** Dokumenty — vše, co je u zakázek (doklady, výkresy, 3D modely, fotky) + vystavení dokladu. */
-export default async function DocumentsPage() {
+export default async function DocumentsPage(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireFeature("documents");
+  const { can } = await getAccess();
+  // #25: dokumenty jen „moje" (super admin všichni, nebo „Jen moje"); obsah nákupních dokladů zamčený
+  const scope = await getFlowScope(await flowWhoFrom((await props?.searchParams) ?? {}));
   const [files, jobs] = await Promise.all([
-    listJobFiles({ includeArchived: true, limit: 2000 }),
-    listJobs({ sort: "updated", dir: "desc" }),
+    listJobFiles({ includeArchived: true, limit: 2000 }, { scope }),
+    listJobs({ sort: "updated", dir: "desc" }, { scope }),
   ]);
   const info = await getFileFlowInfo(files.map((f) => f.id));
   const flowFiles = files.map((f) => toFlowFile(f, info[f.id] ?? null));
@@ -55,14 +64,21 @@ export default async function DocumentsPage() {
             <BookLink href={bookHref("vse")} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+      </FlowHeader>
 
       <FlowHint>
         <strong>Tip:</strong> klikni na barevný druh nahoře a uvidíš jen faktury, jen výkresy… Číslo zakázky u dokumentu tě
         vezme rovnou do její karty. Nový doklad z mobilu? Stačí <em>Vyfotit doklad</em> — AI ho přečte a zařadí ke správné zakázce.
       </FlowHint>
+      {!can("margins") && (
+        <p className="flex items-start gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {PRICE_DOCS_NOTE}
+        </p>
+      )}
 
-      <DocumentsBrowser files={flowFiles} today={today} />
+      {scope?.error ? null : <DocumentsBrowser files={flowFiles} today={today} />}
 
       <FlowSection
         id="vystavit"

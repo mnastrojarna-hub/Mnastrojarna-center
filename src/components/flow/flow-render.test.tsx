@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import * as React from "react";
 import { renderToString } from "react-dom/server";
 import type { JobDetail, JobListItem, JobQuote, JobFile } from "@/lib/jobs/types";
@@ -31,6 +31,15 @@ vi.mock("@/components/ai-pricing-panel", () => ({ AiPricingPanel: () => <div>AI-
 vi.mock("@/components/integration-settings-editor", () => ({ IntegrationSettingsEditor: () => <div>PARAMS-EDITOR</div> }));
 
 const user = { id: "u1", email: "obchod@local.test", fullName: "Petr Obchodník", role: "obchodnik", active: true };
+// #25: rozsah „moje" stránek toku (data jsou mockovaná níže, rozsah se jim jen předá)
+const scopeState = { all: false, canToggle: false, who: "moje" as "moje" | "vsichni", error: false, mailboxEmails: [] as string[] };
+vi.mock("@/lib/data/flow-scope", () => ({
+  flowWhoFrom: async () => null,
+  getFlowScope: async () => ({
+    userId: "u1", all: scopeState.all, who: scopeState.who, canToggle: scopeState.canToggle, jobIds: new Set(["j1", "j2", "j4", "j5"]),
+    mailboxIds: [], mailboxEmails: scopeState.mailboxEmails, error: scopeState.error,
+  }),
+}));
 vi.mock("@/lib/auth/session", () => ({
   requireFeature: async () => user,
   requireUser: async () => user,
@@ -115,6 +124,8 @@ const data = {
       ? detail({ id: "j4", number: "Z-2026-104", stage: "objednavka", customerOrderNumber: "PO-4500021877" })
       : detail({ id, number: id === "j2" ? "Z-2026-102" : "Z-2026-101", stage: id === "j2" ? "naceneni" : "poptavka" }),
   ),
+  // #25: párování pošty proti všem zakázkám (Potvrzení objednávek)
+  listJobOrderRefs: vi.fn(async () => [{ id: "j4", number: "Z-2026-104", customerOrderNumber: "PO-4500021877" }]),
   getJobFormOptions: vi.fn(async () => ({ users: [], customers: [{ id: "c1", name: "Strojmetal a.s.", customerNumber: "ZK0007", ico: null }], suppliers: [] })),
   listQuotes: vi.fn(async () => [
     { ...quote(), job: { id: "j3", number: "Z-2026-103", title: "Hřídel", stage: "nabidka" as const }, customer: { id: "c3", name: "Beneš CNC s.r.o." } },
@@ -132,7 +143,14 @@ const emails = vi.fn(async () => [
   email(),
   email({ id: "e2", subject: "Objednávka PO-1", category: "Objednávka", jobId: "j4", jobNumber: "Z-2026-104" }),
 ]);
-vi.mock("@/lib/data/queries", () => ({ getEmails: () => emails() }));
+vi.mock("@/lib/data/queries", () => ({
+  getEmails: () => emails(),
+  // #25: fronta super admina „Ke schválení“ (vždy všech)
+  listPendingQuoteApprovals: async () => [
+    { quoteId: "q7", number: "NAB-2026-040", jobId: "j9", jobNumber: "Z-2026-190", customerName: "Kovo Brno", authorName: "Petr Obchodník", total: 12000, currency: "CZK", updatedAt: "2026-10-23T08:00:00Z", createdAt: "2026-10-23T08:00:00Z", unpriced: false },
+    { quoteId: "q8", number: "NAB-2026-041", jobId: "j9", jobNumber: "Z-2026-190", customerName: "Kovo Brno", authorName: "Pavel Dílna", total: null, currency: "CZK", updatedAt: "2026-10-23T08:00:00Z", createdAt: "2026-10-23T08:00:00Z", unpriced: true },
+  ],
+}));
 vi.mock("@/lib/data/pricing-data", () => ({
   getRecentPricingCalculations: async () => [{ id: "pc1", drawing_number: "VK-1", customer_name: "X", material: "C45", quantity: 5, unit_price: 100, corrected: false, created_at: "2026-10-20T10:00:00Z" }],
 }));
@@ -193,8 +211,17 @@ async function page(mod: Promise<PageModule>, props?: unknown): Promise<string> 
   return renderToString(el).replace(/<!-- -->/g, "");
 }
 
+// první import stránek (celý strom komponent) trvá pod zátěží i přes 5 s — načíst předem, ať test neuteče na timeout
+beforeAll(async () => {
+  await Promise.all([
+    import("@/app/(app)/inquiries/page"), import("@/app/(app)/quotes/page"), import("@/app/(app)/confirmations/page"),
+    import("@/app/(app)/documents/page"), import("@/app/(app)/pricing/page"),
+  ]);
+}, 120_000);
+
 beforeEach(() => {
   access.features = new Set(["workflow", "documents", "orders", "mail", "margins"]);
+  Object.assign(scopeState, { all: false, canToggle: false, who: "moje", error: false, mailboxEmails: [] });
 });
 
 describe("stránky obchodního toku — vykreslení", () => {
@@ -253,7 +280,8 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain("verze 2");
     expect(html).toContain("Schváleno · S. Admin");
     expect(html).toContain("Zadáno · P. Obchodník");
-    expect(html).toContain("zatím neschváleno");
+    // #25: místo „zatím neschváleno“ výslovně, že ji nejde odeslat
+    expect(html).toContain("čeká na schválení super admina — odeslat ji zatím nejde");
     expect(html).toContain("Vypršela platnost");
     expect(html).toContain('data-quote-state="vyprsela"');
     expect(html).toContain('href="/api/pdf/job/j3?type=nabidka&amp;quoteId=q1"');
@@ -298,5 +326,67 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain('href="/api/pdf/dodaci-list"');
     expect(html).toContain("náš doklad");
     expect(html).toContain("Vystaveno · P. Obchodník");
+  });
+});
+
+describe("#25 role a viditelnost — stránky toku", () => {
+  const plain = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+
+  it("Poptávky ne-admin: bez Nacenění (odkaz, krok proužku), „Vytvořit nabídku“ do editoru, poznámka „moje“ se schránkou", async () => {
+    scopeState.mailboxEmails = ["obchod@mnastrojarna.test"];
+    const html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
+    expect(html).not.toContain('href="/pricing');
+    expect(plain(html)).not.toContain("Nacenit");
+    expect(html).toContain('href="/orders/j1?tab=nabidky&amp;nova=1"');
+    expect(plain(html)).toContain("Vytvořit nabídku");
+    expect(plain(html)).toContain("Pak Vytvoř nabídku v kartě zakázky — super admin ji schválí a ty ji odešleš.");
+    expect(plain(html)).toContain(
+      "Vidíš jen svoje: zakázky, kde jsi obchodník nebo je zpracováváš, které jsi založil(a), a vše, co přišlo do tvé schránky obchod@mnastrojarna.test. Všechny zakázky najdeš v Knize zakázek.",
+    );
+    // proužek toku bez kroku „Nacenění“
+    expect(html).not.toMatch(/title="Nacenění:/);
+    expect(html).not.toContain('aria-label="Koho zobrazit"');
+  });
+
+  it("chyba „moje“: text chyby místo „Žádná poptávka nečeká“", async () => {
+    scopeState.error = true;
+    data.listJobs.mockImplementationOnce(async () => []);
+    const html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
+    expect(plain(html)).toContain("Tvoje zakázky se nepodařilo načíst — obnov stránku.");
+    expect(html).not.toContain("Žádná poptávka nečeká");
+  });
+
+  it("super admin: přepínač „Všichni / Jen moje“, krok Nacenění; Nabídky se sekcí „Ke schválení“", async () => {
+    access.features = new Set(["workflow", "documents", "orders", "mail", "margins", "pricing", "quote_approval", "flow_all", "dashboard"]);
+    Object.assign(scopeState, { all: true, canToggle: true, who: "vsichni" });
+    let html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
+    expect(html).toContain('aria-label="Koho zobrazit"');
+    expect(html).toMatch(/role="radio" aria-checked="true"[^>]*>.*?Všichni/);
+    expect(html).toMatch(/title="Nacenění:/);
+    expect(html).not.toContain("Zobrazuješ jen svoje");
+
+    Object.assign(scopeState, { all: false, who: "moje" });
+    html = await page(import("@/app/(app)/quotes/page"), { searchParams: Promise.resolve({}) });
+    expect(plain(html)).toContain("Zobrazuješ jen svoje — přepnout na Všichni");
+    expect(plain(html)).toContain("Ke schválení (2)");
+    expect(plain(html)).toContain("Nabídky od kolegů a od AI. Bez schválení je nejde odeslat.");
+    expect(plain(html)).toContain("připravil(a) Petr Obchodník");
+    expect(plain(html)).toContain("bez ceny");
+    expect(html).toContain('data-pending-quote="q7"');
+    expect(html).toContain('href="/orders/j9?tab=nabidky"');
+    // nabídka bez ceny: „Schválit“ zamčené
+    expect(html).toMatch(/data-pending-quote="q8"[\s\S]*?disabled=""[^>]*title="Nabídku s položkou bez ceny nejde schválit/);
+    expect(plain(html)).toContain("Vrátit…");
+    // popis = stejné číslo jako sekce „Ke schválení (2)“ (ne flow_counts), shoda 2–4 „čekají“
+    expect(plain(html)).toContain("2 čekají na tvé schválení");
+    expect(plain(html)).not.toContain("1 čeká na tvé schválení");
+    // „Schválit a odeslat“ přímo v řádku fronty jen u nabídky s cenou; bez ceny viditelný důvod
+    expect(html).toMatch(/data-pending-quote="q7"[\s\S]*?Schválit a odeslat[\s\S]*?data-pending-quote="q8"/);
+    expect(html.slice(html.indexOf('data-pending-quote="q8"'))).not.toMatch(/Schválit a odeslat[\s\S]*?Otevřít nabídku NAB-2026-041/);
+    expect(plain(html)).toContain("bez ceny — nejde schválit, chybí cena");
+    // super admin na tabuli: „čeká na tvé schválení“, ne „na schválení super admina“
+    expect(plain(html)).toContain("čeká na tvé schválení — odeslat půjde po schválení");
+    expect(plain(html)).not.toContain("čeká na schválení super admina — odeslat ji zatím nejde");
+    expect(plain(html)).toContain("Nacenit poptávku");
   });
 });

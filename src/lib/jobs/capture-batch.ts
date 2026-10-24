@@ -10,6 +10,7 @@ import { docNumbersEqual } from "@/lib/jobs/matching";
 import { guessFileKind } from "@/lib/jobs/file-kinds";
 import { isForward, stageMeta, stageRank } from "@/lib/jobs/stages";
 import { plural } from "@/lib/jobs/deadlines";
+import { normalizeDrawingSpec } from "@/lib/jobs/drawing-spec";
 
 /**
  * Dávkové focení — čistá logika sdílená serverem i klientem: druhy dokladů v dávce (meta, barvy,
@@ -919,6 +920,8 @@ export function emptyDrawing(): DrawingExtract {
     generalTolerance: "", tightestTolerance: "", surface: "", heatTreatment: "", surfaceTreatment: "",
     quantity: 0, customerName: "", drawingDate: "", sheet: "", scale: "", notes: "", summary: "",
     confidence: 0, needsClarification: [], drawingNumbers: [], customerOrderNumber: "", ourQuoteNumber: "",
+    materialGroup: "", overallDims: [], shapeHint: "", blankDimensions: "", heatStatus: "nezjisteno", heatSteps: [],
+    surfaceStatus: "nezjisteno", surfaceSteps: [], drawingNotes: [],
   };
 }
 
@@ -933,6 +936,17 @@ function isoDate(v: string): string {
 function nonNeg(v: unknown): number {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".").replace(/[^\d.]/g, "")) : 0;
   return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) / 1000 : 0;
+}
+
+/** Hmotnost dílu v kg; text s jednotkou se převede („930 g" → 0,93; „1,2 t" → 1200). */
+export function weightKgOf(v: unknown): number {
+  if (typeof v !== "string") return nonNeg(v);
+  const t = v.trim();
+  const g = /^(\d+(?:[.,]\d+)?)\s*g$/i.exec(t);
+  if (g) return nonNeg(Number(g[1].replace(",", ".")) / 1000);
+  const ton = /^(\d+(?:[.,]\d+)?)\s*t$/i.exec(t);
+  if (ton) return nonNeg(Number(ton[1].replace(",", ".")) * 1000);
+  return nonNeg(t.replace(/\s*kg$/i, ""));
 }
 
 /** Výstup čtení výkresu → úplný, uklizený DrawingExtract. */
@@ -953,11 +967,21 @@ export function normalizeDrawing(raw: unknown): DrawingExtract {
   out.ourQuoteNumber = safeDocNumber(o.ourQuoteNumber);
   out.revision = out.revision.replace(/^(?:rev(?:ize|ision)?|index|idx)\.?\s*/i, "").slice(0, 20);
   out.drawingDate = isoDate(out.drawingDate);
-  out.weightKg = nonNeg(o.weightKg);
+  out.weightKg = weightKgOf(o.weightKg);
   out.quantity = nonNeg(o.quantity);
   out.confidence = clamp01(typeof o.confidence === "number" ? o.confidence : 0);
   out.needsClarification = (Array.isArray(o.needsClarification) ? o.needsClarification : [])
     .filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean).slice(0, 20);
+  // materiál (skupina), rozměry, kroky TZ / PÚ s výslovným stavem, všechny poznámky
+  const { conflicts, ...spec } = normalizeDrawingSpec(o, out);
+  Object.assign(out, spec);
+  // rozpor „bez TZ / PÚ" × poznámky výkresu → dotaz a nižší jistota (kontrola se otevře)
+  if (conflicts.length) {
+    for (const c of conflicts) if (!out.needsClarification.includes(c)) out.needsClarification.push(c);
+    out.needsClarification = out.needsClarification.slice(0, 20);
+    out.confidence = Math.min(out.confidence, 0.8);
+  }
+  if (!out.notes && out.drawingNotes?.length) out.notes = out.drawingNotes.join("; ").slice(0, 1000);
   return out;
 }
 

@@ -1,0 +1,66 @@
+{
+  "revision": "",
+  "surface": "Ra 0,8",
+  "quantity": 0,
+  "customerName": "Konstrukce Vrba s.r.o.",
+  "drawingDate": "2026-10-01",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "confidence": 0.92,
+  "needsClarification": [],
+  "customerOrderNumber": "",
+  "ourQuoteNumber": "",
+  "blankDimensions": "",
+  "drawingNumber": "E2E-VK-1801",
+  "drawingNumbers": [
+    "E2E-VK-1801"
+  ],
+  "title": "Razník",
+  "material": "1.2379",
+  "materialGroup": "nastrojova_ocel",
+  "dimensions": "Ø32 × 120 mm",
+  "overallDims": [
+    120,
+    32,
+    32
+  ],
+  "shapeHint": "kulatina",
+  "weightKg": 0,
+  "generalTolerance": "ISO 2768-mK",
+  "tightestTolerance": "±0,005",
+  "heatTreatment": "kaleno 58±2 HRC, nitridováno 700 HV",
+  "surfaceTreatment": "černěno",
+  "heatStatus": "uvedeno",
+  "heatSteps": [
+    {
+      "kind": "kaleni",
+      "value": "58±2",
+      "unit": "HRC",
+      "depthMm": "",
+      "note": "vakuově"
+    },
+    {
+      "kind": "nitridace",
+      "value": "700",
+      "unit": "HV",
+      "depthMm": "0,1",
+      "note": ""
+    }
+  ],
+  "surfaceStatus": "uvedeno",
+  "surfaceSteps": [
+    {
+      "kind": "cerneni",
+      "spec": "",
+      "thicknessUm": ""
+    }
+  ],
+  "notes": "Kalit, nitridovat, černit. Obecné tolerance ISO 2768-mK.",
+  "drawingNotes": [
+    "Kaleno 58±2 HRC (vakuově), nitridováno 700 HV, černěno",
+    "Obecné tolerance ISO 2768-mK",
+    "Nekótované hrany sražené 0,3 × 45°",
+    "Funkční plochy bez otřepů"
+  ],
+  "summary": "Razník E2E-VK-1801 z 1.2379, kalený, nitridovaný a černěný."
+}

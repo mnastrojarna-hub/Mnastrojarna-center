@@ -46,11 +46,16 @@ function sameStamp(a: ChangeStamp | null | undefined, b: ChangeStamp | null | un
  * Klíčový dílčí stav pod hlavním stavem (jako v Knize): „Aktualizovaná (rev 2)", „Částečně dodáno 1/2",
  * „Potvrzeno bez dokladu" — vidět i na mobilu bez posouvání řádku průběhu. Návrh má vlastní řádek.
  */
-export function FlowStageChip({ className }: { className?: string }) {
+export function FlowStageChip({ className, hidePendingQuote }: {
+  className?: string;
+  /** #25: chip „Neschválená · NAB-…“ vynechat — hlavička pod ním ukazuje výrazný štítek schválení. */
+  hidePendingQuote?: boolean;
+}) {
   const flow = useFlowActions();
   if (!flow?.facts || !flow.snapshot) return null;
   const chip = primaryChip(flow.facts, flow.snapshot, flow.stamps);
   if (!chip || chip.phase === "proposal") return null;
+  if (hidePendingQuote && chip.phase === "quote" && chip.key === "ke_schvaleni") return null;
   const stamp = chip.stamp && !sameStamp(chip.stamp, flow.stamps?.stage) ? chip.stamp : null;
   return (
     <div className={cn("flex min-w-0 max-w-full flex-col items-start gap-0.5 lg:items-end", className)}>
@@ -73,7 +78,7 @@ export function FlowNextHint({ fallback, className }: { fallback: string; classN
  */
 export function FlowActionBar({ className }: { className?: string }) {
   const flow = useFlowActions();
-  const { jobId } = useJobDetail();
+  const { jobId, notify } = useJobDetail();
   if (!flow?.facts || !flow.snapshot) return null;
   const { next, menu, run, runDirect, undo, canUndo } = flow;
   // barva podle akce (jako v Knize), ne podle chipu
@@ -95,6 +100,8 @@ export function FlowActionBar({ className }: { className?: string }) {
           onRun={async (key) => {
             if (isDirectAction(key)) {
               const res = await runDirect(key);
+              // #25: schválení má vlastní text (kdo ji teď může odeslat), ne jen „Hotovo“
+              if (res?.ok && !res.needsConfirm && key === "quote.approve") notify("success", flow.approveToast);
               return res ?? { ok: false, error: "Akci nejde provést." };
             }
             run(key);

@@ -9,7 +9,9 @@ import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { guessFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import { jobFilePath, translateDbError } from "@/lib/jobs/mapping";
 import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
-import { buildJobFromEmail, isUuidLike, isDbEmailCategory, type EmailForJob } from "@/lib/email/visibility";
+import {
+  attachmentIssuer, buildJobFromEmail, isUuidLike, isDbEmailCategory, jobPeopleFromEmail, type EmailForJob,
+} from "@/lib/email/visibility";
 import { emailCategoryLabel } from "@/lib/data/labels";
 import type { EmailCategory } from "@/lib/supabase/database.types";
 
@@ -149,14 +151,23 @@ interface AttachmentRow {
 async function copyAttachments(db: JobsDb, emailId: string, jobId: string, actorId: string): Promise<number> {
   let copied = 0;
   try {
-    const { data } = await db
-      .from("email_attachments")
-      .select("id, filename, mime_type, size_bytes, storage_path")
-      .eq("email_id", emailId)
-      .not("storage_path", "is", null);
+    const [{ data }, { data: em }] = await Promise.all([
+      db.from("email_attachments")
+        .select("id, filename, mime_type, size_bytes, storage_path")
+        .eq("email_id", emailId)
+        .not("storage_path", "is", null),
+      db.from("emails").select("category, supplier_id, customer_id").eq("id", emailId).maybeSingle(),
+    ]);
+    // #25: vystavitel příloh podle e-mailu — dodavatel (nákupní doklad, zaměstnanec ho uvidí zamčený),
+    // zákazník (podklad), jinak neznámý
+    const mailRow = em as { category: EmailCategory | null; supplier_id: string | null; customer_id: string | null } | null;
+    const issuer = mailRow
+      ? attachmentIssuer({ category: mailRow.category, supplierId: mailRow.supplier_id, customerId: mailRow.customer_id })
+      : null;
     for (const a of (data ?? []) as AttachmentRow[]) {
       try {
-        if (!a.storage_path) continue;
+        // jen soubor této přílohy (bez „..", absolutní cesty a cizích bucketů)
+        if (!a.storage_path || a.storage_path.includes("..") || a.storage_path.startsWith("/") || a.storage_path.includes("://")) continue;
         if (a.size_bytes && a.size_bytes > JOB_FILE_MAX_BYTES) continue;
         const filename = (a.filename ?? "").trim() || a.storage_path.split("/").pop() || "priloha";
         // Storage kopíruje jen v rámci jednoho bucketu → stáhnout a nahrát
@@ -180,6 +191,8 @@ async function copyAttachments(db: JobsDb, emailId: string, jobId: string, actor
           archived: false,
           note: "Příloha e-mailu",
           uploaded_by: actorId,
+          origin: "email",
+          ...(issuer ? { issuer } : {}),
         } as never);
         if (insErr) {
           await db.storage.from(JOB_BUCKET).remove([path]);
@@ -239,9 +252,29 @@ export async function linkEmailToJob(emailId: string, jobId: string): Promise<{ 
   }
 }
 
+/** Vlastník schránky e-mailu (emails.owner_id, jinak vlastník schránky) — jen aktivní účet. */
+async function mailboxOwnerOf(db: JobsDb, ownerId: string | null, mailboxId: string | null): Promise<{ id: string; role: string } | null> {
+  let id = ownerId;
+  if (!id && mailboxId) {
+    const { data } = await db.from("mailboxes").select("owner_id").eq("id", mailboxId).maybeSingle();
+    id = (data as { owner_id: string | null } | null)?.owner_id ?? null;
+  }
+  if (!id) return null;
+  const { data: p } = await db.from("profiles").select("id, role, active").eq("id", id).maybeSingle();
+  const prof = p as { id: string; role: string; active: boolean } | null;
+  return prof && prof.active !== false ? { id: prof.id, role: prof.role } : null;
+}
+
+async function customerOwnerOf(db: JobsDb, customerId: string | null): Promise<string | null> {
+  if (!customerId) return null;
+  const { data } = await db.from("customers").select("owner_id").eq("id", customerId).maybeSingle();
+  return (data as { owner_id: string | null } | null)?.owner_id ?? null;
+}
+
 /**
  * Založí zakázku z e-mailu (Poptávka, u objednávky/potvrzení stav Objednávka)
  * a propojí ji s e-mailem. Už propojený e-mail vrátí existující zakázku.
+ * Obchodník / Zpracovává podle vlastníka schránky (#25), založil = klikající.
  */
 export async function createJobFromEmail(
   emailId: string,
@@ -253,9 +286,9 @@ export async function createJobFromEmail(
   const { user } = access;
 
   try {
-    const found = await getVisibleEmailRow<EmailForJob & { order_id: string | null }>(
+    const found = await getVisibleEmailRow<EmailForJob & { order_id: string | null; owner_id: string | null; mailbox_id: string | null }>(
       emailId,
-      "id, subject, from_name, from_email, customer_id, category, received_at, ai_summary, snippet, order_id",
+      "id, subject, from_name, from_email, customer_id, category, received_at, ai_summary, snippet, order_id, owner_id, mailbox_id",
     );
     if (!found) return fail(NOT_FOUND);
     const email = found.row;
@@ -280,7 +313,13 @@ export async function createJobFromEmail(
       return fail(numErr?.message ?? "Nepodařilo se přidělit číslo zakázky.");
     }
 
-    const row = buildJobFromEmail(email, { number, actorId: user.id, customerId });
+    // #25: zakázka patří vlastníkovi schránky (obchodník → Obchodník, zaměstnanec → Zpracovává)
+    const people = jobPeopleFromEmail({
+      mailboxOwner: await mailboxOwnerOf(db, email.owner_id, email.mailbox_id),
+      customerOwnerId: await customerOwnerOf(db, customerId),
+      actor: { id: user.id, role: user.role },
+    });
+    const row = buildJobFromEmail(email, { number, actorId: user.id, customerId, ownerId: people.ownerId, assigneeId: people.assigneeId });
     const { data: created, error } = await db.from("orders").insert(row as never).select("id, number").single();
     if (error || !created) return fail(error?.message ?? "Zakázku se nepodařilo založit.");
     const job = created as { id: string; number: string };

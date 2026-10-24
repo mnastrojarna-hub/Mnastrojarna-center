@@ -62,7 +62,9 @@ export const quoteStatusLabel: Record<QuoteStatus, string> = {
 export const approvalTypeLabel: Record<ApprovalType, string> = {
   email_reply: "E-mail odpověď",
   quote: "Nabídka",
-  supplier_request: "Objednávka dodavateli",
+  // = popisek modulu automatiky („Poptávky dodavatelům")
+  supplier_request: "Poptávka dodavateli",
+  purchase_order: "Objednávka dodavateli",
   categorization: "Kategorizace",
   order_match: "Párování objednávky",
   reminder: "Upomínka",

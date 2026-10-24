@@ -182,10 +182,13 @@ export async function notifyQuoteApprovers(input: { quoteId: string; jobId: stri
     const link = (p: P) => (p.job_id ? `${origin}/orders/${p.job_id}?tab=nabidky` : `${origin}/quotes`);
     const subject = `Ke schválení: nabídka ${current.number ?? ""} – ${customerOf(current)} (${authorName})`.replace(/\s+/g, " ").trim();
     const lines = pending.map((p) => `${p.number ?? "—"} · ${customerOf(p)} · ${authorOf(p)} · ${amount(p)}\n${link(p)}`);
-    const text = [`Na tvé schválení čeká ${pending.length} ${pending.length === 1 ? "nabídka" : pending.length < 5 ? "nabídky" : "nabídek"}:`, "", ...lines, "",
+    // 1 „čeká … nabídka“, 2–4 „čekají … nabídky“, 5+ „čeká … nabídek“
+    const n = pending.length;
+    const count = `${n >= 2 && n <= 4 ? "čekají" : "čeká"} ${n} ${n === 1 ? "nabídka" : n >= 2 && n <= 4 ? "nabídky" : "nabídek"}`;
+    const text = [`Na tvé schválení ${count}:`, "", ...lines, "",
       "Odeslat zákazníkovi je půjde až po schválení."].join("\n");
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const html = `<p>Na tvé schválení čeká ${pending.length} ${pending.length === 1 ? "nabídka" : pending.length < 5 ? "nabídky" : "nabídek"}:</p><ul>${
+    const html = `<p>Na tvé schválení ${count}:</p><ul>${
       pending.map((p) => `<li>${esc(`${p.number ?? "—"} · ${customerOf(p)} · ${authorOf(p)} · ${amount(p)}`)} — <a href="${esc(link(p))}">Otevřít nabídku</a></li>`).join("")
     }</ul><p>Odeslat zákazníkovi je půjde až po schválení.</p>`;
 

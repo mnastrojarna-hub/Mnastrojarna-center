@@ -47,11 +47,39 @@ export function describeInvalidCredentials(email: string, state: LoginAccountSta
 }
 
 /** /login s chybou a zadaným e-mailem (pole zůstane vyplněné tím, co uživatel napsal). */
-export function loginRedirectUrl(error: string, email?: string | null): string {
+export function loginRedirectUrl(error: string, email?: string | null, next?: string | null): string {
   const params = new URLSearchParams({ error });
   const e = (email ?? "").trim();
   if (e && e.length <= 254) params.set("email", e);
+  const n = safeNextPath(next);
+  if (n) params.set("next", n);
   return `/login?${params.toString()}`;
+}
+
+/**
+ * Kam po přihlášení (odkaz z e-mailu „Otevřít nabídku“ přežije přihlášení): jen cesta v této aplikaci
+ * („/…“, ne „//host“ ani „/\host“), bez řídicích znaků, ne zpět na přihlašovací stránky. Jinak null.
+ */
+export function safeNextPath(raw: string | string[] | null | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const s = String(value ?? "");
+  if (!s || s.length > 2000 || !s.startsWith("/") || s.startsWith("//") || s.startsWith("/\\")) return null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x20 || c === 0x7f || c === 0x5c) return null; // řídicí znaky a „\“
+  }
+  let url: URL;
+  try {
+    url = new URL(s, "http://app.invalid");
+  } catch {
+    return null;
+  }
+  if (url.origin !== "http://app.invalid") return null;
+  if (/^\/(login|auth|setup|forgot-password|reset-password|api)(\/|$)/.test(url.pathname)) return null;
+  const out = `${url.pathname}${url.search}${url.hash}`;
+  // po normalizaci („/.//host", „/..//host", „/%2e//host" → „//host") znovu: nikdy protokolově relativní adresa
+  if (out.startsWith("//") || out.startsWith("/\\")) return null;
+  return out;
 }
 
 /** E-mail z URL pro předvyplnění formuláře — jen rozumná adresa, jinak prázdno. */

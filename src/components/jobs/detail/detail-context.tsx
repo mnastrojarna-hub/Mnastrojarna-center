@@ -18,6 +18,8 @@ export interface DetailPerms {
   canDelete: boolean;
   margins: boolean;
   aiCapture: boolean;
+  /** #25: Obchodníka zakázky mění jen super admin (bez údaje = canDelete, také jen super admin). */
+  ownerEditable?: boolean;
 }
 
 export type UploadEntryPhase = "ceka" | UploadPhase | "hotovo" | "chyba";

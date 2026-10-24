@@ -23,6 +23,8 @@ export function ItemsTab({ items, currency, onDirtyChange }: { items: JobItem[];
 
   const baseSig = React.useMemo(() => draftsSignature(toDrafts(base)), [base, toDrafts]);
   const sig = draftsSignature(drafts);
+  // štítky z výkresu (materiál, hmotnost, TZ / PÚ) — podle id položky (= klíč konceptu)
+  const specs = React.useMemo(() => Object.fromEntries(items.map((it) => [it.id, it.spec ?? null])), [items]);
   const dirty = sig !== (savedSig ?? baseSig);
 
   // nová data ze serveru: když nic neupravuju (nebo jsem právě uložil), převezmu je
@@ -99,6 +101,7 @@ export function ItemsTab({ items, currency, onDirtyChange }: { items: JobItem[];
           setError(null);
         }}
         columns={{ revision: true, purchase: perms.margins, currency }}
+        specs={specs}
       />
 
       {error && (

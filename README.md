@@ -40,21 +40,63 @@ doklady a učí se z ručních oprav.
 
 ### Role a oprávnění
 
-| Funkce | Super admin | Obchodník | Zaměstnanec |
-| --- | --- | --- | --- |
-| Kniha zakázek, tok (poptávky → potvrzení), dokumenty | ✅ | ✅ | ✅ |
-| Zákazníci, dodavatelé | ✅ | ✅ | ✅ |
-| Pošta | všech | vlastní | vlastní |
-| Nákupní ceny a marže | ✅ | ✅ | ❌ |
-| Provize | všech | vlastní | ❌ |
-| AI čtení dokladů | ✅ | dle povolení | dle povolení |
-| AI přehled, asistent, znalostní DB, výkresy, ladění AI, AI nacenění | ✅ | ❌ | ❌ |
-| Nastavení, uživatelé, mazání | ✅ | ❌ | ❌ |
-
 Zdroj pravdy: `src/lib/auth/permissions.ts` (`can(subject, feature, ctx)`). Data se na serveru čtou
 **servisním klíčem** (obchází RLS), proto **každá stránka, server action i API route** kontroluje
 oprávnění sama (`requireFeature` / `checkFeature` / `apiRequire` v `src/lib/auth/session.ts`).
 Nacenění dělá člověk — AI se zatím jen učí (`ai_pricing` je jen pro super admina).
+
+### Role a viditelnost
+
+**Kniha zakázek** = výroba a celý život zakázky — vidí ji každý (všechny zakázky, detail, zákazníci,
+dodavatelé). **Obchodní tok** (Poptávky, Nabídky, Potvrzení objednávek, Objednávky dodavatelům,
+Dokumenty) = práce z pošty — ne-admin vidí jen „svoje", super admin vše (s přepínačem „Všichni / Jen moje",
+`?kdo=moje`, cookie `flow_kdo`).
+
+| Kde | Super admin | Obchodník | Zaměstnanec |
+| --- | --- | --- | --- |
+| Kniha zakázek (seznam, tabule, KPI), detail zakázky | vše | vše | vše |
+| Prodejní ceny (hodnota zakázky, nabídky) | ✅ | ✅ | ✅ |
+| Nákupní ceny, marže, záložka Nákup, ceny dodavatelů | ✅ | ✅ | ❌ |
+| Provize zakázky | ✅ | jen na své zakázce | ❌ |
+| Nákupní doklady (PO, nabídka / potvrzení / DL / faktura dodavatele) | otevřené | otevřené | řádek vidět, obsah zamčený |
+| Obchodník zakázky (změna) | ✅ | ❌ (Zpracovává ano) | ❌ (Zpracovává ano) |
+| Zákazníci (vč. cenového profilu), dodavatelé | vše | vše | vše (bez profilu) |
+| Poptávky, Nabídky, Potvrzení objednávek | vše + přepínač | moje | moje |
+| Nacenění (`/pricing`, „Nacenit", krok v proužku toku) | ✅ | ❌ | ❌ |
+| Objednávky dodavatelům | vše + přepínač, ceny, akce | moje, ceny, akce | moje, bez cen, bez PDF a akcí |
+| Dokumenty | vše + přepínač | moje | moje, nákupní doklady zamčené |
+| Přijatá / odeslaná pošta | všech schránek | vlastní schránky | vlastní schránky |
+| Odznaky v menu (postranní i mobilní „Menu") | vše | moje | moje |
+| ⌘K: Zakázky (i podle čísla nabídky), Zákazníci, Dodavatelé | vše | vše | vše |
+| ⌘K: Nabídky | vše | moje | moje |
+| Vytvořit nabídku | bez schválení | → „Neschválená" | → „Neschválená" |
+| Schválit / vrátit nabídku k přepracování | **jen on** | ❌ | ❌ |
+| Odeslat nabídku zákazníkovi | ✅ | po schválení | po schválení (autor, obchodník nebo řešitel zakázky) |
+| Vyfotit doklad (AI čtení) | ✅ | ✅ (výchozí) | ✅ (výchozí) |
+| AI přehled, asistent, znalostní DB, výkresy, ladění AI | ✅ | ❌ | ❌ |
+| Nastavení, uživatelé, mazání | ✅ | ❌ | ❌ |
+
+**„Moje"** (jedna definice v TS `src/lib/auth/flow-scope.ts` → `isMineJob` a v SQL `flow_mine_job_ids`,
+test parity hlídá shodu): zakázka je moje, když jsem její **Obchodník**, **Zpracovává** ji, **založil(a)**
+jsem ji, přišla do **mé schránky** (e-mail zakázky nebo k ní připojený, i moje odeslaná pošta), nebo
+jsem autor / obchodník některé její **nabídky**. „Moje" je filtr dotazů (`listJobs/listQuotes/listJobFiles/
+listPurchaseOrders(…, { scope })`, počty `flow_counts(p_mine)`, odznaky `flow_badge_counts(p_mine)`),
+**ne** RLS — Kniha potřebuje všechny řádky. Vlastník zákazníka do „moje" nepatří.
+
+**Schvalování nabídek:** nabídka, kterou připraví (nebo před odesláním změní) kdokoli kromě super admina,
+je **„Neschválená — čeká na schválení super admina"** (štítek v kartě nabídky, v řádku i kartě Knihy,
+v hlavičce zakázky, na `/quotes`). Do schválení ji nejde odeslat (tlačítko zamčené, server i DB to
+odmítnou); PDF náhled má vodoznak „NESCHVÁLENO — NEODESÍLAT". Super admin ji schválí jedním klikem
+(AI přehled → „Nabídky ke schválení", `/quotes` → „Ke schválení"), rovnou „Schválit a odeslat", nebo
+„Vrátit k přepracování…" s důvodem (autor ho uvidí v kartě nabídky a v odznaku „Nabídky"). Po schválení
+„Připravil(a) P. Obchodník · Schválil J. Semorád · 23. 10. 2026" a odeslat ji může autor, obchodník nebo
+řešitel zakázky. Jakákoli další změna ne-adminem schválení zruší; super admin nabídky schválení
+nepotřebují. Limit částky schválení se už nepoužívá.
+
+Migrace: `supabase/migrations/20261023155000_role_viditelnost.sql` (schvalování, RLS, ceny dokladů) a
+`20261023157000_role_viditelnost_moje.sql` („moje", odznaky, obchodník zakázky jen super admin).
+Zbytkové riziko: REST relace aktivního uživatele dál čte sloupce nákupních cen (aplikace je nepoužívá —
+servisní klíč + maskování); zpřísnění přes sloupcová práva je další krok.
 
 ### AI a učení
 

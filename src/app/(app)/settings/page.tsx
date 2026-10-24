@@ -1,8 +1,10 @@
 import type { ComponentProps } from "react";
 import Link from "next/link";
 import {
-  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText,
+  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText, EyeOff,
 } from "lucide-react";
+import { DrawingAnonSettings } from "@/components/settings/drawing-anon-settings";
+import { getAnonSettingsPanel } from "@/lib/data/anonymize";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +12,8 @@ import { Button } from "@/components/ui/button";
 import { IntegrationSettingsEditor } from "@/components/integration-settings-editor";
 import { MailboxManager } from "@/components/mailbox-manager";
 import { OutlookImport } from "@/components/outlook-import";
-import { ApprovalLimitCard } from "@/components/settings/approval-limit-card";
 import { getIntegrationSettingsMeta, getMailboxes, getUsers } from "@/lib/data/settings-data";
-import { requireFeature } from "@/lib/auth/session";
+import { getAccess, requireFeature } from "@/lib/auth/session";
 import { isSupabaseConfigured, hasServiceKey } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 
@@ -21,18 +22,18 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   // Data se čtou servisním klíčem → nejdřív oprávnění
   await requireFeature("settings");
-  const [settings, mailboxes, users] = await Promise.all([
+  const [settings, mailboxes, users, anon, access] = await Promise.all([
     getIntegrationSettingsMeta(),
     getMailboxes(),
     getUsers(),
+    getAnonSettingsPanel(),
+    getAccess(),
   ]);
   const configured = isSupabaseConfigured();
   const serviceKey = hasServiceKey();
   const { url } = getSupabaseEnv();
   // Parametry kalkulace se ladí v Nacenění / Ladění & korekce, AI přístup v Uživatelích — tady jen systém
   const systemSettings = settings.filter((s) => s.category !== "pricing" && s.category !== "ai_access" && s.key !== "quote_approval_limit");
-  const limitRaw = settings.find((s) => s.key === "quote_approval_limit")?.value ?? "";
-  const approvalLimit = limitRaw && Number(limitRaw) > 0 ? Number(limitRaw) : null;
   // Vlastník schránky = uživatel, který vidí její poštu
   const mailboxUsers = users.map((u) => ({ id: u.id, full_name: u.full_name || u.email || "Bez jména", email: u.email }));
   // MailboxManager bere { mailboxes, users } (výběr vlastníka schránky); cast drží kompatibilitu i se starší signaturou
@@ -97,20 +98,40 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Schvalování nabídek (čtyři oči nad limitem) */}
+      {/* Schvalování nabídek (#25: limit částky zrušen — kolegy schvaluje super admin vždy) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Schvalování nabídek
           </CardTitle>
           <CardDescription>
-            Kdy musí nabídku před odesláním zkontrolovat druhý člověk. Kdo a kdy schválil, je vidět u každé nabídky.
+            Kdo a kdy nabídku schválil, je vidět u každé nabídky. Fronta „Ke schválení“ je v Nabídkách a v AI přehledu.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ApprovalLimitCard initial={approvalLimit} />
+          <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-approval-limit-retired>
+            Nabídky kolegů schvaluje super admin vždy, tvoje nabídky schválení nepotřebují — limit částky se už nepoužívá.
+          </p>
         </CardContent>
       </Card>
+
+      {/* Anonymizace výkresů pro dodavatele */}
+      {anon && (
+        <Card id="anonymizace">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <EyeOff className="h-4 w-4 text-muted-foreground" /> Anonymizace výkresů
+            </CardTitle>
+            <CardDescription>
+              Z výkresů pro dodavatele se smaže firma, kdo kreslil, logo a cesty na disk — technické údaje zůstanou.
+              Běží automaticky u výkresů z e-mailu, fotek i nahraných souborů; ručně tlačítkem v Poptávkách.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DrawingAnonSettings {...anon} canEdit={access.user?.role === "super_admin"} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Audit — samostatná stránka */}
       <Link href="/settings/audit" className="group block">

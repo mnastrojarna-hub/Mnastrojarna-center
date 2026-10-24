@@ -70,6 +70,8 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";
+    // kam se po přihlášení vrátit (např. odkaz „Otevřít nabídku“ z e-mailu); ověří safeNextPath při přihlášení
+    if (pathname !== "/") redirectUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     const redirectResponse = NextResponse.redirect(redirectUrl);
     // přenes případné obnovené auth cookies
     supabaseResponse.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));

@@ -30,6 +30,7 @@ import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
 import { FLOW_QUOTE_COLUMNS, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent } from "@/lib/jobs/flow-status";
 import { quoteSnapshotSha } from "@/lib/jobs/quote-approval-store";
+import { assertJobFileAccess, FILE_PRICE_SEND } from "@/lib/jobs/job-file-access";
 
 /**
  * Doklady ze zakázky: PDF (nabídka, potvrzení, dodací list, faktura) se vygeneruje
@@ -477,6 +478,10 @@ export async function sendJobDocument(
   const { db, user } = c;
 
   try {
+    // #25 (§4.2): nákupní doklad posílá jen obchodník / super admin; PDF nabídky čekající na schválení
+    // nebo vystavené před posledním schválením neodejde (dál i podrobná pravidla naší nabídky níže)
+    const access = await assertJobFileAccess(db, fileId, await getAccess(), "send");
+    if (!access.ok) return fail(access.error);
     const { data: fileData, error: fileErr } = await db
       .from("job_files")
       .select("id, job_id, kind, filename, mime_type, storage_path, quote_id, size_bytes, origin, issuer, created_at")
@@ -612,6 +617,8 @@ export async function draftJobDocumentEmail(
     if (!job) return fail(NOT_FOUND);
     const file = job.files.find((f) => f.id === fileId.toLowerCase());
     if (!file) return fail(FILE_NOT_FOUND);
+    // #25: nákupní doklad bez práva na marže ani nezačne odesílat (schválení nabídky hlídá až odeslání)
+    if (file.locked === "price") return fail(FILE_PRICE_SEND);
     const kind: DocumentEmailKind = isDocumentEmailKind(file.kind) ? file.kind : "ostatni";
     return await composeDocumentEmail(db, user, job, kind, file);
   } catch (err) {

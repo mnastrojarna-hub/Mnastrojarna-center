@@ -46,6 +46,27 @@ export interface RegisterJobFileInput {
   issuer?: DocIssuerKey | null;
   /** Revize objednávky, kterou náš doklad (potvrzení) pokrývá. */
   orderRevision?: number | null;
+  /**
+   * #25: smí volající tento dokument nahradit novou verzí? Text = ne (výslovné nahrazení selže s tímto
+   * textem, automatická verze podle názvu se nevytvoří — vznikne samostatný dokument). Bez volby = smí.
+   */
+  replaceBlock?: (file: FileRow) => Promise<string | null> | string | null;
+  /** #25: opakovaná registrace téže cesty vrátí existující záznam jen tomu, kdo ho nahrál (akce z prohlížeče). */
+  dupOnlyOwn?: boolean;
+  /**
+   * Anonymizace výkresu: „skipped" = člověk ji vypnul (kontrola dávky „Anonymizovat pro dodavatele" vypnuto).
+   * Bez volby rozhodne DB trigger (kandidát → pending podle Nastavení). Zapíše jen serverový klient.
+   */
+  anonStatus?: "skipped";
+  /** Master fotky v plném rozlišení (zdroj anonymizace místo zmenšeného hlavního souboru). */
+  anonSourcePath?: string | null;
+}
+
+const PATH_TAKEN = "Tento soubor už patří jinému dokumentu.";
+
+/** Master fotky nahraný při focení (capture/<uživatel>/…), přesouvá se k zakázce až při uložení. */
+function isCaptureMasterPath(userId: string, path: string): boolean {
+  return /^[0-9a-f-]{36}$/i.test(userId) && path.startsWith(`capture/${userId.toLowerCase()}/`) && !path.includes("..") && path.length <= 500;
 }
 
 const ORIGINS: JobFileOrigin[] = ["generated", "upload", "capture", "email", "import"];
@@ -108,6 +129,11 @@ export async function registerJobFileCore(
   const sha = typeof input.contentSha256 === "string" && /^(p:|g:)?[0-9a-f]{64}$/.test(input.contentSha256) ? input.contentSha256 : null;
   if (input.origin !== undefined && input.origin !== null && !ORIGINS.includes(input.origin)) return fail("Neznámý původ dokumentu.");
   if (input.issuer !== undefined && input.issuer !== null && !ISSUERS.includes(input.issuer)) return fail("Neznámý vystavitel dokladu.");
+  if (input.anonStatus !== undefined && input.anonStatus !== "skipped") return fail("Neplatný stav anonymizace.");
+  const anonSource = typeof input.anonSourcePath === "string" && input.anonSourcePath ? input.anonSourcePath : null;
+  if (anonSource && (anonSource === input.path || !(isValidJobFilePath(jobId, anonSource) || isCaptureMasterPath(userId, anonSource)))) {
+    return fail("Neplatná cesta zdroje anonymizace.");
+  }
   const orderRevision = cleanNumber(input.orderRevision);
   if (orderRevision !== null && (!Number.isInteger(orderRevision) || orderRevision < 1 || orderRevision > 10_000)) return fail("Neplatná revize objednávky.");
 
@@ -117,7 +143,10 @@ export async function registerJobFileCore(
 
     // opakovaná registrace stejného souboru → vrátit existující záznam
     const { data: dup } = await db.from("job_files").select(JOB_FILE_SELECT).eq("storage_path", input.path).maybeSingle();
-    if (dup) return { ok: true, file: rowToJobFile(dup as FileRow) };
+    if (dup) {
+      if (input.dupOnlyOwn && ((dup as FileRow).uploaded_by ?? null) !== userId) return fail(PATH_TAKEN);
+      return { ok: true, file: rowToJobFile(dup as FileRow) };
+    }
 
     if (input.quoteId) {
       const { data: q } = await db.from("quotes").select("id").eq("id", input.quoteId).eq("job_id", jobId).maybeSingle();
@@ -139,6 +168,8 @@ export async function registerJobFileCore(
         if (!next || next.job_id !== jobId) break;
         replaced = next;
       }
+      const blocked = input.replaceBlock ? await input.replaceBlock(replaced) : null;
+      if (blocked) return fail(blocked);
     }
     const kind: JobFileKind = input.kind ?? (replaced && isJobFileKind(replaced.kind) ? replaced.kind : guessFileKind(filename, mimeType ?? undefined));
     if (!replaced && !input.noAutoVersion && !isGenericCaptureName(filename)) {
@@ -153,6 +184,8 @@ export async function registerJobFileCore(
         .order("version", { ascending: false })
         .limit(1);
       replaced = ((same ?? []) as FileRow[])[0] ?? null;
+      // nesmí-li ho nahradit (nákupní doklad), vznikne samostatný dokument — předchozí zůstane beze změny
+      if (replaced && input.replaceBlock && (await input.replaceBlock(replaced))) replaced = null;
     }
 
     const version = replaced ? (replaced.version ?? 1) + 1 : 1;
@@ -180,11 +213,22 @@ export async function registerJobFileCore(
     if (input.origin) row.origin = input.origin;
     if (input.issuer) row.issuer = input.issuer;
     if (orderRevision !== null) row.order_revision = orderRevision;
+    if (anonSource) row.anon_source_path = anonSource;
+    if (input.anonStatus === "skipped") {
+      // rozhodl člověk (s autorem); trigger v session kontextu anon_* vynuluje — platí jen ze serveru
+      Object.assign(row, {
+        anon_status: "skipped", anon_reason: "Anonymizace vypnuta při nahrání", anon_at: new Date().toISOString(),
+        anon_by: userId, anon_actor_kind: "user", anon_via: input.origin === "capture" ? "foto" : "rucne",
+      });
+    }
     const { data: created, error } = await db.from("job_files").insert(row as never).select(JOB_FILE_SELECT).single();
     if (error || !created) {
       // souběžná registrace téže cesty → vrátit tu první
       const { data: again } = await db.from("job_files").select(JOB_FILE_SELECT).eq("storage_path", input.path).maybeSingle();
-      if (again) return { ok: true, file: rowToJobFile(again as FileRow) };
+      if (again) {
+        if (input.dupOnlyOwn && ((again as FileRow).uploaded_by ?? null) !== userId) return fail(PATH_TAKEN);
+        return { ok: true, file: rowToJobFile(again as FileRow) };
+      }
       return fail(error?.message ?? "Dokument se nepodařilo uložit.");
     }
     const created1 = created as FileRow;

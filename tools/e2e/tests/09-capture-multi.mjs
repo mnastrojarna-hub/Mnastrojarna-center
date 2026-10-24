@@ -943,6 +943,101 @@ await T("ks dle výkresu: objednávka „počet kusů dle výkresu“ + výkres 
   await page.close();
 });
 
+// Výkres → materiál, hmotnost, TZ / PÚ (Krok B): kontrola, položky zakázky a archiv výkresů, desktop i mobil
+for (const mobile of [false, true]) {
+  const sfx = mobile ? "-mobil" : "";
+  await T(`materiál a úpravy z výkresu${mobile ? " (mobil 390 px)" : ""}: 1.2379 kaleno 58±2 HRC, nitridováno 700 HV, černěno + výkres bez úprav → kontrola, položky, archiv`, async (context) => {
+    const page = await context.newPage();
+    await login(page, USERS.admin);
+    await openFromBook(page);
+    await upload(page, [
+      pngFile(fname(`mt-po${sfx}`, "objednavka_zakaznik-g18"), 181),
+      pngFile(fname(`mt-va${sfx}`, "vykres-g18a"), 182),
+      pngFile(fname(`mt-vb${sfx}`, "vykres-g18b"), 183),
+    ]);
+    await readBatch(page);
+    const review = await toReviewWithModel(page);
+    const dr = (no) => review.docs.find((d) => d.kind === "drawing" && d.drawing.drawingNumber === no);
+    const va = dr("E2E-VK-1801");
+    const vb = dr("E2E-VK-1802");
+    expect(va && vb, `oba výkresy v kontrole (${review.docs.map((d) => d.kind).join(",")})`);
+    const sa = review.initial.docs[va.docId].state.spec;
+    const sb = review.initial.docs[vb.docId].state.spec;
+    expect(sa?.materialGroup === "nastrojova_ocel" && sa?.heatStatus === "uvedeno" && sa?.surfaceStatus === "uvedeno",
+      `razník: skupina a stavy (${JSON.stringify(sa && { g: sa.materialGroup, h: sa.heatStatus, s: sa.surfaceStatus })})`);
+    expect(JSON.stringify(sa?.heatSteps.map((x) => `${x.kind} ${x.value} ${x.unit}`)) === JSON.stringify(["kaleni 58±2 HRC", "nitridace 700 HV"]),
+      `razník: kroky TZ (${JSON.stringify(sa?.heatSteps)})`);
+    expect(sb?.heatStatus === "bez" && sb?.surfaceStatus === "bez" && sb?.weightSource === "vykres", `deska: bez TZ / bez PÚ, hmotnost z výkresu (${JSON.stringify(sb)?.slice(0, 200)})`);
+    // v UI: rozbalit oba výkresy
+    for (const d of [va, vb]) {
+      const sec = page.locator(`section[data-doc-id="${d.docId}"]`);
+      const toggle = sec.locator("button[aria-expanded]").first();
+      if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+      await sec.getByTestId("capture-drawing-spec").waitFor({ timeout: 10_000 });
+    }
+    const secA = page.locator(`section[data-doc-id="${va.docId}"]`);
+    const secB = page.locator(`section[data-doc-id="${vb.docId}"]`);
+    expect(await secA.getByTestId("spec-heat").getAttribute("data-status") === "uvedeno", "razník: TZ uvedeno v UI");
+    expect(await secA.getByTestId("spec-heat-step-0").locator("input").first().inputValue() === "58±2", "razník: hodnota 58±2 v UI");
+    expect(await secA.getByTestId("spec-heat-step-1").locator("select").first().inputValue() === "nitridace", "razník: 2. krok nitridace");
+    expect(await secA.getByTestId("spec-surface-step-0").locator("select").first().inputValue() === "cerneni", "razník: PÚ černění");
+    expect(/\d/.test(await secA.getByTestId("spec-blank-weight").inputValue()), "razník: odhad polotovaru vyplněný");
+    expect((await secB.getByTestId("spec-heat-status-text").innerText()).includes("Bez tepelného zpracování"), "deska: „Bez tepelného zpracování“ v UI");
+    expect((await secB.getByTestId("spec-surface-status-text").innerText()).includes("Bez povrchové úpravy"), "deska: „Bez povrchové úpravy“ v UI");
+    expect(await secB.getByTestId("spec-weight").inputValue() === "2,6", "deska: hmotnost 2,6 kg z výkresu");
+    expect(await noHorizontalOverflow(page), "kontrola bez vodorovného posunu");
+    // snímky karty výkresu: vyšší okno, ať se sekce vejde celá (dialog se posouvá uvnitř)
+    const vp = page.viewportSize();
+    await page.setViewportSize({ width: vp.width, height: 2600 });
+    await page.waitForTimeout(300);
+    for (const [sec, name] of [[secA, "vykres-material-kontrola"], [secB, "vykres-bez-uprav-kontrola"]]) {
+      await sec.scrollIntoViewIfNeeded();
+      await sec.screenshot({ path: path.join(ARTIFACTS, `capture-multi/${name}${sfx}.png`) });
+    }
+    await page.setViewportSize(vp);
+
+    const res = await saveAll(page);
+    const jobId = res.groups.find((g) => g.ok && g.jobId)?.jobId;
+    expect(jobId, `uložená zakázka (${JSON.stringify(res.groups)})`);
+    const rows = sqlJson(`select json_agg(json_build_array(drawing_number, material_group, heat_status, heat_treatment, surface_status, surface_treatment, weight_kg, weight_source, blank_weight_kg is not null) order by position) from order_items where order_id = ${q(jobId)}`) ?? [];
+    expect(JSON.stringify(rows[0]?.slice(0, 6)) === JSON.stringify(["E2E-VK-1801", "nastrojova_ocel", "uvedeno", "kalení 58±2 HRC (vakuově); nitridace 700 HV, hloubka 0,1 mm", "uvedeno", "černění"]) && rows[0]?.[8] === true,
+      `položka razník v DB (${JSON.stringify(rows[0])})`);
+    expect(JSON.stringify(rows[1]) === JSON.stringify(["E2E-VK-1802", "bezna_ocel", "bez", null, "bez", null, 2.6, "vykres", true]), `položka deska v DB (${JSON.stringify(rows[1])})`);
+    const arch = sqlJson(`select json_agg(json_build_array(drawing_number, heat_status, surface_status, material_group) order by drawing_number) from drawings where job_id = ${q(jobId)}`) ?? [];
+    expect(JSON.stringify(arch) === JSON.stringify([["E2E-VK-1801", "uvedeno", "uvedeno", "nastrojova_ocel"], ["E2E-VK-1802", "bez", "bez", "bezna_ocel"]]), `archiv výkresů v DB (${JSON.stringify(arch)})`);
+    const vf = jobFiles(jobId).filter((f) => f.kind === "vykres").map((f) => `${f.ai_extracted?.drawingNumber}:${f.ai_extracted?.heatStatus}:${f.ai_extracted?.surfaceStatus}`).sort();
+    expect(JSON.stringify(vf) === JSON.stringify(["E2E-VK-1801:uvedeno:uvedeno", "E2E-VK-1802:bez:bez"]), `dokumenty zakázky: stav úprav v metadatech (${vf})`);
+
+    // Položky zakázky: štítky
+    await page.goto(`${BASE}/orders/${jobId}?tab=polozky`);
+    const chipsA = page.locator(`[data-testid="${mobile ? "item-spec-m-0" : "item-spec-0"}"]:visible`).first();
+    const chipsB = page.locator(`[data-testid="${mobile ? "item-spec-m-1" : "item-spec-1"}"]:visible`).first();
+    await chipsA.waitFor({ timeout: 30_000 });
+    const ta = await chipsA.innerText();
+    const tb = await chipsB.innerText();
+    expect(/Nástr\. ocel/.test(ta) && /kg\/ks polotovar/.test(ta) && ta.includes("Kaleno 58±2 HRC") && ta.includes("Nitridace 700 HV") && ta.includes("Černění"), `štítky razníku (${ta.replace(/\n/g, " | ")})`);
+    expect(tb.includes("bez TZ") && tb.includes("bez PÚ") && tb.includes("2,6 kg díl"), `štítky desky (${tb.replace(/\n/g, " | ")})`);
+    expect(await noHorizontalOverflow(page), "položky bez vodorovného posunu");
+    await chipsA.scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollBy(0, -120));
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: path.join(ARTIFACTS, `capture-multi/vykres-material-polozky${sfx}.png`) });
+
+    // Archiv výkresů
+    await page.goto(`${BASE}/drawings?q=E2E-VK-180`);
+    const archA = page.locator('[data-testid="drawing-spec-E2E-VK-1801"]:visible').first();
+    await archA.waitFor({ timeout: 30_000 });
+    const aa = await archA.innerText();
+    const ab = await page.locator('[data-testid="drawing-spec-E2E-VK-1802"]:visible').first().innerText();
+    expect(aa.includes("Kaleno 58±2 HRC") && aa.includes("Nitridace 700 HV") && aa.includes("Černění"), `archiv: štítky razníku (${aa.replace(/\n/g, " | ")})`);
+    expect(ab.includes("bez TZ") && ab.includes("bez PÚ"), `archiv: štítky desky (${ab.replace(/\n/g, " | ")})`);
+    expect(await noHorizontalOverflow(page), "archiv bez vodorovného posunu");
+    await page.waitForTimeout(700);
+    await shot(page, `capture-multi/vykres-material-archiv${sfx}`);
+    await page.close();
+  }, mobile ? { mobile: true } : undefined);
+}
+
 await T("ochrany API: cizí relace / stránka → 400, cizí Origin → 403, nepřihlášený → 401", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.admin);

@@ -114,6 +114,7 @@ export function DocumentSendDialog({
   const [error, setError] = React.useState<string | null>(null);
   const [warning, setWarning] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
+  const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const run = React.useRef(0);
 
@@ -132,6 +133,8 @@ export function DocumentSendDialog({
             setStep("unpriced");
             return;
           }
+          // #25: neschválená nabídka — znovu to zkoušet nemá smysl, jen vysvětlit
+          setBlocked(gen.code === "approval");
           setError(gen.error ?? "PDF se nepodařilo vytvořit.");
           setStep("form");
           return;
@@ -161,6 +164,7 @@ export function DocumentSendDialog({
       setFile(null);
       setWarning(null);
       setError(null);
+      setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
       setStep("preparing");
     }
@@ -229,7 +233,9 @@ export function DocumentSendDialog({
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> {warning}
               </p>
               <p className="text-amber-800/90 dark:text-amber-200/80">
-                Položky bez ceny budou mít v dokladu „—“. Ceny doplníš v Nacenění nebo v kartě zakázky (záložka Položky).
+                {kind === "nabidka"
+                  ? "Položky bez ceny budou mít v dokladu „—“. Ceny doplníš v úpravě nabídky (karta zakázky → Nabídky)."
+                  : "Položky bez ceny budou mít v dokladu „—“. Ceny doplníš v kartě zakázky (záložka Položky)."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Zpět — doplním ceny</Button>
@@ -241,12 +247,12 @@ export function DocumentSendDialog({
             <>
               {file ? (
                 <AttachmentChip fileId={file.id} filename={file.filename} />
-              ) : (
+              ) : blocked ? null : (
                 <Button type="button" variant="outline" onClick={() => void prepare()}>
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
               )}
-              <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} />
+              {!blocked && <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} />}
             </>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

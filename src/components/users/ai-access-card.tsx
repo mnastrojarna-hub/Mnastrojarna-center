@@ -112,8 +112,8 @@ export function AiAccessCard({
           <SwitchTile
             icon={Camera}
             tone="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-            title="AI čtení dokladů z fotky pro všechny uživatele"
-            text={`Zapne AI všem aktivním uživatelům (${activeUsers}). Jinak jen těm, kterým ji povolíš jednotlivě.`}
+            title="AI focení pro všechny uživatele"
+            text={`Výchozí: zapnuto — AI přečte fotku dokladu každému aktivnímu uživateli (${activeUsers}). Vypnutím ji necháš jen super adminovi a těm, kterým ji povolíš jednotlivě.`}
             checked={forAll}
             busy={saving === "forAll"}
             disabled={saving !== null || !enabled}
@@ -126,9 +126,9 @@ export function AiAccessCard({
           <div className="space-y-1">
             <p className="font-medium">Jak to funguje</p>
             <p className="text-muted-foreground">
-              Pro ostatní uživatele je AI ve výchozím stavu vypnutá: fotku dokladu přiloží k zakázce a údaje
-              vyplní ručně. AI se z těchto ručních záznamů učí, takže je postupně přesnější. Super admin může AI
-              povolit konkrétnímu člověku přepínačem <strong>AI</strong> v seznamu, nebo všem najednou tady.
+              Ve výchozím stavu AI přečte fotku dokladu každému — údaje vyplní sama a člověk je jen zkontroluje.
+              Když AI focení pro všechny vypneš, ostatní fotku přiloží k zakázce a údaje vyplní ručně (AI se z nich
+              učí). Jednotlivým lidem ji pak povolíš přepínačem <strong>AI</strong> v seznamu.
             </p>
           </div>
         </div>

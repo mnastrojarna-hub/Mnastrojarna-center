@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ShoppingBag, Search, X, Factory, CalendarClock, CalendarCheck, Send, AlertTriangle, ListChecks, Clock3, BadgeCheck,
-  PackageCheck, Ban, Inbox, ArrowUpRight, ClipboardList, CircleDotDashed, type LucideIcon,
+  PackageCheck, Ban, Inbox, ArrowUpRight, ClipboardList, CircleDotDashed, Lock, type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,24 @@ function isFilter(v: unknown): v is PurchaseFilter {
   return typeof v === "string" && FILTERS.some((f) => f.key === v);
 }
 
+export const PO_PRICES_HIDDEN_NOTE = "Ceny objednávek vidí obchodník a super admin.";
+
+interface BoardProps {
+  items: PurchaseOrderListItem[];
+  today: string;
+  initialFilter?: string;
+  initialQuery?: string;
+  /**
+   * #25: nákupní ceny (právo margins). Bez nich (zaměstnanec) server řádky maskuje; přehled ukáže „—“
+   * místo částek, bez PDF a akcí (odeslat, převzít, zrušit), odkaz zakázky vede do Výroby.
+   */
+  canSeePrices?: boolean;
+  /** Lišta „Všichni / Jen moje“ (stránka) pod hlavičkou. */
+  scopeBar?: React.ReactNode;
+}
+
 /** Přehled „Objednávky dodavatelům" napříč zakázkami: stavy, hledání, PDF a odeslání. */
-export function PurchaseOrdersBoard(props: { items: PurchaseOrderListItem[]; today: string; initialFilter?: string; initialQuery?: string }) {
+export function PurchaseOrdersBoard(props: BoardProps) {
   return (
     <ToastProvider>
       <Board {...props} />
@@ -46,8 +62,10 @@ export function PurchaseOrdersBoard(props: { items: PurchaseOrderListItem[]; tod
 }
 
 function Board({
-  items, today, initialFilter, initialQuery,
-}: { items: PurchaseOrderListItem[]; today: string; initialFilter?: string; initialQuery?: string }) {
+  items, today, initialFilter, initialQuery, canSeePrices: canSeePricesProp, scopeBar,
+}: BoardProps) {
+  // bez údaje: maskované řádky ze serveru = bez cen
+  const canSeePrices = canSeePricesProp ?? !items.some((po) => po.pricesHidden);
   const router = useRouter();
   const notify = useNotify();
   const [refreshing, startRefresh] = React.useTransition();
@@ -86,7 +104,11 @@ function Board({
         count={stats[0].count}
         description={
           <>
-            Naše objednávky za Mnástrojárnu u kooperantů a dodavatelů — vystavují se na kartě zakázky (záložka <em>Nákup &amp; marže</em>) z vítězné nabídky.
+            {canSeePrices ? (
+              <>Naše objednávky za Mnástrojárnu u kooperantů a dodavatelů — vystavují se na kartě zakázky (záložka <em>Nákup &amp; marže</em>) z vítězné nabídky.</>
+            ) : (
+              <>Naše objednávky za Mnástrojárnu u kooperantů a dodavatelů k tvým zakázkám — co je objednáno, kdy to má přijít a jestli to dorazilo.</>
+            )}
             {toSend ? <> <strong>{toSend}</strong> čeká na odeslání.</> : null}
             {lateCount ? <> <strong className="text-red-600 dark:text-red-400">{lateCount}</strong> po termínu.</> : null}
           </>
@@ -96,7 +118,15 @@ function Board({
             <Link href="/orders"><ClipboardList className="h-4 w-4" /> Kniha zakázek</Link>
           </Button>
         }
-      />
+      >
+        {scopeBar}
+      </PageHero>
+
+      {!canSeePrices && (
+        <p className="flex items-start gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-prices-hidden>
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {PO_PRICES_HIDDEN_NOTE}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
         {FILTERS.map((f) => {
@@ -142,8 +172,12 @@ function Board({
           )}
         </div>
         <p className="shrink-0 text-sm text-muted-foreground">
-          {visible.length} {visible.length === 1 ? "objednávka" : visible.length < 5 && visible.length > 0 ? "objednávky" : "objednávek"} ·{" "}
-          <strong className="tabular-nums text-foreground">{formatMoney(visibleTotal)}</strong> bez DPH
+          {visible.length} {visible.length === 1 ? "objednávka" : visible.length < 5 && visible.length > 0 ? "objednávky" : "objednávek"}
+          {canSeePrices && (
+            <>
+              {" "}· <strong className="tabular-nums text-foreground">{formatMoney(visibleTotal)}</strong> bez DPH
+            </>
+          )}
         </p>
       </div>
 
@@ -154,7 +188,11 @@ function Board({
           </span>
           <p className="font-medium">Zatím žádná objednávka dodavateli</p>
           <p className="max-w-md text-sm text-muted-foreground">
-            Otevři zakázku → záložka <strong>Nákup &amp; marže</strong> → vyber vítěznou nabídku dodavatele → <strong>Vystavit objednávku</strong>. Vše se vyplní samo.
+            {canSeePrices ? (
+              <>Otevři zakázku → záložka <strong>Nákup &amp; marže</strong> → vyber vítěznou nabídku dodavatele → <strong>Vystavit objednávku</strong>. Vše se vyplní samo.</>
+            ) : (
+              <>Objednávky dodavatelům vystavuje obchodník nebo super admin. Až budou u tvých zakázek nějaké, uvidíš je tady.</>
+            )}
           </p>
           <Button asChild variant="success"><Link href="/orders">Otevřít Knihu zakázek</Link></Button>
         </div>
@@ -167,7 +205,7 @@ function Board({
       ) : (
         <ul className="space-y-2">
           {visible.map((po) => (
-            <OrderRow key={po.id} po={po} today={today} notify={notify} onChanged={refresh} />
+            <OrderRow key={po.id} po={po} today={today} notify={notify} onChanged={refresh} canSeePrices={canSeePrices} />
           ))}
         </ul>
       )}
@@ -176,14 +214,17 @@ function Board({
 }
 
 function OrderRow({
-  po, today, notify, onChanged,
+  po, today, notify, onChanged, canSeePrices,
 }: {
   po: PurchaseOrderListItem;
   today: string;
   notify: ReturnType<typeof useNotify>;
   onChanged: () => void;
+  canSeePrices: boolean;
 }) {
   const m = PURCHASE_ORDER_STATUS_META[po.status];
+  // bez práva na ceny žádná částka (maskovaná data mají total 0 — nikdy ho neukazovat jako částku)
+  const price = canSeePrices && !po.pricesHidden ? formatMoney(po.total, po.currency) : null;
   const late = isPurchaseOrderLate(po, today);
   const cancelled = po.status === "zrusena";
   return (
@@ -199,12 +240,13 @@ function OrderRow({
           <p className="flex items-center gap-1 truncate text-sm font-medium">
             <Factory className="h-3.5 w-3.5 shrink-0 text-orange-600" /> {po.supplier?.name ?? "Dodavatel"}
           </p>
-          <p className="text-base font-bold tabular-nums lg:hidden">{formatMoney(po.total, po.currency)}</p>
+          {/* skrytá cena na mobilu nezabírá řádek — poznámku nad seznamem má stránka */}
+          {price && <p className="text-base font-bold tabular-nums lg:hidden">{price}</p>}
         </div>
 
         <div className="min-w-0 space-y-1">
           {po.job ? (
-            <Link href={`/orders/${po.job.id}?tab=nakup`} className="group flex min-w-0 items-center gap-1.5">
+            <Link href={`/orders/${po.job.id}?tab=${canSeePrices ? "nakup" : "vyroba"}`} className="group flex min-w-0 items-center gap-1.5">
               <span className="shrink-0 whitespace-nowrap font-mono text-xs font-bold text-primary group-hover:underline">{po.job.number}</span>
               <StageBadge stage={po.job.stage} size="xs" short />
               <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
@@ -236,8 +278,14 @@ function OrderRow({
         </dl>
 
         <div className="flex flex-col gap-2 lg:items-end">
-          <p className="hidden text-lg font-bold tabular-nums lg:block">{formatMoney(po.total, po.currency)}</p>
-          <PurchaseOrderActions order={po} notify={notify} onChanged={onChanged} />
+          {price ? (
+            <p className="hidden text-lg font-bold tabular-nums lg:block">{price}</p>
+          ) : (
+            <p className="hidden items-center gap-1 text-xs text-muted-foreground lg:inline-flex" title={PO_PRICES_HIDDEN_NOTE} data-price-hidden>
+              <Lock className="h-3 w-3 shrink-0" aria-hidden /> cena skrytá
+            </p>
+          )}
+          {canSeePrices && !po.pricesHidden && <PurchaseOrderActions order={po} notify={notify} onChanged={onChanged} />}
         </div>
 
         <PurchaseStepsLine order={po} className="lg:col-span-4" />

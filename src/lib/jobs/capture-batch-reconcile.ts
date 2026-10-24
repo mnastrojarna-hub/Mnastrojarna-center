@@ -1,4 +1,5 @@
 import type { JobFileKind, JobStage } from "@/lib/supabase/database.types";
+import { initialSpecState, materialDifference, sanitizeSpecState } from "@/lib/jobs/drawing-spec";
 import type { CaptureDocKind, ExtractedBusinessDoc, ExtractedItem, ExtractedParty } from "@/lib/jobs/capture-types";
 import type {
   BatchApplyState, BatchDocExtract, BatchDocReview, BatchDocType, BatchGroupReview, BatchGroupState, BatchPage,
@@ -1130,7 +1131,8 @@ export function groupDeadlineOf(
   if (result.proposal) {
     const p = result.proposal;
     source = { docId: p.docId ?? primaryId ?? "", label: p.label };
-    warnings.push(makeWarning("deadline_from_quote", p.past ? "warn" : "info", ids(p.docId), deadlineMessage(result) ?? p.label, [], gk));
+    // termín odvozený z textu (nebo AI nesedí s textem) = warn → ke kontrole, nikdy plná automatika (canAutoApplyBatch)
+    warnings.push(makeWarning("deadline_from_quote", p.past || p.review ? "warn" : "info", ids(p.docId), deadlineMessage(result) ?? p.label, [], gk));
   } else if (result.differs) {
     warnings.push(makeWarning("deadline_from_quote", "info", ids(quotes[0]?.docId ?? null), result.differs, [], gk));
   } else if (!result.realistic && result.reason && result.reason !== "missing") {
@@ -1311,6 +1313,18 @@ export function groupDocOf(docs: ReconcileDoc[], ourIco: string, opts: { today?:
       }
     }
     itemDrawings[i] = drawingHits.map((x) => x.d.id);
+    // materiál: platí doklad (objednávka > nabídka > poptávka); jiný materiál na výkresu = upozornění
+    // (jiná skupina → „warn", kontrola se otevře; jen jiný zápis téže skupiny → „info")
+    const docMaterial = out.material.trim();
+    for (const { d, dr, num } of drawingHits) {
+      const drMat = (dr?.material ?? "").trim();
+      const diff = docMaterial && drMat ? materialDifference(docMaterial, drMat) : null;
+      if (!diff) continue;
+      warnings.push(makeWarning(
+        "material_conflict", diff === "group" ? "warn" : "info", [...(baseId ? [baseId] : []), d.id],
+        `Materiál se liší: ${docMaterial}${baseSrc ? ` (${baseSrc})` : ""} × ${drMat} (z výkresu ${num}) — u položky platí ${docMaterial}, zkontroluj revizi výkresu.`,
+      ));
+    }
     for (const { d, dr, num } of drawingHits) {
       const fills: [keyof ExtractedItem, string][] = [["revision", dr?.revision ?? ""], ["material", dr?.material ?? ""], ["name", dr?.title ?? ""]];
       for (const [f, v] of fills) {
@@ -1739,17 +1753,20 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
           titleSource = `název z položky zakázky ${jobNo}${other ? ` (na výkresu „${dr!.title.trim()}")` : ""}`;
         }
       }
-      const state: DrawingReviewState = {
-        drawingNumber: number, revision, title, material: dr?.material ?? "", dimensions: dr?.dimensions ?? "",
-        generalTolerance: dr?.generalTolerance ?? "", tightestTolerance: dr?.tightestTolerance ?? "",
-        quantity: quantity > 0 ? String(Math.round(quantity * 1000) / 1000) : "", link, archive: true, note: "", onDuplicate: dup && !dup.weak ? "skip" : null,
-      };
-      docStates[d.id] = { kind: "drawing", state };
       const drawing: DrawingExtract = dr ? { ...dr, drawingNumbers: drawingNumbersOf(dr) } : {
         drawingNumber: number, revision, title: "", material: "", dimensions: "", weightKg: 0, generalTolerance: "",
         tightestTolerance: "", surface: "", heatTreatment: "", surfaceTreatment: "", quantity: 0, customerName: "",
         drawingDate: "", sheet: "", scale: "", notes: "", summary: "", confidence: 0, needsClarification: [], drawingNumbers: numbers,
       };
+      const quantityText = quantity > 0 ? String(Math.round(quantity * 1000) / 1000) : "";
+      const state: DrawingReviewState = {
+        drawingNumber: number, revision, title, material: dr?.material ?? "", dimensions: dr?.dimensions ?? "",
+        generalTolerance: dr?.generalTolerance ?? "", tightestTolerance: dr?.tightestTolerance ?? "",
+        quantity: quantityText, link, archive: true, note: "", onDuplicate: dup && !dup.weak ? "skip" : null,
+        // materiál, hmotnost, TZ / PÚ (výslovný stav), poznámky — návrh AI + odhad polotovaru
+        spec: initialSpecState(drawing, { aiUsed: d.aiUsed && Boolean(dr), title, quantity: quantityText }),
+      };
+      docStates[d.id] = { kind: "drawing", state };
       const sources: { quantity?: string; title?: string } = {};
       if (quantity > 0 && quantitySource) sources.quantity = quantitySource;
       if (title && titleSource) sources.title = titleSource;
@@ -2028,12 +2045,15 @@ function sanitizeDocState(
     if (typeof link === "string") return link;
     const qty = s(st.quantity, 30);
     if (qty && (cleanNumber(qty) === null || (cleanNumber(qty) ?? 0) < 0)) return "Výkres: neplatné množství.";
+    const spec = sanitizeSpecState(st.spec);
+    if (typeof spec === "string") return spec;
     return {
       kind: "drawing",
       state: {
         drawingNumber: s(st.drawingNumber, 80), revision: s(st.revision, 20), title: s(st.title, 300), material: s(st.material, 200),
         dimensions: s(st.dimensions, 200), generalTolerance: s(st.generalTolerance, 120), tightestTolerance: s(st.tightestTolerance, 120),
         quantity: qty, link, archive: st.archive !== false, note: s(st.note, 2000), onDuplicate: cleanDup(st.onDuplicate),
+        ...(spec ? { spec } : {}),
       },
     };
   }

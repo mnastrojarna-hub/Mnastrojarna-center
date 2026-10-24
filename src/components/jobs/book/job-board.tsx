@@ -241,7 +241,7 @@ function BoardCard({
       <p className="mt-1 truncate text-sm font-semibold">{job.customer?.name ?? <span className="italic text-muted-foreground">Bez zákazníka</span>}</p>
       <p className="truncate text-xs text-muted-foreground">{job.title || "Bez názvu"}</p>
       <CustomerDocNumber job={job} className="mt-1.5" />
-      <RowStateChip job={job} view={view} className="relative z-10 mt-1.5" />
+      <RowStateChip job={job} view={view} shortFlag className="relative z-10 mt-1.5" />
       <ProductionLine job={job} compact className="mt-2" />
       <div className="mt-2 flex items-end justify-between gap-2">
         <DeadlineBlock job={job} today={today} compact />

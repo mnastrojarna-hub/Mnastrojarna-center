@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Archive, Download, ExternalLink, FolderOpen, Search, Sparkles, X } from "lucide-react";
+import { Archive, Download, ExternalLink, FolderOpen, Lock, Search, Sparkles, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { FlowEmpty } from "./flow-header";
 import { czDay, fileKindCounts, filterFiles, formatBytes, isImageFile, todayPrague } from "./flow-utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { fileOriginLabel, type FileFlowInfo } from "./flow-state";
+import { fileLockText } from "./file-lock";
+import type { FileLock } from "@/lib/jobs/types";
 
 /** Dokument zakázky pro přehled (čistá data ze serveru). */
 export interface FlowFile {
@@ -31,6 +33,8 @@ export interface FlowFile {
   hasAiData: boolean;
   /** Původ a autoři (bez DB stavů null). */
   flow?: FileFlowInfo | null;
+  /** #25: obsah zamčený (nákupní doklad bez práva, neschválená / zastaralá nabídka) — bez náhledu a stažení. */
+  locked?: FileLock;
   job: { id: string; number: string; title: string; customerName: string | null };
 }
 
@@ -125,7 +129,7 @@ export function DocumentsBrowser({ files, today }: { files: FlowFile[]; today: s
         <>
           <ul className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
             {shown.slice(0, limit).map((f) => (
-              <FileCard key={f.id} file={f} today={today} />
+              f.locked ? <LockedFileCard key={f.id} file={f} today={today} /> : <FileCard key={f.id} file={f} today={today} />
             ))}
           </ul>
           {shown.length > limit && (
@@ -138,6 +142,48 @@ export function DocumentsBrowser({ files, today }: { files: FlowFile[]; today: s
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Zamčený dokument (#25): druh, název, zakázka, datum a kdo nahrál zůstávají; náhled, otevření a stažení ne
+ * (server je odmítne také). Řádek není odkaz na soubor — jen text, proč je zamčený.
+ */
+function LockedFileCard({ file: f, today }: { file: FlowFile; today: string }) {
+  const m = FILE_KINDS[f.kind] ?? FILE_KINDS.ostatni;
+  const text = fileLockText(f.locked) ?? "";
+  return (
+    <li
+      className={cn("flex overflow-hidden rounded-xl border border-dashed bg-card/70 shadow-sm sm:flex-col", f.archived && "opacity-70")}
+      data-locked={f.locked ?? undefined}
+    >
+      <div aria-hidden className={cn("relative flex w-20 shrink-0 items-center justify-center overflow-hidden opacity-70 sm:h-32 sm:w-full", m.badge)}>
+        <Lock className="h-8 w-8 sm:h-10 sm:w-10" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-2.5 sm:p-3">
+        <div className="flex flex-wrap items-center gap-1">
+          <FileKindBadge kind={f.kind} />
+          {f.archived && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground">
+              <Archive className="h-3 w-3" /> archiv
+            </span>
+          )}
+        </div>
+        <p className="line-clamp-2 break-words text-sm font-medium leading-snug text-muted-foreground" title={f.filename}>{f.title || f.filename}</p>
+        <p className="flex items-start gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+          <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden /> <span className="min-w-0">{text}</span>
+        </p>
+        <Link href={`/orders/${f.job.id}?tab=dokumenty`} className="flex min-w-0 items-center gap-1 text-xs hover:underline">
+          <span className="shrink-0 whitespace-nowrap font-mono font-semibold">{f.job.number}</span>
+          <span className="truncate text-muted-foreground">{f.job.customerName ?? f.job.title}</span>
+        </Link>
+        {f.flow?.uploaded && <ActorStamp stamp={f.flow.uploaded} verb={f.flow.origin === "generated" ? "Vystaveno" : "Nahráno"} short />}
+        <span className="mt-auto truncate pt-1 text-[11px] text-muted-foreground">
+          {czDay(todayPrague(new Date(f.createdAt)), { short: true, today })}
+          {f.uploadedBy && !f.flow?.uploaded ? ` · ${f.uploadedBy}` : ""}
+        </span>
+      </div>
+    </li>
   );
 }
 

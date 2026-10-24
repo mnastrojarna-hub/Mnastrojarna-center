@@ -21,5 +21,17 @@
   "needsClarification": [],
   "drawingNumbers": [
     "8800-03"
+  ],
+  "materialGroup": "nerez",
+  "overallDims": [],
+  "shapeHint": "kulatina",
+  "blankDimensions": "",
+  "heatStatus": "bez",
+  "heatSteps": [],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "drawingNotes": [
+    "Obecné tolerance ISO 2768-mK",
+    "Nekótované hrany sražené 0,5 × 45°"
   ]
 }

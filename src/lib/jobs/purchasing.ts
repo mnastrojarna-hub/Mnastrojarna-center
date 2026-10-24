@@ -359,8 +359,31 @@ export function defaultDeliveryAddress(company: {
     .join("\n");
 }
 
+/**
+ * Kam nám dodavatelé vozí díly: Nastavení „Dodací adresa (provozovna)" (jeden řádek s čárkami → řádky),
+ * jinak korespondenční / doručovací adresa provozovny, jinak sídlo.
+ */
+export function ourDeliveryAddressOf(
+  company: { name: string; address: { street?: string; zip?: string; city?: string }; correspondence?: { street?: string; zip?: string; city?: string } },
+  custom?: string | null,
+): string {
+  const c = (custom ?? "").trim();
+  if (c) return c.includes("\n") ? c : c.split(/\s*,\s*/).filter(Boolean).join("\n");
+  const k = company.correspondence;
+  if (k && (k.street ?? "").trim()) return defaultDeliveryAddress({ name: company.name, address: k });
+  return defaultDeliveryAddress(company);
+}
+
+/** Dodací podmínka podle místa dodání („DAP Mezná"); bez místa výchozí „DAP Mnástrojárna". */
+export function deliveryTermsFor(address: string | null | undefined): string {
+  const lines = String(address ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+  const lastLine = lines[lines.length - 1] ?? "";
+  const place = (lastLine.split(",").pop() ?? "").trim().replace(/^\d{3}\s?\d{2}\s+/, "").trim();
+  return lines.length >= 2 && place ? `DAP ${place}` : DEFAULT_DELIVERY_TERMS;
+}
+
 /** Poznámka objednávky: naše zakázka + výkresy. Bez zákazníka a jeho cen. */
-export function purchaseOrderNote(jobNumber: string | null | undefined, drawings: (string | null | undefined)[]): string {
+export function purchaseOrderNote(jobNumber: string | null | undefined, drawings: (string | null | undefined)[], drawingsLabel = "Výroba dle výkresů"): string {
   const list: string[] = [];
   for (const d of drawings) {
     const s = (d ?? "").trim();
@@ -371,7 +394,7 @@ export function purchaseOrderNote(jobNumber: string | null | undefined, drawings
   if (job) parts.push(`Objednávka k naší zakázce ${job}.`);
   if (list.length) {
     const shown = list.slice(0, 12).join(", ");
-    parts.push(`Výroba dle výkresů: ${shown}${list.length > 12 ? " a další" : ""}.`);
+    parts.push(`${drawingsLabel}: ${shown}${list.length > 12 ? " a další" : ""}.`);
   }
   return parts.join(" ");
 }
@@ -784,6 +807,8 @@ export function purchaseOrderEmail(input: {
   senderEmail?: string | null;
   senderPhone?: string | null;
   companyWeb?: string | null;
+  /** Objednávka bez nabídky dodavatele: výkresy firma od nás nemá — řádek, že je pošleme. */
+  drawingsSeparately?: boolean;
 }): { subject: string; body: string } {
   const days = input.confirmWithinDays ?? CONFIRM_WITHIN_WORKING_DAYS;
   const quote = (input.supplierQuoteNumber ?? "").trim();
@@ -794,6 +819,7 @@ export function purchaseOrderEmail(input: {
     `v příloze Vám zasíláme naši objednávku č. ${input.number}${quote ? ` na základě Vaší nabídky č. ${quote}` : ""}.`,
   ];
   if (req) lines.push(`Požadovaný termín dodání: ${czDate(req)} (${czWeekday(req)}).`);
+  if (input.drawingsSeparately && !quote) lines.push("Výkresovou dokumentaci k položkám Vám pošleme samostatně, pokud ji od nás ještě nemáte.");
   lines.push(
     "",
     `Prosíme o potvrzení objednávky a termínu dodání do ${days} ${days === 1 ? "pracovního dne" : "pracovních dnů"} — stačí odpovědět na tento e-mail.`,

@@ -210,3 +210,48 @@ describe("filtry Knihy podle podrobných stavů", () => {
     expect(paymentStateOf({ stage: "dokonceno", paidAt: null, invoiceDueDate: null, invoiceNumber: null })).toBe("zaplaceno");
   });
 });
+
+describe("#25 neschválená nabídka v Knize", () => {
+  const pending = (p: Partial<QuoteFacts> = {}) => quote({
+    status: "ke_schvaleni", state: "ke_schvaleni", sentAt: null, approvalRequired: true, adminApprovalRequired: true, total: 5000, ...p,
+  });
+
+  it("štítek za hlavním chipem v poptávce i objednávce; ve fázi nabídky ho nahrazuje chip „Neschválená“", () => {
+    const inquiry = job({ flowQuotes: [pending()] });
+    expect(rowFlowView(inquiry, SALES).approval?.kind).toBe("pending");
+    const order = job({
+      stage: "objednavka", flow: facts({ stage: "objednavka", inquiryStatus: "zpracovana", orderStatus: "dorucena", orderRevision: 1 }),
+      flowQuotes: [quote({ id: "q0", status: "prijato", state: "prijata" }), pending({ id: "q2", number: "NAB-2026-032" })],
+    });
+    expect(rowFlowView(order, SALES).approval?.number).toBe("NAB-2026-032");
+    const pricing = job({ stage: "naceneni", flow: facts({ stage: "naceneni", inquiryStatus: "zpracovana", itemsCount: 1, itemsPriced: 1 }), flowQuotes: [pending()] });
+    const v = rowFlowView(pricing, SALES);
+    expect(v.chip?.key).toBe("ke_schvaleni");
+    // ve fázi nabídky štítek NAHRADÍ fialový chip (jinak by „Neschválená“ vypadala jako „Schválená“)
+    expect(v.approval?.kind).toBe("pending");
+    expect(v.chipIsApproval).toBe(true);
+    expect(rowFlowView(inquiry, SALES).chipIsApproval).toBe(false);
+    const row = render(<JobRows jobs={[pricing]} today="2026-10-22" access={SALES} />);
+    expect(row).not.toContain("ring-violet-400"); // žádný fialový chip stavu nabídky
+    expect(flat(row)).toContain("Neschválená · NAB-2026-031");
+    expect(row.match(/data-approval="pending"/g)?.length).toBe(2);
+    // vrácená se ukáže i tam (jiná informace než „Neschválená“)
+    expect(rowFlowView(job({ ...pricing, flowQuotes: [pending({ returnedAt: "2026-10-23T09:00:00Z", returnNote: "cena" })] }), SALES).approval?.kind).toBe("returned");
+    // schválenou ani archivní Kniha neoznačuje
+    expect(rowFlowView(job({ flowQuotes: [pending({ archived: true })] }), SALES).approval).toBeNull();
+    expect(rowFlowView(job({ flowQuotes: [quote({ status: "ke_schvaleni", state: "schvalena", approvedBy: "u9", sentAt: null })] }), SALES).approval).toBeNull();
+  });
+
+  it("řádek (mobil celý text od sm, desktop krátký) a karta tabule: „Neschválená“ s title", () => {
+    const html = render(<JobRows jobs={[job({ flowQuotes: [pending()] })]} today="2026-10-22" access={SALES} />);
+    expect(html).toContain('data-approval="pending"');
+    expect(html).toContain("Neschválená — čeká na schválení super admina");
+    expect(html).toContain('title="Nabídka NAB-2026-031 čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi."');
+    // jednou v kartě (mobil / tablet), jednou u stavu (desktop)
+    expect(html.match(/data-approval="pending"/g)?.length).toBe(2);
+    const board = render(<JobBoard jobs={[job({ flowQuotes: [pending()] })]} stages={["poptavka"]} today="2026-10-22" access={SALES} />);
+    expect(board).toContain('data-approval="pending"');
+    expect(flat(board)).toContain("Neschválená");
+    expect(flat(board)).not.toContain("Neschválená — čeká");
+  });
+});

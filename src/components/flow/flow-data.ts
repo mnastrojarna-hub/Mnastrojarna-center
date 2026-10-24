@@ -141,6 +141,7 @@ export function toFlowFile(
     hasAiData: f.hasAiData,
     job: f.job,
     flow,
+    locked: f.locked ?? null,
   };
 }
 

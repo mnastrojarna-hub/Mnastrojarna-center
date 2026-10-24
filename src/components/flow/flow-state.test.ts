@@ -141,6 +141,19 @@ describe("akce nabídky v přehledu", () => {
     const returned = quote({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, createdBy: "u1", returnedAt: "2026-10-23T08:00:00Z" });
     expect(quoteRowActions({ quote: returned, display: "ke_schvaleni", hasJob: true, current: true }, ctx(STAFF)).next)
       .toEqual({ key: "quote.edit", label: "Upravit podle připomínek" });
+    // super admin vrácenou primárně neschvaluje (čeká se na autora), „Schválit“ zůstává v menu
+    const adminCtx = ctx([...SALES, "quote_approval"], { isSuperAdmin: true, userId: "admin" });
+    const adminReturned = quoteRowActions({ quote: { ...returned, total: 1000 }, display: "ke_schvaleni", hasJob: true, current: true }, adminCtx);
+    expect(adminReturned.next).toBeNull();
+    expect(adminReturned.menu).toContain("quote.approve");
+  });
+
+  it("#25 review: obchodník zakázky (jobOwnerId) smí odeslat schválenou nabídku kolegy i z /quotes", () => {
+    const approved = quote({ state: "schvalena", approvalRequired: true, adminApprovalRequired: true, approvedBy: "admin", createdBy: "u7" });
+    const row = { quote: approved, display: "schvalena" as const, hasJob: true, current: true };
+    expect(quoteRowActions(row, ctx(STAFF)).next).toBeNull();
+    expect(quoteRowActions({ ...row, jobOwnerId: "u1" }, ctx(STAFF)).next?.key).toBe("quote.send");
+    expect(quoteRowActions({ ...row, jobOwnerId: "u8", jobAssigneeId: "u1" }, ctx(STAFF)).menu).toContain("quote.send");
   });
 
   it("odeslaná / vypršelá / připomínky; zaměstnanec jen navrhne zamítnutí; bez zakázky nic", () => {

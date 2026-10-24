@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { renderPurchaseOrderPdf, samplePurchaseOrder } from "./render-purchase";
 import { computeTotals, type DocItem } from "./types";
+import { unpricedSummary } from "./purchase-order";
 
 const PREVIEW = process.env.PDF_PREVIEW === "1";
 const PREVIEW_DIR = "/tmp/claude-0/pdf-preview";
@@ -69,6 +70,23 @@ describe("PDF objednávka dodavateli", () => {
     });
     isPdf(buf, 3 * 1024);
     save("objednavka-vydana-minimum.pdf", buf);
+  }, 30_000);
+
+  it("závazná objednávka bez cen: žádné „Celkem 0,00 Kč“ (karta „dle Vaší nabídky“); změna č. 2; pokyn kalírně (review)", async () => {
+    const s = samplePurchaseOrder();
+    const unpriced = s.items.map((it) => ({ ...it, unitPrice: 0, unpriced: true }));
+    expect(unpricedSummary(unpriced)).toEqual({ all: true, count: unpriced.length });
+    expect(unpricedSummary([{ ...s.items[0] }, { ...s.items[1], unpriced: true }])).toEqual({ all: false, count: 1 });
+    const buf = await renderPurchaseOrderPdf({
+      ...s, items: unpriced, revision: 2, revisionDate: "2026-10-24",
+      intro: "Dobrý den, u Vás závazně objednáváme tepelné zpracování níže uvedených dílů.",
+      workInstruction: "Tepelné zpracování proveďte dle výkresové dokumentace v uvedené revizi (tvrdost, hloubka vrstvy), odchylky předem konzultujte.",
+    });
+    isPdf(buf, 3 * 1024);
+    expect(pageCount(buf)).toBe(1);
+    save("objednavka-vydana-bez-cen-zmena.pdf", buf);
+    const part = await renderPurchaseOrderPdf({ ...s, items: [s.items[0], { ...s.items[1], unpriced: true }] });
+    isPdf(part, 3 * 1024);
   }, 30_000);
 
   it("součty ukázky sedí (bez DPH, DPH 21 %, s DPH)", () => {

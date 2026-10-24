@@ -72,7 +72,7 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
   async function issue(force = false) {
     if (!job || busy) return;
     if (kind === "nabidka" && !job.hasQuote) {
-      setError("Zakázka zatím nemá nabídku — vytvoř ji v Nacenění („Vytvořit nabídku z ceny“) nebo v kartě zakázky.");
+      setError("Zakázka zatím nemá nabídku — vytvoř ji v kartě zakázky (záložka Nabídky).");
       return;
     }
     setBusy(true);

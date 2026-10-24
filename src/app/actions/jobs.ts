@@ -138,6 +138,31 @@ async function applyStage(
 }
 
 // ── Zakázka ─────────────────────────────────────────────────
+const OWNER_ADMIN_ONLY = "Obchodníka zakázky mění jen super admin.";
+
+/**
+ * #25: nová zakázka — ne-admin smí jako obchodníka zvolit jen sebe, nikoho, nebo obchodníka
+ * vybraného zákazníka (foto dokladu tak zakázku dá obchodníkovi zákazníka). null = v pořádku.
+ */
+async function ownerChoiceError(c: Ctx, ownerId: string | null | undefined, customerId: string | null): Promise<string | null> {
+  if (c.user.role === "super_admin" || !ownerId || ownerId === c.user.id) return null;
+  if (customerId && isUuid(customerId)) {
+    const { data } = await c.db.from("customers").select("owner_id").eq("id", customerId).maybeSingle();
+    if ((data as { owner_id: string | null } | null)?.owner_id === ownerId) return null;
+  }
+  return OWNER_ADMIN_ONLY;
+}
+
+/** Obchodník zákazníka (jen aktivní účet) — výchozí Obchodník nové zakázky bez výslovné volby. */
+async function activeCustomerOwner(db: JobsDb, customerId: string | null | undefined): Promise<string | null> {
+  if (!customerId || !isUuid(customerId)) return null;
+  const { data } = await db.from("customers").select("owner_id").eq("id", customerId).maybeSingle();
+  const ownerId = (data as { owner_id: string | null } | null)?.owner_id ?? null;
+  if (!ownerId) return null;
+  const { data: p } = await db.from("profiles").select("active").eq("id", ownerId).maybeSingle();
+  return (p as { active: boolean | null } | null)?.active === false ? null : ownerId;
+}
+
 export async function createJob(
   input: JobInput & { items?: JobItemInput[] },
   opts: {
@@ -165,16 +190,41 @@ export async function createJob(
     const row = jobInputToRow({ ...input, stage });
     if (!margins) delete row.purchase_cost;
 
+    // #25: obchodníka zakázky určuje super admin — ostatní jen sebe, nikoho, nebo obchodníka vybraného
+    // zákazníka. Kontrola PŘED jakýmkoli zápisem (jinak by zůstal založený zákazník s cizím obchodníkem,
+    // kterého by pak šlo „převzít" jako obchodníka zákazníka). Nezvoleno / „—" = výchozí níže (jako dřív).
+    const isAdmin = user.role === "super_admin";
+    const isSales = isAdmin || user.role === "obchodnik";
+    const requestedOwner = (row.owner_id as string | null | undefined) ?? undefined;
+    delete row.owner_id;
+    if (requestedOwner !== undefined) {
+      const ownerErr = await ownerChoiceError(c, requestedOwner, (row.customer_id as string | null | undefined) ?? null);
+      if (ownerErr) return fail(ownerErr);
+    }
+
     // zákazník: vybraný, nebo dohledat / založit podle názvu
+    // (nový zákazník: super admin → zvolený obchodník / on; obchodník → on sám; zaměstnanec → bez obchodníka)
     let customerCreated = false;
     if (!row.customer_id) {
       const name = cleanText(input.customerName, 300);
       if (name) {
-        const found = await findOrCreateCustomer(db, { name, ownerId: (row.owner_id as string | null) ?? user.id });
+        const customerOwner = isAdmin ? (requestedOwner ?? user.id) : isSales ? user.id : null;
+        const found = await findOrCreateCustomer(db, { name, ownerId: customerOwner });
         if (!found) return fail("Zákazníka se nepodařilo dohledat ani založit.");
         row.customer_id = found.id;
         customerCreated = found.created;
       }
+    }
+
+    // #25: bez výslovné volby jako u e-mailu a fotky — Obchodník = obchodník zákazníka, jinak zakládající
+    // obchodník / super admin; zaměstnanec zakázku zpracovává (Obchodník = obchodník zákazníka, jinak nikdo).
+    let ownerId: string | null;
+    if (requestedOwner !== undefined) {
+      ownerId = requestedOwner;
+    } else {
+      const customerOwner = await activeCustomerOwner(db, row.customer_id as string | null | undefined);
+      ownerId = customerOwner ?? (isSales ? user.id : null);
+      if (!isSales && row.assignee_id === undefined) row.assignee_id = user.id;
     }
 
     const itemRows = items.map((it, i) => {
@@ -203,7 +253,7 @@ export async function createJob(
       ...row,
       number,
       status: stage,
-      owner_id: (row.owner_id as string | null | undefined) ?? user.id,
+      owner_id: ownerId,
       created_by: user.id,
       source,
       email_id: opts.emailId ?? null,
@@ -256,16 +306,24 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     delete row.status;
     if (!margins) delete row.purchase_cost;
 
+    // #25: obchodníka zakázky mění jen super admin („Zpracovává" smí každý) — kontrola PŘED založením
+    // zákazníka níže (jinak by po odmítnutí zůstal založený zákazník)
+    const isAdmin = user.role === "super_admin";
+    if (!isAdmin && row.owner_id !== undefined && diffJob(before, { owner_id: row.owner_id }).length) return fail(OWNER_ADMIN_ONLY);
+
     if (rest.customerId === undefined) {
       const name = cleanText(rest.customerName, 300);
       if (name) {
-        const found = await findOrCreateCustomer(db, { name, ownerId: (before.owner_id as string | null) ?? user.id });
+        // nový zákazník: obchodník zakázky, jinak zakládající obchodník / super admin; zaměstnanec obchodníkem není
+        const isSales = isAdmin || user.role === "obchodnik";
+        const found = await findOrCreateCustomer(db, { name, ownerId: (before.owner_id as string | null) ?? (isSales ? user.id : null) });
         if (!found) return fail("Zákazníka se nepodařilo dohledat ani založit.");
         row.customer_id = found.id;
       }
     }
 
     const changes = diffJob(before, row);
+    if (!isAdmin && changes.some((ch) => ch.field === "owner_id")) return fail(OWNER_ADMIN_ONLY);
     const fromStage = isJobStage(before.status) ? before.status : null;
     const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
     if (stageTo && reasonRequired("job", stageTo)) return fail(CLOSE_NEEDS_REASON);

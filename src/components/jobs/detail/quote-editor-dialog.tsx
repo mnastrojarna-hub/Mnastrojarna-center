@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createJobQuote, updateJobQuote } from "@/app/actions/jobs";
+import { useAccess } from "@/components/access-provider";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
 import { ItemsEditor } from "./items-editor";
@@ -41,6 +42,7 @@ export function QuoteEditorDialog({
   currency?: string;
 }) {
   const { jobId, perms, notify, refresh } = useJobDetail();
+  const superAdmin = useAccess().role === "super_admin";
   const [form, setForm] = React.useState<QuoteFormState>(initial);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -73,7 +75,17 @@ export function QuoteEditorDialog({
         return;
       }
       const number = "number" in res && typeof res.number === "string" ? res.number : quoteNumber;
-      notify("success", editing ? `Nabídka ${number ?? ""} uložena.` : `Nabídka ${number ?? ""} vytvořena — teď ji schval a odešli.`);
+      // #25: nabídku ne-admina schvaluje super admin; jeho vlastní schválení nepotřebují
+      const reset = "approvalReset" in res && res.approvalReset === true;
+      const pending = "needsApproval" in res && res.needsApproval === true;
+      notify(
+        "success",
+        editing
+          ? reset ? "Nabídka upravena — změnu musí super admin znovu schválit." : `Nabídka ${number ?? ""} uložena.`
+          : pending
+            ? `Nabídka ${number ?? ""} vytvořena — čeká na schválení super admina.`
+            : `Nabídka ${number ?? ""} vytvořena — teď ji odešli.`,
+      );
       onOpenChange(false);
       refresh();
     } catch {
@@ -90,13 +102,17 @@ export function QuoteEditorDialog({
           icon={editing ? Pencil : FilePlus2}
           tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
           title={editing ? `Upravit nabídku ${quoteNumber ?? ""}` : "Nová nabídka"}
-          subtitle={editing ? "Změna položek nebo cen zruší schválení — nabídku pak schval znovu." : "Předvyplněno z položek zakázky. Doplň ceny a ulož."}
+          subtitle={
+            editing
+              ? superAdmin ? "Úprava schválené nabídky ji rovnou znovu schválí (tvým jménem)." : "Každá změna zruší schválení — nabídku pak znovu schválí super admin."
+              : superAdmin ? "Předvyplněno z položek zakázky. Doplň ceny a ulož." : "Předvyplněno z položek zakázky. Doplň ceny a ulož — před odesláním ji schválí super admin."
+          }
         />
         <form onSubmit={submit} className="space-y-5 p-4 sm:p-5" noValidate>
           <ErrorBox error={error} />
-          {editing && approved && (
+          {editing && approved && !superAdmin && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-              Nabídka je schválená. Když změníš položky nebo ceny, bude potřeba ji schválit znovu.
+              Nabídka je schválená. Když ji změníš, bude zase neschválená a odeslat ji půjde až po novém schválení super adminem.
             </p>
           )}
           <Field label="Název nabídky" icon={Type}>

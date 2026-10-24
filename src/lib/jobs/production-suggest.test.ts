@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  leadTimeLabel, money, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, operationKindsOfText,
+  familyScopeOf, kindAccusative, leadTimeLabel, money, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, operationKindsOfText,
   purchaseItemsForStep, quoteKinds, quoteStepMatch, quoteValue, rankQuotesForStep, stepPurchaseOrderNote,
-  suggestRoute, suggestStepDeadline, suggestWhoForStep, unitClass,
+  suggestRoute, suggestStepDeadline, suggestWhoForStep, unitClass, workingDayOnOrAfter,
   type SuggestItem, type SuggestQuote,
 } from "./production-suggest";
 
@@ -67,6 +67,29 @@ describe("druhy kroků z textu a technologií", () => {
     expect(operationKindsOfText("soustružení a broušení; zinkování")).toEqual(["soustruzeni", "brouseni", "povrchova_uprava"]);
     expect(operationKindsOfText("žíhání na odstranění pnutí")).toEqual(["tepelne_zpracovani"]);
     expect(operationKindsOfText(null)).toEqual([]);
+  });
+
+  it("zakalit / zakalení / prokalit / prokalení / kalit (hranice slova i s předponou a diakritikou); nekalit ani kalibr ne", () => {
+    for (const t of ["zakalit na 58 HRC", "Zakalení 60 HRC", "prokalit", "PROKALENÍ celého průřezu", "kalit", "kalený díl", "vykalit",
+      "díl zakalený", "frézovat, zakalit", "materiál 1.2379 – kalit 58–60 HRC", "firma kalí ve vakuu", "kalení"]) {
+      expect(operationKindsOfText(t), t).toContain("tepelne_zpracovani");
+    }
+    for (const t of ["kalibrace", "kalibr M8", "nekalit", "kaliště", "nekalený polotovar"]) {
+      expect(operationKindsOfText(t), t).not.toContain("tepelne_zpracovani");
+    }
+    expect(operationKindsOfText("Frézování + zakalení")).toEqual(["frezovani", "tepelne_zpracovani"]);
+  });
+
+  it("kalendář (splatnost, týden, termín) není kalení; zušlechtit / zušlechtění je tepelné zpracování (review)", () => {
+    for (const t of ["Splatnost 30 kalendářních dnů", "Dodání ve 45. kalendářním týdnu", "termín dle kalendáře", "kalendářní", "kalendáře",
+      "Cena platí 30 kalendářních dnů"]) {
+      expect(operationKindsOfText(t), t).not.toContain("tepelne_zpracovani");
+    }
+    for (const t of ["zušlechtit na 28–32 HRC", "Zušlechtění", "zuslechteni", "materiál zušlechtěný"]) {
+      expect(operationKindsOfText(t), t).toContain("tepelne_zpracovani");
+    }
+    // nabídka obrábění s textem o splatnosti zůstane obráběním
+    expect(operationKindsOfText("Frézování dílů, cena platí 30 kalendářních dnů")).toEqual(["frezovani"]);
   });
 
   it("technologie dodavatele jen z jedné rodiny; kdo obrábí i kalí, nic neprozradí", () => {
@@ -306,12 +329,24 @@ describe("termín kroku", () => {
   });
 
   it("další krok u jiné firmy: od konce předchozího + 1 pracovní den na dopravu", () => {
-    // výroba končí pá 13. 11. → doprava po 16. 11. → kalení 5 dní → 21. 11.
+    // výroba končí pá 13. 11. → doprava po 16. 11. → kalení 5 dní → so 21. 11. → nejbližší pracovní den po 23. 11.
     expect(suggestStepDeadline({ today: TODAY, previousEnd: "2026-11-13", performerChanged: true, quote: { deliveryDate: null, leadTimeDays: 5 } }))
-      .toMatchObject({ date: "2026-11-21", caption: "z nabídky (5 dní) + 1 den doprava" });
+      .toMatchObject({ date: "2026-11-23", caption: "z nabídky (5 dní) + 1 den doprava" });
     // termín z nabídky před koncem předchozího kroku se nepoužije
     expect(suggestStepDeadline({ today: TODAY, previousEnd: "2026-11-13", quote: { deliveryDate: "2026-11-01", leadTimeDays: null }, supplierLeadDays: 7 }))
       .toMatchObject({ date: "2026-11-20", source: "lhuta_dodavatele", caption: "obvyklá lhůta dodavatele (1 týden)" });
+  });
+
+  it("lhůta v kalendářních dnech nekončí o víkendu ani o svátku (review)", () => {
+    // 21. 10. + 10 dní = so 31. 10. → po 2. 11.
+    expect(suggestStepDeadline({ today: "2026-10-21", quote: { deliveryDate: null, leadTimeDays: 10 } }).date).toBe("2026-11-02");
+    // 14. 12. + 10 dní = čt 24. 12. (svátek) → 25. a 26. 12. svátky, 27. neděle → po 28. 12.
+    expect(suggestStepDeadline({ today: "2026-12-14", supplierLeadDays: 10 }).date).toBe("2026-12-28");
+    // 21. 10. + 7 dní = st 28. 10. (státní svátek) → čt 29. 10.; pracovní den zůstává
+    expect(suggestStepDeadline({ today: "2026-10-21", quote: { deliveryDate: null, leadTimeDays: 7 } }).date).toBe("2026-10-29");
+    expect(workingDayOnOrAfter("2026-11-02")).toBe("2026-11-02");
+    // explicitní termín z nabídky dodavatele se nemění (to datum slíbil on)
+    expect(suggestStepDeadline({ today: TODAY, quote: { deliveryDate: "2026-11-14", leadTimeDays: null } }).date).toBe("2026-11-14");
   });
 
   it("poslední krok: konečný termín − 3 pracovní dny (28. 10. je svátek)", () => {
@@ -452,5 +487,29 @@ describe("objednávka dodavateli pro krok", () => {
     expect(note).toBe("Objednávka k naší zakázce Z-2026-104. Výroba dle výkresů: PR-7075-20. Operace: Tepelné zpracování (krok 2 ze 3). Navazuje: Výroba 2 — termín prosíme dodržet.");
     expect(note).not.toMatch(/mezitermín/i);
     expect(stepPurchaseOrderNote({ jobNumber: "Z-1", drawings: [], stepLabel: "Výroba", stepNo: 1, stepCount: 1 })).toBe("Objednávka k naší zakázce Z-1. Operace: Výroba.");
+  });
+
+  it("kalírna / povrch: „Dle výkresů“, ne „Výroba dle výkresů“ (review)", () => {
+    const heat = stepPurchaseOrderNote({ jobNumber: "Z-1", drawings: ["PR-7075-20"], stepLabel: "Tepelné zpracování", stepNo: 2, stepCount: 3, kind: "tepelne_zpracovani" });
+    expect(heat).toContain("Dle výkresů: PR-7075-20.");
+    expect(heat).not.toContain("Výroba dle výkresů");
+    expect(stepPurchaseOrderNote({ jobNumber: "Z-1", drawings: ["X"], stepLabel: "Výroba", stepNo: 1, stepCount: 1, kind: "vyroba" })).toContain("Výroba dle výkresů: X.");
+  });
+});
+
+describe("drobnosti z review", () => {
+  it("„Naposledy dělal výrobu / povrchovou úpravu“ ve 4. pádě", () => {
+    expect(kindAccusative("vyroba")).toBe("výrobu");
+    expect(kindAccusative("povrchova_uprava")).toBe("povrchovou úpravu");
+    expect(kindAccusative("tepelne_zpracovani")).toBe("tepelné zpracování");
+    expect(kindAccusative("frezovani")).toBe("frézování");
+  });
+
+  it("kalírna ze šablony bez dílů dostane jen díly s kalením na výkresu; povrch jen díly s povrchem", () => {
+    expect(familyScopeOf("tepelne_zpracovani", ITEMS)).toEqual([PRIRUBA.id]);
+    expect(familyScopeOf("povrchova_uprava", ITEMS)).toBeNull();                       // žádný díl povrch nemá
+    expect(familyScopeOf("povrchova_uprava", [PRIRUBA, { ...POUZDRO, surfaceTreatment: "zinek" }])).toEqual([POUZDRO.id]);
+    expect(familyScopeOf("vyroba", ITEMS)).toBeNull();
+    expect(familyScopeOf("tepelne_zpracovani", [PRIRUBA, { ...POUZDRO, heatTreatment: "kalit" }])).toBeNull(); // všechny
   });
 });

@@ -16,11 +16,13 @@ import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
  * zakázky rovnou s tím dialogem (?akce=…).
  */
 export function RowNextAction({
-  jobId, action, quoteId, reopenOrderTo, waitingNote, palette, className,
+  jobId, action, quoteId, quoteUpdatedAt, reopenOrderTo, waitingNote, palette, className,
 }: {
   jobId: string;
   action: { key: FlowActionKey; label: string } | null;
   quoteId?: string | null;
+  /** updated_at aktivní nabídky z načtené Knihy — „Schválit“ projde jen nezměněná nabídka. */
+  quoteUpdatedAt?: string | null;
   reopenOrderTo?: OrderDocStatus;
   waitingNote?: string | null;
   palette?: PaletteKey;
@@ -30,7 +32,7 @@ export function RowNextAction({
   // otisk dalšího kroku: po přímé akci se musí změnit (jinak pojistka stránku načte znovu)
   const settle = useSettledRefresh(250, `${jobId}:${action?.key ?? "-"}`);
   if (!action || action.key === "proposal.decide") return null;
-  const ctx = { jobId, quoteId, reopenOrderTo, waitingNote };
+  const ctx = { jobId, quoteId, reopenOrderTo, waitingNote, expectedUpdatedAt: quoteUpdatedAt ?? null };
   const direct = FLOW_ACTIONS[action.key].kind === "direct" && isDirectAction(action.key);
   return (
     <span title={action.label} className="inline-flex">

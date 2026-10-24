@@ -919,7 +919,8 @@ export function classifyMaterial(designation: string | null | undefined, aiGroup
         if (!structural.includes(num)) continue; // S600, S390… = Böhler HSS (TRADE_RULES)
         if (!suf && ["500", "690", "700"].includes(num) && /bohler|boehler/.test(f)) continue;
       }
-      if (letter === "E" && !["295", "335", "360"].includes(num)) continue;
+      // E295/E335/E360 (EN 10025-2) a přesné trubky E215–E470 (EN 10305: E235+N, E355+SR)
+      if (letter === "E" && !["215", "235", "255", "295", "335", "355", "360", "410", "470"].includes(num)) continue;
       if (letter === "P" && !["195", "235", "265", "275", "295", "355", "460"].includes(num)) continue;
       const qt = /Q/.test(suf) && letter === "S";
       add({
@@ -929,6 +930,10 @@ export function classifyMaterial(designation: string | null | undefined, aiGroup
     }
     for (const m of t.matchAll(/(?<![A-Za-z\d])(DC0[1-7]|DD1[1-4]|DX5[1-7]D?|HC\d{3}LA)(?:\+Z\d*)?(?![A-Za-z\d])/gi)) {
       add({ group: "bezna_ocel", sub: S.plech_ocel, conf: 0.95, source: "oznaceni", matched: m[0], normalized: m[1].toUpperCase(), index: m.index ?? 0 });
+    }
+    // Tažená automatová ocel ETG 88 / ETG 100 (Steeltec)
+    for (const m of t.matchAll(/(?<![A-Za-z\d])ETG\s?-?\s?(88|100)(?![\d])/gi)) {
+      add({ group: "bezna_ocel", sub: S.automatova, conf: 0.95, source: "oznaceni", matched: m[0], normalized: `ETG ${m[1]}`, index: m.index ?? 0 });
     }
     // Staré DIN St37-2, St52-3, RSt37-2
     for (const m of t.matchAll(/(?<![A-Za-z\d])(?:R|U)?St\s?(33|34|37|42|44|50|52|60|70)(?:-\d)?(?![\d])/g)) {
@@ -1388,7 +1393,7 @@ interface TPattern<K extends string> {
 
 // Pozn.: vše proti fold textu (malá písmena, bez diakritiky; ä→a, ü→u, ö→o)
 const HEAT_PATTERNS: TPattern<HeatKind>[] = [
-  { kind: "bez_tz", re: /\bbez\s+(?:tepeln\w*\s+zprac\w*|tz)\b|\bohne\s+warmebehandlung\w*|\b(?:no|without)\s+heat\s+treatment\b|\bunbehandelt\b/ },
+  { kind: "bez_tz", re: /\bbez\s+(?:tepeln\w*\s+zprac\w*|tz)\b|\b(?:tz|tepeln\w*\s+zprac\w*)\s*[:=-]?\s*(?:zadn[eayo]|neni|none)(?![\w])|\bohne\s+warmebehandlung\w*|\b(?:no|without)\s+heat\s+treatment\b|\bunbehandelt\b/ },
   { kind: "nitrocementace", re: /\bnitrocement\w*|\bnitrokarbur\w*|\bnitrocarbur\w*|\btenifer\w*|\bqpq\b|\btufftrid\w*|\bsalzbadnitrier\w*|\bsursulf\w*|\bkarbonitrid\w*\s+v\s+solne\w*/ },
   { kind: "karbonitridace", re: /\bkarbonitrid\w*|\bcarbonitrid\w*|\bcarbonitrier\w*/ },
   { kind: "nitridace", re: /\bplazm\w*\s+nitrid\w*|\bplasma\s?nitri\w*|\bplasmanitri\w*|\bgasnitri\w*|\bplynov\w*\s+nitrid\w*|\bnitrid(?:ovat|ovano|ovany|ovana|ovane|ovani|ovanim|ace|aci|ed|ing|uj\w*)\b|\bnitrid\b|\bnitrier(?:t|en|ung)\b|\bnht\b/,
@@ -1411,7 +1416,7 @@ const HEAT_PATTERNS: TPattern<HeatKind>[] = [
 ];
 
 const SURFACE_PATTERNS: TPattern<SurfaceKind>[] = [
-  { kind: "bez_upravy", re: /\bbez\s+povrch\w*\s+uprav\w*|\bbez\s+pu\b|\bbez\s+upravy\b|\bohne\s+oberfl[a]?ch\w*|\bno\s+surface\s+(?:treatment|finish|coating)\b|\bunbeschichtet\b/ },
+  { kind: "bez_upravy", re: /\bbez\s+povrch\w*\s+uprav\w*|\bbez\s+pu\b|\bbez\s+upravy\b|\b(?:pu|povrch\w*\s+uprav\w*)\s*[:=-]?\s*(?:zadn[eayo]|neni|none)(?![\w])|\bohne\s+oberfl[a]?ch\w*|\bno\s+surface\s+(?:treatment|finish|coating)\b|\bunbeschichtet\b/ },
   { kind: "praskove_lakovani", re: /\bprask\w*\s+(?:lak\w*|barv\w*|nater\w*|nanes\w*)|\bkomaxit\w*|\bpulverbeschicht\w*|\bpulverlack\w*|\bpowder[\s-]+coat\w*|\bpolyester\s+powder\b/ },
   { kind: "zinkove_lamely", re: /\blamel\w*\s+zin\w*|\bzinkov\w*\s+lamel\w*|\bzinklamell\w*|\bzinc[\s-]+flake\w*|\bdacromet\w*|\bgeomet\w*|\bdelta[\s-]?(?:protekt|tone|seal)\w*|\bmagni\s?\d{3}\b/ },
   { kind: "zinkovani", re: /\bzarov\w*\s+(?:po)?zink\w*|\b(?:po)?zink\w*\s+zarov\w*|\bzarov\w*\s+zinek\b|\bzink\w*\s+ponor\w*|\bponor\w*\s+zink\w*|\bfeuerverzink\w*|\bhot[\s-]?dip\w*(?:\s+galvani\w*)?|\bhdg\b|\bt\s?zn\b/, detail: () => "žárové" },
@@ -1436,7 +1441,7 @@ const SURFACE_PATTERNS: TPattern<SurfaceKind>[] = [
   { kind: "lakovani", re: /\b(?:na)?lakov(?:at|ano|ani|ana|any|anim)\b|\bnaterem\b|\bnater\b|\bnatrit\b|\bnatreno\b|\blackier\w*|\bpaint(?:ed|ing)?\b|\bbarva\s+ral\b|\bral\s?\d{4}\b|\bzakladn\w*\s+barv\w*|\bkataforez\w*|\bktl\b|\be[\s-]coat\w*|\bgrundier\w*|\bprimer\b/,
     detail: (s, around) => (/kataforez|ktl|e[\s-]coat/.test(s) ? "kataforéza" : /zakladn|grundier|primer/.test(s) ? "základní barva" : undefined) },
   { kind: "fosfatovani", re: /\b\w*(?:fosfat|phosphat)\w*|\bbonderi\w*|\bparkeri\w*/,
-    detail: (s, around) => (/mangan/.test(around) ? "manganový" : /zink|zinc|zinek/.test(around) ? "zinkový" : undefined) },
+    detail: (s, around, after) => (/mangan/.test(around) || /^\w+\s*[-,]?\s*mn\b/.test(after) ? "manganový" : /zink|zinc|zinek/.test(around) || /^\w+\s*[-,]?\s*zn\b/.test(after) ? "zinkový" : undefined) },
   { kind: "moreni", re: /\bmoren\w*|\bmorit\b|\bbeizen\b|\bgebeizt\b|\bpickl\w*/ },
   { kind: "chromatovani", re: /\bchromatov\w*|\bchromatier\w*|\bchromat(?:e|ing)\s+conver\w*|\balodin\w*|\biridit\w*|\bsurtec\s?\d*|\bkonverzn\w*\s+vrstv\w*|\bchem\w*\s+konverz\w*|\bconversion\s+coat\w*|\bchem\s?film\b/ },
   { kind: "pasivace", re: /\bpasiv\w*|\bpassivi\w*|\bpassivat\w*/ },
@@ -1598,6 +1603,17 @@ export function parseTreatments(text: string | null | undefined): ParsedTreatmen
         if (pr && ral && !(pr.detail ?? "").includes(ral)) pr.detail = [pr.detail, `RAL ${ral}`].filter(Boolean).join(", ");
         surface.splice(surface.indexOf(s), 1);
       }
+    }
+  }
+
+  // „fosfátovat Zn" / „Zn-fosfát" = zinkový fosfát, ne další (galvanický) zinek
+  for (const ph of surface.filter((s) => s.kind === "fosfatovani")) {
+    for (const z of [...surface]) {
+      if (z.kind !== "galvanicky_zinek" && z.kind !== "zinkovani") continue;
+      const between = z.index >= ph.end ? f.slice(ph.end, z.index) : z.end <= ph.index ? f.slice(z.end, ph.index) : null;
+      if (between === null || !/^[\s-]{0,3}$|^\s*\(?\s*$/.test(between) || !/^(?:zn|zinek|zink\w*)$/.test(f.slice(z.index, z.end).trim())) continue;
+      if (!(ph.detail ?? "").includes("zinkový")) ph.detail = [ph.detail, "zinkový"].filter(Boolean).join(", ");
+      surface.splice(surface.indexOf(z), 1);
     }
   }
 

@@ -10,6 +10,8 @@ import { getJobPurchasing } from "@/lib/data/purchasing";
 import { JobDetailView } from "@/components/jobs/detail/job-detail-view";
 
 export const dynamic = "force-dynamic";
+// předání do výroby: jedno odeslání = PDF objednávek + e-maily dodavatelům (akce běží ve funkci stránky)
+export const maxDuration = 60;
 
 // metadata i stránka čtou stejnou zakázku — jeden dotaz na požadavek
 const loadJob = cache(getJob);
@@ -40,9 +42,11 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
         canDelete: access.can("delete"),
         margins: access.can("margins"),
         aiCapture: access.can("ai_capture"),
+        ownerEditable: user.role === "super_admin",
       }}
       initialTab={typeof sp.tab === "string" ? sp.tab : undefined}
-      initialAction={typeof sp.akce === "string" ? sp.akce : null}
+      // ?nova=1 (Poptávky „Vytvořit nabídku“) = záložka Nabídky s otevřeným editorem nové nabídky
+      initialAction={typeof sp.akce === "string" ? sp.akce : sp.nova === "1" ? "quote.create" : null}
       flow={{
         stamps, fieldStamps, payments, revisions,
         access: { features: access.features, userId: user.id, role: user.role },

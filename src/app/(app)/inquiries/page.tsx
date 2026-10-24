@@ -1,10 +1,14 @@
 import Link from "next/link";
-import { Calculator, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { Calculator, EyeOff, FilePlus, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
+import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { listJobs, getJobFormOptions } from "@/lib/data/jobs";
 import { getEmails } from "@/lib/data/queries";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowJobStates, listFlowStateJobIds } from "@/lib/data/flow-pages";
+import { flowWhoFrom, getFlowScope } from "@/lib/data/flow-scope";
+import { mineParam } from "@/lib/auth/flow-scope";
 import type { EmailItem } from "@/lib/data/types";
 import { INQUIRY_ORDER, INQUIRY_STATES, OPEN_INQUIRY, chipsForTab } from "@/lib/jobs/flow-status";
 import { Button } from "@/components/ui/button";
@@ -20,6 +24,11 @@ import { toFlowEmails } from "@/components/flow/flow-data";
 import { QuickInquiryDialog } from "@/components/flow/quick-inquiry-dialog";
 import { bookHref, todayPrague } from "@/components/flow/flow-utils";
 import { CLOSED_JOB_KEYS, STATE_PARAM, actionPalette, parseStateParam } from "@/components/flow/flow-state";
+import { getAnonPending, getAnonReviewList, getJobAnonBadges } from "@/lib/data/anonymize";
+import { AnonymizeToolButton } from "@/components/anonymize/anonymize-tool-dialog";
+import { JobAnonBadge } from "@/components/anonymize/anon-badge";
+import { AnonReviewChip, AnonReviewList, type AnonReviewRowView } from "@/components/anonymize/anon-review-section";
+import type { AnonUiStatus } from "@/components/anonymize/anon-status";
 
 export const dynamic = "force-dynamic";
 
@@ -36,18 +45,49 @@ export default async function InquiriesPage({
   const sp = (await searchParams) ?? {};
   const { can } = await getAccess();
   const mail = can("mail");
+  // #25: Nacenění zatím jen super admin — ostatní nabídku vytvoří ručně v kartě zakázky
+  const canPrice = can("pricing");
   const selected = parseStateParam(sp[STATE_PARAM], INQUIRY_ORDER, OPEN_INQUIRY);
   const withClosed = selected.some((k) => CLOSED_JOB_KEYS.includes(k));
-  const [counts, ids, all, options, emails] = await Promise.all([
-    getFlowCounts(),
-    listFlowStateJobIds([{ phase: "inquiry", keys: selected }]),
-    listJobs(withClosed ? { sort: "deadline", dir: "asc" } : { stages: [...OPEN_STAGES], sort: "deadline", dir: "asc" }),
+  // #25: obchodní tok jen „moje" (super admin všichni, nebo „Jen moje")
+  const scope = await getFlowScope(await flowWhoFrom(sp));
+  const [counts, ids, all, options, allEmails] = await Promise.all([
+    getFlowCounts({ mine: mineParam(scope) }),
+    listFlowStateJobIds([{ phase: "inquiry", keys: selected }], { scope }),
+    listJobs(withClosed ? { sort: "deadline", dir: "asc" } : { stages: [...OPEN_STAGES], sort: "deadline", dir: "asc" }, { scope }),
     getJobFormOptions(),
     mail ? getEmails() : Promise.resolve([] as EmailItem[]),
   ]);
+  // pošta je už podle schránek; super admin v „Jen moje" jen své schránky
+  const emails = scope && scope.canToggle && !scope.all
+    ? allEmails.filter((e) => Boolean(e.mailboxId && scope.mailboxIds.includes(e.mailboxId)))
+    : allEmails;
   // bez podrobných stavů (DB je nemá) aspoň poptávky podle hlavního stavu
   const jobs = ids ? all.filter((j) => ids.has(j.id)) : all.filter((j) => j.stage === "poptavka");
-  const states = await getFlowJobStates(jobs.map((j) => j.id));
+  const [states, anonBadges, anonReview, anonPending] = await Promise.all([
+    getFlowJobStates(jobs.map((j) => j.id)),
+    getJobAnonBadges(jobs.map((j) => j.id)),
+    getAnonReviewList({ scope, limit: 30 }),
+    getAnonPending(scope),
+  ]);
+  const reviewRows: AnonReviewRowView[] = anonReview.map((r) => ({
+    id: r.id, jobId: r.jobId, jobNumber: r.jobNumber, jobTitle: r.jobTitle, filename: r.filename, anonFilename: r.anonFilename,
+    status: r.status as AnonUiStatus, reason: r.reason, counts: (r.summary?.counts ?? {}) as Record<string, number>, at: r.at,
+    total: typeof r.summary?.total === "number" ? r.summary.total : null, crop: r.crop, page: r.page,
+  }));
+  // „Ke kontrole anonymizace": s položkami nahoře (nad seznamem poptávek), jen čekající → dole
+  const anonSection = (reviewRows.length > 0 || anonPending.count > 0) ? (
+    <FlowSection
+      id="anonymizace"
+      icon={EyeOff}
+      iconClass="bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+      title="Ke kontrole anonymizace"
+      description="Výkresy pro dodavatele, u kterých si AI nebyla jistá (nebo se anonymizace nepovedla). Zkontroluj náhled a schval."
+      count={reviewRows.length}
+    >
+      <AnonReviewList items={reviewRows} pendingFileIds={anonPending.fileIds} pendingCount={anonPending.count} />
+    </FlowSection>
+  ) : null;
   const chips = chipsForTab("inquiries", counts);
   const openCount = Object.keys(counts).length ? OPEN_INQUIRY.reduce((s, k) => s + (counts[`inquiry.${k}`] ?? 0), 0) : jobs.length;
   const isDefault = selected.length === OPEN_INQUIRY.length && OPEN_INQUIRY.every((k) => selected.includes(k));
@@ -67,21 +107,36 @@ export default async function InquiriesPage({
           <>Zákazník chce díl — tady je každá poptávka: kdo ji převzal, co chybí a jak dopadla. Přijde e-mailem (AI ji pozná sama), vyfotíš ji, nebo ji zadáš ručně.</>
         }
         step="poptavka"
+        canPrice={canPrice}
         actions={
           <>
             <CaptureButton label="Vyfotit poptávku" variant="send" className="flex-1 shadow-md shadow-primary/20 sm:flex-none" />
             <QuickInquiryDialog customers={options.customers} label="Nová poptávka" className="flex-1 sm:flex-none" />
+            <AnonymizeToolButton className="flex-1 sm:flex-none" />
             <BookLink href={bookHref("poptavky", ["poptavka"])} className="w-full sm:w-auto" />
           </>
         }
-      />
+      >
+        <FlowScopeBar scope={scopeBarData(scope)} />
+        {reviewRows.length > 0 && <AnonReviewChip count={reviewRows.length} />}
+      </FlowHeader>
 
-      <FlowHint>
-        <strong>Jak dál:</strong> novou poptávku <em>Převezmi</em> (budeš její řešitel), chybí-li výkres nebo množství, dej{" "}
-        <em>Čeká na podklady</em> — až podklady přijdou, stav skončí sám. Pak{" "}
-        <Link href="/pricing" className="font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300">Nacenit</Link>.
-        U každého stavu vidíš, kdo ho nastavil.
-      </FlowHint>
+      {canPrice ? (
+        <FlowHint>
+          <strong>Jak dál:</strong> novou poptávku <em>Převezmi</em> (budeš její řešitel), chybí-li výkres nebo množství, dej{" "}
+          <em>Čeká na podklady</em> — až podklady přijdou, stav skončí sám. Pak{" "}
+          <Link href="/pricing" className="font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300">Nacenit</Link>.
+          U každého stavu vidíš, kdo ho nastavil.
+        </FlowHint>
+      ) : (
+        <FlowHint>
+          <strong>Jak dál:</strong> novou poptávku <em>Převezmi</em> (budeš ji zpracovávat), chybí-li výkres nebo množství, dej{" "}
+          <em>Čeká na podklady</em>. Pak <em>Vytvoř nabídku</em> v kartě zakázky — super admin ji schválí a ty ji odešleš.
+          U každého stavu vidíš, kdo ho nastavil.
+        </FlowHint>
+      )}
+
+      {reviewRows.length > 0 && anonSection}
 
       <ToastProvider>
         <FlowSection
@@ -92,7 +147,7 @@ export default async function InquiriesPage({
           count={jobs.length}
         >
           <FlowStateFilter chips={chips} selected={selected} fallback={OPEN_INQUIRY} label="Stav poptávky" />
-          {jobs.length === 0 ? (
+          {scope?.error ? null : jobs.length === 0 ? (
             <FlowEmpty
               icon={Inbox}
               iconClass="bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300"
@@ -106,12 +161,17 @@ export default async function InquiriesPage({
               jobs={jobs}
               today={today}
               renderState={(j) => (states[j.id] ? <FlowRowState state={states[j.id]} tab="inquiries" /> : null)}
+              renderBadge={(j) => <JobAnonBadge badge={anonBadges[j.id]} />}
               renderAction={(j) => {
                 const st = states[j.id];
                 if (!st) {
-                  return (
+                  return canPrice ? (
                     <Button asChild size="sm" className="min-h-11 w-full bg-amber-500 text-amber-950 shadow-sm hover:bg-amber-500/90 sm:min-h-9 sm:w-auto">
                       <Link href={`/pricing?job=${j.id}`}><Calculator className="h-4 w-4" /> Nacenit</Link>
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" className="min-h-11 w-full bg-violet-700 text-white shadow-sm hover:bg-violet-800 sm:min-h-9 sm:w-auto">
+                      <Link href={`/orders/${j.id}?tab=nabidky&nova=1`}><FilePlus className="h-4 w-4" /> Vytvořit nabídku</Link>
                     </Button>
                   );
                 }
@@ -120,10 +180,12 @@ export default async function InquiriesPage({
                     target={{
                       jobId: j.id, jobNumber: j.number, facts: st.facts, quotes: st.quotes, quote: st.snapshot.activeQuote,
                       today, onlyOpenQuote: st.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
+                      quoteAuthor: st.quoteAuthor ?? null,
                     }}
                     next={st.next}
                     menu={st.menu}
                     palette={st.next ? actionPalette(st.next.key) : undefined}
+                    canPrice={canPrice}
                   />
                 );
               }}
@@ -131,6 +193,8 @@ export default async function InquiriesPage({
           )}
         </FlowSection>
       </ToastProvider>
+
+      {reviewRows.length === 0 && anonSection}
 
       {mail && (
         <FlowSection

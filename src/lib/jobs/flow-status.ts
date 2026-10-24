@@ -1772,8 +1772,10 @@ function quoteNext(s: FlowSnapshot, ctx: ActionCtx): Next | undefined {
   if (quoteUnpriced(q)) return allowed(ctx, "quote.edit", "Doplnit cenu");
   if (s.quote === "ke_schvaleni") {
     // #25: schvaluje jen super admin; vrácenou nabídku autor upraví podle připomínek
-    if (canApproveQuote(q, ctx)) return allowed(ctx, "quote.approve");
+    // (vrácenou super admin primárně neschvaluje — čeká se na autora; „Schválit“ zůstává v menu)
     if (q.returnedAt && q.createdBy && q.createdBy === ctx.userId) return allowed(ctx, "quote.edit", "Upravit podle připomínek");
+    if (q.returnedAt) return null;
+    if (canApproveQuote(q, ctx)) return allowed(ctx, "quote.approve");
     return null;
   }
   if (s.quote === "schvalena" || s.quote === "rozpracovana") {

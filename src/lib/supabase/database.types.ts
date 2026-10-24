@@ -23,7 +23,9 @@ export type PurchaseOrderStatus = "navrh" | "vystavena" | "odeslana" | "potvrzen
 export type CommissionStatus = "predbezna" | "k_vyplate" | "vyplaceno";
 export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
-export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder";
+export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder"
+  // objednávka dodavateli vystavená při předání do výroby (migrace 20261023150000)
+  | "purchase_order";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "edited" | "auto_executed";
 export type MailboxProvider = "outlook" | "imap" | "gmail";
 
@@ -111,7 +113,7 @@ export interface Supplier {
   updated_at: string;
 }
 
-export interface Drawing {
+export interface Drawing extends AnonColumns {
   id: string;
   drawing_number: string;
   revision: string;
@@ -144,6 +146,12 @@ export interface Drawing {
   drawing_notes: string | null;
   weight_source: WeightSource | null;
   material_condition: string | null;
+  // Výslovný stav a kroky úprav + zdroj údajů (migrace 20261023158000) — viz drawing-spec.ts
+  heat_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  surface_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  heat_steps: Record<string, unknown>[] | null;
+  surface_steps: Record<string, unknown>[] | null;
+  spec_sources: Record<string, "ai" | "rucne">;
 }
 
 export interface Quote {
@@ -485,10 +493,134 @@ export interface OrderItem {
   drawing_notes: string | null;
   weight_source: WeightSource | null;
   material_condition: string | null;
+  // Výslovný stav a kroky úprav + zdroj údajů (migrace 20261023158000) — viz drawing-spec.ts
+  heat_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  surface_status: "uvedeno" | "bez" | "nezjisteno" | null;
+  heat_steps: Record<string, unknown>[] | null;
+  surface_steps: Record<string, unknown>[] | null;
+  spec_sources: Record<string, "ai" | "rucne">;
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
-export interface JobFileRow {
+/** Anonymizace výkresů (migrace 20261023159000) — sloupce anon_* na job_files a drawings. Logika: src/lib/anonymize/**. */
+export type AnonStatusDb = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";
+export interface AnonColumns {
+  anon_status: AnonStatusDb | null;
+  anon_priority: number;
+  anon_source_path: string | null;
+  anon_path: string | null;
+  anon_filename: string | null;
+  anon_mime: string | null;
+  anon_size: number | null;
+  anon_sha256: string | null;
+  anon_method: "raster_pdf" | "image" | "image_pdf" | "dxf" | "step" | null;
+  anon_pages: Record<string, unknown> | null;
+  anon_regions: Record<string, unknown>[] | null;
+  anon_summary: Record<string, unknown> | null;
+  anon_confidence: number | null;
+  anon_reason: string | null;
+  anon_config_hash: string | null;
+  anon_terms_hash: string | null;
+  anon_ai_cache: Record<string, unknown> | null;
+  anon_at: string | null;
+  anon_by: string | null;
+  anon_actor_kind: "user" | "ai" | "system" | null;
+  anon_via: string | null;
+  anon_reviewed_at: string | null;
+  anon_reviewed_by: string | null;
+  anon_attempts: number;
+  anon_lock_until: string | null;
+  anon_usage: Record<string, unknown> | null;
+}
+
+export interface DrawingAnonAdhocRow extends Omit<AnonColumns, "anon_status"> {
+  id: string;
+  user_id: string;
+  storage_path: string;
+  content_sha256: string | null;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  anon_status: AnonStatusDb | "uploading";
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+}
+
+export interface DrawingAnonTextRow {
+  id: string;
+  job_file_id: string | null;
+  drawing_id: string | null;
+  adhoc_id: string | null;
+  region_id: string;
+  category: string;
+  text: string;
+  created_at: string;
+}
+
+export interface DrawingAnonAiCacheRow {
+  src_sha256: string;
+  config_hash: string;
+  method: string | null;
+  cache: Record<string, unknown>;
+  model: string | null;
+  created_at: string;
+}
+
+/** Útrata AI anonymizace po bězích (denní limit automatiky). */
+export interface DrawingAnonUsageLogRow {
+  id: number;
+  created_at: string;
+  subject_table: string;
+  subject_id: string;
+  via: string | null;
+  manual: boolean;
+  usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  calls: number;
+}
+
+export interface AnonSendQueueRow {
+  id: string;
+  kind: "purchase_order" | "job_document" | "supplier_inquiry";
+  job_id: string | null;
+  ref_id: string | null;
+  payload: Record<string, unknown>;
+  file_ids: string[];
+  status: "waiting" | "sending" | "sent" | "blocked" | "cancelled" | "failed";
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  attempts: number;
+}
+
+export interface DrawingAnonSettingsRow {
+  id: number;
+  enabled: boolean;
+  auto_capture: boolean;
+  auto_upload: boolean;
+  auto_email: boolean;
+  hires_capture: boolean;
+  redact: Record<string, boolean>;
+  extra_terms: string[];
+  keep_terms: string[];
+  include_crm_customer: boolean;
+  fill_pdf: "white" | "black";
+  fill_photo: "background" | "white" | "black";
+  max_dpi: number;
+  max_mpx: number;
+  verify_photos: boolean;
+  daily_usd: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface JobFileRow extends AnonColumns {
   id: string;
   job_id: string;
   kind: JobFileKind;
@@ -693,6 +825,8 @@ export interface ApprovalItemRow {
   resolved_by: string | null;
   resolved_at: string | null;
   created_at: string;
+  /** Objednávka dodavateli (řádek „purchase_order"; migrace 20261023150000). */
+  purchase_order_id?: string | null;
 }
 
 export interface CommissionEntry {
@@ -1050,6 +1184,13 @@ export interface Database {
       job_payments: Tbl<JobPaymentRow>;
       job_order_revisions: Tbl<JobOrderRevisionRow>;
       production_handoffs: Tbl<ProductionHandoffRow>;
+      // anonymizace výkresů (migrace 20261023159000)
+      drawing_anon_adhoc: Tbl<DrawingAnonAdhocRow>;
+      drawing_anon_texts: Tbl<DrawingAnonTextRow>;
+      drawing_anon_ai_cache: Tbl<DrawingAnonAiCacheRow>;
+      drawing_anon_usage_log: Tbl<DrawingAnonUsageLogRow>;
+      anon_send_queue: Tbl<AnonSendQueueRow>;
+      drawing_anon_settings: Tbl<DrawingAnonSettingsRow>;
     };
     Views: {
       job_flow_v: { Row: JobFlowRow; Relationships: [] };
@@ -1077,6 +1218,12 @@ export interface Database {
       };
       /** Moje zakázky obchodního toku (migrace 20261023155000; session → vždy auth.uid()). */
       flow_mine_job_ids: { Args: { p_user: string }; Returns: string[] };
+      /** Totéž jako jedno pole (bez limitu řádků PostgRESTu; migrace 20261023157000). */
+      flow_mine_job_id_list: { Args: { p_user: string }; Returns: string[] };
+      /** Objekt úložiště patří nákupnímu dokladu (migrace 20261023155000). */
+      job_file_path_is_price_doc: { Args: { p_path: string }; Returns: boolean };
+      /** Která z daných id jsou nákupní doklady (i přes sdílenou cestu v úložišti; migrace 20261023157000). */
+      job_file_price_ids: { Args: { p_ids: string[] }; Returns: string[] };
       /** Odznaky menu (p_mine null = všichni). */
       flow_badge_counts: {
         Args: { p_mine?: string | null };
@@ -1095,6 +1242,11 @@ export interface Database {
         Returns: number;
       };
       flow_decide_order_change: { Args: { p_job: string; p_accept: boolean; p_note?: string | null }; Returns: undefined };
+      anon_is_candidate: { Args: { p_kind: string; p_filename: string; p_mime: string | null; p_origin: string | null; p_issuer: string | null }; Returns: boolean };
+      anon_unsupported_ext: { Args: { p_filename: string }; Returns: boolean };
+      claim_drawing_anon: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: JobFileRow[] };
+      claim_drawing_anon_drawings: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: Drawing[] };
+      claim_drawing_anon_adhoc: { Args: { p_limit: number; p_ids?: string[] | null }; Returns: DrawingAnonAdhocRow[] };
       flow_reject_quote: {
         Args: { p_quote: string; p_reason: string; p_note?: string | null; p_competitor_price?: number | null; p_close_job?: boolean };
         Returns: JobStage;

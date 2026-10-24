@@ -1,4 +1,5 @@
 import "server-only";
+import { specViewFromRow } from "@/lib/jobs/drawing-spec";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { quoteStatusLabel, approvalTypeLabel } from "@/lib/data/labels";
 import type {
@@ -70,7 +71,8 @@ export async function getEmails(): Promise<EmailItem[]> {
 }
 
 /** Položka fronty + kdo návrh připravil (AI / plánovač) — fronta ukazuje oba autory (minor 16). */
-export type ApprovalQueueItem = ApprovalItem & { proposedBy: string };
+/** quoteHref = odkaz „Otevřít nabídku“ u řádku nabídky (#25: karta zakázky → Nabídky). */
+export type ApprovalQueueItem = ApprovalItem & { proposedBy: string; quoteHref?: string | null };
 
 export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!(await allowedAccess("dashboard"))) return [];
@@ -78,12 +80,19 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!db) return [];
   const { data, error } = await db
     .from("approval_queue")
-    .select("*")
+    .select("*, po:purchase_orders!purchase_order_id(id, creator:profiles!created_by(id, full_name, email))")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   warn("approval_queue", error);
   if (error || !data) return [];
-  return (data as ApprovalItemRow[]).map((a) => ({
+  type PoEmbed = { creator?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null };
+  // objednávku dodavateli připravil ten, kdo zakázku předal do výroby (purchase_orders.created_by), ne AI
+  const poCreator = (a: ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null }): string | null => {
+    const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
+    const c = po ? (Array.isArray(po.creator) ? po.creator[0] ?? null : po.creator ?? null) : null;
+    return c ? (c.full_name ?? "").trim() || (c.email ?? "").trim() || null : null;
+  };
+  return (data as (ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null })[]).map((a) => ({
     id: a.id,
     rawType: a.type as ApprovalType,
     type: approvalTypeLabel[a.type as ApprovalType] ?? a.type,
@@ -95,8 +104,12 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
       : "",
     createdAt: a.created_at,
     aiConfidence: a.ai_confidence ?? 0,
-    // kdo návrh připravil: připomenutí = plánovač, ostatní (odpovědi, nabídky, poptávky dodavatelům) = AI
-    proposedBy: a.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
+    // kdo návrh připravil: připomenutí = plánovač, objednávka = kdo předal do výroby, ostatní (odpovědi,
+    // nabídky, poptávky dodavatelům) = AI
+    proposedBy: a.type === "reminder" ? "Systém (plánovač)" : a.type === "purchase_order" ? poCreator(a) ?? "Systém" : "✨ AI",
+    quoteHref: a.type === "quote" && (a.quote_id || a.order_id)
+      ? a.order_id ? `/orders/${a.order_id}?tab=nabidky` : "/quotes"
+      : null,
   }));
 }
 
@@ -132,7 +145,7 @@ export async function getResolvedApprovals(limit = 6): Promise<ResolvedApproval[
       title: r.title,
       type: approvalTypeLabel[r.type] ?? r.type,
       status: auto ? "auto_executed" : r.status === "rejected" ? "rejected" : "approved",
-      proposedBy: r.type === "reminder" ? "Systém (plánovač)" : "✨ AI",
+      proposedBy: r.type === "reminder" ? "Systém (plánovač)" : r.type === "purchase_order" ? "Předání do výroby" : "✨ AI",
       stamp: {
         by: p && name ? { id: p.id, name } : null, byName: name, at: r.resolved_at,
         via: auto ? "automaticky" : null, kind: auto ? "ai" : name ? "user" : "system",
@@ -265,6 +278,8 @@ export async function getDrawings(opts: { customerId?: string } = {}): Promise<D
       jobId: job?.id ?? d.job_id ?? null,
       jobNumber: job?.number ?? null,
       jobFileId: d.job_file_id ?? null,
+      title: d.title ?? null,
+      spec: specViewFromRow(d as unknown as Record<string, unknown>),
     };
   });
 }
@@ -323,33 +338,122 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
   const db = await supa();
   if (!db) return empty;
   try {
-    const { can } = await getAccess();
-    // = výchozí pohled stránky: otevřené poptávky, vše k nacenění, nabídky „Ke schválení (N)",
-    // objednávky k potvrzení (doručené, rozpor, změna) bez pozastavených a reklamací (nemají akci)
-    const [inquiries, pricing, quotes, confirmations, orders, approvals, inbox] = await Promise.all([
-      db.from("orders").select("id", { count: "exact", head: true }).in("inquiry_status", ["prijata", "v_reseni", "ceka_na_podklady"])
-        .in("status", ["poptavka", "naceneni"]),
-      db.from("orders").select("id", { count: "exact", head: true }).in("status", ["poptavka", "naceneni"]),
-      db.from("quotes").select("id", { count: "exact", head: true }).eq("state", "ke_schvaleni").eq("archived", false),
-      db.from("orders").select("id", { count: "exact", head: true }).in("order_status", ["dorucena", "rozpor", "aktualizovana"])
-        .not("status", "in", "(nerealizovano,zruseno,pozastaveno,reklamace)"),
+    const { can, user } = await getAccess();
+    if (!user || !user.active) return empty;
+    // #25: obchodní tok = „moje" (super admin všichni — odznaky jsou vždy „Všichni", i při „Jen moje");
+    // = výchozí pohled stránky: otevřené poptávky, vše k nacenění, objednávky k potvrzení (doručené,
+    // rozpor, změna) bez pozastavených a reklamací; nabídky: super admin = čekají na jeho schválení,
+    // ostatní = moje schválené k odeslání + vrácené k přepracování (flow_badge_counts)
+    const mine = can("flow_all") ? null : user.id;
+    const [flow, orders, approvals, inbox] = await Promise.all([
+      db.rpc("flow_badge_counts", { p_mine: mine }),
       db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", `(${CLOSED_STAGES.join(",")})`),
       can("dashboard")
         ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
         : Promise.resolve({ count: 0 }),
       getUnreadCount(),
     ]);
+    warn("badges", flow.error);
+    const f = ((flow.data ?? []) as Record<string, number | null>[])[0] ?? {};
+    const n = (k: string) => Number(f[k] ?? 0) || 0;
     return {
       inbox,
-      inquiries: inquiries.count ?? 0,
-      pricing: pricing.count ?? 0,
-      quotes: quotes.count ?? 0,
-      confirmations: confirmations.count ?? 0,
+      inquiries: n("inquiries"),
+      pricing: can("pricing") ? n("pricing") : 0,
+      quotes: can("quote_approval") ? n("quotes_pending") : n("quotes_ready") + n("quotes_returned"),
+      confirmations: n("confirmations"),
       orders: orders.count ?? 0,
-      approvals: approvals.count ?? 0,
+      // AI přehled = fronta AI návrhů + ruční nabídky kolegů ke schválení (panel „Nabídky ke schválení")
+      approvals: can("dashboard") ? (approvals.count ?? 0) + n("quotes_pending_manual") : 0,
     };
   } catch {
     return empty;
+  }
+}
+
+/** Nabídka čekající na schválení super adminem (panel AI přehledu a sekce „Ke schválení" v Nabídkách). */
+export interface PendingQuoteApproval {
+  quoteId: string;
+  number: string | null;
+  jobId: string | null;
+  jobNumber: string | null;
+  /** Název zakázky (řádek fronty říká, k čemu nabídka je). */
+  jobTitle?: string | null;
+  customerName: string | null;
+  authorName: string | null;
+  total: number | null;
+  currency: string;
+  updatedAt: string | null;
+  createdAt: string;
+  /** Bez položek nebo s položkou bez ceny — schválit nejde (autor doplní ceny). */
+  unpriced: boolean;
+}
+
+/**
+ * Fronta „Ke schválení" super admina (#25 §8.9) — vždy všichni (i při „Jen moje"): neschválené,
+ * nearchivované, nevrácené nabídky otevřených zakázek; bez nabídek, které čekají ve frontě AI
+ * (ty schvaluje ApprovalQueue). Jen s právem quote_approval.
+ */
+export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[]> {
+  if (!(await allowedAccess("quote_approval"))) return [];
+  const db = await supa();
+  if (!db) return [];
+  try {
+    const { data, error } = await fetchPaged<Record<string, unknown>>((from, to) => db.from("quotes")
+      .select([
+        "id, number, job_id, total, currency, updated_at, created_at",
+        "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name))",
+        "customer:customers!customer_id(name)",
+        "creator:profiles!created_by(full_name, email)",
+        "items:quote_items!quote_id(unit_price)",
+      ].join(", "))
+      .eq("state", "ke_schvaleni")
+      .eq("archived", false)
+      .is("approval_returned_at", null)
+      .order("updated_at", { ascending: true })
+      .order("id")
+      .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>, 2000);
+    warn("pending-quotes", error);
+    if (error) return [];
+    const ids = data.map((r) => String(r.id));
+    const queued = new Set<string>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: q, error: qErr } = await db.from("approval_queue").select("quote_id")
+        .eq("status", "pending").in("quote_id", ids.slice(i, i + 200));
+      warn("pending-quotes:queue", qErr);
+      for (const r of (q ?? []) as { quote_id: string | null }[]) if (r.quote_id) queued.add(r.quote_id);
+    }
+    type Embed<T> = T | T[] | null | undefined;
+    const first = <T,>(v: Embed<T>): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+    const closed = ["dokonceno", "nerealizovano", "zruseno"];
+    const out: PendingQuoteApproval[] = [];
+    for (const r of data) {
+      const id = String(r.id);
+      if (queued.has(id)) continue;
+      const job = first(r.job as Embed<{ id: string; number: string | null; title?: string | null; status: string; customer?: Embed<{ name: string }> }>);
+      if (job && closed.includes(job.status)) continue;
+      const creator = first(r.creator as Embed<{ full_name: string | null; email: string | null }>);
+      const items = (Array.isArray(r.items) ? r.items : []) as { unit_price: number | string | null }[];
+      const total = r.total === null || r.total === undefined ? null : Number(r.total);
+      out.push({
+        quoteId: id,
+        number: (r.number as string | null) ?? null,
+        jobId: job?.id ?? ((r.job_id as string | null) ?? null),
+        jobNumber: job?.number ?? null,
+        jobTitle: job?.title?.trim() || null,
+        customerName: first(r.customer as Embed<{ name: string }>)?.name ?? first(job?.customer)?.name ?? null,
+        authorName: (creator?.full_name ?? "").trim() || (creator?.email ?? "").trim() || null,
+        total: total !== null && Number.isFinite(total) ? total : null,
+        currency: (r.currency as string | null) || "CZK",
+        updatedAt: (r.updated_at as string | null) ?? null,
+        createdAt: String(r.created_at),
+        unpriced: total === null || !items.length || items.some((it) => it.unit_price === null || it.unit_price === undefined),
+      });
+    }
+    return out;
+  } catch (err) {
+    console.error(`[data:pending-quotes] ${err instanceof Error ? err.message : String(err)}`);
+    return [];
   }
 }
 

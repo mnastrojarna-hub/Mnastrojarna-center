@@ -46,7 +46,7 @@ export function CustomerPricingProfile({ customer }: { customer: Customer }) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" /> Cenový profil (AI nacenění)
+          <TrendingUp className="h-4 w-4 text-muted-foreground" /> Cenový profil zákazníka
         </CardTitle>
         <CardDescription>
           Profil se automaticky promítá do každé kalkulace: individuální marže má přednost,

@@ -18,5 +18,17 @@
   "notes": "",
   "summary": "Výkres vodicí lišty 4711-03 rev. A.",
   "confidence": 0.9,
-  "needsClarification": []
+  "needsClarification": [],
+  "materialGroup": "bezna_ocel",
+  "overallDims": [],
+  "shapeHint": "hranol",
+  "blankDimensions": "",
+  "heatStatus": "bez",
+  "heatSteps": [],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "drawingNotes": [
+    "Obecné tolerance ISO 2768-mK",
+    "Nekótované hrany sražené 0,5 × 45°"
+  ]
 }

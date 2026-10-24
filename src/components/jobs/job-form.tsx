@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   AlertCircle, Building2, CalendarDays, ClipboardList, Copy, Flame, Hash, Loader2, Package, Plus, StickyNote, Trash2,
-  Truck, Users, Check,
+  Truck, Users, Check, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { NativeSelect } from "@/components/jobs/book/native-select";
 import { StagePicker } from "@/components/jobs/book/stage-picker";
 import {
   DATE_FIELDS, PRIORITIES, UNITS, MAX_TITLE, emptyItem, findSameCustomer, firstErrorKey, formTotals, initialFormState,
-  lineTotal, validateJobForm, type ItemDraft, type JobFormErrors, type JobFormInitial, type JobFormState, type JobFormValues,
+  lineTotal, ownerPreview, validateJobForm, type ItemDraft, type JobFormErrors, type JobFormInitial, type JobFormState, type JobFormValues,
 } from "@/components/jobs/book/job-form-model";
 import { formatMoney } from "@/components/jobs/book/job-cells";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
@@ -85,11 +85,15 @@ export function JobForm({
 }: JobFormProps) {
   const access = useAccess();
   const margins = access.can("margins");
+  // #25: Obchodníka zakázky volí jen super admin — ostatním ho doplní server (obchodník zákazníka)
+  const ownerEditable = access.role === "super_admin";
   const uid = React.useId();
   const fid = (key: string) => `${uid}-${key.replace(/\./g, "-")}`;
 
   const [state, setState] = React.useState<JobFormState>(() =>
-    initialFormState(initial, { ownerId: access.userId ?? undefined }),
+    ownerEditable
+      ? initialFormState(initial, { ownerId: access.userId ?? undefined })
+      : initialFormState({ ...initial, ownerId: undefined }),
   );
   const [errors, setErrors] = React.useState<JobFormErrors>({});
   const [formError, setFormError] = React.useState<string | null>(null);
@@ -101,12 +105,12 @@ export function JobForm({
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
 
-  // obchodník = já, pokud se oprávnění načetla až po otevření
+  // obchodník = já (jen super admin), pokud se oprávnění načetla až po otevření
   React.useEffect(() => {
-    if (access.userId && !state.ownerId && !dirty && options.users.some((u) => u.id === access.userId)) {
+    if (ownerEditable && access.userId && !state.ownerId && !dirty && options.users.some((u) => u.id === access.userId)) {
       setState((s) => ({ ...s, ownerId: access.userId ?? "" }));
     }
-  }, [access.userId, state.ownerId, dirty, options.users]);
+  }, [ownerEditable, access.userId, state.ownerId, dirty, options.users]);
 
   function patch(p: Partial<JobFormState>) {
     setState((s) => ({ ...s, ...p }));
@@ -164,7 +168,10 @@ export function JobForm({
     }
     setBusy(true);
     try {
-      const res = await onSubmit(values);
+      // ne-admin obchodníka neposílá (server vezme obchodníka zákazníka) — jinak by „—" zakázku nechalo bez obchodníka
+      const sent: JobFormValues = { ...values };
+      if (!ownerEditable) delete sent.ownerId;
+      const res = await onSubmit(sent);
       if (res && !res.ok) setFormError(res.error ?? "Uložení se nepovedlo.");
       else setDirty(false);
     } catch {
@@ -369,14 +376,26 @@ export function JobForm({
       {/* ── Lidé ───────────────────────────────────────── */}
       <Section icon={Users} tone={TONES.emerald} title="Lidé">
         <div className={grid2}>
-          <Field id={fid("ownerId")} label="Obchodník" hint="odpovídá za zakázku">
-            <NativeSelect id={fid("ownerId")} value={state.ownerId} onChange={(e) => patch({ ownerId: e.target.value })}>
-              <option value="">— nikdo —</option>
-              {options.users.map((u) => (
-                <option key={u.id} value={u.id}>{userLabel(u)}</option>
-              ))}
-            </NativeSelect>
-          </Field>
+          {ownerEditable ? (
+            <Field id={fid("ownerId")} label="Obchodník" hint="odpovídá za zakázku">
+              <NativeSelect id={fid("ownerId")} value={state.ownerId} onChange={(e) => patch({ ownerId: e.target.value })}>
+                <option value="">— nikdo —</option>
+                {options.users.map((u) => (
+                  <option key={u.id} value={u.id}>{userLabel(u)}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+          ) : (
+            <div className="space-y-1" data-field="owner-readonly">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                Obchodník <Lock className="h-3 w-3" aria-label="jen pro čtení" />
+              </span>
+              <p className="flex min-h-10 items-center rounded-md border border-dashed px-3 text-sm text-muted-foreground">
+                {ownerPreview(state, options, { userId: access.userId ?? null, role: access.role ?? null })}
+              </p>
+              <p className="text-[11px] text-muted-foreground">Obchodníka zakázky mění jen super admin.</p>
+            </div>
+          )}
           <Field id={fid("assigneeId")} label="Zpracovává" hint="kdo na ní dělá">
             <NativeSelect id={fid("assigneeId")} value={state.assigneeId} onChange={(e) => patch({ assigneeId: e.target.value })}>
               <option value="">— zatím nikdo —</option>

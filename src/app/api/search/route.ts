@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { apiRequire, getAccess } from "@/lib/auth/session";
 import { getCustomers, getSuppliers, getDrawings } from "@/lib/data/queries";
 import { listJobs, listQuotes } from "@/lib/data/jobs";
+import { getFlowScope } from "@/lib/data/flow-scope";
+import { isMineQuote } from "@/lib/auth/flow-scope";
 import { searchNormalize } from "@/lib/jobs/mapping";
 import type { JobStage } from "@/lib/supabase/database.types";
 
@@ -16,6 +18,8 @@ interface SearchEntry {
   href: string;
   keywords: string;
   stage?: JobStage;
+  /** Zakázky: čísla jejích nabídek (hledá se i podle nich — i kolegových; hint „nab. …" ukáže paleta). */
+  quoteNumbers?: string[];
 }
 
 function kw(...parts: (string | null | undefined)[]): string {
@@ -32,13 +36,24 @@ export async function GET() {
   const { can } = await getAccess();
   const empty = Promise.resolve([] as never[]);
   try {
-    const [jobs, customers, suppliers, quotes, drawings] = await Promise.all([
+    const [jobs, customers, suppliers, allQuotes, drawings, scope] = await Promise.all([
       can("orders") ? listJobs({ sort: "updated", dir: "desc", limit: 1500 }) : empty,
       can("customers") ? getCustomers() : empty,
       can("suppliers") ? getSuppliers() : empty,
+      // všechny nabídky jen na serveru: čísla nabídek k zakázkám (Kniha je všech), skupina „Nabídky" jen „moje"
       can("orders") ? listQuotes() : empty,
       can("drawings") ? getDrawings() : empty,
+      getFlowScope(),
     ]);
+    const quotes = allQuotes.filter((q) => isMineQuote({
+      jobId: q.job?.id ?? null, createdBy: q.createdBy?.id ?? null, ownerId: q.ownerId ?? null,
+      approvalRequestedBy: q.approvalRequestedBy ?? null,
+    }, scope));
+    const quoteNumbers = new Map<string, string[]>();
+    for (const q of allQuotes) {
+      if (!q.job || !q.number) continue;
+      quoteNumbers.set(q.job.id, [...(quoteNumbers.get(q.job.id) ?? []), q.number]);
+    }
     const out: Record<"jobs" | "customers" | "suppliers" | "quotes" | "drawings", SearchEntry[]> = {
       jobs: jobs.map((j) => ({
         id: j.id,
@@ -48,8 +63,9 @@ export async function GET() {
         stage: j.stage,
         keywords: kw(
           j.number, j.title, j.customer?.name, j.customer?.customerNumber, j.customerOrderNumber,
-          j.customerInquiryNumber, j.invoiceNumber, ...j.drawingNumbers,
+          j.customerInquiryNumber, j.invoiceNumber, ...j.drawingNumbers, ...(quoteNumbers.get(j.id) ?? []),
         ),
+        quoteNumbers: quoteNumbers.get(j.id),
       })),
       customers: customers.map((c) => ({
         id: c.id,

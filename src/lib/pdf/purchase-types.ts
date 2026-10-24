@@ -40,4 +40,9 @@ export interface PurchaseOrderData {
   intro?: string;
   /** Text v souhrnu pod cenou (např. přenesená daňová povinnost). */
   totalsHint?: string;
+  /** Změna objednávky: revize ≥ 2 → v hlavičce „Změna č. {revize} · ze dne {revisionDate}". */
+  revision?: number;
+  revisionDate?: string;
+  /** Pokyn k provedení (3. bod pokynů); undefined = „Vyrábějte dle výkresové dokumentace…" u položek s výkresem. */
+  workInstruction?: string;
 }

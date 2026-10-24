@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Building2, UserRound, Mail, Phone, Hash, FileDigit, Users, Factory, Truck, StickyNote, Tag, Calculator, Percent,
   ShoppingCart, ReceiptText, MessageSquareQuote, Banknote, Wrench, MapPin, ClipboardList, X, Plus, Loader2,
-  CalendarDays, BadgeCheck, PenLine, ExternalLink, Handshake, type LucideIcon,
+  CalendarDays, BadgeCheck, PenLine, ExternalLink, Handshake, Lock, type LucideIcon,
 } from "lucide-react";
 import type { JobDetail } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
@@ -136,6 +136,8 @@ function TagsEditor({ tags }: { tags: string[] }) {
 /** Záložka Přehled — vše upravitelné na místě (klik → uprav → Enter). */
 export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?: Record<string, ChangeStamp> }) {
   const { options, perms, save } = useJobDetail();
+  // #25: obchodníka zakázky mění jen super admin (bez údaje platí mazání — také jen super admin)
+  const ownerEditable = perms.ownerEditable ?? perms.canDelete;
 
   const customerOptions = React.useMemo<SearchOption[]>(
     () => options.customers.map((c) => ({
@@ -253,10 +255,25 @@ export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?
       </InfoCard>
 
       <InfoCard icon={Users} tone="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" title="Lidé" subtitle="Kdo za zakázku odpovídá">
-        <InlineSelect
-          label="Obchodník" icon={UserRound} iconClass="text-amber-500" value={job.owner?.id ?? null} options={people}
-          onSave={(id) => save({ ownerId: id })} display={personDisplay}
-        />
+        {ownerEditable ? (
+          <InlineSelect
+            label="Obchodník" icon={UserRound} iconClass="text-amber-500" value={job.owner?.id ?? null} options={people}
+            onSave={(id) => save({ ownerId: id })} display={personDisplay}
+          />
+        ) : (
+          // #25: obchodníka zakázky mění jen super admin (server i DB to hlídají také)
+          <div className="min-w-0" data-field="owner-readonly">
+            <div className="mb-0.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <UserRound className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+              Obchodník
+              <Lock className="h-3 w-3" aria-label="jen pro čtení" />
+            </div>
+            <div className="text-sm">
+              {job.owner ? <PersonChip name={job.owner.name} /> : <span className="text-muted-foreground">—</span>}
+            </div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Obchodníka zakázky mění jen super admin.</p>
+          </div>
+        )}
         <FieldStamp stamps={fieldStamps} column="owner_id" />
         <InlineSelect
           label="Zpracovává" icon={ClipboardList} iconClass="text-amber-500" value={job.assignee?.id ?? null} options={people}

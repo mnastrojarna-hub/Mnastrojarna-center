@@ -94,6 +94,55 @@ await T("pošta: obchodník vidí jen svou schránku, admin vše", async (contex
   await context.clearCookies();
 });
 
+await T("#25 role: Nacenění jen super admin (/pricing → vysvětlení), Objednávky dodavatelům i zaměstnanci", async (context) => {
+  const page = await context.newPage();
+  await login(page, USERS.admin);
+  let nav = await navTexts(page);
+  expect(nav.some((t) => t.includes("Nacenění")), `admin vidí Nacenění (menu: ${nav.join(", ")})`);
+  await page.close();
+  await context.clearCookies();
+  for (const user of [USERS.obchod, USERS.dilna]) {
+    const p = await context.newPage();
+    await login(p, user);
+    nav = await navTexts(p);
+    expect(!nav.some((t) => t.includes("Nacenění")), `${user.email} NEvidí Nacenění (menu: ${nav.join(", ")})`);
+    expect(nav.some((t) => t.includes("Objednávky dodavatelům")), `${user.email} vidí Objednávky dodavatelům`);
+    await p.goto(`${BASE}/pricing`);
+    await p.waitForURL(/pristup=pricing/, { timeout: 15_000 });
+    await p.locator("main").getByText("Nacenění zatím dělá jen super admin.", { exact: false }).first().waitFor({ timeout: 15_000 });
+    await p.close();
+    await context.clearCookies();
+  }
+});
+
+await T("#25 pošta: odeslaná pošta jen vlastní (admin vše); zaměstnanec nestáhne cizí schránku", async (context) => {
+  const tag = `E2E01-sent-${Date.now()}`;
+  const obchodId = sql(`select id from profiles where email = '${USERS.obchod.email}'`);
+  const box = "d5000000-0000-0000-0000-000000000001";
+  sql(`insert into emails (mailbox_id, owner_id, direction, subject, from_email, to_email, received_at, category)
+    values ('${box}', '${obchodId}', 'out', '${tag}', 'obchod@mnastrojarna.test', 'zakaznik@example.test', now(), 'ostatni')`);
+  try {
+    const seen = {};
+    for (const [key, user] of [["obchod", USERS.obchod], ["dilna", USERS.dilna], ["admin", USERS.admin]]) {
+      const p = await context.newPage();
+      await login(p, user);
+      await p.goto(`${BASE}/sent`);
+      await p.waitForLoadState("networkidle");
+      seen[key] = (await p.locator("main").innerText()).includes(tag);
+      if (key === "dilna") {
+        const r = await p.request.post(`${BASE}/api/emails/sync`, { data: { mailboxId: box } });
+        const j = await r.json().catch(() => ({}));
+        expect(r.status() === 200 && !j.mailboxes, `zaměstnanec nestáhne schránku obchodu (${r.status()} ${JSON.stringify(j).slice(0, 160)})`);
+      }
+      await p.close();
+      await context.clearCookies();
+    }
+    expect(seen.obchod && !seen.dilna && seen.admin, `odeslaná pošta: obchod ${seen.obchod}, dílna ${seen.dilna}, admin ${seen.admin}`);
+  } finally {
+    sql(`delete from emails where subject = '${tag}'`);
+  }
+});
+
 await T("zapomenuté heslo: kód z e-mailu → nové heslo → přihlášen", async (context) => {
   await clearMail(USERS.dilna.email);
   sql(`delete from password_reset_codes where email = '${USERS.dilna.email}'`); // limit 3 kódy / 15 min

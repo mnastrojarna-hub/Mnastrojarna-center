@@ -169,4 +169,99 @@ describe("přehled nabídek", () => {
     expect(text(html)).toContain("Neschválená"); // #25: štítek stavu ke_schvaleni
     expect(text(html)).toContain("Zadáno · P. Obchodník");
   });
+
+  it("#25 neschválená nabídka kolegy: „Neschválená · připravil(a) Petr Obchodník“, vrácená „vráceno autorovi“ + důvod", () => {
+    const facts = {
+      id: "q1", number: "NAB-2026-031", revision: 1, status: "ke_schvaleni" as const, state: "ke_schvaleni" as const, approvedBy: null,
+      approvalRequired: true, adminApprovalRequired: true, createdBy: "u1", archived: false, sentAt: null, validUntil: base.validUntil,
+      aiGenerated: false, supersededBy: null, total: 186000,
+    };
+    const info = {
+      id: "q1", facts, display: "ke_schvaleni" as const, stateChangedAt: null, lostReason: null, rejectedReason: null, feedback: null,
+      competitorPrice: null, stamps: { created: stamp("Petr Obchodník"), approvalRequested: null, approved: null, sent: null, accepted: null, rejected: null },
+      next: null, menu: [], proposal: null,
+    };
+    const pending = toFlowQuote({ ...base, status: "ke_schvaleni", sentAt: null, aiGenerated: false }, info, { today: TODAY, onlyOpen: true });
+    let html = renderToString(<QuotesBoard quotes={[pending]} today={TODAY} counts={null} />);
+    expect(text(html)).toContain("Neschválená · připravil(a) Petr Obchodník");
+    expect(text(html)).toContain("čeká na schválení super admina — odeslat ji zatím nejde");
+    const returned = toFlowQuote({ ...base, status: "ke_schvaleni", sentAt: null, aiGenerated: false }, {
+      ...info, facts: { ...facts, returnedAt: "2026-10-23T09:00:00Z", returnNote: "Doplň cenu dopravy" },
+    }, { today: TODAY, onlyOpen: true });
+    html = renderToString(<QuotesBoard quotes={[returned]} today={TODAY} counts={null} />);
+    expect(text(html)).toContain("Neschválená · vráceno autorovi");
+    expect(text(html)).toContain("Vráceno k přepracování: Doplň cenu dopravy");
+  });
+
+  it("#25 prázdné Nabídky: ne-admin bez odkazu do Nacenění", () => {
+    let html = renderToString(<QuotesBoard quotes={[]} today={TODAY} counts={null} />);
+    expect(html).not.toContain('href="/pricing"');
+    expect(text(html)).toContain("Nabídka vznikne v kartě zakázky v záložce Nabídky (tlačítko „Vytvořit nabídku“ u poptávky).");
+    html = renderToString(<QuotesBoard quotes={[]} today={TODAY} counts={null} canPrice />);
+    expect(html).toContain('href="/pricing"');
+  });
+
+  it("#25 „Vytvořit nabídku“ bez práva na Nacenění vede rovnou do editoru nabídky", () => {
+    const st = state(facts({ itemsPriced: 1 }), SALES);
+    const html = renderToString(<FlowActionBar target={{ jobId: "j1", jobNumber: "Z-2026-101", facts: st.facts, today: TODAY }} next={{ key: "quote.create", label: "Vytvořit nabídku" }} menu={[]} />);
+    expect(html).toContain('href="/orders/j1?tab=nabidky&amp;nova=1"');
+    const admin = renderToString(<FlowActionBar target={{ jobId: "j1", jobNumber: "Z-2026-101", facts: st.facts, today: TODAY }} next={{ key: "quote.create", label: "Vytvořit nabídku" }} menu={[]} canPrice />);
+    expect(admin).toContain('href="/pricing?job=j1"');
+  });
+});
+
+describe("#25 zamčené dokumenty", async () => {
+  const { DocumentsBrowser } = await import("./documents-browser");
+  const f = (over: Record<string, unknown>) => ({
+    id: "f1", kind: "naceneni" as const, title: "Nabídka Kalírna", filename: "kalirna.pdf", mimeType: "application/pdf", sizeBytes: 1000,
+    version: 1, archived: false, note: null, createdAt: "2026-10-22T10:00:00Z", uploadedBy: "Pavel Dílna", hasAiData: false,
+    job: { id: "j1", number: "Z-2026-101", title: "Hřídel", customerName: "Strojmetal" }, flow: null, ...over,
+  });
+
+  it("nákupní doklad bez práva: řádek s textem, bez náhledu, otevření a stažení; neschválená / zastaralá nabídka", () => {
+    const html = renderToString(<DocumentsBrowser today={TODAY} files={[
+      f({ locked: "price" }),
+      f({ id: "f2", kind: "nabidka", title: "NAB-1", locked: "unapproved" }),
+      f({ id: "f3", kind: "nabidka", title: "NAB-2", locked: "stale" }),
+      f({ id: "f4", kind: "vykres", title: "Výkres", locked: null }),
+    ]} />);
+    expect(text(html)).toContain("Nákupní doklad — obsah vidí obchodník a super admin.");
+    expect(text(html)).toContain("Neplatné — čeká na schválení");
+    expect(text(html)).toContain("Neplatné — vzniklo před schválením");
+    expect(html).toContain('data-locked="price"');
+    for (const id of ["f1", "f2", "f3"]) expect(html).not.toContain(`/api/jobs/files/${id}`);
+    expect(html).toContain('href="/api/jobs/files/f4?download=1"');
+    expect(text(html)).toContain("Nabídka Kalírna");
+    expect(text(html)).toContain("Z-2026-101");
+  });
+});
+
+describe("#25 lišta rozsahu a proužek toku", async () => {
+  const { FlowScopeBar } = await import("./flow-scope-bar");
+  const { FlowStrip } = await import("./flow-header");
+
+  it("ne-admin bez schránky: poznámka + odkaz Kniha zakázek; chyba = vlastní text", () => {
+    let html = renderToString(<FlowScopeBar scope={{ canToggle: false, who: "moje", error: false, mailboxEmails: [] }} />);
+    expect(text(html)).toContain("Vidíš jen svoje: zakázky, kde jsi obchodník nebo je zpracováváš, a ty, které jsi založil(a). Nemáš přiřazenou e-mailovou schránku — požádej super admina.");
+    expect(html).toContain('href="/orders"');
+    html = renderToString(<FlowScopeBar scope={{ canToggle: false, who: "moje", error: true, mailboxEmails: [] }} />);
+    expect(text(html)).toContain("Tvoje zakázky se nepodařilo načíst — obnov stránku.");
+    expect(html).toContain('role="alert"');
+  });
+
+  it("super admin: „Všichni“ / „Jen moje“ (aria Koho zobrazit), v „Jen moje“ návrat na Všichni", () => {
+    let html = renderToString(<FlowScopeBar scope={{ canToggle: true, who: "vsichni", error: false, mailboxEmails: [] }} />);
+    expect(html).toContain('aria-label="Koho zobrazit"');
+    expect(text(html)).toContain("Všichni");
+    expect(text(html)).toContain("Jen moje");
+    expect(text(html)).not.toContain("Zobrazuješ jen svoje");
+    html = renderToString(<FlowScopeBar scope={{ canToggle: true, who: "moje", error: false, mailboxEmails: [] }} />);
+    expect(text(html)).toContain("Zobrazuješ jen svoje — přepnout na Všichni");
+    expect(html).toMatch(/aria-checked="true"[^>]*>.*?Jen moje/);
+  });
+
+  it("proužek toku: krok Nacenění jen s právem", () => {
+    expect(renderToString(<FlowStrip current="poptavka" />)).not.toContain('href="/pricing"');
+    expect(renderToString(<FlowStrip current="poptavka" canPrice />)).toContain('href="/pricing"');
+  });
 });

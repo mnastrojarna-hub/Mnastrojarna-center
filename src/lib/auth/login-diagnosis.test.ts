@@ -6,6 +6,7 @@ import {
   loginError,
   loginRedirectUrl,
   prefillEmail,
+  safeNextPath,
 } from "@/lib/auth/login-diagnosis";
 
 const VIT = "vit.volny@mnastrojarna.cz";
@@ -64,5 +65,30 @@ describe("přihlašovací formulář si drží odeslaný e-mail", () => {
     expect(prefillEmail("bez-zavinace")).toBe("");
     expect(prefillEmail(undefined)).toBe("");
     expect(prefillEmail(`${"a".repeat(250)}@b.cz`)).toBe("");
+  });
+});
+
+describe("#25 návrat po přihlášení (?next=)", () => {
+  it("pustí jen cestu v aplikaci, i s parametry", () => {
+    expect(safeNextPath("/orders/abc?tab=nabidky")).toBe("/orders/abc?tab=nabidky");
+    expect(safeNextPath(["/quotes#ke-schvaleni"])).toBe("/quotes#ke-schvaleni");
+    expect(safeNextPath("/orders/x/../y")).toBe("/orders/y");
+  });
+  it("odmítne cizí host, schéma, zpětné lomítko, řídicí znaky a přihlašovací stránky", () => {
+    for (const bad of [
+      "", null, undefined, "https://evil.example/x", "//evil.example", "/\\evil.example", "/x\\y", "javascript:alert(1)",
+      "/orders\n", "/login", "/login?next=/x", "/auth/callback", "/api/pdf/job/1", "/reset-password", "a/b", "/" + "x".repeat(2100),
+    ]) expect(safeNextPath(bad as string)).toBeNull();
+  });
+  it("odmítne cestu, ze které se normalizací stane protokolově relativní adresa („//host“)", () => {
+    for (const bad of ["/.//evil.example", "/..//evil.example", "/%2e//evil.example", "/.//evil.example/a?x=1", "/./..//evil.example"]) {
+      expect(safeNextPath(bad), bad).toBeNull();
+    }
+    expect(safeNextPath("/./orders/1")).toBe("/orders/1");
+  });
+  it("chybová adresa /login nese next dál", () => {
+    const url = new URL(loginRedirectUrl("Nesprávné heslo.", VIT, "/orders/1?tab=nabidky"), "http://x");
+    expect(url.searchParams.get("next")).toBe("/orders/1?tab=nabidky");
+    expect(new URL(loginRedirectUrl("x", VIT, "//evil"), "http://x").searchParams.has("next")).toBe(false);
   });
 });

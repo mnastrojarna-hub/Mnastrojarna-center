@@ -1,14 +1,13 @@
 import Link from "next/link";
 import {
   AlarmClock, ArrowRight, Bot, CalendarClock, CheckCircle2, Circle, ClipboardList, Flame, History, Inbox,
-  ListChecks, Mail, MessageSquareQuote, Rocket, ShoppingCart, Sparkles, Wallet, type LucideIcon,
+  ListChecks, Mail, MessageSquareQuote, Rocket, ShieldAlert, ShoppingCart, Sparkles, Wallet, type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ApprovalQueue } from "@/components/approval-queue";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/status-badge";
-import { StateChip } from "@/components/flow-status/state-chip";
-import { QUOTE_STATES } from "@/lib/jobs/flow-status";
+import { QuoteApprovalList } from "@/components/flow/quote-approval-list";
 import { AiConfidence } from "@/components/ai-confidence";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
@@ -16,10 +15,14 @@ import { JobMiniList } from "@/components/customers/job-mini-list";
 import { CLOSED_STAGES, STAGES, STAGE_ORDER } from "@/lib/jobs/stages";
 import { bookKpis, segmentOfStage } from "@/components/jobs/book/book-params";
 import { requireFeature, getAccess } from "@/lib/auth/session";
-import { FLOW_TILES, getEmails, getApprovalQueue, getCommissions, getFlowDashboard, getResolvedApprovals } from "@/lib/data/queries";
+import {
+  FLOW_TILES, getEmails, getApprovalQueue, getCommissions, getFlowDashboard, getResolvedApprovals, listPendingQuoteApprovals,
+} from "@/lib/data/queries";
 import { FlowStateTiles, MoversPanel } from "@/components/dashboard/flow-overview";
-import { getJobStageCounts, listJobs, listQuotes } from "@/lib/data/jobs";
+import { getJobStageCounts, listJobs } from "@/lib/data/jobs";
 import { getSetupStatus } from "@/lib/setup/status";
+import { getAnonReviewCount } from "@/lib/data/anonymize";
+import { EyeOff } from "lucide-react";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
 
 /**
@@ -36,12 +39,20 @@ export default async function DashboardPage() {
     getJobStageCounts(),
     listJobs({ sort: "updated", dir: "desc", limit: 6 }),
     listJobs({ group: "aktivni", deadline: "overdue", sort: "deadline", dir: "asc", limit: 5 }),
-    listQuotes({ state: ["ke_schvaleni"] }),
+    listPendingQuoteApprovals(),
     can("commissions") ? getCommissions("month") : Promise.resolve([]),
     getSetupStatus(),
     getFlowDashboard(),
     getResolvedApprovals(5),
   ]);
+  const anonReview = await getAnonReviewCount();
+  // #25: dlaždice = fronta AI + ruční nabídky kolegů (oba panely níže je vypíšou)
+  const waitingApproval = approvals.length + quotes.length;
+  // chip „Ke schválení“ = stejné nabídky jako panel níže (ruční kolegů + AI ve frontě), ne vrácené autorovi
+  const flowCounts = {
+    ...flow.counts,
+    "quote.ke_schvaleni": quotes.length + approvals.filter((a) => a.rawType === "quote").length,
+  };
 
   const kpis = bookKpis(counts);
   const mail = emails.filter((e) => e.category !== "Spam");
@@ -57,7 +68,7 @@ export default async function DashboardPage() {
     },
     { label: "Termín do 7 dní", value: kpis.dueSoon, hint: "připrav dodání", icon: CalendarClock, href: "/orders?segment=vse&deadline=week", tone: TONE.amber },
     { label: "Poptávky & nabídky", value: kpis.inquiries, hint: "před objednávkou", icon: MessageSquareQuote, href: "/orders?segment=poptavky", tone: TONE.sky },
-    { label: "Čeká na schválení", value: approvals.length, hint: approvals.length ? "jedním klikem níže" : "fronta je prázdná", icon: ListChecks, href: "#fronta", tone: TONE.fuchsia },
+    { label: "Čeká na schválení", value: waitingApproval, hint: waitingApproval ? "jedním klikem níže" : "fronta je prázdná", icon: ListChecks, href: "#fronta", tone: TONE.fuchsia },
     { label: "Nepřečtená pošta", value: unread, hint: `${aiSorted} roztřídila AI`, icon: Inbox, href: "/inbox", tone: TONE.blue },
   ];
 
@@ -108,6 +119,21 @@ export default async function DashboardPage() {
         </section>
       )}
 
+      {anonReview > 0 && (
+        <Link
+          href="/inquiries#anonymizace"
+          data-testid="dashboard-anon-review"
+          className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm transition hover:shadow-md dark:border-rose-500/20 dark:bg-rose-500/10"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"><EyeOff className="h-4 w-4" /></span>
+          <span className="min-w-0 flex-1">
+            <strong className="text-rose-800 dark:text-rose-200">{anonReview} {anonReview === 1 ? "výkres" : anonReview < 5 ? "výkresy" : "výkresů"} ke kontrole anonymizace</strong>
+            <span className="block text-xs text-muted-foreground">Před odesláním dodavateli zkontroluj, že je smazaná firma, jména, logo a cesty.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      )}
+
       {/* Dlaždice → filtr v Knize zakázek */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {tiles.map((t) => (
@@ -132,7 +158,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Podrobné stavy toku — co čeká na koho */}
-      <FlowStateTiles tiles={FLOW_TILES} counts={flow.counts} />
+      <FlowStateTiles tiles={FLOW_TILES} counts={flowCounts} />
 
       {/* Kde jsou zakázky */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -174,9 +200,19 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-5">
-        <div className="space-y-5 lg:col-span-3">
-          <div id="fronta" className="scroll-mt-4">
+      {/* grid-cols-1 + min-w-0: na mobilu se sloupec nesmí roztáhnout podle nejširšího obsahu */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
+        <div className="min-w-0 space-y-5 lg:col-span-3">
+          <div id="fronta" className="scroll-mt-4 space-y-5">
+            <Panel
+              icon={<ShieldAlert />}
+              tone="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+              title={`Nabídky ke schválení (${quotes.length})`}
+              hint="Nabídky od kolegů a od AI. Bez schválení je nejde odeslat."
+              action={<Button asChild variant="ghost" size="sm"><Link href="/quotes#ke-schvaleni">Nabídky <ArrowRight /></Link></Button>}
+            >
+              <QuoteApprovalList items={quotes} stacked />
+            </Panel>
             <ApprovalQueue initialItems={approvals} recent={resolved} />
           </div>
 
@@ -231,7 +267,7 @@ export default async function DashboardPage() {
           </Panel>
         </div>
 
-        <div className="space-y-5 lg:col-span-2">
+        <div className="min-w-0 space-y-5 lg:col-span-2">
           <MoversPanel movers={flow.movers} total={flow.movedToday} />
 
           <Panel
@@ -259,31 +295,6 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted-foreground">Kniha zakázek je zatím prázdná.</p>
             ) : (
               <JobMiniList jobs={recent} showCustomer />
-            )}
-          </Panel>
-
-          <Panel icon={<ListChecks />} tone="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" title={`Nabídky ke schválení (${quotes.length})`}>
-            {quotes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Žádná nabídka nečeká na schválení.</p>
-            ) : (
-              <ul className="divide-y rounded-xl border">
-                {quotes.slice(0, 6).map((q) => (
-                  <li key={q.id}>
-                    <Link href={q.job ? `/orders/${q.job.id}` : "/quotes"} className="flex items-center gap-3 px-3 py-2 transition hover:bg-accent/60">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-sm font-semibold">{q.number}</span>
-                          <StateChip meta={QUOTE_STATES[q.state ?? "ke_schvaleni"]} size="xs" ai={q.aiGenerated} />
-                        </div>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {[q.customer?.name, q.job?.number, q.createdBy ? `zadal ${q.createdBy.name}` : null].filter(Boolean).join(" · ")}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-sm font-semibold">{q.total !== null ? formatCZK(q.total) : "bez ceny"}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
             )}
           </Panel>
 

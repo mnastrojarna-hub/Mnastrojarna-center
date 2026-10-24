@@ -1,6 +1,8 @@
 // View-modely Knihy zakázek (UI ↔ datová vrstva). Plní se výhradně z DB (tabulka orders a spol.).
+import type { DrawingSpecView } from "@/lib/jobs/drawing-spec";
 import type {
-  ActorKind, ChangeVia, InquiryStatus, JobStage, JobFileKind, JobSource, PriorityLevel, PurchaseOrderStatus, QuoteState, QuoteStatus,
+  ActorKind, ChangeVia, DocIssuerKey, InquiryStatus, JobStage, JobFileKind, JobFileOrigin, JobSource, PriorityLevel,
+  PurchaseOrderStatus, QuoteState, QuoteStatus,
 } from "@/lib/supabase/database.types";
 import type { DeadlineState } from "@/lib/jobs/operations";
 import type { StageGroupKey } from "@/lib/jobs/stages";
@@ -130,6 +132,8 @@ export interface JobItem {
   /** Uzavřeno s menším množstvím (zmetky, zákazník přijal méně). */
   deliveryClosed?: boolean;
   deliveryClosedReason?: string | null;
+  /** Materiál, hmotnost, TZ / PÚ z výkresu (štítky v Položkách); null = výkres nic neuvádí. */
+  spec?: DrawingSpecView | null;
 }
 
 export interface JobQuoteItem {
@@ -218,7 +222,45 @@ export interface JobFile {
   note: string | null;
   /** AI z dokladu něco přečetla (ai_extracted není prázdné). */
   hasAiData: boolean;
+  /** Kdo doklad vystavil (my / zákazník / dodavatel). */
+  issuer?: DocIssuerKey | null;
+  /** Odkud dokument je (vystavený, nahraný, foto, e-mail, import). */
+  origin?: JobFileOrigin | null;
+  /**
+   * #25: obsah zamčený pro tohoto uživatele (řádek je vidět, náhled / stažení / odeslání ne):
+   * price = nákupní doklad bez práva na marže; unapproved / stale = PDF naší nabídky čekající
+   * na schválení / vystavené před posledním schválením.
+   */
+  locked?: FileLock;
+  /** Anonymizace výkresu pro dodavatele (null = netýká se — náš doklad, jiný typ souboru). */
+  anon?: JobFileAnon | null;
 }
+
+export type JobFileAnonStatus = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";
+
+/** Stav anonymizace dokumentu pro UI (odznak, menu) — bez textů smazaných oblastí. */
+export interface JobFileAnon {
+  status: JobFileAnonStatus;
+  /** Anonymní název kopie („D-1234_B.pdf"). */
+  filename: string | null;
+  at: string | null;
+  /** Kdo anonymizaci provedl (profil) — u AI ten, kdo soubor nahrál. */
+  by: string | null;
+  actorKind: "user" | "ai" | "system" | null;
+  reason: string | null;
+  /** Člověk výsledek zkontroloval / schválil. */
+  reviewed: boolean;
+  reviewedAt: string | null;
+  /** Počty smazaných oblastí po kategoriích (company, person, path…). */
+  counts: Record<string, number>;
+  total: number;
+  warnings: { code: string; message: string }[];
+  /** Vyřazené stránky (dopis, faktura ve smíšeném PDF). */
+  excludedPages: number[];
+  method: string | null;
+}
+
+export type FileLock = "price" | "unapproved" | "stale" | null;
 
 export type JobEventType =
   | "created" | "stage" | "status" | "field" | "file" | "quote" | "comment" | "ai" | "email";
@@ -410,7 +452,8 @@ export interface JobQuoteInput {
 /** Výběrové seznamy pro formuláře zakázky. */
 export interface JobFormOptions {
   users: (PersonRef & { role: string })[];
-  customers: { id: string; name: string; customerNumber: string | null; ico: string | null }[];
+  /** ownerId = obchodník zákazníka (nová zakázka ho dostane, když obchodníka nevybírá super admin). */
+  customers: { id: string; name: string; customerNumber: string | null; ico: string | null; ownerId?: string | null }[];
   suppliers: { id: string; name: string }[];
 }
 

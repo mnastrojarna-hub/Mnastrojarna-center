@@ -26,6 +26,8 @@ import {
  */
 
 const NO_DB = "Supabase není nakonfigurováno.";
+/** = text pojistky v DB (customers_owner_guard, migrace 20261023157000). */
+const CUSTOMER_OWNER_ADMIN_ONLY = "Obchodníka zákazníka mění jen super admin.";
 
 function clean(v: unknown, max = 300): string | null {
   const s = typeof v === "string" ? v.trim() : "";
@@ -122,6 +124,12 @@ export async function createCustomer(
   if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
   const mapped = customerColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
+  // #25: obchodník zákazníka určuje, komu připadnou jeho další zakázky (a provize) → cizího vybírá jen super admin
+  if (auth.user.role !== "super_admin" && mapped.cols.owner_id && mapped.cols.owner_id !== auth.user.id) {
+    return { ok: false, error: CUSTOMER_OWNER_ADMIN_ONLY };
+  }
+  // zaměstnanec obchodníkem zákazníka není — jím založený zákazník je bez obchodníka (přidělí super admin)
+  if (auth.user.role === "zamestnanec") mapped.cols.owner_id = null;
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
     const dup = await findDuplicate(db, mapped.cols);
@@ -153,8 +161,13 @@ export async function updateCustomer(
   if ("error" in mapped) return { ok: false, error: mapped.error };
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
-    const { data: current } = await db.from("customers").select("id, customer_number").eq("id", id).maybeSingle();
+    const { data: current } = await db.from("customers").select("id, customer_number, owner_id").eq("id", id).maybeSingle();
     if (!current) return { ok: false, error: "Zákazník neexistuje (možná ho někdo smazal)." };
+    // #25: obchodníka zákazníka mění jen super admin (ostatní ho jen ponechají)
+    if (auth.user.role !== "super_admin"
+      && (mapped.cols.owner_id ?? null) !== ((current as { owner_id: string | null }).owner_id ?? null)) {
+      return { ok: false, error: CUSTOMER_OWNER_ADMIN_ONLY };
+    }
 
     const dup = await findDuplicate(db, mapped.cols, id);
     // stejný název u jiné firmy povolíme, IČO / DIČ ne

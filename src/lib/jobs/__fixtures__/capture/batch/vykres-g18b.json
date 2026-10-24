@@ -1,0 +1,43 @@
+{
+  "revision": "",
+  "surface": "Ra 0,8",
+  "quantity": 0,
+  "customerName": "Konstrukce Vrba s.r.o.",
+  "drawingDate": "2026-10-01",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "confidence": 0.92,
+  "needsClarification": [],
+  "customerOrderNumber": "",
+  "ourQuoteNumber": "",
+  "blankDimensions": "",
+  "drawingNumber": "E2E-VK-1802",
+  "drawingNumbers": [
+    "E2E-VK-1802"
+  ],
+  "title": "Distanční deska",
+  "material": "S235JR",
+  "materialGroup": "bezna_ocel",
+  "dimensions": "200 × 120 × 15 mm",
+  "overallDims": [
+    200,
+    120,
+    15
+  ],
+  "shapeHint": "hranol",
+  "weightKg": 2.6,
+  "generalTolerance": "ISO 2768-m",
+  "tightestTolerance": "±0,1",
+  "heatTreatment": "",
+  "surfaceTreatment": "",
+  "heatStatus": "bez",
+  "heatSteps": [],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "notes": "Obecné tolerance ISO 2768-m.",
+  "drawingNotes": [
+    "Obecné tolerance ISO 2768-m",
+    "Odjehlit"
+  ],
+  "summary": "Distanční deska E2E-VK-1802 bez úprav."
+}

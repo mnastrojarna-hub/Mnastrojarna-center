@@ -103,12 +103,12 @@ describe("nález 1: 2D/3D, platnost nabídky a platební podmínky nejsou dodac�
   ])("„%s“ → žádná lhůta", (text) => {
     expect(parseLeadTime(text)).toBeNull();
   });
-  it("skutečná lhůta za 2D/3D / za platností se najde; 30d a 4w dál platí", () => {
+  it("skutečná lhůta za 2D/3D / za platností se najde; „30d“ / „4w“ gramatika nezná (žádná lhůta)", () => {
     expect(parseLeadTime("Výroba dle 3D modelu, dodání 4 týdny")).toMatchObject({ days: 28 });
     expect(parseLeadTime("Nabídka platí 30 dní. Dodací lhůta 6 týdnů")).toMatchObject({ days: 42 });
     expect(parseLeadTime("Platební podmínky: 14 dní, dodání 10 pracovních dnů")).toMatchObject({ days: 10, unit: "pracovni" });
-    expect(parseLeadTime("30d")).toMatchObject({ days: 30 });
-    expect(parseLeadTime("4w ARO")).toMatchObject({ days: 28, from: "objednavka" });
+    expect(parseLeadTime("30d")).toBeNull();
+    expect(parseLeadTime("4w ARO")).toBeNull();
   });
   it("nabídka „EXW Vimperk“ + poznámka „Výroba dle 3D modelu“ → žádný termín objednávka + 3 dny", () => {
     const q = quoteTermsOfDoc(quote({ deliveryTerms: "EXW Vimperk", note: "Výroba dle 3D modelu", summary: "" }), "NAB-6");
@@ -348,11 +348,11 @@ describe("2. kolo — nález 1: platba, záruka, delší věta o platnosti, čí
     expect(parseLeadTime("expedice 10 pracovních dnů")).toMatchObject({ days: 10, unit: "pracovni" });
     expect(parseLeadTime("Platba převodem 14 dní, dodání 4 týdny")).toMatchObject({ days: 28 });
     expect(parseLeadTime("Záruka 24 měsíců. Dodání 3 týdny")).toMatchObject({ days: 21 });
-    expect(parseLeadTime("Garantovaná dodací lhůta 4 týdny")).toMatchObject({ days: 28 });
-    expect(parseLeadTime("Platba 14 dní, 4 týdny od objednání")).toMatchObject({ days: 28, from: "objednavka" });
+    // uzavřená gramatika: „garantovaná" není povolený úvod kotvy; holá doba jen jako CELÉ dodací pole
+    expect(parseLeadTime("Garantovaná dodací lhůta 4 týdny")).toBeNull();
+    expect(parseLeadTime("Platba 14 dní, 4 týdny od objednání")).toBeNull();
     expect(parseLeadTime("Payment 30 days net, lead time 2 weeks")).toMatchObject({ days: 14 });
     expect(parseLeadTime("Platnost nabídky 30 dní, dodací lhůta 4 týdny")).toMatchObject({ days: 28 });
-    expect(parseLeadTime("30d")).toMatchObject({ days: 30 });
   });
   it("dopad přes orderDeadline: záruka / platnost / 3d nedají termín", () => {
     expect(deadlineWith("EXW Vimperk, záruční doba 24 měsíců").proposal).toBeNull();
@@ -376,10 +376,12 @@ describe("2. kolo — nález 2: poznámka jen v klauzuli se slovem o dodání (h
   ])("poznámka „%s“ → žádná lhůta", (text) => {
     expect(parseLeadTimeInContext(text)).toBeNull();
   });
-  it("lhůta u slova o dodání se dál najde", () => {
-    expect(parseLeadTimeInContext("Kalení 2 dny, dodání 4 týdny")).toMatchObject({ days: 28 });
-    expect(parseLeadTimeInContext("Kalení 2 dny a dodání 4 týdny")).toMatchObject({ days: 28 });
-    expect(parseLeadTimeInContext("4 týdny dodání")).toMatchObject({ days: 28 });
+  it("lhůta v klauzuli s dodací kotvou se dál najde (jen celá gramatická klauzule)", () => {
+    // jiná klauzule s vlastní dobou (kalení, výroba, expedice…) = lhůta nejednoznačná → nic (uzavřené pravidlo, 4. kolo)
+    expect(parseLeadTimeInContext("Kalení 2 dny, dodání 4 týdny")).toBeNull();
+    // kotva uprostřed klauzule / doba před kotvou = mimo gramatiku
+    expect(parseLeadTimeInContext("Kalení 2 dny a dodání 4 týdny")).toBeNull();
+    expect(parseLeadTimeInContext("4 týdny dodání")).toBeNull();
     expect(parseLeadTimeInContext("Výroba dle 3D modelu, dodání 4 týdny")).toMatchObject({ days: 28 });
     expect(parseLeadTimeInContext("Lieferzeit 5 Wochen nach Auftragseingang")).toMatchObject({ days: 35, from: "objednavka" });
     expect(parseLeadTimeInContext("Platba 14 dní; dodací lhůta 6 týdnů")).toMatchObject({ days: 42 });

@@ -3,6 +3,7 @@ import { StageSelect } from "@/components/jobs/stage-select";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { FlowStatusChip } from "@/components/flow-status/state-chip";
+import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
 import { RowNextAction, RowProposal } from "@/components/jobs/book/row-flow";
 import { rowFlowView, type BookAccess, type RowFlowView } from "@/components/jobs/book/book-flow";
 import { actionPalette } from "@/components/flow/flow-state";
@@ -43,17 +44,26 @@ export function JobRows({ jobs, today, access }: { jobs: JobListItem[]; today: s
 }
 
 /** Chip podrobného stavu (tabulka 1.11) nebo návrh změny s ✓ / ✕; pod chipem kdo dílčí stav změnil. */
-export function RowStateChip({ job, view, className }: { job: JobListItem; view: RowFlowView; className?: string }) {
+export function RowStateChip({
+  job, view, className, shortFlag,
+}: { job: JobListItem; view: RowFlowView; className?: string; shortFlag?: boolean }) {
   const proposal = job.flow?.proposal;
   if (proposal) {
     return <RowProposal jobId={job.id} proposal={proposal} stamp={job.stamps?.proposal} canDecide={view.canDecideProposal} className={className} />;
   }
-  if (!view.chip) return null;
-  if (!view.chipStamp) return <FlowStatusChip chip={view.chip} size="xs" className={cn("max-w-full", className)} />;
+  if (!view.chip) return view.approval ? <QuoteApprovalFlag flag={view.approval} size="xs" short={shortFlag} className={className} /> : null;
+  if (!view.chipStamp && !view.approval) return <FlowStatusChip chip={view.chip} size="xs" className={cn("max-w-full", className)} />;
   return (
     <span className={cn("inline-flex min-w-0 max-w-full flex-col items-start gap-0.5", className)}>
-      <FlowStatusChip chip={view.chip} size="xs" className="max-w-full" />
-      <ActorStamp stamp={view.chipStamp} short className="max-w-[10.5rem]" />
+      {view.chipIsApproval ? (
+        // #25: „Neschválená · NAB-…“ výrazně (jantarový štítek se štítem), ne fialový chip jako „Schválená“
+        <QuoteApprovalFlag flag={view.approval} size="xs" short={shortFlag} withNumber />
+      ) : (
+        <FlowStatusChip chip={view.chip} size="xs" className="max-w-full" />
+      )}
+      {view.chipStamp && <ActorStamp stamp={view.chipStamp} short className="max-w-[10.5rem]" />}
+      {/* #25: neschválená nabídka je vidět všem, ale výrazně označená */}
+      {!view.chipIsApproval && <QuoteApprovalFlag flag={view.approval} size="xs" short={shortFlag} />}
     </span>
   );
 }
@@ -67,6 +77,7 @@ export function RowAction({ job, view, className }: { job: JobListItem; view: Ro
       jobId={job.id}
       action={view.next}
       quoteId={view.activeQuoteId}
+      quoteUpdatedAt={(job.flowQuotes ?? []).find((q) => q.id === view.activeQuoteId)?.updatedAt ?? null}
       reopenOrderTo={job.flow?.orderConfirmedRevision ? "potvrzena" : "dorucena"}
       waitingNote={job.flow?.waitingNote ?? null}
       palette={palette}
@@ -159,7 +170,7 @@ function JobRow({ job, today, access }: { job: JobListItem; today: string; acces
           <StageSelect jobId={job.id} stage={job.stage} size="sm" flow={job.flow} quotes={job.flowQuotes} />
           {/* kdo stav naposledy posunul — text na všech šířkách, ťuknutím detail */}
           <ActorStamp stamp={view.stamp} short className="max-w-[10.5rem] xl:max-w-[11rem]" />
-          <RowStateChip job={job} view={view} className="hidden lg:inline-flex" />
+          <RowStateChip job={job} view={view} shortFlag className="hidden lg:inline-flex" />
           <ProductionLine job={job} compact className="hidden w-full max-w-[11rem] lg:flex" />
         </div>
 
