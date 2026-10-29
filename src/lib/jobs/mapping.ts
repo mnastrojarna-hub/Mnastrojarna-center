@@ -498,7 +498,8 @@ const PRODUCTION_LIST_COLUMNS = [
 
 /** Embedy pro fakta toku: operace (počet), objednávky dodavatelům, nabídky dodavatelů bez ceny. */
 const FLOW_EMBEDS = [
-  "ops:job_operations!job_id(count)",
+  // stavy kroků (počet + „běží krok?" — Kniha i detail ukážou stejné „Předat do kroku…" / „Posunout dál…")
+  "ops:job_operations!job_id(status)",
   "pos:purchase_orders!job_id(status)",
   "sq:supplier_quotes!job_id(total)",
 ].join(", ");
@@ -708,7 +709,7 @@ export interface JobRow {
   ord_by?: Embed<PersonEmbed>;
   lost_person?: Embed<PersonEmbed>;
   prop_by?: Embed<PersonEmbed>;
-  ops?: { count?: number | null }[] | null;
+  ops?: { count?: number | null; status?: string | null }[] | null;
   pos?: { status?: string | null }[] | null;
   sq?: { total?: number | string | null }[] | null;
 }
@@ -746,6 +747,11 @@ export interface ItemRow {
   surface_steps?: unknown;
   surface_treatment?: string | null;
   drawing_notes?: string | null;
+  // technologie položky (migrace 20261029140000)
+  tech_procedure?: string | null;
+  tech_complete?: boolean | null;
+  tech_complete_by?: string | null;
+  supplier_note?: string | null;
 }
 
 export interface QuoteRow {
@@ -902,13 +908,18 @@ export function flowQuotesOf(quotes: readonly (Partial<QuoteRow> & { id: string 
 
 /** Fakta pro deriveFlow / primaryChip / nextAction z řádku orders (sloupce FLOW_LIST_COLUMNS + embedy FLOW_EMBEDS). */
 export function flowFactsOfRow(row: JobRow): FlowFacts {
-  const opsCount = Array.isArray(row.ops) ? Number(row.ops[0]?.count ?? 0) || 0 : 0;
-  return flowFactsFromRow(row as unknown as AnyRow, {
+  const ops = Array.isArray(row.ops) ? row.ops : null;
+  // embed (status) = řádek za krok; starší embed (count) = jeden řádek s počtem
+  const counted = ops && ops.length === 1 && typeof ops[0]?.count === "number" ? Number(ops[0].count) || 0 : null;
+  const opsCount = counted ?? (ops ? ops.length : 0);
+  const facts = flowFactsFromRow(row as unknown as AnyRow, {
     pendingSupplierQuotes: (row.sq ?? []).filter((x) => x.total === null || x.total === undefined).length,
     hasOperations: opsCount > 0,
     hasPurchaseOrders: (row.pos ?? []).some((p) => p.status !== "zrusena"),
     assigneeName: personRef(row.assignee)?.name ?? null,
   });
+  if (ops && counted === null) facts.productionRunning = ops.some((o) => o?.status === "probiha" || o?.status === "problem");
+  return facts;
 }
 
 /** Kdo naposledy změnil hlavní stav a dílčí stavy — ze sloupců *_changed_* (bez historie událostí). */
@@ -1055,6 +1066,9 @@ export function rowToJobItem(row: ItemRow, opts: ViewOptions): JobItem {
     ...(row.delivered_quantity !== undefined ? { deliveredQuantity: num(row.delivered_quantity) ?? 0 } : {}),
     ...(row.delivery_closed !== undefined ? { deliveryClosed: Boolean(row.delivery_closed), deliveryClosedReason: row.delivery_closed_reason ?? null } : {}),
     ...(row.material_group !== undefined || row.heat_status !== undefined ? { spec: specViewFromRow(row as Record<string, unknown>) } : {}),
+    ...(row.tech_complete !== undefined || row.supplier_note !== undefined || row.tech_procedure !== undefined
+      ? { tech: { procedure: row.tech_procedure ?? null, complete: Boolean(row.tech_complete), completeBy: row.tech_complete_by ?? null, supplierNote: row.supplier_note ?? null } }
+      : {}),
   };
 }
 
@@ -1336,6 +1350,13 @@ function deadlineInputOf(j: JobListItem): DeadlineInput {
 /** Splňuje zakázka filtr termínu? */
 export function matchesDeadline(j: JobListItem, filter: JobFilters["deadline"], today: Date = pragueToday()): boolean {
   if (!filter) return true;
+  if (filter === "krok") {
+    // ve výrobě: aktuální krok po termínu, nebo konec výroby po konečném termínu (zákazník)
+    if (j.stage !== "ve_vyrobe") return false;
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const target = j.dueDate ?? j.customerRequiredDate ?? null;
+    return Boolean((j.productionDue && j.productionDue < iso) || (j.productionEnd && target && j.productionEnd > target));
+  }
   const input = deadlineInputOf(j);
   if (filter === "no_date") return effectiveDeadline(input) === null;
   const info = deadlineInfo(input, today);

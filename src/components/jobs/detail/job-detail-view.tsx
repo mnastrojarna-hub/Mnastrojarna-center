@@ -20,6 +20,7 @@ import { FlowActionsProvider, type FlowAccess } from "./flow-actions";
 import { ProductionTab, type JobProductionData } from "@/components/jobs/production/production-tab";
 import { PurchasingTab } from "@/components/jobs/purchasing/purchasing-tab";
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
+import { sortOperations, stepLabel } from "@/lib/jobs/production";
 import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";
 import type { JobPayment, OrderRevision } from "@/lib/data/flow-status";
 
@@ -35,7 +36,8 @@ export interface JobFlowData {
 
 const TABS: { key: DetailTab; label: string; icon: LucideIcon; tone: string; count: string }[] = [
   { key: "prehled", label: "Přehled", icon: LayoutDashboard, tone: "text-sky-600 dark:text-sky-400", count: "" },
-  { key: "vyroba", label: "Výroba", icon: Factory, tone: "text-yellow-600 dark:text-yellow-400", count: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300" },
+  // „Výrobu bych přejmenoval na technologii" (majitel 29. 10.) — klíč záložky zůstává „vyroba" (odkazy ?tab=vyroba)
+  { key: "vyroba", label: "Technologie", icon: Factory, tone: "text-yellow-600 dark:text-yellow-400", count: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-300" },
   { key: "polozky", label: "Položky", icon: Package, tone: "text-blue-600 dark:text-blue-400", count: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300" },
   { key: "nabidky", label: "Nabídky", icon: FileText, tone: "text-violet-600 dark:text-violet-400", count: "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300" },
   { key: "nakup", label: "Nákup & marže", icon: ShoppingBag, tone: "text-lime-600 dark:text-lime-400", count: "bg-lime-100 text-lime-800 dark:bg-lime-500/20 dark:text-lime-300" },
@@ -95,6 +97,20 @@ export function JobDetailView({
     }
   }
 
+  // objednávka dodavateli → krok výroby („Krok 2: Tepelné zpracování") pro řádky Nákupu
+  const poSteps = React.useMemo(() => {
+    const ops = sortOperations(production?.operations ?? []);
+    const live = ops.filter((o) => o.status !== "preskoceno");
+    const out: Record<string, string> = {};
+    for (const o of ops) {
+      if (!o.purchaseOrderId) continue;
+      const n = live.findIndex((x) => x.id === o.id) + 1;
+      const label = `${n > 0 ? `Krok ${n}` : "Krok"}: ${stepLabel(o, ops)}`;
+      out[o.purchaseOrderId] = out[o.purchaseOrderId] ? `${out[o.purchaseOrderId]} + ${label}` : label;
+    }
+    return out;
+  }, [production?.operations]);
+
   const counts: Record<DetailTab, number> = {
     prehled: 0,
     vyroba: production?.summary.total ?? 0,
@@ -114,6 +130,8 @@ export function JobDetailView({
         access={flow?.access}
         setTab={changeTab}
         initialAction={initialAction}
+        purchaseOrders={purchasing?.purchaseOrders.map((p) => ({ id: p.id, number: p.number, status: p.status, supplierName: p.supplier?.name ?? "dodavatel" }))}
+        productionRunning={production ? production.operations.some((o) => o.status === "probiha" || o.status === "problem") : null}
       >
         <div className="space-y-4">
           <JobToolbar job={job} />
@@ -157,7 +175,7 @@ export function JobDetailView({
             </TabsContent>
             {purchasing && (
               <TabsContent value="nakup">
-                <PurchasingTab job={job} data={purchasing} />
+                <PurchasingTab job={job} data={purchasing} stepOf={poSteps} />
               </TabsContent>
             )}
             <TabsContent value="dokumenty">

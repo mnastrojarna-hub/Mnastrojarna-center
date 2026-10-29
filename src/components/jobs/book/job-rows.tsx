@@ -162,16 +162,17 @@ function JobRow({ job, today, access }: { job: JobListItem; today: string; acces
           </div>
           <CustomerDocNumber job={job} className="mt-1.5 lg:hidden" />
           <RowStateChip job={job} view={view} className="relative z-10 mt-1.5 lg:hidden" />
-          <ProductionLine job={job} className="mt-2 lg:hidden" />
+          <ProductionLine job={job} today={today} className="mt-2 lg:hidden" />
         </div>
 
         {/* stav */}
-        <div className="relative z-10 order-2 flex shrink-0 flex-col items-end gap-0.5 lg:order-none lg:justify-self-end [grid-area:stage] xl:items-start xl:justify-self-start">
+        <div className="relative z-10 order-2 flex shrink-0 flex-col items-end gap-0.5 lg:order-none lg:min-w-0 lg:max-w-full lg:justify-self-end [grid-area:stage] xl:items-start xl:justify-self-start">
           <StageSelect jobId={job.id} stage={job.stage} size="sm" flow={job.flow} quotes={job.flowQuotes} />
           {/* kdo stav naposledy posunul — text na všech šířkách, ťuknutím detail */}
           <ActorStamp stamp={view.stamp} short className="max-w-[10.5rem] xl:max-w-[11rem]" />
-          <RowStateChip job={job} view={view} shortFlag className="hidden lg:inline-flex" />
-          <ProductionLine job={job} compact className="hidden w-full max-w-[11rem] lg:flex" />
+          {/* dlouhý chip („Ohrožen konečný termín (o 8 dní)“) se zkrátí ve sloupci, nepřeteče do Termínu */}
+          <RowStateChip job={job} view={view} shortFlag className="max-w-[10.5rem] xl:max-w-[11rem] hidden lg:inline-flex" />
+          <ProductionLine job={job} compact today={today} className="hidden w-full max-w-[11rem] lg:flex" />
         </div>
 
         {/* termín */}

@@ -142,7 +142,7 @@ export function SupplierQuoteCard({
         {quote.note && <p className="line-clamp-2 text-xs text-muted-foreground">{quote.note}</p>}
 
         <div className="flex flex-col gap-0.5">
-          <ActorStamp verb={quote.source === "foto" ? "Zapsána z fotky" : "Zapsána"} stamp={createdStamp(quote)} />
+          <ActorStamp verb={quote.source === "foto" ? "Zapsána z fotky" : quote.source === "telefon" ? "Nabídka telefonem — zapsána" : "Zapsána"} stamp={createdStamp(quote)} />
           {quote.selected && quote.selectedStamp && (
             <ActorStamp verb="Vítězná" stamp={quote.selectedStamp} className="text-green-700 dark:text-green-400" />
           )}

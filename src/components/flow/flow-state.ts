@@ -309,7 +309,16 @@ export function flowActionHref(key: FlowActionKey, jobId: string, opts: { canPri
       return `/orders/${jobId}?tab=nakup`;
     case "quote.edit":
       return `/orders/${jobId}?tab=nabidky`;
+    case "production.handoff":
+    case "production.advance":
+    case "production.finish":
+    case "production.replan":
+    case "production.undo":
+    case "purchasing.notifySuppliers":
+      // předání do výroby: dialog otevře karta zakázky (Kniha ho otevírá rovnou na řádku)
+      return `/orders/${jobId}?akce=${key}`;
     case "production.plan":
+    case "production.sendPo":
     case "delivery.record":
     case "delivery.closeShort":
     case "delivery.partialNote":

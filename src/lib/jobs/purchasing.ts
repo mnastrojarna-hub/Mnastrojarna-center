@@ -10,6 +10,7 @@ import {
   type PersonEmbed,
 } from "@/lib/jobs/mapping";
 import { STAGES, isJobStage, stageRank } from "@/lib/jobs/stages";
+import { isOperationKind } from "@/lib/jobs/operations";
 import { czDate, czWeekday } from "@/lib/pdf/types";
 import { stampFromRow, type ChangeStamp, type PurchaseExtraState } from "@/lib/jobs/flow-status";
 
@@ -123,7 +124,7 @@ export function applyPurchasePrices(
   return { changes, total: purchaseItemsTotal(items.map((i) => ({ quantity: i.quantity, unitPrice: next.get(i.id) ?? null }))) };
 }
 
-export const SUPPLIER_QUOTE_SOURCES: SupplierQuoteSource[] = ["manual", "foto", "email", "ai"];
+export const SUPPLIER_QUOTE_SOURCES: SupplierQuoteSource[] = ["manual", "foto", "email", "ai", "telefon"];
 
 export function isSupplierQuoteSource(v: unknown): v is SupplierQuoteSource {
   return typeof v === "string" && (SUPPLIER_QUOTE_SOURCES as string[]).includes(v);
@@ -416,7 +417,7 @@ export interface DraftJob {
   number: string;
   title: string;
   currency: string;
-  items: Pick<JobItem, "drawingNumber" | "revision" | "name" | "description" | "material" | "quantity" | "unit" | "purchaseUnitPrice">[];
+  items: (Pick<JobItem, "drawingNumber" | "revision" | "name" | "description" | "material" | "quantity" | "unit" | "purchaseUnitPrice"> & Partial<Pick<JobItem, "tech">>)[];
   drawingNumbers: string[];
   totalQuantity: number;
   purchaseCost: number | null;
@@ -441,9 +442,15 @@ export function itemsFromSupplierQuote(quote: Pick<SupplierQuoteView, "items">, 
       quantity: it.quantity,
       unit: textOrUndef(it.unit) ?? "ks",
       unitPrice: it.unitPrice,
-      note: textOrUndef(it.note),
+      // poznámka pro dodavatele z Technologie (podle čísla výkresu) — v PDF zvýrazněná „Pozor: …"
+      note: joinNote(supplierNoteSegment(match?.tech?.supplierNote), splitItemNote(it.note).rest),
     };
   });
+}
+
+function joinNote(...parts: (string | null | undefined)[]): string | undefined {
+  const t = parts.map((p) => (p ?? "").trim()).filter(Boolean).join(" · ");
+  return t || undefined;
 }
 
 /** Položky ze zakázky — nákupní cena / MJ, žádná prodejní cena ani interní poznámka. */
@@ -458,7 +465,7 @@ export function itemsFromJob(job: Pick<DraftJob, "items">): PurchaseItemInput[] 
       quantity: it.quantity,
       unit: textOrUndef(it.unit) ?? "ks",
       unitPrice: it.purchaseUnitPrice ?? null,
-      note: name && desc && desc !== name ? desc : undefined,
+      note: joinNote(supplierNoteSegment(it.tech?.supplierNote), name && desc && desc !== name ? desc : undefined),
     };
   });
 }
@@ -710,6 +717,13 @@ export function supplierQuoteInputToRow(
   } else if (!opts.partial) {
     row.source = "manual";
   }
+  // na co je nabídka (druhy kroků) — jen když je výslovně zadané (jinak u focení předvyplní AI)
+  if (input.operationKinds !== undefined) {
+    if (input.operationKinds !== null && !Array.isArray(input.operationKinds)) return { error: "Neplatné druhy kroků nabídky." };
+    const kinds = [...new Set((input.operationKinds ?? []).filter((k): k is string => typeof k === "string"))];
+    if (kinds.some((k) => !isOperationKind(k))) return { error: "Neznámý druh kroku nabídky." };
+    row.operation_kinds = kinds.length ? kinds : null;
+  }
   return { row };
 }
 
@@ -764,7 +778,7 @@ export function issueStageHint(stage: JobStage): { message: string; suggestStage
   if (!isJobStage(stage)) return null;
   if (stage === "potvrzeno") {
     return {
-      message: "Objednávka u dodavatele je vystavena — chceš zakázku posunout do stavu Ve výrobě?",
+      message: "Objednávka u dodavatele je vystavena — předej zakázku do výroby (kdo + termín).",
       suggestStage: "ve_vyrobe",
     };
   }
@@ -797,6 +811,46 @@ export function parseEmailList(value: unknown): string[] | null {
   return out;
 }
 
+// ── Poznámka pro dodavatele u položky (Technologie → objednávka) ──
+/** Úvod části poznámky položky objednávky, která je pro dodavatele („Pozor: popsat na čele"). */
+export const SUPPLIER_NOTE_PREFIX = "Pozor: ";
+
+/** Poznámka pro dodavatele jako část poznámky položky objednávky (null = žádná). */
+export function supplierNoteSegment(note: string | null | undefined): string | null {
+  const t = (note ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  return /^pozor\b/i.test(t) ? `${SUPPLIER_NOTE_PREFIX}${t.replace(/^pozor[:\s,–-]*/i, "").trim() || t}` : `${SUPPLIER_NOTE_PREFIX}${t}`;
+}
+
+/** Poznámka položky objednávky → upozornění pro dodavatele („Pozor: …") a zbytek (materiál, úpravy…). */
+export function splitItemNote(note: string | null | undefined): { warning: string | null; rest: string | null } {
+  const parts = (note ?? "").split(" · ").map((p) => p.trim()).filter(Boolean);
+  const warn = parts.filter((p) => p.startsWith(SUPPLIER_NOTE_PREFIX));
+  const rest = parts.filter((p) => !p.startsWith(SUPPLIER_NOTE_PREFIX));
+  return {
+    warning: warn.length ? warn.map((w) => w.slice(SUPPLIER_NOTE_PREFIX.length).trim()).filter(Boolean).join("; ") || null : null,
+    rest: rest.length ? rest.join(" · ") : null,
+  };
+}
+
+export interface SupplierItemNote {
+  /** Číslo výkresu, jinak název položky. */
+  ref: string;
+  note: string;
+}
+
+/** Souhrn poznámek pro dodavatele z položek objednávky (do e-mailu). */
+export function supplierNotesOfItems(items: { drawingNumber?: string | null; name?: string | null; note?: string | null }[]): SupplierItemNote[] {
+  const out: SupplierItemNote[] = [];
+  items.forEach((it, i) => {
+    const w = splitItemNote(it.note).warning;
+    if (!w) return;
+    const ref = (it.drawingNumber ?? "").trim() || (it.name ?? "").trim() || `položka ${i + 1}`;
+    out.push({ ref, note: w });
+  });
+  return out;
+}
+
 export function purchaseOrderEmail(input: {
   number: string;
   companyName: string;
@@ -809,6 +863,8 @@ export function purchaseOrderEmail(input: {
   companyWeb?: string | null;
   /** Objednávka bez nabídky dodavatele: výkresy firma od nás nemá — řádek, že je pošleme. */
   drawingsSeparately?: boolean;
+  /** Poznámky pro dodavatele u položek („pozor popsat na čele") — souhrn v e-mailu (v PDF jsou u položky). */
+  itemNotes?: SupplierItemNote[];
 }): { subject: string; body: string } {
   const days = input.confirmWithinDays ?? CONFIRM_WITHIN_WORKING_DAYS;
   const quote = (input.supplierQuoteNumber ?? "").trim();
@@ -819,6 +875,11 @@ export function purchaseOrderEmail(input: {
     `v příloze Vám zasíláme naši objednávku č. ${input.number}${quote ? ` na základě Vaší nabídky č. ${quote}` : ""}.`,
   ];
   if (req) lines.push(`Požadovaný termín dodání: ${czDate(req)} (${czWeekday(req)}).`);
+  const notes = (input.itemNotes ?? []).filter((n) => n.note.trim());
+  if (notes.length) {
+    lines.push("", "Prosíme, věnujte pozornost poznámkám u položek:");
+    for (const n of notes.slice(0, 20)) lines.push(`– ${n.ref}: ${n.note.trim()}`);
+  }
   if (input.drawingsSeparately && !quote) lines.push("Výkresovou dokumentaci k položkám Vám pošleme samostatně, pokud ji od nás ještě nemáte.");
   lines.push(
     "",
@@ -1044,6 +1105,7 @@ export interface SupplierQuoteDbRow {
   updated_at?: string | null;
   selected_at?: string | null;
   selected_by?: string | null;
+  operation_kinds?: string[] | null;
   supplier?: Embed<SupplierEmbedRow>;
   creator?: Embed<PersonEmbed>;
   selector?: Embed<PersonEmbed>;
@@ -1179,6 +1241,7 @@ export function rowToSupplierQuoteView(row: SupplierQuoteDbRow): SupplierQuoteVi
     updatedAt: row.updated_at ?? row.created_at,
     items: itemsOf(row.items),
     selectedStamp: row.selected ? poStamp(row.selected_at, row.selected_by, row.selector) : null,
+    operationKinds: Array.isArray(row.operation_kinds) ? row.operation_kinds.filter((k) => isOperationKind(k)) : null,
   };
 }
 

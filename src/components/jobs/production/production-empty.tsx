@@ -3,6 +3,9 @@
 import { ChevronRight, Factory, PackageCheck } from "lucide-react";
 import { OPERATION_KINDS, OPERATION_TEMPLATES } from "@/lib/jobs/operations";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { stageRank } from "@/lib/jobs/stages";
+import type { JobStage } from "@/lib/supabase/database.types";
 import { useProduction } from "./production-context";
 import { KindGrid } from "./operation-dialog";
 
@@ -10,12 +13,29 @@ import { KindGrid } from "./operation-dialog";
  * Zakázka zatím bez postupu: jedním klepnutím „Kompletní dodávka" (dodá jedna
  * firma), šablona postupu, nebo poskládat operace ručně z barevných dlaždic.
  */
-export function ProductionEmpty() {
+export function ProductionEmpty({ stage }: { stage?: JobStage }) {
   const { open } = useProduction();
   const templates = OPERATION_TEMPLATES.filter((t) => t.key !== "komplet");
+  const rank = stage ? stageRank(stage) : -1;
+  const before = Boolean(stage) && ((rank >= 3 && rank < 5) || stage === "pozastaveno" || stage === "reklamace");
 
   return (
-    <section aria-label="Založit postup výroby" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+    <div className="space-y-4">
+      {before && (
+        <section aria-label="Předat do výroby" className="flex flex-col gap-3 rounded-2xl border-2 border-rose-200 bg-rose-50/60 p-4 dark:border-rose-500/30 dark:bg-rose-500/10 sm:flex-row sm:items-center sm:p-5" data-testid="handoff-empty">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white">
+            <Factory className="h-6 w-6" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-bold leading-tight">Zakázka ještě není ve výrobě</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">Předej ji do výroby — AI předvyplní nejlevnější firmu z nabídek a termín, ty jen potvrdíš.</p>
+          </div>
+          <Button type="button" onClick={() => open({ type: "handoff", kind: "predani" })} className="h-12 shrink-0 gap-2 bg-rose-600 px-5 text-base font-semibold text-white hover:bg-rose-700 sm:h-11">
+            <Factory /> Předat do výroby…
+          </Button>
+        </section>
+      )}
+    <section aria-label={before ? "Naplánovat postup" : "Založit postup výroby"} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
       <div className="h-1.5 w-full bg-gradient-to-r from-sky-500 via-orange-500 to-purple-500" />
       <div className="space-y-5 p-4 sm:p-6">
         <div className="flex items-start gap-3">
@@ -23,7 +43,7 @@ export function ProductionEmpty() {
             <Factory className="h-6 w-6" />
           </span>
           <div>
-            <h3 className="text-lg font-bold leading-tight">Jak se zakázka vyrobí?</h3>
+            <h3 className="text-lg font-bold leading-tight">{before ? "Naplánovat postup" : "Jak se zakázka vyrobí?"}</h3>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Vyber postup — pak už jen klepáš <strong className="text-foreground">Začít</strong> a <strong className="text-foreground">Hotovo</strong> a v knize je vždy vidět, kde díl je.
             </p>
@@ -82,5 +102,6 @@ export function ProductionEmpty() {
         </div>
       </div>
     </section>
+    </div>
   );
 }

@@ -19,10 +19,17 @@ import { OUTBOUND_APPROVAL_TYPES, type ApprovalItem } from "@/lib/data/types";
 import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
 import { relativeTime, cn } from "@/lib/utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
-import type { ResolvedApproval } from "@/lib/data/queries";
+import type { ApprovalPurchaseOrder, ResolvedApproval } from "@/lib/data/queries";
 
 /** Položka fronty; proposedBy = kdo návrh připravil („✨ AI", „Systém (plánovač)"); quoteHref = „Otevřít nabídku". */
-type QueueItem = ApprovalItem & { proposedBy?: string; quoteHref?: string | null };
+type QueueItem = ApprovalItem & { proposedBy?: string; quoteHref?: string | null; purchaseOrder?: ApprovalPurchaseOrder | null };
+
+const PO_SEND_LABEL: Record<ApprovalPurchaseOrder["kind"], string> = {
+  issue: "Odeslat objednávku",
+  change: "Odeslat změnu",
+  cancel: "Odeslat storno",
+  hold: "Odeslat pozastavení",
+};
 
 const RESOLVED_LABEL: Record<ResolvedApproval["status"], string> = {
   approved: "Schváleno",
@@ -72,6 +79,8 @@ function ApprovalRow({
   const [learned, setLearned] = React.useState(false);
 
   const isOutbound = OUTBOUND_APPROVAL_TYPES.includes(item.rawType);
+  // objednávka dodavateli: šablona serveru (ne AI) — PDF, odkud odejde, odeslat / upravit e-mail / zamítnout
+  const po = item.rawType === "purchase_order" ? item.purchaseOrder ?? null : null;
 
   const approve = async () => {
     setBusy("approve");
@@ -114,14 +123,16 @@ function ApprovalRow({
 
   return (
     <div className="rounded-lg border bg-card transition-colors hover:border-primary/30">
-      <div className="flex items-start gap-3 p-3">
+      {/* na úzkém displeji jdou tlačítka pod text (jinak text zmáčknou na jeden sloupec) */}
+      <div className="flex flex-wrap items-start gap-3 p-3 sm:flex-nowrap">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           {typeIcon[item.rawType] ?? <Mail className="h-4 w-4" />}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 shrink grow basis-[calc(100%-2.75rem)] sm:basis-0">
           <div className="flex items-center gap-2">
             <span className={cn("text-sm font-medium", item.rawType === "supplier_invoice" ? "line-clamp-2" : "truncate")}>{item.title}</span>
-            <AiConfidence value={item.aiConfidence} />
+            {/* Objednávka dodavateli je doklad z předání (ne odhad AI) — procento by mátlo. */}
+            {item.rawType !== "purchase_order" && <AiConfidence value={item.aiConfidence} />}
           </div>
           {!compact && item.summary && (
             <p className="mt-0.5 text-sm text-muted-foreground">{item.summary}</p>
@@ -153,12 +164,27 @@ function ApprovalRow({
               </span>
             )}
             <span>· {item.proposedBy ? `připravil ${item.proposedBy} · ` : ""}{relativeTime(item.createdAt)}</span>
+            {item.rawType === "purchase_order" && (
+              <span className="w-full text-[11px] sm:w-auto" data-testid="po-sender">
+                Odešle se z: <span className="font-medium text-foreground">{po?.senderEmail ?? "tvé schránky"}</span>
+              </span>
+            )}
+            {po?.fileId && (
+              <a href={`/api/jobs/files/${po.fileId}`} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">
+                <FileText className="h-3 w-3" aria-hidden /> Otevřít PDF
+              </a>
+            )}
+            {po?.jobId && (
+              <Link href={`/orders/${po.jobId}?tab=vyroba`} className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">
+                Zakázka <ArrowRight className="h-3 w-3" aria-hidden />
+              </Link>
+            )}
             {item.body && (
               <button
                 onClick={() => setOpen((o) => !o)}
                 className="inline-flex items-center gap-0.5 font-medium text-foreground/70 hover:text-foreground"
               >
-                {open ? "Skrýt text" : "Zobrazit text"}
+                {open ? (item.rawType === "purchase_order" ? "Skrýt e-mail" : "Skrýt text") : item.rawType === "purchase_order" ? "Zobrazit e-mail" : "Zobrazit text"}
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
               </button>
             )}
@@ -166,14 +192,20 @@ function ApprovalRow({
         </div>
 
         {/* Rychlé akce: zelená = bezpečné potvrzení, červená = odešle ven */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button variant="ghost" size="icon-sm" aria-label="Zamítnout" onClick={reject} disabled={busy !== null}>
-            {busy === "reject" ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-          </Button>
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto">
+          {item.rawType === "purchase_order" ? (
+            <Button variant="ghost" size="sm" onClick={reject} disabled={busy !== null} className="h-9">
+              {busy === "reject" ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} Zamítnout
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon-sm" aria-label="Zamítnout" onClick={reject} disabled={busy !== null}>
+              {busy === "reject" ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+            </Button>
+          )}
           {isOutbound ? (
-            <Button variant="send" size="sm" onClick={approve} disabled={busy !== null}>
+            <Button variant="send" size="sm" onClick={approve} disabled={busy !== null} className={cn(item.rawType === "purchase_order" && "h-9")}>
               {busy === "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Odeslat
+              {item.rawType === "purchase_order" ? PO_SEND_LABEL[po?.kind ?? "issue"] : "Odeslat"}
             </Button>
           ) : (
             <Button variant="success" size="sm" onClick={approve} disabled={busy !== null}>
@@ -203,7 +235,7 @@ function ApprovalRow({
               <div className="flex items-center gap-2">
                 <Button variant="success" size="sm" onClick={saveEdit} disabled={busy !== null}>
                   {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  Uložit úpravu (AI se naučí)
+                  {item.rawType === "purchase_order" ? "Uložit úpravu" : "Uložit úpravu (AI se naučí)"}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setBody(savedBody); }}>
                   Zrušit
@@ -215,7 +247,7 @@ function ApprovalRow({
               <pre className="whitespace-pre-wrap rounded-md bg-background p-3 font-sans text-sm">{savedBody || "—"}</pre>
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  <Pencil className="h-4 w-4" /> Upravit text
+                  <Pencil className="h-4 w-4" /> {item.rawType === "purchase_order" ? "Upravit e-mail" : "Upravit text"}
                 </Button>
                 {learned && (
                   <span className="inline-flex items-center gap-1 text-xs text-success">

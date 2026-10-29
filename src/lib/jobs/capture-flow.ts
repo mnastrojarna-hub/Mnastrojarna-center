@@ -401,14 +401,16 @@ export async function captureProductionHandoff(
       who = ctxPo.supplierName;
       due = end;
     }
-  } else if (consent === "review" && doc?.supplier && doc.supplier.name.trim() && date) {
-    // 4: nic nesedí — jen se souhlasem člověka (AI objednávku nevystavuje)
+  } else if (consent === "review" && doc?.supplier && doc.supplier.name.trim() && date && !firstWaiting) {
+    // 4: nic nesedí — jen se souhlasem člověka (AI objednávku nevystavuje). Čekající krok, který nejde
+    // spustit (bez objednávky / kdo / termínu), by zůstal před novým krokem a zakázka by byla „Ve výrobě"
+    // bez běžícího kroku → 5 (předá člověk dialogem „Předat do výroby…").
     const cands = [...ctx.suppliers.values()].map((s) => ({ id: s.id, name: s.name, ico: s.ico, dic: null, email: s.email, contactEmails: [], customerNumber: null, supplierNumberAtCustomer: null }));
     const hit = cands.length ? matchParty(doc.supplier, cands) : null;
     const sup = hit && hit.score >= 80 ? ctx.suppliers.get(hit.id) ?? null : null;
     steps = [{
       kind: "vyroba", who: sup ? { type: "supplier", id: sup.id, name: sup.name } : { type: "free", name: doc.supplier.name.trim().slice(0, 300) },
-      plannedEnd: date, endsAtCustomerDate: false, deadlineAgreed: false, deadlineSource: "potvrzeni_dodavatele", whoSource: "ai", start: !firstWaiting,
+      plannedEnd: date, endsAtCustomerDate: false, deadlineAgreed: false, deadlineSource: "potvrzeni_dodavatele", whoSource: "ai", start: true,
       po: { mode: "neobjednavat", noneReason: `Objednáno mimo systém — potvrzení dodavatele${doc.documentNumber ? ` ${doc.documentNumber}` : ""}`.slice(0, 500) },
     }];
     who = sup?.name ?? doc.supplier.name.trim();

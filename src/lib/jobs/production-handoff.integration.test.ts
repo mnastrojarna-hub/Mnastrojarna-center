@@ -395,6 +395,50 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await ops(C.id))[0].deadline_state).toBe("pozadovano");
   }, 90_000);
 
+  it("odesílatel je vždy stejný: „Rovnou odeslat“ adminem i jiným obchodníkem i „Odeslat“ v Nákupu → schránka obchodníka zakázky", async () => {
+    const boxOwner = async (poId: unknown) => {
+      const po = (await svc.from("purchase_orders").select("status, sent_mailbox_id").eq("id", String(poId)).single()).data as Row;
+      expect(po.status).toBe("odeslana");
+      return ((await svc.from("mailboxes").select("owner_id").eq("id", po.sent_mailbox_id as string).single()).data as Row).owner_id;
+    };
+    // admin předá zakázku obchodníka a rovnou odešle (dřív: schránka admina)
+    as("admin");
+    const D1 = await newJob();
+    await newQuote(D1.id, novak, [40, 42]);
+    const p1 = await plan(D1.id);
+    expect(p1.automation.senderEmail).toBeTruthy();
+    const r1 = await act.submitProductionHandoff(D1.id, inputOf(p1, { sendNow: ["*"] }));
+    expect(r1.ok, r1.error).toBe(true);
+    expect(r1.result!.purchaseOrders[0].send, r1.result!.purchaseOrders[0].sendError).toBe("odeslano");
+    expect(await boxOwner(r1.result!.purchaseOrders[0].id)).toBe(id("sales"));
+
+    // „Odeslat“ v Nákupu (adminem) — taky ze schránky obchodníka zakázky
+    as("sales");
+    const D2 = await newJob();
+    await newQuote(D2.id, novak, [40, 42]);
+    await handoffOne(D2.id, novak);
+    const [po2] = await pos(D2.id);
+    as("admin");
+    const m = (await svc.from("approval_queue").select("payload").eq("purchase_order_id", String(po2.id)).eq("status", "pending").single()).data as Row;
+    const pl = m.payload as Row;
+    const s2 = await pur.sendPurchaseOrder(String(po2.id), { to: String(pl.to), subject: String(pl.subject), body: String(pl.body) } as never);
+    expect(s2.ok, s2.error).toBe(true);
+    expect(await boxOwner(po2.id)).toBe(id("sales"));
+
+    // jiný obchodník (bez pošty všech schránek) předá cizí zakázku s „Rovnou odeslat“ → schránka obchodníka zakázky
+    if (who.users.sales2) {
+      as("sales2");
+      const D3 = await newJob();
+      await newQuote(D3.id, novak, [40, 42]);
+      const p3 = await plan(D3.id);
+      const r3 = await act.submitProductionHandoff(D3.id, inputOf(p3, { sendNow: ["*"] }));
+      expect(r3.ok, r3.error).toBe(true);
+      expect(r3.result!.purchaseOrders[0].send, r3.result!.purchaseOrders[0].sendError).toBe("odeslano");
+      expect(await boxOwner(r3.result!.purchaseOrders[0].id)).toBe(id("sales"));
+    }
+    as("sales");
+  }, 150_000);
+
   it("plná automatika: bezpečná objednávka odejde sama; s položkou bez ceny čeká ve frontě s důvodem", async () => {
     await setMode("full");
     try {
@@ -705,6 +749,20 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect(h4, h4.warning).toMatchObject({ moved: true });
     expect(await pos(K3.id)).toHaveLength(0);
     expect((await ops(K3.id))[0]).toMatchObject({ supplier_name: "Neznámá Kalírna s.r.o.", po_mode: "neobjednavat", po_none_reason: "Objednáno mimo systém — potvrzení dodavatele POT-1" });
+
+    // čekající krok, který nejde spustit (u dodavatele bez objednávky) + nespárované potvrzení → stav zůstává
+    // (jinak by byla zakázka „Ve výrobě" bez běžícího kroku)
+    const K4 = await newJob();
+    const ins = await svc.from("job_operations").insert({
+      job_id: K4.id, kind: "tepelne_zpracovani", status: "ceka", position: 1, supplier_id: tepkal, planned_end: "2026-11-20", po_mode: "pri_predani",
+    } as never);
+    expect(ins.error).toBeNull();
+    const h5 = await flow.captureProductionHandoff(db, salesActor, K4.id, { customerOrderNumber: null, promisedDeliveryDate: "2026-11-27", supplier: stranger, documentNumber: "POT-2" }, "review");
+    expect(h5.moved).toBe(false);
+    expect(h5.warning).toBe(flow.CAPTURE_HANDOFF_WAITING);
+    expect((await job(K4.id)).status).toBe("potvrzeno");
+    expect(await ops(K4.id)).toHaveLength(1);
+    expect((await ops(K4.id))[0]).toMatchObject({ status: "ceka" });
   }, 120_000);
 
   it("dodání objednávky → další krok: plná automatika + bezpečný krok se předá sám (objednávka odejde), jinak upozornění", async () => {
@@ -1286,6 +1344,208 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect(ok.ok, ok.error).toBe(true);
     const ev = (await events(L.id)).map((e) => String(e.message));
     expect(ev.some((m) => m.includes(`po konečném termínu (zákazník) 10. 11. — přijal ${who.users.sales.fullName}`))).toBe(true);
+  }, 90_000);
+
+  it("Technologie: poznámka pro dodavatele → položka objednávky („Pozor: …“) + souhrn v e-mailu; postup a kompletní dodávka do historie", async () => {
+    as("worker");
+    const T = await newJob();
+    const tech = await import("@/app/actions/technology");
+    const s = await tech.saveItemTechnology(T.id, [
+      { itemId: T.items[0], supplierNote: "pozor popsat na čele", procedure: "1. soustružit\n2. frézovat drážku" },
+      { itemId: T.items[1], complete: true, completeBy: "Frézy Novák" },
+    ]);
+    expect(s.ok, s.error).toBe(true);
+    expect(s.saved).toBe(2);
+    const its = ((await svc.from("order_items").select("id, tech_procedure, tech_complete, tech_complete_by, supplier_note").eq("order_id", T.id).order("position")).data ?? []) as Row[];
+    expect(its[0]).toMatchObject({ supplier_note: "pozor popsat na čele", tech_procedure: "1. soustružit\n2. frézovat drážku", tech_complete: false });
+    expect(its[1]).toMatchObject({ tech_complete: true, tech_complete_by: "Frézy Novák" });
+    const ev = (await events(T.id)).filter((e) => (e.data as Row)?.technology);
+    expect(ev).toHaveLength(1);
+    expect(ev[0].actor_id).toBe(id("worker"));
+    // beze změny nic nezapíše
+    expect((await tech.saveItemTechnology(T.id, [{ itemId: T.items[0], supplierNote: "pozor popsat na čele" }])).saved).toBe(0);
+    // cizí položka
+    expect((await tech.saveItemTechnology(T.id, [{ itemId: A.items[0], supplierNote: "x" }])).ok).toBe(false);
+
+    as("sales");
+    await newQuote(T.id, novak, [40, 42]);
+    const p = await plan(T.id);
+    expect(p.client?.items.find((i) => i.id === T.items[0])?.supplierNote).toBe("pozor popsat na čele");
+    const r = await act.submitProductionHandoff(T.id, inputOf(p));
+    expect(r.ok, r.error).toBe(true);
+    const [po] = await pos(T.id);
+    const items = (po.items as Row[]).sort((a, b) => Number(a.position) - Number(b.position));
+    expect(String(items[0].note)).toMatch(/^Pozor: popsat na čele/);
+    expect(String(items[1].note ?? "")).not.toMatch(/Pozor/);
+    const q = (await svc.from("approval_queue").select("payload").eq("purchase_order_id", String(po.id)).eq("status", "pending").single()).data as Row;
+    expect(String((q.payload as Row).body)).toContain(`– PR-${TAG}-20: popsat na čele`);
+  }, 120_000);
+
+  it("Nabídka telefonem: nová firma do adresáře, cena jen obchodník, krok i objednávka z ní", async () => {
+    as("worker");
+    const P = await newJob();
+    const w = await act.recordPhoneQuote(P.id, { supplierName: `${SUP} Telefon CNC s.r.o.`, price: 9999, leadTimeDays: 10, note: "volal p. Dvořák", kind: "vyroba" });
+    expect(w.ok, w.error).toBe(true);
+    expect(w.suggestion!.price).toBeNull(); // zaměstnanec cenu nezadá ani nevidí
+    const q1 = (await svc.from("supplier_quotes").select("source, total, lead_time_days, note, operation_kinds, supplier_id").eq("id", w.quoteId!).single()).data as Row;
+    expect(q1).toMatchObject({ source: "telefon", total: null, lead_time_days: 10, note: "Nabídka telefonem: volal p. Dvořák", operation_kinds: ["vyroba"] });
+    expect((await events(P.id)).some((e) => /^Nabídka telefonem: .*Telefon CNC s\.r\.o\. — termín 10 dní · volal p\. Dvořák$/.test(String(e.message)))).toBe(true);
+
+    as("sales");
+    const r = await act.recordPhoneQuote(P.id, { supplierId: hruby, price: 15_000, deliveryDate: "2026-12-01", kind: "vyroba", orderItemIds: [P.items[0]] });
+    expect(r.ok, r.error).toBe(true);
+    expect(r.suggestion).toMatchObject({ source: "nabidka", who: { type: "supplier", id: hruby }, price: 15_000, deliveryDate: "2026-12-01", reason: "Nabídka telefonem" });
+    const res = await act.submitProductionHandoff(P.id, await manualInput(P.id, [supplierStep(hruby, "2026-12-01", {
+      supplierQuoteId: r.quoteId, whoSource: "nabidka", orderItemIds: [P.items[0]],
+    })]));
+    expect(res.ok, res.error).toBe(true);
+    const [po] = await pos(P.id);
+    expect(po).toMatchObject({ supplier_id: hruby, supplier_quote_id: r.quoteId });
+    expect(Number(po.total)).toBe(15_000);
+    expect((await ops(P.id))[0]).toMatchObject({ supplier_quote_id: r.quoteId });
+    expect((await act.recordPhoneQuote(P.id, { supplierId: hruby, kind: "vyroba" })).error).toMatch(/termín/);
+  }, 120_000);
+
+  it("odesílatel bez vlastní schránky = jako každý e-mail (send.ts: firemní schránka / globální SMTP), nikdy cizí osobní", async () => {
+    const ownerId = id("sales");
+    const sender = await store.purchaseOrderSender(svc as never, { id: id("worker") }, null);
+    // zaměstnanec nemá vlastní schránku → odešle se tak, jak by odešel jeho e-mail (bez schránky obchodníka)
+    expect(sender.from).toEqual({ ownerId: id("worker") });
+    const send = await import("@/lib/email/send");
+    const d = await send.describeSender({ ownerId: id("worker") });
+    expect(sender.mailboxEmail).toBe(d.ok ? d.from ?? null : null);
+    // zakázka obchodníka se schránkou → jeho schránka (i když posílá někdo jiný)
+    const viaOwner = await store.purchaseOrderSender(svc as never, { id: id("admin") }, ownerId);
+    expect(viaOwner.signerId).toBe(ownerId);
+    expect("mailboxId" in viaOwner.from && viaOwner.from.ownerId).toBe(ownerId);
+  }, 60_000);
+
+  const jobCost = async (jid: string): Promise<{ cost: number; known: boolean }> => {
+    const { data } = await svc.rpc("job_cost", { p_job: jid });
+    const r = (Array.isArray(data) ? data[0] : data) as { cost: number | string; known: boolean };
+    return { cost: Number(r.cost), known: Boolean(r.known) };
+  };
+
+  it("review WP3 #1: Výroba → TZ → Výroba u stejné firmy — druhé obrábění nepřevezme nabídku 1. kroku (bez cen, náklady jednou)", async () => {
+    as("sales");
+    const T = await newJob();
+    const x = await newQuote(T.id, novak, [40, 42]);                         // 12 200 Kč
+    const hq = await newQuote(T.id, tepkal, [5, 5], { note: "kalení" });     // 1 500 Kč
+    // starý dialog: přidaná „Výroba 2" převzala nabídku Výroby 1
+    const r = await act.submitProductionHandoff(T.id, await manualInput(T.id, [
+      supplierStep(novak, "2026-11-20", { supplierQuoteId: x, whoSource: "nejlevnejsi_nabidka" }),
+      supplierStep(tepkal, "2026-11-27", { kind: "tepelne_zpracovani", start: false, supplierQuoteId: hq, whoSource: "nejlevnejsi_nabidka", po: { mode: "pri_predani" } }),
+      supplierStep(novak, "2026-12-11", { start: false, supplierQuoteId: x, whoSource: "nejlevnejsi_nabidka", po: { mode: "pri_predani" } }),
+    ]));
+    expect(r.ok, r.error).toBe(true);
+    const [po1] = await pos(T.id);
+    expect(Number(po1.total)).toBe(12_200);
+    // přidaný krok „Výroba" v dialogu: nabídka Výroby 1 se nenabízí
+    const p0 = await plan(T.id);
+    expect(p0.client?.kindSuggestions?.vyroba?.primary).toMatchObject({ supplierQuoteId: null, reason: "Stejná firma jako krok 1 (Výroba 1) — cena dle nové nabídky" });
+    // → TZ
+    const o = await ops(T.id);
+    const d1 = await plan(T.id, { kind: "dalsi_krok" });
+    expect((await act.submitProductionHandoff(T.id, inputOf(d1, { complete: { operationId: String(o[0].id) } }))).ok).toBe(true);
+    // → Výroba 2: plán bez nabídky 1. kroku, objednávka bez cen
+    const d2 = await plan(T.id, { kind: "dalsi_krok" });
+    expect(d2.steps[0]).toMatchObject({ operationId: o[2].id, supplierQuoteId: null, whoSource: "posledni_operace", who: { type: "supplier", id: novak } });
+    expect(d2.steps[0].poPreview).toMatchObject({ itemCount: 2, unpriced: 2, total: 0 });
+    expect([d2.steps[0].suggestions.primary, ...d2.steps[0].suggestions.alternatives].some((s) => s?.supplierQuoteId === x)).toBe(false);
+    // i zastaralý dialog, který nabídku pošle, cenu podruhé nezapočítá
+    const res = await act.submitProductionHandoff(T.id, inputOf(d2, { complete: { operationId: String(o[1].id) } }, [{ ...d2.steps[0], supplierQuoteId: x, whoSource: "nejlevnejsi_nabidka" }]));
+    expect(res.ok, res.error).toBe(true);
+    const all = await pos(T.id);
+    expect(all).toHaveLength(3);
+    const po3 = all.find((p) => p.id !== po1.id && p.supplier_id === novak)!;
+    expect(po3.supplier_quote_id).toBeNull();
+    expect((po3.items as Row[]).map((i) => i.unit_price)).toEqual([null, null]);
+    expect(Number(po3.total ?? 0)).toBe(0);
+    expect((await ops(T.id))[2]).toMatchObject({ status: "probiha", supplier_quote_id: null });
+    const q = (await queue(T.id)).find((x2) => (x2.payload as Row)?.purchaseOrderId === po3.id)!;
+    expect(String(q.summary)).toContain("cena dle nové nabídky");
+    expect(String(q.summary)).not.toContain("Dodavatel nemá výkresy");
+    // 12 200 (obrábění) + 1 000 (kalení jen příruby 200 × 5) — ne podruhé 12 200
+    expect((await jobCost(T.id)).cost).toBe(13_200);
+  }, 150_000);
+
+  it("review WP3 #2: nabídka telefonem pro krok s víc díly — cena za kus u každého dílu, objednávka i náhled s cenami položek", async () => {
+    as("sales");
+    const P = await newJob();
+    const bad = await act.recordPhoneQuote(P.id, { supplierId: hruby, price: 9_800, leadTimeDays: 10, kind: "vyroba" });
+    expect(bad.ok).toBe(false);
+    expect(bad.error).toMatch(/cenu za kus u každého dílu/);
+    const r = await act.recordPhoneQuote(P.id, { supplierId: hruby, itemPrices: { [P.items[0]]: 30, [P.items[1]]: 38 }, leadTimeDays: 10, kind: "vyroba" });
+    expect(r.ok, r.error).toBe(true);
+    expect(r.suggestion).toMatchObject({ price: 9_800, order: { itemCount: 2, unpriced: 0, total: 9_800 } });
+    const qi = ((await svc.from("supplier_quote_items").select("unit_price, position").eq("supplier_quote_id", r.quoteId!).order("position")).data ?? []) as Row[];
+    expect(qi.map((i) => Number(i.unit_price))).toEqual([30, 38]);
+    const p = await plan(P.id);
+    expect(p.steps[0]).toMatchObject({ supplierQuoteId: r.quoteId });
+    expect(p.steps[0].poPreview).toMatchObject({ unpriced: 0, total: 9_800 });
+    const res = await act.submitProductionHandoff(P.id, inputOf(p));
+    expect(res.ok, res.error).toBe(true);
+    const [po] = await pos(P.id);
+    expect(Number(po.total)).toBe(9_800);
+    expect(await jobCost(P.id)).toEqual({ cost: 9_800, known: true });
+    // jen část dílů s cenou: návrh nepřislíbí celkovou částku
+    const r2 = await act.recordPhoneQuote(P.id, { supplierId: nomail, itemPrices: { [P.items[0]]: 30 }, leadTimeDays: 5, kind: "vyroba" });
+    expect(r2.suggestion).toMatchObject({ price: null, order: { itemCount: 2, unpriced: 1, total: 6_000 } });
+  }, 120_000);
+
+  it("review WP3 #3: poznámka pro dodavatele → objednávka z Nákupu (návrh) i dodatečně (nové PDF); předání ji použije; odeslaná se nemění", async () => {
+    as("sales");
+    const N = await newJob();
+    const q = await newQuote(N.id, novak, [40, 42]);
+    const tech = await import("@/app/actions/technology");
+    expect((await tech.saveItemTechnology(N.id, [{ itemId: N.items[0], supplierNote: "pozor popsat na čele" }])).ok).toBe(true);
+    const dr = await pur.draftPurchaseOrder(N.id, { supplierQuoteId: q });
+    expect(dr.ok, dr.error).toBe(true);
+    expect(dr.draft!.items[0].note).toBe("Pozor: popsat na čele");
+    const iss = await pur.issuePurchaseOrder(N.id, { ...dr.draft!, requiredDate: "2026-11-20" });
+    expect(iss.ok, iss.error).toBe(true);
+    const fileBefore = String((await pos(N.id))[0].file_id);
+    // dodatečná poznámka v Technologii → vystavená (neodeslaná) objednávka se doplní, nové PDF
+    const s2 = await tech.saveItemTechnology(N.id, [{ itemId: N.items[1], supplierNote: "změna materiálu na 1.4301" }]);
+    expect(s2.ok, s2.error).toBe(true);
+    expect(s2.notice).toMatch(new RegExp(`Doplněno do objednávky ${iss.number}`));
+    const [po] = await pos(N.id);
+    const items = (po.items as Row[]).sort((a, b) => Number(a.position) - Number(b.position));
+    expect(String(items[0].note)).toMatch(/^Pozor: popsat na čele/);
+    expect(String(items[1].note)).toMatch(/^Pozor: změna materiálu na 1\.4301/);
+    const f = (await files(N.id)).find((x) => x.id === po.file_id)!;
+    expect(f).toBeTruthy();
+    const text = await pdfText(String(po.file_id));
+    if (text !== null) expect(text).toMatch(/Pozor:\s+změna\s+materiálu/);
+    expect((await events(N.id)).some((e) => String(e.message) === `Objednávka ${iss.number}: poznámky pro dodavatele doplněny (nové PDF)`)).toBe(true);
+    void fileBefore;
+    // předání: použije se vystavená objednávka a poznámka je v ní
+    const p = await plan(N.id);
+    expect(p.steps[0].po).toMatchObject({ mode: "existujici", existingId: iss.id });
+    expect((await act.submitProductionHandoff(N.id, inputOf(p))).ok).toBe(true);
+    // odeslaná objednávka se nemění — upozornění
+    await svc.from("purchase_orders").update({ status: "odeslana" }).eq("id", String(iss.id));
+    const s3 = await tech.saveItemTechnology(N.id, [{ itemId: N.items[0], supplierNote: "pozor popsat na boku" }]);
+    expect(s3.notice).toMatch(new RegExp(`Objednávka ${iss.number} už odešla — poznámku pošli dodavateli zvlášť`));
+    const after = ((await pos(N.id))[0].items as Row[]).sort((a, b) => Number(a.position) - Number(b.position));
+    expect(String(after[0].note)).toMatch(/^Pozor: popsat na čele/);
+  }, 150_000);
+
+  it("review WP3 #6: po přesunu bez předání jeden dialog „Doplnit kdo a termín“ = krok běží + objednávka (žádný třetí dialog)", async () => {
+    as("sales");
+    const D = await newJob();
+    await newQuote(D.id, novak, [40, 42]);
+    await svc.from("orders").update({ status: "ve_vyrobe" }).eq("id", D.id);
+    const p = await plan(D.id);
+    expect(p.kind).toBe("doplneni");
+    expect(p.steps[0]).toMatchObject({ start: true, who: { type: "supplier", id: novak }, po: { mode: "vystavit" } });
+    expect(p.steps[0].poPreview).toMatchObject({ itemCount: 2, total: 12_200 });
+    const r = await act.submitProductionHandoff(D.id, inputOf(p));
+    expect(r.ok, r.error).toBe(true);
+    expect((await ops(D.id)).map((o) => o.status)).toEqual(["probiha"]);
+    const [po] = await pos(D.id);
+    expect(po).toMatchObject({ supplier_id: novak, status: "vystavena" });
+    expect(r.result?.purchaseOrders).toHaveLength(1);
   }, 90_000);
 
   it("čisté pomocníky: druh předání z faktů, tvar vstupu, práva", () => {

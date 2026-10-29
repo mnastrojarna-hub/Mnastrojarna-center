@@ -14,6 +14,8 @@ import { useJobDetail } from "@/components/jobs/detail/detail-context";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { SearchSelect } from "@/components/jobs/detail/search-select";
 import { PurchaseItemsEditor } from "./purchase-items-editor";
+import { OPERATION_KINDS, OPERATION_KIND_ORDER } from "@/lib/jobs/operations";
+import { cn } from "@/lib/utils";
 import { FULLSCREEN_DIALOG, Field } from "./ui-bits";
 import {
   draftsFromJobItems, purchaseDraftsTotal, supplierQuoteFormFrom, supplierQuoteFormNew, supplierQuoteFormToInput,
@@ -145,6 +147,42 @@ export function SupplierQuoteDialog({
             >
               <Input inputMode="decimal" value={form.total} onChange={(e) => set("total", e.target.value)} placeholder={sum.priced ? formatMoney(sum.total) : "celková cena"} className="text-right tabular-nums" />
             </Field>
+          </div>
+
+          {/* na co je nabídka (druhy kroků) — předání do výroby porovná nabídky ke stejnému kroku */}
+          <div className="space-y-1.5" data-testid="quote-kinds">
+            <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              Na co je nabídka
+              {form.operationKindsAi && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-300" title="Předvyplnila AI z textu nabídky">
+                  ✦ Předvyplnila AI
+                </span>
+              )}
+              <span className="font-normal">· nevyplněno = podle textu nabídky</span>
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {OPERATION_KIND_ORDER.map((k) => {
+                const m = OPERATION_KINDS[k];
+                const on = (form.operationKinds ?? []).includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setForm((f) => {
+                      const cur = f.operationKinds ?? [];
+                      return { ...f, operationKindsAi: false, operationKinds: on ? cur.filter((x) => x !== k) : [...cur, k] };
+                    })}
+                    className={cn(
+                      "inline-flex h-9 items-center gap-1 rounded-full border px-3 text-xs font-medium transition sm:h-8",
+                      on ? cn(m.badge, "border-transparent ring-1 ring-foreground/20") : "text-muted-foreground hover:bg-accent",
+                    )}
+                  >
+                    <m.icon className="h-3.5 w-3.5" /> {m.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <PurchaseItemsEditor

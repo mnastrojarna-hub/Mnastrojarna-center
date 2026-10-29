@@ -21,7 +21,7 @@ import {
   PURCHASE_ORDER_STATUS_META, applyPurchasePrices, buildPurchaseOrderDraft, canChangePurchaseOrderStatus, canFillPurchasePrices,
   cleanPurchaseItems, isPurchaseOrderEditable, isPurchaseOrderStatus, issueStageHint,
   purchaseOrderEmail, purchaseOrderFileName, resolveQuoteDeliveryDate, resolveSupplierQuoteTotal, rowsTotal,
-  rowToCommissionView, supplierQuoteInputToRow, validatePurchaseOrderDraft,
+  rowToCommissionView, supplierNotesOfItems, supplierQuoteInputToRow, validatePurchaseOrderDraft,
   type CommissionDbRow, type PurchaseItemRowInput,
 } from "@/lib/jobs/purchasing";
 import { ourDeliveryAddressCore, purchaseOrderMailFor, purchasePriceOnlyChanges, sendPurchaseOrderCore, storePurchaseOrderPdfCore } from "@/lib/jobs/purchase-order-docs";
@@ -600,6 +600,18 @@ function statusLabel(s: PurchaseOrderStatus): string {
  * neodešla. Potvrzení → potvrzený termín do zakázky (slíbený termín dodavatele);
  * Dodána (všechny aktivní objednávky) → zakázka do stavu „Dodáno k nám".
  */
+/** „Celkem" objednávky = součet položek, jak jsou opravdu v DB (po chybě uprostřed doplňování cen). */
+async function syncPurchaseOrderTotal(db: JobsDb, poId: string): Promise<void> {
+  try {
+    const { data } = await db.from("purchase_order_items").select("quantity, unit_price").eq("purchase_order_id", poId);
+    const rows = ((data ?? []) as { quantity: number | string | null; unit_price: number | string | null }[])
+      .map((r) => ({ quantity: Number(r.quantity) || 0, unit_price: r.unit_price === null || r.unit_price === undefined ? null : Number(r.unit_price) }));
+    await db.from("purchase_orders").update({ total: rowsTotal(rows as PurchaseItemRowInput[]) } as never).eq("id", poId);
+  } catch (err) {
+    console.error(`[purchasing] Součet objednávky ${poId} se nepodařilo srovnat: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export async function updatePurchaseOrder(
   id: string,
   patch: PurchaseOrderPatch,
@@ -687,18 +699,28 @@ export async function updatePurchaseOrder(
     }
 
     if (!Object.keys(row).length && !newRows && !priceChanges.length) return { ok: true };
+    // doplnění cen: NEJDŘÍV ceny položek, až potom hlavička (celkem) — chyba uprostřed nesmí nechat
+    // „celkem" jiné než součet položek; při chybě se celkem srovná podle toho, co v DB opravdu je
+    if (priceChanges.length) {
+      for (const ch of priceChanges) {
+        // cena položky → DB přepočte provizi zakázky (trigger na položkách; „čeká na nákupní cenu" zmizí)
+        const { error } = await db.from("purchase_order_items").update({ unit_price: ch.unitPrice } as never).eq("id", ch.id).eq("purchase_order_id", id);
+        if (error) {
+          await syncPurchaseOrderTotal(db, id);
+          return fail(error.message);
+        }
+      }
+    }
     if (Object.keys(row).length) {
       const { error } = await db.from("purchase_orders").update(row as never).eq("id", id);
-      if (error) return fail(error.message);
+      if (error) {
+        if (priceChanges.length) await syncPurchaseOrderTotal(db, id);
+        return fail(error.message);
+      }
     }
     if (newRows) {
       const itemErr = await replaceItems(db, "purchase_order_items", "purchase_order_id", id, newRows);
       if (itemErr) return fail(itemErr);
-    }
-    for (const ch of priceChanges) {
-      // cena položky → DB přepočte provizi zakázky (trigger na položkách; „čeká na nákupní cenu" zmizí)
-      const { error } = await db.from("purchase_order_items").update({ unit_price: ch.unitPrice } as never).eq("id", ch.id).eq("purchase_order_id", id);
-      if (error) return fail(error.message);
     }
 
     const supplier = po.supplier?.name ?? "dodavatel";
@@ -857,6 +879,7 @@ export async function draftPurchaseOrderEmail(
       companyName: COMPANY.name,
       supplierQuoteNumber: po.supplierQuote?.number,
       requiredDate: po.confirmedDate ?? po.requiredDate,
+      itemNotes: supplierNotesOfItems(po.items ?? []),
       senderName: me.name ?? c.user.fullName,
       senderEmail: me.email ?? c.user.email,
       senderPhone: me.phone ?? COMPANY.phone,
@@ -878,8 +901,11 @@ export async function sendPurchaseOrder(id: string, mail: PurchaseOrderMail): Pr
     const { db, user } = c;
     const po = await fetchPurchaseOrder(db, id);
     if (!po) return fail(PO_NOT_FOUND);
-    // jádro: PDF v příloze, stav Odeslána, schránka odeslání; čekající řádek fronty („issue") vyřídí DB trigger
-    const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, id, mail, { from: { ownerId: user.id }, kind: "issue" });
+    // jádro: PDF v příloze, stav Odeslána, schránka odeslání; čekající řádek fronty („issue") vyřídí DB trigger.
+    // Odesílá se ze schránky obchodníka zakázky, když ji má použitelnou (jako každé odeslání objednávky).
+    const { data: jobRow } = await db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
+    const sender = await purchaseOrderSender(db, { id: user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+    const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, id, mail, { from: sender.from, kind: "issue" });
     if (!res.ok) return fail(res.error);
     revalidatePurchasing(po.jobId);
     revalidatePath("/sent");

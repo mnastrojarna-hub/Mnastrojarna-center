@@ -11,7 +11,24 @@ vi.mock("@/app/actions/purchasing", () => ({
   createSupplierQuote: vi.fn(), updateSupplierQuote: vi.fn(), deleteSupplierQuote: vi.fn(), selectWinningSupplierQuote: vi.fn(),
   unselectSupplierQuote: vi.fn(), draftPurchaseOrder: vi.fn(), issuePurchaseOrder: vi.fn(), updatePurchaseOrder: vi.fn(),
   regeneratePurchaseOrderPdf: vi.fn(), draftPurchaseOrderEmail: vi.fn(), sendPurchaseOrder: vi.fn(), assignJobOwner: vi.fn(),
-  importCapturedSupplierQuote: vi.fn(), setPurchaseReceived: vi.fn(),
+  importCapturedSupplierQuote: vi.fn(), setPurchaseReceived: vi.fn(), notifySuppliers: vi.fn(),
+}));
+vi.mock("@/app/actions/production-handoff", () => ({
+  prepareProductionHandoff: vi.fn(), submitProductionHandoff: vi.fn(), ensureHandoffDocuments: vi.fn(), sendStepPurchaseOrder: vi.fn(),
+  reissueStepPurchaseOrder: vi.fn(), recordPhoneQuote: vi.fn(),
+}));
+// otevřené dialogy (Radix portál se na serveru nevykreslí) → obsah rovnou
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ open, children }: { open?: boolean; children: React.ReactNode }) => (open ? <div data-dialog>{children}</div> : null),
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div role="dialog">{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DialogClose: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DialogPortal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DialogOverlay: () => null,
 }));
 vi.mock("@/app/actions/jobs", () => ({ updateJob: vi.fn(), setJobStage: vi.fn() }));
 vi.mock("@/lib/jobs/upload-client", () => ({ uploadJobFiles: vi.fn(), uploadJobFile: vi.fn() }));
@@ -20,6 +37,9 @@ import { JobDetailProvider } from "@/components/jobs/detail/detail-context";
 import { PurchasingTab } from "./purchasing-tab";
 import { PurchaseOrdersBoard } from "./purchase-orders-board";
 import { SupplierQuotesSection } from "./supplier-quotes";
+import { SupplierNoticeDialog } from "./supplier-notice-dialog";
+import { SupplierQuoteDialog } from "./supplier-quote-dialog";
+import { supplierQuoteFormFrom, supplierQuoteFormToInput } from "./purchasing-model";
 import { maskPurchaseOrderListItem } from "@/lib/auth/price-visibility";
 import type { JobDetail, JobFormOptions } from "@/lib/jobs/types";
 import type {
@@ -185,6 +205,41 @@ describe("Nákup & marže — render", () => {
     expect(html).toContain("Vystavit další objednávku");
     expect(html).toContain("objednávky dodavatelům");
     expect(html).toContain("Provize k výplatě");
+  });
+
+  it("předání do výroby: objednávka ukazuje krok výroby; storno u dodavatelů; „Na co je nabídka“ (✦ AI)", () => {
+    const html = renderToString(
+      <JobDetailProvider jobId="j1" perms={PERMS} options={options}>
+        <PurchasingTab job={job()} data={data({ purchaseOrders: [order({})] })} stepOf={{ po1: "Krok 2: Tepelné zpracování" }} />
+      </JobDetailProvider>,
+    );
+    expect(html).toContain("Krok 2: Tepelné zpracování");
+    expect(html).toContain('data-testid="po-step"');
+
+    const notice = renderToString(
+      <SupplierNoticeDialog open onOpenChange={() => {}} jobId="j1" kind="cancel"
+        purchaseOrders={[
+          { id: "a", number: "OV-2026-004", status: "odeslana", supplierName: "Kalírna Brno" },
+          { id: "b", number: "OV-2026-005", status: "vystavena", supplierName: "Frézy Hrubý" },
+          { id: "c", number: "OV-2026-006", status: "dodana", supplierName: "Frézy Hrubý" },
+        ]} />,
+    ).replace(/<!-- -->/g, "");
+    expect(notice).toContain("Stornovat u dodavatelů");
+    expect(notice).toContain("2 otevřené objednávky u dodavatelů");
+    expect(notice).toContain("Dodavatel dostane e-mail: „Storno objednávky OV-2026-004");
+    expect(notice).toContain("Dodavateli ještě neodešla — jen se zruší.");
+    expect(notice).not.toContain("OV-2026-006");
+    expect(notice).toContain("Odeslat dodavatelům");
+
+    const dlg = renderToString(
+      <JobDetailProvider jobId="j1" perms={PERMS} options={options}>
+        <SupplierQuoteDialog open onOpenChange={() => {}} job={job()} quote={quote({ source: "foto", operationKinds: ["tepelne_zpracovani"] })} />
+      </JobDetailProvider>,
+    ).replace(/<!-- -->/g, "");
+    expect(dlg).toContain("Na co je nabídka");
+    expect(dlg).toContain("✦ Předvyplnila AI");
+    expect(dlg).toMatch(/aria-pressed="true"[^>]*>(<svg[\s\S]*?<\/svg>)?\s*Tepelné zpracování/);
+    expect(supplierQuoteFormToInput(supplierQuoteFormFrom(quote({ operationKinds: ["vyroba"] }))).operationKinds).toEqual(["vyroba"]);
   });
 
   it("pásmová provize z inkasa: předběžný odhad", () => {

@@ -6,6 +6,7 @@ import {
 } from "./components";
 import { czDate, czk, czNumber, czWeekday, countryName, isPlaceholder, lineTotal, plural, type DocItem } from "./types";
 import type { PurchaseOrderData } from "./purchase-types";
+import { splitItemNote } from "@/lib/jobs/purchasing";
 
 /**
  * PDF „Objednávka" — naše objednávka vydaná dodavateli. Stejný vzhled jako
@@ -125,7 +126,16 @@ function PurchaseItemsTable({ items, currency }: { items: DocItem[]; currency: s
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.cellDesc}>{it.description}</Text>
             {it.material ? <Text style={styles.cellSub}>Materiál: {it.material}</Text> : null}
-            {it.note ? <Text style={styles.cellNote}>{it.note}</Text> : null}
+            {(() => {
+              // poznámka pro dodavatele (Technologie → „Pozor: popsat na čele") zvýrazněná, zbytek poznámky pod ní
+              const n = splitItemNote(it.note);
+              return (
+                <>
+                  {n.warning ? <Text style={{ fontSize: 8.2, lineHeight: 1.35, fontWeight: "bold", color: C.red, marginTop: 1.5 }}>Pozor: {n.warning}</Text> : null}
+                  {n.rest ? <Text style={styles.cellNote}>{n.rest}</Text> : null}
+                </>
+              );
+            })()}
           </View>
           <Text style={[styles.cellRight, { width: W.qty }]}>
             {czNumber(it.quantity)} <Text style={styles.cellUnit}>{it.unit}</Text>

@@ -7,7 +7,7 @@
 //  * položky a poznámka objednávky dodavateli pro krok.
 import { OPERATION_KINDS, type OperationKind } from "@/lib/jobs/operations";
 import {
-  SUPPLIER_BUFFER_WORKING_DAYS, addCalendarDays, addWorkingDays, isWorkingDay, purchaseOrderNote, r2,
+  SUPPLIER_BUFFER_WORKING_DAYS, addCalendarDays, addWorkingDays, isWorkingDay, purchaseOrderNote, r2, supplierNoteSegment,
 } from "@/lib/jobs/purchasing";
 import type { PurchaseItemInput } from "@/lib/jobs/purchasing-types";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
@@ -239,6 +239,8 @@ export interface SuggestItem {
   surfaceTreatment?: string | null;
   hardness?: string | null;
   purchaseUnitPrice?: number | null;
+  /** Poznámka pro dodavatele (Technologie) — do objednávky u položky jako „Pozor: …". */
+  supplierNote?: string | null;
 }
 
 export interface QuoteLine {
@@ -485,6 +487,13 @@ export interface SuggestWhoInput {
   ctx: RankContext;
   /** Bez práva „margins": žádné částky. */
   canSeePrices: boolean;
+  /**
+   * Nabídky už spotřebované jinou objednávkou / jiným krokem zakázky (id nabídky → „Výroba 1" /
+   * „objednávka OV-…"). Druhá objednávka podle stejné nabídky by cenu započítala dvakrát — nabídka
+   * se proto nenabízí jako „Nejlevnější nabídka"; firma zůstane návrhem „stejná firma jako … —
+   * cena dle nové nabídky" (bez ceny).
+   */
+  usedQuotes?: Record<string, string>;
 }
 
 export interface WhoSuggestionResult {
@@ -559,7 +568,10 @@ function stampText(by: string | null | undefined, at: string | null | undefined)
  * Vítěz z Nákupu (selected) je PRVNÍ ALTERNATIVA, primární jen když je zároveň nejlevnější.
  */
 export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
-  const { step, ctx, canSeePrices } = input;
+  const { step, canSeePrices } = input;
+  const used = input.usedQuotes ?? {};
+  const usedIds = Object.keys(used);
+  const ctx: RankContext = usedIds.length ? { ...input.ctx, excludeQuoteIds: [...(input.ctx.excludeQuoteIds ?? []), ...usedIds] } : input.ctx;
   const fam = operationFamily(step.kind);
   const ranked = rankQuotesForStep(step, input.quotes, ctx);
   const best = ranked.comparable[0]?.value.value ?? null;
@@ -623,6 +635,20 @@ export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
     if (idx >= 0) alternatives.splice(idx, 1);
   }
 
+  // 2b) firma, jejíž nabídku už spotřeboval jiný krok / objednávka zakázky: návrh bez ceny („cena dle nové nabídky")
+  const sameFirm: WhoSuggestion[] = [];
+  for (const [qid, label] of Object.entries(used)) {
+    const q = input.quotes.find((x) => x.id === qid);
+    if (!q || quoteStepMatch(quoteKinds(q).kinds, step.kind) === 0) continue;
+    const who = whoOfQuote(q);
+    const key = who.type === "supplier" ? `s:${who.id}` : `f:${q.supplierName.trim().toLowerCase()}`;
+    const has = (s: WhoSuggestion | null) => Boolean(s && (s.who.type === "supplier" ? `s:${s.who.id}` : s.who.type === "free" ? `f:${s.who.name.trim().toLowerCase()}` : s.who.type) === key);
+    if (has(primary) || alternatives.some(has) || sameFirm.some(has)) continue;
+    sameFirm.push(blank("posledni_operace", who, `Stejná firma jako ${label} — cena dle nové nabídky`));
+  }
+  if (!primary && sameFirm.length) primary = sameFirm.shift() ?? null;
+  alternatives.push(...sameFirm);
+
   // 3) historie
   if (!primary) primary = historySuggestion(input);
 
@@ -638,12 +664,23 @@ export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
   const samePoFirm = (a: WhoSuggestion) => Boolean(poWho && (
     (poWho.type === "supplier" && a.who.type === "supplier" && a.who.id === poWho.id)
     || (poWho.type === "free" && a.who.type === "free" && a.who.name.trim().toLowerCase() === poWho.name.trim().toLowerCase())));
+  // objednávka, kterou by návrh vystavil (stejné pravidlo jako server) — náhled nesmí slíbit cenu, kterou objednávka mít nebude
+  const withOrder = (s: WhoSuggestion | null): WhoSuggestion | null => {
+    if (!s || !s.supplierQuoteId || s.source === "objednavka") return s;
+    const q = input.quotes.find((x) => x.id === s.supplierQuoteId);
+    if (!q) return s;
+    const built = purchaseItemsForStep({ step, items: input.ctx.items, quote: q, includeUncovered: true });
+    const priced = built.items.filter((it) => it.unitPrice !== null && it.unitPrice !== undefined);
+    const total = r2(priced.reduce((sum, it) => sum + (it.unitPrice ?? 0) * it.quantity, 0));
+    return { ...s, order: { itemCount: built.items.length, unpriced: built.items.length - priced.length, total: canSeePrices && priced.length ? total : null } };
+  };
   return {
-    primary,
+    primary: withOrder(primary),
     alternatives: alternatives
       .filter((a) => !primary || a.supplierQuoteId !== primary.supplierQuoteId || a.source !== primary.source)
       .filter((a) => !samePoFirm(a))
-      .slice(0, 5),
+      .slice(0, 5)
+      .map((a) => withOrder(a) as WhoSuggestion),
     warning,
     message: primary ? null : "K tomuto kroku nemáme nabídku — vyber firmu, nebo „U nás“.",
   };
@@ -967,7 +1004,8 @@ export function purchaseItemsForStep(input: {
     quantity: qty(it),
     unit: (it.unit ?? "").trim() || "ks",
     unitPrice,
-    note: [extraNote, drawingItemNote(it, step.kind)].filter(Boolean).join(" · ") || undefined,
+    // poznámka pro dodavatele z Technologie první (v PDF zvýrazněná), pak doplněk a údaje z výkresu
+    note: [supplierNoteSegment(it.supplierNote), extraNote, drawingItemNote(it, step.kind)].filter(Boolean).join(" · ") || undefined,
     orderItemId: it.id,
   });
 

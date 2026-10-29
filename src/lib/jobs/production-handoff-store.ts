@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { logAudit } from "@/lib/audit";
-import { isSmtpConfigured, pickSmtpMailbox, type SmtpPreference } from "@/lib/email/send";
+import { describeSender, isSmtpConfigured, pickSmtpMailbox, type SmtpPreference } from "@/lib/email/send";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { OPERATION_KINDS, isOperationKind, type DeadlineState, type OperationKind } from "@/lib/jobs/operations";
 import { cleanDate, cleanNumber, cleanText, fetchPaged, isUuid, one, personRef, todayIso } from "@/lib/jobs/mapping";
@@ -22,12 +22,13 @@ import {
 } from "@/lib/jobs/production-suggest";
 import type {
   ApplyPurchaseItem, ApplyPurchaseOrder, ApplyStep, DeadlineSource, HandoffErrorCode, HandoffInput, HandoffIssue, HandoffKind,
-  HandoffPlan, HandoffResult, HandoffStepInput, ProductionApplyPayload, ProductionApplyResult, StepPlan, StepWho, WhoSource, WhoSuggestion,
+  HandoffPlan, HandoffResult, HandoffStepInput, PhoneQuoteInput, ProductionApplyPayload, ProductionApplyResult, StepPlan, StepWho, WhoSource, WhoSuggestion,
 } from "@/lib/jobs/production-handoff-types";
 import { HANDOFF_KINDS } from "@/lib/jobs/production-handoff-types";
-import { DEFAULT_PAYMENT_TERMS, addWorkingDays, deliveryTermsFor, isPurchaseOrderEditable, r2 } from "@/lib/jobs/purchasing";
-import { fetchPurchaseOrder, fetchSupplierQuotes } from "@/lib/data/purchasing";
-import { loadSupplierCandidates } from "@/lib/jobs/purchasing-store";
+import { DEFAULT_PAYMENT_TERMS, addWorkingDays, deliveryTermsFor, isPurchaseOrderEditable, r2, splitItemNote, supplierNoteSegment } from "@/lib/jobs/purchasing";
+import { fetchPurchaseOrder, fetchPurchaseOrders, fetchSupplierQuotes } from "@/lib/data/purchasing";
+import { findOrCreateSupplierByParty, insertSupplierQuote, loadSupplierCandidates } from "@/lib/jobs/purchasing-store";
+import { emptyParty } from "@/lib/jobs/extracted-normalize";
 import { matchParty } from "@/lib/jobs/matching";
 import {
   hasPriceRole, ourDeliveryAddressCore, purchaseOrderContactId, purchaseOrderMailFor, sendPurchaseOrderCore, storePurchaseOrderPdfCore,
@@ -155,7 +156,7 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
   if (!isUuid(jobId)) return null;
   const [jobRes, itemsRes, opsRes, quotes, kindsRes, poRes, routeRes, pendingRes, handoffRes] = await Promise.all([
     db.from("orders").select("id, number, title, status, currency, due_date, customer_required_date, max_tolerated_date, owner_id, customer:customers!customer_id(name)").eq("id", jobId).maybeSingle(),
-    db.from("order_items").select("id, position, drawing_number, revision, name, description, material, material_group, material_designation, quantity, unit, weight_kg, heat_treatment, surface_treatment, hardness, purchase_unit_price").eq("order_id", jobId).order("position"),
+    db.from("order_items").select("id, position, drawing_number, revision, name, description, material, material_group, material_designation, quantity, unit, weight_kg, heat_treatment, surface_treatment, hardness, purchase_unit_price, supplier_note").eq("order_id", jobId).order("position"),
     db.from("job_operations").select(OPERATION_SELECT).eq("job_id", jobId).order("position").order("created_at"),
     fetchSupplierQuotes(db, jobId),
     db.from("supplier_quotes").select("id, operation_kinds").eq("job_id", jobId),
@@ -186,7 +187,7 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
     material: cleanText(r.material, 200), materialGroup: cleanText(r.material_group, 120), materialDesignation: cleanText(r.material_designation, 200),
     quantity: num(r.quantity) || 1, unit: cleanText(r.unit, 20) ?? "ks", weightKg: cleanNumber(r.weight_kg),
     heatTreatment: cleanText(r.heat_treatment, 500), surfaceTreatment: cleanText(r.surface_treatment, 500), hardness: cleanText(r.hardness, 200),
-    purchaseUnitPrice: cleanNumber(r.purchase_unit_price),
+    purchaseUnitPrice: cleanNumber(r.purchase_unit_price), supplierNote: cleanText(r.supplier_note, 1000),
   }));
   const ops = sortOperations(((opsRes.data ?? []) as unknown as JobOperationDbRow[]).map((r) => rowToJobOperation(r, today)));
   const kinds = new Map(((kindsRes.data ?? []) as { id: string; operation_kinds: string[] | null }[]).map((r) => [r.id, r.operation_kinds]));
@@ -293,6 +294,43 @@ function quoteFor(ctx: HandoffContext, id: string | null | undefined): SuggestQu
   return id ? ctx.quotes.find((q) => q.id === id) ?? null : null;
 }
 
+/**
+ * Nabídky, které už spotřeboval jiný krok nebo objednávka zakázky (id nabídky → „krok 1 (Výroba 1)" /
+ * „objednávka OV-…"). Druhá objednávka podle stejné nabídky by cenu (náklady, marži, provizi) započítala
+ * dvakrát — Výroba → Tepelné zpracování → Výroba u stejné firmy = druhé obrábění podle nové nabídky.
+ * Nepočítá se krok `selfOpId`, jeho vlastní objednávka, objednávky z `keepPoIds` (krok je použije),
+ * kroky se stejnou objednávkou (souvislé kroky jedné firmy) ani otevřená objednávka bez kroku (z Nákupu —
+ * krok ji použije, nevystaví druhou).
+ */
+export function usedQuotesOf(ctx: Pick<HandoffContext, "ops" | "purchaseOrders">, opts: { selfOpId?: string | null; keepPoIds?: (string | null | undefined)[] } = {}): Record<string, string> {
+  const out: Record<string, string> = {};
+  const live = sortOperations(ctx.ops.filter((o) => o.status !== "preskoceno"));
+  const self = opts.selfOpId ? ctx.ops.find((o) => o.id === opts.selfOpId) ?? null : null;
+  const keep = new Set((opts.keepPoIds ?? []).filter((x): x is string => Boolean(x)));
+  if (self?.purchaseOrderId) keep.add(self.purchaseOrderId);
+  const name = (o: JobOperation) => `krok ${live.findIndex((x) => x.id === o.id) + 1} (${stepLabel(o, live)})`;
+  for (const o of live) {
+    if (o.id === opts.selfOpId || !o.supplierQuoteId) continue;
+    if (o.purchaseOrderId && keep.has(o.purchaseOrderId)) continue;
+    const po = o.purchaseOrderId ? ctx.purchaseOrders.find((p) => p.id === o.purchaseOrderId) ?? null : null;
+    if (po?.status === "zrusena") continue;
+    out[o.supplierQuoteId] ??= name(o);
+  }
+  for (const p of ctx.purchaseOrders) {
+    if (p.status === "zrusena" || !p.supplierQuoteId || keep.has(p.id) || out[p.supplierQuoteId]) continue;
+    if (OPEN_PO.includes(p.status) && !p.linked) continue;
+    const op = live.find((o) => o.purchaseOrderId === p.id);
+    out[p.supplierQuoteId] = op ? name(op) : `objednávka ${p.number}`;
+  }
+  return out;
+}
+
+/** Nabídka už je na jiné (nezrušené) objednávce zakázky — nová objednávka podle ní se nenacení (cena by byla dvakrát). */
+export function quoteOnOtherPurchaseOrder(ctx: Pick<HandoffContext, "purchaseOrders">, quoteId: string | null | undefined, exceptPoId?: string | null): boolean {
+  if (!quoteId) return false;
+  return ctx.purchaseOrders.some((p) => p.status !== "zrusena" && p.supplierQuoteId === quoteId && p.id !== exceptPoId);
+}
+
 function sameSupplierQuote(q: SuggestQuote, who: StepWho): boolean {
   if (who.type === "supplier") return q.supplierId ? q.supplierId === who.id : false;
   if (who.type === "free") return !q.supplierId && q.supplierName.trim().toLowerCase() === who.name.trim().toLowerCase();
@@ -318,6 +356,8 @@ export interface PlanOptions {
   automationMode: AutomationMode;
   /** Kterou schránkou se bude posílat (null = žádná použitelná). */
   senderEmail?: string | null;
+  /** Jiný postup z porovnání („Použít: kompletně u Hrubý") — klíč z plan.routes. */
+  route?: string;
 }
 
 function openPoSuggestions(ctx: HandoffContext): SuggestOpenPurchaseOrder[] {
@@ -375,16 +415,18 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   const openPos = openPoSuggestions(ctx);
   const rankCtx = { items: ctx.items, currency: ctx.job.currency, today };
 
-  const suggestFor = (kindOf: OperationKind, orderItemIds: string[] | null, plannedWho: StepWho | null, onlyStep: boolean, neighbours: (string | null)[]) =>
+  const suggestFor = (kindOf: OperationKind, orderItemIds: string[] | null, plannedWho: StepWho | null, onlyStep: boolean, neighbours: (string | null)[],
+    usedQuotes: Record<string, string> = {}) =>
     suggestWhoForStep({
       step: { kind: kindOf, orderItemIds, plannedWho, onlyStep },
       quotes: ctx.quotes, openPurchaseOrders: openPos, history: ctx.history,
-      ctx: { ...rankCtx, neighbourSupplierIds: neighbours }, canSeePrices: margins,
+      ctx: { ...rankCtx, neighbourSupplierIds: neighbours }, canSeePrices: margins, usedQuotes,
     });
 
   // 1) kroky dialogu
   let routeSource: HandoffPlan["routeSource"] = "planovane";
   let routes: HandoffPlan["routes"] = [];
+  let routeChips: string[] = [];
   const bases: { key: string; op: JobOperation | null; route: RouteStepSuggestion | null; done?: boolean }[] = [];
   const pickOp = opts.operationId ? live.find((o) => o.id === opts.operationId) ?? null : null;
   if (kind === "doplneni") {
@@ -413,8 +455,14 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
         items: ctx.items, quotes: ctx.quotes, currency: ctx.job.currency, today, canSeePrices: margins,
       });
       routeSource = sr.source;
-      routes = sr.routes.map((r) => ({ key: r.key, label: r.label, total: margins ? r.total : null, complete: r.complete, selected: r.selected }));
-      const list = kind === "zaznam" ? sr.steps.slice(0, 1) : sr.steps;
+      routeChips = sr.chips;
+      // uživatel zvolil jiný postup z porovnání → jeho kroky (a označený jako vybraný)
+      const picked = opts.route ? sr.routes.find((r) => r.key === opts.route) ?? null : null;
+      routes = sr.routes.map((r) => ({
+        key: r.key, label: r.label, total: margins ? r.total : null, complete: r.complete, selected: picked ? r.key === picked.key : r.selected,
+      }));
+      const chosen = picked?.steps ?? sr.steps;
+      const list = kind === "zaznam" ? chosen.slice(0, 1) : chosen;
       list.forEach((r, i) => bases.push({ key: `s${i + 1}`, op: null, route: r, done: kind === "zaznam" }));
     }
   }
@@ -425,17 +473,29 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   let prevWho: StepWho | null = running ? whoOfOp(running) : null;
   let prevConfirmed = Boolean(running && running.deadlineState === "potvrzeno");
   const usedPo = new Set<string>();
+  const inDialog = new Set(bases.map((b) => b.op?.id).filter((x): x is string => Boolean(x)));
+  const before = live.filter((o) => (o.status === "hotovo" || RUNNING.has(o.status)) && !inDialog.has(o.id)).length;
   bases.forEach((b, i) => {
     const kindOf = b.op?.kind ?? b.route?.kind ?? "vyroba";
     let orderItemIds = b.op ? b.op.orderItemIds ?? null : b.route?.orderItemIds ?? null;
     // krok ze šablony („Výroba → tepelné zpracování → výroba") nemá díly: kalírna / povrch jen díly s úpravou na výkresu
     if (!orderItemIds && (!b.op || b.op.status === "ceka")) orderItemIds = familyScopeOf(kindOf, ctx.items);
     const opWho = b.op ? whoOfOp(b.op) : (b.route?.who ?? { type: "none" } as StepWho);
+    // nabídky spotřebované jiným krokem / objednávkou zakázky nebo dřívějším krokem dialogu — znovu se necení
+    const used = usedQuotesOf(ctx, { selfOpId: b.op?.id ?? null, keepPoIds: [i === 0 ? opts.existingPurchaseOrderId : null] });
+    drafts.forEach((d, j) => {
+      if (d.supplierQuoteId && !used[d.supplierQuoteId]) used[d.supplierQuoteId] = `krok ${before + j + 1} (${OPERATION_KINDS[d.kind].label})`;
+    });
     const sug = suggestFor(kindOf, orderItemIds, stepHasWho(opWho) ? opWho : null, bases.length === 1 && live.length <= 1,
-      [prevWho?.type === "supplier" ? prevWho.id : null]);
+      [prevWho?.type === "supplier" ? prevWho.id : null], used);
     let who = opWho;
     let whoSource: WhoSource | null = b.op?.whoSource ?? null;
     let quoteId: string | null = b.op?.supplierQuoteId ?? b.route?.supplierQuoteId ?? null;
+    if (quoteId && used[quoteId]) {
+      // krok nesl nabídku, kterou už má jiná objednávka (např. „Výroba 2" naplánovaná s nabídkou Výroby 1)
+      quoteId = null;
+      if (whoSource === "nejlevnejsi_nabidka" || whoSource === "nabidka") whoSource = "posledni_operace";
+    }
     let existingPoId: string | null = b.op?.purchaseOrderId && b.op.purchaseOrder?.status !== "zrusena" ? b.op.purchaseOrderId : null;
     // předané existující objednávka (z dialogu vystavení v Nákupu) — první krok
     if (i === 0 && opts.existingPurchaseOrderId) {
@@ -453,7 +513,7 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
       whoSource = primary.source;
       quoteId = primary.supplierQuoteId ?? quoteId;
       if (primary.purchaseOrder && !usedPo.has(primary.purchaseOrder.id)) existingPoId = primary.purchaseOrder.id;
-    } else if (stepHasWho(who) && !whoSource && b.route?.supplierQuoteId) {
+    } else if (stepHasWho(who) && !whoSource && b.route?.supplierQuoteId && quoteId) {
       whoSource = primary && primary.source === "nejlevnejsi_nabidka" && primary.supplierQuoteId === b.route.supplierQuoteId ? "nejlevnejsi_nabidka" : "nabidka";
     }
     // vystavená objednávka téže firmy (z Nákupu) se použije — nevystaví se druhá
@@ -516,7 +576,11 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   });
 
   // 3) kroky plánu (vstup dialogu + náhled objednávky)
-  const startIdx = kind === "predani" && !running ? 0 : kind === "dalsi_krok" ? 0 : -1;
+  // doplnění bez běžícího kroku (po „Přesunout bez dodavatele a termínu"): jeden dialog = kdo, termín,
+  // objednávka i spuštění prvního kroku (jako předání) — ne „připraveno" a další dialog „Předat do kroku…"
+  const doplneniStarts = kind === "doplneni" && !running && Boolean(drafts[0])
+    && (!drafts[0].operationId || drafts[0].operationId === waiting[0]?.id);
+  const startIdx = (kind === "predani" && !running) || kind === "dalsi_krok" || doplneniStarts ? 0 : -1;
   const finalRoute = [
     ...live.filter((o) => !drafts.some((d) => d.operationId === o.id)).map((o) => ({ id: o.id, kind: o.kind, title: o.title, status: o.status, position: o.position, createdAt: o.createdAt })),
     ...drafts.map((d, i) => {
@@ -529,7 +593,7 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   const steps: StepPlan[] = drafts.map((d, i) => {
     const supplierStep = isSupplierWho(d.who);
     const existing = d.existingPoId ? ctx.purchaseOrders.find((p) => p.id === d.existingPoId) ?? null : null;
-    const startNow = i === startIdx && (kind === "predani" || kind === "dalsi_krok") && (!d.status || d.status === "ceka");
+    const startNow = i === startIdx && (kind === "predani" || kind === "dalsi_krok" || kind === "doplneni") && (!d.status || d.status === "ceka");
     let poMode: StepPlan["po"]["mode"] = null;
     if (d.who.type === "u_nas") poMode = null;
     else if (kind === "zaznam") poMode = existing ? "existujici" : "neobjednavat";
@@ -625,6 +689,42 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   const cur = running ?? (kind === "dalsi_krok" || kind === "ukonceni" ? null : null);
   const curPo = cur?.purchaseOrderId ? ctx.purchaseOrders.find((p) => p.id === cur.purchaseOrderId) ?? null : null;
   const loc = (o: JobOperation) => o.location;
+
+  // podklady pro dialog: návrhy kdo pro přidaný krok (podle druhu), adresář, díly, kontext kontroly
+  const lastWho = drafts.length ? drafts[drafts.length - 1].who : running ? whoOfOp(running) : null;
+  const kindSuggestions: NonNullable<HandoffPlan["client"]>["kindSuggestions"] = {};
+  // přidaný krok nesmí znovu použít nabídku jiného kroku / objednávky (Výroba → TZ → Výroba u stejné firmy)
+  const usedForAdded = usedQuotesOf(ctx, {});
+  // další krok: „Jiný další krok" připravený krok nahradí — jeho nabídka zůstane volná
+  if (kind !== "dalsi_krok") steps.forEach((s, j) => {
+    if (s.supplierQuoteId && !usedForAdded[s.supplierQuoteId]) usedForAdded[s.supplierQuoteId] = `krok ${before + j + 1} (${s.label})`;
+  });
+  for (const k of Object.keys(OPERATION_KINDS) as OperationKind[]) {
+    const ids = familyScopeOf(k, ctx.items);
+    const s = suggestFor(k, ids, null, false, [lastWho?.type === "supplier" ? lastWho.id : null], usedForAdded);
+    kindSuggestions[k] = { orderItemIds: ids, primary: s.primary, alternatives: s.alternatives };
+  }
+  const vctx = validationContext(ctx, steps.map((s) => s.operationId ?? null), today);
+  const remainingFrom = running ? live.findIndex((o) => o.id === running.id) + 1 : 0;
+  const client: NonNullable<HandoffPlan["client"]> = {
+    today,
+    suppliers: [...ctx.suppliers.values()].map((s) => ({ id: s.id, name: s.name, email: s.email, leadDays: s.leadDays })),
+    items: ctx.items.map((i) => ({
+      id: i.id, drawingNumber: i.drawingNumber, name: i.name, quantity: i.quantity, unit: i.unit ?? "ks",
+      heatTreatment: [i.heatTreatment, i.hardness].filter(Boolean).join(" ") || null, surfaceTreatment: i.surfaceTreatment ?? null,
+      supplierNote: i.supplierNote ?? null,
+    })),
+    otherSteps: vctx.otherSteps,
+    openPurchaseOrders: vctx.openPurchaseOrders,
+    previousEnd: prevCtx,
+    kindSuggestions,
+    routeChips,
+    remaining: live.slice(Math.max(0, remainingFrom)).filter((o) => o.status === "ceka").map((o) => {
+      const p = o.purchaseOrderId ? ctx.purchaseOrders.find((x) => x.id === o.purchaseOrderId) ?? null : null;
+      return { id: o.id, label: labels.get(o.id) ?? o.label, location: o.location, purchaseOrder: p ? { id: p.id, number: p.number, status: p.status } : null };
+    }),
+    undoHandoffId: ctx.lastPredani?.id ?? null,
+  };
   return {
     token: randomUUID(),
     routeVersion: ctx.routeVersion,
@@ -658,6 +758,7 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
     },
     pendingCapturedQuotes: ctx.pendingCapturedQuotes,
     issues,
+    client,
   };
 }
 
@@ -956,6 +1057,9 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
   const purchaseOrders: ApplyPurchaseOrder[] = [];
   const metas: PoGroupMeta[] = [];
   const singleStepRoute = liveRoute.length <= 1;
+  // nabídka už nacenila jinou objednávku zakázky (nebo jinou objednávku tohoto předání): nová objednávka
+  // podle ní je BEZ cen — jinak by se cena započítala dvakrát (Výroba → TZ → Výroba u stejné firmy)
+  const pricedNow = new Set<string>();
   for (const g of groups) {
     const idx = g.stepKeys.map((k) => keys.indexOf(k));
     const first = idx[0];
@@ -966,6 +1070,9 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
     let q = quoteFor(ctx, s.supplierQuoteId);
     if (q && r.supplierId && q.supplierId && q.supplierId !== r.supplierId) q = null;
     if (q && !r.supplierId && !sameSupplierQuote(q, steps[first].who)) q = null;
+    const reusedQuote = q && (quoteOnOtherPurchaseOrder(ctx, q.id) || pricedNow.has(q.id)) ? q : null;
+    if (reusedQuote) q = null;
+    else if (q) pricedNow.add(q.id);
     const scope = idx.some((i) => !steps[i].orderItemIds) ? null : [...new Set(idx.flatMap((i) => steps[i].orderItemIds ?? []))];
     const quantities = Object.assign({}, ...idx.map((i) => steps[i].po.quantities ?? {})) as Record<string, number>;
     // díly mimo nabídku: výchozí „Objednat i zbylé díly … bez ceny" (D.5); bez nich jen když je udělá jiný krok
@@ -1039,7 +1146,7 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
       queue: {
         title: "",
         // firma bez nabídky nemá výkresy (dostala je jen ta, která nabízela) — připomenout
-        summary: `${stepsText}${requiredDate ? ` · požadovaný termín ${shortDay(requiredDate)}` : ""}${q ? "" : ` · ${NO_DRAWINGS_HINT}`}`,
+        summary: `${stepsText}${requiredDate ? ` · požadovaný termín ${shortDay(requiredDate)}` : ""}${q || reusedQuote ? "" : ` · ${NO_DRAWINGS_HINT}`}${reusedQuote ? " · cena dle nové nabídky (nabídka už je na jiné objednávce)" : ""}`,
         target: email,
         payload: { to: email ?? "", senderId: actor.id },
       },
@@ -1049,6 +1156,7 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
     const sugAll = suggestWhoForStep({
       step: { kind: s.kind, orderItemIds: s.orderItemIds ?? null }, quotes: ctx.quotes, openPurchaseOrders: [],
       ctx: { items: ctx.items, currency: ctx.job.currency, today }, canSeePrices: true,
+      usedQuotes: usedQuotesOf(ctx, { selfOpId: s.operationId ?? null }),
     });
     const best = sugAll.primary?.source === "nejlevnejsi_nabidka" ? sugAll.primary : sugAll.alternatives.find((a) => a.source === "nejlevnejsi_nabidka") ?? null;
     if (whoSource === "nejlevnejsi_nabidka" || whoSource === "objednavka") {
@@ -1088,7 +1196,8 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
       deadlineState: deadlineStateFor({ who: s.who, deadlineAgreed: s.deadlineAgreed, deadlineSource, purchaseOrderStatus: existingPo?.status ?? null }),
       deadlineSource,
       whoSource: s.whoSource ?? (stepHasWho(s.who) ? "rucne" : null),
-      supplierQuoteId: quoteOk ? q!.id : null,
+      // nabídka, kterou už nacenila jiná objednávka, se ke kroku s novou objednávkou nepřipíše
+      supplierQuoteId: quoteOk && !(ordersNow && quoteOnOtherPurchaseOrder(ctx, q!.id, existingPo?.id)) ? q!.id : null,
       poMode: poMode as ApplyStep["poMode"],
       poNoneReason: poMode === "neobjednavat" ? cleanText(s.po.noneReason, 500) : null,
       poGroup: ordersNow ? groupOfStep.get(keys[i]) ?? null : null,
@@ -1185,19 +1294,34 @@ export async function usableMailbox(db: JobsDb, userId: string | null | undefine
 }
 
 /**
- * Odkud poslat objednávku: schvaluje obchodník zakázky → jeho schránka; schvaluje někdo s poštou všech
- * schránek a obchodník zakázky (s právem na ceny — odpověď dodavatele bývá s cenami) má použitelnou
- * schránku → schránka obchodníka (odpověď dodavatele dojde jemu); jinak schránka schvalujícího. Nikdy
- * systémová ani schránka zaměstnance.
+ * Odkud poslat objednávku — STEJNĚ pro každé odeslání (předání „Rovnou odeslat", automatika při předání,
+ * schválení ve frontě, tlačítko „Odeslat" u kroku i v Nákupu, storno / změna): obchodník zakázky (s právem
+ * na ceny — odpověď dodavatele bývá s cenami) má použitelnou schránku → jeho schránka (odpověď dodavatele
+ * dojde jemu, požadavek majitele 4); jinak schránka toho, kdo posílá. Nikdy systémová ani schránka
+ * zaměstnance. `mailAll` se už nerozhoduje (dřív jen s poštou všech schránek → nekonzistentní odesílatel).
  */
-export async function purchaseOrderSender(db: JobsDb, approver: { id: string; mailAll: boolean }, jobOwnerId: string | null):
+export async function purchaseOrderSender(db: JobsDb, approver: { id: string; mailAll?: boolean }, jobOwnerId: string | null):
   Promise<{ from: SmtpPreference; signerId: string; mailboxEmail: string | null }> {
-  if (jobOwnerId && jobOwnerId !== approver.id && approver.mailAll && await hasPriceRole(db, jobOwnerId)) {
+  if (jobOwnerId && jobOwnerId !== approver.id && await hasPriceRole(db, jobOwnerId)) {
     const box = await usableMailbox(db, jobOwnerId);
     if (box) return { from: { mailboxId: box.id, ownerId: jobOwnerId }, signerId: jobOwnerId, mailboxEmail: box.email };
   }
+  // jinak jako každý e-mail uživatele (send.ts): vlastní schránka → firemní schránka → globální SMTP;
+  // nikdy osobní schránka jiného uživatele. Vlastní schránku bez odesílání send.ts odmítne (bez tiché náhrady).
   const own = await usableMailbox(db, approver.id);
-  return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: own?.email ?? null };
+  if (own) return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: own.email };
+  const fallback = await senderAddress({ ownerId: approver.id });
+  return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: fallback };
+}
+
+/** Adresa, ze které by send.ts e-mail opravdu odeslal (null = odeslat nejde). */
+async function senderAddress(pref: SmtpPreference): Promise<string | null> {
+  try {
+    const d = await describeSender(pref);
+    return d.ok ? d.from ?? null : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Fronta a odeslání ───────────────────────────────────────
@@ -1489,10 +1613,25 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
     return { ok: true, result };
   }
 
+  // použitá (existující) objednávka: poznámky pro dodavatele z Technologie se do ní doplní (neodeslaná — nové PDF)
+  const reusedPoIds = [...new Set((input.steps ?? []).map((s) => (s.po?.mode === "existujici" ? s.po.existingId : null)).filter((x): x is string => isUuid(x)))];
+  if (reusedPoIds.length) {
+    try {
+      const notes = await syncPurchaseOrderSupplierNotes(db, author, jobId, { poIds: reusedPoIds });
+      if (notes.sent.length) {
+        result.issues.push({ code: "route_health", level: "warning", message: `Objednávka ${notes.sent.join(", ")} už odešla — poznámky pro dodavatele pošli dodavateli zvlášť.` });
+      }
+    } catch (err) {
+      console.error(`[handoff] poznámky do objednávky: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   const metas = built && !("error" in built) ? built.groups : [];
   const sendNow = new Set(actor.margins ? (input.sendNow ?? []) : []);
   const mode = (data.purchaseOrders ?? []).length ? await purchaseOrderMode(db) : "approval";
-  const senderBox = actor.margins && (data.purchaseOrders ?? []).length ? await usableMailbox(db, actor.id) : null;
+  // odkud by objednávka odešla (schránka obchodníka zakázky, jinak moje) — stejně jako sendQueuedPurchaseOrder
+  const senderBox = actor.margins && actor.id && (data.purchaseOrders ?? []).length
+    ? (await purchaseOrderSender(db, { id: actor.id }, ctx.job.ownerId)).mailboxEmail : null;
   for (const p of data.purchaseOrders ?? []) {
     const meta = metas.find((m) => m.group === p.group) ?? null;
     const out: HandoffResult["purchaseOrders"][number] = {
@@ -1516,7 +1655,7 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
     }) : ["neznámá objednávka"];
     const auto = !human && mode === "full" && actor.margins && blockers.length === 0;
     if ((human || auto) && actor.id) {
-      const r = await sendQueuedPurchaseOrder(db, { id: actor.id, fullName: actor.fullName, mailAll: false }, p.id, {
+      const r = await sendQueuedPurchaseOrder(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll }, p.id, {
         status: human ? "approved" : "auto_executed", via: human ? "rucne" : "automaticky", eventData: { handoffId: result.handoffId, auto },
       });
       if (r.ok) out.send = "odeslano";
@@ -1613,6 +1752,62 @@ export async function ensureHandoffDocumentsCore(db: JobsDb, actor: HandoffActor
   return out;
 }
 
+// ── Poznámky pro dodavatele → objednávka (Technologie) ──────
+/**
+ * Poznámky pro dodavatele (Technologie) do objednávek zakázky: neodeslaná objednávka (návrh / vystavená)
+ * dostane u položky „Pozor: …", nové PDF (nová verze) a znovu sestavený e-mail ve frontě. Odeslaná se
+ * nemění — vrátí se její číslo (poznámku je třeba poslat dodavateli zvlášť). Položka objednávky ↔ položka
+ * zakázky: order_item_id, jinak číslo výkresu. `itemIds` = jen tyto položky zakázky, `poIds` = jen tyto objednávky.
+ */
+export async function syncPurchaseOrderSupplierNotes(db: JobsDb, author: { id: string | null; fullName: string }, jobId: string,
+  opts: { poIds?: string[]; itemIds?: string[] } = {}): Promise<{ updated: string[]; sent: string[] }> {
+  const out = { updated: [] as string[], sent: [] as string[] };
+  if (!isUuid(jobId)) return out;
+  const { data: itemRows } = await db.from("order_items").select("id, drawing_number, supplier_note").eq("order_id", jobId);
+  const items = ((itemRows ?? []) as Row[]).map((r) => ({ id: String(r.id), drawing: normalizeDrawingNumber(cleanText(r.drawing_number, 120)), note: cleanText(r.supplier_note, 1000) }));
+  if (!items.length) return out;
+  const onlyItems = opts.itemIds ? new Set(opts.itemIds) : null;
+  const pos = (await fetchPurchaseOrders(db, jobId))
+    .filter((p) => p.status !== "zrusena" && p.status !== "dodana" && (!opts.poIds || opts.poIds.includes(p.id)));
+  for (const po of pos) {
+    const changes: { id: string; note: string | null }[] = [];
+    for (const it of po.items) {
+      if (!it.id) continue;
+      const d = normalizeDrawingNumber(it.drawingNumber);
+      const byDrawing = d ? items.filter((x) => x.drawing === d) : [];
+      const item = (it.orderItemId ? items.find((x) => x.id === it.orderItemId) : null) ?? (byDrawing.length === 1 ? byDrawing[0] : null);
+      if (!item || (onlyItems && !onlyItems.has(item.id))) continue;
+      const next = [supplierNoteSegment(item.note), splitItemNote(it.note).rest].filter(Boolean).join(" · ") || null;
+      if ((next ?? null) !== ((it.note ?? "").trim() || null)) changes.push({ id: it.id, note: next });
+    }
+    if (!changes.length) continue;
+    if (!isPurchaseOrderEditable(po.status)) { out.sent.push(po.number); continue; }
+    let failed = false;
+    for (const c of changes) {
+      const { error } = await db.from("purchase_order_items").update({ note: c.note } as never).eq("id", c.id).eq("purchase_order_id", po.id);
+      if (error) { failed = true; console.error(`[notes] objednávka ${po.number}: ${error.message}`); break; }
+    }
+    if (failed) continue;
+    out.updated.push(po.number);
+    const fresh = await fetchPurchaseOrder(db, po.id);
+    const signer = author.id ?? (await purchaseOrderContactId(db, po));
+    if (fresh && signer) {
+      try {
+        const stored = await storePurchaseOrderPdfCore(db, { id: signer, fullName: author.fullName }, fresh, { replaceFileId: po.fileId });
+        if ("error" in stored) console.error(`[notes] PDF objednávky ${po.number}: ${stored.error}`);
+      } catch (err) {
+        console.error(`[notes] PDF objednávky ${po.number}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    await fillQueueMail(db, po.id, author.id, { name: author.fullName });
+    await logJobEvent(db, {
+      jobId, type: "field", message: `Objednávka ${po.number}: poznámky pro dodavatele doplněny (nové PDF)`,
+      data: { purchaseOrderId: po.id, fields: ["item_note"], items: changes.length }, actorId: author.id, entity: "purchase_order", entityId: po.id,
+    });
+  }
+  return out;
+}
+
 // ── Změna kroku s objednávkou (E.5) ─────────────────────────
 export interface StepPoChange {
   who?: boolean;
@@ -1680,8 +1875,10 @@ export async function syncStepPurchaseOrder(db: JobsDb, actor: HandoffActor, ope
         }
         const ctx = await loadHandoffContext(db, jobId);
         if (!ctx) return { ok: false, error: "Zakázka nenalezena." };
-        const q = ctx.quotes.find((x) => x.id === op.supplier_quote_id && x.supplierId === newSupplier)
-          ?? ctx.quotes.find((x) => x.supplierId === newSupplier) ?? null;
+        // nabídka nové firmy, kterou už nacenila jiná objednávka zakázky, se znovu nepočítá (položky bez ceny)
+        const free = (x: SuggestQuote) => !quoteOnOtherPurchaseOrder(ctx, x.id, po.id);
+        const q = ctx.quotes.find((x) => x.id === op.supplier_quote_id && x.supplierId === newSupplier && free(x))
+          ?? ctx.quotes.find((x) => x.supplierId === newSupplier && free(x)) ?? null;
         const built = purchaseItemsForStep({
           step: { kind: isOperationKind(op.kind) ? op.kind : "vyroba", orderItemIds: (op.order_item_ids as string[] | null) ?? null },
           items: ctx.items, quote: q, includeUncovered: true,
@@ -1845,6 +2042,7 @@ export async function replaceStepSupplierCore(db: JobsDb, actor: HandoffActor, o
     const sug = suggestWhoForStep({
       step: { kind: cur.kind, orderItemIds: cur.orderItemIds ?? null }, quotes: ctx.quotes.filter((q) => q.supplierId === supplierId), openPurchaseOrders: [],
       ctx: { items: ctx.items, currency: ctx.job.currency, today: ctx.today }, canSeePrices: true,
+      usedQuotes: usedQuotesOf(ctx, { selfOpId: cur.id }),
     });
     quoteId = [sug.primary, ...sug.alternatives].find((s) => s?.supplierQuoteId && s.who.type === "supplier" && s.who.id === supplierId)?.supplierQuoteId ?? null;
   }
@@ -1927,8 +2125,8 @@ export async function autoAdvanceAfterDelivery(db: JobsDb, userId: string | null
     const p = prof as { full_name: string | null; role: string; active: boolean } | null;
     const margins = Boolean(p?.active) && (p?.role === "super_admin" || p?.role === "obchodnik");
     if (!margins) return manual;
-    const box = await usableMailbox(db, userId);
-    const plan = buildHandoffPlan(ctx, { kind: "dalsi_krok", operationId: next.id, margins, mailAll: p?.role === "super_admin", actorId: userId, automationMode: "full", senderEmail: box?.email ?? null });
+    const box = await purchaseOrderSender(db, { id: userId }, ctx.job.ownerId);
+    const plan = buildHandoffPlan(ctx, { kind: "dalsi_krok", operationId: next.id, margins, mailAll: p?.role === "super_admin", actorId: userId, automationMode: "full", senderEmail: box.mailboxEmail });
     const step = plan.steps[0];
     if (!step || step.operationId !== next.id) return manual;
     const existing = next.purchaseOrderId && next.purchaseOrder?.status !== "zrusena" ? next.purchaseOrderId : null;
@@ -1975,3 +2173,101 @@ export function stepInputFromOperation(op: JobOperation, over: Partial<HandoffSt
 }
 
 export { whoOfOp };
+
+// ── Nabídka telefonem (dialog předání: „kdo" ručně podle nabídky, která přišla telefonem) ──
+export type { PhoneQuoteInput };
+
+/**
+ * Zapíše nabídku telefonem jako nabídku dodavatele (zdroj „telefon") — dodavatel a výrobce se bere
+ * vždy podle nějaké nabídky (majitel 29. 10.). Vrací návrh „kdo" pro krok (předání ho použije pro krok
+ * i objednávku: cena položek se postaví na serveru z této nabídky). Ceny jen s právem na marže.
+ */
+export async function recordPhoneQuoteCore(db: JobsDb, actor: Pick<HandoffActor, "id" | "margins">, jobId: string, input: PhoneQuoteInput):
+  Promise<{ ok: true; quoteId: string; suggestion: WhoSuggestion } | { ok: false; error: string }> {
+  if (!isUuid(jobId) || !actor.id) return { ok: false, error: "Zakázka nenalezena." };
+  if (!input || !isOperationKind(input.kind)) return { ok: false, error: "Neznámý druh kroku." };
+  const ctx = await loadHandoffContext(db, jobId);
+  if (!ctx) return { ok: false, error: "Zakázka nenalezena." };
+  if (CLOSED_STAGES.includes(ctx.job.status)) return { ok: false, error: "Uzavřená zakázka — nabídku nejde zapsat." };
+
+  // dodavatel: z adresáře, nebo podle názvu (shoda ≥ 80), jinak nový v adresáři
+  let supplier: { id: string; name: string } | null = null;
+  if (input.supplierId) {
+    if (!isUuid(input.supplierId)) return { ok: false, error: "Dodavatel nenalezen." };
+    const s = ctx.suppliers.get(input.supplierId);
+    if (!s) return { ok: false, error: "Dodavatel nenalezen." };
+    supplier = { id: s.id, name: s.name };
+  } else {
+    const name = cleanText(input.supplierName, 300);
+    if (!name || name.length < 2) return { ok: false, error: "Napiš, od které firmy nabídka je." };
+    const found = await findOrCreateSupplierByParty(db, { ...emptyParty(), name });
+    if (!found) return { ok: false, error: "Dodavatele se nepodařilo založit." };
+    supplier = { id: found.id, name: found.name };
+  }
+
+  const scopeIds = Array.isArray(input.orderItemIds) ? input.orderItemIds.filter((x) => ctx.items.some((i) => i.id === x)) : null;
+  const scope = scopeIds && scopeIds.length ? ctx.items.filter((i) => scopeIds.includes(i.id)) : ctx.items;
+  const positive = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v > 0 ? r2(v) : null);
+  const lead = typeof input.leadTimeDays === "number" && Number.isFinite(input.leadTimeDays) && input.leadTimeDays > 0 ? Math.min(365, Math.round(input.leadTimeDays)) : null;
+  const delivery = cleanDate(input.deliveryDate);
+  // ceny: u jednoho dílu cena celkem (→ za kus), u víc dílů cena za kus u každého dílu — objednávka potřebuje
+  // cenu položek (celková cena za víc dílů by v objednávce chyběla a náklady zakázky by byly 0)
+  const total = actor.margins ? positive(input.price) : null;
+  const perItem = new Map<string, number>();
+  if (actor.margins && input.itemPrices && typeof input.itemPrices === "object") {
+    for (const it of scope) {
+      const p = positive((input.itemPrices as Record<string, unknown>)[it.id]);
+      if (p !== null) perItem.set(it.id, p);
+    }
+  }
+  if (scope.length > 1 && total !== null && !perItem.size) {
+    return { ok: false, error: "Krok má víc dílů — napiš cenu za kus u každého dílu (objednávka potřebuje cenu položek)." };
+  }
+  const anyPrice = perItem.size > 0 || total !== null;
+  if (!lead && !delivery && !anyPrice) return { ok: false, error: "Doplň aspoň termín (lhůtu nebo datum dodání)." };
+  const note = cleanText(input.note, 900);
+  // položky nabídky = díly kroku (pokrytí celé)
+  const unitPriceOf = (it: SuggestItem): number | null => {
+    if (perItem.has(it.id)) return perItem.get(it.id) as number;
+    if (scope.length === 1 && total !== null) return r2(total / (it.quantity || 1));
+    return null;
+  };
+  const items = scope.map((it) => ({
+    drawingNumber: it.drawingNumber ?? undefined, name: it.name ?? it.description ?? undefined, material: it.materialDesignation ?? it.material ?? undefined,
+    quantity: it.quantity, unit: it.unit ?? "ks", unitPrice: unitPriceOf(it),
+  }));
+  const allPriced = items.every((it) => it.unitPrice !== null);
+  const price = anyPrice && allPriced ? r2(items.reduce((s, it) => s + (it.unitPrice ?? 0) * it.quantity, 0)) : null;
+  const created = await insertSupplierQuote(db, actor.id, jobId, {
+    supplierId: supplier.id, quoteDate: pragueToday(), leadTimeDays: lead, ...(delivery ? { deliveryDate: delivery } : {}),
+    currency: ctx.job.currency || "CZK", note: `Nabídka telefonem${note ? `: ${note}` : ""}`, items: items as never,
+    ...(price !== null ? { total: price } : {}), source: "telefon",
+  }, { silent: true });
+  if (!created.ok) return { ok: false, error: created.error };
+  // na co je nabídka (druh kroku) — porovná se s ostatními nabídkami ke stejnému kroku
+  await db.from("supplier_quotes").update({ operation_kinds: [input.kind] } as never).eq("id", created.id);
+  const when = delivery ? `do ${shortDay(delivery)}` : lead ? `termín ${lead} ${lead === 1 ? "den" : lead < 5 ? "dny" : "dní"}` : null;
+  await logJobEvent(db, {
+    jobId, type: "quote",
+    message: `Nabídka telefonem: ${supplier.name}${when ? ` — ${when}` : ""}${note ? ` · ${note}` : ""}`.slice(0, 500),
+    data: { supplierQuoteId: created.id, supplierId: supplier.id, source: "telefon", kind: input.kind },
+    actorId: actor.id,
+  });
+  // objednávka podle této nabídky — stejné pravidlo jako server při předání (náhled = skutečnost)
+  const built = purchaseItemsForStep({
+    step: { kind: input.kind, orderItemIds: scopeIds && scopeIds.length ? scopeIds : null }, items: ctx.items,
+    quote: { items: items.map((it) => ({ ...it, drawingNumber: it.drawingNumber ?? null, name: it.name ?? null, note: null })), total: price, number: null },
+    includeUncovered: true,
+  });
+  const priced = built.items.filter((it) => it.unitPrice !== null && it.unitPrice !== undefined);
+  const suggestion: WhoSuggestion = {
+    source: "nabidka", who: { type: "supplier", id: supplier.id, name: supplier.name }, supplierQuoteId: created.id, quoteNumber: null,
+    purchaseOrder: null, price, currency: ctx.job.currency || "CZK", priceBasis: price !== null ? "prepocet_mnozstvi" : null, diffToBest: null,
+    leadTimeDays: lead, deliveryDate: delivery, coverage: null, expired: false, quantityMismatch: false, badges: [], reason: "Nabídka telefonem",
+    order: {
+      itemCount: built.items.length, unpriced: built.items.length - priced.length,
+      total: actor.margins && priced.length ? r2(priced.reduce((s, it) => s + (it.unitPrice ?? 0) * it.quantity, 0)) : null,
+    },
+  };
+  return { ok: true, quoteId: created.id, suggestion };
+}

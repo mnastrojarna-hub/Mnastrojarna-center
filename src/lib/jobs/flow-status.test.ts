@@ -12,6 +12,7 @@ import {
   stampText, stampTitle, transitionFeature, approvalReasons, quoteLabel, flowFactsFromRow, quoteFactsFromRow,
   QUOTE_ACCEPT_BLOCKED, QUOTE_ARCHIVED_SEND, QUOTE_AWAITS_APPROVAL, QUOTE_SEND_NO_RIGHT, approvedStampText,
   quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent,
+  UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META,
   type ActionCtx, type ChangeStamp, type FlowFacts, type FlowStateMeta, type JobStamps, type QuoteFacts,
 } from "./flow-status";
 import { STAGES, STAGE_ORDER, stageRank } from "./stages";
@@ -55,6 +56,7 @@ const ALL_META: FlowStateMeta[] = [
   ...Object.values(ORDER_STATES), ...Object.values(FULFILMENT_STATES), ...Object.values(CONFIRMATION_STATES),
   ...Object.values(DELIVERY_STATES), ...Object.values(PAYMENT_STATES), ...Object.values(PURCHASE_EXTRA_STATES),
   NO_PLAN_META, LOST_JOB_META, CANCELLED_JOB_META, PROPOSAL_META,
+  UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META,
 ];
 
 // ── Meta a paleta ───────────────────────────────────────────
@@ -390,16 +392,18 @@ describe("nextAction (tabulka 1.12)", () => {
     expect(next(o({ stage: "objednavka", orderStatus: "rozpor" }))?.key).toBe("order.resolveMismatch");
     expect(next(o({ stage: "ve_vyrobe", orderStatus: "aktualizovana", orderRevision: 2, orderConfirmedRevision: 1 }))?.key).toBe("order.decideChange");
     expect(next(o({ stage: "potvrzeno", orderStatus: "potvrzena", orderConfirmedRevision: 1 }))?.key).toBe("order.sendConfirmation");
-    expect(next(o({ stage: "potvrzeno", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1 }))?.key).toBe("production.plan");
-    expect(next(o({ stage: "potvrzeno", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1, hasOperations: true }))).toBeNull();
+    // potvrzená objednávka → vždy předání do výroby (i s připraveným postupem / objednávkou z Nákupu)
+    expect(next(o({ stage: "potvrzeno", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1 }))).toEqual({ key: "production.handoff", label: "Předat do výroby…" });
+    expect(next(o({ stage: "potvrzeno", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1, hasOperations: true }))?.key).toBe("production.handoff");
     const vv = o({ stage: "ve_vyrobe", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1 });
     expect(next({ ...vv, itemsCount: 2, itemsDelivered: 1 })).toEqual({ key: "delivery.record", label: "Dodat zbytek" });
     expect(next({ ...vv, productionDone: 2, productionTotal: 2 })).toEqual({ key: "delivery.record", label: "Zapsat dodání" });
-    expect(next(vv)).toBeNull();
+    // ve výrobě bez kroků (starší zakázka) → doplnit kdo a termín (dřív žádný další krok)
+    expect(next(vv)).toEqual({ key: "production.handoff", label: "Doplnit kdo a termín…" });
     // ve výrobě bez odeslaného potvrzení: dodání má přednost, potvrzení jen v menu (review UX 3)
     const noDoc = o({ stage: "ve_vyrobe", orderStatus: "potvrzena", orderConfirmedRevision: 1, itemsCount: 2, itemsDelivered: 1 });
     expect(next(noDoc)).toEqual({ key: "delivery.record", label: "Dodat zbytek" });
-    expect(next(o({ stage: "ve_vyrobe", orderStatus: "potvrzena", orderConfirmedRevision: 1 }))).toBeNull();
+    expect(next(o({ stage: "ve_vyrobe", orderStatus: "potvrzena", orderConfirmedRevision: 1 }))?.key).toBe("production.handoff");
     expect(menuActions(noDoc, deriveFlow(noDoc, [], TODAY), SALES)).toContain("order.sendConfirmation");
     const dz = o({ stage: "dodano_zakaznikovi", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1 });
     expect(next(dz)?.key).toBe("delivery.confirmNote");
@@ -603,12 +607,17 @@ describe("primaryChip (tabulka 1.11)", () => {
     expect(chipOf(o({ stage: "ve_vyrobe", orderStatus: "rozpor" }))?.key).toBe("rozpor");
     expect(chipOf(o({ stage: "potvrzeno", confirmationSentRevision: null }))?.key).toBe("bez_dokladu");
     expect(chipOf(o({ stage: "potvrzeno" }))?.key).toBe("bez_postupu");
-    expect(chipOf(o({ stage: "potvrzeno", hasOperations: true }))).toBeNull();
+    expect(chipOf(o({ stage: "potvrzeno" }))?.label).toBe("K předání do výroby");
+    // i s připraveným postupem — zakázka stále čeká na předání (kdo + termín)
+    expect(chipOf(o({ stage: "potvrzeno", hasOperations: true }))?.key).toBe("bez_postupu");
     expect(chipOf(o({ stage: "montaz", orderStatus: "aktualizovana", orderRevision: 2 }))?.key).toBe("aktualizovana");
   });
 
   it("výroba, dodání, faktura, uzavřené", () => {
-    expect(chipOf(o({ stage: "ve_vyrobe" }))).toBeNull();
+    // ve výrobě bez kroku s kdo + termínem (starší zakázka) → „Chybí kdo a termín"
+    expect(chipOf(o({ stage: "ve_vyrobe" }))?.key).toBe("bez_predani");
+    const ready = { productionStep: "vyroba", productionLocation: "Frézy Novák", productionDue: "2026-11-13", productionTotal: 2, productionDone: 0 };
+    expect(chipOf(o({ stage: "ve_vyrobe", ...ready }))).toBeNull();
     const part = chipOf(o({ stage: "ve_vyrobe", itemsCount: 3, itemsDelivered: 2 }));
     expect(part).toMatchObject({ key: "castecne" });
     expect(part?.progress?.label).toBe("2/3 položek");
@@ -854,5 +863,62 @@ describe("parita TS ↔ SQL migrace", () => {
     const ranks: Record<string, number> = {};
     for (const m of body.matchAll(/when '([a-z_]+)' then (\d+)/g)) ranks[m[1]] = Number(m[2]);
     for (const s of STAGE_ORDER) expect(ranks[s] ?? -1, s).toBe(flowRank(s));
+  });
+});
+
+// ── Předání do výroby (H.5): další krok, menu, chipy ────────
+describe("předání do výroby — další krok, menu a chipy", () => {
+  const snap = (f: FlowFacts) => deriveFlow(f, [], TODAY);
+  const vv = (p: Partial<FlowFacts> = {}) => facts({
+    stage: "ve_vyrobe", inquiryStatus: "zpracovana", orderStatus: "potvrzena", orderRevision: 1, orderConfirmedRevision: 1, confirmationSentRevision: 1,
+    productionStep: "vyroba", productionLocation: "Frézy Novák", productionDue: "2026-11-13", productionTotal: 2, productionDone: 0,
+    dueDate: "2026-11-20", productionEnd: "2026-11-19", ...p,
+  });
+  const next = (f: FlowFacts, c: ActionCtx = SALES) => nextAction(f, snap(f), c);
+
+  it("ve výrobě: chybí kdo/termín → Doplnit; neodeslaná objednávka (marže) → Odeslat; pozdě → Přeplánovat; jinak Posunout dál", () => {
+    expect(next(vv({ productionLocation: null }))).toEqual({ key: "production.handoff", label: "Doplnit kdo a termín…" });
+    expect(next(vv({ productionDue: null }))).toEqual({ key: "production.handoff", label: "Doplnit kdo a termín…" });
+    expect(next(vv({ productionPoStatus: "vystavena" }))?.key).toBe("production.sendPo");
+    // zaměstnanec objednávku neposílá → posun dál
+    expect(next(vv({ productionPoStatus: "vystavena" }), WORKER)?.key).toBe("production.advance");
+    expect(next(vv({ productionEnd: "2026-11-24" }))?.key).toBe("production.replan");
+    expect(next(vv({ productionFinalEnd: "2026-11-18" }))?.key).toBe("production.replan");
+    expect(next(vv())).toEqual({ key: "production.advance", label: "Posunout dál…" });
+    expect(next(vv({ productionRunning: false }))).toEqual({ key: "production.advance", label: "Předat do kroku…" });
+    // dodání má pořád přednost
+    expect(next(vv({ itemsCount: 2, itemsDelivered: 1 }))?.key).toBe("delivery.record");
+  });
+
+  it("chipy: ohrožený konečný termín > změněný konečný termín > chybí kdo a termín > další krok čeká", () => {
+    const chipOf = (f: FlowFacts) => primaryChip(f, snap(f));
+    expect(chipOf(vv({ productionEnd: "2026-11-22" }))).toMatchObject({ key: "ohrozeny_termin", label: "Ohrožen konečný termín (o 2 dny)" });
+    expect(chipOf(vv({ productionFinalEnd: "2026-11-18" }))?.key).toBe("termin_zmenen");
+    expect(chipOf(vv({ productionLocation: null }))?.label).toBe("Chybí kdo a termín");
+    expect(chipOf(vv({ productionRunning: false }))?.label).toBe("K předání dalšímu kroku");
+    expect(chipOf(vv())).toBeNull();
+  });
+
+  it("menu: před výrobou Předat + Naplánovat postup; ve výrobě Posunout / Ukončit / Přeplánovat / Vrátit; storno u dodavatelů jen s marží", () => {
+    const p = facts({ stage: "potvrzeno", inquiryStatus: "zpracovana", orderStatus: "potvrzena", orderRevision: 1, orderConfirmedRevision: 1, confirmationSentRevision: 1 });
+    expect(menuActions(p, snap(p), SALES)).toEqual(expect.arrayContaining(["production.plan"]));
+    const m = menuActions(vv(), snap(vv()), SALES);
+    for (const k of ["production.finish", "production.replan", "production.undo"]) expect(m).toContain(k);
+    expect(menuActions(vv({ productionLocation: null }), snap(vv({ productionLocation: null })), SALES)).toContain("production.handoff");
+    const z = facts({ stage: "zruseno", openPurchaseOrders: 2 });
+    expect(menuActions(z, snap(z), SALES)).toContain("purchasing.notifySuppliers");
+    expect(menuActions(z, snap(z), WORKER)).not.toContain("purchasing.notifySuppliers");
+    expect(next(z)).toEqual({ key: "purchasing.notifySuppliers", label: "Stornovat u dodavatelů…" });
+    expect(FLOW_ACTIONS["production.plan"]).toMatchObject({ label: "Naplánovat postup", kind: "link" });
+    expect(FLOW_ACTIONS["production.plan"].href?.("x")).toBe("/orders/x?tab=vyroba");
+  });
+
+  it("fakta z řádku: production_* a objednávky z embedu", () => {
+    const f = flowFactsFromRow({
+      status: "ve_vyrobe", production_step: "tepelne_zpracovani", production_location: "TepKal", production_step_no: 2, production_due: "2026-11-12",
+      production_po_status: "vystavena", production_end: "2026-11-19", production_final_end: null, due_date: "2026-11-20",
+      pos: [{ status: "vystavena" }, { status: "dodana" }, { status: "zrusena" }],
+    });
+    expect(f).toMatchObject({ productionStep: "tepelne_zpracovani", productionStepNo: 2, productionPoStatus: "vystavena", openPurchaseOrders: 1, deliveredPurchaseOrders: 1, dueDate: "2026-11-20" });
   });
 });

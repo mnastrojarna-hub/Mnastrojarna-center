@@ -4,13 +4,14 @@ import {
   ShoppingCart, GitCompare, BadgeCheck, RefreshCw, Ban, PackageCheck, CircleDotDashed, Factory, FilePlus, FileCheck,
   MailCheck, FileX, ClipboardCheck, Truck, Package, Banknote, AlarmClock, Sparkles, Hand, Camera, Mail, Cog, Upload,
   Clock, Globe, Database, CircleSlash, Pencil, Undo, CalendarPlus, ThumbsUp, Handshake, ReceiptText, Wrench,
+  ArrowRightCircle, Flag, CalendarClock, CalendarX2, UserRoundX,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
 import type { PersonRef } from "@/lib/jobs/types";
 import type {
   JobStage, QuoteStatus, InquiryStatus, OrderDocStatus, QuoteState, LostReason, ChangeVia, ActorKind, FlowCause,
-  FlowProposal, OrderMismatch,
+  FlowProposal, OrderMismatch, PurchaseOrderStatus,
 } from "@/lib/supabase/database.types";
 
 export type { InquiryStatus, OrderDocStatus, QuoteState, LostReason, ChangeVia, ActorKind, FlowCause };
@@ -471,11 +472,35 @@ export const PURCHASE_EXTRA_STATES: Record<PurchaseExtraState, FlowStateMeta<Pur
   }),
 };
 
-/** Chip řádku: potvrzená objednávka bez postupu výroby (1.11 — hint u potvrzeno). */
+/** Chip řádku: potvrzená objednávka čeká na předání do výroby (kdo + termín). */
 export const NO_PLAN_META: FlowStateMeta<"bez_postupu"> = meta({
-  key: "bez_postupu", phase: "fulfilment", label: "Bez postupu výroby", short: "Bez postupu",
-  description: "Objednávka je potvrzená, ale nemá výrobní operace ani objednávku u dodavatele.",
+  key: "bez_postupu", phase: "fulfilment", label: "K předání do výroby", short: "K předání",
+  description: "Objednávka je potvrzená — předej ji do výroby: kdo to dělá a do kdy.",
   icon: Wrench, tone: "action", palette: "indigo.action", source: "derived", terminal: false,
+});
+/** Chip řádku: ve výrobě, ale aktuální krok nemá kdo nebo termín (starší zakázky). */
+export const UNPLANNED_META: FlowStateMeta<"bez_predani"> = meta({
+  key: "bez_predani", phase: "fulfilment", label: "Chybí kdo a termín", short: "Chybí kdo",
+  description: "Zakázka je ve výrobě, ale aktuální krok nemá, kdo to dělá, nebo termín.",
+  icon: UserRoundX, tone: "problem", palette: "rose.problem", source: "derived", terminal: false,
+});
+/** Chip řádku: další krok čeká na předání (kdo + termín + objednávka). */
+export const NEXT_STEP_META: FlowStateMeta<"k_predani_kroku"> = meta({
+  key: "k_predani_kroku", phase: "fulfilment", label: "K předání dalšímu kroku", short: "Další krok",
+  description: "Předchozí krok je hotový — předej díl dalšímu kroku (kdo + termín).",
+  icon: ArrowRightCircle, tone: "action", palette: "amber.action", source: "derived", terminal: false,
+});
+/** Chip řádku: výroba skončí po konečném termínu (zákazník). */
+export const ROUTE_LATE_META: FlowStateMeta<"ohrozeny_termin"> = meta({
+  key: "ohrozeny_termin", phase: "fulfilment", label: "Ohrožen konečný termín", short: "Ohrožen termín",
+  description: "Výroba podle termínů kroků skončí po konečném termínu (zákazník).",
+  icon: CalendarX2, tone: "problem", palette: "rose.problem", source: "derived", terminal: false,
+});
+/** Chip řádku: konečný termín (zákazník) se změnil — postup je potřeba přeplánovat. */
+export const FINAL_CHANGED_META: FlowStateMeta<"termin_zmenen"> = meta({
+  key: "termin_zmenen", phase: "fulfilment", label: "Konečný termín se změnil — přeplánuj výrobu", short: "Přeplánovat",
+  description: "Krok s konečným termínem má jiné datum než konečný termín (zákazník).",
+  icon: CalendarClock, tone: "action", palette: "amber.action", source: "derived", terminal: false,
 });
 /** Chip řádku nerealizované zakázky (důvod prohry). */
 export const LOST_JOB_META: FlowStateMeta<"nerealizovano"> = meta({
@@ -743,6 +768,30 @@ export interface FlowFacts {
   assigneeId?: string | null;
   assigneeName?: string | null;
   value?: number | null;
+  // ── Předání do výroby: aktuální krok (orders.production_*, udržuje DB) ──
+  /** Druh aktuálního kroku („hotovo" = vše hotové). */
+  productionStep?: string | null;
+  /** Kde se aktuální krok dělá (null = kdo chybí). */
+  productionLocation?: string | null;
+  productionStepNo?: number | null;
+  /** Termín aktuálního kroku. */
+  productionDue?: string | null;
+  productionDueState?: string | null;
+  /** Stav objednávky aktuálního kroku. */
+  productionPoStatus?: PurchaseOrderStatus | null;
+  /** Nejzazší termín otevřených kroků (konec výroby). */
+  productionEnd?: string | null;
+  /** Termín kroku s konečným termínem (zákazník). */
+  productionFinalEnd?: string | null;
+  /** Aktuální krok běží (null = nevíme — fakta z orders to neříkají). */
+  productionRunning?: boolean | null;
+  /** Konečný termín (zákazník) a požadavek zákazníka. */
+  dueDate?: string | null;
+  customerRequiredDate?: string | null;
+  /** Otevřené objednávky u dodavatelů (vystavená / odeslaná / potvrzená) — bez práva na nákup 0. */
+  openPurchaseOrders?: number;
+  /** Dodané objednávky (zápis výroby při přeskočení). */
+  deliveredPurchaseOrders?: number;
 }
 
 export interface QuoteFacts {
@@ -1371,6 +1420,23 @@ function proposalChip(f: FlowFacts, stamps?: JobStamps | null): PhaseChip | null
   });
 }
 
+/**
+ * Výroba z faktů zakázky (orders.production_*; zrcadlí routeHealth): aktuální krok bez kdo / termínu,
+ * konec výroby po konečném termínu (o kolik dní), krok s konečným termínem s jiným datem, další krok čeká.
+ */
+export function productionHealth(f: FlowFacts): { unplanned: boolean; late: number | null; finalChanged: boolean; nextWaiting: boolean } {
+  const total = f.productionTotal ?? 0;
+  const step = f.productionStep ?? null;
+  const open = total > 0 && f.productionDone < total && step !== "hotovo";
+  const loc = (f.productionLocation ?? "").trim();
+  const unplanned = f.stage === "ve_vyrobe" && (!open || !step || !loc || loc === "—" || !f.productionDue);
+  const target = f.dueDate ?? f.customerRequiredDate ?? null;
+  const late = open && f.productionEnd && target && f.productionEnd > target ? dayDiff(target, f.productionEnd) : null;
+  const finalChanged = open && Boolean(f.productionFinalEnd && f.dueDate && f.productionFinalEnd !== f.dueDate);
+  const nextWaiting = open && !unplanned && f.productionRunning === false;
+  return { unplanned, late, finalChanged, nextWaiting };
+}
+
 /** Chip řádku Knihy — jen když přidává informaci k StageBadge (tabulka 1.11). */
 export function primaryChip(f: FlowFacts, s: FlowSnapshot, stamps?: JobStamps | null): PhaseChip | null {
   const pc = proposalChip(f, stamps);
@@ -1418,12 +1484,19 @@ export function primaryChip(f: FlowFacts, s: FlowSnapshot, stamps?: JobStamps | 
       const m = CONFIRMATION_STATES.bez_dokladu;
       return chip("confirmation", m, { hint: `rev ${f.orderConfirmedRevision ?? f.orderRevision}`, stamp: stamps?.confirmed ?? null });
     }
-    if (!f.hasOperations && !f.hasPurchaseOrders) return chip("fulfilment", NO_PLAN_META);
-    return null;
+    // potvrzená objednávka: další krok je vždy předání do výroby (i s připraveným postupem / objednávkou z Nákupu)
+    return chip("fulfilment", NO_PLAN_META);
   }
   if (rank >= 5 && rank <= 8) {
     if (s.delivery === "castecne") return chip("delivery", DELIVERY_STATES.castecne, { progress: deliveryProgress(f) });
     if (s.delivery === "k_expedici") return chip("delivery", DELIVERY_STATES.k_expedici);
+    if (f.stage === "ve_vyrobe") {
+      const h = productionHealth(f);
+      if (h.late !== null) return chip("fulfilment", ROUTE_LATE_META, { label: `${ROUTE_LATE_META.label} (o ${h.late} ${czPlural(h.late, "den", "dny", "dní")})` });
+      if (h.finalChanged) return chip("fulfilment", FINAL_CHANGED_META);
+      if (h.unplanned) return chip("fulfilment", UNPLANNED_META);
+      if (h.nextWaiting) return chip("fulfilment", NEXT_STEP_META);
+    }
     return null;
   }
   if (f.stage === "dodano_zakaznikovi") {
@@ -1521,7 +1594,9 @@ export type FlowActionKey =
   | "quote.feedback" | "quote.answerNoChange" | "quote.accept" | "quote.reject" | "quote.propose" | "quote.reopen"
   | "quote.returnToAuthor" | "quote.newRevision" | "quote.extend" | "order.confirm" | "order.confirmOther" | "order.flagMismatch"
   | "order.resolveMismatch" | "order.requestFix" | "order.registerChange" | "order.decideChange" | "order.rejectChange"
-  | "order.sendConfirmation" | "order.cancel" | "order.propose" | "order.reopen" | "production.plan" | "delivery.record"
+  | "order.sendConfirmation" | "order.cancel" | "order.propose" | "order.reopen" | "production.plan" | "production.handoff"
+  | "production.advance" | "production.finish" | "production.replan" | "production.sendPo" | "production.undo"
+  | "purchasing.notifySuppliers" | "delivery.record"
   | "delivery.closeShort" | "delivery.partialNote" | "delivery.confirmNote" | "payment.invoice" | "payment.record"
   | "payment.settle" | "job.correct";
 
@@ -1586,7 +1661,15 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "order.cancel": act({ key: "order.cancel", label: "Stornovat objednávku…", icon: Ban, intent: "danger", feature: "margins", needsReason: true, kind: "dialog" }),
   "order.propose": act({ key: "order.propose", label: "Navrhnout storno…", icon: Hand, intent: "danger", feature: "workflow", needsReason: true, kind: "dialog" }),
   "order.reopen": act({ key: "order.reopen", label: "Obnovit objednávku", icon: Undo, intent: "secondary", feature: "delete", kind: "direct" }),
-  "production.plan": act({ key: "production.plan", label: "Naplánovat výrobu", icon: Factory, intent: "primary", feature: "orders", kind: "link", href: tab("production") }),
+  "production.plan": act({ key: "production.plan", label: "Naplánovat postup", icon: Factory, intent: "secondary", feature: "orders", kind: "link", href: tab("vyroba") }),
+  // předání do výroby (povinně kdo + termín; objednávka dodavateli se vystaví sama)
+  "production.handoff": act({ key: "production.handoff", label: "Předat do výroby…", icon: Factory, intent: "primary", feature: "orders", kind: "dialog" }),
+  "production.advance": act({ key: "production.advance", label: "Posunout dál…", icon: ArrowRightCircle, intent: "primary", feature: "orders", kind: "dialog" }),
+  "production.finish": act({ key: "production.finish", label: "Ukončit výrobu…", icon: Flag, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "production.replan": act({ key: "production.replan", label: "Přeplánovat výrobu…", icon: CalendarClock, intent: "primary", feature: "orders", kind: "dialog" }),
+  "production.sendPo": act({ key: "production.sendPo", label: "Odeslat objednávku dodavateli", icon: Send, intent: "primary", feature: "margins", kind: "link", href: tab("vyroba") }),
+  "production.undo": act({ key: "production.undo", label: "Vrátit předání do výroby", icon: Undo2, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "purchasing.notifySuppliers": act({ key: "purchasing.notifySuppliers", label: "Stornovat u dodavatelů…", icon: Ban, intent: "secondary", feature: "margins", kind: "dialog" }),
   "delivery.record": act({ key: "delivery.record", label: "Zapsat dodání", icon: Truck, intent: "primary", feature: "workflow", kind: "dialog" }),
   "delivery.closeShort": act({ key: "delivery.closeShort", label: "Uzavřít s menším množstvím…", icon: PackageCheck, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "delivery.partialNote": act({ key: "delivery.partialNote", label: "Částečná dodávka…", icon: CircleDotDashed, intent: "secondary", feature: "workflow", kind: "dialog" }),
@@ -1785,6 +1868,19 @@ function quoteNext(s: FlowSnapshot, ctx: ActionCtx): Next | undefined {
   return undefined;
 }
 
+/**
+ * Ve výrobě (po přednosti dodání): chybí kdo / termín → „Doplnit kdo a termín…"; neodeslaná objednávka
+ * kroku (obchodník/admin) → „Odeslat objednávku dodavateli"; ohrožený / změněný konečný termín →
+ * „Přeplánovat výrobu…"; jinak „Posunout dál…" (nic neběží → „Předat do kroku…").
+ */
+function productionNext(f: FlowFacts, ctx: ActionCtx): Next {
+  const h = productionHealth(f);
+  if (h.unplanned) return allowed(ctx, "production.handoff", "Doplnit kdo a termín…");
+  if ((f.productionPoStatus === "navrh" || f.productionPoStatus === "vystavena") && ctx.can("margins")) return allowed(ctx, "production.sendPo");
+  if (h.late !== null || h.finalChanged) return allowed(ctx, "production.replan");
+  return allowed(ctx, "production.advance", f.productionRunning === false ? "Předat do kroku…" : "Posunout dál…");
+}
+
 /** Primární tlačítko (sloveso dalšího kroku) — tabulka 1.12. */
 export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next {
   if (f.proposal && ctx.can(proposalFeature(f.proposal))) return { key: "proposal.decide", label: FLOW_ACTIONS["proposal.decide"].label };
@@ -1818,11 +1914,16 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     if (rank >= 5) {
       if (s.delivery === "castecne") return allowed(ctx, "delivery.record", "Dodat zbytek");
       if (s.delivery === "k_expedici") return allowed(ctx, "delivery.record", "Zapsat dodání");
+      if (f.stage === "ve_vyrobe") return productionNext(f, ctx);
       return null;
     }
     if (s.confirmation === "bez_dokladu") return allowed(ctx, "order.sendConfirmation");
-    if (f.stage === "potvrzeno") return !f.hasOperations && !f.hasPurchaseOrders ? allowed(ctx, "production.plan") : null;
+    // potvrzená objednávka → předání do výroby (komu a do kdy), i s připraveným postupem / objednávkou
+    if (f.stage === "potvrzeno") return allowed(ctx, "production.handoff");
     return null;
+  }
+  if ((f.stage === "zruseno" || f.stage === "nerealizovano") && (f.openPurchaseOrders ?? 0) > 0) {
+    return allowed(ctx, "purchasing.notifySuppliers", "Stornovat u dodavatelů…");
   }
   if (f.stage === "dodano_zakaznikovi") {
     if (s.delivery === "dodano") return allowed(ctx, "delivery.confirmNote");
@@ -1892,7 +1993,17 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
   }
 
   // výroba, dodání, platba
-  if (f.stage === "potvrzeno" && !f.hasOperations && !f.hasPurchaseOrders) add("production.plan");
+  // výroba: předání (kdo + termín), plán dopředu; ve výrobě posun / ukončení / přeplánování / vrácení
+  if (rank === 3 || rank === 4 || f.stage === "pozastaveno" || f.stage === "reklamace") { add("production.handoff"); add("production.plan"); }
+  if (f.stage === "ve_vyrobe") {
+    const h = productionHealth(f);
+    if (h.unplanned) add("production.handoff");
+    else add("production.advance");
+    if ((f.productionTotal ?? 0) > 0) add("production.finish");
+    add("production.replan");
+    add("production.undo");
+  }
+  if ((f.stage === "zruseno" || f.stage === "nerealizovano" || f.stage === "pozastaveno") && (f.openPurchaseOrders ?? 0) > 0) add("purchasing.notifySuppliers");
   if (rank >= 5 && rank <= 9 && s.delivery !== "dl_potvrzen" && s.delivery !== "dodano") {
     if (f.itemsCount > 0) { add("delivery.record"); if (s.delivery === "castecne") add("delivery.closeShort"); }
     else add("delivery.partialNote");
@@ -1918,6 +2029,10 @@ export const FLOW_ORDER_COLUMNS = [
   "delivery_note_confirmed_at", "invoice_number", "invoice_due_date", "paid_at", "paid_so_far", "waiting_since",
   "waiting_note", "order_status_changed_at", "lost_reason", "lost_note", "flow_proposal", "order_mismatch",
   "assignee_id", "value",
+  // předání do výroby: aktuální krok, konec výroby, konečný termín (zákazník), objednávky u dodavatelů
+  "production_step", "production_location", "production_step_no", "production_due", "production_due_state",
+  "production_po_status", "production_end", "production_final_end", "due_date", "customer_required_date",
+  "pos:purchase_orders!job_id(status)",
 ].join(", ");
 
 /** Sloupce quotes pro QuoteFacts. */
@@ -1977,7 +2092,34 @@ export function flowFactsFromRow(
     assigneeId: textOrNull(r.assignee_id),
     assigneeName: extra.assigneeName ?? null,
     value: numOrNull(r.value),
+    ...productionFactsOf(r),
   };
+}
+
+const PO_STATUS_KEYS: PurchaseOrderStatus[] = ["navrh", "vystavena", "odeslana", "potvrzena", "dodana", "zrusena"];
+
+/** Fakta aktuálního kroku výroby z řádku orders (sloupce production_*; embed pos = stavy objednávek). */
+function productionFactsOf(r: Record<string, unknown>): Partial<FlowFacts> {
+  const out: Partial<FlowFacts> = {};
+  if ("production_step" in r) out.productionStep = textOrNull(r.production_step);
+  if ("production_location" in r) out.productionLocation = textOrNull(r.production_location);
+  if ("production_step_no" in r) out.productionStepNo = numOrNull(r.production_step_no);
+  if ("production_due" in r) out.productionDue = textOrNull(r.production_due);
+  if ("production_due_state" in r) out.productionDueState = textOrNull(r.production_due_state);
+  if ("production_po_status" in r) {
+    const p = r.production_po_status;
+    out.productionPoStatus = typeof p === "string" && (PO_STATUS_KEYS as string[]).includes(p) ? (p as PurchaseOrderStatus) : null;
+  }
+  if ("production_end" in r) out.productionEnd = textOrNull(r.production_end);
+  if ("production_final_end" in r) out.productionFinalEnd = textOrNull(r.production_final_end);
+  if ("due_date" in r) out.dueDate = textOrNull(r.due_date);
+  if ("customer_required_date" in r) out.customerRequiredDate = textOrNull(r.customer_required_date);
+  if (Array.isArray(r.pos)) {
+    const st = (r.pos as { status?: unknown }[]).map((p) => p?.status);
+    out.openPurchaseOrders = st.filter((s) => s === "vystavena" || s === "odeslana" || s === "potvrzena").length;
+    out.deliveredPurchaseOrders = st.filter((s) => s === "dodana").length;
+  }
+  return out;
 }
 
 export function quoteFactsFromRow(r: Record<string, unknown>): QuoteFacts {

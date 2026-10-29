@@ -18,6 +18,9 @@ import {
   reasonRequired, stageEffect, stageEffectText, transitionFeature, type FlowFacts, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import type { JobStage } from "@/lib/supabase/database.types";
+import { stageMoveIntent } from "@/lib/jobs/production-handoff";
+import type { HandoffKind } from "@/lib/jobs/production-handoff-types";
+import { ProductionHandoffDialog } from "@/components/jobs/production/handoff/handoff-dialog";
 import { cn } from "@/lib/utils";
 
 /** Tok zakázky včetně volitelných kroků (sklad, montáž) v pořadí knihy. */
@@ -64,6 +67,13 @@ export function StageCorrectionDialog({
   // otisk = výchozí stav: po korekci se musí změnit (jinak pojistka stránku načte znovu)
   const settle = useSettledRefresh(250, `${jobId}:${from}`);
   const [remote, setRemote] = React.useState<{ to: JobStage; lines: string[]; error?: string } | null>(null);
+  const [openedFrom, setOpenedFrom] = React.useState<JobStage | null>(open ? from : null);
+  // „Přesunout i tak" u zakázky bez objednávky zákazníka: korekce postaru (hlídání předání je zatím vypnuté)
+  const [legacy, setLegacy] = React.useState(false);
+  React.useEffect(() => {
+    if (open) setOpenedFrom((f) => f ?? from);
+    else { setOpenedFrom(null); setLegacy(false); }
+  }, [open, from]);
   const local = React.useMemo(() => {
     if (!to || !flow) return null;
     return stageEffectText(stageEffect({ ...flow, stage: from }, quotes ?? [], { kind: "stage", to }));
@@ -82,6 +92,54 @@ export function StageCorrectionDialog({
   }, [open, to, flow, jobId]);
 
   if (!to) return null;
+  // přesun do / z / přes výrobu: povinné předání (kdo + termín), ukončení, zápis výroby nebo vrácení.
+  // Výchozí stav platí z chvíle otevření — po předání se stránka obnoví (stav = cíl) a otevřený
+  // dialog (výsledek předání) se nesmí přepnout na obyčejnou korekci „Ve výrobě → Ve výrobě“.
+  const intent = stageMoveIntent(openedFrom ?? from, to, {
+    openSteps: flow ? Math.max(0, (flow.productionTotal ?? 0) - (flow.productionDone ?? 0)) : 1,
+    doneSteps: flow?.productionDone ?? 0,
+    deliveredPurchaseOrders: flow?.deliveredPurchaseOrders ?? 0,
+  });
+  if (intent.kind === "blocked" && !legacy) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent aria-describedby={undefined} className="w-[calc(100%-1.5rem)] sm:max-w-md">
+          <div className="space-y-3 p-5">
+            <DialogTitle className="pr-8">Do výroby teď předat nejde</DialogTitle>
+            <p className="text-sm text-muted-foreground" role="alert">
+              {intent.code === "NO_CUSTOMER_ORDER"
+                ? "Zákazník ještě neobjednal — nejdřív zapiš objednávku zákazníka."
+                : "Uzavřenou zakázku nelze předat do výroby — nejdřív ji obnov."}
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {/* hlídání předání je zatím vypnuté (majitel 29. 10.) — přesun postaru jde, zapíše se do historie */}
+              <button type="button" onClick={() => setLegacy(true)} data-testid="stage-legacy-move"
+                className="inline-flex h-11 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground sm:h-10">
+                Přesunout i tak (bez předání)
+              </button>
+              <button type="button" onClick={() => onOpenChange(false)} className="inline-flex h-11 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-accent sm:h-10">Rozumím</button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+  if (intent.kind !== "none" && intent.kind !== "blocked") {
+    const kind: HandoffKind = intent.kind;
+    return (
+      <ProductionHandoffDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        jobId={jobId}
+        kind={kind}
+        target={intent.kind === "predani" ? null : to}
+        onDone={(d) => {
+          onDone?.(d.stage ?? to);
+          settle();
+        }}
+      />
+    );
+  }
   const needsReason = reasonRequired("job", to);
   const loading = !flow && (!remote || remote.to !== to);
   const lines = local ?? (remote?.to === to ? remote.lines : []);

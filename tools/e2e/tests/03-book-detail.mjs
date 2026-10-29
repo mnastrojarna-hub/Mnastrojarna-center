@@ -695,27 +695,40 @@ await T("detail: další krok „Potvrdit objednávku“ (obchodník) → DB sta
   await shot(page, S("21-detail-history-stage"));
 });
 
-await T("detail: StageSelect (zaměstnanec) → Korekce stavu s náhledem → Ve výrobě, Historie ukáže jméno účtu", async (context) => {
+await T("detail: StageSelect (zaměstnanec) → Ve výrobě = předání do výroby (kdo + termín), Historie ukáže jméno účtu", async (context) => {
   const page = await context.newPage();
   const before = sql(`select status || '|' || stage_changed_at from orders where id = ${lit(D1.id)}`).split("|");
   await openJob(page, USERS.dilna, D1);
   await page.waitForTimeout(1100);
   await header(page).getByRole("button", { name: /^Stav zakázky: / }).click();
   await page.getByRole("menuitem", { name: /^Ve výrobě/ }).click();
-  const dlg = page.getByRole("dialog");
-  await dlg.waitFor({ timeout: 10_000 });
-  expect((await dlg.innerText()).includes(`Korekce stavu: ${STAGE_LABELS[before[0]]} → Ve výrobě`), "dialog korekce s náhledem");
-  await dlg.getByRole("textbox").fill(`E2E korekce ${TAG}`);
-  await dlg.getByRole("button", { name: "Změnit na Ve výrobě" }).click();
-  await header(page).getByRole("button", { name: "Stav zakázky: Ve výrobě — změnit" }).waitFor({ timeout: 15_000 });
+  // přesun do výroby = povinné předání: komu to zadávám a do kdy (WP3)
+  const dlg = page.locator('[data-testid="handoff-dialog"]');
+  await dlg.locator('[data-testid="handoff-submit"]').waitFor({ timeout: 20_000 });
+  expect((await dlg.innerText()).includes("komu to zadáváš a do kdy"), "dialog předání do výroby");
+  await dlg.getByRole("button", { name: "U nás" }).first().click();
+  const due = sql(`select (current_date + 7)::text`);
+  await dlg.locator('input[type="date"]').first().fill(due);
+  await dlg.getByLabel("Poznámka k předání (nepovinné)").fill(`E2E korekce ${TAG}`);
+  await dlg.locator('[data-testid="handoff-submit"]').click();
+  // s upozorněním (např. zakázka bez cen) zůstane výsledek předání otevřený → [Hotovo]
+  await eventually(async () => {
+    if (await dlg.locator('[data-testid="handoff-result"]').count()) await dlg.getByRole("button", { name: "Hotovo" }).click();
+    expect((await dlg.count()) === 0, "dialog předání zavřený");
+  });
+  await header(page).getByRole("button", { name: "Stav zakázky: Ve výrobě — změnit" }).waitFor({ timeout: 20_000 });
   await eventually(async () => {
     const r = sql(`select status || '|' || (stage_changed_at > ${lit(before[1])}::timestamptz) || '|' || stage_changed_by || '|' || stage_changed_via from orders where id = ${lit(D1.id)}`);
-    expect(r === `ve_vyrobe|true|${ID.dilna}|rucne`, `DB po korekci: ${r}`);
+    expect(r === `ve_vyrobe|true|${ID.dilna}|rucne`, `DB po předání: ${r}`);
   });
   const ev = sql(`select message || '|' || actor_id || '|' || actor_name from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
-  expect(ev === `Stav: ${STAGE_LABELS[before[0]]} → Ve výrobě — E2E korekce ${TAG}|${ID.dilna}|Jana Zaměstnanec`, `událost: ${ev}`);
+  // změna stavu nese poznámku předání; kdo + termín je v souhrnu předání („Předáno do výroby: 1) … U nás …")
+  expect(ev.startsWith(`Stav: ${STAGE_LABELS[before[0]]} → Ve výrobě`) && ev.includes(`E2E korekce ${TAG}`) && ev.endsWith(`|${ID.dilna}|Jana Zaměstnanec`), `událost: ${ev}`);
+  const ho = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(D1.id)} and message like 'Předáno do výroby:%' order by created_at desc limit 1`);
+  expect(ho.includes("U nás") && ho.endsWith(`|${ID.dilna}`), `souhrn předání (kdo + termín) se jménem: ${ho}`);
   await openTab(page, "Historie");
-  const li = historyItem(page, "Jana Zaměstnanec");
+  // předání zapíše víc událostí (stav, souhrn předání, start kroku) — změna stavu je jedna z nich
+  const li = page.locator('main [role=tabpanel][data-state=active] ol > li').filter({ hasText: "Jana Zaměstnanec" }).filter({ hasText: "Ve výrobě" }).first();
   await li.waitFor({ timeout: 10_000 });
   expect((await li.innerText()).includes("Ve výrobě"), "Historie: Jana → Ve výrobě");
 });
@@ -860,7 +873,9 @@ await T("detail: záložky a ?tab= (Nákup & marže jen s právem marží)", asy
   const page = await context.newPage();
   await openJob(page, USERS.obchod, D5, "?tab=nakup");
   let tabs = (await page.getByRole("tab").allInnerTexts()).map((t) => t.split("\n")[0]);
-  expect(JSON.stringify(tabs) === JSON.stringify(["Přehled", "Výroba", "Položky", "Nabídky", "Nákup & marže", "Dokumenty", "Historie"]), `záložky obchodníka: ${tabs.join(", ")}`);
+  // „Výroba" se jmenuje „Technologie" (majitel 29. 10.); „Komunikace" (Pošta B) jen když je nasazená
+  const expectedTabs = ["Přehled", "Technologie", "Položky", "Nabídky", "Nákup & marže", "Dokumenty", ...(tabs.includes("Komunikace") ? ["Komunikace"] : []), "Historie"];
+  expect(JSON.stringify(tabs) === JSON.stringify(expectedTabs), `záložky obchodníka: ${tabs.join(", ")}`);
   expect((await tabSel(page)) === "Nákup & marže", "?tab=nakup → Nákup & marže");
   await shot(page, S("25-detail-tab-nakup"));
   await page.goto(`${BASE}/orders/${D5.id}?tab=historie`);
@@ -879,7 +894,7 @@ await T("detail: záložky a ?tab= (Nákup & marže jen s právem marží)", asy
   expect((await tabSel(p2)) === "Přehled", "?tab=nakup bez práva → Přehled");
   await p2.goto(`${BASE}/orders/${D5.id}?tab=vyroba`);
   await detailReady(p2);
-  await eventually(async () => expect((await tabSel(p2)) === "Výroba", "?tab=vyroba → Výroba"));
+  await eventually(async () => expect((await tabSel(p2)) === "Technologie", "?tab=vyroba → Technologie"));
   await p2.goto(`${BASE}/orders/${D5.id}?tab=nesmysl`);
   await detailReady(p2);
   await eventually(async () => expect((await tabSel(p2)) === "Přehled", "neplatná záložka → Přehled"));
@@ -1080,7 +1095,8 @@ await T("mobil 390 px: karta zakázky — všechny záložky bez přetékání",
   await openJob(page, USERS.obchod, D5);
   await expectNoOverflow(page, "detail mobil");
   await shot(page, S("31-mobile-detail"));
-  for (const t of ["Výroba", "Položky", "Nabídky", "Nákup & marže", "Dokumenty", "Historie"]) {
+  const present = (await page.getByRole("tab").allInnerTexts()).map((x) => x.split("\n")[0]);
+  for (const t of ["Technologie", "Položky", "Nabídky", "Nákup & marže", "Dokumenty", ...(present.includes("Komunikace") ? ["Komunikace"] : []), "Historie"]) {
     await page.getByRole("tab", { name: new RegExp(`^${t.replace("&", "\\&")}`) }).click();
     await eventually(async () => expect((await tabSel(page)) === t, `záložka ${t}`));
     await page.waitForTimeout(300);

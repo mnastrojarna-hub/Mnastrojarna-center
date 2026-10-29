@@ -134,6 +134,19 @@ export interface JobItem {
   deliveryClosedReason?: string | null;
   /** Materiál, hmotnost, TZ / PÚ z výkresu (štítky v Položkách); null = výkres nic neuvádí. */
   spec?: DrawingSpecView | null;
+  /** Technologie (záložka Technologie): postup technologa, kompletní dodávka, poznámka pro dodavatele. */
+  tech?: JobItemTech;
+}
+
+/** Technologie položky (migrace 20261029140000). */
+export interface JobItemTech {
+  /** Technologický postup (volný text technologa); nepovinný při kompletní dodávce. */
+  procedure: string | null;
+  /** „Bez technologie — kompletně zadáno {firma}". */
+  complete: boolean;
+  completeBy: string | null;
+  /** Poznámka pro dodavatele — tiskne se do objednávky u položky a do e-mailu. */
+  supplierNote: string | null;
 }
 
 export interface JobQuoteItem {
@@ -335,7 +348,8 @@ export interface JobDetail extends JobListItem {
   events: JobEvent[];
 }
 
-export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date";
+/** „krok" = krok výroby po termínu nebo ohrožený konečný termín (zákazník). */
+export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date" | "krok";
 /**
  * Platba faktury (podrobný stav paymentKey): čeká na úhradu / částečně zaplaceno / po splatnosti /
  * zaplaceno; „nezaplaceno" = vše kromě zaplaceno (vč. po splatnosti).

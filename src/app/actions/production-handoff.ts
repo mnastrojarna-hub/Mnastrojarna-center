@@ -9,9 +9,12 @@ import type { JobsDb } from "@/lib/jobs/events";
 import { isUuid, translateDbError } from "@/lib/jobs/mapping";
 import {
   buildHandoffPlan, deriveHandoffKind, ensureHandoffDocumentsCore, loadHandoffContext, productionHandoffCore, purchaseOrderMode,
-  sendQueuedPurchaseOrder, usableMailbox, type HandoffActor,
+  purchaseOrderSender, recordPhoneQuoteCore, sendQueuedPurchaseOrder, type HandoffActor,
 } from "@/lib/jobs/production-handoff-store";
-import { HANDOFF_KINDS, type HandoffErrorCode, type HandoffInput, type HandoffIssue, type HandoffKind, type HandoffPlan, type HandoffResult } from "@/lib/jobs/production-handoff-types";
+import {
+  HANDOFF_KINDS, type HandoffErrorCode, type HandoffInput, type HandoffIssue, type HandoffKind, type HandoffPlan, type HandoffResult,
+  type PhoneQuoteInput, type WhoSuggestion,
+} from "@/lib/jobs/production-handoff-types";
 import { isJobStage } from "@/lib/jobs/stages";
 import type { PurchaseOrderMail } from "@/lib/jobs/purchasing-types";
 import type { JobStage } from "@/lib/supabase/database.types";
@@ -58,7 +61,7 @@ function revalidateHandoff(jobId: string) {
 /** Předvyplněný plán dialogu (jen čtení). Bez práva na marže žádné ceny. */
 export async function prepareProductionHandoff(
   jobId: string,
-  opts: { kind?: HandoffKind; operationId?: string; existingPurchaseOrderId?: string; target?: JobStage } = {},
+  opts: { kind?: HandoffKind; operationId?: string; existingPurchaseOrderId?: string; target?: JobStage; route?: string } = {},
 ): Promise<ActionResult<{ plan: HandoffPlan; code?: HandoffErrorCode }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -67,6 +70,7 @@ export async function prepareProductionHandoff(
   if (opts?.operationId !== undefined && !isUuid(opts.operationId)) return fail("Krok nenalezen.");
   if (opts?.existingPurchaseOrderId !== undefined && !isUuid(opts.existingPurchaseOrderId)) return fail("Objednávka nenalezena.");
   if (opts?.target !== undefined && !isJobStage(opts.target)) return fail("Neplatný cílový stav.");
+  if (opts?.route !== undefined && (typeof opts.route !== "string" || opts.route.length > 120)) return fail("Neplatný postup.");
   try {
     const ctx = await loadHandoffContext(c.db, jobId);
     if (!ctx) return fail("Zakázka nenalezena.");
@@ -74,9 +78,13 @@ export async function prepareProductionHandoff(
       const derived = deriveHandoffKind(ctx.job.status, ctx.ops);
       if ("error" in derived) return fail(derived.error, derived.code);
     }
-    const [mode, box] = await Promise.all([purchaseOrderMode(c.db), c.actor.margins ? usableMailbox(c.db, c.user.id) : Promise.resolve(null)]);
+    // odkud objednávka odejde: schránka obchodníka zakázky, jinak moje (stejně jako každé odeslání)
+    const [mode, box] = await Promise.all([
+      purchaseOrderMode(c.db),
+      c.actor.margins ? purchaseOrderSender(c.db, { id: c.user.id }, ctx.job.ownerId) : Promise.resolve(null),
+    ]);
     const plan = buildHandoffPlan(ctx, {
-      ...opts, margins: c.actor.margins, mailAll: c.actor.mailAll, actorId: c.user.id, automationMode: mode, senderEmail: box?.email ?? null,
+      ...opts, margins: c.actor.margins, mailAll: c.actor.mailAll, actorId: c.user.id, automationMode: mode, senderEmail: box?.mailboxEmail ?? null,
     });
     return { ok: true, plan };
   } catch (err) {
@@ -190,6 +198,25 @@ export async function sendStepPurchaseOrder(purchaseOrderId: string, mail?: Part
     revalidateHandoff(po.job_id);
     revalidatePath("/sent");
     return { ok: true, sent: true, ...(res.emailId ? { emailId: res.emailId } : {}) };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * „Nabídka telefonem" v dialogu předání: firma (z adresáře / nová), cena (jen obchodník / admin),
+ * lhůta nebo datum dodání, poznámka → nabídka dodavatele (zdroj „telefon"), kterou krok i objednávka použijí.
+ */
+export async function recordPhoneQuote(jobId: string, input: PhoneQuoteInput): Promise<ActionResult<{ quoteId: string; suggestion: WhoSuggestion }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(jobId)) return fail("Zakázka nenalezena.");
+  if (!input || typeof input !== "object") return fail("Neplatná nabídka.");
+  try {
+    const res = await recordPhoneQuoteCore(c.db, { id: c.user.id, margins: c.actor.margins }, jobId, input);
+    if (!res.ok) return fail(res.error);
+    revalidateHandoff(jobId);
+    return { ok: true, quoteId: res.quoteId, suggestion: res.suggestion };
   } catch (err) {
     return fail(err);
   }

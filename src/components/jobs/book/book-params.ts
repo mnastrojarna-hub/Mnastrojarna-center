@@ -92,6 +92,7 @@ export const DEADLINE_FILTERS: { key: JobDeadlineFilter; label: string }[] = [
   { key: "week", label: "Do 7 dní" },
   { key: "month", label: "Tento měsíc" },
   { key: "no_date", label: "Bez termínu" },
+  { key: "krok", label: "Krok výroby po termínu nebo ohrožený konečný termín" },
 ];
 
 export const PAYMENT_FILTERS: { key: JobPaymentFilter; label: string }[] = [

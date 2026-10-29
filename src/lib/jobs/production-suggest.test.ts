@@ -513,3 +513,39 @@ describe("drobnosti z review", () => {
     expect(familyScopeOf("tepelne_zpracovani", [PRIRUBA, { ...POUZDRO, heatTreatment: "kalit" }])).toBeNull(); // všechny
   });
 });
+
+describe("review WP3: spotřebovaná nabídka a objednávka podle návrhu", () => {
+  it("Výroba → TZ → Výroba u Nováka: nabídka 1. kroku se pro druhé obrábění nenabízí jako nejlevnější — stejná firma bez ceny", () => {
+    const r = suggestWhoForStep({
+      step: { kind: "vyroba" }, quotes: [NOVAK, TEPKAL], ctx: CTX, canSeePrices: true,
+      usedQuotes: { novak: "krok 1 (Výroba 1)" },
+    });
+    expect(r.primary).toMatchObject({
+      source: "posledni_operace", who: { type: "supplier", id: "sup-novak" }, supplierQuoteId: null, price: null,
+      reason: "Stejná firma jako krok 1 (Výroba 1) — cena dle nové nabídky",
+    });
+    expect([r.primary, ...r.alternatives].some((s) => s?.supplierQuoteId === "novak")).toBe(false);
+    // jiná volná nabídka vyhraje „Nejlevnější"; stejná firma zůstane alternativou bez ceny
+    const r2 = suggestWhoForStep({
+      step: { kind: "vyroba" }, quotes: [NOVAK, LEVNA_PROSLA, { ...HRUBY, operationKinds: ["vyroba"], selected: false }], ctx: CTX, canSeePrices: true,
+      usedQuotes: { novak: "krok 1 (Výroba 1)" },
+    });
+    expect(r2.primary).toMatchObject({ source: "nejlevnejsi_nabidka", supplierQuoteId: "hruby" });
+    expect(r2.alternatives.find((a) => a.who.type === "supplier" && a.who.id === "sup-novak")).toMatchObject({ supplierQuoteId: null, price: null });
+    // nabídka na jiný druh (kalírna) „stejnou firmu" nenabízí
+    expect(suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [TEPKAL], ctx: CTX, canSeePrices: true, usedQuotes: { tepkal: "krok 2" } }).primary).toBeNull();
+  });
+
+  it("návrh nese objednávku, kterou by vystavil: celková cena za víc dílů = položky bez ceny (náhled neslíbí částku)", () => {
+    const total = quote({ id: "tel", supplierName: "Telefon CNC", operationKinds: ["vyroba"], total: 9_800, items: [
+      { drawingNumber: "PR-7075-20", name: "Příruba", quantity: 200, unit: "ks", unitPrice: null, note: null },
+      { drawingNumber: "PR-7075-21", name: "Pouzdro", quantity: 100, unit: "ks", unitPrice: null, note: null },
+    ] });
+    const r = suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [total], ctx: CTX, canSeePrices: true });
+    expect(r.primary).toMatchObject({ supplierQuoteId: "tel", price: 9_800, order: { itemCount: 2, unpriced: 2, total: null } });
+    const n = suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [NOVAK], ctx: CTX, canSeePrices: true });
+    expect(n.primary?.order).toEqual({ itemCount: 2, unpriced: 0, total: 12_200 });
+    // bez práva na ceny bez částky
+    expect(suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [NOVAK], ctx: CTX, canSeePrices: false }).primary?.order).toEqual({ itemCount: 2, unpriced: 0, total: null });
+  });
+});

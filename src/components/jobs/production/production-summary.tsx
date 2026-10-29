@@ -4,13 +4,14 @@ import * as React from "react";
 import { AlertTriangle, ArrowRight, Check, CircleCheckBig, Clock, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OPERATION_KINDS } from "@/lib/jobs/operations";
-import { operationDisplayName, summarizeOperations } from "@/lib/jobs/production";
+import { operationDisplayName, stepLabel, summarizeOperations } from "@/lib/jobs/production";
+import { DeadlineChip } from "./handoff/deadline-chip";
 import type { JobOperation } from "@/lib/jobs/production-types";
 import { cn } from "@/lib/utils";
 import { useProduction } from "./production-context";
 import {
   currentOperation, dayLabel, lastNoteLine, operationStatusStamp, overdueOperations, plannedState, primaryAction,
-  problemOperations, progressSegments, upcomingOperation, type ChangedByFields, type ProgressSegment,
+  problemOperations, progressSegments, stepAction, stepCounterOf, upcomingOperation, type ChangedByFields, type ProgressSegment,
 } from "./production-helpers";
 import { useOperationActions } from "./use-operation-actions";
 
@@ -61,10 +62,24 @@ export function ProgressBar({ segments, labels = true }: { segments: ProgressSeg
   );
 }
 
-function CurrentAction({ op }: { op: JobOperation }) {
+function CurrentAction({ op, label }: { op: JobOperation; label: string }) {
+  const { ops, stage, open } = useProduction();
   const { advance, advancing, busy } = useOperationActions(op);
   const pa = primaryAction(op.status);
-  if (!pa) return null;
+  const action = stage ? stepAction(op, ops, stage) : pa ? { mode: "advance" as const, ...pa } : null;
+  if (!action) return null;
+  if (action.mode === "handoff") {
+    return (
+      <Button
+        type="button"
+        onClick={() => open({ type: "handoff", kind: action.kind, operationId: action.operationId })}
+        className="h-12 w-full gap-2 bg-rose-600 text-base font-semibold text-white shadow-md hover:bg-rose-700 sm:h-11 sm:w-auto sm:px-6"
+        data-testid="summary-handoff"
+      >
+        <ArrowRight /> {action.label}
+      </Button>
+    );
+  }
   return (
     <Button
       type="button"
@@ -72,11 +87,11 @@ function CurrentAction({ op }: { op: JobOperation }) {
       disabled={busy}
       className={cn(
         "h-12 w-full gap-2 text-base font-semibold shadow-md sm:h-11 sm:w-auto sm:px-6",
-        pa.next === "probiha" ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-success text-success-foreground hover:bg-success/90",
+        action.next === "probiha" ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-success text-success-foreground hover:bg-success/90",
       )}
     >
-      {advancing ? <Loader2 className="animate-spin" /> : pa.next === "probiha" ? <Play className="fill-current" /> : <Check strokeWidth={3} />}
-      {pa.next === "probiha" ? `Začít: ${op.label}` : `Hotovo: ${op.label}`}
+      {advancing ? <Loader2 className="animate-spin" /> : action.next === "probiha" ? <Play className="fill-current" /> : <Check strokeWidth={3} />}
+      {action.next === "probiha" ? `Začít: ${label}` : `Hotovo: ${label}`}
     </Button>
   );
 }
@@ -86,7 +101,7 @@ function CurrentAction({ op }: { op: JobOperation }) {
  * průběhu, hlavní tlačítko pro aktuální operaci, problémy a zpoždění.
  */
 export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
-  const { today, events } = useProduction();
+  const { today, events, finalDate } = useProduction();
   const summary = summarizeOperations(ops);
   const segments = progressSegments(ops);
   const current = currentOperation(ops);
@@ -129,8 +144,9 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
             {finished ? (
               <p className="text-lg font-bold leading-tight text-green-700 dark:text-green-400 sm:text-xl">Výroba hotová ✓</p>
             ) : current ? (
-              <p className="break-words text-lg font-bold leading-tight sm:text-xl">
-                {current.label}
+              <p className="break-words text-lg font-bold leading-tight sm:text-xl" data-testid="production-now">
+                {stepCounterOf(current, ops) && <span className="font-semibold text-muted-foreground">{stepCounterOf(current, ops)} · </span>}
+                {stepLabel(current, ops)}
                 {current.location !== "—" && <span className="font-semibold text-muted-foreground"> · {current.location}</span>}
               </p>
             ) : (
@@ -147,7 +163,18 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
                   ].filter(Boolean).join(" · ")}
                 </span>
               )}
-              {!finished && planned && (
+              {!finished && current?.plannedEnd ? (
+                <DeadlineChip
+                  compact
+                  op={{
+                    plannedEnd: current.plannedEnd, endsAtCustomerDate: current.endsAtCustomerDate, deadlineState: current.deadlineState ?? null,
+                    deadlineSource: current.deadlineSource ?? null, inHouse: current.inHouse, location: current.location, status: current.status,
+                    purchaseOrder: current.purchaseOrder ? { number: current.purchaseOrder.number, status: current.purchaseOrder.status, confirmedDate: current.purchaseOrder.confirmedDate } : null,
+                  }}
+                  finalDate={finalDate ?? null}
+                  today={today}
+                />
+              ) : !finished && planned && (
                 <span className={cn("inline-flex items-center gap-1 font-medium", planned.tone === "overdue" && "text-red-600 dark:text-red-400", (planned.tone === "today" || planned.tone === "soon") && "text-amber-700 dark:text-amber-400")}>
                   <Clock className="h-3 w-3" /> {planned.text}
                 </span>
@@ -191,7 +218,7 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
 
         {!finished && current && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CurrentAction op={current} />
+            <CurrentAction op={current} label={stepLabel(current, ops)} />
             {upcoming && upcoming.id !== current.id && (
               <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                 <ArrowRight className="h-3.5 w-3.5 shrink-0" /> Pak:

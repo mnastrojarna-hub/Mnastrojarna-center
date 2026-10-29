@@ -4,6 +4,8 @@ import * as React from "react";
 import type { OperationKind } from "@/lib/jobs/operations";
 import type { JobOperation } from "@/lib/jobs/production-types";
 import type { JobEvent } from "@/lib/jobs/types";
+import type { HandoffKind } from "@/lib/jobs/production-handoff-types";
+import type { JobStage } from "@/lib/supabase/database.types";
 import { useJobDetail } from "@/components/jobs/detail/detail-context";
 
 /**
@@ -18,7 +20,18 @@ export type DialogState =
   | { type: "delete"; op: JobOperation }
   | { type: "template"; key: string }
   | { type: "complete" }
+  /** Předání do výroby (kdo + termín + objednávka) — všechny druhy. */
+  | { type: "handoff"; kind?: HandoffKind; operationId?: string; existingPurchaseOrderId?: string; target?: JobStage | null; replan?: boolean }
   | null;
+
+/** Co smí uživatel v předání do výroby (ceny, potvrzení termínu, odeslání objednávek). */
+export interface HandoffAccess {
+  canSeePrices: boolean;
+  canConfirmCustomerDate: boolean;
+  canReceive: boolean;
+  canSend: boolean;
+  canCancelSent: boolean;
+}
 
 export interface ProductionCtxValue {
   jobId: string;
@@ -33,6 +46,14 @@ export interface ProductionCtxValue {
   canDeleteAll: boolean;
   userId: string | null;
   open: (d: DialogState) => void;
+  /** Stav zakázky (předání do výroby / posun / ukončení). */
+  stage?: JobStage;
+  /** Práva předání (bez nich žádné ceny ani odeslání). */
+  permissions?: HandoffAccess | null;
+  /** Konečný termín (zákazník). */
+  finalDate?: { date: string | null; source: "due_date" | "customer_required_date" | null; maxTolerated: string | null } | null;
+  /** Díly zakázky (rozsah kroku „Díly: 1 ze 2"). */
+  items?: { id: string; drawingNumber: string | null; name: string | null }[];
 }
 
 const ProductionContext = React.createContext<ProductionCtxValue | null>(null);

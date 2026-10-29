@@ -20,13 +20,15 @@ export function WhoIcon({ who, className }: { who: WhoValue; className?: string 
 }
 
 export function WhoPicker({
-  value, onChange, suppliers, label = "Kdo to dělá", allowNone = true, startOpen, className, id,
+  value, onChange, suppliers, label = "Kdo to dělá", allowNone = true, noneLabel = "Zatím nevím", startOpen, className, id,
 }: {
   value: WhoValue;
   onChange: (v: WhoValue) => void;
   suppliers: { id: string; name: string }[];
   label?: string;
   allowNone?: boolean;
+  /** Popisek volby „nikdo" (předání: „Rozhodnu, až bude krok na řadě"). */
+  noneLabel?: string;
   /** Otevřít rovnou hledání (nový výběr). */
   startOpen?: boolean;
   className?: string;
@@ -121,7 +123,7 @@ export function WhoPicker({
             onClick={() => pick(WHO_NONE)}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed px-3 text-sm text-muted-foreground transition hover:bg-muted"
           >
-            Zatím nevím
+            {noneLabel}
           </button>
         )}
         {value.type !== "none" && (
@@ -148,7 +150,7 @@ export function WhoPicker({
             onKeyDown={onKey}
             placeholder="Hledej dodavatele, nebo napiš název firmy…"
             autoComplete="off"
-            className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-10 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm"
           />
         </div>
         <ul role="listbox" aria-label="Dodavatelé" className="max-h-48 overflow-y-auto p-1">

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  AlertTriangle, ArrowDown, ArrowUp, Check, CheckCheck, CircleCheck, Clock, FileText, Loader2, MoreHorizontal, Pencil,
+  AlertTriangle, ArrowDown, ArrowRightCircle, ArrowUp, Check, CheckCheck, CircleCheck, Clock, FileText, Loader2, MoreHorizontal, Pencil,
   Play, Plus, RotateCcw, SkipForward, StickyNote, Trash2, Undo2, UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,61 @@ import type { JobOperation } from "@/lib/jobs/production-types";
 import { cn } from "@/lib/utils";
 import { useProduction } from "./production-context";
 import {
-  PLANNED_TONE, STATUS_STAMP, dayLabel, lastNoteLine, operationStatusStamp, operationVisuals, plannedState, primaryAction,
-  stampLabel, whoOfOperation, type ChangedByFields, type OperationVisual,
+  PLANNED_TONE, STATUS_STAMP, dayLabel, isBeforeProduction, lastNoteLine, operationStatusStamp, operationVisuals, plannedState, poChipOf, primaryAction,
+  stampLabel, stepAction, stepCounterOf, whoOfOperation, type ChangedByFields, type OperationVisual,
 } from "./production-helpers";
 import { useOperationActions } from "./use-operation-actions";
 import { WhoIcon } from "./who-picker";
+import { DeadlineChip } from "./handoff/deadline-chip";
+import { performerRole } from "@/lib/jobs/production-handoff";
+import { stepLabel } from "@/lib/jobs/production";
+import { ensureHandoffDocuments, reissueStepPurchaseOrder, sendStepPurchaseOrder } from "@/app/actions/production-handoff";
+import { useRunner } from "./production-context";
+
+const PO_TONE: Record<"amber" | "green" | "grey" | "red" | "lime", string> = {
+  amber: "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200",
+  green: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
+  grey: "bg-muted text-muted-foreground",
+  red: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+  lime: "bg-lime-50 text-lime-800 dark:bg-lime-500/10 dark:text-lime-300",
+};
+
+/** Objednávka kroku: stav + jedno tlačítko (Odeslat / vystavit znovu / vytvořit PDF) pro obchodníka / admina. */
+function PoChip({ op, chip, canSend }: { op: JobOperation; chip: NonNullable<ReturnType<typeof poChipOf>>; canSend: boolean }) {
+  const { run, isBusy } = useRunner();
+  const key = `po:${op.id}`;
+  const busy = isBusy(key);
+  const po = op.purchaseOrder;
+  const pdfMissing = canSend && po && !po.fileId && po.status !== "zrusena" && op.handoffId;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1" data-testid="step-po">
+      <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium", PO_TONE[chip.tone])} title="Naše objednávka dodavateli">
+        <FileText className="h-3 w-3 shrink-0" /> {chip.text}
+      </span>
+      {canSend && po?.fileId && (
+        <a href={`/api/jobs/files/${po.fileId}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-sky-700 hover:underline dark:text-sky-400">PDF</a>
+      )}
+      {canSend && chip.action === "send" && po && (
+        <button type="button" disabled={busy} onClick={() => void run(key, () => sendStepPurchaseOrder(po.id), { success: `Objednávka ${po.number ?? ""} odeslána dodavateli.` })}
+          className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Odeslat
+        </button>
+      )}
+      {canSend && chip.action === "reissue" && (
+        <button type="button" disabled={busy} onClick={() => void run(key, () => reissueStepPurchaseOrder(op.id), { success: (r) => `Vystavena nová objednávka ${(r as { number?: string }).number ?? ""}.` })}
+          className="inline-flex h-7 items-center rounded-md border px-2 text-[11px] font-semibold hover:bg-accent disabled:opacity-60">
+          Vystavit znovu
+        </button>
+      )}
+      {pdfMissing && (
+        <button type="button" disabled={busy} onClick={() => void run(key, () => ensureHandoffDocuments(op.jobId, op.handoffId as string), { success: "PDF objednávky vytvořeno." })}
+          className="inline-flex h-7 items-center rounded-md border px-2 text-[11px] font-semibold hover:bg-accent disabled:opacity-60">
+          PDF chybí — vytvořit
+        </button>
+      )}
+    </span>
+  );
+}
 
 /**
  * Postup výroby jako linka metra: vlevo kolej s barevnými stanicemi (hotovo =
@@ -71,18 +121,28 @@ function Station({ op, visual }: { op: JobOperation; visual: OperationVisual }) 
 }
 
 function OperationItem({ op, index, count, visual }: { op: JobOperation; index: number; count: number; visual: OperationVisual }) {
-  const { today, open, events } = useProduction();
+  const { today, open, events, ops, stage, finalDate, items, permissions } = useProduction();
   const { advance, advancing, busy } = useOperationActions(op);
+  const action = stage ? stepAction(op, ops, stage) : (() => { const p = primaryAction(op.status); return p ? { mode: "advance" as const, ...p } : null; })();
+  const counter = stepCounterOf(op, ops);
+  const title = stepLabel(op, ops);
+  const role = performerRole(op, ops);
+  const po = poChipOf(op, today);
+  const scoped = op.orderItemIds && items && items.length ? items.filter((i) => op.orderItemIds!.includes(i.id)) : null;
+  const deadlineStamp = op.deadlineChangedBy && op.deadlineChangedAt ? stampLabel("termín", { name: op.deadlineChangedBy.name, at: op.deadlineChangedAt }, today) : null;
   const stamp = operationStatusStamp(events, op as JobOperation & ChangedByFields);
   const by = stamp
-    ? stampLabel(stamp.auto ? "Navázalo samo · spustil" : STATUS_STAMP[op.status], stamp, today)
+    ? stampLabel(
+        stamp.auto ? "Navázalo samo · spustil" : op.status === "ceka" && !op.startedAt ? "Naplánoval" : STATUS_STAMP[op.status],
+        stamp,
+        today,
+      )
     : op.createdBy
       ? `Přidal ${op.createdBy.name}${dayLabel(op.createdAt, today) ? ` · ${dayLabel(op.createdAt, today)}` : ""}`
       : null;
   const m = OPERATION_KINDS[op.kind];
   const st = OPERATION_STATUSES[op.status];
   const StIcon = st.icon;
-  const pa = primaryAction(op.status);
   const planned = plannedState(op, today);
   const who = whoOfOperation(op);
   const note = lastNoteLine(op.note);
@@ -111,8 +171,8 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{index + 1}.</span>
-              <h4 className={cn("min-w-0 break-words text-[15px] font-semibold leading-tight", visual === "skipped" && "line-through")}>{op.label}</h4>
+              <span className="text-[11px] font-bold tabular-nums text-muted-foreground">{counter ?? `${index + 1}.`}</span>
+              <h4 className={cn("min-w-0 break-words text-[15px] font-semibold leading-tight", visual === "skipped" && "line-through")}>{title}</h4>
               {op.title && (
                 <span className={cn("inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10.5px] font-medium", m.badge)}>
                   <m.icon className="h-3 w-3" /> {m.short}
@@ -141,22 +201,39 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
                 <span className="inline-flex min-w-0 items-center gap-1.5 font-medium">
                   <WhoIcon who={who} className="h-4 w-4 shrink-0" />
                   <span className="truncate">{op.location}</span>
+                  {role && role !== "u nás" && <span className="text-[11px] font-normal text-muted-foreground">({role})</span>}
                   {who.type === "free" && <span className="text-[11px] font-normal text-muted-foreground">mimo adresář</span>}
                 </span>
               )}
-              {op.purchaseOrderNumber && (
-                <span className="inline-flex items-center gap-1 rounded bg-lime-50 px-1.5 py-0.5 font-mono text-[11px] text-lime-800 dark:bg-lime-500/10 dark:text-lime-300" title="Naše objednávka dodavateli">
-                  <FileText className="h-3 w-3" /> {op.purchaseOrderNumber}
-                </span>
-              )}
+              {po && <PoChip op={op} chip={po} canSend={Boolean(permissions?.canSend)} />}
             </div>
+            {scoped && scoped.length < (items?.length ?? 0) && (
+              <p className="mt-1 text-[11.5px] text-muted-foreground">
+                Díly: {scoped.length} ze {items!.length} ({scoped.map((i) => i.drawingNumber || i.name || "díl").join(", ")})
+              </p>
+            )}
           </div>
           <OperationMenu op={op} index={index} count={count} />
         </div>
 
-        {(planned || from || started || finished) && (
+        {op.plannedEnd && op.status !== "hotovo" && op.status !== "preskoceno" && (
+          <div className="mt-2" data-testid="step-deadline">
+            <DeadlineChip
+              op={{
+                plannedEnd: op.plannedEnd, endsAtCustomerDate: op.endsAtCustomerDate, deadlineState: op.deadlineState ?? null,
+                deadlineSource: op.deadlineSource ?? null, inHouse: op.inHouse, location: op.location, status: op.status,
+                deadlineChangedBy: op.deadlineChangedBy ?? null, deadlineChangedAt: op.deadlineChangedAt ?? null,
+                purchaseOrder: op.purchaseOrder ? { number: op.purchaseOrder.number, status: op.purchaseOrder.status, confirmedDate: op.purchaseOrder.confirmedDate } : null,
+              }}
+              finalDate={finalDate ?? null}
+              today={today}
+            />
+            {deadlineStamp && <p className="mt-0.5 text-[10.5px] text-muted-foreground">{deadlineStamp}</p>}
+          </div>
+        )}
+        {(from || started || finished || (planned && (op.status === "hotovo" || op.status === "preskoceno"))) && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-            {planned && (
+            {planned && (op.status === "hotovo" || op.status === "preskoceno") && (
               <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold", PLANNED_TONE[planned.tone])}>
                 <Clock className="h-3 w-3" /> {planned.text}
               </span>
@@ -198,21 +275,27 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
           </p>
         )}
 
-        {pa && (
+        {action && (
           <div className="mt-3 flex">
             <Button
               type="button"
-              onClick={() => void advance()}
+              onClick={() => {
+                if (action.mode === "handoff") open({ type: "handoff", kind: action.kind, operationId: action.operationId });
+                else void advance();
+              }}
               disabled={busy}
+              data-testid={action.mode === "handoff" ? "step-handoff" : "step-advance"}
               className={cn(
                 "h-11 w-full gap-2 text-base font-semibold shadow-sm sm:h-10 sm:w-auto sm:px-5 sm:text-sm",
-                pa.next === "probiha"
-                  ? "bg-amber-500 text-white hover:bg-amber-600"
-                  : "bg-success text-success-foreground hover:bg-success/90",
+                action.mode === "handoff"
+                  ? "bg-rose-600 text-white hover:bg-rose-700"
+                  : action.next === "probiha"
+                    ? "bg-amber-500 text-white hover:bg-amber-600"
+                    : "bg-success text-success-foreground hover:bg-success/90",
               )}
             >
-              {advancing ? <Loader2 className="animate-spin" /> : pa.next === "probiha" ? <Play className="fill-current" /> : <Check strokeWidth={3} />}
-              {pa.label}
+              {advancing ? <Loader2 className="animate-spin" /> : action.mode === "handoff" ? <ArrowRightCircle /> : action.next === "probiha" ? <Play className="fill-current" /> : <Check strokeWidth={3} />}
+              {action.label}
             </Button>
           </div>
         )}
@@ -222,10 +305,13 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
 }
 
 function OperationMenu({ op, index, count }: { op: JobOperation; index: number; count: number }) {
-  const { open, canDeleteAll, userId } = useProduction();
+  const { open, canDeleteAll, userId, stage } = useProduction();
   const { setStatus, move, busy } = useOperationActions(op);
   const canDelete = canDeleteAll || (userId ? canDeleteOwnOperation({ created_by: op.createdBy?.id ?? null, created_at: op.createdAt }, userId) : false);
   const s = op.status;
+  // před výrobou by krok „Probíhá / Hotovo / Problém" zakázku sám přesunul do výroby (bez kdo a termínu):
+  // místo toho dialog předání (kdo + termín + objednávka) nebo zápis výroby (už hotovo)
+  const pre = Boolean(stage && isBeforeProduction(stage));
 
   return (
     <DropdownMenu>
@@ -236,17 +322,27 @@ function OperationMenu({ op, index, count }: { op: JobOperation; index: number; 
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="truncate">{op.label}</DropdownMenuLabel>
-        {s === "ceka" && (
+        {s === "ceka" && pre && (
+          <>
+            <DropdownMenuItem onSelect={() => open({ type: "handoff", kind: "predani" })} data-testid="step-menu-handoff">
+              <ArrowRightCircle className="!text-rose-600" /> Předat do výroby…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => open({ type: "handoff", kind: "zaznam", target: "dodano_k_nam" })} data-testid="step-menu-record">
+              <CircleCheck className="!text-green-600" /> Už vyrobeno — zapsat výrobu…
+            </DropdownMenuItem>
+          </>
+        )}
+        {s === "ceka" && !pre && (
           <DropdownMenuItem onSelect={() => void setStatus("hotovo")}>
             <CircleCheck className="!text-green-600" /> Rovnou hotovo
           </DropdownMenuItem>
         )}
-        {s === "problem" && (
+        {s === "problem" && !pre && (
           <DropdownMenuItem onSelect={() => void setStatus("probiha")}>
             <RotateCcw className="!text-amber-600" /> Problém vyřešen — pokračuje
           </DropdownMenuItem>
         )}
-        {s === "hotovo" && (
+        {s === "hotovo" && !pre && (
           <DropdownMenuItem onSelect={() => void setStatus("probiha")}>
             <Undo2 /> Vrátit — ještě probíhá
           </DropdownMenuItem>
@@ -256,7 +352,7 @@ function OperationMenu({ op, index, count }: { op: JobOperation; index: number; 
             <Clock /> Vrátit na Čeká
           </DropdownMenuItem>
         )}
-        {(s === "ceka" || s === "probiha") && (
+        {(s === "probiha" || (s === "ceka" && !pre)) && (
           <DropdownMenuItem onSelect={() => open({ type: "note", op, mode: "problem" })} className="text-red-600 focus:text-red-700 dark:text-red-400">
             <AlertTriangle className="!text-current" /> Nahlásit problém…
           </DropdownMenuItem>

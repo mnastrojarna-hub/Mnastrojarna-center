@@ -17,6 +17,14 @@ const JOB = "d0000000-0000-0000-0000-000000000006"; // Z-2026-106, ve výrobě
 const HRUBY = "d4000000-0000-0000-0000-000000000001";
 const OWNER = "156c7996-b488-4c53-a3f5-e51dd004f4ad"; // Petr Obchodník (obchodnik, 10 %)
 const MAIL_TO = `e2e-dodavatel-${Date.now()}@local.test`;
+// data relativně k dnešku (pevná data v minulosti → 400 „Požadovaný termín … je v minulosti")
+const isoPlus = (days: number) => {
+  const d = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date())}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+const QUOTE_DATE = isoPlus(-9);
+const QUOTE_DELIVERY = isoPlus(5); // datum nabídky + 14 dní
 
 function loadEnv(): Record<string, string> {
   const file = path.resolve(process.cwd(), ".local-supabase/env");
@@ -153,7 +161,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
 
   it("nabídky dodavatelů: založení, dopočet termínu a ceny, vítěz", async () => {
     const r1 = await a.createSupplierQuote(JOB, {
-      supplierId: HRUBY, number: "NAB-E2E-1", quoteDate: "2026-10-20", leadTimeDays: 14,
+      supplierId: HRUBY, number: "NAB-E2E-1", quoteDate: QUOTE_DATE, leadTimeDays: 14,
       items: [{ drawingNumber: "E2E-100", name: "Hřídel E2E", material: "C45", quantity: 10, unitPrice: 2500 }],
     });
     expect(r1).toMatchObject({ ok: true });
@@ -164,7 +172,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     expect((await a.createSupplierQuote(JOB, { supplierName: "X", items: [] })).error).toBe("Zadej položky nebo celkovou cenu nabídky.");
 
     const { data: q } = await db.from("supplier_quotes").select("total, delivery_date, created_by").eq("id", r1.id!).single();
-    expect(q).toMatchObject({ total: 25000, delivery_date: "2026-11-03", created_by: OWNER });
+    expect(q).toMatchObject({ total: 25000, delivery_date: QUOTE_DELIVERY, created_by: OWNER });
 
     expect((await a.selectWinningSupplierQuote(r2.id!)).ok).toBe(true);
     expect((await a.selectWinningSupplierQuote(r1.id!)).ok).toBe(true);
@@ -183,7 +191,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     const dr = await a.draftPurchaseOrder(JOB);
     expect(dr.ok).toBe(true);
     const d = dr.draft!;
-    expect(d).toMatchObject({ supplierId: HRUBY, supplierQuoteId: quoteIds[0], itemsSource: "nabidka_dodavatele", total: 24_000, requiredDate: "2026-11-03" });
+    expect(d).toMatchObject({ supplierId: HRUBY, supplierQuoteId: quoteIds[0], itemsSource: "nabidka_dodavatele", total: 24_000, requiredDate: QUOTE_DELIVERY });
     expect(d.supplier?.email).toBe("objednavky@hruby-cnc.cz");
     expect(d.deliveryAddress).toContain("\n");
     expect(d.note).toContain("Z-2026-106");
@@ -235,8 +243,10 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
 
     const dr = await a.draftPurchaseOrder(JOB, { supplierQuoteId: quoteIds[1] });
     expect(dr.draft).toMatchObject({ supplierId: null, supplierName: "Brusírna E2E", itemsSource: "zakazka" });
+    // termín z konečného termínu zakázky ze seedu může být už v minulosti → náhled s termínem za 2 týdny
+    const draft = { ...dr.draft!, requiredDate: dr.draft!.requiredDate && dr.draft!.requiredDate >= isoPlus(0) ? dr.draft!.requiredDate : isoPlus(14) };
     const post = await route.POST(
-      new Request("http://localhost/api/pdf/purchase-order/draft", { method: "POST", body: JSON.stringify({ jobId: JOB, draft: dr.draft }) }),
+      new Request("http://localhost/api/pdf/purchase-order/draft", { method: "POST", body: JSON.stringify({ jobId: JOB, draft }) }),
       { params: Promise.resolve({ id: "draft" }) },
     );
     expect(post.status).toBe(200);
@@ -275,9 +285,9 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
 
   it("potvrzení dodavatelem → slíbený termín v zakázce; dodání → Dodáno k nám", async () => {
     expect((await a.updatePurchaseOrder(poId, { status: "dodana", confirmedDate: "x" })).error).toBe("Neplatné datum.");
-    const r = await a.updatePurchaseOrder(poId, { status: "potvrzena", confirmedDate: "2026-11-05", supplierReference: "POT-777" });
+    const r = await a.updatePurchaseOrder(poId, { status: "potvrzena", confirmedDate: isoPlus(7), supplierReference: "POT-777" });
     expect(r.ok, r.error).toBe(true);
-    expect((await job()).supplier_promised_date).toBe("2026-11-05");
+    expect((await job()).supplier_promised_date).toBe(isoPlus(7));
     expect((await a.updatePurchaseOrder(poId, { status: "odeslana" })).error).toMatch(/Stav nelze změnit/);
 
     const del = await a.updatePurchaseOrder(poId, { status: "dodana" });

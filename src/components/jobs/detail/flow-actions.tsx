@@ -14,6 +14,10 @@ import { StagePickerDialog } from "@/components/jobs/stage-select";
 import { ConfirmOrderDialog, MismatchList } from "@/components/flow/confirm-order-dialog";
 import { DeliveryDialog } from "@/components/jobs/production/delivery-dialog";
 import { PaymentDialog } from "@/components/jobs/production/payment-dialog";
+import { ProductionHandoffDialog } from "@/components/jobs/production/handoff/handoff-dialog";
+import { DeliveryAfterFinish } from "@/components/jobs/production/handoff/delivery-finish";
+import { productionLabel } from "@/lib/jobs/operations";
+import { SupplierNoticeDialog, type NoticePurchaseOrder } from "@/components/jobs/purchasing/supplier-notice-dialog";
 import { canUndoDirect, decideProposal, isDirectAction, runDirectAction, undoDirectAction, type DirectResult } from "@/components/jobs/flow-direct";
 import {
   decideOrderChange, proposeFlowChange, registerOrderChange, requestOrderFix, setInquiryStatus, setOrderStatus,
@@ -98,6 +102,7 @@ const TAB_OF: Partial<Record<FlowActionKey, DetailTab>> = {
   "quote.create": "nabidky",
   "quote.edit": "nabidky",
   "production.plan": "vyroba",
+  "production.sendPo": "vyroba",
   "delivery.confirmNote": "vyroba",
   "payment.invoice": "vyroba",
 };
@@ -121,13 +126,17 @@ function approvedToastOf(q: JobQuote | null): string {
 }
 
 export function FlowActionsProvider({
-  job, stamps, revisions, access, setTab, initialAction, children,
+  job, stamps, revisions, access, setTab, initialAction, purchaseOrders, productionRunning, children,
 }: {
+  /** Běží teď krok výroby? („Posunout dál…" vs. „Předat do kroku…") — z postupu na kartě. */
+  productionRunning?: boolean | null;
   job: JobDetail;
   stamps: JobStamps | null;
   revisions?: OrderRevision[];
   access?: FlowAccess | null;
   setTab: (tab: DetailTab) => void;
+  /** Objednávky dodavatelům (storno / pozastavení u dodavatelů) — jen s právem na nákup. */
+  purchaseOrders?: NoticePurchaseOrder[];
   /** Akce z odkazu (?akce=…) — otevře se po načtení. */
   initialAction?: string | null;
   children: React.ReactNode;
@@ -153,7 +162,10 @@ export function FlowActionsProvider({
     withReturn: true,
   }), [features, userId, role, job.assignee, job.owner]);
 
-  const facts = React.useMemo(() => (job.flow ? { ...job.flow, stage: job.stage } : null), [job.flow, job.stage]);
+  const facts = React.useMemo(
+    () => (job.flow ? { ...job.flow, stage: job.stage, ...(productionRunning === undefined ? {} : { productionRunning }) } : null),
+    [job.flow, job.stage, productionRunning],
+  );
   const quotes = React.useMemo(() => job.flowQuotes ?? [], [job.flowQuotes]);
   const snapshot = React.useMemo(() => (facts ? deriveFlow(facts, quotes, pragueToday()) : null), [facts, quotes]);
   const next = facts && snapshot ? nextAction(facts, snapshot, ctx) : null;
@@ -260,6 +272,7 @@ export function FlowActionsProvider({
           revisions={revisions ?? []}
           quote={quoteOf(dialog.quoteId)}
           margins={perms.margins}
+          purchaseOrders={purchaseOrders ?? []}
           onClose={close}
           onDone={done}
           onSwitch={(key) => setDialog({ key, quoteId: dialog.quoteId })}
@@ -305,7 +318,7 @@ interface ReasonConfig {
 }
 
 function FlowDialog({
-  state, job, facts, quotes, revisions, quote, margins, onClose, onDone, onSwitch, setTab,
+  state, job, facts, quotes, revisions, quote, margins, purchaseOrders, onClose, onDone, onSwitch, setTab,
 }: {
   state: { key: FlowActionKey; quoteId?: string };
   job: JobDetail;
@@ -314,6 +327,7 @@ function FlowDialog({
   revisions: OrderRevision[];
   quote: JobQuote | null;
   margins: boolean;
+  purchaseOrders: NoticePurchaseOrder[];
   onClose: (open: boolean) => void;
   onDone: (message: string) => void;
   onSwitch: (key: FlowActionKey) => void;
@@ -521,6 +535,20 @@ function FlowDialog({
     case "delivery.record":
     case "delivery.closeShort":
     case "delivery.partialNote":
+      // ve výrobě s otevřenými kroky: nejdřív „Ukončit výrobu" (kroky, neodeslané objednávky), pak dodání (C.3)
+      if (key === "delivery.record" && job.stage === "ve_vyrobe" && (facts.productionTotal ?? 0) > (facts.productionDone ?? 0)
+        && facts.productionStep && facts.productionStep !== "hotovo") {
+        return (
+          <DeliveryAfterFinish
+            jobId={jobId}
+            items={job.items}
+            stepLabel={productionLabel(facts.productionStep, facts.productionLocation ?? null)}
+            onClose={onClose}
+            onDone={onDone}
+            onSplitItems={() => setTab("polozky")}
+          />
+        );
+      }
       return (
         <DeliveryDialog
           open
@@ -550,6 +578,34 @@ function FlowDialog({
     case "job.correct":
       return (
         <StagePickerDialog open onOpenChange={onClose} jobId={jobId} stage={job.stage} flow={facts} quotes={quotes} onDone={() => onDone("Stav opraven.")} />
+      );
+    case "production.handoff":
+    case "production.advance":
+    case "production.finish":
+    case "production.replan":
+    case "production.undo":
+      // předání do výroby: povinně kdo + termín, objednávka dodavateli se vystaví sama
+      return (
+        <ProductionHandoffDialog
+          open
+          onOpenChange={onClose}
+          jobId={jobId}
+          kind={key === "production.advance" ? "dalsi_krok" : key === "production.finish" ? "ukonceni" : key === "production.replan" ? "plan" : key === "production.undo" ? "zpet" : undefined}
+          replan={key === "production.replan"}
+          target={key === "production.undo" ? "potvrzeno" : null}
+          onDone={(d) => onDone(d.message)}
+        />
+      );
+    case "purchasing.notifySuppliers":
+      return (
+        <SupplierNoticeDialog
+          open
+          onOpenChange={onClose}
+          jobId={jobId}
+          kind={job.stage === "pozastaveno" ? "hold" : "cancel"}
+          purchaseOrders={purchaseOrders}
+          onDone={onDone}
+        />
       );
     case "proposal.decide":
       return facts.proposal ? (

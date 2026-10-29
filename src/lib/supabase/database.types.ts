@@ -526,6 +526,11 @@ export interface OrderItem {
   heat_steps: Record<string, unknown>[] | null;
   surface_steps: Record<string, unknown>[] | null;
   spec_sources: Record<string, "ai" | "rucne">;
+  // Technologie položky (migrace 20261029140000)
+  tech_procedure?: string | null;
+  tech_complete?: boolean;
+  tech_complete_by?: string | null;
+  supplier_note?: string | null;
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
@@ -943,7 +948,7 @@ export interface SupplierQuoteRow {
   selected: boolean;
   note: string | null;
   file_id: string | null;
-  source: "manual" | "foto" | "email" | "ai";
+  source: "manual" | "foto" | "email" | "ai" | "telefon";
   created_by: string | null;
   created_at: string;
   updated_at: string;

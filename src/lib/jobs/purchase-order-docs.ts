@@ -9,7 +9,7 @@ import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { cleanText, isUuid, jobFilePath, one, personRef, type PersonEmbed } from "@/lib/jobs/mapping";
 import {
   ourDeliveryAddressOf, parseEmailList, purchaseOrderCancelEmail, purchaseOrderChangeEmail, purchaseOrderEmail,
-  purchaseOrderFileName, purchaseOrderHoldEmail,
+  purchaseOrderFileName, purchaseOrderHoldEmail, supplierNotesOfItems,
 } from "@/lib/jobs/purchasing";
 import type { PurchaseItem, PurchaseOrderMail, PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import type { PurchaseItemRowInput } from "@/lib/jobs/purchasing";
@@ -210,7 +210,11 @@ export type PoMailKind = "issue" | "change" | "cancel" | "hold";
 /** Návrh e-mailu dodavateli s podpisem skutečného odesílatele (jméno, telefon, e-mail z profilu). */
 export async function purchaseOrderMailFor(
   db: JobsDb,
-  po: Pick<PurchaseOrderView, "number" | "supplierQuote" | "requiredDate" | "confirmedDate" | "supplier"> & { revision?: number | null },
+  po: Pick<PurchaseOrderView, "number" | "supplierQuote" | "requiredDate" | "confirmedDate" | "supplier"> & {
+    revision?: number | null;
+    /** Položky (poznámky pro dodavatele → souhrn v e-mailu). */
+    items?: Pick<PurchaseOrderView["items"][number], "drawingNumber" | "name" | "note">[];
+  },
   signerId: string | null,
   kind: PoMailKind = "issue",
   extra: { previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null } = {},
@@ -231,7 +235,10 @@ export async function purchaseOrderMailFor(
       ? purchaseOrderCancelEmail({ ...sender, reason: extra.reason })
       : kind === "hold"
         ? purchaseOrderHoldEmail({ ...sender, reason: extra.reason })
-        : purchaseOrderEmail({ ...sender, supplierQuoteNumber: po.supplierQuote?.number, requiredDate: po.confirmedDate ?? po.requiredDate, drawingsSeparately: !po.supplierQuote });
+        : purchaseOrderEmail({
+          ...sender, supplierQuoteNumber: po.supplierQuote?.number, requiredDate: po.confirmedDate ?? po.requiredDate, drawingsSeparately: !po.supplierQuote,
+          itemNotes: supplierNotesOfItems(po.items ?? []),
+        });
   return { to: po.supplier?.email ?? "", ...mail, attachmentName: purchaseOrderFileName(po.number) };
 }
 

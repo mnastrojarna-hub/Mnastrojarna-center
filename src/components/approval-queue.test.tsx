@@ -33,4 +33,28 @@ describe("Fronta schvalování — oba autoři (kdo připravil, kdo vyřídil)",
     expect(html).toContain("připravil ✨ AI");
     expect(html).toContain("text-red-700");
   });
+
+  it("objednávka dodavateli: odkud odejde, PDF, zakázka, „Odeslat objednávku“ / „Zamítnout“, e-mail (bez procent AI)", () => {
+    const html = renderToString(
+      <ApprovalQueue
+        initialItems={[{
+          id: "p1", rawType: "purchase_order", type: "Objednávka dodavateli", title: "Objednávka OV-2026-012 — Frézy Novák s.r.o.",
+          summary: "Výroba 1 · požadovaný termín 13. 11.", target: "obchod@frezy-novak.cz", body: "Dobrý den,\nv příloze…", createdAt: iso(3),
+          aiConfidence: 0.9, proposedBy: "Petr Obchodník",
+          purchaseOrder: { id: "po1", number: "OV-2026-012", fileId: "f1", jobId: "j1", senderEmail: "obchod@mnastrojarna.cz", kind: "issue" },
+        }]}
+      />,
+    ).replace(/<!-- -->/g, "");
+    expect(html).toContain("Objednávka OV-2026-012 — Frézy Novák s.r.o.");
+    expect(html).toContain("Výroba 1 · požadovaný termín 13. 11.");
+    expect(html).toContain("připravil Petr Obchodník");
+    expect(html).toContain("Odešle se z: <span class=\"font-medium text-foreground\">obchod@mnastrojarna.cz</span>");
+    expect(html).toContain("/api/jobs/files/f1");
+    expect(html).toContain("Otevřít PDF");
+    expect(html).toContain("/orders/j1?tab=vyroba");
+    expect(html).toContain("Odeslat objednávku");
+    expect(html).toContain("Zamítnout");
+    expect(html).toContain("Zobrazit e-mail");
+    expect(html).not.toContain("90 %");
+  });
 });
