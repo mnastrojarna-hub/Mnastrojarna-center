@@ -1,0 +1,24 @@
+{
+  "supplier": {
+    "name": "E2E Kalírna Nová s.r.o.", "ico": "27999990", "dic": "CZ27999990", "street": "Tovární 5", "city": "Zlín", "zip": "76001",
+    "country": "CZ", "email": "info@e2e-kalirna.cz", "phone": "+420 577 000 222", "contactPerson": "Petr Nový", "bankAccount": "CZ6508000000192000145399"
+  },
+  "number": "2026-7001",
+  "variableSymbol": "20267001",
+  "issueDate": "2026-10-20",
+  "taxableDate": "2026-10-20",
+  "dueDate": "2026-11-03",
+  "currency": "CZK",
+  "totalNet": 4000,
+  "totalVat": 840,
+  "totalGross": 4840,
+  "items": [
+    { "text": "Kalení vakuově 58 HRC", "code": "", "quantity": 20, "unit": "kg", "unitPrice": 200, "amount": 4000, "vatRate": 21, "refs": [] }
+  ],
+  "references": { "purchaseOrderNumbers": [], "jobNumbers": [], "customerOrderNumbers": [], "deliveryNoteNumbers": [], "drawingNumbers": [] },
+  "isCreditNote": false,
+  "isProforma": false,
+  "confidence": 0.9,
+  "summary": "Kalení.",
+  "needsClarification": []
+}

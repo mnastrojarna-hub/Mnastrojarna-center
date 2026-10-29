@@ -28,6 +28,8 @@ export const ACCOUNTS = [
   { user: "pop@pop3only.test", pass: "Pop3-Heslo-1", imap: false, pop3: true },
   { user: "kolega@mnastrojarna.test", pass: "Kolega-Heslo-1", imap: true, pop3: true },
   { user: "cert@jinycert.test", pass: "Cert-Heslo-1", imap: true, pop3: true },
+  // E2E 18 (Pošta A): vlastní schránka v Můj účet, stažení celé schránky, odpovědi, Odeslané
+  { user: "posta@nastrojarstvi.test", pass: "Posta-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {
@@ -64,6 +66,54 @@ function makeMessages(user) {
     );
     return { uid: i + 1, raw, date, from: m.from, subject: subj, to: user, messageId: `<e2e-${i + 1}.${user.replace(/[^a-z0-9]/gi, "")}@${domain}>` };
   });
+}
+
+/** Zpráva z RFC 822 zdroje (APPEND do Odeslaných): hlavičky pro ENVELOPE. */
+function messageFromRaw(raw, uid) {
+  const text = raw.toString("latin1");
+  const end = text.search(/\r?\n\r?\n/);
+  const head = (end >= 0 ? text.slice(0, end) : text).replace(/\r?\n[ \t]+/g, " ");
+  const h = {};
+  for (const line of head.split(/\r?\n/)) {
+    const i = line.indexOf(":");
+    if (i > 0) { const k = line.slice(0, i).trim().toLowerCase(); if (!(k in h)) h[k] = line.slice(i + 1).trim(); }
+  }
+  const date = h.date ? new Date(h.date) : new Date();
+  return {
+    uid, raw, date: Number.isNaN(date.getTime()) ? new Date() : date,
+    from: h.from ?? "", subject: h.subject ?? "", to: (h.to ?? "").split(",")[0]?.trim() ?? "", messageId: h["message-id"] ?? `<append-${uid}@test>`,
+  };
+}
+
+/**
+ * Nová zpráva (UTF-8 předmět i jméno jako encoded-word; volitelně In-Reply-To / References a přílohy
+ * jako multipart/mixed s base64).
+ */
+function buildMessage(user, uid, { subject, body = "Text", from = "Nový <novy@zakaznik.test>", inReplyTo, references, attachments = [], date = new Date(), messageId, cc }) {
+  const enc = (s) => (/[^\x20-\x7e]/.test(s) ? `=?UTF-8?B?${Buffer.from(s).toString("base64")}?=` : s);
+  const fromEnc = from.replace(/^([^<]+)</, (_, name) => `${enc(name.trim())} <`);
+  const id = messageId ?? `<e2e-new-${uid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test>`;
+  const head = [
+    `Message-ID: ${id}`, `Date: ${date.toUTCString().replace("GMT", "+0000")}`, `From: ${fromEnc}`, `To: ${user}`,
+    ...(cc ? [`Cc: ${cc}`] : []), `Subject: ${enc(subject)}`,
+    ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`] : []), ...(references ? [`References: ${references}`] : []), "MIME-Version: 1.0",
+  ];
+  let raw;
+  if (attachments.length) {
+    const b = `b-${uid}-${Date.now()}`;
+    const parts = [
+      `--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n${body}\r\n`,
+      ...attachments.map((a) => {
+        const b64 = Buffer.from(a.content).toString("base64").replace(/.{1,76}/g, "$&\r\n");
+        return `--${b}\r\nContent-Type: ${a.contentType ?? "application/octet-stream"}; name="${a.filename}"\r\nContent-Disposition: attachment; filename="${a.filename}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}`;
+      }),
+      `--${b}--\r\n`,
+    ];
+    raw = Buffer.from([...head, `Content-Type: multipart/mixed; boundary="${b}"`, "", parts.join("")].join("\r\n"), "utf8");
+  } else {
+    raw = Buffer.from([...head, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: 8bit", "", body, ""].join("\r\n"), "utf8");
+  }
+  return { uid, raw, date, from: fromEnc, subject: enc(subject), to: user, messageId: id };
 }
 
 // ── Certifikáty ─────────────────────────────────────────────
@@ -120,6 +170,7 @@ class Conn {
     for (;;) {
       if (this.literal) {
         if (this.buf.length < this.literal.need) return;
+        this.lastLiteral = Buffer.from(this.buf.subarray(0, this.literal.need)); // APPEND: zpráva beze změny
         const lit = this.buf.subarray(0, this.literal.need).toString("utf8");
         this.buf = this.buf.subarray(this.literal.need);
         this.literal.parts.push(JSON.stringify(lit));
@@ -209,9 +260,18 @@ function imapDate(d) {
   return `${p(d.getUTCDate())}-${mon}-${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())} +0000`;
 }
 
-function imapHandler(state, mailboxes, events) {
+/** Složka účtu: INBOX, nebo „Sent" (SPECIAL-USE \Sent — sem ukládá aplikace kopie odeslaných přes APPEND). */
+function folderOf(name) {
+  const n = String(name ?? "").replace(/^"|"$/g, "");
+  if (n.toUpperCase() === "INBOX") return "INBOX";
+  if (n === "Sent") return "Sent";
+  return null;
+}
+
+function imapHandler(state, mailboxes, events, sentBoxes) {
   const caps = (conn) =>
     `IMAP4rev1 ID NAMESPACE${conn.secure ? "" : " STARTTLS LOGINDISABLED"}`;
+  const box = (folder = state.folder) => (folder === "Sent" ? sentBoxes.get(state.user) : mailboxes.get(state.user));
   return (line, conn) => {
     const sp = line.indexOf(" ");
     const tag = sp < 0 ? line : line.slice(0, sp);
@@ -258,19 +318,36 @@ function imapHandler(state, mailboxes, events) {
         if (!state.user) return conn.write(`${tag} NO not authenticated\r\n`);
         const [, pattern] = tokenize(rest);
         if (pattern === "") conn.write('* LIST (\\Noselect) "." ""\r\n');
-        else conn.write('* LIST (\\HasNoChildren) "." INBOX\r\n');
+        else {
+          conn.write('* LIST (\\HasNoChildren) "." INBOX\r\n');
+          conn.write('* LIST (\\HasNoChildren \\Sent) "." Sent\r\n');
+        }
         return ok();
+      }
+      case "APPEND": {
+        if (!state.user) return conn.write(`${tag} NO not authenticated\r\n`);
+        const [name] = tokenize(rest);
+        const folder = folderOf(name);
+        if (!folder) return conn.write(`${tag} NO [TRYCREATE] Mailbox does not exist\r\n`);
+        const raw = conn.lastLiteral ?? Buffer.alloc(0);
+        const list = box(folder);
+        const uid = (list.at(-1)?.uid ?? 0) + 1;
+        list.push(messageFromRaw(raw, uid));
+        events.push({ type: "append", user: state.user, folder, uid, size: raw.length });
+        return conn.write(`${tag} OK [APPENDUID 1700000000 ${uid}] APPEND completed\r\n`);
       }
       case "SELECT": case "EXAMINE": case "STATUS": {
         if (!state.user) return conn.write(`${tag} NO not authenticated\r\n`);
         const [name] = tokenize(rest);
-        if (String(name).toUpperCase() !== "INBOX") return conn.write(`${tag} NO [NONEXISTENT] Mailbox does not exist\r\n`);
-        const msgs = mailboxes.get(state.user);
+        const folder = folderOf(name);
+        if (!folder) return conn.write(`${tag} NO [NONEXISTENT] Mailbox does not exist\r\n`);
+        const msgs = box(folder);
         const uidNext = (msgs.at(-1)?.uid ?? 0) + 1;
         if (cmd === "STATUS") {
-          conn.write(`* STATUS INBOX (MESSAGES ${msgs.length} UIDNEXT ${uidNext} UIDVALIDITY 1700000000 UNSEEN 0)\r\n`);
+          conn.write(`* STATUS ${folder} (MESSAGES ${msgs.length} UIDNEXT ${uidNext} UIDVALIDITY 1700000000 UNSEEN 0)\r\n`);
           return ok();
         }
+        state.folder = folder;
         state.selected = true;
         conn.write(`* FLAGS (\\Seen \\Answered \\Flagged \\Deleted \\Draft)\r\n* OK [PERMANENTFLAGS ()] ok\r\n* ${msgs.length} EXISTS\r\n* 0 RECENT\r\n`);
         conn.write(`* OK [UIDVALIDITY 1700000000] ok\r\n* OK [UIDNEXT ${uidNext}] ok\r\n`);
@@ -279,18 +356,28 @@ function imapHandler(state, mailboxes, events) {
       case "CLOSE": case "UNSELECT": state.selected = false; return ok();
       case "SEARCH": {
         if (!state.selected) return conn.write(`${tag} NO no mailbox selected\r\n`);
-        const msgs = mailboxes.get(state.user);
+        const msgs = box();
         const t = tokenize(rest);
         const maxUid = msgs.at(-1)?.uid ?? 0;
         let found = msgs.map((m, i) => ({ m, seq: i + 1 }));
         const ui = t.findIndex((x) => String(x).toUpperCase() === "UID");
         if (ui >= 0) found = found.filter(({ m }) => inSet(t[ui + 1], m.uid, maxUid));
+        // HEADER <pole> <hodnota> (dohledání zprávy podle Message-ID)
+        const hi = t.findIndex((x) => String(x).toUpperCase() === "HEADER");
+        if (hi >= 0) {
+          const name = String(t[hi + 1] ?? "").toLowerCase();
+          const value = String(t[hi + 2] ?? "").toLowerCase();
+          found = found.filter(({ m }) => {
+            const head = m.raw.toString("utf8").split(/\r?\n\r?\n/)[0];
+            return head.split(/\r?\n/).some((l) => l.toLowerCase().startsWith(`${name}:`) && l.toLowerCase().includes(value));
+          });
+        }
         conn.write(`* SEARCH${found.map(({ m, seq }) => ` ${uidMode ? m.uid : seq}`).join("")}\r\n`);
         return ok();
       }
       case "FETCH": {
         if (!state.selected) return conn.write(`${tag} NO no mailbox selected\r\n`);
-        const msgs = mailboxes.get(state.user);
+        const msgs = box();
         const set = rest.split(" ")[0];
         const items = rest.slice(set.length + 1).toUpperCase();
         const max = uidMode ? (msgs.at(-1)?.uid ?? 0) : msgs.length;
@@ -455,6 +542,7 @@ function smtpHandler(state, events, sent) {
 export async function startMailTestServer({ dir = path.join(os.tmpdir(), "mnastrojarna-mail-test"), base = 24000, host = "127.0.0.1" } = {}) {
   const certs = ensureCerts(dir);
   const mailboxes = new Map(ACCOUNTS.map((a) => [a.user, makeMessages(a.user)]));
+  const sentBoxes = new Map(ACCOUNTS.map((a) => [a.user, []])); // IMAP složka „Sent" (\Sent), plní ji APPEND
   const events = [];
   const sent = [];
   const servers = [];
@@ -469,7 +557,7 @@ export async function startMailTestServer({ dir = path.join(os.tmpdir(), "mnastr
         sock.on("close", () => sockets.delete(sock));
         if (proto === "blackhole") { sock.on("error", () => {}); return; }
         const state = {};
-        const handler = proto === "imap" ? imapHandler(state, mailboxes, events) : proto === "pop3" ? pop3Handler(state, mailboxes, events) : smtpHandler(state, events, sent);
+        const handler = proto === "imap" ? imapHandler(state, mailboxes, events, sentBoxes) : proto === "pop3" ? pop3Handler(state, mailboxes, events) : smtpHandler(state, events, sent);
         const conn = new Conn(sock, ctx, handler, events, proto);
         events.push({ type: "connect", proto, port, secure: conn.secure });
         conn.write(typeof greet[proto] === "function" ? greet[proto](conn.secure) : greet[proto]);
@@ -506,15 +594,32 @@ export async function startMailTestServer({ dir = path.join(os.tmpdir(), "mnastr
     accounts: ACCOUNTS,
     events,
     sent,
-    /** Přidá zprávu do schránky (test inkrementálního stahování). */
-    addMessage(user, { subject, body = "Text", from = "Nový <novy@zakaznik.test>" }) {
+    /**
+     * Přidá zprávu do INBOXu (test inkrementálního stahování, odpověď zákazníka s In-Reply-To,
+     * příloha). Vrací UID; `lastMessageId` = její Message-ID.
+     */
+    addMessage(user, opts) {
       const list = mailboxes.get(user);
       const uid = (list.at(-1)?.uid ?? 0) + 1;
-      const date = new Date();
-      const messageId = `<e2e-new-${uid}-${Date.now()}@test>`;
-      const raw = Buffer.from(`Message-ID: ${messageId}\r\nDate: ${date.toUTCString()}\r\nFrom: ${from}\r\nTo: ${user}\r\nSubject: ${subject}\r\n\r\n${body}\r\n`);
-      list.push({ uid, raw, date, from, subject, to: user, messageId });
+      const msg = buildMessage(user, uid, opts);
+      list.push(msg);
+      this.lastMessageId = msg.messageId;
       return uid;
+    },
+    lastMessageId: null,
+    /** Hromadně `count` zpráv („Archiv 1"…), data rozložená do minulosti po `stepHours` (fetch-all). */
+    addMessages(user, count, { prefix = "Archiv", stepHours = 6, from = "Archiv <archiv@zakaznik.test>" } = {}) {
+      const list = mailboxes.get(user);
+      const now = Date.now();
+      for (let i = 0; i < count; i++) {
+        const uid = (list.at(-1)?.uid ?? 0) + 1;
+        list.push(buildMessage(user, uid, { subject: `${prefix} ${i + 1}`, body: `Zpráva ${i + 1} z archivu.`, from, date: new Date(now - (count - i) * stepHours * 3600_000) }));
+      }
+      return list.length;
+    },
+    /** Zprávy složky („INBOX" / „Sent") — kontrola kopií odeslaných (APPEND). */
+    folder(user, name = "Sent") {
+      return (name === "Sent" ? sentBoxes.get(user) : mailboxes.get(user)) ?? [];
     },
     async close() {
       for (const s of sockets) s.destroy();
@@ -548,12 +653,41 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dir = path.resolve(arg("--dir", path.join(os.tmpdir(), "mnastrojarna-mail-test")));
   const base = Number(arg("--base", process.env.MAIL_TEST_BASE ?? 24000));
   const srv = await startMailTestServer({ dir, base });
-  // Ovládání pro E2E (jen 127.0.0.1): GET /events (pokusy o přihlášení…), GET /sent (odeslané zprávy)
+  // Ovládání pro E2E (jen 127.0.0.1): GET /events (pokusy o přihlášení…), GET /sent (zprávy přijaté přes SMTP),
+  // GET /folder?user=&name=Sent (složka na IMAP serveru), POST /add?user=&count=&prefix= (hromadně do INBOXu),
+  // POST /message?user= s JSON { subject, body, from, inReplyTo, references, attachments:[{filename, contentType, base64}] }
   const control = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    const body = url.pathname === "/events" ? srv.events : url.pathname === "/sent" ? srv.sent.map(({ from, to, raw }) => ({ from, to, raw: raw.slice(0, 4000) })) : null;
-    res.writeHead(body ? 200 : 404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(body ?? { error: "not found" }));
+    const reply = (code, body) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
+    const user = url.searchParams.get("user") ?? "";
+    if (req.method === "POST" && (url.pathname === "/add" || url.pathname === "/message")) {
+      let data = "";
+      req.on("data", (c) => { data += c; });
+      req.on("end", () => {
+        if (!srv.folder(user, "INBOX").length && !ACCOUNTS.some((a) => a.user === user)) return reply(404, { error: "unknown user" });
+        if (url.pathname === "/add") {
+          const total = srv.addMessages(user, Number(url.searchParams.get("count") ?? 10), { prefix: url.searchParams.get("prefix") ?? "Archiv" });
+          return reply(200, { total });
+        }
+        try {
+          const j = JSON.parse(data || "{}");
+          const attachments = (j.attachments ?? []).map((a) => ({ filename: a.filename, contentType: a.contentType, content: Buffer.from(a.base64 ?? "", "base64") }));
+          const uid = srv.addMessage(user, { ...j, attachments });
+          return reply(200, { uid, messageId: srv.lastMessageId });
+        } catch (err) {
+          return reply(400, { error: String(err) });
+        }
+      });
+      return;
+    }
+    const body = url.pathname === "/events"
+      ? srv.events
+      : url.pathname === "/sent"
+        ? srv.sent.map(({ from, to, raw }) => ({ from, to, raw: raw.slice(0, 4000) }))
+        : url.pathname === "/folder"
+          ? srv.folder(user, url.searchParams.get("name") ?? "Sent").map((m) => ({ uid: m.uid, subject: m.subject, messageId: m.messageId, raw: m.raw.toString("utf8").slice(0, 6000) }))
+          : null;
+    reply(body ? 200 : 404, body ?? { error: "not found" });
   });
   const controlPort = base + 80;
   await new Promise((resolve, reject) => { control.once("error", reject); control.listen(controlPort, "127.0.0.1", resolve); });

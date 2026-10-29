@@ -1,5 +1,8 @@
 // Typy databáze CNC Sales OS (ručně dle supabase/migrations/*).
 // Při změně schématu aktualizuj zde i v migracích.
+import type {
+  SupplierInvoiceAllocationRow, SupplierInvoiceFileRow, SupplierInvoiceItemRow, SupplierInvoiceRow,
+} from "@/lib/supplier-invoices/db-types";
 
 export type UserRole = "super_admin" | "obchodnik" | "zamestnanec";
 export type EmailCategory =
@@ -25,7 +28,9 @@ export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
 export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder"
   // objednávka dodavateli vystavená při předání do výroby (migrace 20261023150000)
-  | "purchase_order";
+  | "purchase_order"
+  // návrh AI, jak rozdělit fakturu dodavatele na zakázky (migrace 20261029110000)
+  | "supplier_invoice";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "edited" | "auto_executed";
 export type MailboxProvider = "outlook" | "imap" | "gmail";
 
@@ -109,6 +114,8 @@ export interface Supplier {
   contact_person: string | null;
   website: string | null;
   address: string | null;
+  /** Bankovní účet z faktury dodavatele (migrace 20261029110000). */
+  bank_account?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -383,6 +390,26 @@ export interface Order {
   production_final_end?: string | null;
   production_finished_at?: string | null;
   production_finished_by?: string | null;
+  /** Sloučeno do jiné zakázky (#24, migrace 20261023161000) — odkaz na zdroj přesměruje na cíl. */
+  merged_into_id?: string | null;
+  merged_at?: string | null;
+  merged_by?: string | null;
+}
+
+/** Sloučení zakázek (idempotence RPC merge_jobs, banner přesměrování; migrace 20261023161000). */
+export interface JobMergeRow {
+  id: string;
+  token: string;
+  target_id: string | null;
+  source_id: string | null;
+  target_number: string;
+  source_number: string;
+  forced: boolean;
+  reason: string | null;
+  result: Json;
+  created_by: string | null;
+  created_via: string | null;
+  created_at: string;
 }
 
 /** Výrobní operace zakázky (migrace 0022). */
@@ -1184,6 +1211,7 @@ export interface Database {
       job_payments: Tbl<JobPaymentRow>;
       job_order_revisions: Tbl<JobOrderRevisionRow>;
       production_handoffs: Tbl<ProductionHandoffRow>;
+      job_merges: Tbl<JobMergeRow>;
       // anonymizace výkresů (migrace 20261023159000)
       drawing_anon_adhoc: Tbl<DrawingAnonAdhocRow>;
       drawing_anon_texts: Tbl<DrawingAnonTextRow>;
@@ -1191,6 +1219,11 @@ export interface Database {
       drawing_anon_usage_log: Tbl<DrawingAnonUsageLogRow>;
       anon_send_queue: Tbl<AnonSendQueueRow>;
       drawing_anon_settings: Tbl<DrawingAnonSettingsRow>;
+      // faktury dodavatelů (migrace 20261029110000)
+      supplier_invoices: Tbl<SupplierInvoiceRow>;
+      supplier_invoice_files: Tbl<SupplierInvoiceFileRow>;
+      supplier_invoice_items: Tbl<SupplierInvoiceItemRow>;
+      supplier_invoice_allocations: Tbl<SupplierInvoiceAllocationRow>;
     };
     Views: {
       job_flow_v: { Row: JobFlowRow; Relationships: [] };
@@ -1212,6 +1245,12 @@ export interface Database {
       /** Dopočet starých dat předání do výroby (idempotentní; jen servisní role). */
       production_handoff_backfill: { Args: Record<string, never>; Returns: undefined };
       production_route_version: { Args: { p_job: string }; Returns: string };
+      /** Sloučení zakázek (#24): náhled a jediná cesta sloučení (atomicky, idempotentně; jen servisní role). */
+      merge_jobs_preview: { Args: { p_target: string; p_source: string }; Returns: Json };
+      merge_jobs: {
+        Args: { p_target: string; p_source: string; p_token: string; p_force?: boolean; p_reason?: string | null };
+        Returns: Json;
+      };
       flow_counts: {
         Args: { p_owner?: string | null; p_closed_days?: number; p_mine?: string | null };
         Returns: { flow_phase: string; flow_key: string; n: number }[];

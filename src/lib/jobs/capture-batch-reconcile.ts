@@ -9,7 +9,7 @@ import type {
 } from "@/lib/jobs/capture-batch-types";
 import {
   BATCH_TYPES, batchStage, batchTypeFor, cleanDrawingNumbers, distinctJobCount, drawingNumbersOf, isBatchDocType, isBusinessType, makeWarning,
-  pagesKey, redactPrices, safeDocNumber, sideOf, uniqueWarnings, validateBatchSort,
+  isSupplierInvoiceType, pagesKey, redactPrices, safeDocNumber, sideOf, uniqueWarnings, validateBatchSort,
 } from "@/lib/jobs/capture-batch";
 import {
   CHIP_FIELDS, MERGE_FIELD_LABELS, REVIEW_FIELDS, REVIEW_FIELD_KEYS, buildExistingTarget, buildNewTarget, chipFor,
@@ -1901,6 +1901,8 @@ export function canAutoApplyBatch(review: BatchReviewModel, summaries: DocExtrac
     if (d.aiType !== d.type) return false;
     const s = summaries.find((x) => x.docId === d.id);
     if (!s || s.status !== "ready") return false;
+    // faktura dodavatele jde do Faktur dodavatelů (rozdělení má vlastní režim automatiky)
+    if (isSupplierInvoiceType(d.type)) continue;
     if (BATCH_TYPES[d.type].form === "business" || BATCH_TYPES[d.type].form === "drawing") {
       if ((s.confidence ?? 0) < AUTO_CONFIDENCE || s.clarifications > 0) return false;
     }
@@ -2124,7 +2126,8 @@ export function sanitizeBatchApplyState(
   if (typeof sort === "string") return { ok: false, error: sort };
   const invalid = validateBatchSort(sort, ctx.pages);
   if (invalid) return { ok: false, error: invalid };
-  const active = sort.docs.filter((d) => !d.excluded);
+  // faktury dodavatelů nejsou ve skupinách zakázek (uloží se do Faktur dodavatelů)
+  const active = sort.docs.filter((d) => !d.excluded && !isSupplierInvoiceType(d.type));
   const activeIds = new Set(active.map((d) => d.id));
 
   const rawDocs = o.docs && typeof o.docs === "object" ? (o.docs as Record<string, unknown>) : {};

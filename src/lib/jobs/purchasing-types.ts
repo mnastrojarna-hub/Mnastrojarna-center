@@ -177,7 +177,9 @@ export interface JobCommissionView {
 }
 
 /** Odkud se bere náklad zakázky; „neuplna" = objednávka dodavateli má položku bez ceny (náklad neznámý). */
-export type PurchaseCostSource = "objednavky" | "odhad" | "neuplna" | null;
+export type PurchaseCostSource = "objednavky" | "odhad" | "neuplna"
+  // objednávky, u kterých fakturu dodavatele nahradila skutečná částka, + faktury bez objednávky (20261029110000)
+  | "faktury" | null;
 
 export interface JobPurchasingTotals {
   /** Objednávka zákazníka bez DPH (orders.value). */
@@ -198,6 +200,8 @@ export interface JobPurchasingTotals {
   unpricedItems?: number;
   /** Jen u „neuplna": čísla objednávek s položkou bez ceny. */
   unpricedPurchaseOrders?: string[];
+  /** Jen u „neuplna": faktury dodavatelů v cizí měně bez kurzu („kurz EUR u faktury dodavatele", 20261029110000). */
+  missingRates?: string[];
 }
 
 /** Nákupní strana zakázky — jen pro roli s právem „margins". */

@@ -9,6 +9,7 @@ import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
 import type { BadgeCounts } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
+import { useMailLive } from "@/components/mail/mail-live-provider";
 
 /**
  * Číslo na „Menu“ (#25): super admin = vše, co čeká na jeho rozhodnutí (AI přehled: fronta AI + nabídky
@@ -39,8 +40,10 @@ export function MobileNav({ features, counts }: { features: Feature[]; counts?: 
   const [menuOpen, setMenuOpen] = React.useState(false);
   const sections = navForFeatures(features);
   const activeHref = activeNavHref(pathname, sections.flatMap((s) => s.items.map((i) => i.href)));
-  const badgeCounts: Record<string, number | undefined> = counts ?? {};
+  const live = useMailLive();
+  const badgeCounts: Record<string, number | undefined> = { ...(counts ?? {}), ...(live.unread !== null ? { inbox: live.unread } : {}) };
   const menuCount = mobileMenuCount(features, counts);
+  const unread = badgeCounts.inbox ?? 0;
 
   React.useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -83,13 +86,15 @@ export function MobileNav({ features, counts }: { features: Feature[]; counts?: 
         {mail && (
           <Link
             href="/inbox"
+            aria-label={unread ? `Pošta — ${unread} nepřečtených` : "Pošta"}
             className={cn(
-              "flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-medium",
+              "relative flex flex-col items-center gap-1 px-3 py-1 text-[10px] font-medium",
               pathname.startsWith("/inbox") ? "text-primary" : "text-muted-foreground",
             )}
           >
             <Inbox className="h-5 w-5" />
             Pošta
+            <CountBadge n={unread} className="absolute -top-0.5 right-0.5 ring-2 ring-background" />
           </Link>
         )}
 

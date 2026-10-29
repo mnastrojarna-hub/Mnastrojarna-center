@@ -144,7 +144,8 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
     }
     const stages = resolveStageFilter(filters);
     const build = () => {
-      let query = s.db.from("orders").select(JOB_LIST_SELECT);
+      // #24: sloučená zakázka (zdroj) žije jen v historii cíle — odkaz na ni přesměruje
+      let query = s.db.from("orders").select(JOB_LIST_SELECT).is("merged_into_id", null);
       if (stages) query = query.in("status", stages);
       if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
       if (filters.assigneeId) query = query.eq("assignee_id", filters.assigneeId);
@@ -187,7 +188,7 @@ export async function listJobOrderRefs(): Promise<Pick<JobListItem, "id" | "numb
   try {
     const { data, error } = await fetchPaged<{ id: string; number: string; customer_order_number: string | null }>(
       (from, to) => s.db.from("orders").select("id, number, customer_order_number")
-        .not("customer_order_number", "is", null)
+        .not("customer_order_number", "is", null).is("merged_into_id", null)
         .order("created_at", { ascending: false }).order("id").range(from, to),
       MAX_ROWS,
     );
@@ -242,7 +243,8 @@ export async function getJobStageCounts(): Promise<JobStageCounts> {
   if (!s) return emptyStageCounts();
   try {
     const { data, error } = await fetchPaged<{ status: string }>(
-      (from, to) => s.db.from("orders").select(JOB_COUNT_SELECT).order("id").range(from, to),
+      // #24: sloučené duplicity se nepočítají (seznam je také nezobrazuje)
+      (from, to) => s.db.from("orders").select(JOB_COUNT_SELECT).is("merged_into_id", null).order("id").range(from, to),
       50_000,
     );
     warn("counts", error);
@@ -464,6 +466,7 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
     const [jobsRes, customersRes] = await Promise.all([
       fetchPaged<MatchJobRow>((from, to) => s.db.from("orders").select(`${MATCH_JOB_SELECT}, supplier_id, supplier_order_number`)
         .neq("status", "zruseno")
+        .is("merged_into_id", null)
         .gte("created_at", since.toISOString())
         .order("created_at", { ascending: false })
         .order("id")

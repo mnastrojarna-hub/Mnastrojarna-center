@@ -192,21 +192,26 @@ describe.skipIf(!hasOpenssl)("pošta — skutečný IMAP/POP3/SMTP server", () =
     expect(srv.events.filter((e) => e.type === "auth").every((e) => e.secure)).toBe(true);
   });
 
-  it("stahování IMAP: první = nejnovější, pak jen nové (UID), časový limit posune stav jen o zpracované", async () => {
+  it("stahování IMAP: celá schránka od nejnovější po dávkách, pak jen nové (UID), časový limit posune stav jen o zpracované", async () => {
     const inc = { ...ep("imap", "127.0.0.1", P("imaps"), "tls"), user: USER, password: PASS };
     const first = await fetchIncoming(inc, USER, {}, 2, { ca });
-    expect(first.emails.map((e) => e.subject)).toEqual(["Objednávka 4500123", "Nabídka materiálu"]);
-    expect(first.emails[0].fromEmail).toBe("eva@firma.test");
-    expect(first.emails[0].body).toMatch(/přírub/);
-    expect(first.stateAfter(2).imap).toEqual({ uidValidity: "1700000000", lastUid: 3 });
-    expect(first.stateAfter(0).imap?.lastUid).toBe(1);
+    expect(first.emails.map((e) => e.subject)).toEqual(["Nabídka materiálu", "Objednávka 4500123"]);
+    expect(first.emails[1].fromEmail).toBe("eva@firma.test");
+    expect(first.emails[1].body).toMatch(/přírub/);
+    expect(first.total).toBe(3);
+    expect(first.remaining).toBe(1);
+    expect(first.stateAfter(2).imap).toEqual({ uidValidity: "1700000000", lastUid: 3, backfillBelow: 2 });
+    expect(first.stateAfter(0).imap).toMatchObject({ lastUid: 3, backfillBelow: 4 });
 
-    const none = await fetchIncoming(inc, USER, first.stateAfter(2), 20, { ca });
+    const older = await fetchIncoming(inc, USER, first.stateAfter(2), 20, { ca });
+    expect(older.emails.map((e) => e.subject)).toEqual(["Poptávka hřídele 50 ks"]);
+    expect(older.remaining).toBe(0);
+    const none = await fetchIncoming(inc, USER, older.stateAfter(1), 20, { ca });
     expect(none.emails).toHaveLength(0);
 
     srv.addMessage(USER, { subject: "Nová poptávka" });
     srv.addMessage(USER, { subject: "Druhá nová" });
-    const fresh = await fetchIncoming(inc, USER, first.stateAfter(2), 1, { ca });
+    const fresh = await fetchIncoming(inc, USER, older.stateAfter(1), 1, { ca });
     expect(fresh.emails.map((e) => e.subject)).toEqual(["Nová poptávka"]);
     expect(fresh.remaining).toBe(1);
     const rest = await fetchIncoming(inc, USER, fresh.stateAfter(1), 20, { ca });
@@ -218,9 +223,10 @@ describe.skipIf(!hasOpenssl)("pošta — skutečný IMAP/POP3/SMTP server", () =
     const inc = { ...ep("pop3", "127.0.0.1", P("pop3s"), "tls"), user, password: "Pop3-Heslo-1" };
     const first = await fetchIncoming(inc, user, {}, 20, { ca });
     expect(first.emails).toHaveLength(3);
-    expect(first.emails[0].subject).toBe("Pop: Poptávka hřídele 50 ks");
-    expect(first.emails[0].body).toMatch(/\.tečka na začátku řádku/);
-    expect(first.emails[0].messageId).toMatch(/^e2e-1\./);
+    const popt = first.emails.find((e) => e.subject === "Pop: Poptávka hřídele 50 ks")!;
+    expect(popt.body).toMatch(/\.tečka na začátku řádku/);
+    expect(popt.messageId).toMatch(/^e2e-1\./);
+    expect(first.emails.map((e) => e.subject)[0]).toBe("Pop: Nabídka materiálu"); // nejnovější první
     const st = first.stateAfter(3);
     const again = await fetchIncoming(inc, user, st, 20, { ca });
     expect(again.emails).toHaveLength(0);
@@ -235,9 +241,20 @@ describe.skipIf(!hasOpenssl)("pošta — skutečný IMAP/POP3/SMTP server", () =
     for (let i = 0; i < 5005; i++) srv.addMessage(user, { subject: `Archiv ${i}` });
     const inc = { ...ep("pop3", "127.0.0.1", P("pop3s"), "tls"), user, password: "Kolega-Heslo-1" };
     const first = await fetchIncoming(inc, user, {}, 5, { ca, timeoutMs: 20_000 });
-    expect(first.emails.map((e) => e.subject)).toEqual(["Archiv 5000", "Archiv 5001", "Archiv 5002", "Archiv 5003", "Archiv 5004"]);
+    expect(first.emails.map((e) => e.subject)).toEqual(["Archiv 5004", "Archiv 5003", "Archiv 5002", "Archiv 5001", "Archiv 5000"]);
     let st = first.stateAfter(5);
-    expect((st.pop3?.seen ?? []).length).toBe(first.total); // všechny UIDL na serveru, žádné prořezání podle počtu
+    // celá schránka po dávkách — žádná zpráva dvakrát, seznam UIDL se neprořezává podle počtu
+    const seen = new Set(first.emails.map((e) => e.messageId));
+    for (let round = 0; round < 10; round++) {
+      const next = await fetchIncoming(inc, user, st, 2000, { ca, timeoutMs: 20_000 });
+      for (const e of next.emails) {
+        expect(seen.has(e.messageId)).toBe(false);
+        seen.add(e.messageId);
+      }
+      st = next.stateAfter(next.emails.length);
+      if (!next.remaining) break;
+    }
+    expect((st.pop3?.seen ?? []).length).toBe(first.total);
     for (let round = 0; round < 2; round++) {
       const again = await fetchIncoming(inc, user, st, 20, { ca, timeoutMs: 20_000 });
       expect(again.emails).toHaveLength(0); // dřív: 8 nejstarších zpráv znovu v každém kole

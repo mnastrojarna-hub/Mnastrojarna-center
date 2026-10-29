@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { sendMail } from "@/lib/email/send";
+import { replyHeaders, replySubject } from "@/lib/email/threading";
 import { recordCorrection } from "@/app/actions/corrections";
 import { logAudit } from "@/lib/audit";
 import { OUTBOUND_APPROVAL_TYPES } from "@/lib/data/types";
@@ -107,22 +108,39 @@ export async function resolveApproval(
         if (!row.target || !row.target.includes("@")) {
           return { ok: false, error: "Chybí e-mailová adresa příjemce — nejdřív ji doplň úpravou položky." };
         }
-        // Odpověď na e-mail jde ze schránky, kam e-mail přišel; ostatní ze schránky schvalujícího.
-        // E-mail bez schránky (globální účet) = firemní (systémová) schránka.
-        let replyMailbox: string | null | undefined;
+        // Stejná cesta jako odpověď z Přijaté pošty (pickSmtpMailbox): vlastní schránka schvalujícího
+        // (u odpovědi přednostně ta, kam e-mail přišel) → firemní schránka, kam e-mail přišel → firemní
+        // → globální SMTP; nikdy osobní schránka kolegy. Odpověď nese In-Reply-To / References (vlákno).
+        type ReplySource = { mailbox_id: string | null; message_id: string | null; message_refs: string[] | null; subject: string | null; order_id: string | null; customer_id: string | null; supplier_id: string | null; thread_id: string | null };
+        let reply: ReplySource | null = null;
         if (row.email_id) {
-          const { data: em } = await supabase.from("emails").select("mailbox_id").eq("id", row.email_id).maybeSingle();
-          replyMailbox = em ? ((em as { mailbox_id: string | null }).mailbox_id ?? null) : undefined;
+          const { data: em } = await supabase
+            .from("emails")
+            .select("mailbox_id, message_id, message_refs, subject, order_id, customer_id, supplier_id, thread_id" as "*")
+            .eq("id", row.email_id)
+            .maybeSingle();
+          reply = (em as unknown as ReplySource | null) ?? null;
         }
+        const headers = reply ? replyHeaders({ messageId: reply.message_id, references: reply.message_refs, subject: reply.subject }) : null;
         const res = await sendMail({
           to: row.target,
-          subject: row.payload.subject || row.title,
+          subject: row.payload.subject || (reply ? replySubject(reply.subject) : row.title),
           text: row.payload.body,
-          from: replyMailbox ? { mailboxId: replyMailbox } : replyMailbox === null ? { system: true } : { ownerId: auth.user.id },
+          from: { ownerId: auth.user.id, replyMailboxId: reply?.mailbox_id ?? null },
           senderId: auth.user.id,
+          inReplyTo: headers?.inReplyTo ?? null,
+          references: headers?.references ?? null,
+          jobId: reply?.order_id ?? row.order_id ?? undefined,
+          customerId: reply?.customer_id ?? null,
+          supplierId: reply?.supplier_id ?? null,
         });
         if (!res.sent) {
           return { ok: false, error: res.reason ?? "Odeslání selhalo." };
+        }
+        // odpověď do vlákna původního e-mailu (i když odešla z jiné schránky / globálního SMTP)
+        if (res.emailId && reply?.thread_id) {
+          await supabase.from("emails").update({ thread_id: reply.thread_id, has_draft: false } as never).eq("id", res.emailId);
+          await supabase.from("emails").update({ has_draft: false } as never).eq("id", row.email_id!);
         }
         const { error } = await supabase
           .from("approval_queue")

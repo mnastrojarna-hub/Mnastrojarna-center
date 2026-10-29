@@ -4,6 +4,8 @@ import { SupplierDialog } from "@/components/suppliers/supplier-dialog";
 import { tagSuggestions } from "@/components/suppliers/model";
 import { requireFeature } from "@/lib/auth/session";
 import { getSuppliers } from "@/lib/data/queries";
+import { SupplierFromInvoiceDialog } from "@/components/suppliers/supplier-from-invoice-dialog";
+import { supplierInvoiceCounts } from "@/lib/data/supplier-invoices";
 
 export default async function SuppliersPage({
   searchParams,
@@ -13,7 +15,7 @@ export default async function SuppliersPage({
   await requireFeature("suppliers");
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.slice(0, 200) : "";
-  const suppliers = await getSuppliers();
+  const [suppliers, invoiceCounts] = await Promise.all([getSuppliers(), supplierInvoiceCounts()]);
   const suggestions = {
     technologies: tagSuggestions(suppliers, "technologies"),
     materials: tagSuggestions(suppliers, "materials"),
@@ -25,9 +27,14 @@ export default async function SuppliersPage({
       <PageHeader
         title="Dodavatelé"
         description="Kooperace a materiál — kdo co umí, jak rychle a jak jsme spokojeni. Vidí a upravuje celý tým."
-        actions={<SupplierDialog suggestions={suggestions} className="flex-1 sm:flex-none" />}
+        actions={
+          <>
+            <SupplierFromInvoiceDialog className="flex-1 sm:flex-none" />
+            <SupplierDialog suggestions={suggestions} className="flex-1 sm:flex-none" />
+          </>
+        }
       />
-      <SuppliersBrowser key={q} suppliers={suppliers} initialQuery={q} />
+      <SuppliersBrowser key={q} suppliers={suppliers} initialQuery={q} invoiceCounts={invoiceCounts} />
     </div>
   );
 }

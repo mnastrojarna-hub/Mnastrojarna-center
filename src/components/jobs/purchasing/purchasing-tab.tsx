@@ -16,6 +16,7 @@ import { PurchaseOrderCard } from "./purchase-orders-section";
 import { EditPurchaseOrderDialog, SendPurchaseOrderDialog } from "./purchase-order-dialogs";
 import { SectionTitle } from "./ui-bits";
 import { ownerAssignedStamp } from "./purchasing-model";
+import { JobSupplierInvoices } from "@/components/supplier-invoices/job-supplier-invoices";
 
 type SendTarget = { id: string; number: string; supplierName: string | null; fileId: string | null };
 
@@ -135,6 +136,9 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
           </div>
         )}
       </section>
+
+      {/* Faktury dodavatelů (jen kdo je vidí — načítá se akcí s kontrolou práv) */}
+      <JobSupplierInvoices jobId={job.id} currency={job.currency} refreshKey={data.totals.cost} />
 
       <SupplierQuoteDialog
         open={quoteDialog.open}

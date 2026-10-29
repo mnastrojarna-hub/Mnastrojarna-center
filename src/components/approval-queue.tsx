@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight, Check, X, Mail, FileText, Factory, Tag, Bot, Send, Pencil, Loader2, ChevronDown, GraduationCap, ShieldAlert,
 } from "lucide-react";
+// faktura dodavatele (rozdělení na zakázky ke schválení)
+import { Receipt } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +50,7 @@ const typeIcon: Partial<Record<ApprovalItem["rawType"], React.ReactNode>> = {
   categorization: <Tag className="h-4 w-4" />,
   reminder: <Mail className="h-4 w-4" />,
   order_match: <FileText className="h-4 w-4" />,
+  supplier_invoice: <Receipt className="h-4 w-4" />,
 };
 
 function ApprovalRow({
@@ -117,7 +120,7 @@ function ApprovalRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{item.title}</span>
+            <span className={cn("text-sm font-medium", item.rawType === "supplier_invoice" ? "line-clamp-2" : "truncate")}>{item.title}</span>
             <AiConfidence value={item.aiConfidence} />
           </div>
           {!compact && item.summary && (
@@ -137,6 +140,11 @@ function ApprovalRow({
             {item.quoteHref && (
               <Link href={item.quoteHref} className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">
                 Otevřít nabídku <ArrowRight className="h-3 w-3" aria-hidden />
+              </Link>
+            )}
+            {item.rawType === "supplier_invoice" && (
+              <Link href="/supplier-invoices?stav=ke_kontrole" className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">
+                Faktury ke kontrole <ArrowRight className="h-3 w-3" aria-hidden />
               </Link>
             )}
             {isOutbound && target && (

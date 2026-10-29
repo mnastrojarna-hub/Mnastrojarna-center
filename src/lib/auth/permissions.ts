@@ -42,13 +42,16 @@ export type Feature =
   | "delete"          // mazání zakázek a dokladů
   | "pricing"         // Nacenění (zatím jen super admin)
   | "quote_approval"  // schvalování nabídek
-  | "flow_all";       // obchodní tok všech (bez toho jen „moje")
+  | "flow_all"        // obchodní tok všech (bez toho jen „moje")
+  | "supplier_invoices_upload" // nahrát fakturu dodavatele (všichni)
+  | "supplier_invoices"        // faktury dodavatelů — seznam, detail, rozdělení (super admin; přepínač → všichni)
+  | "supplier_invoices_paid";  // zaplaceno / nezaplaceno faktury dodavatele (vždy jen super admin)
 
 export const ALL_FEATURES: Feature[] = [
   "orders", "workflow", "documents", "customers", "suppliers", "mail", "mail_all", "dashboard",
   "ai_assistant", "ai_tuning", "knowledge", "drawings", "ai_pricing", "ai_capture",
   "commissions", "commissions_all", "margins", "users", "settings", "delete",
-  "pricing", "quote_approval", "flow_all",
+  "pricing", "quote_approval", "flow_all", "supplier_invoices_upload", "supplier_invoices", "supplier_invoices_paid",
 ];
 
 export interface AccessSubject {
@@ -65,6 +68,11 @@ export interface AccessContext {
   aiCaptureForAll: boolean;
   /** Je nastaven Claude API klíč. */
   aiConfigured: boolean;
+  /**
+   * Faktury dodavatelů vidí všichni (integration_settings.supplier_invoices_visibility = all);
+   * výchozí (chybí / false) = jen super admin. Zaplaceno / nezaplaceno vždy jen super admin.
+   */
+  supplierInvoicesForAll?: boolean;
 }
 
 export const DEFAULT_ACCESS_CONTEXT: AccessContext = {
@@ -74,11 +82,11 @@ export const DEFAULT_ACCESS_CONTEXT: AccessContext = {
   aiConfigured: false,
 };
 
-const EVERYONE: Feature[] = ["orders", "workflow", "documents", "customers", "suppliers", "mail"];
+const EVERYONE: Feature[] = ["orders", "workflow", "documents", "customers", "suppliers", "mail", "supplier_invoices_upload"];
 const SALES_EXTRA: Feature[] = ["commissions", "margins"];
 const ADMIN_ONLY: Feature[] = [
   "mail_all", "dashboard", "ai_assistant", "ai_tuning", "knowledge", "drawings",
-  "commissions_all", "users", "settings", "delete", "pricing", "quote_approval", "flow_all",
+  "commissions_all", "users", "settings", "delete", "pricing", "quote_approval", "flow_all", "supplier_invoices_paid",
 ];
 /** Funkce, které reálně volají AI — vyžadují hlavní vypínač i klíč (bez klíče se pracuje ručně). */
 const AI_RUNTIME: Feature[] = ["ai_pricing", "ai_capture"];
@@ -94,6 +102,8 @@ export function can(subject: AccessSubject | null | undefined, feature: Feature,
 
   if (EVERYONE.includes(feature)) return true;
   if (ADMIN_ONLY.includes(feature)) return false;
+  // faktury dodavatelů: jeden přepínač (Nastavení faktur) — zatím jen super admin
+  if (feature === "supplier_invoices") return ctx.supplierInvoicesForAll === true;
 
   if (feature === "ai_capture") return subject.aiAccess || ctx.aiCaptureForAll;
   if (feature === "ai_pricing") return false; // nacenění dělá zatím člověk
@@ -145,9 +155,13 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   pricing: "Nacenění",
   quote_approval: "Schvalování nabídek",
   flow_all: "Obchodní tok všech",
+  supplier_invoices_upload: "Nahrát fakturu dodavatele",
+  supplier_invoices: "Faktury dodavatelů",
+  supplier_invoices_paid: "Zaplaceno u faktur dodavatelů",
 };
 
 /** Doplňující vysvětlení u odepřené funkce (AccessBanner) — co dělat místo toho. */
 export const FEATURE_HINTS: Partial<Record<Feature, string>> = {
   pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin.",
+  supplier_invoices: "Faktury dodavatelů zatím zpracovává super admin. Fakturu nahraješ přes „Nahrát fakturu“ nebo vyfocením dokladu.",
 };

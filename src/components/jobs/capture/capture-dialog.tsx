@@ -562,7 +562,8 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
     const target = currentTarget(s);
     if (!model || !review || !target) return;
     const supplierSide = isSupplierSideDoc(review);
-    const problem = reviewProblem(review, target, supplierSide);
+    // faktura dodavatele jde do Faktur dodavatelů — zakázku, zákazníka ani dodavatele formulář nevyplňuje
+    const problem = review.chip === "faktura_dodavatel" ? null : reviewProblem(review, target, supplierSide);
     if (problem) {
       dispatch({ type: "failed", error: problem, step: "review" });
       return;
@@ -1063,7 +1064,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
               ) : (
                 <Button type="button" size="lg" onClick={save} disabled={step === "saving"} className={cn("min-w-0 flex-1 sm:flex-none", SAVE_TONE)} data-testid="capture-save">
                   {step === "saving" ? <Loader2 className="animate-spin" /> : <Check />}
-                  {step === "saving" ? "Ukládám…" : "Uložit do knihy"}
+                  {step === "saving" ? "Ukládám…" : review?.chip === "faktura_dodavatel" ? "Uložit fakturu" : "Uložit do knihy"}
                 </Button>
               )}
             </div>

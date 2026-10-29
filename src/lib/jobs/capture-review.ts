@@ -1103,7 +1103,8 @@ export function captureEventMessage(args: {
 }
 
 /** Nadpis obrazovky „Hotovo" („Uloženo do zakázky Z-2026-014 · Objednávka zákazníka · stav Objednávka"). */
-export function resultHeadline(r: Pick<CaptureResult, "jobNumber" | "created" | "docLabel" | "stageTo" | "stageFrom">): string {
+export function resultHeadline(r: Pick<CaptureResult, "jobNumber" | "created" | "docLabel" | "stageTo" | "stageFrom" | "supplierInvoice">): string {
+  if (r.supplierInvoice) return r.supplierInvoice.id ? "Faktura uložena do Faktur dodavatelů" : "Děkujeme, nahráno";
   const parts = [`${r.created ? "Založena zakázka" : "Uloženo do zakázky"} ${r.jobNumber ?? ""}`.trim()];
   if (r.docLabel) parts.push(r.docLabel);
   const stage = r.stageTo ?? r.stageFrom;

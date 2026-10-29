@@ -4,6 +4,8 @@ import { isUuidLike } from "@/lib/email/visibility";
 import { detectMailbox, testMailbox, type DetectRequest, type MailboxTestInput } from "@/lib/email/mailbox-diagnose";
 import { logAudit } from "@/lib/audit";
 import { userActor } from "@/lib/supabase/actor-headers";
+import { sendTestMail } from "@/lib/email/send";
+import { testSendText } from "@/lib/email/my-mailbox";
 
 // IMAP/POP3/SMTP klienti potřebují Node runtime; vlastní časové limity (40 s) drží výsledek pod limitem
 export const runtime = "nodejs";
@@ -44,6 +46,13 @@ export async function POST(req: Request) {
         actor: userActor(auth.user),
       });
       return NextResponse.json(result);
+    }
+    if (body.action === "testSend") {
+      // „Vyzkoušet odeslání": zkušební e-mail ze schránky na její vlastní adresu (+ kopie do Odeslaných)
+      if (!mailboxId) return NextResponse.json({ error: "Nejdřív schránku ulož." }, { status: 400 });
+      const res = await sendTestMail(mailboxId, auth.user.fullName);
+      await logAudit({ action: "mailbox_test_send", entity: "mailboxes", entityId: mailboxId, diff: { ok: res.sent, sentCopy: res.sentCopy }, actor: userActor(auth.user) });
+      return NextResponse.json({ ...res, text: testSendText(res) });
     }
     if (body.action === "test") {
       const input = body as unknown as MailboxTestInput;

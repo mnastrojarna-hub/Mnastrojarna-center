@@ -46,6 +46,14 @@ function statusChips(e: JobEvent): { phase: FlowPhase; from: string | null; to: 
   return stateMeta(phase, to) || stateMeta(phase, from) ? { phase, from, to } : null;
 }
 
+/** #24: záznam přesunutý při sloučení zakázek → číslo zakázky, odkud je („ze Z-2026-014"). */
+export function mergedFromNumber(e: Pick<JobEvent, "data">): string | null {
+  const m = e.data?.mergedFrom;
+  if (!m || typeof m !== "object") return null;
+  const n = (m as { number?: unknown }).number;
+  return typeof n === "string" && n.trim() ? n.trim().slice(0, 40) : null;
+}
+
 /** Kdo: ikona druhu (člověk / AI / systém) + jméno (nikdy prázdné) + způsob. */
 function EventAuthor({ e }: { e: JobEvent }) {
   const stamp = eventStamp(e);
@@ -74,6 +82,7 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
   const note = st && typeof e.data?.note === "string" ? e.data.note : null;
   const auto = autoLabel(e);
   const sc = statusChips(e);
+  const mergedFrom = mergedFromNumber(e);
 
   return (
     <li className="relative flex gap-3 pb-5">
@@ -86,6 +95,11 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
           <EventAuthor e={e} />
           <span title={formatTimestamp(e.createdAt) ?? undefined} suppressHydrationWarning>{relativeTime(e.createdAt)}</span>
           {auto && <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium">⚙ {auto}</span>}
+          {mergedFrom && (
+            <span className="whitespace-nowrap rounded-full bg-indigo-100 px-1.5 text-[10px] font-medium text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300" title="Záznam přešel při sloučení zakázek" data-testid="event-merged-from">
+              ze {mergedFrom}
+            </span>
+          )}
           {e.type === "ai" && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-fuchsia-100 px-1.5 text-[10px] font-medium text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-300">
               <Sparkles className="h-2.5 w-2.5" /> AI

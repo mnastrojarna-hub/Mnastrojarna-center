@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
-  ArrowRight, Camera, ClipboardList, Factory, FileBox, FileText, Loader2, MessageSquareQuote, Plus, Search, ShoppingCart,
+  ArrowRight, Camera, ClipboardList, Factory, FileBox, FileText, Loader2, MessageSquareQuote, Plus, Receipt, Search, ShoppingCart,
   Sparkles, Users,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -33,10 +33,10 @@ export interface SearchEntry {
   stage?: JobStage;
 }
 
-export type SearchGroupKey = "jobs" | "customers" | "suppliers" | "quotes" | "drawings";
+export type SearchGroupKey = "jobs" | "customers" | "suppliers" | "quotes" | "drawings" | "supplierInvoices";
 export type SearchData = Record<SearchGroupKey, SearchEntry[]>;
 
-const EMPTY: SearchData = { jobs: [], customers: [], suppliers: [], quotes: [], drawings: [] };
+const EMPTY: SearchData = { jobs: [], customers: [], suppliers: [], quotes: [], drawings: [], supplierInvoices: [] };
 
 /** Skóre shody: 0 = neodpovídá; vyšší = lepší (začátek popisku > popisek > klíčová slova). */
 export function paletteScore(search: string, entry: Pick<SearchEntry, "label" | "keywords">): number {
@@ -101,6 +101,8 @@ const GROUPS: { key: SearchGroupKey; heading: string; icon: React.ReactNode; ton
   { key: "quotes", heading: "Nabídky", icon: <FileText />, tone: "text-violet-600 dark:text-violet-400", feature: "orders" },
   { key: "suppliers", heading: "Dodavatelé", icon: <Factory />, tone: "text-orange-600 dark:text-orange-400", feature: "suppliers" },
   { key: "drawings", heading: "Výkresy", icon: <FileBox />, tone: "text-indigo-600 dark:text-indigo-400", feature: "drawings" },
+  // faktury dodavatelů jen s právem (zatím super admin) — data posílá /api/search jen jemu
+  { key: "supplierInvoices", heading: "Faktury dodavatelů", icon: <Receipt />, tone: "text-emerald-600 dark:text-emerald-400", feature: "supplier_invoices" },
 ];
 
 /** Kolik shod ukázat ve skupině (bez hledání jen pár nejnovějších zakázek). */
@@ -150,7 +152,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
       .then((d: Partial<SearchData>) => {
         setData({
           jobs: d.jobs ?? [], customers: d.customers ?? [], suppliers: d.suppliers ?? [],
-          quotes: d.quotes ?? [], drawings: d.drawings ?? [],
+          quotes: d.quotes ?? [], drawings: d.drawings ?? [], supplierInvoices: d.supplierInvoices ?? [],
         });
       })
       .catch(() => {})
@@ -170,7 +172,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     (a) => paletteScore(q, { label: a.label, keywords: a.keywords }) > 0,
   );
   const nav = allNavItems
-    .filter((item) => access.can(item.feature))
+    .filter((item) => access.can(item.feature) && !(item.hideWith && access.can(item.hideWith)))
     .filter((item) => paletteScore(q, { label: item.title, keywords: searchNormalize(item.description ?? "") }) > 0);
   const groups = GROUPS.filter((g) => access.can(g.feature)).map((g) => ({
     ...g,

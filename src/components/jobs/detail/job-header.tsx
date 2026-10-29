@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, Sparkles, Camera, Mail, Trash2, MoreHorizontal, Banknote, Package, FileText, Paperclip,
-  Hash, Loader2, Import, Bot, Flag,
+  Hash, Loader2, Import, Bot, Flag, Combine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ import { InlineEditor, PersonChip, useOptimisticValue } from "./inline-field";
 import { UploadButton } from "./upload-controls";
 import { DocumentsMenu } from "./documents-menu";
 import { ConfirmDialog } from "./confirm-dialog";
+import { MergeJobDialog } from "./merge-job-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty } from "./detail-helpers";
 import { ProductionHeaderBadges } from "@/components/jobs/production/production-chip";
 import { FlowActionBar, FlowNextHint, FlowProposalLine, FlowStageChip, FlowTrail, StageStamp } from "./flow-header";
@@ -34,6 +35,7 @@ import { approvalHint, jobApprovalFlag } from "./approval";
 export function JobToolbar({ job }: { job: JobDetail }) {
   const { perms } = useJobDetail();
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [mergeOpen, setMergeOpen] = React.useState(false);
   const approval = jobApprovalFlag(job.flowQuotes, job.quotes);
   return (
     // -top-5 = horní odsazení <main> (pt-5): lišta se přilepí bez mezery, kterou by prosvítal obsah
@@ -63,7 +65,7 @@ export function JobToolbar({ job }: { job: JobDetail }) {
           <CaptureButton jobId={job.id} label="Přidat doklad (foto)" size="sm" className="hidden sm:inline-flex" />
           <UploadButton size="sm" compact className="px-2.5 sm:px-3" />
           <DocumentsMenu quotes={job.quotes} acceptedQuoteId={job.acceptedQuoteId} size="sm" compact className="px-2.5 sm:px-3" />
-          {perms.canDelete && (
+          {(perms.canDelete || perms.canMerge) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" aria-label="Další akce">
@@ -71,15 +73,23 @@ export function JobToolbar({ job }: { job: JobDetail }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setConfirmDelete(true)} className="text-red-600 focus:text-red-700 dark:text-red-400">
-                  <Trash2 className="!text-current" /> Smazat zakázku
-                </DropdownMenuItem>
+                {perms.canMerge && (
+                  <DropdownMenuItem onSelect={() => setMergeOpen(true)}>
+                    <Combine /> Sloučit s jinou zakázkou…
+                  </DropdownMenuItem>
+                )}
+                {perms.canDelete && (
+                  <DropdownMenuItem onSelect={() => setConfirmDelete(true)} className="text-red-600 focus:text-red-700 dark:text-red-400">
+                    <Trash2 className="!text-current" /> Smazat zakázku
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
       </div>
       {perms.canDelete && <DeleteJobDialog job={job} open={confirmDelete} onOpenChange={setConfirmDelete} />}
+      {perms.canMerge && <MergeJobDialog job={job} open={mergeOpen} onOpenChange={setMergeOpen} />}
     </div>
   );
 }

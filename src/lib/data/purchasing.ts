@@ -15,6 +15,8 @@ import {
 } from "@/lib/jobs/purchasing";
 import type { FlowScope } from "@/lib/auth/flow-scope";
 import { maskPurchaseOrderListItem } from "@/lib/auth/price-visibility";
+import { withInvoiceCosts } from "@/lib/supplier-invoices/costs";
+import { fetchJobInvoiceAllocations } from "@/lib/supplier-invoices/job-costs-store";
 
 /**
  * Datová vrstva nákupu zakázky (nabídky dodavatelů, objednávky vydané, provize).
@@ -191,10 +193,17 @@ export async function getJobPurchasing(jobId: string): Promise<JobPurchasing | n
       ...(commissionHidden ? { commissionHidden: true } : {}),
       owner,
       pendingCaptured,
-      totals: purchasingTotals({
+      // faktury dodavatelů (potvrzené) nahradí částky objednávek — stejně jako provize v DB (job_cost)
+      totals: withInvoiceCosts(purchasingTotals({
         revenue: cleanNumber(job.value),
         plannedCost: cleanNumber(job.purchase_cost),
         purchaseOrders: orders,
+      }), {
+        purchaseOrders: orders.map((p) => ({
+          id: p.id, number: p.number, status: p.status, total: p.total, hasUnpriced: p.items.some((i) => i.unitPrice === null),
+          itemIds: p.items.map((i) => i.id).filter((x): x is string => Boolean(x)),
+        })),
+        allocations: await fetchJobInvoiceAllocations(s.db, jobId),
       }),
     };
   } catch (err) {

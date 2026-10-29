@@ -18,6 +18,7 @@ const modules = [
   { key: "drawing_extract", label: "Extrakce z výkresů", desc: "Čtení metadat z PDF/STEP/DXF", recommended: "full" },
   { key: "capture", label: "Foto dokladů", desc: "Roztřídění a uložení vyfocených dokladů bez kontroly (jen při jisté shodě)", recommended: "approval" },
   { key: "purchase_order", label: "Objednávky dodavatelům", desc: "Odeslání objednávky vystavené při předání do výroby", recommended: "approval" },
+  { key: "supplier_invoice", label: "Faktury dodavatelů", desc: "Rozdělení faktury dodavatele na zakázky a režii (jinak čeká na potvrzení super adminem)", recommended: "approval" },
 ] as const;
 
 export function AutomationSettings({ initial }: { initial?: Record<string, Mode> }) {

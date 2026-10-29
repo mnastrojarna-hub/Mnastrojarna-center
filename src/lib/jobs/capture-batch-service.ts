@@ -42,7 +42,7 @@ import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normali
 import { docNumbersEqual, matchCustomer, matchJob, matchParty, type JobMatchCandidateExt } from "@/lib/jobs/matching";
 import { recordTrainingExample } from "@/lib/jobs/training";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
-import { withChangeNote } from "@/lib/supabase/actor-headers";
+import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import {
   autoCaptureCtx, captureHandoffActor, captureProductionHandoff, captureStageGuard, receiveSupplierDlByPhoto, recordPhotoDelivery,
 } from "@/lib/jobs/capture-flow";
@@ -68,6 +68,11 @@ import {
   SESSION_GONE, aiAvailability, analyzeSingle, applyBusinessDoc, applyDocFlow, begin, fail, loadSuppliers, message,
   type Ctx, type PrereadDoc,
 } from "@/lib/jobs/capture-service";
+import { readSupplierInvoice } from "@/lib/ai/supplier-invoice-reader";
+import { businessDocFromInvoice } from "@/lib/supplier-invoices/extract";
+import { createInvoiceFromBatchDoc, isSupplierInvoiceDoc } from "@/lib/supplier-invoices/capture-bridge";
+import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
+import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
 
 /**
  * Dávkové focení — serverová orchestrace (relace v DB, servisní klíč, oprávnění hlídá každá funkce):
@@ -151,7 +156,12 @@ async function previewsOf(db: JobsDb, files: BatchFile[]): Promise<BatchPreview[
   }));
 }
 
-function summaryOf(row: ExtractRow, margins: boolean): DocExtractSummary {
+/** Smí vidět faktury dodavatelů i s čísly a částkami (jinak jen „Faktura dodavatele → Faktury dodavatelů"). */
+function seesInvoices(c: Ctx): boolean {
+  return supplierInvoicePerms(c.access.can).amounts;
+}
+
+function summaryOf(row: ExtractRow, margins: boolean, invoices: boolean): DocExtractSummary {
   const meta = BATCH_TYPES[row.docType];
   const ex = row.data?.extract;
   let number = "";
@@ -169,7 +179,13 @@ function summaryOf(row: ExtractRow, margins: boolean): DocExtractSummary {
     number = ex.model.drawingNumber;
   }
   const party = ex?.kind === "business" ? (meta.side === "supplier" ? ex.doc.supplier.name : ex.doc.customer.name) : "";
-  const title = [meta.label, number].filter(Boolean).join(" ") + (party ? ` · ${party}` : "");
+  let title = [meta.label, number].filter(Boolean).join(" ") + (party ? ` · ${party}` : "");
+  // faktura dodavatele jde do Faktur dodavatelů — kdo faktury nevidí (obchodník v režimu „jen super admin"),
+  // nedostane ani číslo faktury a dodavatele, jen druh dokladu
+  if (isSupplierInvoiceDoc(row.docType) && !invoices) {
+    title = "Faktura dodavatele → Faktury dodavatelů";
+    number = "";
+  }
   return {
     docId: row.docId, pagesKey: row.pagesKey, type: row.docType, status: row.status,
     error: row.error, aiUsed: Boolean(row.data?.aiUsed), title: margins || meta.side !== "supplier" ? title : redactPrices(title),
@@ -178,11 +194,11 @@ function summaryOf(row: ExtractRow, margins: boolean): DocExtractSummary {
 }
 
 /** Souhrny vytěžení pro doklady aktuálního roztřídění. */
-function summariesFor(sort: BatchSort, rows: ExtractRow[], margins: boolean): DocExtractSummary[] {
+function summariesFor(sort: BatchSort, rows: ExtractRow[], margins: boolean, invoices: boolean): DocExtractSummary[] {
   const out: DocExtractSummary[] = [];
   for (const d of activeDocs(sort)) {
     const r = extractRowFor(rows, d);
-    if (r) out.push({ ...summaryOf(r, margins), docId: d.id });
+    if (r) out.push({ ...summaryOf(r, margins, invoices), docId: d.id });
   }
   return out;
 }
@@ -236,7 +252,8 @@ function isSingleBusiness(sort: BatchSort, prep: PreparedBatch): boolean {
   if (prep.pages.some((p) => p.source === "file") || prep.files.some((f) => f.fromZip)) return false;
   if (prep.files.length > CAPTURE_MAX_PAGES) return false;
   const t = docs[0].type;
-  return isBusinessType(t) && t !== "nabidka_dodavatel";
+  // faktura dodavatele jde do Faktur dodavatelů (dávka s jedním dokladem), ne do formuláře zakázky
+  return isBusinessType(t) && t !== "nabidka_dodavatel" && !isSupplierInvoiceDoc(t);
 }
 
 async function readWhole(
@@ -316,7 +333,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
       const onlyVisual = visual.length === 1 && !prep.pages.some((p) => p.source === "file") && prep.files.length === 1;
       if (res.ok) {
         const type = batchTypeFor(res.doc.docKind, res.doc.issuer);
-        if (onlyVisual && isBusinessType(type) && type !== "nabidka_dodavatel") {
+        if (onlyVisual && isBusinessType(type) && type !== "nabidka_dodavatel" && !isSupplierInvoiceDoc(type)) {
           return single({ doc: res.doc, aiUsed: true, reason: null, notes: res.notes });
         }
         const d = sort.docs.find((x) => x.pageIds.includes(readable[0].id));
@@ -326,7 +343,8 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
           d.documentNumber = res.doc.documentNumber;
           d.confidence = res.doc.confidence;
           d.title = [BATCH_TYPES[type].label, res.doc.documentNumber].filter(Boolean).join(" ");
-          if (isBusinessType(type)) whole = { doc: res.doc, usage: res.usage, pageIds: d.pageIds };
+          // faktura dodavatele: vytěžení udělá čtečka faktur (extractBatchDoc), obchodní čtení se nepoužije
+          if (isBusinessType(type) && !isSupplierInvoiceDoc(type)) whole = { doc: res.doc, usage: res.usage, pageIds: d.pageIds };
         }
         sortSource = "ai";
       } else {
@@ -385,7 +403,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
     if (wholeRes?.ok) {
       const ids = readable.map((p) => p.id);
       const d = activeDocs(sort).find((x) => isBusinessType(x.type) && x.pageIds.length === ids.length && ids.every((id) => x.pageIds.includes(id)));
-      if (d) whole = { doc: wholeRes.doc, usage: wholeRes.usage, pageIds: d.pageIds };
+      if (d && !isSupplierInvoiceDoc(d.type)) whole = { doc: wholeRes.doc, usage: wholeRes.usage, pageIds: d.pageIds };
     }
   }
 
@@ -422,7 +440,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
       const doc = alignDocType(whole.doc, d.type, false);
       const stored: StoredExtract = { extract: { kind: "business", doc: doc.doc }, ...partyMatches(doc.doc, d.type, await getMd()), docKind: doc.doc.docKind, issuer: doc.doc.issuer, aiUsed: true, note: null };
       await putExtract(db, captureId, { docId: d.id, pagesKey: pagesKey(d.pageIds), docType: d.type, status: "ready", data: stored, usage: whole.usage, restart: true });
-      extracts.push(summaryOf({ docId: d.id, pagesKey: pagesKey(d.pageIds), docType: d.type, status: "ready", data: stored, error: null, usage: whole.usage, startedAt: "", updatedAt: "" }, margins));
+      extracts.push(summaryOf({ docId: d.id, pagesKey: pagesKey(d.pageIds), docType: d.type, status: "ready", data: stored, error: null, usage: whole.usage, startedAt: "", updatedAt: "" }, margins, seesInvoices(c)));
     }
   }
   const model: BatchSortModel = {
@@ -454,7 +472,7 @@ export async function batchSession(c: Ctx, captureId: string): Promise<{ ok: tru
   const mode = await getModuleMode("capture");
   const sort = session.lastSort ?? session.aiSort;
   const rows = await listExtracts(c.db, session.captureId);
-  const extracts = summariesFor(sort, rows, c.margins);
+  const extracts = summariesFor(sort, rows, c.margins, seesInvoices(c));
   const fixedJob = session.fixedJobId ? await getJob(session.fixedJobId) : null;
   return {
     ok: true,
@@ -515,9 +533,9 @@ export async function extractBatchDoc(
   const existing = rows.find((r) => r.docId === input.docId && r.pagesKey === key && r.docType === type)
     ?? findExtract(rows, input.docId, key, type);
   if (existing && !input.force) {
-    if (existing.status === "ready" || existing.status === "manual") return { ok: true, summary: { ...summaryOf(existing, c.margins), docId: input.docId } };
+    if (existing.status === "ready" || existing.status === "manual") return { ok: true, summary: { ...summaryOf(existing, c.margins, seesInvoices(c)), docId: input.docId } };
     if (existing.status === "reading" && Date.now() - Date.parse(existing.startedAt) < EXTRACT_READING_TTL_MS) {
-      return { ok: true, summary: { ...summaryOf(existing, c.margins), docId: input.docId, status: "reading" } };
+      return { ok: true, summary: { ...summaryOf(existing, c.margins, seesInvoices(c)), docId: input.docId, status: "reading" } };
     }
   }
   await putExtract(db, session.captureId, { docId: input.docId, pagesKey: key, docType: type, status: "reading", restart: true });
@@ -542,6 +560,17 @@ export async function extractBatchDoc(
         stored = meta.form === "business"
           ? { extract: { kind: "business", doc: { ...emptyExtracted(), docKind: meta.docKind!, issuer: meta.issuer! } }, customerMatch: null, supplierMatch: null, docKind: meta.docKind, issuer: meta.issuer, aiUsed: false, note: reason }
           : { extract: { kind: "drawing", drawing: drawingFromName(names[0] ?? "") }, customerMatch: null, supplierMatch: null, docKind: "vykres", issuer: null, aiUsed: false, note: reason };
+      } else if (isSupplierInvoiceDoc(type)) {
+        // faktura dodavatele: čtečka faktur (hlavička, všechny řádky, odkazy) — při uložení se znovu nečte
+        const res = await readSupplierInvoice({ files: files.files, deadline, clientSignal: null, fakeGroup: fakeGroupFor(type, names) });
+        usage = res.usage;
+        const doc = businessDocFromInvoice(res.invoice, { ...emptyExtracted(), docKind: "faktura", issuer: "dodavatel" });
+        const md = await loadMatchData(db);
+        stored = {
+          extract: { kind: "business", doc }, ...partyMatches(doc, type, md),
+          docKind: "faktura", issuer: "dodavatel", aiUsed: true, note, truncated: files.truncated,
+          supplierInvoice: res.invoice,
+        };
       } else if (meta.form === "business") {
         const others = (session.lastSort ?? session.aiSort).docs.filter((d) => !d.excluded && pagesKey(d.pageIds) !== key);
         const batchContext: BatchContextLine[] = others.slice(0, 12).map((d) => ({
@@ -598,7 +627,7 @@ export async function extractBatchDoc(
   });
   const summary = summaryOf({
     docId: input.docId, pagesKey: key, docType: type, status, data: status === "error" ? null : stored, error, usage, startedAt: "", updatedAt: "",
-  }, c.margins);
+  }, c.margins, seesInvoices(c));
   return { ok: true, summary };
 }
 
@@ -636,7 +665,8 @@ async function strongMatchOf(db: JobsDb, type: BatchDocType, doc: ExtractedBusin
   }
   if ((type === "faktura_my" || type === "dodaci_list_my") && doc.documentNumber) {
     const col = type === "faktura_my" ? "invoice_number" : "delivery_note_number";
-    const { data } = await db.from("orders").select("id, number").eq(col, doc.documentNumber).limit(2);
+    // sloučená duplicita (#24) číslo dokladu sdílí s cílem — počítá se jen živá zakázka
+    const { data } = await db.from("orders").select("id, number").eq(col, doc.documentNumber).is("merged_into_id", null).limit(2);
     const rows = (data ?? []) as { id: string; number: string }[];
     if (rows.length === 1) return { jobId: rows[0].id, jobNumber: rows[0].number, reason: `podle čísla ${type === "faktura_my" ? "faktury" : "dodacího listu"} ${doc.documentNumber}`, score: 90 };
   }
@@ -888,7 +918,15 @@ async function reviewModel(
   opts: { assign: Record<string, string>; targets: Record<string, string>; confirmed: string[] },
 ): Promise<BatchReviewModel> {
   const { db, margins } = c;
-  const ctx = await reviewContext(c, session, sort);
+  const ctxAll = await reviewContext(c, session, sort);
+  // faktury dodavatelů jdou mimo zakázky (Faktury dodavatelů) — do skupin, upozornění ani kontroly zakázek nepatří
+  const invoiceDocs = ctxAll.docs.filter((d) => isSupplierInvoiceDoc(d.type));
+  const invoiceIds = new Set(invoiceDocs.map((d) => d.id));
+  const ctx: ReviewContext = {
+    ...ctxAll,
+    docs: ctxAll.docs.filter((d) => !invoiceIds.has(d.id)),
+    typeConflicts: ctxAll.typeConflicts.filter((w) => !w.docIds.some((id) => invoiceIds.has(id))),
+  };
   const [mode, formOptions] = await Promise.all([getModuleMode("capture"), getJobFormOptions()]);
   const grouped = groupBatch({
     docs: ctx.docs, ourIco: ourIco(), fixedJobId: session.fixedJobId, assign: opts.assign, customerConfirmed: opts.confirmed,
@@ -897,6 +935,7 @@ async function reviewModel(
   const activeIds = new Set(ctx.docs.map((d) => d.id));
   // upozornění z roztřídění platí, jen dokud se doklad / stránka nezměnily
   warnings.push(...session.sortWarnings.filter((w) => {
+    if (w.docIds.some((id) => invoiceIds.has(id))) return false;
     if (!w.docIds.every((id) => activeIds.has(id))) return false;
     if (w.actions.some((a) => a.kind === "restore_page" && a.pageId && !sort.excludedPageIds.includes(a.pageId))) return false;
     if (w.code === "issuer_mismatch" || w.code === "complaint" || w.code === "sort_uncertain") {
@@ -966,7 +1005,31 @@ async function reviewModel(
     docs: docReviews,
     warnings: uniqueWarnings(warnings),
     initial: { sort, groups: states, docs: docStates },
+    ...(invoiceDocs.length ? { supplierInvoices: supplierInvoiceLane(c, sort, invoiceDocs, ctxAll.rows) } : {}),
   };
+}
+
+/** Pruh „Faktura dodavatele → Faktury dodavatelů" (údaje jen s právem na faktury). */
+function supplierInvoiceLane(c: Ctx, sort: BatchSort, docs: ReconcileDoc[], rows: ExtractRow[]): NonNullable<BatchReviewModel["supplierInvoices"]> {
+  const show = seesInvoices(c);
+  return docs.map((d) => {
+    const draft = sort.docs.find((x) => x.id === d.id);
+    const row = draft ? extractRowFor(rows, draft) : null;
+    const inv = row?.data?.supplierInvoice as { totalNet?: number; currency?: string } | undefined;
+    const doc = d.extract?.kind === "business" ? d.extract.doc : null;
+    return {
+      docId: d.id,
+      pageIds: draft?.pageIds ?? [],
+      aiUsed: d.aiUsed,
+      ...(show ? {
+        details: {
+          supplierName: doc?.supplier.name ?? "", documentNumber: doc?.documentNumber || d.documentNumber,
+          totalNet: typeof inv?.totalNet === "number" ? inv.totalNet : doc?.totalWithoutVat ?? null,
+          currency: inv?.currency ?? doc?.currency ?? "CZK", items: doc?.items.length ?? 0,
+        },
+      } : {}),
+    };
+  });
 }
 
 /** Hledání zakázky pro „Jiná…" (číslo, název, zákazník, č. objednávky). */
@@ -978,6 +1041,7 @@ export async function searchBatchJobs(c: Ctx, qRaw: string): Promise<{ ok: true;
     .from("orders")
     .select("id, number, title, status, customer_order_number, customer:customers!customer_id(name)")
     .or(`number.ilike.${like},title.ilike.${like},customer_order_number.ilike.${like}`)
+    .is("merged_into_id", null)                       // sloučená duplicita (#24) žije jen v historii cíle
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) return fail(error.message);
@@ -988,7 +1052,7 @@ export async function searchBatchJobs(c: Ctx, qRaw: string): Promise<{ ok: true;
   if (custIds.length) {
     const { data: m } = await c.db
       .from("orders").select("id, number, title, status, customer:customers!customer_id(name)")
-      .in("customer_id", custIds).order("created_at", { ascending: false }).limit(20);
+      .in("customer_id", custIds).is("merged_into_id", null).order("created_at", { ascending: false }).limit(20);
     more = m ?? [];
   }
   const out: ReviewOptions["jobs"] = [];
@@ -1230,6 +1294,10 @@ async function resultFromJournal(c: Ctx, session: BatchSession): Promise<BatchRe
       if (d?.status === "done" && d.result && "docId" in d.result) result.docs.push(d.result as unknown as BatchDocResult);
     }
   }
+  for (const d of session.lastApply?.docs ?? []) {
+    const st = steps.get(`sinv:${d.id}`);
+    if (st?.status === "done" && st.result && "docId" in st.result) result.docs.push(st.result as unknown as BatchDocResult);
+  }
   return result;
 }
 
@@ -1262,7 +1330,7 @@ async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown)
   // plná automatika: znovu ověřit nad daty relace a uložit návrh serveru
   if (auto) {
     const review = await reviewModel(c, session, state.sort, { assign: session.lastAssign ?? {}, targets: session.lastTargets ?? {}, confirmed: [] });
-    const summaries = summariesFor(state.sort, rows, margins);
+    const summaries = summariesFor(state.sort, rows, margins, seesInvoices(c));
     if (!canAutoApplyBatch(review, summaries)) {
       return { ok: false, status: "failed", error: "Vyžaduje kontrolu", aiUsed: session.aiUsed, groups: [], docs: [], pending: [], warnings: [] };
     }
@@ -1475,6 +1543,47 @@ async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown)
       });
       await writeStep(db, session.captureId, evKey, "done");
     }
+  }
+
+  // faktury dodavatelů → Faktury dodavatelů (mimo zakázky, soubor do bucketu faktur — nikdy dokument zakázky)
+  const seeInvoices = seesInvoices(c);
+  for (const draft of state.sort.docs.filter((d) => !d.excluded && isSupplierInvoiceDoc(d.type))) {
+    const key = `sinv:${draft.id}`;
+    const prevInv = steps.get(key);
+    if (prevInv?.status === "done" && prevInv.result) {
+      result.docs.push(prevInv.result as unknown as BatchDocResult);
+      continue;
+    }
+    await writeStep(db, session.captureId, key, "started");
+    const meta = BATCH_TYPES[draft.type];
+    let r: BatchDocResult;
+    try {
+      const res = await createInvoiceFromBatchDoc({
+        db: c.db, actor: auto ? { id: user.id, kind: "ai", via: "foto", agent: "capture" } : userActor(user, "foto"),
+        session, docId: draft.id, pageIds: draft.pageIds,
+        title: draft.title || meta.label, stored: extractRowFor(rows, draft)?.data ?? null,
+        // focení spuštěné u zakázky → řádky bez vlastního důkazu dostanou návrh na ni
+        contextJobId: session.fixedJobId,
+      });
+      r = {
+        docId: draft.id, groupKey: "", type: draft.type, label: meta.label, ok: res.ok, ...(res.ok ? {} : { error: res.error }),
+        jobId: null, jobNumber: null, fileIds: [], fileKind: meta.fileKind,
+        title: seeInvoices ? draft.title || "Faktura dodavatele" : "Faktura dodavatele → Faktury dodavatelů",
+        summary: !res.ok ? "" : !seeInvoices ? THANKS_TEXT
+          : res.duplicateOfId ? "Tahle faktura už je nahraná — označená jako duplicita." : "Uloženo do Faktur dodavatelů — zkontroluj rozdělení na zakázky.",
+        links: res.ok && seeInvoices ? [{ label: "Otevřít fakturu", href: `/supplier-invoices/${res.id}` }] : [],
+        supplierInvoice: true,
+        ...(res.ok && seeInvoices ? { supplierInvoiceId: res.id } : {}),
+      };
+    } catch (err) {
+      r = {
+        docId: draft.id, groupKey: "", type: draft.type, label: meta.label, ok: false, error: message(err),
+        jobId: null, jobNumber: null, fileIds: [], fileKind: meta.fileKind, title: meta.label, summary: "", links: [], supplierInvoice: true,
+      };
+    }
+    result.docs.push(r);
+    if (!r.ok) result.pending.push(draft.id);
+    await writeStep(db, session.captureId, key, r.ok ? "done" : "failed", r as unknown as Row);
   }
 
   // vyřazené doklady → stránky smazat

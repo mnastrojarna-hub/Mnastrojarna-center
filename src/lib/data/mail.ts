@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/auth/session";
 import {
@@ -154,25 +155,22 @@ export async function getEmails(opts: GetEmailsOptions = {}): Promise<EmailItem[
   return (data as EmailListRow[]).map(toEmailItem);
 }
 
-/** Počet MÝCH nepřečtených příchozích e-mailů (bez spamu) — odznak v navigaci. */
+/**
+ * Odznak pošty v navigaci = počet nepřečtených VLÁKEN ve složce Přijaté (nepřečtený příchozí e-mail
+ * nebo neotevřené předání od kolegy) — stejné číslo jako u složky Přijaté (RPC mail_folder_counts).
+ */
 export async function getUnreadCount(): Promise<number> {
   const scope = await getMailScope();
   if (!scope) return 0;
   const db = await supa();
   if (!db) return 0;
   try {
-    const q = db
-      .from("emails")
-      .select("id", { count: "exact", head: true })
-      .eq("direction", "in")
-      .eq("is_read", false)
-      .eq("is_spam", false)
-      .neq("category", "spam");
-    const visible = applyVisibility(q, scope);
-    if (visible === false) return 0;
-    const { count, error } = await visible;
+    const { data, error } = await (db as unknown as SupabaseClient).rpc("mail_folder_counts", {
+      p_user: scope.userId, p_all: scope.all, p_owned: scope.ownedMailboxIds, p_mailbox: null, p_no_mailbox: false,
+    });
     warn("unread", error);
-    return count ?? 0;
+    const r = ((data ?? []) as { inbox_unread?: number }[])[0];
+    return Number(r?.inbox_unread) || 0;
   } catch {
     return 0;
   }
@@ -250,6 +248,21 @@ export async function getVisibleEmailRow<T extends object>(
   warn("email", error);
   if (error || !data) return null;
   const row = data as T & { owner_id: string | null; mailbox_id: string | null };
-  if (!canSeeEmail(scope, row, scope.ownedMailboxIds)) return null;
+  if (!canSeeEmail(scope, row, scope.ownedMailboxIds) && !(await isSharedWithMe(db, emailId, scope.userId))) return null;
   return { row, scope };
+}
+
+/**
+ * Vlákno e-mailu mi kolega předal („Předat kolegovi") → smím ho vidět — jen zprávy ze schránky
+ * předaného e-mailu (kopie stejné zprávy v cizí osobní schránce ne).
+ */
+async function isSharedWithMe(db: Db, emailId: string, userId: string): Promise<boolean> {
+  const raw = db as unknown as SupabaseClient;
+  const { data: em } = await raw.from("emails").select("thread_id, mailbox_id").eq("id", emailId).maybeSingle();
+  const row = em as { thread_id: string | null; mailbox_id: string | null } | null;
+  if (!row?.thread_id) return false;
+  let q = raw.from("email_shares").select("id", { count: "exact", head: true }).eq("thread_id", row.thread_id).eq("shared_with", userId);
+  q = row.mailbox_id ? q.eq("mailbox_id", row.mailbox_id) : q.is("mailbox_id", null);
+  const { count } = await q;
+  return (count ?? 0) > 0;
 }

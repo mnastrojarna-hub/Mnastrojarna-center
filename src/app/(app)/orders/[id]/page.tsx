@@ -1,7 +1,9 @@
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireFeature, getAccess } from "@/lib/auth/session";
+import { getMergeBanner, getMergeRedirect, getMergedSourceInfo } from "@/lib/data/job-merge";
+import { MergeBanner, MergedSourceBanner } from "@/components/jobs/detail/merge-banner";
 import { getFieldStamps, getJobStamps, listJobPayments, listOrderRevisions } from "@/lib/data/flow-status";
 import { FIELD_STAMP_COLUMNS } from "@/components/jobs/detail/detail-helpers";
 import { getJob, getJobFormOptions } from "@/lib/data/jobs";
@@ -28,21 +30,32 @@ export async function generateMetadata({ params }: Pick<Params, "params">): Prom
 export default async function JobDetailPage({ params, searchParams }: Params) {
   const user = await requireFeature("orders");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions] = await Promise.all([
+  const mergedFrom = typeof sp.slouceno === "string" ? sp.slouceno : null;
+  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions, mergedInto, banner] = await Promise.all([
     loadJob(id), getJobFormOptions(), getAccess(), getJobProduction(id), getJobPurchasing(id),
     getJobStamps(id), getFieldStamps(id, FIELD_STAMP_COLUMNS), listJobPayments(id), listOrderRevisions(id),
+    // #24: sloučená zakázka (zdroj) → přesměrovat na tu, která zůstala; na ní banner
+    getMergeRedirect(id), mergedFrom ? getMergeBanner(id, mergedFrom, sp.presmerovano === "1") : Promise.resolve(null),
   ]);
   if (!job) notFound();
+  // ?historie=1 = původní (sloučenou) zakázku jen zobrazit — odkaz z banneru cíle
+  if (mergedInto && sp.historie !== "1") redirect(`/orders/${mergedInto.id}?slouceno=${encodeURIComponent(job.number)}&presmerovano=1`);
+  const sourceInfo = mergedInto ? await getMergedSourceInfo(id, mergedInto) : null;
 
   return (
+    <>
+    {banner && <MergeBanner {...banner} />}
+    {sourceInfo && <MergedSourceBanner number={job.number} {...sourceInfo} />}
     <JobDetailView
       job={job}
       options={options}
       perms={{
-        canDelete: access.can("delete"),
+        // sloučená zakázka je jen historie (úpravy odmítne DB) — bez mazání a dalšího slučování
+        canDelete: !sourceInfo && access.can("delete"),
         margins: access.can("margins"),
-        aiCapture: access.can("ai_capture"),
-        ownerEditable: user.role === "super_admin",
+        aiCapture: !sourceInfo && access.can("ai_capture"),
+        ownerEditable: !sourceInfo && user.role === "super_admin",
+        canMerge: !sourceInfo && (user.role === "super_admin" || user.role === "obchodnik"),
       }}
       initialTab={typeof sp.tab === "string" ? sp.tab : undefined}
       // ?nova=1 (Poptávky „Vytvořit nabídku“) = záložka Nabídky s otevřeným editorem nové nabídky
@@ -54,5 +67,6 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
       production={production}
       purchasing={purchasing}
     />
+    </>
   );
 }

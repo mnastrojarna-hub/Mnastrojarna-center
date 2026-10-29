@@ -11,6 +11,7 @@ import { CaptureDocForm } from "@/components/jobs/capture/capture-doc-form";
 import { CaptureDrawingForm } from "@/components/jobs/capture/capture-drawing-form";
 import { CaptureModelForm } from "@/components/jobs/capture/capture-model-form";
 import { CaptureFileForm } from "@/components/jobs/capture/capture-file-form";
+import { CaptureSupplierInvoices } from "@/components/jobs/capture/capture-supplier-invoices";
 import { viewerPages, type LocalUrls } from "@/components/jobs/capture/capture-sort";
 import { jobsGenitive, mergeAllPlan, saveCountInfo, warningResolved, type BatchProblem } from "@/components/jobs/capture/capture-flow";
 import { BATCH_TYPES } from "@/lib/jobs/capture-batch";
@@ -218,7 +219,7 @@ export function CaptureBatchReview({
   const groups = review.groups
     .map((g, i) => ({ g, i, st: state.groups.find((x) => x.key === g.key) }))
     .filter((x): x is { g: typeof x.g; i: number; st: BatchGroupState } => Boolean(x.st && x.st.docIds.some((id) => review.docs.some((d) => d.docId === id))));
-  const docCount = review.docs.length;
+  const docCount = review.docs.length + (review.supplierInvoices?.length ?? 0);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 pb-2">
@@ -417,7 +418,9 @@ export function CaptureBatchReview({
         );
       })}
 
-      {review.docs.length === 0 && (
+      <CaptureSupplierInvoices review={review} batch={batch} local={local} />
+
+      {review.docs.length === 0 && !review.supplierInvoices?.length && (
         <p className={cn("rounded-xl p-3 text-sm", TONES.slate)}>Všechny doklady jsou vyřazené — vrať se do roztřídění.</p>
       )}
     </div>

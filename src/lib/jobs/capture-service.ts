@@ -28,6 +28,7 @@ import { isJobStage } from "@/lib/jobs/stages";
 import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { docNumbersEqual } from "@/lib/jobs/matching";
 import { findPurchaseOrderByNumber } from "@/lib/jobs/purchasing-store";
+import { resolveMergeTarget } from "@/lib/jobs/job-merge-store";
 import {
   autoCaptureCtx, captureHandoffActor, captureProductionHandoff, captureStageGuard, checkPhotoOrderMismatch, confirmOrderByPhoto, markQuoteSentByPhoto, photoOrderRevision,
   proposeFromCapture, receiveSupplierDlByPhoto, recordPhotoDelivery, registerPhotoOrderRevision,
@@ -36,6 +37,10 @@ import { issuerKey, looksLikeCancellation, type OrderChange } from "@/lib/jobs/c
 import { singleExistingTarget, singleNewTarget, singleOrderDeadline, type SingleOrderDeadline } from "@/lib/jobs/capture-single-deadline";
 import { jobQuoteTerms } from "@/lib/jobs/job-quote-terms";
 import type { QuoteTerms } from "@/lib/jobs/order-deadline";
+import { createSupplierInvoiceFromFile, type InvoiceFileInput } from "@/lib/supplier-invoices/service";
+import { invoiceFromBusinessDoc } from "@/lib/supplier-invoices/extract";
+import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
+import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
 import type {
   CaptureDocKind, CaptureResult, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedParty,
 } from "@/lib/jobs/capture-types";
@@ -600,10 +605,47 @@ export async function applyCapture(input: { captureId: string; state: unknown })
   try {
     const session = await readSession(c.db, c.user.id, input.captureId);
     if (!session) return failResult(SESSION_GONE);
+    // faktura dodavatele (chip ve formuláři) → Faktury dodavatelů, ne zakázka
+    if ((input.state as { chip?: unknown } | null)?.chip === "faktura_dodavatel") return await applySupplierInvoiceCapture(c, session);
     return await applyBusinessDoc(c, session, input.state, { auto: false });
   } catch (err) {
     return failResult(err);
   }
+}
+
+/** Jeden doklad označený jako faktura dodavatele → Faktury dodavatelů (stránky přesune, relaci uklidí). */
+async function applySupplierInvoiceCapture(c: Ctx, session: CaptureSession): Promise<CaptureResult> {
+  const files: InvoiceFileInput[] = [];
+  for (const f of session.files) {
+    const { data } = await bucket(c.db).download(f.path);
+    if (!data) return failResult(`Stránku ${f.filename} se nepodařilo načíst z úložiště.`, session.aiUsed);
+    files.push({ bytes: new Uint8Array(await (data as Blob).arrayBuffer()), filename: f.filename, mimeType: f.mimeType });
+  }
+  const pdf = files.some((f) => (f.mimeType ?? "").includes("pdf"));
+  // vytěžení z obchodního čtení použít jen, když ho AI opravdu četla jako fakturu od dodavatele — jinak
+  // (např. objednávka zákazníka přeznačená chipem) by položky byly prodejní ceny zákazníka a dodavatel chyběl:
+  // fakturu přečte znovu čtečka faktur
+  const asInvoice = session.aiUsed && session.doc.docKind === "faktura" && session.doc.issuer === "dodavatel";
+  const res = await createSupplierInvoiceFromFile(files, pdf ? "upload" : "photo", userActor(c.user, "foto"), {
+    db: c.db,
+    captureKey: `single:${session.captureId}`,
+    extract: asInvoice ? invoiceFromBusinessDoc(session.doc) : null,
+    aiUsed: asInvoice,
+    process: "background",
+    contextJobId: session.fixedJobId ?? null,
+  });
+  if (!res.ok) return failResult(res.error, session.aiUsed);
+  try {
+    await bucket(c.db).remove([...session.files.map((f) => f.path), captureSessionPath(c.user.id, session.captureId)]);
+  } catch {
+    // úklid je best-effort
+  }
+  const see = supplierInvoicePerms(c.access.can).amounts;
+  return {
+    ok: true, created: false, aiUsed: session.aiUsed, filled: [], docLabel: "Faktura dodavatele",
+    summary: see ? "Uloženo do Faktur dodavatelů — zkontroluj rozdělení na zakázky." : THANKS_TEXT,
+    supplierInvoice: { id: see ? res.id : null },
+  };
 }
 
 function isEmptyValue(v: unknown): boolean {
@@ -612,6 +654,15 @@ function isEmptyValue(v: unknown): boolean {
 
 function clamp01(v: number): number {
   return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
+}
+
+/** Zakázka, kterou dřívější pokus dávky založil (klíč focení); sloučená (#24) → zakázka, do které se sloučila. */
+async function jobByCaptureKey(db: JobsDb, captureKey: string): Promise<string | null> {
+  const { data } = await db.from("orders").select("id, merged_into_id").eq("capture_key", captureKey).maybeSingle();
+  const row = data as { id: string; merged_into_id: string | null } | null;
+  if (!row) return null;
+  if (!row.merged_into_id) return row.id;
+  return (await resolveMergeTarget(db, row.id))?.id ?? row.merged_into_id;
 }
 
 /** Dodavatel podle IČO / DIČ / názvu, jinak nový. */
@@ -677,9 +728,9 @@ export async function applyBusinessDoc(
 
   // dávka: zakázka už založená dřívějším pokusem → jen doplnit
   if (captureKey && state.targetKey === "new") {
-    const { data: prev } = await db.from("orders").select("id").eq("capture_key", captureKey).maybeSingle();
-    if (prev) {
-      state.targetKey = (prev as { id: string }).id;
+    const prevId = await jobByCaptureKey(db, captureKey);
+    if (prevId) {
+      state.targetKey = prevId;
       createdEarlier = true;
     }
   }
@@ -788,8 +839,8 @@ export async function applyBusinessDoc(
     );
     if (!res.ok || !res.id || !res.number) {
       // souběh / opakování: zakázku s tímto klíčem už založil jiný pokus → použít ji
-      const { data: again } = await db.from("orders").select("id").eq("capture_key", captureKey).maybeSingle();
-      if (again) return applyBusinessDoc(c, session, { ...state, targetKey: (again as { id: string }).id }, opts);
+      const againId = await jobByCaptureKey(db, captureKey);
+      if (againId) return applyBusinessDoc(c, session, { ...state, targetKey: againId }, opts);
       return failResult(res.error ?? "Zakázku se nepodařilo založit.", aiUsed);
     }
     jobId = res.id;

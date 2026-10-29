@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { SentList } from "@/components/sent-list";
 import { getMailboxesForUser, getSentMail } from "@/lib/data/mail";
@@ -6,7 +7,7 @@ import { NO_MAILBOX } from "@/lib/email/visibility";
 
 export const dynamic = "force-dynamic";
 
-/** Odeslaná pošta: každý svou, super admin všechny schránky (+ starší log fronty schvalování). */
+/** Archiv odeslané pošty: každý svou, super admin všechny schránky (+ starší log fronty schvalování). Bez ?archiv=1 → /inbox?slozka=sent. */
 export default async function SentPage({
   searchParams,
 }: {
@@ -15,6 +16,13 @@ export default async function SentPage({
   await requireFeature("mail");
   const sp = await searchParams;
   const raw = typeof sp.schranka === "string" ? sp.schranka : undefined;
+  // Odeslaná pošta je složka „Odeslané" v Přijaté poště (vlákna, odpověď, přeposlání). Tato stránka
+  // zůstává jen jako archiv (?archiv=1) — super admin tu vidí i starší log fronty schvalování.
+  if (sp.archiv !== "1") {
+    const q = new URLSearchParams({ slozka: "sent" });
+    if (raw) q.set("schranka", raw);
+    redirect(`/inbox?${q.toString()}`);
+  }
   const [{ can }, mailboxes] = await Promise.all([getAccess(), getMailboxesForUser()]);
   const all = can("mail_all");
   const mailboxId =
