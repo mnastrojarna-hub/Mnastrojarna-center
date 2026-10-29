@@ -6,6 +6,7 @@ import { getFlowScope } from "@/lib/data/flow-scope";
 import { isMineQuote } from "@/lib/auth/flow-scope";
 import { searchNormalize } from "@/lib/jobs/mapping";
 import type { JobStage } from "@/lib/supabase/database.types";
+import { supplierInvoiceSearchEntries } from "@/lib/data/supplier-invoices";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function GET() {
   const { can } = await getAccess();
   const empty = Promise.resolve([] as never[]);
   try {
-    const [jobs, customers, suppliers, allQuotes, drawings, scope] = await Promise.all([
+    const [jobs, customers, suppliers, allQuotes, drawings, scope, supplierInvoices] = await Promise.all([
       can("orders") ? listJobs({ sort: "updated", dir: "desc", limit: 1500 }) : empty,
       can("customers") ? getCustomers() : empty,
       can("suppliers") ? getSuppliers() : empty,
@@ -44,6 +45,8 @@ export async function GET() {
       can("orders") ? listQuotes() : empty,
       can("drawings") ? getDrawings() : empty,
       getFlowScope(),
+      // faktury dodavatelů: jen s právem (datová funkce ho ověří sama a jinak vrátí [])
+      can("supplier_invoices") ? supplierInvoiceSearchEntries() : empty,
     ]);
     const quotes = allQuotes.filter((q) => isMineQuote({
       jobId: q.job?.id ?? null, createdBy: q.createdBy?.id ?? null, ownerId: q.ownerId ?? null,
@@ -54,7 +57,7 @@ export async function GET() {
       if (!q.job || !q.number) continue;
       quoteNumbers.set(q.job.id, [...(quoteNumbers.get(q.job.id) ?? []), q.number]);
     }
-    const out: Record<"jobs" | "customers" | "suppliers" | "quotes" | "drawings", SearchEntry[]> = {
+    const out: Record<"jobs" | "customers" | "suppliers" | "quotes" | "drawings" | "supplierInvoices", SearchEntry[]> = {
       jobs: jobs.map((j) => ({
         id: j.id,
         label: `${j.number} · ${j.title || "bez názvu"}`,
@@ -96,9 +99,10 @@ export async function GET() {
         href: "/drawings",
         keywords: kw(d.number, d.material, d.customer, d.revision),
       })),
+      supplierInvoices,
     };
     return NextResponse.json(out, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return NextResponse.json({ jobs: [], customers: [], suppliers: [], quotes: [], drawings: [] });
+    return NextResponse.json({ jobs: [], customers: [], suppliers: [], quotes: [], drawings: [], supplierInvoices: [] });
   }
 }

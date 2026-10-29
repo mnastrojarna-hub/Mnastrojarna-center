@@ -64,6 +64,11 @@ export interface StoredExtract {
   note: string | null;
   /** Usage do souhrnu (bez cen). */
   truncated?: boolean;
+  /**
+   * Faktura dodavatele přečtená čtečkou faktur (SupplierInvoiceExtract) — při uložení dávky z ní vznikne
+   * faktura v Fakturách dodavatelů bez dalšího volání AI.
+   */
+  supplierInvoice?: unknown;
 }
 
 export interface ExtractRow {

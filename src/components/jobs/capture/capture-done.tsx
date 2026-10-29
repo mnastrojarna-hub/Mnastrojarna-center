@@ -25,6 +25,30 @@ export function CaptureDone({
 }) {
   const href = result.jobId ? `/orders/${result.jobId}` : "/orders";
   const items = (result.itemsAdded ?? 0) + (result.itemsMerged ?? 0);
+  if (result.supplierInvoice) {
+    // faktura dodavatele → Faktury dodavatelů (ne zakázka); bez práva na faktury jen poděkování
+    const invoiceId = result.supplierInvoice.id;
+    return (
+      <div className="mx-auto flex min-h-full max-w-xl flex-col items-center justify-center py-6 text-center" data-testid="capture-supplier-invoice-done">
+        <span className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-500/15 dark:text-emerald-300">
+          <CheckCircle2 className="h-11 w-11" />
+        </span>
+        <h3 className="mt-4 text-lg font-semibold" data-testid="capture-result-headline">{resultHeadline(result)}</h3>
+        {result.summary && <p className="mt-2 text-sm text-muted-foreground">{result.summary}</p>}
+        <div className="mt-6 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+          {invoiceId && (
+            <Button asChild size="lg" className="sm:min-w-44">
+              <Link href={`/supplier-invoices/${invoiceId}`} onClick={onClose}><ExternalLink /> Otevřít fakturu</Link>
+            </Button>
+          )}
+          <Button type="button" size="lg" onClick={onAnother} className="bg-rose-600 text-white hover:bg-rose-700 sm:min-w-44">
+            <Camera /> Vyfotit další doklad
+          </Button>
+          <Button type="button" size="lg" variant="ghost" onClick={onClose}>Zavřít</Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto flex min-h-full max-w-xl flex-col items-center justify-center py-6 text-center">
       <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-inner dark:bg-emerald-500/15 dark:text-emerald-300">

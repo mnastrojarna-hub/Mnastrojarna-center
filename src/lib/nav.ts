@@ -19,6 +19,8 @@ import {
   UserCog,
   ShoppingBag,
   ScrollText,
+  Receipt,
+  FileUp,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -35,6 +37,8 @@ export interface NavItem {
   color: string;
   /** Hlavní položka — vizuálně zvýrazněná. */
   primary?: boolean;
+  /** Skrýt, když má uživatel tuto funkci (např. „Nahrát fakturu" vedle plných Faktur dodavatelů). */
+  hideWith?: Feature;
 }
 
 export interface NavSection {
@@ -67,6 +71,9 @@ export const navSections: NavSection[] = [
       { title: "Potvrzení objednávek", href: "/confirmations", icon: PackageCheck, feature: "workflow", badgeKey: "confirmations", description: "Objednávky k potvrzení", color: "text-orange-500" },
       // #25: pro všechny — „moje" a bez práva na nákupní ceny maskované (bez cen, PDF a akcí)
       { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "workflow", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
+      // faktury dodavatelů: zatím jen super admin (přepínač viditelnosti); nahrát smí každý
+      { title: "Faktury dodavatelů", href: "/supplier-invoices", icon: Receipt, feature: "supplier_invoices", color: "text-emerald-600", description: "Přijaté faktury, rozdělení na zakázky, zaplaceno" },
+      { title: "Nahrát fakturu", href: "/supplier-invoices/upload", icon: FileUp, feature: "supplier_invoices_upload", hideWith: "supplier_invoices", color: "text-emerald-600", description: "Vyfoť nebo nahraj fakturu od dodavatele" },
       { title: "Dokumenty", href: "/documents", icon: ReceiptText, feature: "documents", description: "Faktury, nabídky, dodací listy, výkresy", color: "text-emerald-500" },
     ],
   },
@@ -110,7 +117,7 @@ export const allNavItems: NavItem[] = navSections.flatMap((s) => s.items);
 /** Navigace jen s položkami, na které má uživatel právo (prázdné sekce zmizí). */
 export function navForFeatures(features: readonly Feature[]): NavSection[] {
   return navSections
-    .map((s) => ({ ...s, items: s.items.filter((i) => features.includes(i.feature)) }))
+    .map((s) => ({ ...s, items: s.items.filter((i) => features.includes(i.feature) && !(i.hideWith && features.includes(i.hideWith))) }))
     .filter((s) => s.items.length > 0);
 }
 

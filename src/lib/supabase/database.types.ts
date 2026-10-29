@@ -1,5 +1,8 @@
 // Typy databáze CNC Sales OS (ručně dle supabase/migrations/*).
 // Při změně schématu aktualizuj zde i v migracích.
+import type {
+  SupplierInvoiceAllocationRow, SupplierInvoiceFileRow, SupplierInvoiceItemRow, SupplierInvoiceRow,
+} from "@/lib/supplier-invoices/db-types";
 
 export type UserRole = "super_admin" | "obchodnik" | "zamestnanec";
 export type EmailCategory =
@@ -25,7 +28,9 @@ export type JobSource = "manual" | "foto" | "email" | "import" | "ai";
 export type AutomationMode = "full" | "approval";
 export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categorization" | "order_match" | "reminder"
   // objednávka dodavateli vystavená při předání do výroby (migrace 20261023150000)
-  | "purchase_order";
+  | "purchase_order"
+  // návrh AI, jak rozdělit fakturu dodavatele na zakázky (migrace 20261029110000)
+  | "supplier_invoice";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "edited" | "auto_executed";
 export type MailboxProvider = "outlook" | "imap" | "gmail";
 
@@ -109,6 +114,8 @@ export interface Supplier {
   contact_person: string | null;
   website: string | null;
   address: string | null;
+  /** Bankovní účet z faktury dodavatele (migrace 20261029110000). */
+  bank_account?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1212,6 +1219,11 @@ export interface Database {
       drawing_anon_usage_log: Tbl<DrawingAnonUsageLogRow>;
       anon_send_queue: Tbl<AnonSendQueueRow>;
       drawing_anon_settings: Tbl<DrawingAnonSettingsRow>;
+      // faktury dodavatelů (migrace 20261029110000)
+      supplier_invoices: Tbl<SupplierInvoiceRow>;
+      supplier_invoice_files: Tbl<SupplierInvoiceFileRow>;
+      supplier_invoice_items: Tbl<SupplierInvoiceItemRow>;
+      supplier_invoice_allocations: Tbl<SupplierInvoiceAllocationRow>;
     };
     Views: {
       job_flow_v: { Row: JobFlowRow; Relationships: [] };

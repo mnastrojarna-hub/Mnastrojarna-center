@@ -95,6 +95,22 @@ export function CaptureReviewForm({ model, review, targets, onChange, onPickJob,
   const supplierSide = !embedded && isSupplierSideDoc(review);
   const set = (patch: Partial<ReviewState>) => onChange({ ...review, ...patch });
 
+  // faktura dodavatele jde do Faktur dodavatelů (ne do zakázky) — zakázka, údaje ani druh dokumentu se nevyplňují
+  if (!embedded && review.chip === "faktura_dodavatel") {
+    return (
+      <div className="space-y-3 pb-4">
+        <Banner model={model} />
+        <KindSection model={model} review={review} target={target} onChange={onChange} />
+        <Section icon={Wallet} tone="emerald" title="Uloží se do Faktur dodavatelů" hint="Nevznikne zakázka ani dokument zakázky.">
+          <p className="text-sm" data-testid="capture-invoice-note">
+            Uloží se do Faktur dodavatelů — zpracuje super admin. AI fakturu přečte (dodavatel, položky) a navrhne,
+            na které zakázky patří.
+          </p>
+        </Section>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("space-y-3", !embedded && "pb-4")}>
       {!embedded && <Banner model={model} />}

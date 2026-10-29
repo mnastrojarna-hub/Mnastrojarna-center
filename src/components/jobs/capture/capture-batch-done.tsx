@@ -108,7 +108,7 @@ export function CaptureBatchDone({
               <TypeChip docType={d.type} label={d.title || d.label} className="min-w-0 max-w-full" />
               <span className={cn("ml-auto flex items-center gap-1 text-xs font-medium", d.ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")}>
                 {d.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                {d.ok ? (d.skipped === "duplicate" ? "už uložené" : d.purchasingPending ? "čeká na Nákup" : "uloženo") : "neuloženo"}
+                {d.ok ? (d.skipped === "duplicate" ? "už uložené" : d.purchasingPending ? "čeká na Nákup" : d.supplierInvoice ? "nahráno" : "uloženo") : "neuloženo"}
               </span>
             </div>
             {d.error && <p className="mt-1 text-xs text-red-700 dark:text-red-300">{d.error}</p>}

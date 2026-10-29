@@ -177,6 +177,8 @@ export interface CaptureResult {
   warnings?: string[];
   /** Co doklad udělal s podrobnými stavy (revize objednávky, rozpor, dodáno částečně…). */
   flowNotes?: string[];
+  /** Doklad šel do Faktur dodavatelů (ne do zakázky); id jen s právem na faktury dodavatelů. */
+  supplierInvoice?: { id: string | null };
 }
 
 /** Mapování druhu dokladu na druh souboru zakázky. */

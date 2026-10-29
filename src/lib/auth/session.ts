@@ -25,15 +25,18 @@ function truthy(v: string | undefined, fallback: boolean): boolean {
 /** Nastavení AI přístupu (hlavní vypínač, AI pro všechny, klíč). */
 export const getAccessContext = cache(async (): Promise<AccessContext> => {
   try {
-    const [enabled, forAll, ai] = await Promise.all([
+    const [enabled, forAll, ai, invoices] = await Promise.all([
       getSetting("ai_enabled"),
       getSetting("ai_capture_for_all"),
       getAiConfig(),
+      getSetting("supplier_invoices_visibility"),
     ]);
     return {
       aiEnabled: truthy(enabled, DEFAULT_ACCESS_CONTEXT.aiEnabled),
       aiCaptureForAll: truthy(forAll, DEFAULT_ACCESS_CONTEXT.aiCaptureForAll),
       aiConfigured: Boolean(ai.apiKey),
+      // faktury dodavatelů: jediný přepínač viditelnosti (výchozí jen super admin)
+      supplierInvoicesForAll: (invoices ?? "").trim().toLowerCase() === "all",
     };
   } catch {
     return DEFAULT_ACCESS_CONTEXT;

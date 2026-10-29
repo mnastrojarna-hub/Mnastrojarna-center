@@ -1,0 +1,26 @@
+{
+  "supplier": {
+    "name": "Kovoobrábění Hrubý s.r.o.", "ico": "25874411", "dic": "CZ25874411", "street": "Průmyslová 12", "city": "Brno", "zip": "61200",
+    "country": "CZ", "email": "fakturace@hruby-cnc.cz", "phone": "+420 541 000 111", "contactPerson": "Jana Hrubá", "bankAccount": "2401234567/2010"
+  },
+  "number": "FA-2026-0815",
+  "variableSymbol": "20260815",
+  "issueDate": "2026-10-15",
+  "taxableDate": "2026-10-15",
+  "dueDate": "2026-11-14",
+  "currency": "CZK",
+  "totalNet": 31500,
+  "totalVat": 6615,
+  "totalGross": 38115,
+  "items": [
+    { "text": "Výroba přírub dle Vaší obj. OV-2099-901", "code": "", "quantity": 1, "unit": "kpl", "unitPrice": 30000, "amount": 30000, "vatRate": 21, "refs": ["OV-2099-901"] },
+    { "text": "Kalení — sdružené zakázky", "code": "", "quantity": 1, "unit": "kpl", "unitPrice": 1000, "amount": 1000, "vatRate": 21, "refs": [] },
+    { "text": "Doprava", "code": "", "quantity": 1, "unit": "ks", "unitPrice": 500, "amount": 500, "vatRate": 21, "refs": [] }
+  ],
+  "references": { "purchaseOrderNumbers": [], "jobNumbers": [], "customerOrderNumbers": [], "deliveryNoteNumbers": [], "drawingNumbers": [] },
+  "isCreditNote": false,
+  "isProforma": false,
+  "confidence": 0.93,
+  "summary": "Faktura Kovoobrábění Hrubý za výrobu přírub, kalení a dopravu.",
+  "needsClarification": []
+}

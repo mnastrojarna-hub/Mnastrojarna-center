@@ -37,6 +37,10 @@ import { issuerKey, looksLikeCancellation, type OrderChange } from "@/lib/jobs/c
 import { singleExistingTarget, singleNewTarget, singleOrderDeadline, type SingleOrderDeadline } from "@/lib/jobs/capture-single-deadline";
 import { jobQuoteTerms } from "@/lib/jobs/job-quote-terms";
 import type { QuoteTerms } from "@/lib/jobs/order-deadline";
+import { createSupplierInvoiceFromFile, type InvoiceFileInput } from "@/lib/supplier-invoices/service";
+import { invoiceFromBusinessDoc } from "@/lib/supplier-invoices/extract";
+import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
+import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
 import type {
   CaptureDocKind, CaptureResult, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedParty,
 } from "@/lib/jobs/capture-types";
@@ -601,10 +605,47 @@ export async function applyCapture(input: { captureId: string; state: unknown })
   try {
     const session = await readSession(c.db, c.user.id, input.captureId);
     if (!session) return failResult(SESSION_GONE);
+    // faktura dodavatele (chip ve formuláři) → Faktury dodavatelů, ne zakázka
+    if ((input.state as { chip?: unknown } | null)?.chip === "faktura_dodavatel") return await applySupplierInvoiceCapture(c, session);
     return await applyBusinessDoc(c, session, input.state, { auto: false });
   } catch (err) {
     return failResult(err);
   }
+}
+
+/** Jeden doklad označený jako faktura dodavatele → Faktury dodavatelů (stránky přesune, relaci uklidí). */
+async function applySupplierInvoiceCapture(c: Ctx, session: CaptureSession): Promise<CaptureResult> {
+  const files: InvoiceFileInput[] = [];
+  for (const f of session.files) {
+    const { data } = await bucket(c.db).download(f.path);
+    if (!data) return failResult(`Stránku ${f.filename} se nepodařilo načíst z úložiště.`, session.aiUsed);
+    files.push({ bytes: new Uint8Array(await (data as Blob).arrayBuffer()), filename: f.filename, mimeType: f.mimeType });
+  }
+  const pdf = files.some((f) => (f.mimeType ?? "").includes("pdf"));
+  // vytěžení z obchodního čtení použít jen, když ho AI opravdu četla jako fakturu od dodavatele — jinak
+  // (např. objednávka zákazníka přeznačená chipem) by položky byly prodejní ceny zákazníka a dodavatel chyběl:
+  // fakturu přečte znovu čtečka faktur
+  const asInvoice = session.aiUsed && session.doc.docKind === "faktura" && session.doc.issuer === "dodavatel";
+  const res = await createSupplierInvoiceFromFile(files, pdf ? "upload" : "photo", userActor(c.user, "foto"), {
+    db: c.db,
+    captureKey: `single:${session.captureId}`,
+    extract: asInvoice ? invoiceFromBusinessDoc(session.doc) : null,
+    aiUsed: asInvoice,
+    process: "background",
+    contextJobId: session.fixedJobId ?? null,
+  });
+  if (!res.ok) return failResult(res.error, session.aiUsed);
+  try {
+    await bucket(c.db).remove([...session.files.map((f) => f.path), captureSessionPath(c.user.id, session.captureId)]);
+  } catch {
+    // úklid je best-effort
+  }
+  const see = supplierInvoicePerms(c.access.can).amounts;
+  return {
+    ok: true, created: false, aiUsed: session.aiUsed, filled: [], docLabel: "Faktura dodavatele",
+    summary: see ? "Uloženo do Faktur dodavatelů — zkontroluj rozdělení na zakázky." : THANKS_TEXT,
+    supplierInvoice: { id: see ? res.id : null },
+  };
 }
 
 function isEmptyValue(v: unknown): boolean {

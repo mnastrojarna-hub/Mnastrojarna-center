@@ -65,6 +65,7 @@ export const approvalTypeLabel: Record<ApprovalType, string> = {
   // = popisek modulu automatiky („Poptávky dodavatelům")
   supplier_request: "Poptávka dodavateli",
   purchase_order: "Objednávka dodavateli",
+  supplier_invoice: "Faktura dodavatele",
   categorization: "Kategorizace",
   order_match: "Párování objednávky",
   reminder: "Upomínka",

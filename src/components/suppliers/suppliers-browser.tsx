@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import {
-  BadgeCheck, ClipboardList, Clock, Factory, Globe, Mail, MapPin, Phone, Search, SearchX, Star, UserRound, X,
+  BadgeCheck, ClipboardList, Clock, Factory, Globe, Mail, MapPin, Phone, Receipt, Search, SearchX, Star, UserRound, X,
 } from "lucide-react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
@@ -18,7 +19,12 @@ import { cn } from "@/lib/utils";
  * Adresář dodavatelů (kooperace): hledání podle názvu, technologie i materiálu,
  * barevné chipy technologií jako filtr, karty s hodnocením a dodací lhůtou.
  */
-export function SuppliersBrowser({ suppliers, initialQuery = "" }: { suppliers: SupplierView[]; initialQuery?: string }) {
+export function SuppliersBrowser({ suppliers, initialQuery = "", invoiceCounts = null }: {
+  suppliers: SupplierView[];
+  initialQuery?: string;
+  /** Počet faktur dodavatele — jen kdo vidí Faktury dodavatelů (zatím super admin), jinak null. */
+  invoiceCounts?: Record<string, number> | null;
+}) {
   const [q, setQ] = React.useState(initialQuery);
   const [tech, setTech] = React.useState<string | null>(null);
   const [topRated, setTopRated] = React.useState(false);
@@ -132,7 +138,7 @@ export function SuppliersBrowser({ suppliers, initialQuery = "" }: { suppliers: 
           </p>
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {shown.map((s) => (
-              <SupplierCard key={s.id} supplier={s} suggestions={suggestions} />
+              <SupplierCard key={s.id} supplier={s} suggestions={suggestions} invoices={invoiceCounts ? invoiceCounts[s.id] ?? 0 : null} />
             ))}
           </ul>
         </>
@@ -141,7 +147,7 @@ export function SuppliersBrowser({ suppliers, initialQuery = "" }: { suppliers: 
   );
 }
 
-function SupplierCard({ supplier: s, suggestions }: { supplier: SupplierView; suggestions: SupplierSuggestions }) {
+function SupplierCard({ supplier: s, suggestions, invoices = null }: { supplier: SupplierView; suggestions: SupplierSuggestions; invoices?: number | null }) {
   const web = websiteHref(s.website);
   return (
     <li className="flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm transition hover:border-orange-500/40 hover:shadow-md">
@@ -217,6 +223,11 @@ function SupplierCard({ supplier: s, suggestions }: { supplier: SupplierView; su
             {`${s.totalJobs} ${plural(s.totalJobs, "zakázka", "zakázky", "zakázek")}`}
             {s.activeJobs > 0 && <span className="font-semibold text-orange-700 dark:text-orange-300">{`· ${s.activeJobs} v běhu`}</span>}
           </div>
+        )}
+        {invoices !== null && (
+          <Link href={`/supplier-invoices?dodavatel=${s.id}`} className="inline-flex items-center gap-1.5 font-medium text-emerald-700 hover:underline dark:text-emerald-300" data-testid="supplier-invoices-link">
+            <Receipt className="h-3 w-3" /> {invoices ? `Faktury (${invoices})` : "Faktury"}
+          </Link>
         )}
         {s.note && <p className="line-clamp-2 text-muted-foreground">{s.note}</p>}
       </div>

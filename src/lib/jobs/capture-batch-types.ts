@@ -323,6 +323,17 @@ export interface BatchReviewModel {
   docs: BatchDocReview[];
   warnings: BatchWarning[];
   initial: BatchApplyState;
+  /** Faktury dodavatelů v dávce — mimo zakázky, uloží se do Faktur dodavatelů (chybí = žádné). */
+  supplierInvoices?: BatchSupplierInvoiceDoc[];
+}
+
+/** Faktura dodavatele v kontrole dávky („Faktura dodavatele → Faktury dodavatelů"). */
+export interface BatchSupplierInvoiceDoc {
+  docId: string;
+  pageIds: string[];
+  aiUsed: boolean;
+  /** Jen s právem na faktury dodavatelů (super admin) — jinak chybí. */
+  details?: { supplierName: string; documentNumber: string; totalNet: number | null; currency: string; items: number };
 }
 
 export interface BatchGroupState {
@@ -362,6 +373,10 @@ export interface BatchDocResult {
   links: BatchResultLink[];
   supplierQuoteId?: string; purchasingPending?: boolean;
   drawingId?: string; drawingArchived?: boolean; itemId?: string;
+  /** Faktura dodavatele uložená do Faktur dodavatelů (mimo zakázky). */
+  supplierInvoice?: boolean;
+  /** Jen s právem na faktury dodavatelů. */
+  supplierInvoiceId?: string;
 }
 export interface BatchResult {
   /** true i při částečném úspěchu */

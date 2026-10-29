@@ -104,6 +104,11 @@ export function isBusinessType(type: BatchDocType): boolean {
   return BATCH_TYPES[type]?.form === "business";
 }
 
+/** Faktura dodavatele jde mimo zakázky do Faktur dodavatelů (nezakládá zakázku ani dokument zakázky). */
+export function isSupplierInvoiceType(type: BatchDocType | string | null | undefined): boolean {
+  return type === "faktura_dodavatel";
+}
+
 /** Popisek do věty („objednávka zákazníka", „naše faktura"). */
 export function typePhrase(type: BatchDocType): string {
   const chip = CAPTURE_CHIPS.find((c) => c.key === type);
@@ -344,7 +349,10 @@ export function distinctJobCount(groups: { job: { targetKey: string } }[]): numb
 
 /** Nadpis obrazovky Hotovo („Uloženo 6 dokladů k zakázce Z-2026-031 · stav Vyfakturováno"). */
 export function batchResultHeadline(r: Pick<BatchResult, "groups" | "docs">): string {
-  const saved = r.docs.filter((d) => d.ok && d.skipped !== "excluded").length;
+  // faktury dodavatelů jdou mimo zakázky (Faktury dodavatelů) — do „uloženo k zakázce" se nepočítají
+  const invoices = r.docs.filter((d) => d.ok && d.skipped !== "excluded" && d.supplierInvoice).length;
+  const saved = r.docs.filter((d) => d.ok && d.skipped !== "excluded" && !d.supplierInvoice).length;
+  const invoiceTail = invoices ? `${invoices === 1 ? "1 faktura" : `${invoices} faktury`} → Faktury dodavatelů` : "";
   // skupiny uložené do stejné zakázky = jedna zakázka (počítají se různá jobId)
   const groups: BatchResult["groups"] = [];
   for (const g of r.groups) {
@@ -353,20 +361,27 @@ export function batchResultHeadline(r: Pick<BatchResult, "groups" | "docs">): st
     if (same < 0) groups.push(g);
     else groups[same] = { ...groups[same], created: groups[same].created || g.created, stageTo: groups[same].stageTo ?? g.stageTo };
   }
-  if (!saved && !groups.length) return "Nic se neuložilo";
+  if (!saved && !invoices && !groups.length) return "Nic se neuložilo";
+  // jen faktury dodavatelů (mimo zakázky)
+  if (!saved && !groups.length) {
+    return r.docs.some((d) => d.ok && d.supplierInvoiceId)
+      ? `${invoices === 1 ? "Faktura uložena" : `${invoices} faktury uloženy`} do Faktur dodavatelů`
+      : "Děkujeme, nahráno";
+  }
+  const withInvoices = (s: string) => (invoiceTail ? `${s} · ${invoiceTail}` : s);
   if (groups.length <= 1) {
     const g = groups[0];
     const parts: string[] = [];
     if (!g) parts.push(savedWord(saved));
-    else if (g.created) parts.push(`Založena zakázka ${g.jobNumber}`, lowerFirst(savedWord(saved)));
-    else parts.push(`${savedWord(saved)} k zakázce ${g.jobNumber}`);
+    else if (g.created) parts.push(`Založena zakázka ${g.jobNumber}`, ...(saved ? [lowerFirst(savedWord(saved))] : []));
+    else parts.push(saved ? `${savedWord(saved)} k zakázce ${g.jobNumber}` : `Zakázka ${g.jobNumber}`);
     const stage = g?.stageTo ?? null;
     if (stage) parts.push(`stav ${stageMeta(stage).label}`);
-    return parts.join(" · ");
+    return withInvoices(parts.join(" · "));
   }
   const created = groups.filter((g) => g.created).length;
   const head = `${savedWord(saved)} ke ${groups.length} ${plural(groups.length, "zakázce", "zakázkám", "zakázkám")}`;
-  return created ? `${head} · ${created === 1 ? "1 nová zakázka" : `${created} ${plural(created, "nová zakázka", "nové zakázky", "nových zakázek")}`}` : head;
+  return withInvoices(created ? `${head} · ${created === 1 ? "1 nová zakázka" : `${created} ${plural(created, "nová zakázka", "nové zakázky", "nových zakázek")}`}` : head);
 }
 
 /** Souhrn nad „Uložit vše" („2 zakázky · 6 dokladů · + nový zákazník Kovo Plus · + 3 položky · …"). */

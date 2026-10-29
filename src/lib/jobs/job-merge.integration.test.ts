@@ -496,6 +496,54 @@ describe.skipIf(!LOCAL_ENABLED)("sloučení zakázek ↔ lokální Supabase", ()
     expect(spaced.some((c) => c.id === f.order.id)).toBe(true);
   }, 60_000);
 
+  it("faktury dodavatelů: alokace zdroje (i na spojenou položku) přejdou na cíl, náklad cíle je spočítá, pozdní zápis na zdroj skončí u cíle", async () => {
+    const f = await fixture();
+    const { data: srcItem } = await svc.from("order_items").select("id").eq("order_id", f.quoteJob.id).eq("position", 0).single();
+    const { data: tgtItem } = await svc.from("order_items").select("id").eq("order_id", f.order.id).eq("position", 0).single();
+    const { data: sup, error: se } = await svc.from("suppliers").insert({ name: `Kooperant faktury ${TAG}` }).select("id").single();
+    if (se) throw new Error(se.message);
+    suppliers.push((sup as { id: string }).id);
+    const { data: po, error: pe } = await svc.from("purchase_orders").insert({
+      job_id: f.quoteJob.id, supplier_id: (sup as { id: string }).id, number: `OV-E2E-${TAG}-${n}`, status: "vystavena", total: 20_000,
+    }).select("id").single();
+    if (pe) throw new Error(pe.message);
+    const { data: inv, error: ie } = await svc.from("supplier_invoices").insert({
+      supplier_id: (sup as { id: string }).id, supplier_name: "Kooperant", number: `FA-${TAG}-${n}`, total_net: 18_000, source: "upload",
+    }).select("id").single();
+    if (ie) throw new Error(ie.message);
+    const invoiceId = (inv as { id: string }).id;
+    try {
+      const { data: it, error: ite } = await svc.from("supplier_invoice_items").insert({ invoice_id: invoiceId, position: 0, text: "Výroba", amount: 18_000 }).select("id").single();
+      if (ite) throw new Error(ite.message);
+      const { error: ae } = await svc.from("supplier_invoice_allocations").insert({
+        invoice_id: invoiceId, item_id: (it as { id: string }).id, target: "job", job_id: f.quoteJob.id, purchase_order_id: (po as { id: string }).id,
+        order_item_id: (srcItem as { id: string }).id, amount: 18_000, confirmed_at: new Date().toISOString(),
+      });
+      if (ae) throw new Error(ae.message);
+      await merged(f.order.id, f.quoteJob.id);
+      // (počet v souhrnu RPC; typovaný přehled sloučení ho neukazuje)
+      expect(localSql(`select result->'moved'->>'supplierInvoiceAllocations' from job_merges where source_id = '${f.quoteJob.id}'`)).toBe("1");
+      const { data: a } = await svc.from("supplier_invoice_allocations").select("job_id, order_item_id, purchase_order_id").eq("invoice_id", invoiceId).single();
+      expect(a).toMatchObject({ job_id: f.order.id, order_item_id: (tgtItem as { id: string }).id, purchase_order_id: (po as { id: string }).id });
+      // náklad cíle bez dvojího počítání: dílčí faktura 18 000 na objednávku 20 000 → 20 000; konečná → 18 000
+      expect(localSql(`select cost::text || '|' || known::text from job_cost('${f.order.id}')`)).toBe("20000.00|true");
+      await svc.from("supplier_invoices").update({ final_po_ids: [(po as { id: string }).id] }).eq("id", invoiceId);
+      const cost = localSql(`select cost::text || '|' || known::text from job_cost('${f.order.id}')`);
+      expect(cost).toBe("18000.00|true");
+      const { data: ce } = await svc.from("commission_entries").select("cost").eq("order_id", f.order.id).maybeSingle();
+      if (ce) expect(Number((ce as { cost: number }).cost)).toBe(18_000);
+      // pozdní zápis na sloučený zdroj → cíl
+      await svc.from("supplier_invoice_allocations").delete().eq("invoice_id", invoiceId);
+      const { data: late, error: le } = await svc.from("supplier_invoice_allocations").insert({
+        invoice_id: invoiceId, item_id: (it as { id: string }).id, target: "job", job_id: f.quoteJob.id, amount: 500,
+      }).select("job_id").single();
+      expect(le).toBeNull();
+      expect((late as { job_id: string }).job_id).toBe(f.order.id);
+    } finally {
+      await svc.from("supplier_invoices").delete().eq("id", invoiceId);
+    }
+  }, 60_000);
+
   it("REST (session) nesloučí ani nenastaví příznak sloučení", async () => {
     const f = await fixture();
     const s = await localSession(DEMO.admin.email, DEMO.admin.password);

@@ -360,8 +360,9 @@ export function marginHero(t: JobPurchasingTotals): MarginHero {
   return {
     revenue: t.revenue,
     cost: t.cost,
-    costLabel: t.costSource === "objednavky" ? "objednávky dodavatelům" : t.costSource === "odhad" ? "odhad (plánovaný nákup)"
-      : t.costSource === "neuplna" ? `neúplná — ${pendingText(t.unpricedPurchaseOrders)}` : "zatím neznámý",
+    costLabel: t.costSource === "objednavky" ? "objednávky dodavatelům" : t.costSource === "faktury" ? "faktury a objednávky dodavatelům"
+      : t.costSource === "odhad" ? "odhad (plánovaný nákup)"
+      : t.costSource === "neuplna" ? `neúplná — ${t.missingRates?.length ? [t.unpricedPurchaseOrders?.length ? pendingText(t.unpricedPurchaseOrders) : null, `chybí ${t.missingRates.join(", ")}`].filter(Boolean).join("; ") : pendingText(t.unpricedPurchaseOrders)}` : "zatím neznámý",
     profit: t.profit,
     margin: t.margin,
     tone,
