@@ -9,6 +9,8 @@ export interface AccountData {
   position: string | null;
   createdAt: string | null;
   lastSeenAt: string | null;
+  /** Podpis e-mailu (profiles.mail_signature, migrace 20261029100000). */
+  mailSignature?: string;
   mailboxes: {
     id: string; email: string; displayName: string | null; active: boolean; lastSyncAt: string | null;
     /** Chyba posledního stažení (null = OK). */
@@ -25,14 +27,14 @@ export async function loadAccountData(userId: string): Promise<AccountData> {
   try {
     const db = createAdminClient();
     const [profileRes, mailboxRes] = await Promise.all([
-      db.from("profiles").select("phone, position, created_at, last_seen_at").eq("id", userId).maybeSingle(),
+      db.from("profiles").select("phone, position, created_at, last_seen_at, mail_signature" as "*").eq("id", userId).maybeSingle(),
       db
         .from("mailboxes")
         .select("id, email, display_name, active, last_sync_at, provider, config")
         .eq("owner_id", userId)
         .order("email", { ascending: true }),
     ]);
-    const p = profileRes.data as Pick<Profile, "phone" | "position" | "created_at" | "last_seen_at"> | null;
+    const p = profileRes.data as unknown as (Pick<Profile, "phone" | "position" | "created_at" | "last_seen_at"> & { mail_signature?: string | null }) | null;
     const boxes = (mailboxRes.data ?? []) as Pick<Mailbox, "id" | "email" | "display_name" | "active" | "last_sync_at" | "provider" | "config">[];
     const statuses = await getMailboxStatuses(boxes.map((b) => b.id));
     return {
@@ -40,6 +42,7 @@ export async function loadAccountData(userId: string): Promise<AccountData> {
       position: p?.position ?? null,
       createdAt: p?.created_at ?? null,
       lastSeenAt: p?.last_seen_at ?? null,
+      mailSignature: p?.mail_signature ?? "",
       mailboxes: boxes.map((b) => ({
         id: b.id,
         email: b.email,

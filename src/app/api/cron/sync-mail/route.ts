@@ -25,10 +25,13 @@ export async function GET(req: Request) {
   if (status === 401) return NextResponse.json({ error: "Neautorizováno." }, { status: 401 });
 
   try {
-    // Na Vercel Hobby běží cron jen 1× denně → větší dávka (inkrementálně, nic se neztratí)
-    // deadline = nejzazší konec stahování; nová schránka / e-mail jen do konce − 60 s (pod maxDuration 300 s,
-    // zbývá čas i na plánovač toku). Plánovač se se známým odmítnutým heslem nepřihlašuje (manual: false).
-    const result = await syncMailbox({ limit: 50, actor: cronActor("cron-mail"), deadline: Date.now() + 240_000 });
+    // Na Vercel Hobby běží cron jen 1× denně (vercel.json „17 5 * * *") — „živě" stahuje otevřená aplikace
+    // (/api/emails/live každou minutu, MailLiveProvider). Častější plán: Vercel Pro (vercel.json např.
+    // „*/5 * * * *"), nebo externí plánovač (cron-job.org, GitHub Actions) volající tuto adresu s hlavičkou
+    // Authorization: Bearer <CRON_SECRET>. Stahuje se dávka za dávkou do limitu (kurzor, nic se neztratí);
+    // nová schránka / e-mail jen do konce − 60 s (pod maxDuration 300 s, zbývá čas i na plánovač toku).
+    // Plánovač se se známým odmítnutým heslem nepřihlašuje (manual: false).
+    const result = await syncMailbox({ limit: 100, actor: cronActor("cron-mail"), deadline: Date.now() + 240_000 });
     const flow = await runFlowReminders().catch((err: unknown) => ({ error: err instanceof Error ? err.message : "Plánovač toku selhal" }));
     return NextResponse.json({ ...result, flow });
   } catch (err) {

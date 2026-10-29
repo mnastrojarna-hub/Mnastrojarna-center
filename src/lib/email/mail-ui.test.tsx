@@ -26,13 +26,21 @@ vi.mock("@/app/actions/integrations", () => ({
   addMailbox: vi.fn(), updateMailbox: vi.fn(), deleteMailbox: vi.fn(), testMailboxConnection: vi.fn(),
 }));
 vi.mock("@/app/actions/mailbox-owner", () => ({ setMailboxOwner: vi.fn() }));
+vi.mock("@/app/actions/mail-inbox", () => ({
+  listThreadsAction: vi.fn(), openThreadAction: vi.fn(() => new Promise(() => {})), markThreadReadAction: vi.fn(), setThreadFlagAction: vi.fn(),
+  setThreadPriorityAction: vi.fn(), shareCandidatesAction: vi.fn(), shareThreadAction: vi.fn(), runAiOnThreadAction: vi.fn(),
+}));
+vi.mock("@/app/actions/mail-compose", () => ({
+  composeContextAction: vi.fn(), prepareMailUploadAction: vi.fn(), sendComposedAction: vi.fn(), searchRecipientsAction: vi.fn(), saveSignatureAction: vi.fn(),
+}));
 
 import { AutomationProvider } from "@/components/automation-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { InboxView } from "@/app/(app)/inbox/inbox-view";
 import { SentList } from "@/components/sent-list";
 import { MailboxManager } from "@/components/mailbox-manager";
-import type { EmailItem, SentItem } from "@/lib/data/types";
+import type { SentItem } from "@/lib/data/types";
+import type { ThreadSummary } from "./mail-types";
 import type { Mailbox } from "@/lib/supabase/database.types";
 import type { MailboxOption } from "./visibility";
 
@@ -44,23 +52,25 @@ function render(node: React.ReactNode): string {
   ).replace(/<!-- -->/g, "");
 }
 
-const emails: EmailItem[] = [
-  {
-    id: "e1", from: "Jan Dvořák", fromEmail: "dvorak@strojmetal.cz", subject: "Poptávka hřídele", preview: "Dobrý den, 50 ks",
-    category: "Poptávka", priority: "Vysoká", customer: "StrojMetal", receivedAt: "2026-10-22T08:00:00Z",
-    aiConfidence: 0.93, aiSummary: "Zákazník poptává 50 ks hřídelí", unread: true, hasDraft: true,
-    mailboxId: "m1", mailboxEmail: "obchod@mnastrojarna.cz", direction: "in",
-  },
-  {
-    id: "e2", from: "Eva Nová", fromEmail: "eva@firma.cz", subject: "Objednávka 4500123", preview: "Objednáváme",
-    category: "Objednávka", priority: "Střední", receivedAt: "2026-10-21T08:00:00Z", aiConfidence: 0, unread: false,
-    hasDraft: false, jobId: "j1", jobNumber: "Z-2026-001",
-  },
-  {
-    id: "e3", from: "Spammer", fromEmail: "x@spam.biz", subject: "Výhra", preview: "", category: "Spam", priority: "Nízká",
-    receivedAt: "2026-10-20T08:00:00Z", aiConfidence: 0, unread: true, hasDraft: false,
-  },
+const thread = (p: Partial<ThreadSummary> & { threadId: string; subject: string }): ThreadSummary => ({
+  emailId: `e-${p.threadId}`, mailboxId: "m1", direction: "in", from: "—", fromEmail: "", preview: "", category: "Ostatní",
+  aiConfidence: 0, lastAt: "2026-10-22T08:00:00Z", hasDraft: false, messageCount: 1, unreadCount: 0, flagged: false,
+  priority: 3, priorityManual: false, hasAttachments: false, aiPending: false, ...p,
+});
+const threads: ThreadSummary[] = [
+  thread({
+    threadId: "t1", from: "Jan Dvořák", fromEmail: "dvorak@strojmetal.cz", subject: "Poptávka hřídele", preview: "Dobrý den, 50 ks",
+    category: "Poptávka", customer: "StrojMetal", aiConfidence: 0.93, aiSummary: "Zákazník poptává 50 ks hřídelí", unreadCount: 1,
+    hasDraft: true, mailboxEmail: "obchod@mnastrojarna.cz", priority: 2, messageCount: 3, flagged: true, hasAttachments: true,
+  }),
+  thread({
+    threadId: "t2", from: "Eva Nová", fromEmail: "eva@firma.cz", subject: "Objednávka 4500123", preview: "Objednáváme",
+    category: "Objednávka", jobId: "j1", jobNumber: "Z-2026-001", priority: 1, priorityManual: true,
+    share: { note: "Prosím nacenit do pátku", by: "Petr Obchodník", unread: true },
+  }),
 ];
+const page = (items: ThreadSummary[]) => ({ items, total: items.length, offset: 0, hasMore: false });
+const counts = { inboxUnread: 2, flagged: 1, spam: 4, shared: 1, sharedUnread: 1, aiPending: 0 };
 
 const mailboxes: MailboxOption[] = [
   { id: "m1", email: "obchod@mnastrojarna.cz", displayName: "Obchod", ownerId: "u1", ownerName: "Petra Obchodní" },
@@ -72,36 +82,48 @@ describe("Přijatá pošta — render", () => {
     accessState.features = [];
   });
 
-  it("běžný uživatel: jeho schránka, barevné kategorie, bez AI prvků", () => {
-    const html = render(<InboxView emails={emails} mailboxes={[mailboxes[0]]} scope="own" mailboxId={null} />);
+  it("běžný uživatel: složky s počty, vlákna s vlaječkou a prioritou, poznámka kolegy, bez AI prvků", () => {
+    const html = render(<InboxView initial={page(threads)} counts={counts} mailboxes={[mailboxes[0]]} scope="own" mailboxId={null} folder="inbox" />);
     expect(html).toContain("Tvoje schránka:");
     expect(html).toContain("obchod@mnastrojarna.cz");
+    for (const f of ["Přijaté", "Odeslané", "Označené", "Předané mně", "Vše", "Spam"]) expect(html).toContain(f);
     expect(html).toContain("Poptávka hřídele");
-    expect(html).toContain("bg-sky-500"); // barva poptávky (tečka nepřečteného / pruh)
+    expect(html).toContain("bg-sky-500"); // barva poptávky (tečka nepřečteného)
     expect(html).toContain("Z-2026-001");
-    expect(html).toContain("Založit zakázku");
-    expect(html).not.toContain("Výhra"); // spam není ve „Vše"
+    expect(html).toContain("Od Petr Obchodník");
+    expect(html).toContain("Prosím nacenit do pátku");
+    expect(html).toContain('data-flagged="1"');
+    expect(html).toContain("P1");
+    expect(html).toContain("P2");
+    expect(html).toContain("Nová zpráva");
+    expect(html).toContain("Stáhnout poštu");
+    // review #2: žádné vlákno se neotevře samo (otevření = přečteno) — až po kliknutí
+    expect(html).toContain("Vyber e-mail vlevo.");
+    expect(html).not.toContain('data-testid="thread-view"');
+    expect(html).toContain("2 vlákna");
     expect(html).not.toContain("Co AI zjistila");
     expect(html).not.toContain("Návrh připraven");
     expect(html).not.toContain("% AI");
     expect(html).not.toContain("Všechny schránky");
   });
 
-  it("bez přiřazené schránky: vysvětlení, co dělat", () => {
-    const html = render(<InboxView emails={[]} mailboxes={[]} scope="own" mailboxId={null} />);
-    expect(html).toContain("Zatím nemáš přiřazenou e-mailovou schránku.");
-    expect(html).toContain("Super admin ti ji přiřadí v sekci Uživatelé.");
+  it("bez schránky: připoj si ji sám v Můj účet", () => {
+    const html = render(<InboxView initial={page([])} counts={counts} mailboxes={[]} scope="own" mailboxId={null} folder="inbox" />);
+    expect(html).toContain("Zatím nemáš připojenou e-mailovou schránku.");
+    expect(html).toContain("Připojit schránku");
+    expect(html).toContain('href="/account#schranka"');
   });
 
   it("super admin: přepínač schránek a AI shrnutí", () => {
     accessState.features = ["mail", "mail_all", "dashboard"];
-    const html = render(<InboxView emails={emails} mailboxes={mailboxes} scope="all" mailboxId={null} />);
+    const html = render(<InboxView initial={page(threads)} counts={counts} mailboxes={mailboxes} scope="all" mailboxId={null} folder="inbox" />);
     expect(html).toContain("Všechny schránky");
     expect(html).toContain("Petra Obchodní");
-    expect(html).toContain("bez vlastníka");
-    expect(html).toContain("Co AI zjistila");
-    expect(html).toContain("Zákazník poptává 50 ks hřídelí");
+    expect(html).toContain("firemní (bez vlastníka)");
     expect(html).toContain("93% AI");
+    expect(html).not.toContain('data-testid="thread-view"');
+    // review #10: mobil = kompaktní výběr schránky
+    expect(html).toContain('data-testid="mailbox-select"');
   });
 });
 

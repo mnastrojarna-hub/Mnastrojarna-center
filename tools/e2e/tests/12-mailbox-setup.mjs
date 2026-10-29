@@ -303,7 +303,8 @@ await T("odmítnuté heslo: ručně se zkusí, automatické stažení při otev�
   const ap = await admin.newPage();
   await login(ap, USERS.admin);
   await ap.goto(`${BASE}/settings`);
-  await ap.getByTestId(`mailbox-row-${user}`).getByTestId("auth-blocked").waitFor({ timeout: 20_000 });
+  // streamovaná stránka (loading.tsx) má chvíli i skrytou kopii obsahu → první viditelný
+  await ap.getByTestId(`mailbox-row-${user}`).getByTestId("auth-blocked").first().waitFor({ timeout: 20_000 });
   await admin.close();
 
   // oprava hesla → automatické stažení zase běží

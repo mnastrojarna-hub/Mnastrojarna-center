@@ -1,6 +1,8 @@
-import Link from "next/link";
+import { MyMailboxCard } from "@/components/mail/my-mailbox-card";
+import { SignatureForm } from "@/components/mail/signature-form";
+import { listMyMailboxes } from "@/lib/email/my-mailbox";
 import {
-  BadgeCheck, Crown, Briefcase, Wrench, Mail, KeyRound, UserRound, ShieldCheck, Sparkles, Inbox, Check, Eye,
+  Crown, Briefcase, Wrench, Mail, KeyRound, UserRound, ShieldCheck, Sparkles, Inbox, Check, Eye,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +64,7 @@ function SectionIcon({ icon: Icon, tone }: { icon: React.ComponentType<{ classNa
 /** Můj účet — jméno, telefon, heslo, role a co role vidí, vlastní schránky. */
 export default async function AccountPage() {
   const user = await requireUser();
-  const [data, access] = await Promise.all([loadAccountData(user.id), getAccess()]);
+  const [data, access, myBoxes] = await Promise.all([loadAccountData(user.id), getAccess(), listMyMailboxes(user.id).catch(() => [])]);
   const RoleIcon = ROLE_ICONS[user.role];
   const style = ROLE_STYLES[user.role];
   const features = SHOWN_FEATURES.filter((f) => access.features.includes(f));
@@ -185,58 +187,26 @@ export default async function AccountPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <SectionIcon icon={Inbox} tone="bg-blue-500/10 text-blue-600 dark:text-blue-400" /> Moje e-mailové schránky
-              </CardTitle>
-              <CardDescription>
-                {access.features.includes("mail_all")
-                  ? "Jako super admin vidíš poštu všech schránek."
-                  : "Vidíš jen poštu schránek, které ti přidělil super admin."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {data.mailboxes.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  Zatím ti nebyla přidělena žádná schránka. Požádej super admina.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {data.mailboxes.map((m) => (
-                    <li key={m.id} className="flex items-center gap-3 rounded-lg border p-3">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                        <Mail className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{m.displayName || m.email}</div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          {m.displayName ? `${m.email} · ` : ""}
-                          {m.lastSyncAt ? `staženo ${relativeTime(m.lastSyncAt)}` : "zatím nestaženo"}
-                        </div>
-                        {m.incomplete ? (
-                          <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">Nastavení schránky není kompletní — požádej super admina.</div>
-                        ) : m.lastSyncError ? (
-                          <div className="mt-0.5 break-words text-xs text-destructive">Poslední stažení selhalo: {m.lastSyncError}</div>
-                        ) : null}
-                      </div>
-                      <Badge
-                        variant={m.active ? "outline" : "muted"}
-                        className={m.active ? "border-transparent bg-success/10 text-success" : undefined}
-                      >
-                        {m.active ? <><BadgeCheck className="h-3 w-3" /> aktivní</> : "vypnutá"}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {access.features.includes("mail") && (
-                <Link href="/inbox" className="mt-3 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline">
-                  Otevřít přijatou poštu
-                </Link>
-              )}
-            </CardContent>
-          </Card>
+          {access.features.includes("mail") && (
+            <Card id="schranka" className="scroll-mt-20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <SectionIcon icon={Inbox} tone="bg-blue-500/10 text-blue-600 dark:text-blue-400" /> Moje e-mailová schránka
+                </CardTitle>
+                <CardDescription>
+                  Schránku si připojíš sám — e-mail a heslo, nastavení příjmu i odesílání se najde samo. Z ní odcházejí tvoje odpovědi, nabídky a doklady.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <MyMailboxCard initial={myBoxes} isAdmin={access.features.includes("mail_all")} />
+                <div className="space-y-1.5 border-t pt-4">
+                  <div className="flex items-center gap-2 text-sm font-medium"><Mail className="h-4 w-4 text-muted-foreground" /> Podpis e-mailu</div>
+                  <p className="text-xs text-muted-foreground">Vloží se pod každou novou zprávu, odpověď i přeposlání.</p>
+                  <SignatureForm initial={data.mailSignature ?? ""} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

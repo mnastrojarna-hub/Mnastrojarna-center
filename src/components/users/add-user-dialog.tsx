@@ -241,17 +241,9 @@ export function AddUserDialog({
                 </div>
               )}
               <div className="space-y-1.5 sm:col-span-2">
-                <label htmlFor="nu-mailbox" className="text-sm font-medium">E-mailová schránka</label>
-                <select id="nu-mailbox" className={SELECT_CLASS} value={form.mailboxId} onChange={(e) => set("mailboxId", e.target.value)}>
-                  <option value="">— bez schránky —</option>
-                  {mailboxes.map((m) => (
-                    <option key={m.id} value={m.id}>{mailboxLabel(m, ownerMap)}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  {mailboxes.length === 0
-                    ? "Zatím žádné schránky — přidáš je v Nastavení → E-mailové schránky."
-                    : "Uživatel uvidí jen poštu své schránky."}
+                <p className="rounded-lg bg-blue-500/5 p-2.5 text-xs text-muted-foreground" data-testid="nu-mailbox-hint">
+                  <b className="text-foreground">E-mailová schránka:</b> schránku si uživatel nastaví sám v Můj účet (e-mail + heslo).
+                  Přiřadit existující schránku jde výjimečně u uživatele v seznamu.
                 </p>
               </div>
             </div>

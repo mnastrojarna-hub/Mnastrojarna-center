@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   Plus, Trash2, Mail, Loader2, Plug, Pencil, Check, X, CheckCircle2, AlertCircle, UserRound, Wand2, RefreshCw,
-  ChevronDown, ChevronRight, KeyRound, ShieldAlert, Power, Info,
+  ChevronDown, ChevronRight, KeyRound, ShieldAlert, Power, Info, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -376,6 +376,23 @@ function MailboxForm({
     }
   };
 
+  // „Vyzkoušet odeslání": zkušební e-mail ze schránky na její vlastní adresu (+ kopie do Odeslaných na serveru)
+  const [sendBusy, setSendBusy] = React.useState(false);
+  const [sendResult, setSendResult] = React.useState<{ ok: boolean; text: string } | null>(null);
+  const runTestSend = async () => {
+    if (!editing) return;
+    setSendBusy(true);
+    setSendResult(null);
+    try {
+      const r = await postJson<{ sent: boolean; text?: string; reason?: string; error?: string }>("/api/mailboxes/diagnose", { action: "testSend", mailboxId: editing.id });
+      setSendResult({ ok: r.sent, text: r.sent ? `Zkušební e-mail odeslán. ${r.text ?? ""}` : r.text ?? r.reason ?? r.error ?? "Odeslání selhalo." });
+    } catch (err) {
+      setSendResult({ ok: false, text: err instanceof Error ? err.message : "Odeslání selhalo." });
+    } finally {
+      setSendBusy(false);
+    }
+  };
+
   const runDetect = async (allowNameMismatch = false) => {
     setBusy("detect");
     setError(null);
@@ -487,7 +504,9 @@ function MailboxForm({
           <span className="text-sm font-medium">Čí je schránka?</span>
           <OwnerSelect users={users} value={ownerId} onChange={setOwnerId} className="w-full min-w-0 flex-1 sm:min-w-[220px]" />
           <span className="w-full text-xs text-muted-foreground">
-            Vlastník uvidí poštu této schránky ve své Přijaté a Odeslané poště. Bez vlastníka ji vidí jen super admin.
+            Schránku si uživatel nastaví sám v Můj účet — tady jen firemní schránka (bez vlastníka) nebo výjimečné přiřazení.
+            Vlastník uvidí poštu této schránky ve své Přijaté a Odeslané poště a odesílá z ní. Bez vlastníka ji vidí jen super admin
+            (a odchází z ní pošta lidí bez vlastní schránky).
           </span>
         </div>
       )}
@@ -702,6 +721,12 @@ function MailboxForm({
           {busy === "test" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
           Otestovat připojení
         </Button>
+        {editing && (
+          <Button size="sm" variant="outline" onClick={runTestSend} disabled={busy !== null || sendBusy} data-testid="test-send-btn">
+            {sendBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Vyzkoušet odeslání
+          </Button>
+        )}
         <Button size="sm" onClick={save} disabled={busy !== null} data-testid="save-btn">
           {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : editing ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
           {editing ? "Uložit změny" : "Přidat schránku"}
@@ -712,6 +737,9 @@ function MailboxForm({
           </Button>
         )}
       </div>
+      {sendResult && (
+        <p className={cn("break-words text-sm", sendResult.ok ? "text-emerald-700 dark:text-emerald-400" : "text-destructive")} data-testid="test-send-result">{sendResult.text}</p>
+      )}
       {error && <p className="break-words text-sm text-destructive" data-testid="form-error">{error}</p>}
       {notes.map((n) => <p key={n} className="text-xs text-muted-foreground">{n}</p>)}
     </div>

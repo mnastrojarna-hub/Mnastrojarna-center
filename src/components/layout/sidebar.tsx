@@ -7,6 +7,7 @@ import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
 import type { BadgeCounts } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
+import { useMailLive } from "@/components/mail/mail-live-provider";
 
 export function isActivePath(pathname: string, href: string): boolean {
   return matchesNavPath(pathname, href);
@@ -24,7 +25,8 @@ export function Sidebar({
   roleLabel?: string;
 }) {
   const pathname = usePathname();
-  const badgeCounts: Record<string, number | undefined> = counts ?? {};
+  const live = useMailLive(); // živý počet nepřečtené pošty (bez načtení stránky)
+  const badgeCounts: Record<string, number | undefined> = { ...(counts ?? {}), ...(live.unread !== null ? { inbox: live.unread } : {}) };
   const sections = navForFeatures(features);
   const activeHref = activeNavHref(pathname, sections.flatMap((s) => s.items.map((i) => i.href)));
 

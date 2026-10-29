@@ -200,7 +200,7 @@ describe.skipIf(!LOCAL_ENABLED)("stahování pošty ↔ lokální Supabase + tes
       const sentBefore = srv.sent.length;
       const r = await send.sendMail({ to: "zakaznik@test.cz", subject: "Nabídka", text: "x", from: { ownerId: uid }, log: false });
       expect(r.sent).toBe(false);
-      expect(r.reason).toMatch(/^Tvoje schránka nemá nastavené odesílání — doplň odchozí server \(SMTP\) v Nastavení → E-mailové schránky, nebo požádej admina/);
+      expect(r.reason).toMatch(/^Tvoje schránka nemá nastavené odesílání \(SMTP\) — nastav ho v Můj účet → Moje e-mailová schránka/);
       const r2 = await send.sendMail({ to: "zakaznik@test.cz", subject: "Nabídka", text: "x", from: { mailboxId: vyp }, log: false });
       expect(r2.sent).toBe(false);
       expect(r2.reason).toMatch(/vypnutá/);

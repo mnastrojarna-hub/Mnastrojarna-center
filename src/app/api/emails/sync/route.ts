@@ -12,16 +12,24 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 /**
- * Nejzazší konec stahování (zbytek zpráv se stáhne příště — stav se posouvá jen o zpracované).
+ * Nejzazší konec stahování (zbytek zpráv se stáhne při dalším volání — stav se posouvá jen o zpracované).
  * Nová schránka / e-mail se začne jen do konce − 60 s (SYNC_RESERVE_MS) → odpověď do ~160 s, pod maxDuration.
+ * Stahuje se CELÁ schránka (INBOX + Odeslané) po dávkách 50 zpráv; odpověď nese `total` / `remaining` /
+ * `done` a klient volá znovu, dokud není `done` (průběh „Staženo 340 z 2 150").
  */
 const SYNC_BUDGET_MS = 160_000;
+const CHUNK = 50;
+/**
+ * Max. zpráv na schránku za jedno volání — klient volá znovu, dokud není hotovo (průběh se ukazuje
+ * po každém volání a žádné volání se neblíží limitu platformy). MAIL_SYNC_MAX_PER_CALL jen pro testy.
+ */
+const MAX_PER_CALL = Math.min(5000, Math.max(20, Number(process.env.MAIL_SYNC_MAX_PER_CALL) || 400));
 
 /**
  * Ruční synchronizace pošty: super admin stáhne všechny schránky (včetně
  * globálního účtu), ostatní jen své vlastní schránky.
  * Tělo (volitelné): { auto: true } = automatické stažení při otevření Přijaté pošty (přeskočí
- * schránky stažené před < 2 min), { mailboxId } = jen jedna schránka (Nastavení → po uložení).
+ * schránky stažené před < 2 min), { mailboxId } = jen jedna schránka (po uložení schránky).
  */
 export async function POST(req: Request) {
   const auth = await apiRequire("mail");
@@ -41,7 +49,7 @@ export async function POST(req: Request) {
 
   if (can("mail_all")) {
     return NextResponse.json(
-      await syncMailbox({ limit: 20, actor: userActor(user), auto, manual, deadline, ...(only ? { mailboxIds: [only] } : {}) }),
+      await syncMailbox({ limit: CHUNK, maxMessages: MAX_PER_CALL, actor: userActor(user), auto, manual, deadline, ...(only ? { mailboxIds: [only] } : {}) }),
     );
   }
 
@@ -51,7 +59,8 @@ export async function POST(req: Request) {
     fetched: 0,
     ingested: 0,
     mailboxes: 0,
-    message: "Nemáš přiřazenou e-mailovou schránku — požádej super admina.",
+    done: true,
+    message: "Zatím nemáš připojenou e-mailovou schránku — připoj si ji v Můj účet → Moje e-mailová schránka.",
   };
   if (!isSupabaseConfigured()) return NextResponse.json(none);
 
@@ -66,7 +75,7 @@ export async function POST(req: Request) {
     if (selection.kind !== "own") return NextResponse.json(none);
     const ids = only ? selection.mailboxIds.filter((id) => id === only) : selection.mailboxIds;
     if (!ids.length) return NextResponse.json(none);
-    return NextResponse.json(await syncMailbox({ mailboxIds: ids, limit: 20, actor: userActor(user), auto, manual, deadline }));
+    return NextResponse.json(await syncMailbox({ mailboxIds: ids, limit: CHUNK, maxMessages: MAX_PER_CALL, actor: userActor(user), auto, manual, deadline }));
   } catch (err) {
     return NextResponse.json(
       { ...none, configured: true, message: err instanceof Error ? err.message : "Chyba synchronizace" },
