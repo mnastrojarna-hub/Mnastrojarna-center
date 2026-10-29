@@ -4,9 +4,11 @@ import { SYSTEM_ACTOR } from "@/lib/supabase/actor-headers";
 import { diagnoseEndpoint, diagnoseGraph, detectMailSettings, type DetectInput } from "@/lib/email/mail-connect";
 import { updateMailboxStatus } from "@/lib/email/mailbox-status";
 import {
-  isPresetId, mergeMailboxSecrets, normalizeMailboxConfig, resolveIncoming, resolveSmtp, normalizeEmail, EMAIL_RE,
-  type DetectResult, type DiagResult, type SecretChanges,
+  alternateAuthMethod, isPresetId, mergeMailboxSecrets, normalizeMailboxConfig, resolveIncoming, resolveSmtp, normalizeEmail, EMAIL_RE,
+  SMTP_PASSWORD_SOURCE_LABEL, type DetectResult, type DiagResult, type ResolvedSmtp, type SecretChanges,
 } from "@/lib/email/mail-config";
+import { healSmtpPassword } from "@/lib/email/smtp-heal";
+import { userActor } from "@/lib/supabase/actor-headers";
 import type { MailboxConfig, MailboxProvider } from "@/lib/supabase/database.types";
 
 /**
@@ -68,7 +70,7 @@ export async function testMailbox(input: MailboxTestInput, opts: { userId?: stri
     if (missing.length) out.missing = missing;
     const [a, b] = await Promise.all([inc ? diagnoseEndpoint(inc) : null, smtp ? diagnoseEndpoint(smtp) : null]);
     out.incoming = a;
-    out.smtp = b;
+    out.smtp = b && smtp ? await recoverSmtpDiag(b, smtp, { mailboxId: input.mailboxId, stored: await storedConfig(input.mailboxId), userId: opts.userId }) : b;
   }
 
   if (input.mailboxId && (out.incoming || out.graph)) {
@@ -85,6 +87,47 @@ export async function testMailbox(input: MailboxTestInput, opts: { userId?: stri
   return out;
 }
 
+/**
+ * Test SMTP s odmítnutým heslem: stejná oprava jako při odeslání (smtp-recovery.ts) — vlastní SMTP heslo
+ * → heslo příchozí pošty (projde-li a je to uložené heslo schránky, zastaralé SMTP heslo se smaže),
+ * pak jednou druhý mechanismus AUTH. Výsledek říká, s jakým heslem a AUTH se zkoušelo.
+ */
+async function recoverSmtpDiag(
+  first: DiagResult,
+  smtp: ResolvedSmtp,
+  ctx: { mailboxId?: string | null; stored: { config: MailboxConfig } | null; userId?: string | null },
+): Promise<DiagResult> {
+  if (first.ok || first.kind !== "auth") return first;
+  const tried = [`${SMTP_PASSWORD_SOURCE_LABEL[smtp.passwordSource]} (AUTH ${first.authMethod ?? "dle serveru"}) → odmítnuto`];
+  let cur: ResolvedSmtp = smtp;
+  let last = first;
+  if (smtp.passwordSource === "smtp" && smtp.incomingPassword) {
+    cur = { ...smtp, password: smtp.incomingPassword, passwordSource: "incoming", incomingPassword: undefined };
+    const r = await diagnoseEndpoint(cur);
+    if (r.ok) {
+      const storedStale = Boolean(ctx.mailboxId && ctx.stored?.config.smtp_password && ctx.stored.config.smtp_password === smtp.password);
+      const healed = storedStale ? await healSmtpPassword(ctx.mailboxId!, smtp.password, { reason: "test", actor: ctx.userId ? userActor({ id: ctx.userId }) : undefined }) : false;
+      return {
+        ...r,
+        note: healed
+          ? "Uložené vlastní SMTP heslo server odmítl, heslo příchozí pošty přijal — zastaralé SMTP heslo jsem smazal, odesílání teď používá heslo schránky."
+          : "Vlastní SMTP heslo server odmítl, heslo příchozí pošty přijal — odškrtni „SMTP má jiné heslo než schránka“ a ulož.",
+      };
+    }
+    if (r.kind !== "auth") return { ...r, note: `Zkoušeno: ${tried.join("; ")}.` };
+    tried.push(`${SMTP_PASSWORD_SOURCE_LABEL.incoming} (AUTH ${r.authMethod ?? "dle serveru"}) → odmítnuto`);
+    last = r;
+  }
+  const alt = alternateAuthMethod(last.authMethod);
+  const r2 = await diagnoseEndpoint({ ...cur, authMethod: alt });
+  if (r2.ok) return { ...r2, note: `Přihlášení prošlo až mechanismem AUTH ${alt}.` };
+  tried.push(`${SMTP_PASSWORD_SOURCE_LABEL[cur.passwordSource]} (AUTH ${alt}) → ${r2.kind === "auth" ? "odmítnuto" : "chyba"}`);
+  return {
+    ...last,
+    error: `${last.error} Zkoušeno: ${tried.join("; ")}. Co dál: zadej heslo ke schránce znovu (Upravit → nové heslo) a zkus to znovu.`,
+  };
+}
+
 export interface DetectRequest {
   mailboxId?: string | null;
   email: string;
@@ -95,6 +138,8 @@ export interface DetectRequest {
   protocol?: "imap" | "pop3";
   smtpHost?: string;
   smtpPort?: number;
+  /** Šifrování zadaného SMTP (ručně, `none` = Outlook „Žádné"). */
+  smtpTls?: string;
   user?: string;
   allowNameMismatch?: boolean;
   preset?: string;
@@ -115,6 +160,7 @@ export async function detectMailbox(req: DetectRequest): Promise<DetectResult> {
     protocol: req.protocol === "pop3" ? "pop3" : req.protocol === "imap" ? "imap" : undefined,
     smtpHost: req.smtpHost?.trim() || undefined,
     smtpPort: Number(req.smtpPort) || undefined,
+    smtpTls: req.smtpTls === "tls" || req.smtpTls === "starttls" || req.smtpTls === "none" ? req.smtpTls : undefined,
     user: req.user?.trim() || undefined,
     allowNameMismatch: req.allowNameMismatch === true,
     preset: isPresetId(req.preset) ? req.preset : undefined,

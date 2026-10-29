@@ -72,6 +72,8 @@ export async function getMailboxes(): Promise<Mailbox[]> {
       const secrets_set = {
         imap_password: Boolean(config.imap_password),
         smtp_password: Boolean(config.smtp_password || config.imap_password),
+        // uložené VLASTNÍ SMTP heslo (jiné než heslo schránky) — formulář ho musí ukázat, aby šlo smazat
+        smtp_separate: Boolean(config.smtp_password),
         ms_graph_client_secret: Boolean(config.ms_graph_client_secret),
       };
       for (const key of SECRET_MAILBOX_KEYS) delete config[key];

@@ -745,7 +745,8 @@ export interface MailboxConfig {
   smtp_port?: number;
   smtp_user?: string;
   smtp_password?: string;
-  smtp_tls?: "tls" | "starttls";
+  /** `none` = „Žádné" jako v Outlooku (bez SSL, STARTTLS jen když ho server nabídne) — jen ručně. */
+  smtp_tls?: "tls" | "starttls" | "none";
   smtp_skip_name_check?: boolean;
   ms_graph_client_id?: string;
   ms_graph_client_secret?: string;
@@ -766,7 +767,7 @@ export interface Mailbox {
   /** Stav stahování a posledního testu (tabulka mailbox_status) — jen pro UI. */
   status?: MailboxStatus | null;
   /** Která hesla jsou uložená (samotná hesla se do prohlížeče nikdy neposílají). */
-  secrets_set?: { imap_password: boolean; smtp_password: boolean; ms_graph_client_secret: boolean };
+  secrets_set?: { imap_password: boolean; smtp_password: boolean; ms_graph_client_secret: boolean; smtp_separate?: boolean };
   updated_by?: string | null;
 }
 

@@ -21,6 +21,7 @@ import {
   ScrollText,
   Receipt,
   FileUp,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -29,8 +30,8 @@ export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
-  /** Funkce, kterou uživatel musí mít, aby položku viděl. */
-  feature: Feature;
+  /** Funkce, kterou uživatel musí mít, aby položku viděl (`null` = každý přihlášený aktivní uživatel). */
+  feature: Feature | null;
   badgeKey?: string;
   description?: string;
   /** Barva ikony (každá sekce má svou — orientace bez čtení). */
@@ -104,6 +105,8 @@ export const navSections: NavSection[] = [
   {
     label: "Správa",
     items: [
+      // každý (i obchodník a zaměstnanec): heslo, vlastní e-mailová schránka, podpis — dřív jen v menu pod avatarem
+      { title: "Můj účet", href: "/account", icon: UserRound, feature: null, description: "Heslo, moje e-mailová schránka, podpis", color: "text-sky-600" },
       { title: "Provize", href: "/commissions", icon: Wallet, feature: "commissions", description: "Obrat, marže, provize", color: "text-emerald-600" },
       { title: "Uživatelé", href: "/users", icon: UserCog, feature: "users", description: "Účty, role, hesla, schránky, AI", color: "text-rose-500" },
       { title: "Nastavení", href: "/settings", icon: Settings, feature: "settings", description: "Připojení, klíče, firma", color: "text-slate-500" },
@@ -117,7 +120,7 @@ export const allNavItems: NavItem[] = navSections.flatMap((s) => s.items);
 /** Navigace jen s položkami, na které má uživatel právo (prázdné sekce zmizí). */
 export function navForFeatures(features: readonly Feature[]): NavSection[] {
   return navSections
-    .map((s) => ({ ...s, items: s.items.filter((i) => features.includes(i.feature) && !(i.hideWith && features.includes(i.hideWith))) }))
+    .map((s) => ({ ...s, items: s.items.filter((i) => (i.feature === null ? features.length > 0 : features.includes(i.feature)) && !(i.hideWith && features.includes(i.hideWith))) }))
     .filter((s) => s.items.length > 0);
 }
 

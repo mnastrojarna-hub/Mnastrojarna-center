@@ -4,15 +4,23 @@
  *  - předvolby poskytovatelů (hosting90 — ověřená jména serverů a porty, Gmail, Microsoft 365, jiný),
  *  - normalizace a validace konfigurace (test, uložení i stahování používají stejnou funkci),
  *  - hesla: prázdné pole = beze změny (nové heslo jen výslovně), hesla se NEořezávají,
- *  - šifrování podle portu (993/995/465 = TLS, 143/110/587/25/366 = STARTTLS),
+ *  - šifrování podle portu (993/995/465 = TLS, 143/110/587/25/366 = STARTTLS); u SMTP navíc
+ *    „Žádné" jako v Outlooku (`none` — bez SSL, STARTTLS jen když ho server nabídne, jen ručně),
  *  - kandidáti pro „Najít nastavení automaticky" a české vysvětlení chyb podle příčiny.
  *
  * Pole `imap_*` jsou obecně „příchozí server" — u POP3 (`incoming_protocol: "pop3"`) platí stejně.
  */
 import type { MailboxConfig, MailboxProvider } from "@/lib/supabase/database.types";
 
-export type TlsMode = "tls" | "starttls";
+/**
+ * Šifrování: `tls` = SSL/TLS od začátku, `starttls` = STARTTLS povinně, `none` = jen SMTP a jen ručně
+ * („Žádné" z Outlooku, např. hosting90 port 366): spojení bez SSL, STARTTLS se použije, když ho server
+ * nabídne. Automatické zjištění `none` nikdy samo nezvolí (heslo nešifrovaně neposíláme bez souhlasu).
+ */
+export type TlsMode = "tls" | "starttls" | "none";
 export type IncomingProtocol = "imap" | "pop3";
+/** Příchozí pošta (IMAP/POP3) je vždy šifrovaně — `none` jen u SMTP. */
+export type IncomingTls = Exclude<TlsMode, "none">;
 export type MailProto = IncomingProtocol | "smtp";
 export type PresetId = "hosting90" | "gmail" | "m365" | "other";
 
@@ -26,6 +34,9 @@ export interface MailEndpoint {
   /** Proč tento kandidát (pro tabulku „co se zkoušelo"). */
   why?: string;
 }
+
+/** Server příchozí pošty (vždy šifrovaně). */
+export type IncomingEndpoint = MailEndpoint & { tls: IncomingTls };
 
 export interface MailPreset {
   id: PresetId | "test";
@@ -158,7 +169,7 @@ export function defaultTlsForPort(port: number): TlsMode {
 export function defaultPort(protocol: MailProto, tls: TlsMode = "tls"): number {
   if (protocol === "imap") return tls === "tls" ? 993 : 143;
   if (protocol === "pop3") return tls === "tls" ? 995 : 110;
-  return tls === "tls" ? 465 : 587;
+  return tls === "tls" ? 465 : 587; // STARTTLS i „bez SSL" (Outlook: 587, hosting90 i 366)
 }
 
 /** Protokol, kterému port patří (pro upozornění „port 995 je POP3"). */
@@ -170,7 +181,7 @@ export function protocolOfPort(port: number): MailProto | null {
 }
 
 export const PROTO_LABEL: Record<MailProto, string> = { imap: "IMAP", pop3: "POP3", smtp: "SMTP" };
-export const TLS_LABEL: Record<TlsMode, string> = { tls: "SSL/TLS", starttls: "STARTTLS" };
+export const TLS_LABEL: Record<TlsMode, string> = { tls: "SSL/TLS", starttls: "STARTTLS", none: "bez SSL (STARTTLS, nabídne-li ho server)" };
 
 export function isLoopbackHost(host: string): boolean {
   const h = host.toLowerCase();
@@ -275,6 +286,7 @@ export function normalizeMailboxConfig(input: Partial<MailboxConfig> | null | un
     if (user) out[`${side}_user`] = user;
     const tlsVal = src[`${side}_tls`];
     if (tlsVal === "tls" || tlsVal === "starttls") out[`${side}_tls`] = tlsVal;
+    else if (tlsVal === "none" && side === "smtp") out.smtp_tls = "none"; // jen odchozí (Outlook „Žádné")
     if (src[`${side}_skip_name_check`] === true || src[`${side}_skip_name_check`] === "true") out[`${side}_skip_name_check`] = true;
   }
 
@@ -303,11 +315,20 @@ export interface SecretChanges {
   imap_password?: string;
   smtp_password?: string;
   ms_graph_client_secret?: string;
+  /** Odškrtnuté „SMTP má jiné heslo než schránka" → vlastní SMTP heslo smazat (SMTP použije heslo schránky). */
+  clear_smtp_password?: boolean;
+  /** Zaškrtnuté „SMTP má jiné heslo" bez zadání nového → uložené SMTP heslo ponechat i při změně hesla schránky. */
+  keep_smtp_password?: boolean;
 }
 
 /**
  * Spojí novou konfiguraci s uloženými tajnými údaji. Prázdné / chybějící = beze změny.
- * SMTP heslo stejné jako příchozí se neukládá zvlášť (při změně hesla schránky platí nové pro obě).
+ * SMTP heslo:
+ *  - stejné jako příchozí se neukládá zvlášť,
+ *  - nové heslo schránky platí i pro SMTP — staré vlastní SMTP heslo se smaže (pokud ho uživatel
+ *    výslovně nezadal znovu nebo nezaškrtl „ponechat"); jinak by odesílání dál zkoušelo zastaralé heslo
+ *    (produkce 10/2026: příjem OK, odeslání „535 Incorrect authentication data"),
+ *  - `clear_smtp_password` (odškrtnuté „SMTP má jiné heslo") ho smaže vždy.
  */
 export function mergeMailboxSecrets(prev: MailboxConfig | null | undefined, next: MailboxConfig, changes: SecretChanges = {}): MailboxConfig {
   const p = prev ?? {};
@@ -319,7 +340,12 @@ export function mergeMailboxSecrets(prev: MailboxConfig | null | undefined, next
     else delete out[key];
   }
   const smtpExplicit = cleanSecret(changes.smtp_password) ?? cleanSecret(next.smtp_password);
-  if (!smtpExplicit && p.smtp_password && p.smtp_password === p.imap_password) delete out.smtp_password;
+  const imapChanged = cleanSecret(changes.imap_password) ?? cleanSecret(next.imap_password);
+  if (!smtpExplicit) {
+    if (changes.clear_smtp_password === true) delete out.smtp_password;
+    else if (imapChanged !== undefined && imapChanged !== p.imap_password && changes.keep_smtp_password !== true) delete out.smtp_password;
+    else if (p.smtp_password && p.smtp_password === p.imap_password) delete out.smtp_password;
+  }
   if (out.smtp_password && out.smtp_password === out.imap_password) delete out.smtp_password;
   return out;
 }
@@ -351,24 +377,42 @@ export function resolveIncoming(config: MailboxConfig | null | undefined, email:
   const c = config ?? {};
   if (!c.imap_host || !c.imap_password) return null;
   const protocol: IncomingProtocol = c.incoming_protocol === "pop3" ? "pop3" : "imap";
-  const port = Number(c.imap_port) || defaultPort(protocol, c.imap_tls ?? "tls");
+  // příchozí pošta vždy šifrovaně (`none` je jen pro SMTP)
+  const imapTls = c.imap_tls === "tls" || c.imap_tls === "starttls" ? c.imap_tls : undefined;
+  const port = Number(c.imap_port) || defaultPort(protocol, imapTls ?? "tls");
   return {
     protocol,
     host: c.imap_host,
     port,
-    tls: c.imap_tls ?? defaultTlsForPort(port),
+    tls: imapTls ?? defaultTlsForPort(port),
     skipNameCheck: c.imap_skip_name_check === true || undefined,
     user: c.imap_user || normalizeEmail(email),
     password: c.imap_password,
   };
 }
 
+/** Odkud je heslo pro SMTP: vlastní SMTP heslo × heslo příchozí pošty × globální SMTP (Nastavení). */
+export type SmtpPasswordSource = "smtp" | "incoming" | "global";
+
+export const SMTP_PASSWORD_SOURCE_LABEL: Record<SmtpPasswordSource, string> = {
+  smtp: "vlastní SMTP heslo",
+  incoming: "heslo příchozí pošty",
+  global: "heslo globálního SMTP (Nastavení → API klíče a integrace)",
+};
+
+export interface ResolvedSmtp extends ResolvedEndpoint {
+  passwordSource: SmtpPasswordSource;
+  /** Heslo příchozí pošty (ověřené stahováním), když se liší od uloženého vlastního SMTP hesla. */
+  incomingPassword?: string;
+}
+
 /** Odchozí server (uživatel = SMTP → příchozí → e-mail, heslo = SMTP → příchozí). */
-export function resolveSmtp(config: MailboxConfig | null | undefined, email: string): ResolvedEndpoint | null {
+export function resolveSmtp(config: MailboxConfig | null | undefined, email: string): ResolvedSmtp | null {
   const c = config ?? {};
   const password = c.smtp_password || c.imap_password;
   if (!c.smtp_host || !password) return null;
   const port = Number(c.smtp_port) || 465;
+  const own = Boolean(c.smtp_password);
   return {
     protocol: "smtp",
     host: c.smtp_host,
@@ -377,6 +421,8 @@ export function resolveSmtp(config: MailboxConfig | null | undefined, email: str
     skipNameCheck: c.smtp_skip_name_check === true || undefined,
     user: c.smtp_user || c.imap_user || normalizeEmail(email),
     password,
+    passwordSource: own ? "smtp" : "incoming",
+    ...(own && c.imap_password && c.imap_password !== c.smtp_password ? { incomingPassword: c.imap_password } : {}),
   };
 }
 
@@ -472,7 +518,7 @@ function dedupe(list: MailEndpoint[]): MailEndpoint[] {
 }
 
 function forHost(protocol: MailProto, host: string, why: string, ports?: number[], tls?: TlsMode): MailEndpoint[] {
-  const std: Record<MailProto, number[]> = { imap: [993, 143], pop3: [995, 110], smtp: [465, 587, 25] };
+  const std: Record<MailProto, number[]> = { imap: [993, 143], pop3: [995, 110], smtp: [465, 587, 366, 25] };
   const out: MailEndpoint[] = [];
   for (const port of ports ?? std[protocol]) {
     for (const mode of tls ? [tls] : tlsModesForPort(port)) out.push({ protocol, host, port, tls: mode, why });
@@ -633,6 +679,19 @@ export function classifyMailError(err: unknown): MailErrorKind {
   return "other";
 }
 
+export type SmtpAuthMethod = "PLAIN" | "LOGIN";
+
+/** Mechanismus AUTH z chyby nodemaileru (`command: "AUTH PLAIN"`); jiný než PLAIN/LOGIN → undefined. */
+export function authMethodOf(err: unknown): SmtpAuthMethod | undefined {
+  const m = /AUTH\s+(PLAIN|LOGIN)\b/i.exec(String((err as ErrLike | null)?.command ?? ""));
+  return m ? (m[1].toUpperCase() as SmtpAuthMethod) : undefined;
+}
+
+/** Druhý mechanismus k jednomu pokusu navíc (PLAIN ↔ LOGIN; neznámý = server nabídl PLAIN → LOGIN). */
+export function alternateAuthMethod(used: SmtpAuthMethod | undefined): SmtpAuthMethod {
+  return used === "LOGIN" ? "PLAIN" : "LOGIN";
+}
+
 /** Krátký surový text ze serveru (bez stack trace) pro doplnění hlášky. */
 export function rawErrorText(err: unknown): string {
   const e = (err ?? {}) as ErrLike;
@@ -680,7 +739,7 @@ export function describeMailError(kind: MailErrorKind, ctx: DescribeContext): st
     case "tls_protocol":
       return `Na ${where} nesedí šifrování — port 993/995/465 je SSL/TLS, 143/110/587 STARTTLS.`;
     case "no_starttls":
-      return `Server ${where} nenabízí šifrování STARTTLS — heslo nešifrovaně neposíláme. Zkus port ${e.protocol === "imap" ? 993 : e.protocol === "pop3" ? 995 : 465} (SSL/TLS).`;
+      return `Server ${where} nenabízí šifrování STARTTLS — heslo nešifrovaně neposíláme. Zkus port ${e.protocol === "imap" ? 993 : e.protocol === "pop3" ? 995 : 465} (SSL/TLS)${e.protocol === "smtp" ? " — nebo, chceš-li to jako v Outlooku, zvol u odchozího serveru šifrování „bez SSL“" : ""}.`;
     case "auth":
       return (
         `Přihlášení odmítnuto — server ${e.host} nepřijal uživatele nebo heslo${ctx.user ? ` (uživatel ${ctx.user})` : ""}. ` +
@@ -750,6 +809,10 @@ export interface DiagResult {
   /** Počet zpráv v INBOXu (IMAP/POP3/Graph). */
   messages?: number;
   certNames?: string[];
+  /** Doplňující informace (např. „uložené SMTP heslo neplatilo — použito heslo schránky, opraveno"). */
+  note?: string;
+  /** SMTP: mechanismus AUTH, kterým se přihlašovalo (PLAIN / LOGIN). */
+  authMethod?: SmtpAuthMethod;
 }
 
 export interface DetectAttempt {
@@ -788,7 +851,7 @@ export function configFromDetection(
   out.incoming_protocol = incoming.protocol === "pop3" ? "pop3" : "imap";
   out.imap_host = incoming.host;
   out.imap_port = incoming.port;
-  out.imap_tls = incoming.tls;
+  out.imap_tls = incoming.tls === "none" ? "starttls" : incoming.tls; // příchozí pošta vždy šifrovaně
   if (incoming.skipNameCheck) out.imap_skip_name_check = true;
   else delete out.imap_skip_name_check;
   if (smtp) {

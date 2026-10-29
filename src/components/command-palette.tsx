@@ -172,7 +172,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     (a) => paletteScore(q, { label: a.label, keywords: a.keywords }) > 0,
   );
   const nav = allNavItems
-    .filter((item) => access.can(item.feature) && !(item.hideWith && access.can(item.hideWith)))
+    .filter((item) => (item.feature === null || access.can(item.feature)) && !(item.hideWith && access.can(item.hideWith)))
     .filter((item) => paletteScore(q, { label: item.title, keywords: searchNormalize(item.description ?? "") }) > 0);
   const groups = GROUPS.filter((g) => access.can(g.feature)).map((g) => ({
     ...g,

@@ -103,8 +103,9 @@ export default async function AccountPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <div className="space-y-6">
+      {/* grid-cols-1 = minmax(0,1fr): dlouhé adresy schránky nesmí roztáhnout sloupec za okraj telefonu */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -130,7 +131,7 @@ export default async function AccountPage() {
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">

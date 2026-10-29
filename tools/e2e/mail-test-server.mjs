@@ -30,6 +30,11 @@ export const ACCOUNTS = [
   { user: "cert@jinycert.test", pass: "Cert-Heslo-1", imap: true, pop3: true },
   // E2E 18 (Pošta A): vlastní schránka v Můj účet, stažení celé schránky, odpovědi, Odeslané
   { user: "posta@nastrojarstvi.test", pass: "Posta-Heslo-1", imap: true, pop3: true },
+  // E2E 22: obchodník a zaměstnanec si schránku připojí sami (Můj účet), oprava zastaralého SMTP hesla
+  { user: "obchod22@nastrojarstvi.test", pass: "Obchod22-Heslo-1", imap: true, pop3: true },
+  { user: "dilna22@nastrojarstvi.test", pass: "Dilna22-Heslo-1", imap: true, pop3: true },
+  // src/lib/email/smtp-heal.integration.test.ts: zastaralé vlastní SMTP heslo (535) → heslo schránky
+  { user: "smtpheal@nastrojarstvi.test", pass: "Smtpheal-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {

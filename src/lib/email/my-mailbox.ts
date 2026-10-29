@@ -31,6 +31,8 @@ export interface MyMailbox {
   smtp: string | null;
   canSend: boolean;
   passwordStored: boolean;
+  /** Uložené vlastní SMTP heslo (jiné než heslo schránky) — „Upravit" ho nahradí heslem schránky. */
+  smtpPasswordSeparate?: boolean;
   incomplete: boolean;
   lastSyncAt: string | null;
   lastSyncError: string | null;
@@ -62,6 +64,7 @@ function describe(row: Row, status: MailboxStatus | undefined, userId: string): 
     smtp: smtp ? endpointLabel(smtp) : row.provider === "outlook" ? "Microsoft 365 (Graph)" : null,
     canSend: Boolean(smtp) || (row.provider === "outlook" && Boolean(cfg.ms_graph_client_secret)),
     passwordStored: Boolean(cfg.imap_password),
+    smtpPasswordSeparate: Boolean(cfg.smtp_password),
     incomplete: mailboxMissing(row.provider, cfg).length > 0,
     lastSyncAt: st?.last_sync_ok_at ?? null,
     lastSyncError: st?.last_sync_error ?? null,
@@ -89,7 +92,7 @@ async function ownRow(userId: string, mailboxId: string | null | undefined): Pro
 const NOT_MINE = "Schránka nenalezena (spravuješ jen svou vlastní).";
 
 /** Najít nastavení automaticky (IMAP/POP3 + SMTP) pro mou schránku. */
-export async function detectMine(userId: string, input: { mailboxId?: string | null; email: string; password?: string; preset?: string; host?: string; smtpHost?: string; user?: string; allowNameMismatch?: boolean }): Promise<DetectResult> {
+export async function detectMine(userId: string, input: { mailboxId?: string | null; email: string; password?: string; preset?: string; host?: string; smtpHost?: string; smtpPort?: number; smtpTls?: string; user?: string; allowNameMismatch?: boolean }): Promise<DetectResult> {
   if (input.mailboxId && !(await ownRow(userId, input.mailboxId))) return { ok: false, preset: null, evidence: [], attempts: [], error: NOT_MINE };
   return detectMailbox({ ...input, mailboxId: input.mailboxId ?? null });
 }
@@ -112,7 +115,11 @@ export async function saveMine(userId: string, input: SaveMineInput): Promise<{ 
   if (input.mailboxId && !prevRow) return { ok: false, error: NOT_MINE };
   const { config, errors, notes } = normalizeMailboxConfig(input.config ?? {});
   if (errors.length) return { ok: false, error: errors.join(" ") };
-  const next = mergeMailboxSecrets(prevRow?.config ?? {}, config, { imap_password: input.password, smtp_password: input.smtpPassword });
+  // Můj účet nemá pole „SMTP heslo": odesílání ověřilo „Najít nastavení" heslem schránky → staré vlastní
+  // SMTP heslo (zbytek staršího formuláře, server ho odmítal — 535) se smaže, pokud nové nepřišlo výslovně
+  const next = mergeMailboxSecrets(prevRow?.config ?? {}, config, {
+    imap_password: input.password, smtp_password: input.smtpPassword, clear_smtp_password: !input.smtpPassword,
+  });
   const preset = isPresetId(next.preset) ? next.preset : "other";
   const provider: MailboxProvider = preset === "m365" ? "outlook" : providerForPreset(preset);
   const invalid = validateMailboxConfig({ provider, email, config: next });

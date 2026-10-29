@@ -105,11 +105,12 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
     setBusy(action);
     try {
       if (action === "test") {
-        const r = await api<{ incoming?: { ok: boolean; error?: string; messages?: number } | null; smtp?: { ok: boolean; error?: string } | null; graph?: { ok: boolean; error?: string } | null; error?: string }>({ action, mailboxId: b.id });
+        const r = await api<{ incoming?: { ok: boolean; error?: string; messages?: number } | null; smtp?: { ok: boolean; error?: string; note?: string } | null; graph?: { ok: boolean; error?: string } | null; error?: string }>({ action, mailboxId: b.id });
         const inc = r.incoming ?? r.graph;
         const parts = [
           inc ? (inc.ok ? `Příjem OK${typeof (inc as { messages?: number }).messages === "number" ? ` (${(inc as { messages?: number }).messages} zpráv v INBOXu)` : ""}` : `Příjem: ${inc.error}`) : r.error ?? "",
           r.smtp ? (r.smtp.ok ? "Odesílání (SMTP) OK" : `Odesílání: ${r.smtp.error}`) : b.provider === "outlook" ? "" : "Odesílání: SMTP není nastavené",
+          r.smtp?.note ?? "",
         ].filter(Boolean);
         onNote({ ok: Boolean(inc?.ok && (r.smtp?.ok ?? b.provider === "outlook")), text: parts.join(" · ") });
       } else if (action === "testSend") {
@@ -129,7 +130,7 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
     }
   };
   return (
-    <div className="space-y-2 rounded-lg border p-3" data-testid={`my-box-${b.email}`}>
+    <div className="min-w-0 space-y-2 rounded-lg border p-3" data-testid={`my-box-${b.email}`}>
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400"><Mail className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1 text-sm">
@@ -139,8 +140,11 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
             {b.remaining ? ` · čeká ${b.remaining}` : ""}
           </div>
           <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-            <li>Příjem: {b.incoming ?? "—"}</li>
-            <li className={cn(!b.canSend && "text-amber-700 dark:text-amber-400")}>Odesílání: {b.smtp ?? "nenastaveno — doplň v Upravit"}</li>
+            <li className="break-words">Příjem: {b.incoming ?? "—"}</li>
+            <li className={cn("break-words", !b.canSend && "text-amber-700 dark:text-amber-400")}>Odesílání: {b.smtp ?? "nenastaveno — doplň v Upravit"}</li>
+            {b.smtpPasswordSeparate && (
+              <li className="text-amber-700 dark:text-amber-400" data-testid="my-box-smtp-separate">Odesílání používá zvlášť uložené SMTP heslo — Upravit ho nahradí heslem schránky.</li>
+            )}
           </ul>
           {b.authBlocked ? (
             <p className="mt-1 text-xs text-destructive">Heslo odmítnuto — oprav ho (Upravit → nové heslo). Automatické stahování je pozastavené.</p>
@@ -186,6 +190,8 @@ function ConnectForm({ editing, onCancel, onSaved }: { editing: MyMailbox | null
   const [preset, setPreset] = React.useState<PresetId>("hosting90");
   const [host, setHost] = React.useState("");
   const [smtpHost, setSmtpHost] = React.useState("");
+  const [smtpPort, setSmtpPort] = React.useState("");
+  const [smtpTls, setSmtpTls] = React.useState<"" | "tls" | "starttls" | "none">("");
   const [busy, setBusy] = React.useState<"detect" | "save" | null>(null);
   const [detect, setDetect] = React.useState<DetectResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -199,7 +205,9 @@ function ConnectForm({ editing, onCancel, onSaved }: { editing: MyMailbox | null
     try {
       const r = await api<DetectResult>({
         action: "detect", mailboxId: editing?.id ?? null, email, password: password || undefined, preset,
-        host: advanced && host ? host : undefined, smtpHost: advanced && smtpHost ? smtpHost : undefined, allowNameMismatch,
+        host: advanced && host ? host : undefined, smtpHost: advanced && smtpHost ? smtpHost : undefined,
+        smtpPort: advanced && smtpHost && Number(smtpPort) ? Number(smtpPort) : undefined, smtpTls: advanced && smtpHost && smtpTls ? smtpTls : undefined,
+        allowNameMismatch,
       });
       setDetect(r);
       if (!r.ok || !r.config) {
@@ -262,6 +270,22 @@ function ConnectForm({ editing, onCancel, onSaved }: { editing: MyMailbox | null
             Odchozí server (SMTP)
             <Input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.hosting90.cz" aria-label="Odchozí server" />
           </label>
+          <label className="space-y-1 text-xs font-medium">
+            Port SMTP (volitelné)
+            <Input value={smtpPort} onChange={(e) => setSmtpPort(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="465 / 587 / 366" aria-label="Port odchozího serveru" />
+          </label>
+          <label className="space-y-1 text-xs font-medium sm:col-span-2">
+            Šifrování SMTP
+            <select value={smtpTls} onChange={(e) => setSmtpTls(e.target.value as typeof smtpTls)} className="h-9 w-full rounded-md border bg-background px-2 text-sm" aria-label="Šifrování odchozího serveru">
+              <option value="">podle portu (465 SSL/TLS, 587 / 366 STARTTLS)</option>
+              <option value="tls">SSL/TLS</option>
+              <option value="starttls">STARTTLS</option>
+              <option value="none">Žádné (jako Outlook — STARTTLS, nabídne-li ho server)</option>
+            </select>
+          </label>
+          <p className="text-xs text-muted-foreground sm:col-span-3">
+            Nastavení z Outlooku (např. SMTP smtp.nastrojarstvi.com, port 366, šifrování „Žádné“) sem opiš — zkusí se jako první. Heslo pro odesílání je vždy heslo ke schránce.
+          </p>
         </div>
       )}
       {detect?.needsConfirmation && (

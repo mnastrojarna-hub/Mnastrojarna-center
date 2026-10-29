@@ -5,10 +5,10 @@ import { promises as dnsp, Resolver } from "node:dns";
 import type { ImapFlow } from "imapflow";
 import { Pop3Client } from "@/lib/email/pop3";
 import {
-  PRESETS, buildCandidates, certCandidateHosts, classifyGraphError, classifyMailError, configFromDetection,
+  authMethodOf, PRESETS, buildCandidates, certCandidateHosts, classifyGraphError, classifyMailError, configFromDetection,
   describeMailError, domainOf, isValidHost, parseSubjectAltNames, presetFromDns, rawErrorText, HOSTING90_IMAP_HOST,
   type DetectAttempt, type DetectResult, type DiagResult, type DiagStep, type IncomingProtocol, type MailEndpoint,
-  type MailErrorKind, type MailPreset, type MailProto, type PresetId, type ResolvedEndpoint, type TlsMode,
+  type IncomingEndpoint, type MailErrorKind, type MailPreset, type MailProto, type PresetId, type ResolvedEndpoint, type TlsMode,
 } from "@/lib/email/mail-config";
 import type { MailboxConfig } from "@/lib/supabase/database.types";
 
@@ -168,6 +168,23 @@ export async function probeEndpoint(ep: MailEndpoint, opts: NetOptions = {}): Pr
 
   // 3) TLS (přímo, nebo po pozdravu + STARTTLS)
   const s2 = Date.now();
+  if (ep.tls === "none") {
+    // „Žádné" (Outlook): jen pozdrav; STARTTLS použije až odeslání, nabídne-li ho server
+    try {
+      const greet = await readLine(socket, ms, ep.protocol === "smtp");
+      socket.destroy();
+      if (!GREETING_OK[ep.protocol].test(greet)) {
+        steps.push({ id: "tls", ok: false, ms: Date.now() - s2, detail: `server není ${ep.protocol.toUpperCase()}` });
+        return fail("greeting", { message: greet.slice(0, 80) });
+      }
+    } catch (err) {
+      socket.destroy();
+      steps.push({ id: "tls", ok: false, ms: Date.now() - s2, detail: "bez pozdravu" });
+      return fail("greeting", err);
+    }
+    steps.push({ id: "tls", ok: true, ms: Date.now() - s2, detail: "bez SSL — STARTTLS, nabídne-li ho server (jako Outlook „Žádné“)" });
+    return { endpoint: ep, ok: true, steps, ms: Date.now() - t0 };
+  }
   let secure: tls.TLSSocket | null = null;
   try {
     if (ep.tls === "starttls") {
@@ -255,6 +272,8 @@ export async function probeEndpoint(ep: MailEndpoint, opts: NetOptions = {}): Pr
 export interface Credentials {
   user: string;
   pass: string;
+  /** Jen SMTP: vynutit mechanismus AUTH (PLAIN / LOGIN); bez něj první nabízený serverem. */
+  method?: "PLAIN" | "LOGIN";
 }
 
 export function imapOptions(ep: MailEndpoint, auth: Credentials, opts: NetOptions = {}) {
@@ -310,7 +329,7 @@ export async function pop3Login(
   const client = await Pop3Client.connect({
     host: ep.host,
     port: ep.port,
-    tls: ep.tls,
+    tls: ep.tls === "tls" ? "tls" : "starttls", // příchozí pošta vždy šifrovaně
     checkName: ep.skipNameCheck ? false : ep.host,
     ca: opts.ca,
     timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT,
@@ -327,19 +346,28 @@ export async function pop3Login(
   }
 }
 
+/**
+ * SMTP transport: 465 SSL/TLS, STARTTLS povinně, nebo „bez SSL" (jen výslovná volba — Outlook
+ * „Žádné"): STARTTLS se použije, když ho server nabídne; certifikát se pak neověřuje (uživatel
+ * šifrování nepožadoval — i tak je to lepší než heslo úplně nešifrovaně).
+ */
 export async function smtpTransport(ep: MailEndpoint, auth: Credentials, opts: NetOptions = {}) {
   const nodemailer = (await import("nodemailer")).default;
   const ms = opts.timeoutMs ?? 10_000;
+  const plain = ep.tls === "none";
   return nodemailer.createTransport({
     host: ep.host,
     port: ep.port,
     secure: ep.tls === "tls",
     requireTLS: ep.tls === "starttls", // STARTTLS povinně — heslo nikdy nešifrovaně
-    auth,
+    // forceAuth: po nepovedeném STARTTLS nodemailer nezná nabídku AUTH z EHLO a přihlášení by vynechal (→ 530)
+    ...(plain ? { opportunisticTLS: true, forceAuth: true } : {}),
+    auth: { user: auth.user, pass: auth.pass, ...(auth.method ? { method: auth.method } : {}) },
+    ...(auth.method ? { authMethod: auth.method } : {}),
     connectionTimeout: ms,
     greetingTimeout: ms,
     socketTimeout: 30_000,
-    tls: tlsIdentity(ep, opts.ca),
+    tls: plain ? { ...tlsIdentity(ep, opts.ca), rejectUnauthorized: false, checkServerIdentity: () => undefined } : tlsIdentity(ep, opts.ca),
   });
 }
 
@@ -361,7 +389,7 @@ async function loginAny(ep: MailEndpoint, auth: Credentials, opts: NetOptions): 
 
 // ── Test připojení po krocích ───────────────────────────────
 /** Diagnostika jednoho serveru: DNS → spojení → šifrování → přihlášení → INBOX (+ počet zpráv). */
-export async function diagnoseEndpoint(ep: ResolvedEndpoint, opts: NetOptions = {}): Promise<DiagResult> {
+export async function diagnoseEndpoint(ep: ResolvedEndpoint & { authMethod?: Credentials["method"] }, opts: NetOptions = {}): Promise<DiagResult> {
   const endpoint: MailEndpoint = { protocol: ep.protocol, host: ep.host, port: ep.port, tls: ep.tls, skipNameCheck: ep.skipNameCheck };
   const probe = await probeEndpoint(endpoint, opts);
   const steps = [...probe.steps];
@@ -383,7 +411,7 @@ export async function diagnoseEndpoint(ep: ResolvedEndpoint, opts: NetOptions = 
   }
   const t = Date.now();
   try {
-    const messages = await loginAny(endpoint, { user: ep.user, pass: ep.password }, opts);
+    const messages = await loginAny(endpoint, { user: ep.user, pass: ep.password, ...(ep.authMethod ? { method: ep.authMethod } : {}) }, opts);
     steps.push({ id: "login", ok: true, ms: Date.now() - t, detail: ep.user });
     if (ep.protocol !== "smtp") steps.push({ id: "inbox", ok: true, detail: `${messages ?? 0} zpráv` });
     return { ok: true, endpoint, steps, messages, certNames: probe.certNames };
@@ -400,6 +428,7 @@ export async function diagnoseEndpoint(ep: ResolvedEndpoint, opts: NetOptions = 
       kind,
       error: describeMailError(kind, { endpoint, raw: rawErrorText(err), user: ep.user }),
       certNames: probe.certNames,
+      ...(ep.protocol === "smtp" ? { authMethod: authMethodOf(err) ?? ep.authMethod } : {}),
     };
   }
 }
@@ -546,6 +575,8 @@ export interface DetectInput {
   protocol?: IncomingProtocol;
   smtpHost?: string;
   smtpPort?: number;
+  /** Šifrování zadaného odchozího serveru (ručně; `none` = Outlook „Žádné"). */
+  smtpTls?: TlsMode;
   /** Jiné uživatelské jméno než e-mail (výjimečně). */
   user?: string;
   /** Uživatel výslovně potvrdil šifrované spojení bez ověření jména v certifikátu. */
@@ -601,7 +632,7 @@ export async function detectMailSettings(input: DetectInput, opts: DetectOptions
   }
 
   const cands = buildCandidates(
-    { email: input.email, host: input.host, port: input.port, protocol: input.protocol, smtpHost: input.smtpHost, smtpPort: input.smtpPort },
+    { email: input.email, host: input.host, port: input.port, protocol: input.protocol, smtpHost: input.smtpHost, smtpPort: input.smtpPort, smtpTls: input.smtpTls },
     { preset: provider.preset, mxHosts: provider.mxHosts },
   );
 
@@ -742,10 +773,10 @@ export async function connectWithFallback<T>(
   email: string,
   connect: (ep: MailEndpoint, auth: Credentials) => Promise<T>,
   opts: { budgetMs?: number; ca?: string | Buffer } = {},
-): Promise<{ result: T; endpoint: MailEndpoint; healed: boolean }> {
+): Promise<{ result: T; endpoint: IncomingEndpoint; healed: boolean }> {
   const t0 = Date.now();
   const auth = { user: stored.user, pass: stored.password };
-  const first: MailEndpoint = { protocol: stored.protocol, host: stored.host, port: stored.port, tls: stored.tls, skipNameCheck: stored.skipNameCheck };
+  const first: IncomingEndpoint = { protocol: stored.protocol, host: stored.host, port: stored.port, tls: stored.tls === "tls" ? "tls" : "starttls", skipNameCheck: stored.skipNameCheck };
   try {
     return { result: await connect(first, auth), endpoint: first, healed: false };
   } catch (err) {
@@ -767,7 +798,7 @@ export async function connectWithFallback<T>(
         continue;
       }
       try {
-        return { result: await connect(ep, auth), endpoint: ep, healed: true };
+        return { result: await connect(ep, auth), endpoint: { ...ep, tls: ep.tls === "tls" ? "tls" : "starttls" }, healed: true };
       } catch (e2) {
         if (classifyMailError(e2) === "auth") throw e2;
       }

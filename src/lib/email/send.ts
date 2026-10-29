@@ -8,10 +8,12 @@ import { refreshCompanyFromSettings } from "@/lib/company-server";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { MailboxConfig, MailboxProvider } from "@/lib/supabase/database.types";
 import {
-  classifyMailError, defaultTlsForPort, describeMailError, isLoopbackHost, normalizeHost, rawErrorText, resolveSmtp, tlsModesForPort,
-  type TlsMode,
+  defaultTlsForPort, isLoopbackHost, normalizeHost, resolveSmtp, tlsModesForPort,
+  type SmtpAuthMethod, type SmtpPasswordSource, type TlsMode,
 } from "@/lib/email/mail-config";
 import { graphError, graphToken, providerFallbacks, smtpTransport } from "@/lib/email/mail-connect";
+import { describeSmtpFailure, sendWithSmtpRecovery, type SmtpTry } from "@/lib/email/smtp-recovery";
+import { healSmtpPassword } from "@/lib/email/smtp-heal";
 import { appendToSent, type SentCopyState } from "@/lib/email/mail-append";
 import { bracketId } from "@/lib/email/threading";
 
@@ -50,7 +52,13 @@ interface SmtpConfig {
   port: number;
   user?: string;
   password?: string;
-  /** Šifrování (výchozí podle portu: 465 TLS, 587/25/366 STARTTLS). */
+  /** Odkud je heslo (vlastní SMTP × příchozí pošta × globální SMTP) — do hlášky a pro samoopravu. */
+  passwordSource?: SmtpPasswordSource;
+  /** Heslo příchozí pošty, liší-li se od uloženého vlastního SMTP hesla (záložní pokus). */
+  incomingPassword?: string;
+  /** Vynucený mechanismus AUTH (druhý pokus PLAIN ↔ LOGIN). */
+  authMethod?: SmtpAuthMethod;
+  /** Šifrování (výchozí podle portu: 465 TLS, 587/25/366 STARTTLS; `none` jen ručně). */
   tls?: TlsMode;
   skipNameCheck?: boolean;
   from?: string;
@@ -149,6 +157,7 @@ function boxConfig(box: BoxRow): SmtpConfig | null {
   const plainLocal = !box.config?.smtp_tls && isLoopbackHost(smtp.host) && tlsModesForPort(smtp.port).length > 1;
   return {
     host: smtp.host, port: smtp.port, user: smtp.user, password: smtp.password,
+    passwordSource: smtp.passwordSource, incomingPassword: smtp.incomingPassword,
     tls: plainLocal ? undefined : smtp.tls, skipNameCheck: smtp.skipNameCheck,
     from: box.email, mailboxId: box.id, ownerId: box.owner_id, box,
   };
@@ -158,7 +167,7 @@ async function globalSmtp(): Promise<SmtpConfig> {
   const [host, port, user, password] = await Promise.all([
     getSetting("smtp_host"), getSetting("smtp_port"), getSetting("smtp_user"), getSetting("smtp_password"),
   ]);
-  return { host: host ? normalizeHost(host).host : host, port: Number(port || 465), user, password };
+  return { host: host ? normalizeHost(host).host : host, port: Number(port || 465), user, password, passwordSource: "global" };
 }
 
 async function getSmtp(pref: SmtpPreference): Promise<SmtpLookup> {
@@ -200,13 +209,14 @@ async function createSmtpTransport(s: SmtpConfig) {
   const port = s.port || 465;
   const tls = s.tls ?? defaultTlsForPort(port);
   const plainLocal = isLoopbackHost(s.host ?? "") && !s.tls && tlsModesForPort(port).length > 1;
+  const method = s.authMethod ? { method: s.authMethod } : {};
   if (plainLocal) {
     return nodemailer.createTransport({
-      host: s.host, port, secure: false, auth: { user: s.user!, pass: s.password! },
+      host: s.host, port, secure: false, auth: { user: s.user!, pass: s.password!, ...method },
       connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 30_000,
     });
   }
-  return smtpTransport({ protocol: "smtp", host: s.host!, port, tls, skipNameCheck: s.skipNameCheck }, { user: s.user!, pass: s.password! }, { timeoutMs: 10_000 });
+  return smtpTransport({ protocol: "smtp", host: s.host!, port, tls, skipNameCheck: s.skipNameCheck }, { user: s.user!, pass: s.password!, ...method }, { timeoutMs: 10_000 });
 }
 
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
@@ -397,38 +407,37 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
       transport.close();
     }
   };
-  try {
-    if (s.graph) {
+  if (s.graph) {
+    try {
       await sendViaGraph(s, { to, cc, bcc, subject: input.subject, text: input.text, html: input.html, attachments: input.attachments });
-    } else {
-      try {
-        await sendRaw(s);
-      } catch (err) {
-        // síť / certifikát (ne heslo): ověřený SMTP server poskytovatele (hosting90: smtp.hosting90.cz)
-        const kind = classifyMailError(err);
-        if (kind === "auth" || !s.from || isLoopbackHost(s.host ?? "")) throw err;
-        let done = false;
-        for (const ep of await providerFallbacks(s.from, "smtp")) {
-          if (ep.host === s.host && ep.port === s.port) continue;
-          try {
-            await sendRaw({ ...s, host: ep.host, port: ep.port, tls: ep.tls, skipNameCheck: false });
-            done = true;
-            break;
-          } catch (e2) {
-            if (classifyMailError(e2) === "auth") throw e2;
-          }
-        }
-        if (!done) throw err;
-      }
+    } catch (err) {
+      return { sent: false, reason: `Odeslání selhalo — ${err instanceof Error ? err.message : "Microsoft Graph chyba"}` };
     }
-  } catch (err) {
-    if (s.graph) return { sent: false, reason: `Odeslání selhalo — ${err instanceof Error ? err.message : "Microsoft Graph chyba"}` };
-    const tls = s.tls ?? defaultTlsForPort(s.port || 465);
-    const kind = classifyMailError(err);
-    return {
-      sent: false,
-      reason: `Odeslání selhalo — ${describeMailError(kind, { endpoint: { protocol: "smtp", host: s.host ?? "", port: s.port, tls }, raw: rawErrorText(err), user: s.user })}`,
+  } else {
+    // uložené nastavení → (síť / TLS) ověřené servery poskytovatele → (odmítnuté vlastní SMTP heslo)
+    // heslo příchozí pošty → druhý mechanismus AUTH; viz smtp-recovery.ts
+    const port = s.port || 465;
+    const first: SmtpTry = {
+      host: s.host!, port, tls: s.tls ?? defaultTlsForPort(port), skipNameCheck: s.skipNameCheck,
+      user: s.user!, password: s.password!, passwordSource: s.passwordSource ?? "incoming",
     };
+    const explicitTls = s.tls; // lokální testovací server bez TLS: šifrování neurčovat (createSmtpTransport)
+    const rec = await sendWithSmtpRecovery({
+      first,
+      incomingPassword: s.incomingPassword,
+      fallbacks: s.from && !isLoopbackHost(s.host ?? "") ? () => providerFallbacks(s.from!, "smtp") : undefined,
+      attempt: (t) => sendRaw({
+        ...s, host: t.host, port: t.port, tls: t.host === first.host && t.port === first.port ? explicitTls : t.tls, skipNameCheck: t.skipNameCheck,
+        password: t.password, authMethod: t.authMethod,
+      }).then(() => undefined),
+    });
+    if (!rec.ok) {
+      const owner = !s.box ? "global" : s.box.owner_id ? "own" : "company";
+      return { sent: false, reason: `Odeslání selhalo — ${describeSmtpFailure(rec, { owner })}` };
+    }
+    if (rec.healSmtpPassword && s.mailboxId && s.passwordSource === "smtp" && s.password) {
+      await healSmtpPassword(s.mailboxId, s.password, { reason: "send" });
+    }
   }
 
   // Kopie do složky Odeslané na serveru (IMAP APPEND) — selhání jen nahlásit
