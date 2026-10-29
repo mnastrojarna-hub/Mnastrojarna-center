@@ -477,7 +477,7 @@ export const HISTORY_PHASES: { key: HistoryPhase; label: string }[] = [
   { key: "poptavka", label: "Poptávka" },
   { key: "nabidky", label: "Nabídky" },
   { key: "objednavka", label: "Objednávka" },
-  { key: "vyroba", label: "Výroba" },
+  { key: "vyroba", label: "Technologie & výroba" },
   { key: "dodani", label: "Dodání" },
   { key: "platby", label: "Faktura & platby" },
   { key: "dokumenty", label: "Dokumenty" },

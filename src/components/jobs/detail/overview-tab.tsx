@@ -344,7 +344,7 @@ export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?
         )}
       </InfoCard>
 
-      <InfoCard icon={Wrench} tone="bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300" title="Výroba" subtitle="Jak a kde se díly dělají">
+      <InfoCard icon={Wrench} tone="bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300" title="Technologie" subtitle="Jak a kde se díly dělají — kroky a postup v záložce Technologie">
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
           <JobField field="technology" label="Technologie" value={job.technology} icon={Wrench} iconClass="text-yellow-600" placeholder="např. frézování, kalení" />
           <JobField field="manufacturingLocation" label="Místo výroby" value={job.manufacturingLocation} icon={MapPin} iconClass="text-yellow-600" placeholder="u nás / u dodavatele" />
