@@ -383,6 +383,26 @@ export interface Order {
   production_final_end?: string | null;
   production_finished_at?: string | null;
   production_finished_by?: string | null;
+  /** Sloučeno do jiné zakázky (#24, migrace 20261023161000) — odkaz na zdroj přesměruje na cíl. */
+  merged_into_id?: string | null;
+  merged_at?: string | null;
+  merged_by?: string | null;
+}
+
+/** Sloučení zakázek (idempotence RPC merge_jobs, banner přesměrování; migrace 20261023161000). */
+export interface JobMergeRow {
+  id: string;
+  token: string;
+  target_id: string | null;
+  source_id: string | null;
+  target_number: string;
+  source_number: string;
+  forced: boolean;
+  reason: string | null;
+  result: Json;
+  created_by: string | null;
+  created_via: string | null;
+  created_at: string;
 }
 
 /** Výrobní operace zakázky (migrace 0022). */
@@ -1184,6 +1204,7 @@ export interface Database {
       job_payments: Tbl<JobPaymentRow>;
       job_order_revisions: Tbl<JobOrderRevisionRow>;
       production_handoffs: Tbl<ProductionHandoffRow>;
+      job_merges: Tbl<JobMergeRow>;
       // anonymizace výkresů (migrace 20261023159000)
       drawing_anon_adhoc: Tbl<DrawingAnonAdhocRow>;
       drawing_anon_texts: Tbl<DrawingAnonTextRow>;
@@ -1212,6 +1233,12 @@ export interface Database {
       /** Dopočet starých dat předání do výroby (idempotentní; jen servisní role). */
       production_handoff_backfill: { Args: Record<string, never>; Returns: undefined };
       production_route_version: { Args: { p_job: string }; Returns: string };
+      /** Sloučení zakázek (#24): náhled a jediná cesta sloučení (atomicky, idempotentně; jen servisní role). */
+      merge_jobs_preview: { Args: { p_target: string; p_source: string }; Returns: Json };
+      merge_jobs: {
+        Args: { p_target: string; p_source: string; p_token: string; p_force?: boolean; p_reason?: string | null };
+        Returns: Json;
+      };
       flow_counts: {
         Args: { p_owner?: string | null; p_closed_days?: number; p_mine?: string | null };
         Returns: { flow_phase: string; flow_key: string; n: number }[];

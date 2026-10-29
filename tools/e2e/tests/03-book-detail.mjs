@@ -996,7 +996,13 @@ await T("mazání: zaměstnanec ani obchodník nemají tlačítko, server akce z
   await context.clearCookies();
   const p2 = await context.newPage();
   await openJob(p2, USERS.obchod, DELB);
-  expect((await p2.getByRole("button", { name: "Další akce" }).count()) === 0, "obchodník: bez „Další akce“ (mazání jen super admin)");
+  // #24: obchodník má v „Další akce“ jen „Sloučit s jinou zakázkou…“ — mazání ne (jen super admin)
+  const more = p2.getByRole("button", { name: "Další akce" });
+  if (await more.count()) {
+    await more.first().click();
+    await p2.getByRole("menuitem", { name: /Sloučit s jinou zakázkou/ }).waitFor({ timeout: 10_000 });
+    expect((await p2.getByRole("menuitem", { name: /Smazat zakázku/ }).count()) === 0, "obchodník: bez „Smazat zakázku“ (mazání jen super admin)");
+  }
 });
 
 await T("role: obchodník vidí nákupní ceny a marži; zaměstnanec ne — ani v HTML odpovědi detailu", async (context) => {

@@ -636,7 +636,8 @@ async function strongMatchOf(db: JobsDb, type: BatchDocType, doc: ExtractedBusin
   }
   if ((type === "faktura_my" || type === "dodaci_list_my") && doc.documentNumber) {
     const col = type === "faktura_my" ? "invoice_number" : "delivery_note_number";
-    const { data } = await db.from("orders").select("id, number").eq(col, doc.documentNumber).limit(2);
+    // sloučená duplicita (#24) číslo dokladu sdílí s cílem — počítá se jen živá zakázka
+    const { data } = await db.from("orders").select("id, number").eq(col, doc.documentNumber).is("merged_into_id", null).limit(2);
     const rows = (data ?? []) as { id: string; number: string }[];
     if (rows.length === 1) return { jobId: rows[0].id, jobNumber: rows[0].number, reason: `podle čísla ${type === "faktura_my" ? "faktury" : "dodacího listu"} ${doc.documentNumber}`, score: 90 };
   }
@@ -978,6 +979,7 @@ export async function searchBatchJobs(c: Ctx, qRaw: string): Promise<{ ok: true;
     .from("orders")
     .select("id, number, title, status, customer_order_number, customer:customers!customer_id(name)")
     .or(`number.ilike.${like},title.ilike.${like},customer_order_number.ilike.${like}`)
+    .is("merged_into_id", null)                       // sloučená duplicita (#24) žije jen v historii cíle
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) return fail(error.message);
@@ -988,7 +990,7 @@ export async function searchBatchJobs(c: Ctx, qRaw: string): Promise<{ ok: true;
   if (custIds.length) {
     const { data: m } = await c.db
       .from("orders").select("id, number, title, status, customer:customers!customer_id(name)")
-      .in("customer_id", custIds).order("created_at", { ascending: false }).limit(20);
+      .in("customer_id", custIds).is("merged_into_id", null).order("created_at", { ascending: false }).limit(20);
     more = m ?? [];
   }
   const out: ReviewOptions["jobs"] = [];

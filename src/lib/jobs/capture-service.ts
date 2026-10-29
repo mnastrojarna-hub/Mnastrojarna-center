@@ -28,6 +28,7 @@ import { isJobStage } from "@/lib/jobs/stages";
 import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { docNumbersEqual } from "@/lib/jobs/matching";
 import { findPurchaseOrderByNumber } from "@/lib/jobs/purchasing-store";
+import { resolveMergeTarget } from "@/lib/jobs/job-merge-store";
 import {
   autoCaptureCtx, captureHandoffActor, captureProductionHandoff, captureStageGuard, checkPhotoOrderMismatch, confirmOrderByPhoto, markQuoteSentByPhoto, photoOrderRevision,
   proposeFromCapture, receiveSupplierDlByPhoto, recordPhotoDelivery, registerPhotoOrderRevision,
@@ -614,6 +615,15 @@ function clamp01(v: number): number {
   return Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
 }
 
+/** Zakázka, kterou dřívější pokus dávky založil (klíč focení); sloučená (#24) → zakázka, do které se sloučila. */
+async function jobByCaptureKey(db: JobsDb, captureKey: string): Promise<string | null> {
+  const { data } = await db.from("orders").select("id, merged_into_id").eq("capture_key", captureKey).maybeSingle();
+  const row = data as { id: string; merged_into_id: string | null } | null;
+  if (!row) return null;
+  if (!row.merged_into_id) return row.id;
+  return (await resolveMergeTarget(db, row.id))?.id ?? row.merged_into_id;
+}
+
 /** Dodavatel podle IČO / DIČ / názvu, jinak nový. */
 export async function findOrCreateSupplier(db: JobsDb, party: ExtractedParty): Promise<{ id: string; name: string; created: boolean } | null> {
   return findOrCreateSupplierByParty(db, party);
@@ -677,9 +687,9 @@ export async function applyBusinessDoc(
 
   // dávka: zakázka už založená dřívějším pokusem → jen doplnit
   if (captureKey && state.targetKey === "new") {
-    const { data: prev } = await db.from("orders").select("id").eq("capture_key", captureKey).maybeSingle();
-    if (prev) {
-      state.targetKey = (prev as { id: string }).id;
+    const prevId = await jobByCaptureKey(db, captureKey);
+    if (prevId) {
+      state.targetKey = prevId;
       createdEarlier = true;
     }
   }
@@ -788,8 +798,8 @@ export async function applyBusinessDoc(
     );
     if (!res.ok || !res.id || !res.number) {
       // souběh / opakování: zakázku s tímto klíčem už založil jiný pokus → použít ji
-      const { data: again } = await db.from("orders").select("id").eq("capture_key", captureKey).maybeSingle();
-      if (again) return applyBusinessDoc(c, session, { ...state, targetKey: (again as { id: string }).id }, opts);
+      const againId = await jobByCaptureKey(db, captureKey);
+      if (againId) return applyBusinessDoc(c, session, { ...state, targetKey: againId }, opts);
       return failResult(res.error ?? "Zakázku se nepodařilo založit.", aiUsed);
     }
     jobId = res.id;
