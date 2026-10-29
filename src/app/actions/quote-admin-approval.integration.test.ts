@@ -757,7 +757,7 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     as("admin");
   }, 60_000);
 
-  it("přílohy e-mailu v Dokumentech: vystavitel podle e-mailu — faktura dodavatele zamčená, poptávka zákazníka ne", async () => {
+  it("přílohy e-mailu v Dokumentech: vystavitel podle e-mailu — doklad dodavatele zamčený, poptávka zákazníka ne; faktura dodavatele jen do Faktur dodavatelů", async () => {
     const mail = await import("@/app/actions/mail");
     const filesAct = await import("@/app/actions/job-files");
     const { data: sup } = await svc.from("suppliers").select("id").limit(1).single();
@@ -773,7 +773,8 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
       const emailId = (data as { id: string }).id;
       mails.push(emailId);
       const path = `e2e-qappr/${TAG}/${crypto.randomUUID()}-${filename}`;
-      const up = await svc.storage.from("documents").upload(path, Buffer.from("%PDF-1.4 e2e"), { contentType: "application/pdf" });
+      // různý obsah (stejný obsah = duplicita — Pošta B ho do dokumentů zakázky podruhé neuloží)
+      const up = await svc.storage.from("documents").upload(path, Buffer.from(`%PDF-1.4 e2e ${TAG} ${filename}`), { contentType: "application/pdf" });
       if (up.error) throw new Error(up.error.message);
       stored.push(path);
       const att = await svc.from("email_attachments").insert({ email_id: emailId, filename, mime_type: "application/pdf", size_bytes: 12, storage_path: path });
@@ -782,20 +783,34 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     };
     const jobId = await newJob();
     const invoice = await mk({ category: "faktura", supplier_id: supplierId, customer_id: null }, "FV-2026-0042.pdf");
+    const offer = await mk({ category: "nabidka_dodavatele", supplier_id: supplierId, customer_id: null }, "Cenova-nabidka-0042.pdf");
     const rfq = await mk({ category: "poptavka", customer_id: CUSTOMER }, "Angebotsanfrage_AeroParts.pdf");
     try {
       as("sales");
       expect((await mail.linkEmailToJob(invoice, jobId)).ok).toBe(true);
+      expect((await mail.linkEmailToJob(offer, jobId)).ok).toBe(true);
       expect((await mail.linkEmailToJob(rfq, jobId)).ok).toBe(true);
       const { data: files } = await svc.from("job_files").select("id, filename, kind, issuer, origin").eq("job_id", jobId);
       const f = new Map(((files ?? []) as Row[]).map((r) => [String(r.filename), r]));
-      expect(f.get("FV-2026-0042.pdf")).toMatchObject({ issuer: "dodavatel", origin: "email" });
+      // Pošta B (B5): faktura dodavatele nikdy do dokumentů zakázky — do Faktur dodavatelů (vidí jen super admin)
+      expect(f.has("FV-2026-0042.pdf")).toBe(false);
+      const { data: inv } = await svc.from("supplier_invoices").select("id, source").eq("email_id", invoice);
+      expect(((inv ?? []) as Row[]).map((r) => r.source)).toEqual(["email"]);
+      expect(f.get("Cenova-nabidka-0042.pdf")).toMatchObject({ issuer: "dodavatel", origin: "email" });
       expect(f.get("Angebotsanfrage_AeroParts.pdf")).toMatchObject({ kind: "nabidka", issuer: "zakaznik", origin: "email" });
       as("worker");
-      expect((await filesAct.getJobFileUrl(String(f.get("FV-2026-0042.pdf")!.id))).error).toBe("Nákupní doklad vidí obchodník a super admin.");
+      expect((await filesAct.getJobFileUrl(String(f.get("Cenova-nabidka-0042.pdf")!.id))).error).toBe("Nákupní doklad vidí obchodník a super admin.");
       const open = await filesAct.getJobFileUrl(String(f.get("Angebotsanfrage_AeroParts.pdf")!.id));
       expect(open.ok, open.error).toBe(true);
     } finally {
+      // faktura z e-mailu: počkat na zpracování na pozadí (bez AI → ke kontrole), pak uklidit i soubory
+      const invRows = async () => ((await svc.from("supplier_invoices").select("id, status").eq("email_id", invoice)).data ?? []) as { id: string; status: string }[];
+      for (let i = 0; i < 40 && (await invRows()).some((r) => r.status === "nahrano"); i++) await new Promise((r) => setTimeout(r, 250));
+      const ids = (await invRows()).map((r) => r.id);
+      const { data: invFiles } = ids.length ? await svc.from("supplier_invoice_files").select("storage_path").in("invoice_id", ids) : { data: [] };
+      const invPaths = ((invFiles ?? []) as { storage_path: string }[]).map((r) => r.storage_path);
+      if (invPaths.length) await svc.storage.from("supplier-invoices").remove(invPaths);
+      await svc.from("supplier_invoices").delete().eq("email_id", invoice);
       await svc.from("emails").delete().in("id", mails);
       await svc.storage.from("documents").remove(stored);
     }

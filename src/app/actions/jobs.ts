@@ -24,6 +24,8 @@ import {
   FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
+import { supersedeEditedMailChanges } from "@/lib/email/job-link-store";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Akce Knihy zakázek: zakázka, položky, stav, komentáře a nabídky.
@@ -280,6 +282,15 @@ export async function createJob(
       data: { source, items: itemRows.length, customerCreated, ...(opts.emailId ? { emailId: opts.emailId } : {}) },
       actorId: user.id,
     });
+    // poznámka při založení i v historii (majitel 29. 10.: „měly by tam být i poznámky")
+    const createdNote = typeof row.note === "string" && row.note.trim() ? row.note.trim() : null;
+    if (createdNote) {
+      await logJobEvent(db, {
+        jobId, type: "field", message: `Interní poznámka: ${createdNote.slice(0, 300)}`,
+        data: { changes: [{ field: "note", label: "Interní poznámka", from: null, to: createdNote, fromText: "—", toText: createdNote }], note: true },
+        actorId: user.id,
+      });
+    }
     await logAudit({ action: "job_created", entity: "orders", entityId: jobId, diff: { number, source } });
     revalidateJob(jobId);
     return { ok: true, id: jobId, number };
@@ -454,10 +465,10 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
 
     const { data: oldData, error: oldErr } = await db
       .from("order_items")
-      .select("id, drawing_id, purchase_unit_price")
+      .select("id, drawing_id, purchase_unit_price, note, drawing_number, name")
       .eq("order_id", jobId);
     if (oldErr) return fail(oldErr.message);
-    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null }[]).map((r) => [r.id, r]));
+    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null; note: string | null; drawing_number: string | null; name: string | null }[]).map((r) => [r.id, r]));
 
     const rows = items.map((it, i): Row => {
       const r = jobItemToRow(it, i);
@@ -501,6 +512,8 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       const { error: delErr } = await db.from("order_items").delete().in("id", removed);
       if (delErr) return fail(delErr.message);
     }
+    // Pošta B: ručně přepsaná hodnota z e-mailu (počet, materiál, revize, poznámka) = „nahrazeno ruční úpravou"
+    await supersedeEditedMailChanges(db as unknown as SupabaseClient, jobId, user.id);
 
     const totals = computeItemTotals(rows.map((r) => ({
       quantity: r.quantity as number,
@@ -515,10 +528,19 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       if (upErr) return fail(upErr.message);
     }
 
+    // poznámky položek (nové / změněné) jako změny v historii — s textem, ne jen „Položky upraveny"
+    const noteChanges = items.flatMap((it, i) => {
+      const prev = it.id && isUuid(it.id) ? old.get(it.id) : undefined;
+      const before = (prev?.note ?? "").trim();
+      const after = (typeof rows[i].note === "string" ? (rows[i].note as string) : "").trim();
+      if (before === after) return [];
+      const ref = cleanText((rows[i].drawing_number as string | null) ?? prev?.drawing_number ?? (rows[i].name as string | null) ?? prev?.name, 120) ?? `položka ${i + 1}`;
+      return [{ field: "item_note", label: `Poznámka položky ${ref}`, from: before || null, to: after || null, fromText: before || "—", toText: after || "—" }];
+    });
     await logJobEvent(db, {
       jobId, type: "field",
-      message: `Položky upraveny (${rows.length})`,
-      data: { items: rows.length, ...(update.value !== undefined ? { value: update.value } : {}) },
+      message: noteChanges.length === 1 && rows.length === 1 ? `${noteChanges[0].label}: ${noteChanges[0].toText}`.slice(0, 500) : `Položky upraveny (${rows.length})`,
+      data: { items: rows.length, ...(update.value !== undefined ? { value: update.value } : {}), ...(noteChanges.length ? { changes: noteChanges, note: true } : {}) },
       actorId: user.id,
     });
     revalidateJob(jobId);

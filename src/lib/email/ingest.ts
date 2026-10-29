@@ -21,6 +21,8 @@ import { ruleCategorize } from "@/lib/email/mail-rules";
 import { decodePart, mimeLeaves, isAttachmentLeaf, type AttachmentMeta } from "@/lib/email/mime-parts";
 import { replyHeaders, replySubject } from "@/lib/email/threading";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
+import { aiMailActor, loadMailJobAiBudget, processEmailForJobs, MAIL_JOB_CHANGES_MAX_AGE_DAYS, type MailJobActor } from "@/lib/email/job-link-store";
+import { categoryAfterLink, STRONG_SIGNALS } from "@/lib/email/job-match";
 import { aiActor, cronActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import type { MailboxConfig, MailboxStatus } from "@/lib/supabase/database.types";
@@ -117,6 +119,8 @@ export interface AiPolicy {
   recentDays: number;
   /** Návrh odpovědi jen u e-mailů mladších než (hodiny). */
   replyWindowHours: number;
+  /** Pošta B: limit AI pro přiřazení k zakázce + vytěžení technických informací (mail_job_ai_max_per_run). */
+  jobBudget?: { left: number };
 }
 
 export interface IngestOptions {
@@ -154,11 +158,14 @@ export async function loadAiPolicy(): Promise<AiPolicy> {
     const n = Number(v);
     return Number.isFinite(n) && v !== undefined && v !== "" ? Math.min(max, Math.max(min, Math.round(n))) : d;
   };
-  const [days, max] = await Promise.all([getSetting("mail_ai_recent_days").catch(() => undefined), getSetting("mail_ai_max_per_run").catch(() => undefined)]);
+  const [days, max, jobBudget] = await Promise.all([
+    getSetting("mail_ai_recent_days").catch(() => undefined), getSetting("mail_ai_max_per_run").catch(() => undefined), loadMailJobAiBudget(),
+  ]);
   return {
     budget: { left: num(max, DEFAULT_AI_MAX_PER_RUN, 0, 500) },
     recentDays: num(days, DEFAULT_AI_RECENT_DAYS, 0, 3650),
     replyWindowHours: REPLY_WINDOW_HOURS,
+    jobBudget,
   };
 }
 
@@ -377,6 +384,9 @@ export async function ingestEmailsProgress(
   const customers = (customerRows ?? []) as PartyRef[];
   const suppliers = (supplierRows ?? []) as PartyRef[];
   let count = 0;
+  // Pošta B: přiřazení k zakázce (✨ AI za vlastníka schránky) — jisté hned, nejisté jako návrh
+  let jobActor: MailJobActor | null = null;
+  const jobBudget = policy.jobBudget ?? (policy.jobBudget = await loadMailJobAiBudget());
 
   for (let i = 0; i < emails.length; i++) {
     if (!isFresh[i]) continue;
@@ -446,6 +456,15 @@ export async function ingestEmailsProgress(
     count++;
     const emailId = (inserted as { id: string }).id;
     await saveAttachments(db, emailId, e);
+    try {
+      jobActor ??= aiMailActor(opts.ownerId ?? null);
+      // stará pošta (Stáhnout vše, první stažení): jen přiřadit — žádné změny položek, přílohy ani faktury
+      await processEmailForJobs(jobActor, emailId, {
+        useAi, aiBudget: jobBudget, stopAt: opts.stopAt, recentDays: policy.recentDays, backfill: !isRecent(e.receivedAt, MAIL_JOB_CHANGES_MAX_AGE_DAYS),
+      });
+    } catch (err) {
+      console.error(`[mail:ingest] Přiřazení k zakázce selhalo: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     // Návrh odpovědi jen s AI, ne u spamu a jen u čerstvé pošty: plná automatika = odeslat hned, jinak fronta
     if (!analysis || isSpam || !isRecent(e.receivedAt, policy.replyWindowHours / 24)) continue;
@@ -502,16 +521,27 @@ export async function aiCategorizeStored(
   if (!ids.length || !isSupabaseConfigured() || !hasServiceKey()) return { done: 0 };
   if (!(await isMailAiEnabled())) return { done: 0, error: "AI je vypnutá nebo chybí Claude API klíč (Nastavení)." };
   const db = createAdminClient({ actor: aiActor(opts.ownerId ?? null, "email-ingest", "email") });
-  const { data } = await db.from("emails").select("id, from_email, subject, body_text, owner_id").in("id", ids.slice(0, 100));
+  const { data } = await db.from("emails").select("id, from_email, subject, body_text, owner_id, order_id, job_link_source, supplier_id, customer_id").in("id", ids.slice(0, 100));
   const rules = await getAgentInstructions("email");
   let done = 0;
-  for (const row of (data ?? []) as { id: string; from_email: string | null; subject: string | null; body_text: string | null }[]) {
+  type StoredRow = {
+    id: string; from_email: string | null; subject: string | null; body_text: string | null;
+    order_id?: string | null; job_link_source?: string | null; supplier_id?: string | null; customer_id?: string | null;
+  };
+  for (const row of (data ?? []) as StoredRow[]) {
     if (opts.stopAt !== undefined && Date.now() > opts.stopAt) break;
     if (opts.budget && opts.budget.left <= 0) break;
     if (opts.budget) opts.budget.left--;
     try {
       const a = await categorizeEmail({ from: row.from_email ?? "", subject: row.subject ?? "", body: row.body_text ?? "", rules, signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS) });
-      const category = isDbEmailCategory(a.category) ? a.category : "ostatni";
+      const aiCategory = isDbEmailCategory(a.category) ? a.category : "ostatni";
+      // Pošta B: e-mail přiřazený k zakázce zůstane komunikací k zakázce (AI ho nepřetřídí na Ostatní)
+      const category = row.order_id
+        ? categoryAfterLink(aiCategory, {
+          direction: "in", strong: (STRONG_SIGNALS as readonly string[]).includes(row.job_link_source ?? "") || row.job_link_source === "manual",
+          fromSupplier: Boolean(row.supplier_id && !row.customer_id),
+        }) ?? aiCategory
+        : aiCategory;
       const spam = Boolean(a.is_spam || category === "spam");
       await db.from("emails").update({
         category: spam ? "spam" : category, is_spam: spam,

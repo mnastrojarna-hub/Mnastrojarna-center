@@ -7,6 +7,7 @@ import { saveJobItems } from "@/app/actions/jobs";
 import type { JobItem } from "@/lib/jobs/types";
 import { useJobDetail } from "./detail-context";
 import { ItemsEditor } from "./items-editor";
+import { MailOverridesPanel } from "@/components/jobs/communication/mail-overrides-panel";
 import { draftToItemInput, draftsSignature, isBlankDraft, itemToDraft, validateDrafts, type ItemDraft } from "./detail-helpers";
 
 /** Záložka Položky — upravitelná tabulka, „Uložit položky" → saveJobItems. */
@@ -93,6 +94,8 @@ export function ItemsTab({ items, currency, onDirtyChange }: { items: JobItem[];
           {!perms.margins && " Nákupní ceny vidí jen obchodník a admin."}
         </p>
       </div>
+
+      <MailOverridesPanel />
 
       <ItemsEditor
         drafts={drafts}

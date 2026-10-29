@@ -2,10 +2,11 @@ import type { EmailCategory } from "@/lib/data/types";
 
 /** Typy Přijaté pošty (vlákna, složky) — sdílí server i klient. */
 
-export type MailFolder = "inbox" | "sent" | "flagged" | "all" | "spam" | "shared";
-export const MAIL_FOLDERS: MailFolder[] = ["inbox", "sent", "flagged", "all", "spam", "shared"];
+export type MailFolder = "inbox" | "jobs" | "sent" | "flagged" | "all" | "spam" | "shared";
+export const MAIL_FOLDERS: MailFolder[] = ["inbox", "jobs", "sent", "flagged", "all", "spam", "shared"];
 export const FOLDER_LABEL: Record<MailFolder, string> = {
   inbox: "Přijaté",
+  jobs: "K zakázkám",
   sent: "Odeslané",
   flagged: "Označené",
   all: "Vše",
@@ -75,6 +76,24 @@ export interface ThreadSummary {
   aiPending: boolean;
   /** Předáno mně kolegou: poznámka, kdo, nepřečteno. */
   share?: { note: string | null; by: string | null; unread: boolean };
+  /** Pošta B: název zakázky vlákna, jak a kdo ji přiřadil. */
+  jobTitle?: string;
+  jobLinkSource?: string;
+  jobLinkActor?: string;
+  /** Pošta B: návrh „Patří k Z-…?" (vlákno bez zakázky). */
+  suggestion?: JobSuggestionRef;
+}
+
+export interface JobSuggestionRef {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  jobTitle?: string;
+  score: number;
+  /** Otázka k jedné zprávě vlákna, které patří jiné zakázce (odpověď jmenuje tuto zakázku). */
+  forMessage?: boolean;
+  /** Zpráva, ke které otázka patří (do rozhodnutí u ní neutrální kategorie „K zakázce?"). */
+  emailId?: string;
 }
 
 export interface ThreadPage {
@@ -91,9 +110,12 @@ export interface FolderCounts {
   shared: number;
   sharedUnread: number;
   aiPending: number;
+  /** Pošta B: vlákna k zakázkám s nepřečtenou poštou, návrhy přiřazení. */
+  jobsUnread?: number;
+  jobSuggestions?: number;
 }
 
-export const EMPTY_COUNTS: FolderCounts = { inboxUnread: 0, flagged: 0, spam: 0, shared: 0, sharedUnread: 0, aiPending: 0 };
+export const EMPTY_COUNTS: FolderCounts = { inboxUnread: 0, flagged: 0, spam: 0, shared: 0, sharedUnread: 0, aiPending: 0, jobsUnread: 0, jobSuggestions: 0 };
 
 export interface ThreadAttachment {
   id: string;
@@ -129,6 +151,9 @@ export interface ThreadMessage {
   hasDraft: boolean;
   jobId?: string;
   jobNumber?: string;
+  /** Pošta B: jak a kdo zprávu přiřadil k zakázce. */
+  jobLinkSource?: string | null;
+  jobLinkActor?: string | null;
   customer?: string;
   messageId: string | null;
   references: string[];
@@ -159,6 +184,10 @@ export interface ThreadDetail {
   myAddresses?: string[];
   /** Zakázka vlákna (pro přílohy z dokumentů zakázky). */
   jobId?: string | null;
+  /** Pošta B: číslo a název zakázky vlákna, návrh přiřazení. */
+  jobNumber?: string | null;
+  jobTitle?: string | null;
+  suggestion?: JobSuggestionRef | null;
 }
 
 /** Text průběhu stahování („Staženo 340 z 2 150"). */

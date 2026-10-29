@@ -6,7 +6,7 @@ import {
   approvalTypeForKind, sentItemKind, SENT_KIND_STYLE, SENT_KINDS, toEmailItem, toSentItemFromMail,
   toSentItemFromApproval, mergeSentItems, extractAddress, usefulAiSummary, jobStageForEmailCategory,
   jobTitleFromSubject, pragueDate, buildJobFromEmail, jobPeopleFromEmail, one, JOB_TITLE_MAX, filterInbox, foldText, mailtoReply,
-  filterSent, countSentKinds, categoryCodeFromLabel, attachmentIssuer,
+  filterSent, countSentKinds, categoryCodeFromLabel, attachmentIssuer, neutralWhileAsking,
   type EmailListRow,
 } from "./visibility";
 import type { SentItem } from "@/lib/data/types";
@@ -112,9 +112,9 @@ describe("hlavní vypínač AI a cron", () => {
 
 describe("barvy kategorií", () => {
   it("každá kategorie má vlastní barvu a ikonu", () => {
-    expect(INBOX_CATEGORIES).toHaveLength(10);
+    expect(INBOX_CATEGORIES).toHaveLength(11); // + „K zakázce" (Pošta B)
     const dots = new Set(INBOX_CATEGORIES.filter((c) => c !== "Spam" && c !== "Ostatní").map((c) => CATEGORY_STYLE[c].dot));
-    expect(dots.size).toBe(8);
+    expect(dots.size).toBe(9);
     for (const c of INBOX_CATEGORIES) {
       expect(CATEGORY_STYLE[c].label).toBe(c);
       expect(CATEGORY_STYLE[c].icon).toBeTruthy();
@@ -400,6 +400,14 @@ describe("filtr odeslané pošty", () => {
   });
   it("počty", () => {
     expect(countSentKinds(items)).toEqual({ all: 3, email: 1, quote: 1, reminder: 1, supplier: 0, auto: 1 });
+  });
+});
+
+describe("Pošta B fix 3: kategorie zprávy čekající na otázku „Patří k …?“", () => {
+  it("nabídka dodavatele / ostatní / tech. dokumentace z pravidel → neutrální „K zakázce?“ jen do rozhodnutí", () => {
+    for (const c of ["Nabídka dodavatele", "Ostatní", "Technická dokumentace", "K zakázce"]) expect(neutralWhileAsking(c, true)).toBe(true);
+    expect(neutralWhileAsking("Nabídka dodavatele", false)).toBe(false);
+    for (const c of ["Objednávka", "Faktura", "Reklamace", "Poptávka", "Spam"]) expect(neutralWhileAsking(c, true)).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   Sparkles, PlusCircle, PencilLine, Paperclip, FileText, MessageCircle, Mail, Send, Loader2, ArrowRight, History,
-  ListChecks, UserRound, type LucideIcon,
+  ListChecks, UserRound, StickyNote, ShieldCheck, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,7 @@ import type { JobEvent } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
 import {
-  HISTORY_PHASES, autoLabel, dedupeEvents, eventChanges, eventPhase, eventStage, eventStamp, eventTone, type HistoryPhase,
+  HISTORY_PHASES, autoLabel, dedupeEvents, eventChanges, eventPhase, eventStage, eventStamp, eventTone, isNoteEvent, type HistoryPhase,
 } from "./detail-helpers";
 
 const ICONS: Record<JobEvent["type"], LucideIcon> = {
@@ -83,6 +83,9 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
   const auto = autoLabel(e);
   const sc = statusChips(e);
   const mergedFrom = mergedFromNumber(e);
+  const mailAction = e.type === "email" && typeof e.data?.action === "string" ? e.data.action : null;
+  const fromMail = mailAction === "mail_change" || mailAction === "mail_info";
+  const noteEvent = isNoteEvent(e) && changes.length > 0;
 
   return (
     <li className="relative flex gap-3 pb-5">
@@ -114,6 +117,24 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
 
         {e.type === "comment" ? (
           <div className="mt-1 whitespace-pre-wrap rounded-lg rounded-tl-none bg-blue-50 px-3 py-2 text-sm dark:bg-blue-500/10">{e.message}</div>
+        ) : fromMail ? (
+          <MailEventBody e={e} />
+        ) : noteEvent ? (
+          <ul className="mt-1 space-y-1" data-testid="history-note">
+            {changes.map((c, i) => (
+              <li key={`${c.field}-${i}`} className="rounded-lg rounded-tl-none border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                  <StickyNote className="h-3 w-3" /> {c.label}
+                </p>
+                {c.sensitive ? <p className="italic text-muted-foreground">upraveno</p> : (
+                  <>
+                    <p className="whitespace-pre-wrap break-words">{c.to && c.to !== "—" ? c.to : <i className="text-muted-foreground">smazáno</i>}</p>
+                    {c.from && c.from !== "—" && <p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs text-muted-foreground line-through decoration-muted-foreground/40">{c.from}</p>}
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
         ) : st ? (
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm">
             {st.from ? <StageBadge stage={st.from} size="xs" /> : null}
@@ -156,6 +177,26 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
         )}
       </div>
     </li>
+  );
+}
+
+/** Událost „Z e-mailu od …: …" — technická / obchodní informace z pošty k zakázce (Pošta B). */
+function MailEventBody({ e }: { e: JobEvent }) {
+  const d = e.data ?? {};
+  const applied = d.applied === true;
+  // citace z e-mailu se do historie neukládá (vidí ji jen ten, kdo smí e-mail — záložka Komunikace)
+  const drawing = d.action === "mail_change" ? (typeof d.drawingValue === "string" ? d.drawingValue : "neuvádí") : null;
+  return (
+    <div className="mt-1 space-y-1 rounded-lg rounded-tl-none border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-sm dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10" data-testid="history-mail-event">
+      <p className="break-words">{e.message}</p>
+      {d.action === "mail_change" && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+          {applied && <span className="inline-flex items-center gap-1 font-semibold text-fuchsia-800 dark:text-fuchsia-300"><ShieldCheck className="h-3 w-3" /> nadřazeno výkresu</span>}
+          {drawing !== null && <span>výkres: <span className={cn(applied && "line-through")}>{drawing}</span></span>}
+          {typeof d.valuePrev === "string" && d.valuePrev !== "—" && d.valuePrev !== drawing && <span>před změnou: {d.valuePrev}</span>}
+        </p>
+      )}
+    </div>
   );
 }
 

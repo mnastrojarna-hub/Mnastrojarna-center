@@ -13,7 +13,8 @@ export type EmailCategory =
   | "Reklamace"
   | "Technická dokumentace"
   | "Spam"
-  | "Ostatní";
+  | "Ostatní"
+  | "K zakázce";
 
 export interface EmailItem {
   id: string;

@@ -544,6 +544,36 @@ describe.skipIf(!LOCAL_ENABLED)("sloučení zakázek ↔ lokální Supabase", ()
     }
   }, 60_000);
 
+  it("Pošta B: změny z e-mailů a návrhy přiřazení zdroje přejdou na cíl (i spojená položka), pozdní zápis na zdroj skončí u cíle", async () => {
+    const f = await fixture();
+    const { data: srcItem } = await svc.from("order_items").select("id").eq("order_id", f.quoteJob.id).eq("position", 0).single();
+    const { data: tgtItem } = await svc.from("order_items").select("id").eq("order_id", f.order.id).eq("position", 0).single();
+    const thread = `m:-:<merge-b-${TAG}-${n}@test>`;
+    const { error: ce } = await svc.from("job_mail_changes").insert({
+      job_id: f.quoteJob.id, email_id: f.emailId, order_item_id: (srcItem as { id: string }).id, kind: "change", field: "heat",
+      summary: "Tepelné zpracování: kalení", value_new: "kalení", status: "applied", party: "customer",
+    });
+    expect(ce).toBeNull();
+    // návrh stejného vlákna na obě zakázky → po sloučení jen jeden (cíl)
+    const { error: se } = await svc.from("email_job_suggestions").insert([
+      { thread_id: thread, job_id: f.quoteJob.id, score: 0.6 }, { thread_id: thread, job_id: f.order.id, score: 0.5 },
+    ]);
+    expect(se).toBeNull();
+    await merged(f.order.id, f.quoteJob.id);
+    const { data: ch } = await svc.from("job_mail_changes").select("job_id, order_item_id").eq("email_id", f.emailId!).single();
+    expect(ch).toMatchObject({ job_id: f.order.id, order_item_id: (tgtItem as { id: string }).id });
+    const { data: sg } = await svc.from("email_job_suggestions").select("job_id").eq("thread_id", thread);
+    expect(sg).toEqual([{ job_id: f.order.id }]);
+    // pozdní zápis (stahování pošty běželo souběžně) na sloučený zdroj → cíl
+    const { data: late, error: le } = await svc.from("job_mail_changes").insert({
+      job_id: f.quoteJob.id, kind: "info", field: "deadline", summary: `Termín pozdě ${TAG}`, status: "info",
+    }).select("job_id").single();
+    expect(le).toBeNull();
+    expect((late as { job_id: string }).job_id).toBe(f.order.id);
+    await svc.from("job_mail_changes").delete().eq("job_id", f.order.id);
+    await svc.from("email_job_suggestions").delete().eq("thread_id", thread);
+  }, 60_000);
+
   it("REST (session) nesloučí ani nenastaví příznak sloučení", async () => {
     const f = await fixture();
     const s = await localSession(DEMO.admin.email, DEMO.admin.password);

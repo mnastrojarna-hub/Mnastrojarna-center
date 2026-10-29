@@ -7,7 +7,9 @@ import type {
 export type UserRole = "super_admin" | "obchodnik" | "zamestnanec";
 export type EmailCategory =
   | "poptavka" | "objednavka" | "nabidka_dodavatele" | "potvrzeni_objednavky"
-  | "faktura" | "upominka" | "reklamace" | "technicka_dokumentace" | "spam" | "ostatni";
+  | "faktura" | "upominka" | "reklamace" | "technicka_dokumentace" | "spam" | "ostatni"
+  // komunikace k běžící zakázce / poptávce (migrace 20261029145000)
+  | "k_zakazce";
 export type PriorityLevel = "nizka" | "stredni" | "vysoka";
 export type QuoteStatus = "navrh_ai" | "ke_schvaleni" | "odeslano" | "prijato" | "zamitnuto";
 /** Stav zakázky v Knize zakázek (migrace 0019 — nahrazuje původní order_status). */

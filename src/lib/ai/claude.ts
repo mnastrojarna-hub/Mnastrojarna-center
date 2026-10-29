@@ -40,7 +40,7 @@ export interface EmailAnalysis {
 
 const CATEGORY_ENUM: EmailCategory[] = [
   "poptavka", "objednavka", "nabidka_dodavatele", "potvrzeni_objednavky",
-  "faktura", "upominka", "reklamace", "technicka_dokumentace", "spam", "ostatni",
+  "faktura", "upominka", "reklamace", "technicka_dokumentace", "spam", "ostatni", "k_zakazce",
 ];
 
 export async function categorizeEmail(input: {
@@ -88,7 +88,10 @@ export async function categorizeEmail(input: {
       "Jsi asistent nástrojárny Mnástrojárna. Klasifikuj příchozí e-mail do jedné z kategorií " +
       "a urči prioritu, důležitost (0–100), zda jde o spam, krátké shrnutí česky a confidence (0–1). " +
       "Kategorie: poptavka, objednavka, nabidka_dodavatele, potvrzeni_objednavky, faktura, upominka, " +
-      "reklamace, technicka_dokumentace, spam, ostatni." +
+      "reklamace, technicka_dokumentace, spam, ostatni, k_zakazce. " +
+      "k_zakazce = komunikace k již běžící zakázce nebo poptávce (doplnění, upřesnění, změna počtu, " +
+      "materiálu, úpravy, termínu, dotaz k rozpracované věci, odpověď na naši nabídku či objednávku) — " +
+      "NE nová poptávka ani nová objednávka (ty zůstávají poptavka / objednavka)." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {

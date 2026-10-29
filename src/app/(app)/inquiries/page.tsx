@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calculator, EyeOff, FilePlus, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { Calculator, EyeOff, FilePlus, Inbox, MessageSquareQuote, Mail, MessagesSquare } from "lucide-react";
 import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
 import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
@@ -94,6 +94,9 @@ export default async function InquiriesPage({
   const today = todayPrague();
   const inbox = toFlowEmails(emails, ["Poptávka"]);
   const waiting = inbox.filter((e) => !e.jobId).length;
+  // Pošta B: komunikace k rozpracovaným poptávkám (přiřazená pošta „K zakázce")
+  const inquiryIds = new Set(jobs.map((j) => j.id));
+  const talk = toFlowEmails(emails.filter((e) => e.jobId && inquiryIds.has(e.jobId)), ["K zakázce"], 20);
 
   return (
     <div className="space-y-5">
@@ -195,6 +198,18 @@ export default async function InquiriesPage({
       </ToastProvider>
 
       {reviewRows.length === 0 && anonSection}
+
+      {mail && talk.length > 0 && (
+        <FlowSection
+          icon={MessagesSquare}
+          iconClass="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300"
+          title="Komunikace k poptávkám"
+          description="Doplnění a změny k rozpracovaným poptávkám — AI je přiřadila samy, technické změny jsou v historii a v záložce Komunikace."
+          count={talk.length}
+        >
+          <FlowMailList emails={talk} />
+        </FlowSection>
+      )}
 
       {mail && (
         <FlowSection

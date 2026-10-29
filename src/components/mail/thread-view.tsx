@@ -13,12 +13,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PrioritySelect, type PriorityValue } from "@/components/priority";
 import { CategoryEditor, CategoryPill } from "@/components/mail/category-editor";
 import { ShareDialog } from "@/components/mail/share-dialog";
+import { JobLinkBar } from "@/components/mail/job-link-bar";
 import type { ComposeRequest } from "@/components/mail/compose-dialog";
 import { createJobFromEmail } from "@/app/actions/mail";
 import { markThreadReadAction, openThreadAction, runAiOnThreadAction, setThreadFlagAction, setThreadPriorityAction } from "@/app/actions/mail-inbox";
 import { sentCopyLabel } from "@/lib/email/mail-folders";
 import type { ThreadDetail, ThreadMessage, ThreadSummary } from "@/lib/email/mail-types";
-import { categoryStyle } from "@/lib/email/visibility";
+import { categoryStyle, neutralWhileAsking } from "@/lib/email/visibility";
+import { AskingCategoryPill } from "@/components/mail/thread-row";
 import type { EmailCategory } from "@/lib/data/types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -52,6 +54,9 @@ export interface ThreadPatch {
   jobId?: string;
   jobNumber?: string;
   shareUnread?: boolean;
+  /** Pošta B: vlákno odpojeno od zakázky / návrh vyřízen. */
+  jobCleared?: boolean;
+  suggestionDone?: boolean;
 }
 
 export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version }: {
@@ -160,7 +165,12 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
     if (r.ok) setDetail(await openThreadAction(threadId, { markRead: false }));
   };
 
-  const st = categoryStyle(target?.category ?? summary.category);
+  // zpráva čeká na otázku „Patří k …?" (odpověď jmenuje jinou zakázku) → do rozhodnutí neutrální „K zakázce?"
+  const question = detail ? detail.suggestion ?? null : summary.suggestion ?? null;
+  const asking = neutralWhileAsking(target?.category ?? summary.category, Boolean(
+    question?.forMessage && (question.emailId ? question.emailId === (target?.id ?? summary.emailId) : true) && !target?.jobId,
+  ));
+  const st = categoryStyle(asking ? "K zakázce" : target?.category ?? summary.category);
   return (
     <Card className="overflow-hidden" data-testid="thread-view">
       <div className={cn("h-1.5 w-full", st.bar)} aria-hidden />
@@ -172,7 +182,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           <div className="min-w-0 flex-1">
             <h2 className="break-words text-base font-semibold leading-snug sm:text-lg" data-testid="thread-subject">{detail?.subject || summary.subject || "(bez předmětu)"}</h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <CategoryPill category={target?.category ?? summary.category} />
+              {asking ? <AskingCategoryPill /> : <CategoryPill category={target?.category ?? summary.category} />}
               {(target?.customer ?? summary.customer) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-500/10 dark:text-green-300">
                   <Building2 className="h-3 w-3" /> {target?.customer ?? summary.customer}
@@ -281,16 +291,26 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           </ol>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed bg-muted/30 p-3">
-          {jobId ? (
-            <Button asChild variant="success" size="sm">
-              <Link href={`/orders/${jobId}`}><FolderOpen className="h-4 w-4" /> Otevřít zakázku {jobNumber ?? ""}</Link>
-            </Button>
-          ) : (
-            <Button variant="success" size="sm" onClick={createJob} disabled={busy !== null || !lastIn}>
-              {busy === "job" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />} Založit zakázku
-            </Button>
-          )}
+        <div className="space-y-2 rounded-xl border border-dashed bg-muted/30 p-3">
+          <JobLinkBar
+            threadId={threadId}
+            jobId={jobId}
+            jobNumber={jobNumber}
+            jobTitle={detail?.jobTitle ?? summary.jobTitle}
+            linkSource={[...messages].reverse().find((m) => m.jobId)?.jobLinkSource ?? summary.jobLinkSource}
+            linkActor={[...messages].reverse().find((m) => m.jobId)?.jobLinkActor ?? summary.jobLinkActor}
+            suggestion={detail ? detail.suggestion ?? null : summary.suggestion ?? null}
+            canCreate
+            createDisabled={!lastIn}
+            creating={busy === "job"}
+            onCreate={() => void createJob()}
+            onError={(text) => setNotice({ ok: false, text })}
+            onChanged={(c) => {
+              setNotice({ ok: true, text: c.text });
+              onPatch(threadId, c.jobId ? { jobId: c.jobId, jobNumber: c.jobNumber, suggestionDone: true } : { jobCleared: true, suggestionDone: c.suggestionDone });
+              void openThreadAction(threadId, { markRead: false }).then(setDetail);
+            }}
+          />
           {lastIn && (
             <CategoryEditor
               emailId={lastIn.id}

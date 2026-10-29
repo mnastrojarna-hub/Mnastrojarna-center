@@ -14,6 +14,8 @@ import { ItemsTab } from "./items-tab";
 import { QuotesTab } from "./quotes-tab";
 import { DocumentsTab } from "./documents-tab";
 import { HistoryTab } from "./history-tab";
+import { CommunicationTab } from "@/components/jobs/communication/communication-tab";
+import { COMMUNICATION_TAB, useJobMailCount } from "@/components/jobs/communication/job-mail-context";
 import { UploadQueue } from "./upload-controls";
 import { DETAIL_TABS_ID, detailTabOf, isDetailTab, type DetailTab } from "./detail-helpers";
 import { FlowActionsProvider, type FlowAccess } from "./flow-actions";
@@ -42,6 +44,7 @@ const TABS: { key: DetailTab; label: string; icon: LucideIcon; tone: string; cou
   { key: "nabidky", label: "Nabídky", icon: FileText, tone: "text-violet-600 dark:text-violet-400", count: "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300" },
   { key: "nakup", label: "Nákup & marže", icon: ShoppingBag, tone: "text-lime-600 dark:text-lime-400", count: "bg-lime-100 text-lime-800 dark:bg-lime-500/20 dark:text-lime-300" },
   { key: "dokumenty", label: "Dokumenty", icon: Paperclip, tone: "text-rose-600 dark:text-rose-400", count: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300" },
+  COMMUNICATION_TAB,
   { key: "historie", label: "Historie", icon: History, tone: "text-slate-600 dark:text-slate-400", count: "bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300" },
 ];
 
@@ -111,7 +114,9 @@ export function JobDetailView({
     return out;
   }, [production?.operations]);
 
+  const mailCount = useJobMailCount();
   const counts: Record<DetailTab, number> = {
+    komunikace: mailCount,
     prehled: 0,
     vyroba: production?.summary.total ?? 0,
     polozky: job.items.length,
@@ -180,6 +185,9 @@ export function JobDetailView({
             )}
             <TabsContent value="dokumenty">
               <DocumentsTab files={job.files} quotes={job.quotes} />
+            </TabsContent>
+            <TabsContent value="komunikace">
+              <CommunicationTab job={job} />
             </TabsContent>
             <TabsContent value="historie">
               <HistoryTab events={job.events} />
