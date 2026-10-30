@@ -209,10 +209,10 @@ export function AiPricingPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Číslo výkresu"><Input value={form.drawingNumber} onChange={upd("drawingNumber")} placeholder="např. VK-1234" /></Field>
-          <Field label="Materiál"><Input value={form.material} onChange={upd("material")} placeholder="např. 1.2379 / C45 / 1.4301" /></Field>
-          <Field label="Rozměry polotovaru"><Input value={form.dimensions} onChange={upd("dimensions")} placeholder="⌀50 × 120 / 120 × 80 × 25 mm" /></Field>
-          <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" placeholder="50" /></Field>
+          <Field label="Číslo výkresu"><Input value={form.drawingNumber} onChange={upd("drawingNumber")} placeholder="č. výkresu" className="placeholder:italic" /></Field>
+          <Field label="Materiál"><Input value={form.material} onChange={upd("material")} placeholder="materiál (označení oceli / slitiny)" className="placeholder:italic" /></Field>
+          <Field label="Rozměry polotovaru"><Input value={form.dimensions} onChange={upd("dimensions")} placeholder="průměr × délka nebo D × Š × V (mm)" className="placeholder:italic" /></Field>
+          <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" placeholder="počet ks" className="placeholder:italic" /></Field>
           <Field label="Zákazník"><Input value={form.customer} onChange={upd("customer")} placeholder="Název firmy (načte cenový profil)" /></Field>
           <Field label="E-mail zákazníka (pro odeslání)">
             <EmailSuggestInput

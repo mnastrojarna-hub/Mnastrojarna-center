@@ -310,7 +310,7 @@ export function JobForm({
               id={fid("customerName")}
               value={state.customerName}
               onChange={(e) => patch({ customerName: e.target.value })}
-              placeholder="např. Strojmetal s.r.o."
+              placeholder="název firmy"
               aria-invalid={Boolean(errors.customer)}
               className={errClass(errors.customer)}
             />
@@ -339,7 +339,7 @@ export function JobForm({
               id={fid("customerOrderNumber")}
               value={state.customerOrderNumber}
               onChange={(e) => patch({ customerOrderNumber: e.target.value })}
-              placeholder="např. PO-4500021877"
+              placeholder="č. objednávky zákazníka"
               className={cn("font-mono", errClass(errors.customerOrderNumber))}
             />
           </Field>
@@ -348,7 +348,7 @@ export function JobForm({
               id={fid("customerInquiryNumber")}
               value={state.customerInquiryNumber}
               onChange={(e) => patch({ customerInquiryNumber: e.target.value })}
-              placeholder="např. RFQ-2026-118"
+              placeholder="č. poptávky zákazníka"
               className={cn("font-mono", errClass(errors.customerInquiryNumber))}
             />
           </Field>
@@ -426,7 +426,7 @@ export function JobForm({
               id={fid("supplierOrderNumber")}
               value={state.supplierOrderNumber}
               onChange={(e) => patch({ supplierOrderNumber: e.target.value })}
-              placeholder="např. OV-2026-077"
+              placeholder="č. naší objednávky"
               className={cn("font-mono", errClass(errors.supplierOrderNumber))}
             />
           </Field>
@@ -642,6 +642,8 @@ function ItemRow({
   const total = lineTotal(item.quantity, item.unitPrice);
   const unitsId = `${fid(k("unit"))}-list`;
   const small = "h-8 text-sm";
+  // nápověda prázdného pole bez ukázkových hodnot (majitel 30. 10.: ukázky četl jako data)
+  const HINT = "placeholder:font-sans placeholder:italic placeholder:text-muted-foreground/60";
   return (
     <li className="rounded-lg border bg-muted/30 p-2.5">
       <div className="mb-2 flex items-center gap-2">
@@ -661,16 +663,16 @@ function ItemRow({
       </div>
       <div className="grid grid-cols-12 gap-2">
         <ItemField id={fid(k("drawingNumber"))} label="Č. výkresu" className={compact ? "col-span-8" : "col-span-8 sm:col-span-4"}>
-          <Input id={fid(k("drawingNumber"))} value={item.drawingNumber} onChange={(e) => onChange({ drawingNumber: e.target.value })} className={cn(small, "font-mono")} placeholder="VK-2291" />
+          <Input id={fid(k("drawingNumber"))} value={item.drawingNumber} onChange={(e) => onChange({ drawingNumber: e.target.value })} className={cn(small, "font-mono", HINT)} placeholder="č. výkresu" />
         </ItemField>
         <ItemField id={fid(k("revision"))} label="Rev." className={compact ? "col-span-4" : "col-span-4 sm:col-span-2"}>
-          <Input id={fid(k("revision"))} value={item.revision} onChange={(e) => onChange({ revision: e.target.value })} className={cn(small, "font-mono")} placeholder="B" />
+          <Input id={fid(k("revision"))} value={item.revision} onChange={(e) => onChange({ revision: e.target.value })} className={cn(small, "font-mono", HINT)} placeholder="rev." />
         </ItemField>
         <ItemField id={fid(k("name"))} label="Název" className={compact ? "col-span-12" : "col-span-12 sm:col-span-6"}>
-          <Input id={fid(k("name"))} value={item.name} onChange={(e) => onChange({ name: e.target.value })} className={small} placeholder="Příruba Ø120" />
+          <Input id={fid(k("name"))} value={item.name} onChange={(e) => onChange({ name: e.target.value })} className={cn(small, HINT)} placeholder="název dílu" />
         </ItemField>
         <ItemField id={fid(k("material"))} label="Materiál" className={compact ? "col-span-12" : cn("col-span-12", margins ? "sm:col-span-4" : "sm:col-span-6")}>
-          <Input id={fid(k("material"))} value={item.material} onChange={(e) => onChange({ material: e.target.value })} className={small} placeholder="AL 7075" />
+          <Input id={fid(k("material"))} value={item.material} onChange={(e) => onChange({ material: e.target.value })} className={cn(small, HINT)} placeholder="materiál" />
         </ItemField>
         <ItemField id={fid(k("quantity"))} label="Množství" error={errors[k("quantity")]} className={compact ? "col-span-6" : "col-span-6 sm:col-span-2"}>
           <Input

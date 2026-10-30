@@ -461,7 +461,7 @@ function PricingPanel({
               </div>
               <label className="col-span-2 block md:col-span-1">
                 <span className="text-[11px] text-muted-foreground md:hidden">Materiál</span>
-                <Input value={r.material} onChange={(e) => patch(r.key, { material: e.target.value })} placeholder="C45, 1.4301…" aria-label={`Položka ${i + 1}: materiál`} />
+                <Input value={r.material} onChange={(e) => patch(r.key, { material: e.target.value })} placeholder="materiál" className="placeholder:italic" aria-label={`Položka ${i + 1}: materiál`} />
               </label>
               <label className="block">
                 <span className="text-[11px] text-muted-foreground md:hidden">Kusů</span>

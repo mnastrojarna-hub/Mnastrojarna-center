@@ -330,17 +330,39 @@ export interface ReviewItem {
   description: string;
   note: string;
   aiFilled: boolean;
+  /**
+   * Nejistý řádek (≈ 2 %): možná je to existující položka zakázky. Bez odpovědi se neuloží —
+   * „Ano" řádek odebere a zapíše ho do položky (answerPairQuestion), „Je to nová položka" = answer "new".
+   */
+  pair?: ReviewPairQuestion;
 }
 
-export type MergeField = "quantity" | "unitPrice" | "purchaseUnitPrice" | "material" | "name" | "revision";
+/** Otázka „Řádek objednávky ‚…' = položka 1 F0N603W88?" u nejistého řádku. */
+export interface ReviewPairQuestion {
+  itemId: string;
+  /** Popisek položky zakázky („1 F0N603W88 rev. 02 Unašeč upravený"). */
+  itemLabel: string;
+  drawingNumber: string;
+  reason: string;
+  /** Co se do položky zapíše při „Ano". */
+  patch: Partial<Record<MergeField, string>>;
+  override?: MergeField[];
+  /** Odpověď člověka: "new" = opravdu nová položka (null = zatím bez odpovědi). */
+  answer: "new" | null;
+}
+
+export type MergeField = "quantity" | "unitPrice" | "purchaseUnitPrice" | "drawingNumber" | "material" | "name" | "revision" | "description" | "note";
 
 export const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   quantity: "množství",
   unitPrice: "cena / ks",
   purchaseUnitPrice: "nákupní cena / ks",
+  drawingNumber: "číslo výkresu",
   material: "materiál",
   name: "název",
   revision: "revize",
+  description: "popis",
+  note: "poznámka",
 };
 
 /** Doplnění existující položky zakázky (jen prázdné údaje). */
@@ -351,10 +373,22 @@ export interface ReviewMerge {
   patch: Partial<Record<MergeField, string>>;
   apply: boolean;
   /**
-   * Pole, která doklad PŘEPÍŠE i neprázdná — jen „quantity": objednávka zákazníka k zakázce ještě bez
-   * objednávky (počet kusů vždy podle objednávky). Server to znovu hlídá (chip + zakázka bez objednávky).
+   * Pole, která doklad PŘEPÍŠE i neprázdná — jen „quantity" a „unitPrice": objednávka zákazníka k zakázce
+   * ještě bez objednávky (počet kusů a dohodnutá cena podle objednávky). Server to znovu hlídá (chip +
+   * zakázka bez objednávky). Číslo výkresu, revize ani materiál se nikdy nepřepisují.
    */
   override?: MergeField[];
+  /** Řádek formuláře, ze kterého doplnění vzniklo („Ano" u otázky) — vazby výkresů na řádek míří na položku. */
+  fromKey?: string;
+}
+
+/** Kontrola součtu: položky zakázky × celková částka dokladu (párování vs. přidání řádků). */
+export interface ReviewTotals {
+  order: number;
+  ifAppended: number;
+  ifPaired: number;
+  appendMatches: boolean;
+  pairedMatches: boolean;
 }
 
 export interface ReviewTarget {
@@ -381,6 +415,8 @@ export interface ReviewTarget {
   newItems: ReviewItem[];
   merges: ReviewMerge[];
   existingItems: number;
+  /** Součet položek × doklad (jen existující zakázka s položkami a dokladem s cenami). */
+  totals?: ReviewTotals | null;
   /** Návrh stavu; null = neměnit. */
   stageTo: JobStage | null;
 }
@@ -584,6 +620,38 @@ export function proposeStage(
 
 const CONFLICT_GROUPS: ReviewFieldGroup[] = ["cisla", "terminy", "hodnota"];
 
+/** Úprava položky (JobItemInput) → texty doplnění formuláře. */
+export function mergePatchOf(p: Partial<JobItemInput>, margins: boolean): Partial<Record<MergeField, string>> {
+  const patch: Partial<Record<MergeField, string>> = {};
+  for (const f of Object.keys(MERGE_FIELD_LABELS) as MergeField[]) {
+    if (f === "purchaseUnitPrice" && !margins) continue;
+    const v = fieldString((p as Record<string, unknown>)[f]);
+    if (v) patch[f] = v;
+  }
+  return patch;
+}
+
+/** Spárovaný řádek (JobItemUpdate) → doplnění položky ve formuláři (null = nic k zápisu). */
+export function updateToMerge(
+  u: { patch: Partial<JobItemInput>; override?: ("quantity" | "unitPrice")[] },
+  it: { id: string; drawingNumber?: string | null; name?: string | null; position?: number | null },
+  margins: boolean,
+  fromKey?: string,
+): ReviewMerge | null {
+  const patch = mergePatchOf(u.patch, margins);
+  if (!Object.keys(patch).length) return null;
+  const override = (u.override ?? []).filter((f) => patch[f]);
+  return {
+    itemId: it.id,
+    label: [it.drawingNumber, it.name].filter(Boolean).join(" ") || `Položka ${(it.position ?? 0) + 1}`,
+    drawingNumber: it.drawingNumber ?? "",
+    patch,
+    apply: true,
+    ...(override.length ? { override } : {}),
+    ...(fromKey ? { fromKey } : {}),
+  };
+}
+
 export function buildExistingTarget(args: {
   job: TargetJob;
   /** Plán podle dokladu (null = ruční vyplnění bez AI). */
@@ -615,20 +683,20 @@ export function buildExistingTarget(args: {
   for (const u of plan?.itemUpdates ?? []) {
     const it = items.find((i) => i.id === u.id);
     if (!it) continue;
-    const patch: Partial<Record<MergeField, string>> = {};
-    for (const f of Object.keys(MERGE_FIELD_LABELS) as MergeField[]) {
-      if (f === "purchaseUnitPrice" && !margins) continue;
-      const v = fieldString((u.patch as Record<string, unknown>)[f]);
-      if (v) patch[f] = v;
-    }
-    if (!Object.keys(patch).length) continue;
-    merges.push({
-      itemId: it.id,
-      label: [it.drawingNumber, it.name].filter(Boolean).join(" ") || `Položka ${it.position + 1}`,
-      drawingNumber: it.drawingNumber ?? "",
-      patch,
-      apply: true,
-    });
+    const m = updateToMerge(u, it, margins);
+    if (m) merges.push(m);
+  }
+  const newItems = (plan?.newItems ?? []).map((it, i) => itemInputToReview(it, `ai-${i}`, true, margins));
+  for (const q of plan?.pairQuestions ?? []) {
+    const row = newItems[q.newIndex];
+    const it = items.find((i) => i.id === q.itemId);
+    if (!row || !it) continue;
+    const patch = mergePatchOf(q.update.patch, margins);
+    const override = (q.update.override ?? []).filter((f) => patch[f]);
+    row.pair = {
+      itemId: it.id, itemLabel: q.itemLabel, drawingNumber: it.drawingNumber ?? "", reason: q.reason,
+      patch, ...(override.length ? { override } : {}), answer: null,
+    };
   }
   return {
     key: job.id,
@@ -646,11 +714,62 @@ export function buildExistingTarget(args: {
     existing,
     proposed,
     conflicts,
-    newItems: (plan?.newItems ?? []).map((it, i) => itemInputToReview(it, `ai-${i}`, true, margins)),
+    newItems,
     merges,
     existingItems: items.length,
+    totals: plan?.pairTotals ?? null,
     stageTo: plan?.stageTo ?? null,
   };
+}
+
+/** Řádky formuláře, u kterých čeká otázka „je to položka X?" bez odpovědi. */
+export function openPairQuestions(items: ReviewItem[]): ReviewItem[] {
+  return items.filter((i) => i.pair && i.pair.answer === null);
+}
+
+/**
+ * Odpověď na otázku u nejistého řádku: „Ano" = řádek se odebere a zapíše do položky zakázky
+ * (doplnění se stejnými pravidly jako jisté spárování), „Je to nová položka" = řádek se přidá.
+ */
+export function answerPairQuestion(state: ReviewState, key: string, same: boolean): ReviewState {
+  const row = state.items.find((i) => i.key === key);
+  if (!row?.pair) return state;
+  if (!same) {
+    return { ...state, items: state.items.map((i) => (i.key === key && i.pair ? { ...i, pair: { ...i.pair, answer: "new" as const } } : i)) };
+  }
+  const q = row.pair;
+  // co člověk v řádku upravil (počet, cena), platí
+  const patch: Partial<Record<MergeField, string>> = { ...q.patch };
+  const qty = cleanNumber(row.quantity);
+  if (q.patch.quantity && qty !== null && qty > 0) patch.quantity = String(qty);
+  const price = cleanNumber(row.unitPrice);
+  if (q.patch.unitPrice && price !== null && price > 0) patch.unitPrice = String(price);
+  const prev = state.merges.find((m) => m.itemId === q.itemId);
+  const override = [...new Set([...(prev?.override ?? []), ...(q.override ?? [])])];
+  const merge: ReviewMerge = {
+    itemId: q.itemId,
+    label: q.itemLabel,
+    drawingNumber: q.drawingNumber,
+    patch: { ...patch, ...(prev?.patch ?? {}) },
+    apply: true,
+    ...(override.length ? { override } : {}),
+    fromKey: key,
+  };
+  return {
+    ...state,
+    items: state.items.filter((i) => i.key !== key),
+    merges: prev ? state.merges.map((m) => (m.itemId === q.itemId ? merge : m)) : [...state.merges, merge],
+  };
+}
+
+/** Text kontroly součtu („Součet položek 303 040 Kč ≠ objednávka 151 480 Kč"), null = není co ukázat. */
+export function totalsCheckText(totals: ReviewTotals | null | undefined, currency = "CZK", noun = "objednávka"): string | null {
+  if (!totals || !(totals.order > 0)) return null;
+  const fmt = (n: number) => new Intl.NumberFormat("cs-CZ", { style: "currency", currency: /^[A-Z]{3}$/.test(currency) ? currency : "CZK", maximumFractionDigits: 2 }).format(n);
+  if (totals.appendMatches && !totals.pairedMatches) return `Součet položek ${fmt(totals.ifAppended)} = ${noun} ${fmt(totals.order)} jen když jsou řádky nové.`;
+  const sign = totals.appendMatches ? "=" : "≠";
+  const paired = totals.pairedMatches ? ` — po spárování ${fmt(totals.ifPaired)} = ${noun}` : "";
+  return `Součet položek ${fmt(totals.ifAppended)} ${sign} ${noun} ${fmt(totals.order)}${paired}`;
 }
 
 export function buildNewTarget(args: { plan: NewJobPlan | null; margins: boolean; docKind: CaptureDocKind; issuer: DocIssuer }): ReviewTarget {
@@ -896,8 +1015,8 @@ export function reviewItemsToInputs(items: ReviewItem[], margins: boolean): JobI
 export function reviewMergePatches(
   merges: ReviewMerge[],
   margins: boolean,
-): { id: string; patch: Partial<JobItemInput>; overrideQuantity?: boolean }[] {
-  const out: { id: string; patch: Partial<JobItemInput>; overrideQuantity?: boolean }[] = [];
+): { id: string; patch: Partial<JobItemInput>; overrideQuantity?: boolean; overridePrice?: boolean }[] {
+  const out: { id: string; patch: Partial<JobItemInput>; overrideQuantity?: boolean; overridePrice?: boolean }[] = [];
   for (const m of merges) {
     if (!m.apply || !isUuid(m.itemId)) continue;
     const patch: Partial<JobItemInput> = {};
@@ -913,7 +1032,11 @@ export function reviewMergePatches(
       }
     }
     if (Object.keys(patch).length) {
-      out.push({ id: m.itemId, patch, ...(m.override?.includes("quantity") && patch.quantity ? { overrideQuantity: true } : {}) });
+      out.push({
+        id: m.itemId, patch,
+        ...(m.override?.includes("quantity") && patch.quantity ? { overrideQuantity: true } : {}),
+        ...(m.override?.includes("unitPrice") && patch.unitPrice ? { overridePrice: true } : {}),
+      });
     }
   }
   return out;
@@ -1156,6 +1279,8 @@ export function canAutoApply(model: Pick<ReviewModel,
   if ((model.confidence ?? 0) < AUTO_MIN_CONFIDENCE || model.needsClarification.length || !model.chipExact) return false;
   const target = model.targets.find((t) => t.key === model.initial.targetKey);
   if (!target) return false;
+  // nejistý řádek (≈ 2 %) = otázka pro člověka, nikdy tiché přidání
+  if (openPairQuestions(model.initial.items).length) return false;
   if (target.mode === "existing") {
     return Boolean(model.fixedJobId && target.jobId === model.fixedJobId) || (target.score ?? 0) >= AUTO_MIN_SCORE;
   }
@@ -1197,6 +1322,39 @@ function cleanChoice(raw: unknown, what: string): PartyChoice | string {
   return `Neplatný výběr: ${what}.`;
 }
 
+function cleanMergePatch(raw: unknown): Partial<Record<MergeField, string>> {
+  const rawPatch = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const patch: Partial<Record<MergeField, string>> = {};
+  for (const f of Object.keys(MERGE_FIELD_LABELS) as MergeField[]) {
+    const v = str(rawPatch[f], f === "name" || f === "note" ? 500 : f === "description" ? 2000 : 200);
+    if (v) patch[f] = v;
+  }
+  return patch;
+}
+
+/** Přepsat lze jen počet a cenu (a jen když jsou v patchi). */
+function cleanOverride(raw: unknown, patch: Partial<Record<MergeField, string>>): MergeField[] {
+  if (!Array.isArray(raw)) return [];
+  return (["quantity", "unitPrice"] as const).filter((f) => raw.includes(f) && patch[f]);
+}
+
+function cleanPair(raw: unknown): ReviewPairQuestion | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (!isUuid(o.itemId)) return null;
+  const patch = cleanMergePatch(o.patch);
+  const override = cleanOverride(o.override, patch);
+  return {
+    itemId: o.itemId.toLowerCase(),
+    itemLabel: str(o.itemLabel, 300),
+    drawingNumber: str(o.drawingNumber, 200),
+    reason: str(o.reason, 300),
+    patch,
+    ...(override.length ? { override } : {}),
+    answer: o.answer === "new" ? "new" : null,
+  };
+}
+
 function cleanItem(raw: unknown, i: number): ReviewItem | string {
   if (!raw || typeof raw !== "object") return `Položka ${i + 1} je neplatná.`;
   const o = raw as Record<string, unknown>;
@@ -1214,6 +1372,8 @@ function cleanItem(raw: unknown, i: number): ReviewItem | string {
     note: str(o.note, 2000),
     aiFilled: o.aiFilled === true,
   };
+  const pair = cleanPair(o.pair);
+  if (pair) it.pair = pair;
   if (isBlankReviewItem(it)) return it;
   if (it.quantity) {
     const q = cleanNumber(it.quantity);
@@ -1286,19 +1446,16 @@ export function sanitizeReviewState(
     if (!m || typeof m !== "object") continue;
     const r = m as Record<string, unknown>;
     if (!isUuid(r.itemId)) continue;
-    const rawPatch = r.patch && typeof r.patch === "object" ? (r.patch as Record<string, unknown>) : {};
-    const patch: Partial<Record<MergeField, string>> = {};
-    for (const f of Object.keys(MERGE_FIELD_LABELS) as MergeField[]) {
-      const v = str(rawPatch[f], f === "name" ? 500 : 200);
-      if (v) patch[f] = v;
-    }
+    const patch = cleanMergePatch(r.patch);
+    const override = cleanOverride(r.override, patch);
     merges.push({
       itemId: r.itemId.toLowerCase(),
       label: str(r.label, 300),
       drawingNumber: str(r.drawingNumber, 200),
       patch,
       apply: r.apply !== false,
-      ...(Array.isArray(r.override) && r.override.includes("quantity") && patch.quantity ? { override: ["quantity" as const] } : {}),
+      ...(override.length ? { override } : {}),
+      ...(str(r.fromKey, 60) ? { fromKey: str(r.fromKey, 60) } : {}),
     });
   }
 

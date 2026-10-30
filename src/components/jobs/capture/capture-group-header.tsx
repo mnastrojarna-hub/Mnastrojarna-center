@@ -250,7 +250,7 @@ export function CaptureGroupHeader({
               maxLength={300}
               // název jde rovnou do údajů zakázky (kontrola uložení i server čtou fields.title)
               onChange={(e) => onChange({ ...state, jobDraftTitle: e.target.value, job: { ...state.job, fields: { ...state.job.fields, title: e.target.value } } })}
-              placeholder="Např. Upínka 4711-02"
+              placeholder="název zakázky"
               autoComplete="off"
             />
           </div>

@@ -116,7 +116,7 @@ export function QuoteEditorDialog({
             </p>
           )}
           <Field label="Název nabídky" icon={Type}>
-            <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="např. Upínky VK-2291 — 200 ks" />
+            <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="název nabídky (co nabízíme)" className="placeholder:italic" />
           </Field>
 
           <ItemsEditor

@@ -137,6 +137,16 @@ export async function latestMail(to, waitMs = 15_000) {
   return r.json();
 }
 
+/** Logo grafického podpisu (3dfcb3e) — vložená část multipart/related (Content-ID, inline), ne soubor pro zákazníka. */
+export function isSignatureLogo(a) {
+  return a?.contentType === "image/png" && a?.filename === "mnastrojarna-logo.png";
+}
+
+/** Přílohy, které zákazník vidí jako soubory (bez vloženého loga podpisu). */
+export function fileAttachments(mail) {
+  return (mail?.attachments ?? []).filter((a) => !isSignatureLogo(a));
+}
+
 // ── Mini runner ────────────────────────────────────────────
 const results = [];
 export async function test(name, fn) {

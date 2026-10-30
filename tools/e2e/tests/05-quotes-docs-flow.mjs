@@ -4,7 +4,7 @@
 // položkou, verze, dodací list, faktura), stránky toku /inquiries, /pricing, /quotes,
 // /confirmations, /documents (super admin, obchodník, zaměstnanec) a mobil 390 px.
 // Vlastní data mají prefix „E2E-quotes-docs-flow-" a na konci se uklidí.
-import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest as restCall, restLogin, recipients, setRecipients } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest as restCall, restLogin, recipients, setRecipients, fileAttachments } from "../lib.mjs";
 import {
   PREFIX, TAG, lit, userIds, eventually, waitHydrated, expectNoOverflow, waitToast, alertTexts, isoDays,
   fetchPdf, expectPdf, mailsTo, waitMail, createCustomer, createJob, createQuote, cleanupOwnData,
@@ -301,9 +301,11 @@ await T("detail Nabídky: odeslání e-mailem — dialog předvyplněný, mail s
 
   const mail = await waitMail(CUST_EMAIL, (m) => m.subject.includes(st.q1.number) && m.receivedAt > t0);
   expect(mail, "mail catcher přijal e-mail s nabídkou");
-  expect(mail.attachments?.length === 1, `jedna příloha (${JSON.stringify(mail.attachments)})`);
-  expect(mail.attachments[0].contentType === "application/pdf" && /\.pdf$/i.test(mail.attachments[0].filename), `příloha PDF (${JSON.stringify(mail.attachments[0])})`);
-  expect(mail.attachments[0].size > 1500, "příloha není prázdná");
+  // vedle PDF jen vložené logo podpisu (multipart/related, Content-ID — ne soubor pro zákazníka)
+  const files = fileAttachments(mail);
+  expect(files.length === 1, `jedna příloha (${JSON.stringify(mail.attachments)})`);
+  expect(files[0].contentType === "application/pdf" && /\.pdf$/i.test(files[0].filename), `příloha PDF (${JSON.stringify(files[0])})`);
+  expect(files[0].size > 1500, "příloha není prázdná");
   expect(mail.text.includes(st.q1.number), "text e-mailu s číslem nabídky");
   expect((await mailsTo(CUST_EMAIL)).filter((m) => m.subject.includes(st.q1.number)).length === 1, "odešel právě jeden e-mail");
 
@@ -619,7 +621,7 @@ await T("detail: vystavený doklad (potvrzení) jde z karty zakázky poslat zák
   await dlg.getByRole("button", { name: "Odeslat potvrzení objednávky" }).click();
   await waitToast(page, new RegExp(`odesláno na ${esc(CUST_EMAIL)}`), 30_000);
   const mail = await waitMail(CUST_EMAIL, (m) => /Potvrzení objednávky/.test(m.subject) && m.receivedAt > t0);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", "e-mail s PDF potvrzení v příloze");
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", "e-mail s PDF potvrzení v příloze");
   expect(filesOf(D1.id, "potvrzeni").length === filesBefore, "odeslal se existující doklad — nová verze nevznikla");
   await eventually(() => {
     const o = sql(`select coalesce(confirmation_sent_by::text, '-') || '|' || coalesce(confirmation_sent_via, '-') from orders where id = ${lit(D1.id)}`);
@@ -869,7 +871,7 @@ await T("/quotes: super admin Schválit → obchodník Odeslat nabídku (dialog 
   await dlg.getByRole("button", { name: "Odeslat nabídku" }).click();
   await waitToast(page, new RegExp(`Nabídka ${esc(B1Q.number)} odeslána na`), 30_000);
   const mail = await waitMail(CUST_EMAIL, (m) => m.subject.includes(B1Q.number) && m.receivedAt > t0);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF přílohou (${JSON.stringify(mail?.attachments)})`);
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", `mail s PDF přílohou (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => {
     const db = sql(`select q.status || '|' || (q.sent_at is not null) || '|' || o.status || '|' || q.state || '|' || q.sent_by || '|' || q.sent_via from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B1Q.id)}`);
     expect(db === `odeslano|true|nabidka|odeslana|${ID.obchod}|email`, `DB po odeslání: ${db}`);
@@ -956,7 +958,7 @@ await T("/confirmations: Potvrdit objednávku → termín, e-mail s PDF → Potv
   const toast = await waitToast(page, new RegExp(`Objednávka ${esc(C1.number)} potvrzena — potvrzení POT-\\S+ odešlo na`), 30_000);
   expect(toast.includes(CUST_EMAIL), `toast s adresou (${toast})`);
   const mail = await waitMail(CUST_EMAIL, (m) => m.receivedAt > t0 && m.subject === subject);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF potvrzení (${JSON.stringify(mail?.attachments)})`);
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", `mail s PDF potvrzení (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => {
     const o = sql(`select status || '|' || coalesce(due_date::text,'-') || '|' || (confirmed_at is not null) from orders where id = ${lit(C1.id)}`);
     expect(o === `potvrzeno|${isoDays(22)}|true`, `DB: potvrzeno, termín, confirmed_at (${o})`);
@@ -1060,7 +1062,7 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   await dlg.getByRole("button", { name: "Odeslat potvrzení objednávky" }).click();
   await dlg.waitFor({ state: "hidden", timeout: 30_000 });
   const mail = await waitMail(CUST_EMAIL, (m) => m.receivedAt > t0 && m.subject === subject);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF (${JSON.stringify(mail?.attachments)})`);
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", `mail s PDF (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => expect(sql(`select status from orders where id = ${lit(DOC1.id)}`) === "potvrzeno", "DB: Potvrzená objednávka"));
   // zpětná vazba po odeslání (UX)
   await panel.locator('[role="status"]').filter({ hasText: `Odesláno na ${CUST_EMAIL}.` }).waitFor({ timeout: 10_000 });

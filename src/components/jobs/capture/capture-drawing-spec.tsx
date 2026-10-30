@@ -222,7 +222,7 @@ export function CaptureDrawingSpec({
             id={`${idPrefix}-blank-dims`}
             data-testid="spec-blank-dims"
             value={spec.blankDims}
-            placeholder="Ø70 × 130 mm"
+            placeholder="rozměr polotovaru"
             maxLength={120}
             disabled={disabled}
             onChange={(e) => edit("blank", { blankDims: e.target.value })}
@@ -265,7 +265,7 @@ export function CaptureDrawingSpec({
                 {HEAT_KIND_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               <Input
-                id={`${id}-value`} aria-label="Hodnota (tvrdost)" placeholder={missing ? "doplň" : "58±2"} value={s.value} maxLength={40} disabled={disabled}
+                id={`${id}-value`} aria-label="Hodnota (tvrdost)" placeholder={missing ? "doplň" : "hodnota"} value={s.value} maxLength={40} disabled={disabled}
                 onChange={(e) => set({ ...s, value: e.target.value })} autoComplete="off"
                 aria-invalid={missing || undefined} aria-describedby={missing ? `${id}-missing` : undefined}
                 className={cn(missing && "border-amber-400 bg-amber-50/60 ring-1 ring-amber-300 dark:border-amber-500/50 dark:bg-amber-500/10")}
