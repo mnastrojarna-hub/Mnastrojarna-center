@@ -913,6 +913,82 @@ await T("26 · 390 px světlý + tmavý: karta kroku s celým jménem firmy, „
   await setTheme(page, false);
 }, { mobile: true });
 
+// 27. Přehled → karta „Technologie" (majitel 30. 10.: „ukazuje strašně málo, strohé až zavádějící"): kroky v pořadí,
+// kdo je dělá, stav kroku (čeká na nabídku / ve výrobě + objednávka), termín a jeden další krok na správné místo
+const OVQ = job("přehled nacenění", { status: "naceneni" });
+quote(OVQ, NOVAK, [4000, 4200], { lead: 21, kinds: "frezovani" });
+quote(OVQ, TEPKAL, [null, undefined], { lead: 5, kinds: "tepelne_zpracovani" });
+sql(`update order_items set supplier_note = 'pozor popsat na čele' where id = ${lit(OVQ.items[0])}`);
+sql(`insert into job_operations (job_id, kind, status, position, in_house, supplier_id) values (${lit(OVQ.id)}, 'frezovani', 'ceka', 0, false, ${lit(NOVAK)})`);
+sql(`insert into job_operations (job_id, kind, status, position, in_house) values (${lit(OVQ.id)}, 'tepelne_zpracovani', 'ceka', 1, false)`);
+const OVP = job("přehled ve výrobě", { status: "ve_vyrobe" });
+const OVP_PO = sql(`insert into purchase_orders (job_id, supplier_id, number, status, order_date, currency, total, sent_at)
+  values (${lit(OVP.id)}, ${lit(NOVAK)}, ${lit(`OV-E2E14-${TAG}-27`)}, 'odeslana', current_date - 2, 'CZK', 12200, now() - interval '2 days') returning id`).split("\n")[0];
+sql(`insert into job_operations (job_id, kind, status, position, in_house, supplier_id, planned_end, started_at, purchase_order_id, deadline_state)
+  values (${lit(OVP.id)}, 'frezovani', 'probiha', 0, false, ${lit(NOVAK)}, current_date + 9, now() - interval '1 day', ${lit(OVP_PO)}, 'pozadovano')`);
+sql(`insert into job_operations (job_id, kind, status, position, in_house, planned_end, ends_at_customer_date, deadline_state)
+  values (${lit(OVP.id)}, 'brouseni', 'ceka', 1, true, current_date + 40, true, 'plan')`);
+const techCard = (page) => page.locator('main [role=tabpanel][data-state=active] [data-testid="tech-card"]');
+await T("27 · Přehled → karta Technologie: kroky v pořadí, kdo, stav (čeká na nabídku / ve výrobě + objednávka), termín, další krok vede na správné místo; zaměstnanec bez cen", async (ctx) => {
+  const page = await ctx.newPage();
+  await login(page, USERS.obchod);
+  // nacenění: frézování u Nováka (nabídka s cenou), kalení — firma nevybraná, TepKal ještě neposlal cenu
+  await openJob(page, OVQ);
+  const card = techCard(page);
+  await card.waitFor({ timeout: 20_000 });
+  const steps = card.locator('[data-testid="tech-step"]');
+  expect(await steps.count() === 2, `dva kroky (${await steps.count()})`);
+  const s1 = norm(await steps.nth(0).innerText());
+  const s2 = norm(await steps.nth(1).innerText());
+  expect(s1.includes("1. Frézování") && s1.includes(SUP_NAME[NOVAK]) && s1.includes("Nabídka s cenou") && s1.includes("12 200 Kč"), `krok 1: firma, stav, cena z nabídky (${s1})`);
+  expect(s2.includes("2. Tepelné zpracování") && s2.includes(`Poptáno: ${SUP_NAME[TEPKAL]}`) && s2.includes("Čeká na nabídku dodavatele") && !s2.includes("Nevybráno"),
+    `krok 2: čeká na nabídku TepKal, ne „bez dodavatele“ (${s2})`);
+  expect(norm(await card.innerText()).includes("Pro dodavatele: pozor popsat na čele"), "poznámka pro dodavatele u položky");
+  expect(await page.locator('[data-testid="step-suppliers"]').count() === 1, "Dodavatel & peníze: firmy kroků místo „Vyrábíme sami“");
+  await card.scrollIntoViewIfNeeded();
+  await shot(page, S("27-tech-card-naceneni"));
+  const nextBtn = card.locator('[data-testid="tech-next"]');
+  expect(norm(await nextBtn.innerText()) === "Zadat cenu dodavatele", `další krok (${norm(await nextBtn.innerText())})`);
+  await nextBtn.click();
+  await eventually(async () => expect(await page.getByRole("tab", { name: /^Nákup & marže/, selected: true }).count() === 1, "→ záložka Nákup & marže"));
+  // ve výrobě: běží u Nováka s odeslanou objednávkou, broušení u nás s konečným termínem → „Posunout dál…" otevře předání
+  await openJob(page, OVP);
+  await card.waitFor({ timeout: 20_000 });
+  const v1 = norm(await card.locator('[data-testid="tech-step"]').nth(0).innerText());
+  expect(v1.includes(SUP_NAME[NOVAK]) && v1.includes("Ve výrobě u dodavatele") && v1.includes(`OV-E2E14-${TAG}-27 · odeslána`) && /do \d+\. \d+\. · čeká na potvrzení/.test(v1),
+    `krok 1: ve výrobě, objednávka, termín (${v1})`);
+  const v2 = norm(await card.locator('[data-testid="tech-step"]').nth(1).innerText());
+  expect(v2.includes("U nás") && /konečný \d+\. \d+\./.test(v2), `krok 2 u nás s konečným termínem (${v2})`);
+  const vNext = card.locator('[data-testid="tech-next"]');
+  expect(norm(await vNext.innerText()) === "Posunout dál…", `další krok ve výrobě (${norm(await vNext.innerText())})`);
+  await vNext.click();
+  await submit(page).waitFor({ timeout: 20_000 });
+  await page.keyboard.press("Escape");
+  // zaměstnanec: kroky a stavy ano, ceny ne
+  const p2 = await ctx.newPage();
+  await ctx.clearCookies();
+  await login(p2, USERS.dilna);
+  await openJob(p2, OVQ);
+  const wcard = techCard(p2);
+  await wcard.waitFor({ timeout: 20_000 });
+  const wt = norm(await wcard.innerText());
+  expect(wt.includes("1. Frézování") && wt.includes(SUP_NAME[NOVAK]) && !wt.includes("Kč"), `zaměstnanec: kroky bez cen (${wt.slice(0, 300)})`);
+});
+await T("27b · karta Technologie na mobilu 390 px: sbalené kroky, rozbalení podrobností, stránka nepřetéká", async (ctx) => {
+  const page = await ctx.newPage();
+  await login(page, USERS.obchod);
+  await openJob(page, OVP);
+  const card = techCard(page);
+  await card.waitFor({ timeout: 20_000 });
+  const details = card.locator('[data-testid="tech-step-details"]').first();
+  expect(!(await details.isVisible()), "podrobnosti kroku sbalené");
+  await card.locator('[data-testid="tech-group-toggle"]').first().click();
+  await eventually(async () => expect(await details.isVisible(), "po rozbalení vidět objednávku / náklad"));
+  await expectNoOverflow(page, "Přehled Technologie 390 px");
+  await card.scrollIntoViewIfNeeded();
+  await shot(page, S("27b-tech-card-mobile"));
+}, { mobile: true });
+
 const ok = summary(errors.filter((e) => !/HTTP 5\d\d .*\/_next\/|favicon/.test(e)));
 if (!process.env.KEEP) await cleanup();
 if (MODE_BEFORE) setMode(MODE_BEFORE);

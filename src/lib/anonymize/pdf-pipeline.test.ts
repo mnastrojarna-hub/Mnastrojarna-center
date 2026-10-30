@@ -231,11 +231,10 @@ describe("chybějící / rozbitá písma pdf.js", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("bez souborů písem → selže start-up kontrola (nikdy tiše bez textu)", async () => {
+  it("bez souborů písem → selže start-up kontrola (nikdy tiše bez textu); chyba nasazení, ne vada souboru → vyhodí se (opakuje se)", async () => {
     process.env.ANON_PDFJS_DIR = dir;
     const s = await makeVectorDrawing({ withForm: false, withAttachment: false });
-    const res = await anonymizePdf(input(s.pdf));
-    expect(res.failure).toMatch(/fonty pdf\.js/);
+    await expect(anonymizePdf(input(s.pdf))).rejects.toThrow(/fonty pdf\.js/);
     delete process.env.ANON_PDFJS_DIR;
   }, 60_000);
 

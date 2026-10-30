@@ -6,8 +6,8 @@ import { refineCut } from "./cut-refine";
 import { asArray, asNumber, detectVector, isCategory, type AiCallConfig, type AiImageSpec, type VectorPageResult } from "./detect-ai";
 import { maybeGray, rasterToJpeg } from "./image";
 import { itemFrame, lineRangeToItems, quadBox, substringQuad } from "./lines";
-import { openPdf, PDF_MAX_IMAGE_PX, type PdfDocument, type PdfPage } from "./pdf-node";
-import { preparePdf } from "./pdf-prepare";
+import { openPdf, PDF_MAX_IMAGE_PX, PdfUnsupportedError, type PdfDocument, type PdfPage } from "./pdf-node";
+import { preparePdf, type PreparedPdf } from "./pdf-prepare";
 import {
   backgroundLevel, buildRasterPdf, burnGraphic, burnRectKeepLines, checkPdfOutput, contrastInkFraction, encodeFlate, encodeJpeg, fillRect, inkFraction,
   PAGE_BUDGET_BYTES, MIN_DPI, renderPageRaster, renderRegion, ringResidue, targetDpi, type OutPage, type Raster,
@@ -122,6 +122,11 @@ export interface PdfAnonResult {
   outputProblems: string[];
   cache: PdfAiCache | null;
   failure: string | null;
+  /**
+   * failure je vlastnost SOUBORU (heslo k otevření, neplatné PDF, XFA, moc stran, obří sken) → „nelze",
+   * bez opakování. Chyba prostředí / běhu se nikdy nevrací jako failure — vyhodí se (opakuje se).
+   */
+  unsupported?: boolean;
   isCad: boolean;
 }
 
@@ -199,24 +204,31 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     customerStandard: false, termInKeep: false, partPdf: null, outputProblems: [], cache: null, failure: null, isCad: false,
   };
   // příprava: tištěné anotace do obsahu (pravidla čtou, co se vykreslí), velké obrázky
-  const prepared = await preparePdf(input.bytes, PDF_MAX_IMAGE_PX);
+  // (pdf-lib nepřečte PDF s heslem vlastníka ani některé opravitelné vady → originál pro pdf.js, ke kontrole)
+  const prepared = await preparePdf(input.bytes, PDF_MAX_IMAGE_PX)
+    .catch((): PreparedPdf => ({ bytes: input.bytes, flattened: {}, removed: 0, kept: 0, oversized: [], unreadable: true }));
   let pdf: PdfDocument;
   try {
     pdf = await openPdf(prepared.bytes);
   } catch (err) {
-    res.failure = err instanceof Error ? err.message : "PDF nelze otevřít.";
+    // jen vada souboru (heslo k otevření, neplatné PDF) je „nelze"; chyba prostředí se vyhodí a opakuje
+    if (!(err instanceof PdfUnsupportedError)) throw err;
+    res.failure = err.message;
+    res.unsupported = true;
     return res;
   }
   try {
     res.totalPages = pdf.numPages;
     if (pdf.numPages > MAX_PDF_PAGES) {
       res.failure = `PDF má víc než ${MAX_PDF_PAGES} stran — nelze anonymizovat.`;
+      res.unsupported = true;
       return res;
     }
     const meta = await pdf.getMetadata().catch(() => null);
     const info0 = (meta?.info ?? {}) as Record<string, unknown>;
     if (info0.IsXFAPresent && !(await pdf.getPage(1).then((p) => p.getTextContent()).then((t) => t.items.length).catch(() => 0))) {
       res.failure = "PDF je čistý XFA formulář — nelze anonymizovat.";
+      res.unsupported = true;
       return res;
     }
     res.isCad = looksLikeCadProducer(info0);
@@ -224,6 +236,7 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     const big = prepared.oversized.find((o) => o.page >= from);
     if (big) {
       res.failure = `Sken na straně ${big.page} je příliš velký (${Math.round(big.px / 1e6)} MPx) — naskenuj ho nejvýš v 300 DPI nebo pošli menší soubor.`;
+      res.unsupported = true;
       return res;
     }
     const to = Math.min(pdf.numPages, from + PAGES_PER_RUN - 1);

@@ -1,6 +1,7 @@
 import "server-only";
 import path from "node:path";
 import { existsSync } from "node:fs";
+import { PDF_INVALID_TEXT, PDF_PASSWORD_TEXT } from "./failure-text";
 
 /**
  * pdf.js (legacy build) + @napi-rs/canvas v Node — JEDINÉ místo načtení rendereru.
@@ -44,17 +45,41 @@ export class PdfFontsMissingError extends Error {
 }
 
 export async function loadCanvas(): Promise<NapiCanvas> {
-  if (!canvasP) canvasP = import("@napi-rs/canvas");
+  if (!canvasP) {
+    canvasP = import("@napi-rs/canvas");
+    canvasP.catch(() => { canvasP = null; });
+  }
   return canvasP;
+}
+
+/** Globály, které pdf.js v Node potřebuje k vykreslení (prohlížeč je má, Node ne). */
+export const PDFJS_CANVAS_GLOBALS = ["DOMMatrix", "Path2D", "ImageData"] as const;
+
+/**
+ * DOMMatrix / Path2D / ImageData z PŘÍMO importovaného @napi-rs/canvas — PŘED načtením pdf.js.
+ * pdf.js si je v Node doplňuje sám přes createRequire(import.meta.url), jenže v bundlu Next.js je
+ * import.meta.url cesta ze stroje BUILDU (na Vercelu /vercel/path0/node_modules/pdfjs-dist/…), která ve
+ * funkci (/var/task) neexistuje → require selže, globály chybí a KAŽDÉ vykreslení PDF spadne
+ * („Path2D is not defined", „ImageData is not defined"). Dřív se to hlásilo jako „PDF je poškozené".
+ */
+export async function ensurePdfjsGlobals(): Promise<void> {
+  const canvas = (await loadCanvas()) as unknown as Record<string, unknown>;
+  const g = globalThis as Record<string, unknown>;
+  for (const k of PDFJS_CANVAS_GLOBALS) {
+    if (typeof g[k] !== "function" && typeof canvas[k] === "function") g[k] = canvas[k];
+  }
 }
 
 export async function loadPdfjs(): Promise<PdfJs> {
   if (!pdfjsP) {
     pdfjsP = (async () => {
+      await ensurePdfjsGlobals();
       const g = globalThis as { pdfjsWorker?: unknown };
       if (!g.pdfjsWorker) g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
       return import("pdfjs-dist/legacy/build/pdf.mjs");
     })();
+    // selhání načtení (přechodné) se nesmí uložit navždy — další soubor to zkusí znovu
+    pdfjsP.catch(() => { pdfjsP = null; });
   }
   return pdfjsP;
 }
@@ -95,10 +120,15 @@ export async function nodeCanvasFactoryClass() {
 export type PdfDocument = import("pdfjs-dist/types/src/display/api").PDFDocumentProxy;
 export type PdfPage = import("pdfjs-dist/types/src/display/api").PDFPageProxy;
 
+/** Proč PDF nejde zpracovat — vlastnost SOUBORU (ne prostředí): heslo k otevření, neplatná struktura. */
+export type PdfUnsupportedCode = "password" | "invalid";
+
 export class PdfUnsupportedError extends Error {
-  constructor(message: string) {
+  readonly code: PdfUnsupportedCode | null;
+  constructor(message: string, code: PdfUnsupportedCode | null = null) {
     super(message);
     this.name = "PdfUnsupportedError";
+    this.code = code;
   }
 }
 
@@ -131,8 +161,10 @@ export async function openPdf(data: Uint8Array, opts: { requireFonts?: boolean }
     return doc;
   } catch (err) {
     const name = (err as { name?: string })?.name ?? "";
-    if (name === "PasswordException") throw new PdfUnsupportedError("PDF je chráněné heslem — nelze anonymizovat.");
-    if (name === "InvalidPDFException") throw new PdfUnsupportedError("Soubor není platné PDF.");
+    // pdf.js s prázdným heslem otevře i PDF s heslem vlastníka → PasswordException = heslo k OTEVŘENÍ
+    if (name === "PasswordException") throw new PdfUnsupportedError(PDF_PASSWORD_TEXT, "password");
+    if (name === "InvalidPDFException") throw new PdfUnsupportedError(PDF_INVALID_TEXT, "invalid");
+    // cokoli jiného (chybějící modul, paměť, chyba prostředí) NENÍ vada souboru → nahoru, opakuje se
     throw err;
   }
 }
