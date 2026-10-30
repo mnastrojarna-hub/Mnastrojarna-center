@@ -95,8 +95,8 @@ async function openInbox(page, folder = "inbox") {
 }
 
 async function syncNow(page) {
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
-  await page.getByTestId("sync-msg").filter({ hasText: /Staženo|nových|stahuji|nic nového/i }).first().waitFor({ timeout: 90_000 }).catch(() => undefined);
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
+  await page.getByTestId("sync-msg").filter({ hasText: /Přijato|Staženo|nových|stahuji|nic nového/i }).first().waitFor({ timeout: 90_000 }).catch(() => undefined);
   await page.waitForLoadState("networkidle");
 }
 

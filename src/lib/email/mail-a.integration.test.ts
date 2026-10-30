@@ -456,7 +456,8 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta A ↔ lokální Supabase + testovací IM
       return (data as { id: string }).id;
     };
     const locked = await put(`NAB-MA-${TAG}.pdf`, { kind: "nabidka", quote_id: quoteId });
-    const free = await put(`vykres-${TAG}.pdf`, { kind: "vykres" });
+    // náš výkres (issuer my) — výkres ZÁKAZNÍKA by mimo zákazníka zakázky šel jen anonymizovaný (mail-e test)
+    const free = await put(`vykres-${TAG}.pdf`, { kind: "vykres", issuer: "my" });
     const compose = await import("@/app/actions/mail-compose");
     const ctx = await compose.composeContextAction({ jobId });
     expect(ctx.ok).toBe(true);

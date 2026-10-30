@@ -341,6 +341,17 @@ export async function candidatesFor(db: Db, e: EmailRow): Promise<CandidateRow[]
 }
 
 /**
+ * „Zpracovat objednávku" (Pošta E): ke které zakázce e-mail patří — stejná pravidla jako automatické
+ * párování (decideMatch: naše čísla, objednávka zákazníka, vlákno; nikdy jen podle předmětu).
+ */
+export async function matchDecisionForEmail(db: Db, emailId: string): Promise<{ email: EmailRow; decision: ReturnType<typeof decideMatch> } | null> {
+  const e = await loadEmail(db, emailId);
+  if (!e) return null;
+  const rows = await candidatesFor(db, e);
+  return { email: e, decision: decideMatch(rows, { category: e.category, direction: e.direction, customerId: e.customer_id, supplierId: e.supplier_id }) };
+}
+
+/**
  * Kandidáti + vlastní text e-mailu (vyčištěné tělo a přílohy; naše čísla z předmětu zvlášť — pro konflikt
  * s vláknem). Vrací i zakázky, které u vlákna někdo zamítl (rejected) — k rozhodnutí se nepoužijí, jen ke konfliktu.
  */

@@ -27,6 +27,7 @@ vi.mock("@/app/actions/flow-status", () => ({
 }));
 vi.mock("@/app/actions/flow-pages", () => ({ extendQuoteValidity: vi.fn() }));
 vi.mock("@/app/actions/mail", () => ({ createJobFromEmail: vi.fn() }));
+vi.mock("@/app/actions/mail-actions", () => ({ processOrderFromEmailAction: vi.fn() }));
 vi.mock("@/components/ai-pricing-panel", () => ({ AiPricingPanel: () => <div>AI-PANEL</div> }));
 vi.mock("@/components/integration-settings-editor", () => ({ IntegrationSettingsEditor: () => <div>PARAMS-EDITOR</div> }));
 
@@ -225,7 +226,7 @@ beforeEach(() => {
 });
 
 describe("stránky obchodního toku — vykreslení", () => {
-  it("Poptávky: hlavička, chipy stavů s počty, stav + autor, další krok Nacenit, pošta se Založit zakázku", async () => {
+  it("Poptávky: hlavička, chipy stavů s počty, stav + autor, další krok Nacenit, pošta s Vytvořit nabídku", async () => {
     access.features.add("pricing"); // #25: krok „Nacenit“ má jen super admin (pricing)
     const html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
     expect(html).toContain("Poptávky");
@@ -240,7 +241,9 @@ describe("stránky obchodního toku — vykreslení", () => {
     expect(html).toContain('href="/pricing?job=j1"');
     expect(html).toContain("Popt. zák.");
     expect(html).toContain("Poptávky v poště");
-    expect(html).toContain("Založit zakázku");
+    // Pošta E: u poptávky „Vytvořit nabídku“, ne „Založit zakázku“
+    expect(html).toContain("Vytvořit nabídku");
+    expect(html).not.toContain(">Založit zakázku<");
     expect(html).not.toContain("Objednávka PO-1"); // jiná kategorie
     expect(html).toContain("Nová poptávka");
     expect(html).toContain("Vyfotit poptávku");

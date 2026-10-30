@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Mail, RefreshCw, Upload, Search, Loader2, Inbox as InboxIcon, UserRound, AlertCircle, CheckCircle2, X, PenSquare,
-  Send, Flag, Layers, Ban, Share2, SlidersHorizontal, MailOpen, FolderKanban, FolderOpen, Wand2, Settings,
+  Send, Flag, Layers, Ban, Share2, SlidersHorizontal, MailOpen, FolderKanban, FolderOpen, Wand2, Settings, Trash2, Clock,
 } from "lucide-react";
-import { MailSettingsPanel } from "@/components/mail/mail-settings-panel";
+import { MailSettingsPanel, type MailSettingsTab } from "@/components/mail/mail-settings-panel";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,13 @@ import { ThreadRow } from "@/components/mail/thread-row";
 import { ThreadView, type ThreadPatch } from "@/components/mail/thread-view";
 import { ComposeDialog, type ComposeRequest } from "@/components/mail/compose-dialog";
 import { useMailSync } from "@/components/mail/use-mail-sync";
-import { useMailLive } from "@/components/mail/mail-live-provider";
+import { useMailLive, useMailLiveFast } from "@/components/mail/mail-live-provider";
+import { useMailActionRunner } from "@/components/mail/mail-action-runner";
 import { PRIORITY_STYLE, type PriorityValue } from "@/components/priority";
 import { listThreadsAction, setThreadFlagAction, setThreadPriorityAction } from "@/app/actions/mail-inbox";
+import { discardOutboxAction, flushOutboxAction, listOutboxAction, type FlushOutboxResult, type OutboxItem } from "@/app/actions/mail-compose";
+import { updatedAgoLabel } from "@/lib/email/live-poll";
+import { sendReceiveText } from "@/lib/email/send-receive";
 import { backfillMailJobsAction, confirmJobSuggestionAction, rejectJobSuggestionAction } from "@/app/actions/mail-jobs";
 import { CATEGORY_STYLE, INBOX_CATEGORIES, NO_MAILBOX, categoryCodeFromLabel, type MailboxOption } from "@/lib/email/visibility";
 import {
@@ -80,6 +85,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   const { can } = useAccess();
   const canAi = can("dashboard"); // AI třídění, návrhy odpovědí a korekce — jen AI přehled
   const live = useMailLive();
+  // otevřená Pošta: nová pošta se kontroluje každých 30 s (skrytá karta nekontroluje) a objeví se sama
+  useMailLiveFast();
+  const router = useRouter();
 
   const [folder, setFolder] = React.useState<MailFolder>(initialFolder);
   const [mailboxId, setMailboxId] = React.useState<string | null>(initialMailbox);
@@ -193,6 +201,51 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     live.pokeNow();
   };
 
+  // Fronta K odeslání (neodeslané zprávy) — odejdou tlačítkem Přijmout a odeslat
+  const [outbox, setOutbox] = React.useState<OutboxItem[]>([]);
+  const loadOutbox = React.useCallback(async () => {
+    const r = await listOutboxAction().catch(() => null);
+    if (r?.ok) setOutbox(r.items);
+  }, []);
+  React.useEffect(() => {
+    void loadOutbox();
+  }, [loadOutbox, live.version]);
+
+  /**
+   * „Přijmout a odeslat": nejdřív odešle vše, co čeká (moje fronta K odeslání + odeslání s hotovými
+   * výkresy), pak přijme poštu ze všech mých schránek. Výsledek krátce: „Přijato 3, odesláno 1."
+   */
+  const [sendBusy, setSendBusy] = React.useState(false);
+  const [needsSettings, setNeedsSettings] = React.useState(false);
+  const sendReceive = async () => {
+    if (noMailbox) return openSettings("schranka");
+    setSyncMsg(null);
+    setNeedsSettings(false);
+    setSendBusy(true);
+    let sent: FlushOutboxResult | null = null;
+    try {
+      sent = await flushOutboxAction();
+    } catch (err) {
+      sent = { ok: false, error: err instanceof Error ? err.message : "Odeslání selhalo (síť).", sent: 0, failed: 0, errors: [], needsSettings: false, waitingDrawings: 0, blockedDrawings: 0 };
+    } finally {
+      setSendBusy(false);
+    }
+    // příjem: všechny moje schránky (vybraná schránka v přepínači = jen ta, jako dřív)
+    const received = await run(mailboxId && mailboxId !== NO_MAILBOX ? { mailboxId } : {});
+    const summary = sendReceiveText(received, sent);
+    setSyncMsg({ ok: summary.ok, text: summary.text });
+    setNeedsSettings(summary.needsSettings);
+    await Promise.all([reload({ keep: page.items.length }), loadOutbox()]);
+    if (sent?.sent) setThreadVersion((v) => v + 1);
+    live.pokeNow();
+  };
+  const discardOutbox = async (item: OutboxItem) => {
+    if (!window.confirm(`Zahodit neodeslanou zprávu „${item.subject || "bez předmětu"}“? Neodejde.`)) return;
+    const r = await discardOutboxAction(item.id).catch(() => ({ ok: false, error: "Spojení se nepovedlo." }));
+    if (!r.ok) setSyncMsg({ ok: false, text: r.error ?? "Zprávu se nepodařilo zahodit." });
+    await loadOutbox();
+  };
+
   // Automatické stažení při otevření, je-li poslední starší než 5 min (na pozadí, UI neblokuje)
   const autoRan = React.useRef(false);
   React.useEffect(() => {
@@ -291,6 +344,16 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     setSelectedId(t.threadId);
     setMobileDetail(true);
   };
+  // Pošta E: hlavní akce zprávy přímo z řádku (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu …)
+  const rowActions = useMailActionRunner({
+    onLinked: (tid, id, number) => patch(tid, { jobId: id, jobNumber: number }),
+    onNotice: (n) => setSyncMsg({ ok: n.ok, text: n.text }),
+    // objednávka může patřit k víc zakázkám → otevřít vlákno (výběr je v detailu)
+    onChoices: (tid) => {
+      const t = page.items.find((x) => x.threadId === tid);
+      if (t) open(t);
+    },
+  });
   const closeDetail = () => {
     setMobileDetail(false);
     // mobil: zavřený detail se nenechává skrytě otevřený (živá pošta by ho jinak „četla")
@@ -318,22 +381,60 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     if (category && !chipCategories.includes(category)) setCategory(null);
   }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Nastavení pošty (podpis): ozubené kolo v hlavičce, odkaz z Můj účet (/inbox?nastaveni=podpis)
+  // Nastavení pošty: ozubené kolo v hlavičce (záložky Schránka a Podpis), tlačítka u stavu schránky,
+  // odkaz z Můj účet (/inbox?nastaveni=podpis | schranka)
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [settingsTab, setSettingsTab] = React.useState<MailSettingsTab>("schranka");
+  const [editMailboxId, setEditMailboxId] = React.useState<string | null>(null);
+  const mailboxesChanged = React.useRef(false);
+  function openSettings(tab: MailSettingsTab = "schranka", editId: string | null = null) {
+    setSettingsTab(tab);
+    setEditMailboxId(editId);
+    setSettingsOpen(true);
+  }
+  const onSettingsOpenChange = (o: boolean) => {
+    setSettingsOpen(o);
+    // po zavření: změněná schránka → obnovit přehled schránek ze serveru a stáhnout poštu
+    if (!o && mailboxesChanged.current) {
+      mailboxesChanged.current = false;
+      router.refresh();
+      void reload({ keep: page.items.length });
+      live.pokeNow();
+    }
+  };
   React.useEffect(() => {
     const u = new URL(window.location.href);
     if (!u.searchParams.has("nastaveni")) return;
-    setSettingsOpen(true);
+    openSettings(u.searchParams.get("nastaveni") === "podpis" ? "podpis" : "schranka");
     u.searchParams.delete("nastaveni");
     window.history.replaceState(window.history.state, "", u.toString());
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const selectedMailboxEmail = mailboxId ? mailboxes.find((m) => m.id === mailboxId)?.email ?? null : null;
+
+  // „Aktualizováno před X s" — nenápadně, tiká po 5 s
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(t);
+  }, []);
+  const updatedLabel = noMailbox ? "" : updatedAgoLabel(live.at, now);
 
   const recategorize = (t: ThreadSummary, c: EmailCategory) => patch(t.threadId, { category: c });
 
   return (
     // mobil: menší mezery — seznam vláken má začít co nejvýš (čipy kategorií přibyly)
     <div className="space-y-3 sm:space-y-4">
+      <div className="relative">
+      {/* mobil: stav živé pošty vpravo vedle nadpisu (bez dalšího řádku nad seznamem) */}
+      {updatedLabel && (
+        <span
+          className={cn("absolute right-0 top-1.5 text-[11px] sm:hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+          data-testid="mail-updated-mobile"
+          suppressHydrationWarning
+        >
+          {updatedLabel}
+        </span>
+      )}
       <PageHeader
         title="Pošta"
         description={description}
@@ -344,23 +445,27 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             <Button variant="outline" size="sm" onClick={() => setShowImport((s) => !s)} className="hidden sm:inline-flex">
               <Upload className="h-4 w-4" /> Import z Outlooku
             </Button>
-            <Button variant="outline" size="sm" onClick={() => sync()} disabled={progress.running || noMailbox}>
-              <RefreshCw className={cn("h-4 w-4", progress.running && "animate-spin")} />
-              {progress.running ? "Stahuji…" : "Stáhnout poštu"}
+            <Button
+              variant="outline" size="sm" onClick={() => void sendReceive()} disabled={progress.running || sendBusy}
+              title="Přijme novou poštu ze všech tvých schránek a odešle, co čeká na odeslání" data-testid="btn-send-receive"
+            >
+              <RefreshCw className={cn("h-4 w-4", (progress.running || sendBusy) && "animate-spin")} />
+              {sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}
             </Button>
             <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose">
               <PenSquare className="h-4 w-4" /> Nová zpráva
             </Button>
             <Button
-              size="sm" variant="outline" onClick={() => setSettingsOpen(true)}
-              aria-label="Nastavení pošty" title="Nastavení pošty (podpis)" data-testid="btn-mail-settings"
+              size="sm" variant="outline" onClick={() => openSettings("schranka")}
+              aria-label="Nastavení pošty" title="Nastavení pošty (schránka, servery, heslo, podpis)" data-testid="btn-mail-settings"
               className="px-2.5"
             >
-              <Settings className="h-4 w-4" /><span className="hidden xl:inline">Nastavení pošty</span>
+              <Settings className="h-4 w-4" /><span className="hidden sm:inline">Nastavení pošty</span>
             </Button>
           </div>
         }
       />
+      </div>
 
       {progress.running && (
         <div className="rounded-lg border bg-card px-3 py-2 text-sm" data-testid="sync-progress" aria-live="polite">
@@ -388,9 +493,26 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           data-testid="sync-msg"
         >
           {syncMsg.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
-          <span className="min-w-0 flex-1 break-words">{syncMsg.text}</span>
+          <span className="min-w-0 flex-1 break-words">
+            {syncMsg.text}
+            {needsSettings && !syncMsg.ok && (
+              <Button size="sm" variant="outline" className="ml-2 mt-1 h-7 bg-background text-xs" onClick={() => openSettings("schranka")} data-testid="sync-msg-settings">
+                <Settings className="h-3.5 w-3.5" /> Nastavení pošty
+              </Button>
+            )}
+          </span>
           <button onClick={() => setSyncMsg(null)} aria-label="Zavřít" className="opacity-60 hover:opacity-100"><X className="h-4 w-4" /></button>
         </div>
+      )}
+
+      {outbox.length > 0 && (
+        <OutboxBar
+          items={outbox}
+          busy={sendBusy || progress.running}
+          onSend={() => void sendReceive()}
+          onDiscard={(i) => void discardOutbox(i)}
+          onSettings={() => openSettings("schranka")}
+        />
       )}
 
       {scope === "all" ? (
@@ -404,9 +526,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white"><Mail className="h-5 w-5" /></div>
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-semibold text-amber-900 dark:text-amber-200">Zatím nemáš připojenou e-mailovou schránku.</p>
-            <p className="text-amber-800/80 dark:text-amber-300/80">Připoj si ji sám v Můj účet — stačí e-mail a heslo, nastavení se najde samo.</p>
+            <p className="text-amber-800/80 dark:text-amber-300/80">Připoj si ji sám tady v Nastavení pošty — stačí e-mail a heslo, nastavení se najde samo (nebo ho vyplníš ručně).</p>
           </div>
-          <Button asChild size="sm" variant="success"><Link href="/account#schranka">Připojit schránku</Link></Button>
+          <Button size="sm" variant="success" onClick={() => openSettings("schranka")} data-testid="btn-connect-mailbox">Připojit schránku</Button>
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10">
@@ -423,9 +545,14 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             ) : (
               ownMailboxes.map((m) => <span key={m.id} className="font-semibold text-blue-900 dark:text-blue-100">{m.email}</span>)
             )}
-            <MailboxHealth mailboxes={ownMailboxes} />
+            <MailboxHealth mailboxes={ownMailboxes} onFix={(id) => openSettings("schranka", id)} />
           </div>
-          <Link href="/account#schranka" className="text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300">Nastavení schránky</Link>
+          <button
+            type="button" onClick={() => openSettings("schranka")} data-testid="btn-mailbox-settings"
+            className="inline-flex min-h-8 items-center text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300"
+          >
+            Nastavení schránky
+          </button>
         </div>
       )}
 
@@ -524,9 +651,22 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
               })}
             </div>
           )}
-          <div className={cn("items-center justify-between px-1 text-xs text-muted-foreground", chipCategories.length ? "hidden sm:flex" : "flex")}>
+          {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu */}
+          <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground", chipCategories.length ? "hidden sm:flex" : "flex")}>
             <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
-            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <span className="ml-auto inline-flex items-center gap-1.5">
+              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {updatedLabel && (
+                <span
+                  className={cn("text-[11px]", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+                  title={live.error ? `Poslední kontrola: ${live.error}` : "Nová pošta se kontroluje sama každých 30 s"}
+                  data-testid="mail-updated"
+                  suppressHydrationWarning
+                >
+                  {updatedLabel}
+                </span>
+              )}
+            </span>
           </div>
           {folder === "sent" && scope === "all" && (
             <p className="px-1 text-xs text-muted-foreground">
@@ -543,7 +683,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             </div>
           )}
           {items.length === 0 ? (
-            <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} />
+            <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} onConnect={() => openSettings("schranka")} />
           ) : (
             <div className="space-y-2" data-testid="thread-list">
               {items.map((t, i) => (
@@ -562,6 +702,8 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                     suggestionBusy={suggBusy === t.threadId}
                     onCategory={(c) => recategorize(t, c)}
                     onError={(text) => setSyncMsg({ ok: false, text })}
+                    onAction={(key) => void rowActions.run(key, { threadId: t.threadId, emailId: t.emailId, jobId: t.jobId })}
+                    actionBusy={rowActions.busy?.threadId === t.threadId ? rowActions.busy.key : null}
                   />
                 </React.Fragment>
               ))}
@@ -596,6 +738,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                 onBack={closeDetail}
                 onPatch={patch}
                 onCompose={setCompose}
+                onSplit={() => void reload({ keep: page.items.length })}
               />
             </div>
           ) : (
@@ -614,29 +757,80 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           setSyncMsg({ ok: r.sentCopy !== "failed", text: `Odesláno${r.fromAddress ? ` z ${r.fromAddress}` : ""}. ${r.sentCopyText ?? ""}`.trim() });
           setThreadVersion((v) => v + 1);
           void reload({ keep: page.items.length });
+          void loadOutbox();
           live.pokeNow();
         }}
+        onQueued={() => void loadOutbox()}
+        onOpenSettings={() => openSettings("schranka")}
       />
-      <MailSettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} initialMailbox={selectedMailboxEmail} />
+      <MailSettingsPanel
+        open={settingsOpen}
+        onOpenChange={onSettingsOpenChange}
+        initialMailbox={selectedMailboxEmail}
+        tab={settingsTab}
+        onTabChange={setSettingsTab}
+        editMailboxId={editMailboxId}
+        isAdmin={scope === "all"}
+        onMailboxesChanged={() => { mailboxesChanged.current = true; }}
+      />
     </div>
   );
 }
 
-/** Stav stahování schránek (poslední stažení / chyba / neúplné nastavení). */
-function MailboxHealth({ mailboxes }: { mailboxes: MailboxOption[] }) {
+/** Neodeslané zprávy (fronta K odeslání): odejdou tlačítkem Přijmout a odeslat, nebo je zahodím. */
+function OutboxBar({ items, busy, onSend, onDiscard, onSettings }: {
+  items: OutboxItem[]; busy: boolean; onSend: () => void; onDiscard: (i: OutboxItem) => void; onSettings: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const n = items.length;
+  const label = n === 1 ? "1 zpráva čeká na odeslání" : `${n} ${n >= 2 && n <= 4 ? "zprávy čekají" : "zpráv čeká"} na odeslání`;
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200" data-testid="outbox-bar">
+      <div className="flex flex-wrap items-center gap-2">
+        <Clock className="h-4 w-4 shrink-0" />
+        <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 text-left font-medium underline-offset-4 hover:underline" aria-expanded={open}>
+          K odeslání: {label}
+        </button>
+        <Button size="sm" variant="outline" className="h-8 bg-background" onClick={onSettings}><Settings className="h-3.5 w-3.5" /> Nastavení pošty</Button>
+        <Button size="sm" variant="send" className="h-8" onClick={onSend} disabled={busy} data-testid="outbox-send">
+          <Send className="h-3.5 w-3.5" /> Přijmout a odeslat
+        </Button>
+      </div>
+      {open && (
+        <ul className="mt-2 divide-y divide-amber-200 rounded-md border border-amber-200 bg-background/70 dark:divide-amber-500/20 dark:border-amber-500/20" data-testid="outbox-list">
+          {items.map((i) => (
+            <li key={i.id} className="flex items-start gap-2 px-2.5 py-2 text-xs">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-foreground">{i.subject || "(bez předmětu)"}</p>
+                <p className="truncate text-muted-foreground">Komu: {i.to}</p>
+                {i.error && <p className="break-words text-destructive">Neodesláno: {i.error}</p>}
+              </div>
+              <Button size="icon-sm" variant="ghost" onClick={() => onDiscard(i)} aria-label={`Zahodit zprávu ${i.subject}`} title="Zahodit (neodešle se)">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Stav stahování schránek (poslední stažení / chyba / neúplné nastavení); vlastní schránku jde opravit hned. */
+function MailboxHealth({ mailboxes, onFix }: { mailboxes: MailboxOption[]; onFix?: (mailboxId: string) => void }) {
   const items = mailboxes
     .map((m) =>
       m.incomplete
-        ? { id: m.id, bad: true, text: `${m.email}: nastavení není kompletní — doplň ho v Můj účet → Moje e-mailová schránka.` }
+        ? { id: m.id, bad: true, fix: true, text: `${m.email}: nastavení není kompletní — doplň heslo a servery.` }
         : m.authBlocked
-          ? { id: m.id, bad: true, text: `${m.email}: Heslo odmítnuto — oprav ho v Nastavení schránky (Můj účet → Moje e-mailová schránka → Upravit). Automatické stahování je do opravy pozastavené.` }
+          ? { id: m.id, bad: true, fix: true, text: `${m.email}: Heslo odmítnuto — oprav ho v Nastavení pošty. Automatické stahování je do opravy pozastavené.` }
           : m.lastSyncError
-            ? { id: m.id, bad: true, text: m.lastSyncError }
+            ? { id: m.id, bad: true, fix: true, text: m.lastSyncError }
             : m.lastSyncAt
-              ? { id: m.id, bad: false, text: `${mailboxes.length > 1 ? `${m.email}: ` : ""}staženo ${relativeTime(m.lastSyncAt)}` }
+              ? { id: m.id, bad: false, fix: false, text: `${mailboxes.length > 1 ? `${m.email}: ` : ""}staženo ${relativeTime(m.lastSyncAt)}` }
               : null,
     )
-    .filter((x): x is { id: string; bad: boolean; text: string } => Boolean(x));
+    .filter((x): x is { id: string; bad: boolean; fix: boolean; text: string } => Boolean(x));
   // víc neúplných schránek (přehled admina) → jeden řádek místo stěny textu
   const incomplete = mailboxes.filter((m) => m.incomplete);
   if (incomplete.length > 1) {
@@ -644,7 +838,7 @@ function MailboxHealth({ mailboxes }: { mailboxes: MailboxOption[] }) {
     const rest = items.filter((x) => !ids.has(x.id));
     items.length = 0;
     items.push(
-      { id: "incomplete", bad: true, text: `Neúplné nastavení: ${incomplete.map((m) => m.email).join(", ")} — majitel si ho doplní v Můj účet → Moje e-mailová schránka.` },
+      { id: "incomplete", bad: true, fix: false, text: `Neúplné nastavení: ${incomplete.map((m) => m.email).join(", ")} — majitel si ho doplní v Pošta → Nastavení pošty → Schránka.` },
       ...rest,
     );
   }
@@ -652,7 +846,17 @@ function MailboxHealth({ mailboxes }: { mailboxes: MailboxOption[] }) {
   return (
     <div className="mt-0.5 space-y-0.5 text-xs" data-testid="mailbox-health">
       {items.map((x) => (
-        <p key={x.id} suppressHydrationWarning className={cn("break-words", x.bad ? "text-red-700 dark:text-red-300" : "text-blue-900/60 dark:text-blue-200/60")}>{x.text}</p>
+        <p key={x.id} suppressHydrationWarning className={cn("break-words", x.bad ? "text-red-700 dark:text-red-300" : "text-blue-900/60 dark:text-blue-200/60")}>
+          {x.text}
+          {x.fix && onFix && (
+            <button
+              type="button" onClick={() => onFix(x.id)} data-testid="mailbox-health-fix"
+              className="ml-1.5 inline-flex min-h-7 items-center rounded-md border border-red-300 bg-background px-2 font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
+            >
+              Opravit nastavení
+            </button>
+          )}
+        </p>
       ))}
     </div>
   );
@@ -713,7 +917,7 @@ function MailboxSwitcher({ mailboxes, mailboxId, onSwitch }: { mailboxes: Mailbo
   );
 }
 
-function EmptyList({ scope, noMailbox, folder, filtered }: { scope: "all" | "own"; noMailbox: boolean; folder: MailFolder; filtered: boolean }) {
+function EmptyList({ scope, noMailbox, folder, filtered, onConnect }: { scope: "all" | "own"; noMailbox: boolean; folder: MailFolder; filtered: boolean; onConnect: () => void }) {
   return (
     <Card>
       <CardContent className="space-y-3 py-10 text-center text-sm text-muted-foreground" data-testid="mail-empty">
@@ -725,19 +929,20 @@ function EmptyList({ scope, noMailbox, folder, filtered }: { scope: "all" | "own
         ) : noMailbox ? (
           <>
             <p className="font-medium text-foreground">Zatím nemáš připojenou e-mailovou schránku.</p>
-            <p>Připoj si ji v Můj účet (e-mail + heslo). Mezitím můžeš nahrát e-maily z Outlooku.</p>
+            <p>Připoj si ji v Nastavení pošty (e-mail + heslo). Mezitím můžeš nahrát e-maily z Outlooku.</p>
+            <Button size="sm" variant="success" onClick={onConnect}>Připojit schránku</Button>
           </>
         ) : folder !== "inbox" ? (
           <p>Ve složce {FOLDER_LABEL[folder]} nic není.</p>
         ) : scope === "all" ? (
           <>
             <p className="font-medium text-foreground">Zatím tu nejsou žádné e-maily.</p>
-            <p>Připoj schránku v Můj účet (firemní v Nastavení) a klikni na Stáhnout poštu.</p>
+            <p>Připoj schránku v Nastavení pošty (firemní v Nastavení → E-mailové schránky) a klikni na Přijmout a odeslat.</p>
           </>
         ) : (
           <>
             <p className="font-medium text-foreground">Ve schránce zatím nic není.</p>
-            <p>Klikni nahoře na Stáhnout poštu — nové e-maily se objeví tady.</p>
+            <p>Nová pošta se objeví sama — nebo klikni nahoře na Přijmout a odeslat.</p>
           </>
         )}
       </CardContent>

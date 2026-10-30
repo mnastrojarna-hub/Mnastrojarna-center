@@ -3,9 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, FolderPlus, Link2, Loader2, Mail, MailOpen, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowRight, FilePlus2, FolderPlus, Link2, Loader2, Mail, MailOpen, PackageCheck, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAccess } from "@/components/access-provider";
 import { createJobFromEmail, linkEmailToJob } from "@/app/actions/mail";
+import { processOrderFromEmailAction } from "@/app/actions/mail-actions";
+import { flowActionHref } from "@/components/flow/flow-state";
 import { cn, relativeTime } from "@/lib/utils";
 
 /** E-mail z pošty pro stránky toku (jen čistá data ze serveru). */
@@ -49,6 +52,7 @@ export function FlowMailList({ emails }: { emails: FlowEmail[] }) {
 
 function MailRow({ email: e }: { email: FlowEmail }) {
   const router = useRouter();
+  const { can } = useAccess();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [created, setCreated] = React.useState<{ id: string; number: string | null } | null>(null);
@@ -74,18 +78,29 @@ function MailRow({ email: e }: { email: FlowEmail }) {
     }
   }
 
-  async function create() {
+  // Pošta E: poptávka → Vytvořit nabídku (zakázka ve stavu poptávka + editor nabídky); objednávka →
+  // Zpracovat objednávku (spárovat se zakázkou stejnými pravidly jako Pošta, jinak založit)
+  const inquiry = e.category === "Poptávka";
+  async function create(force = false) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
+      if (!inquiry && !force) {
+        const r = await processOrderFromEmailAction(e.id);
+        if (!r.ok) return setError(r.error);
+        if (r.mode === "choose") return setError(`Objednávka může patřit k ${r.choices.map((c) => c.number).join(", ")} — otevři ji v poště a vyber zakázku.`);
+        setCreated({ id: r.jobId, number: r.number ?? null });
+        router.push(`/orders/${r.jobId}`);
+        return;
+      }
       const res = await createJobFromEmail(e.id);
       if (!res.ok || !res.id) {
         setError(res.error ?? "Zakázku se nepodařilo založit.");
         return;
       }
       setCreated({ id: res.id, number: res.number ?? null });
-      router.push(`/orders/${res.id}`);
+      router.push(inquiry ? flowActionHref("quote.create", res.id, { canPrice: can("pricing") }) ?? `/orders/${res.id}` : `/orders/${res.id}`);
     } catch {
       setError("Spojení se nepovedlo — zkus to znovu.");
     } finally {
@@ -133,7 +148,7 @@ function MailRow({ email: e }: { email: FlowEmail }) {
         ) : e.matchJob ? (
           <>
             {/* stejné číslo objednávky zákazníka už má zakázka → přiřadit, ne zakládat duplicitu */}
-            <Button type="button" variant="outline" size="sm" onClick={() => void create()} disabled={busy}>
+            <Button type="button" variant="outline" size="sm" onClick={() => void create(true)} disabled={busy}>
               <FolderPlus className="h-4 w-4" /> Založit novou
             </Button>
             <Button type="button" variant="success" size="sm" onClick={() => void link(e.matchJob!)} disabled={busy}>
@@ -142,9 +157,9 @@ function MailRow({ email: e }: { email: FlowEmail }) {
             </Button>
           </>
         ) : (
-          <Button type="button" variant="success" size="sm" onClick={() => void create()} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />}
-            Založit zakázku
+          <Button type="button" variant="success" size="sm" onClick={() => void create()} disabled={busy} data-testid="flow-mail-action">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : inquiry ? <FilePlus2 className="h-4 w-4" /> : <PackageCheck className="h-4 w-4" />}
+            {inquiry ? "Vytvořit nabídku" : "Zpracovat objednávku"}
           </Button>
         )}
       </div>

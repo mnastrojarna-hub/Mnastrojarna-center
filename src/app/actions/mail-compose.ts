@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { checkFeature, getAccess } from "@/lib/auth/session";
+import type { CurrentUser as SessionUser } from "@/lib/data/current-user";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import { getVisibleEmailRow } from "@/lib/data/mail";
@@ -14,6 +15,9 @@ import { replyHeaders, splitAddresses } from "@/lib/email/threading";
 import { sentCopyLabel } from "@/lib/email/mail-folders";
 import { isDbEmailCategory, isUuidLike } from "@/lib/email/visibility";
 import { assertJobFileAccess, fileLocks } from "@/lib/jobs/job-file-access";
+import { SHARE_FILE_SELECT, pickShareFile, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "@/lib/anonymize/share";
+import { isAnonCandidate } from "@/lib/anonymize/candidate";
+import { blockedAttachmentMessage, recipientsAllowOriginals, type BlockReason } from "@/lib/email/attachment-anon";
 import type { JobsDb } from "@/lib/jobs/events";
 
 /**
@@ -38,6 +42,16 @@ export interface ComposeAttachmentRef {
   ref: string;
   filename?: string;
   contentType?: string;
+  /** Dokument zakázky: výslovně „Poslat originál" (výkres zákazníka bez anonymizace — jen super admin, audit). */
+  original?: boolean;
+}
+
+/** Příloha zablokovaná ochranou výkresů zákazníka (komu nepatří, jde jen anonymizovaná kopie). */
+export interface BlockedAttachment {
+  ref: string;
+  filename: string;
+  reason: string;
+  message: string;
 }
 
 export interface SendComposedInput {
@@ -52,6 +66,8 @@ export interface SendComposedInput {
   attachments?: ComposeAttachmentRef[];
   /** Zakázka (u nové zprávy z detailu zakázky). */
   jobId?: string | null;
+  /** Zpráva z fronty K odeslání (opakované odeslání ze stejného okna — bez dvojí položky ve frontě). */
+  outboxId?: string | null;
 }
 
 export interface SendComposedResult {
@@ -61,6 +77,15 @@ export interface SendComposedResult {
   fromAddress?: string;
   sentCopy?: "ok" | "failed" | "skipped";
   sentCopyText?: string;
+  /** Odeslání selhalo, zpráva čeká ve frontě K odeslání (odejde tlačítkem Přijmout a odeslat). */
+  queued?: boolean;
+  outboxId?: string;
+  /** Chyba nastavení schránky (heslo / SMTP) — uživatel ji opraví v Pošta → Nastavení pošty. */
+  needsSettings?: boolean;
+  /** Výkresy zákazníka, které adresát (není zákazník zakázky) nesmí dostat bez anonymizace. */
+  blocked?: BlockedAttachment[];
+  /** Smí volající výslovně poslat originál (super admin). */
+  canSendOriginal?: boolean;
 }
 
 function cleanList(v: string | undefined): { valid: string[]; invalid: string[] } {
@@ -191,11 +216,272 @@ export async function saveSignatureAction(signature: string): Promise<{ ok: bool
   return { ok: true };
 }
 
-/** Odeslání napsané zprávy (nová / odpověď / odpovědět všem / přeposlání). */
+/**
+ * Odeslání napsané zprávy (nová / odpověď / odpovědět všem / přeposlání). Selže-li samotné odeslání
+ * (heslo, SMTP server, spojení), zpráva se uloží do fronty K odeslání (mail_outbox) — odejde tlačítkem
+ * „Přijmout a odeslat", až uživatel opraví nastavení schránky. Kontroly obsahu (adresy, předmět,
+ * přílohy) do fronty nevedou — ty opraví hned v okně psaní.
+ */
 export async function sendComposedAction(input: SendComposedInput): Promise<SendComposedResult> {
   const access = await checkFeature("mail");
   if ("error" in access) return { ok: false, error: access.error };
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
+  if (!input || typeof input !== "object") return { ok: false, error: "Chybí obsah zprávy." };
+  const outboxId = isUuidLike(input.outboxId) ? input.outboxId : null;
+  const res = await composeAndSend(access.user, input);
+  const c = await db();
+  if (res.ok) {
+    if (outboxId) await finishOutbox(c, access.user.id, outboxId, { ok: true, emailId: res.emailId });
+    return res;
+  }
+  if (res.stage !== "send") {
+    return { ok: false, error: res.error, ...(res.blocked ? { blocked: res.blocked, canSendOriginal: res.canSendOriginal } : {}) };
+  }
+  const queuedId = await queueOutbox(c, access.user.id, input, res.error ?? "Odeslání selhalo.", outboxId);
+  return { ok: false, error: res.error, needsSettings: needsMailSettings(res.error), ...(queuedId ? { queued: true, outboxId: queuedId } : {}) };
+}
+
+// ── Výkresy zákazníka v příloze (ochrana anonymizace, audit 30. 10.) ──
+
+type Guarded =
+  | { kind: "plain" }
+  | { kind: "file"; file: OutgoingAttachment; original: boolean }
+  | { kind: "blocked"; blocked: BlockedAttachment };
+
+/** Jsou všichni adresáti zákazník zakázky (jeho adresy / doména) nebo my? Pak smí jít originál. */
+async function originalsAllowed(c: Db, jobId: string | null, recipients: string[]): Promise<boolean> {
+  if (!jobId || !recipients.length) return false;
+  const { data: job } = await c.from("orders").select("customer_id").eq("id", jobId).maybeSingle();
+  const cid = (job as { customer_id: string | null } | null)?.customer_id ?? null;
+  const [cust, contacts, profs, boxes] = await Promise.all([
+    cid ? c.from("customers").select("email").eq("id", cid) : Promise.resolve({ data: [] }),
+    cid ? c.from("customer_contacts").select("email").eq("customer_id", cid) : Promise.resolve({ data: [] }),
+    c.from("profiles").select("email").not("email", "is", null),
+    c.from("mailboxes").select("email"),
+  ]);
+  const emails = (rows: unknown) => ((rows ?? []) as { email: string | null }[]).flatMap((r) => splitAddresses(r.email));
+  return recipientsAllowOriginals(recipients, {
+    customerEmails: [...emails(cust.data), ...emails(contacts.data)],
+    internalEmails: emails(profs.data),
+    internalDomains: emails(boxes.data).map((e) => e.split("@")[1] ?? ""),
+  });
+}
+
+/**
+ * Dokument zakázky v příloze: náš doklad nebo soubor, který se neanonymizuje → beze změny; výkres zákazníka
+ * pro zákazníka zakázky / kolegu → originál; komukoli jinému → ověřená anonymizovaná kopie (pickShareFile +
+ * verifyShareBytes), jinak zablokovat s hláškou. Originál výslovně jen super admin (audit).
+ */
+async function guardJobFile(c: Db, a: ComposeAttachmentRef, recipients: string[], user: SessionUser): Promise<Guarded> {
+  const { data } = await c.from("job_files").select(SHARE_FILE_SELECT).eq("id", a.ref).maybeSingle();
+  const row = data as FileRowWithAnon | null;
+  if (!row) return { kind: "plain" };
+  if ((row.origin ?? "upload") === "generated" || row.issuer === "my") return { kind: "plain" };
+  const candidate = isAnonCandidate(row.kind, row.filename, row.mime_type, row.origin, row.issuer);
+  if (!candidate && (row.anon_status === null || row.anon_status === "skipped")) return { kind: "plain" };
+  if (await originalsAllowed(c, row.job_id, recipients)) return { kind: "plain" };
+  const price = await sharePriceDocIds(c as never, [row.id]);
+  const d = pickShareFile(row, { original: a.original === true, isSuperAdmin: user.role === "super_admin", priceDocument: price.has(row.id.toLowerCase()) });
+  const block = (reason: BlockReason, detail?: string): Guarded => ({
+    kind: "blocked", blocked: { ref: a.ref, filename: row.filename, reason, message: blockedAttachmentMessage(row.filename, reason, detail) },
+  });
+  if (!d.ok) return block(d.reason, d.message);
+  try {
+    const bytes = await verifyShareBytes(c as never, d, row);
+    return { kind: "file", file: { filename: d.filename, content: Buffer.from(bytes), contentType: d.mime }, original: d.source === "original" };
+  } catch (err) {
+    return block("failed", err instanceof Error ? err.message : undefined);
+  }
+}
+
+// ── Fronta K odeslání (Přijmout a odeslat) ──────────────────
+
+/** Chyba, kterou opraví nastavení schránky (heslo, SMTP), ne obsah zprávy. */
+function needsMailSettings(error: string | undefined): boolean {
+  return /přihlášení odmítnuto|heslo|smtp|odchozí server|schránk|nakonfigurováno/i.test(error ?? "");
+}
+
+const OUTBOX_MAX = 50;
+
+/** Obsah okna psaní k uložení (bez cizích klíčů, ořezané délky). */
+function outboxPayload(input: SendComposedInput): SendComposedInput {
+  const s = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+  return {
+    mode: input.mode === "reply" || input.mode === "replyAll" || input.mode === "forward" ? input.mode : "new",
+    sourceEmailId: isUuidLike(input.sourceEmailId) ? input.sourceEmailId : null,
+    to: s(input.to, 5000),
+    cc: s(input.cc, 5000),
+    bcc: s(input.bcc, 5000),
+    subject: s(input.subject, 300),
+    body: s(input.body, 100_000),
+    attachments: (Array.isArray(input.attachments) ? input.attachments : []).slice(0, 30)
+      .filter((a) => a && (a.kind === "upload" || a.kind === "job" || a.kind === "original") && typeof a.ref === "string")
+      .map((a) => ({ kind: a.kind, ref: a.ref.slice(0, 500), filename: a.filename?.slice(0, 200), contentType: a.contentType?.slice(0, 100), ...(a.original === true ? { original: true } : {}) })),
+    jobId: isUuidLike(input.jobId) ? input.jobId : null,
+  };
+}
+
+/** Uložit / aktualizovat neodeslanou zprávu ve frontě. Bez tabulky (migrace neproběhla) → null. */
+async function queueOutbox(c: Db, userId: string, input: SendComposedInput, error: string, outboxId: string | null): Promise<string | null> {
+  const now = new Date().toISOString();
+  const payload = outboxPayload(input);
+  if (outboxId) {
+    const { data: cur } = await c.from("mail_outbox").select("id, attempts").eq("id", outboxId).eq("created_by", userId).in("status", ["failed", "waiting", "sending"]).maybeSingle();
+    const row = cur as { id: string; attempts: number } | null;
+    if (row) {
+      await c.from("mail_outbox").update({ payload, status: "failed", last_error: error.slice(0, 1000), attempts: row.attempts + 1, updated_at: now }).eq("id", row.id);
+      return row.id;
+    }
+  }
+  const { count } = await c.from("mail_outbox").select("id", { count: "exact", head: true }).eq("created_by", userId).in("status", ["failed", "waiting", "sending"]);
+  if ((count ?? 0) >= OUTBOX_MAX) return null;
+  const { data, error: insErr } = await c.from("mail_outbox")
+    .insert({ created_by: userId, payload, status: "failed", last_error: error.slice(0, 1000), attempts: 1 })
+    .select("id").maybeSingle();
+  if (insErr) {
+    console.error(`[mail:outbox] Zprávu se nepodařilo uložit do K odeslání: ${insErr.message}`);
+    return null;
+  }
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+async function finishOutbox(c: Db, userId: string, id: string, r: { ok: boolean; emailId?: string; error?: string }): Promise<void> {
+  const now = new Date().toISOString();
+  await c.from("mail_outbox")
+    .update(r.ok
+      ? { status: "sent", sent_at: now, email_id: r.emailId ?? null, last_error: null, updated_at: now }
+      : { status: "failed", last_error: (r.error ?? "Odeslání selhalo.").slice(0, 1000), updated_at: now })
+    .eq("id", id).eq("created_by", userId);
+}
+
+export interface OutboxItem {
+  id: string;
+  to: string;
+  subject: string;
+  error: string | null;
+  attempts: number;
+  createdAt: string;
+}
+
+/** Moje zprávy čekající na odeslání (fronta K odeslání). */
+export async function listOutboxAction(): Promise<{ ok: boolean; items: OutboxItem[]; error?: string }> {
+  const access = await checkFeature("mail");
+  if ("error" in access) return { ok: false, items: [], error: access.error };
+  if (!isSupabaseConfigured()) return { ok: true, items: [] };
+  const c = await db();
+  const { data, error } = await c.from("mail_outbox").select("id, payload, last_error, attempts, created_at")
+    .eq("created_by", access.user.id).in("status", ["failed", "waiting", "sending"]).order("created_at", { ascending: true }).limit(OUTBOX_MAX);
+  if (error) return { ok: true, items: [] }; // tabulka ještě není (migrace) = prázdná fronta
+  type Row = { id: string; payload: SendComposedInput | null; last_error: string | null; attempts: number; created_at: string };
+  return {
+    ok: true,
+    items: ((data ?? []) as Row[]).map((r) => ({
+      id: r.id, to: r.payload?.to ?? "", subject: r.payload?.subject ?? "", error: r.last_error, attempts: r.attempts, createdAt: r.created_at,
+    })),
+  };
+}
+
+/** Zahodit zprávu z fronty K odeslání (neodešle se). */
+export async function discardOutboxAction(id: string): Promise<{ ok: boolean; error?: string }> {
+  const access = await checkFeature("mail");
+  if ("error" in access) return { ok: false, error: access.error };
+  if (!isUuidLike(id)) return { ok: false, error: "Zpráva nenalezena." };
+  const c = await db();
+  const { data, error } = await c.from("mail_outbox").update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", id).eq("created_by", access.user.id).in("status", ["failed", "waiting"]).select("id, payload");
+  if (error) return { ok: false, error: error.message };
+  const row = ((data ?? []) as { id: string; payload: SendComposedInput | null }[])[0];
+  if (!row) return { ok: false, error: "Zpráva nenalezena (nebo se právě odesílá)." };
+  // nahrané přílohy zahozené zprávy z úložiště pryč (jen moje koncepty)
+  const prefix = `mail/drafts/${access.user.id}/`;
+  const uploads = (row.payload?.attachments ?? []).filter((a) => a.kind === "upload" && a.ref.startsWith(prefix) && !a.ref.includes("..")).map((a) => a.ref);
+  if (uploads.length) await c.storage.from(UPLOAD_BUCKET).remove(uploads).catch(() => undefined);
+  await logAudit({ action: "email_outbox_discarded", entity: "mail_outbox", entityId: id, diff: {}, actor: userActor(access.user) });
+  return { ok: true };
+}
+
+export interface FlushOutboxResult {
+  ok: boolean;
+  error?: string;
+  /** Odesláno z fronty K odeslání + z fronty anonymizace výkresů. */
+  sent: number;
+  /** Stále neodesláno (důvod v errors). */
+  failed: number;
+  errors: { subject: string; error: string }[];
+  /** Některá chyba je v nastavení schránky (heslo / SMTP). */
+  needsSettings: boolean;
+  /** Odeslání s výkresy, které čekají na anonymizaci / kontrolu (odejdou samy po dokončení). */
+  waitingDrawings: number;
+  blockedDrawings: number;
+}
+
+/**
+ * „Přijmout a odeslat" — odesílací část: odešle všechny MOJE čekající zprávy (fronta K odeslání,
+ * nejvýš 20 najednou) a šťouchne do mé fronty odeslání čekajících na anonymizaci výkresů (pošle ty,
+ * jejichž výkresy jsou už hotové). Cizí položky nikdy.
+ */
+export async function flushOutboxAction(): Promise<FlushOutboxResult> {
+  const out: FlushOutboxResult = { ok: true, sent: 0, failed: 0, errors: [], needsSettings: false, waitingDrawings: 0, blockedDrawings: 0 };
+  const access = await checkFeature("mail");
+  if ("error" in access) return { ...out, ok: false, error: access.error };
+  if (!isSupabaseConfigured()) return out;
+  const c = await db();
+  const me = access.user.id;
+  // „sending" déle než 10 min = přerušený pokus (pád funkce) → zkusit znovu
+  const stale = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { data, error } = await c.from("mail_outbox").select("id, payload, attempts, status")
+    .eq("created_by", me).or(`status.in.(failed,waiting),and(status.eq.sending,updated_at.lt.${stale})`)
+    .order("created_at", { ascending: true }).limit(20);
+  if (!error) {
+    type Row = { id: string; payload: SendComposedInput; attempts: number; status: string };
+    for (const row of (data ?? []) as Row[]) {
+      // claim: jen jeden běh tuto zprávu pošle
+      const { data: claimed } = await c.from("mail_outbox")
+        .update({ status: "sending", attempts: row.attempts + 1, updated_at: new Date().toISOString() })
+        .eq("id", row.id).eq("created_by", me).eq("status", row.status).select("id");
+      if (!(claimed ?? []).length) continue;
+      let res: SendComposedResult & { stage?: string };
+      try {
+        res = await composeAndSend(access.user, row.payload ?? ({} as SendComposedInput));
+      } catch (err) {
+        res = { ok: false, error: err instanceof Error ? err.message : "Odeslání selhalo." };
+      }
+      await finishOutbox(c, me, row.id, res.ok ? { ok: true, emailId: res.emailId } : { ok: false, error: res.error });
+      if (res.ok) out.sent++;
+      else {
+        out.failed++;
+        out.errors.push({ subject: row.payload?.subject ?? "", error: res.error ?? "Odeslání selhalo." });
+        if (needsMailSettings(res.error)) out.needsSettings = true;
+      }
+    }
+    if ((data ?? []).length) {
+      await logAudit({ action: "email_outbox_flush", entity: "mail_outbox", diff: { sent: out.sent, failed: out.failed }, actor: userActor(access.user) });
+    }
+  }
+  // fronta anonymizace výkresů: moje čekající odeslání (výkresy hotové → odejdou teď, jinak počkají)
+  try {
+    const { data: anon, error: anonErr } = await c.from("anon_send_queue").select("id").eq("created_by", me).in("status", ["waiting", "blocked"]).limit(20);
+    const ids = ((anon ?? []) as { id: string }[]).map((r) => r.id);
+    if (!anonErr && ids.length) {
+      const { flushSendQueue } = await import("@/lib/anonymize/send-queue");
+      const r = await flushSendQueue(c, { ids });
+      out.sent += r.sent;
+      out.waitingDrawings = r.waiting;
+      out.blockedDrawings = r.blocked;
+    }
+  } catch (err) {
+    console.error(`[mail:outbox] Fronta odeslání s výkresy: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (out.sent) {
+    revalidatePath("/inbox");
+    revalidatePath("/sent");
+  }
+  return out;
+}
+
+/** Vlastní sestavení a odeslání (okno psaní i fronta K odeslání); `stage: "send"` = selhalo až odeslání. */
+async function composeAndSend(user: SessionUser, input: SendComposedInput): Promise<SendComposedResult & { stage?: "check" | "send" }> {
+  const access = { user };
   if (!input || typeof input !== "object") return { ok: false, error: "Chybí obsah zprávy." };
   const to = cleanList(input.to);
   const cc = cleanList(input.cc);
@@ -225,6 +511,9 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
   const attachments: OutgoingAttachment[] = [];
   let total = 0;
   const uploads: string[] = [];
+  const blocked: BlockedAttachment[] = [];
+  /** Výkresy zákazníka poslané výslovně v originále (super admin) — audit. */
+  const originals: string[] = [];
   for (const a of (input.attachments ?? []).slice(0, 30)) {
     if (!a || typeof a.ref !== "string") continue;
     let file: OutgoingAttachment | null = null;
@@ -244,9 +533,20 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
       if (!chk.ok) return { ok: false, error: chk.error };
       const f = chk.file;
       if (!f.storage_path) return { ok: false, error: "Dokument zakázky nenalezen." };
-      const { data: blob, error } = await c.storage.from("job-files").download(f.storage_path);
-      if (error || !blob) return { ok: false, error: `Dokument „${f.filename ?? "soubor"}" se nepodařilo načíst.` };
-      file = { filename: f.filename || "soubor", content: Buffer.from(await blob.arrayBuffer()), contentType: f.mime_type || undefined };
+      // výkres zákazníka komukoli mimo zákazníka zakázky (dodavatel …) → jen anonymizovaná kopie (anonymize/share.ts)
+      const guarded = await guardJobFile(c, a, [...to.valid, ...cc.valid, ...bcc.valid], user);
+      if (guarded.kind === "blocked") {
+        blocked.push(guarded.blocked);
+        continue;
+      }
+      if (guarded.kind === "file") {
+        file = guarded.file;
+        if (guarded.original) originals.push(a.ref);
+      } else {
+        const { data: blob, error } = await c.storage.from("job-files").download(f.storage_path);
+        if (error || !blob) return { ok: false, error: `Dokument „${f.filename ?? "soubor"}" se nepodařilo načíst.` };
+        file = { filename: f.filename || "soubor", content: Buffer.from(await blob.arrayBuffer()), contentType: f.mime_type || undefined };
+      }
     } else if (a.kind === "original") {
       if (!isUuidLike(a.ref)) continue;
       const { data: att } = await c.from("email_attachments").select("email_id").eq("id", a.ref).maybeSingle();
@@ -260,6 +560,13 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
     total += file.content.length;
     if (total > MAX_TOTAL) return { ok: false, error: "Přílohy jsou dohromady příliš velké (max. 25 MB)." };
     attachments.push(file);
+  }
+  if (blocked.length) {
+    // nic neodeslat: v okně psaní se ukáže proč a nabídne „Odeslat bez nich" (super admin i „Poslat originál")
+    return {
+      ok: false, stage: "check", blocked, canSendOriginal: user.role === "super_admin",
+      error: `${blocked.length === 1 ? "Výkres zákazníka nejde" : "Výkresy zákazníka nejdou"} adresátovi mimo zákazníka zakázky poslat bez anonymizace. ${blocked.map((b) => b.message).join(" ")}`,
+    };
   }
 
   const headers = source && (input.mode === "reply" || input.mode === "replyAll")
@@ -286,7 +593,7 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
     category: source && input.mode !== "forward" && isDbEmailCategory(source.category) && source.category !== "spam" && source.category !== "ostatni"
       ? source.category : undefined,
   });
-  if (!res.sent) return { ok: false, error: res.reason ?? "Odeslání selhalo." };
+  if (!res.sent) return { ok: false, stage: "send", error: res.reason ?? "Odeslání selhalo." };
 
   // vlákno: odpověď i přeposlání patří do vlákna původní zprávy (DB ho z In-Reply-To odvodí jen ve
   // stejné schránce — odpověď z jiné schránky / globálního SMTP by jinak založila nové vlákno)
@@ -299,6 +606,12 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
     diff: { mode: input.mode, to: to.valid, cc: cc.valid, bcc: bcc.valid.length, subject, attachments: attachments.length, from: res.fromAddress, sentCopy: res.sentCopy },
     actor: userActor(access.user),
   });
+  if (originals.length) {
+    await logAudit({
+      action: "email_attachment_original_sent", entity: "emails", entityId: res.emailId,
+      diff: { fileIds: originals, to: to.valid, cc: cc.valid, bcc: bcc.valid.length, subject }, actor: userActor(access.user),
+    });
+  }
   revalidatePath("/inbox");
   revalidatePath("/sent");
   if (jobId) revalidatePath(`/orders/${jobId}`);

@@ -54,6 +54,8 @@ export interface RawEmail {
   /** Vlákno: Message-ID, na který zpráva odpovídá, a References. */
   inReplyTo?: string;
   references?: string[];
+  /** Microsoft 365 (Graph): konverzace — jen pomocný údaj pro „Re:" bez hlaviček. */
+  conversationId?: string;
   /** Hlavičky pro pravidla třídění (list-unsubscribe, precedence, x-spam-flag …). */
   headers?: Record<string, string | undefined>;
   /** Kde zpráva leží na serveru (stažení příloh později). */
@@ -210,7 +212,7 @@ async function graphToken(cfg: GraphCfg): Promise<string> {
   return data.access_token as string;
 }
 
-const GRAPH_SELECT = "$select=id,subject,from,toRecipients,ccRecipients,body,bodyPreview,receivedDateTime,hasAttachments";
+const GRAPH_SELECT = "$select=id,subject,from,toRecipients,ccRecipients,body,bodyPreview,receivedDateTime,hasAttachments,conversationId";
 
 function graphToRaw(m: Record<string, unknown>): RawEmail {
   const from = (m.from as { emailAddress?: { name?: string; address?: string } })?.emailAddress;
@@ -225,6 +227,8 @@ function graphToRaw(m: Record<string, unknown>): RawEmail {
     receivedAt: (m.receivedDateTime as string) || new Date().toISOString(),
     toEmail: list("toRecipients") || undefined,
     ccEmail: list("ccRecipients") || undefined,
+    // vlákno: Microsoft 365 posílá bez hlaviček odpovědi jen conversationId (DB ho použije jen u „Re:")
+    ...(typeof m.conversationId === "string" && m.conversationId ? { conversationId: m.conversationId } : {}),
     direction: "in",
   };
 }
@@ -424,6 +428,8 @@ export async function ingestEmailsProgress(
           message_id: e.messageId,
           in_reply_to: e.inReplyTo ?? null,
           message_refs: e.references?.length ? e.references : null,
+          // jen když je (Graph) — IMAP/POP3 vkládání nezávisí na novém sloupci
+          ...(e.conversationId ? { conversation_id: e.conversationId } : {}),
           from_name: e.fromName,
           from_email: e.fromEmail,
           to_email: e.toEmail ?? null,

@@ -21,6 +21,7 @@ vi.mock("@/app/actions/mail", () => ({
   createJobFromEmail: vi.fn(), getEmailBody: vi.fn(() => new Promise(() => {})), markEmailRead: vi.fn(), setEmailCategory: vi.fn(),
 }));
 vi.mock("@/app/actions/corrections", () => ({ recordCorrection: vi.fn() }));
+vi.mock("@/app/actions/mail-actions", () => ({ processOrderFromEmailAction: vi.fn(), recordSupplierInvoiceFromEmailAction: vi.fn(), splitFromThreadAction: vi.fn() }));
 vi.mock("@/app/actions/email-import", () => ({ importOutlookFiles: vi.fn() }));
 vi.mock("@/app/actions/integrations", () => ({
   addMailbox: vi.fn(), updateMailbox: vi.fn(), deleteMailbox: vi.fn(), testMailboxConnection: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("@/app/actions/mail-inbox", () => ({
 }));
 vi.mock("@/app/actions/mail-compose", () => ({
   composeContextAction: vi.fn(), prepareMailUploadAction: vi.fn(), sendComposedAction: vi.fn(), searchRecipientsAction: vi.fn(), saveSignatureAction: vi.fn(),
+  listOutboxAction: vi.fn(() => new Promise(() => {})), flushOutboxAction: vi.fn(), discardOutboxAction: vi.fn(),
 }));
 
 import { AutomationProvider } from "@/components/automation-provider";
@@ -96,7 +98,13 @@ describe("Přijatá pošta — render", () => {
     expect(html).toContain("P1");
     expect(html).toContain("P2");
     expect(html).toContain("Nová zpráva");
-    expect(html).toContain("Stáhnout poštu");
+    // „Stáhnout poštu" nahradilo „Přijmout a odeslat" (příjem + odeslání čekajících); stav živé pošty
+    expect(html).toContain("Přijmout a odeslat");
+    expect(html).not.toContain("Stáhnout poštu");
+    expect(html).toContain('data-testid="mail-updated"');
+    // nastavení schránky přímo v Poště (tlačítko, ne odkaz pryč)
+    expect(html).toContain('data-testid="btn-mailbox-settings"');
+    expect(html).not.toContain('href="/account#schranka"');
     // review #2: žádné vlákno se neotevře samo (otevření = přečteno) — až po kliknutí
     expect(html).toContain("Vyber e-mail vlevo.");
     expect(html).not.toContain('data-testid="thread-view"');
@@ -107,11 +115,21 @@ describe("Přijatá pošta — render", () => {
     expect(html).not.toContain("Všechny schránky");
   });
 
-  it("bez schránky: připoj si ji sám v Můj účet", () => {
+  it("bez schránky: připoj si ji sám přímo v Poště (Nastavení pošty), žádný odkaz pryč", () => {
     const html = render(<InboxView initial={page([])} counts={counts} mailboxes={[]} scope="own" mailboxId={null} folder="inbox" />);
     expect(html).toContain("Zatím nemáš připojenou e-mailovou schránku.");
-    expect(html).toContain("Připojit schránku");
-    expect(html).toContain('href="/account#schranka"');
+    expect(html).toContain('data-testid="btn-connect-mailbox"');
+    expect(html).not.toContain('href="/account#schranka"');
+    expect(html).toContain("Přijmout a odeslat"); // klik bez schránky otevře Nastavení pošty (ne mrtvé tlačítko)
+  });
+
+  it("neúplná / odmítnutá schránka: tlačítko Opravit nastavení (otevře úpravu v Poště)", () => {
+    const html = render(<InboxView initial={page([])} counts={counts} mailboxes={[{ ...mailboxes[0], incomplete: true }]} scope="own" mailboxId={null} folder="inbox" />);
+    expect(html).toContain("nastavení není kompletní");
+    expect(html).toContain('data-testid="mailbox-health-fix"');
+    const blocked = render(<InboxView initial={page([])} counts={counts} mailboxes={[{ ...mailboxes[0], authBlocked: true }]} scope="own" mailboxId={null} folder="inbox" />);
+    expect(blocked).toContain("Heslo odmítnuto");
+    expect(blocked).toContain('data-testid="mailbox-health-fix"');
   });
 
   it("super admin: přepínač schránek a AI shrnutí", () => {

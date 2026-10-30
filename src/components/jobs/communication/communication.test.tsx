@@ -8,6 +8,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/app/actions/jobs", () => ({ updateJob: vi.fn(), addJobComment: vi.fn(), saveJobItems: vi.fn() }));
 vi.mock("@/app/actions/mail", () => ({ createJobFromEmail: vi.fn(), setEmailCategory: vi.fn() }));
+vi.mock("@/app/actions/mail-actions", () => ({ processOrderFromEmailAction: vi.fn(), recordSupplierInvoiceFromEmailAction: vi.fn(), splitFromThreadAction: vi.fn() }));
 vi.mock("@/app/actions/mail-inbox", () => ({
   openThreadAction: vi.fn(() => new Promise(() => {})), markThreadReadAction: vi.fn(), setThreadFlagAction: vi.fn(), setThreadPriorityAction: vi.fn(),
   shareCandidatesAction: vi.fn(() => new Promise(() => {})), shareThreadAction: vi.fn(), runAiOnThreadAction: vi.fn(),
@@ -165,8 +166,8 @@ describe("pošta: zakázka vlákna a návrh", () => {
     // po rozhodnutí (bez otázky) zase skutečná kategorie
     expect(flat(html(<ThreadRow t={{ ...asking, suggestion: undefined }} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} />))).toContain("Nabídka dodavatele");
   });
-  it("detail vlákna: zakázka (Změnit / Odpojit), návrh (Ano / Ne / Jiná), bez zakázky (Založit / Přiřadit)", () => {
-    const base = { threadId: "t1", canCreate: true, creating: false, onCreate: () => {}, onChanged: () => {}, onError: () => {} };
+  it("detail vlákna: zakázka (Změnit / Odpojit), návrh (Ano / Ne / Jiná), bez zakázky hlavní akce podle kategorie", () => {
+    const base = { threadId: "t1", onAction: () => {}, onChanged: () => {}, onError: () => {} };
     const linked = html(<JobLinkBar {...base} jobId="j1" jobNumber="Z-2026-013" jobTitle="Hřídel" linkSource="thread" linkActor="ai" />);
     expect(linked).toContain('href="/orders/j1?tab=komunikace"');
     expect(flat(linked)).toContain("přiřazeno automaticky · vlákno");
@@ -175,8 +176,26 @@ describe("pošta: zakázka vlákna a návrh", () => {
     const sugg = html(<JobLinkBar {...base} suggestion={{ id: "s1", jobId: "j2", jobNumber: "Z-2026-014", score: 0.6 }} />);
     expect(flat(sugg)).toMatch(/Patří k Z-2026-014 ?\?/);
     expect(sugg).toContain('data-testid="thread-suggestion-yes"');
+    // ostatní pošta bez zakázky: hlavní Přiřadit k zakázce, „Založit zakázku" jen v ⋯
     const none = html(<JobLinkBar {...base} />);
-    expect(flat(none)).toMatch(/Založit zakázku.*Přiřadit k zakázce/);
+    expect(none).toMatch(/data-testid="mail-primary-action" data-action="job.assign"/);
+    expect(none).toContain('data-testid="mail-actions-more"');
+    expect(flat(none)).not.toContain("Založit zakázku");
+    // poptávka → Vytvořit nabídku; faktura → Zapsat fakturu dodavatele (nikdy Založit zakázku)
+    const inquiry = flat(html(<JobLinkBar {...base} category="Poptávka" />));
+    expect(inquiry).toContain("Vytvořit nabídku");
+    expect(inquiry).not.toContain("Založit zakázku");
+    const invoice = html(<JobLinkBar {...base} category="Faktura" />);
+    expect(flat(invoice)).toContain("Zapsat fakturu dodavatele");
+    expect(invoice).toMatch(/data-action="invoice.record"/);
+    // poptávka u zakázky → Pokračovat v nabídce (záložka Nabídky) + chip zakázky
+    const cont = html(<JobLinkBar {...base} category="Poptávka" jobId="j1" jobNumber="Z-2026-013" />);
+    expect(cont).toContain('href="/orders/j1?tab=nabidky"');
+    expect(flat(cont)).toContain("Pokračovat v nabídce");
+    // odeslaná bez zakázky: nic nezakládat
+    expect(html(<JobLinkBar {...base} category="Poptávka" direction="out" />)).not.toContain("mail-primary-action");
+    // spam: žádná akce
+    expect(html(<JobLinkBar {...base} category="Spam" />)).not.toContain("mail-primary-action");
   });
 });
 

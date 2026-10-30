@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RecipientField } from "@/components/mail/recipient-field";
-import { composeContextAction, prepareMailUploadAction, sendComposedAction, type ComposeAttachmentRef, type SendComposedResult } from "@/app/actions/mail-compose";
+import {
+  composeContextAction, prepareMailUploadAction, sendComposedAction, type BlockedAttachment, type ComposeAttachmentRef, type SendComposedResult,
+} from "@/app/actions/mail-compose";
 import { createClient } from "@/lib/supabase/client";
 import {
   forwardBlock, forwardSubject, quoteForReply, replyRecipients, replySubject, splitAddresses,
@@ -53,11 +55,31 @@ export function initialBody(req: ComposeRequest, signature: string): string {
 }
 
 /** Okno psaní: nová zpráva, odpověď, odpovědět všem, přeposlání (s původními přílohami). */
-export function ComposeDialog({ request, onClose, onSent }: {
+export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettings }: {
   request: ComposeRequest | null;
   onClose: () => void;
   onSent: (r: SendComposedResult) => void;
+  /** Odeslání selhalo, zpráva čeká ve frontě K odeslání (Pošta ukáže lištu). */
+  onQueued?: (r: SendComposedResult) => void;
+  /** Otevřít Nastavení pošty (chyba hesla / SMTP). */
+  onOpenSettings?: () => void;
 }) {
+  const [outboxId, setOutboxId] = React.useState<string | null>(null);
+  const [needsSettings, setNeedsSettings] = React.useState(false);
+  /** Výkresy zákazníka, které adresát nesmí dostat bez anonymizace. */
+  const [blocked, setBlocked] = React.useState<{ items: BlockedAttachment[]; canOriginal: boolean } | null>(null);
+  const isBlocked = (a: LocalAttachment) => Boolean(blocked?.items.some((b) => a.ref.kind === "job" && b.ref === a.ref.ref));
+  const sendWithout = () => {
+    const rest = atts.filter((a) => !isBlocked(a));
+    setAtts(rest);
+    void send(rest);
+  };
+  const sendOriginals = () => {
+    if (!window.confirm("Poslat ORIGINÁL výkresu zákazníka bez anonymizace? Adresát uvidí zákazníka a projektanta. Zapíše se do auditu.")) return;
+    const next = atts.map((a) => (isBlocked(a) ? { ...a, ref: { ...a.ref, original: true } } : a));
+    setAtts(next);
+    void send(next);
+  };
   const open = Boolean(request);
   const [to, setTo] = React.useState<string[]>([]);
   const [cc, setCc] = React.useState<string[]>([]);
@@ -80,6 +102,9 @@ export function ComposeDialog({ request, onClose, onSent }: {
     const mine = request.myAddresses ?? [];
     setError(null);
     setSending(false);
+    setOutboxId(null);
+    setNeedsSettings(false);
+    setBlocked(null);
     setFrom(null);
     setFromError(null);
     setShowJobFiles(false);
@@ -141,10 +166,11 @@ export function ComposeDialog({ request, onClose, onSent }: {
     setAtts((a) => [...a, { key: `j-${f.id}`, ref: { kind: "job", ref: f.id, filename: f.filename }, name: f.filename, size: f.sizeBytes, state: "ready" }]);
   };
 
-  const send = async () => {
+  const send = async (list: LocalAttachment[] = atts) => {
     if (!request) return;
     setError(null);
-    if (atts.some((a) => a.state === "uploading")) return setError("Počkej, až se nahrají přílohy.");
+    setBlocked(null);
+    if (list.some((a) => a.state === "uploading")) return setError("Počkej, až se nahrají přílohy.");
     if (!to.length) return setError("Doplň adresáta (Komu).");
     setSending(true);
     const res = await sendComposedAction({
@@ -155,11 +181,24 @@ export function ComposeDialog({ request, onClose, onSent }: {
       bcc: bcc.join(", "),
       subject,
       body,
-      attachments: atts.filter((a) => a.state === "ready").map((a) => a.ref),
+      attachments: list.filter((a) => a.state === "ready").map((a) => a.ref),
       jobId: request.jobId ?? null,
+      outboxId,
     }).catch((e: unknown) => ({ ok: false, error: e instanceof Error ? e.message : "Odeslání selhalo." }) as SendComposedResult);
     setSending(false);
-    if (!res.ok) return setError(res.error ?? "Odeslání selhalo.");
+    if (!res.ok) {
+      setNeedsSettings(Boolean(res.needsSettings));
+      if (res.blocked?.length) {
+        setBlocked({ items: res.blocked, canOriginal: Boolean(res.canSendOriginal) });
+        return;
+      }
+      if (res.queued && res.outboxId) {
+        setOutboxId(res.outboxId);
+        onQueued?.(res);
+        return setError(`${res.error ?? "Odeslání selhalo."} Zpráva se neztratí — čeká v „K odeslání“. Oprav nastavení schránky a klikni v Poště na Přijmout a odeslat (nebo tady znovu Odeslat).`);
+      }
+      return setError(res.error ?? "Odeslání selhalo.");
+    }
     onSent(res);
   };
 
@@ -246,11 +285,37 @@ export function ComposeDialog({ request, onClose, onSent }: {
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> <span className="min-w-0 break-words">{error}</span>
             </p>
           )}
+          {blocked && (
+            <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100" role="alert" data-testid="compose-blocked">
+              <p className="flex items-start gap-1.5 font-medium">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Adresát není zákazník zakázky — výkres zákazníka smí dostat jen anonymizovaný.</span>
+              </p>
+              <ul className="space-y-1 pl-6 text-xs">
+                {blocked.items.map((b) => <li key={b.ref} className="break-words" data-testid="compose-blocked-item" data-reason={b.reason}>{b.message}</li>)}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" className="bg-background" onClick={sendWithout} disabled={sending} data-testid="compose-send-without">
+                  Odeslat bez {blocked.items.length === 1 ? "tohoto výkresu" : "těchto výkresů"}
+                </Button>
+                {blocked.canOriginal && (
+                  <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={sendOriginals} disabled={sending} data-testid="compose-send-original">
+                    Poslat originál (super admin, zapíše se do auditu)
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          {error && needsSettings && onOpenSettings && (
+            <Button type="button" size="sm" variant="outline" onClick={() => { onClose(); onOpenSettings(); }} data-testid="compose-open-settings">
+              Otevřít Nastavení pošty
+            </Button>
+          )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <span className="mr-auto text-xs text-muted-foreground">{recipientsLabel(splitAddresses([...to, ...cc, ...bcc].join(",")).length)}</span>
           <Button variant="ghost" onClick={onClose} disabled={sending}>Zrušit</Button>
-          <Button variant="send" onClick={send} disabled={sending || !to.length} data-testid="compose-send">
+          <Button variant="send" onClick={() => void send()} disabled={sending || !to.length} data-testid="compose-send">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Odeslat
           </Button>
         </div>

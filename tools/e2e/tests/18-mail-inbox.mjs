@@ -148,12 +148,12 @@ await T("vlákno + odpověď z aplikace → odchozí ve vlákně, kopie v Odesla
   const tid = sql(`select thread_id from emails where mailbox_id = '${id}' and subject = 'Posta: Poptávka hřídele 50 ks'`);
   expect(sql(`select thread_id || '|' || direction || '|' || owner_id from emails where message_id = '${mid}'`) === `${tid}|out|${adminId}`, "odchozí ve vlákně, autor admin");
   await page.getByTestId("thread-message").filter({ hasText: TAG }).waitFor({ timeout: 20_000 });
-  // zákazník odpoví → Stáhnout poštu → 3 zprávy ve vlákně
+  // zákazník odpoví → Přijmout a odeslat → 3 zprávy ve vlákně
   await new Promise((r) => setTimeout(r, 1100));
   await addMsg({ subject: "Re: Posta: Poptávka hřídele 50 ks", body: `Děkujeme ${TAG}`, from: "Jan Dvořák <dvorak@strojmetal.test>", inReplyTo: mid, references: `<e2e-1.postanastrojarstvitest@nastrojarstvi.test> ${mid}` });
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
-  // stáhne tlačítko, nebo dřív živá pošta na pozadí (každou minutu) — výsledek je stejný
-  await page.getByTestId("sync-msg").filter({ hasText: /Staženo \d+, nových \d+/ }).waitFor({ timeout: 90_000 });
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
+  // stáhne tlačítko, nebo dřív živá pošta na pozadí (v otevřené Poště každých 30 s) — výsledek je stejný
+  await page.getByTestId("sync-msg").filter({ hasText: /Přijato \d+, odesláno \d+/ }).waitFor({ timeout: 90_000 });
   await eventually(async () => sql(`select count(*) from emails where mailbox_id = '${id}' and thread_id = '${tid}'`) === String(c0 + 2), "odpověď zákazníka ve vlákně (DB)", 60_000);
   await eventually(async () => (await page.getByTestId("thread-message").count()) === c0 + 2, "vlákno má o 2 zprávy víc (moje odpověď + odpověď zákazníka)", 30_000);
   const dirs = await page.getByTestId("thread-message").evaluateAll((els) => els.map((e) => e.getAttribute("data-direction")));
@@ -170,8 +170,8 @@ await T("přeposlání s původní přílohou + nová zpráva (Komu/Kopie/Skryt�
   await login(page, USERS.admin);
   await addMsg({ subject: `Výkres ${TAG}`, body: "V příloze výkres.", from: "Eva <eva@firma.test>", attachments: [{ filename: "vykres-H200.pdf", contentType: "application/pdf", base64: Buffer.from("%PDF-1.4 H200").toString("base64") }] });
   await openInbox(page);
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
-  await page.getByTestId("sync-msg").filter({ hasText: /Staženo/ }).waitFor({ timeout: 90_000 });
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
+  await page.getByTestId("sync-msg").filter({ hasText: /Přijato \d+/ }).waitFor({ timeout: 90_000 });
   await page.getByTestId("mail-search").fill(`Výkres ${TAG}`);
   await page.waitForTimeout(700);
   await openThread(page, `Výkres ${TAG}`);
@@ -297,8 +297,8 @@ await T("review: otevření pošty nic samo nepřečte; Přeposlat bere přijato
   await login(page, USERS.admin);
   await addMsg({ subject: `Nepřečtené ${TAG}`, body: "Nová zpráva, nikdo ji ještě neotevřel.", from: "Jan <jan@zakaznik.test>" });
   await openInbox(page);
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
-  await page.getByTestId("sync-msg").filter({ hasText: /Staženo/ }).waitFor({ timeout: 90_000 });
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
+  await page.getByTestId("sync-msg").filter({ hasText: /Přijato \d+/ }).waitFor({ timeout: 90_000 });
   await page.getByTestId("thread-row").filter({ hasText: `Nepřečtené ${TAG}` }).first().waitFor({ timeout: 20_000 });
   await page.waitForTimeout(2500);
   expect(await page.getByText("Vyber e-mail vlevo.").isVisible(), "žádné vlákno se samo neotevře");
@@ -336,8 +336,8 @@ await T("review (mobil): načtení seznamu nic nepřečte; detail až po ťuknut
   await login(page, USERS.admin);
   await addMsg({ subject: `Mobil ${TAG}`, body: "Zpráva pro mobil.", from: "Eva <eva@firma.test>" });
   await openInbox(page);
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
-  await page.getByTestId("sync-msg").filter({ hasText: /Staženo/ }).waitFor({ timeout: 90_000 });
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
+  await page.getByTestId("sync-msg").filter({ hasText: /Přijato \d+/ }).waitFor({ timeout: 90_000 });
   const row = page.getByTestId("thread-row").filter({ hasText: `Mobil ${TAG}` }).first();
   await row.waitFor({ timeout: 20_000 });
   await page.waitForTimeout(2500);
@@ -368,7 +368,7 @@ if (SHOTS) {
         await addMany(130, `Dávka ${w}${theme}`);
         await page.goto(`${BASE}/inbox`);
         await page.getByTestId("mail-folders").first().waitFor();
-        await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
+        await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
         const prog = page.getByTestId("sync-progress").filter({ hasText: /Staženo [\d\s ]+ z/ });
         await prog.waitFor({ timeout: 60_000 }).then(() => page.screenshot({ path: name("stahovani-prubeh") })).catch(() => undefined);
         await page.getByTestId("sync-msg").waitFor({ timeout: 120_000 }).catch(() => undefined);

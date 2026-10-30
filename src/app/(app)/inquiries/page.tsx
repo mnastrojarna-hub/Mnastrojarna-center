@@ -228,7 +228,7 @@ export default async function InquiriesPage({
         >
           {inbox.length === 0 ? (
             <FlowEmpty icon={Mail} iconClass="bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300" title="V poště žádná poptávka">
-              Jakmile AI v tvé poště rozpozná poptávku, objeví se tady s tlačítkem „Založit zakázku“.
+              Jakmile AI v tvé poště rozpozná poptávku, objeví se tady s tlačítkem „Vytvořit nabídku“.
             </FlowEmpty>
           ) : (
             <FlowMailList emails={inbox} />

@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Reply, ReplyAll, Forward, Share2, Flag, MailOpen, FolderOpen, FolderPlus, Loader2, Paperclip, Sparkles,
+  ArrowLeft, Reply, ReplyAll, Forward, Share2, Flag, MailOpen, Scissors, Loader2, Paperclip, Sparkles,
   ChevronDown, ChevronRight, Building2, CheckCircle2, AlertTriangle, Send, MessageSquareText, MoreHorizontal, PenLine,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -15,7 +14,9 @@ import { CategoryEditor, CategoryPicker, CategoryPill } from "@/components/mail/
 import { ShareDialog } from "@/components/mail/share-dialog";
 import { JobLinkBar } from "@/components/mail/job-link-bar";
 import type { ComposeRequest } from "@/components/mail/compose-dialog";
-import { createJobFromEmail } from "@/app/actions/mail";
+import { splitFromThreadAction, type OrderChoice } from "@/app/actions/mail-actions";
+import { useMailActionRunner, type MailActionNotice } from "@/components/mail/mail-action-runner";
+import type { MailActionKey } from "@/lib/email/mail-actions";
 import { markThreadReadAction, openThreadAction, runAiOnThreadAction, setThreadFlagAction, setThreadPriorityAction } from "@/app/actions/mail-inbox";
 import { sentCopyLabel } from "@/lib/email/mail-folders";
 import type { ThreadDetail, ThreadMessage, ThreadSummary } from "@/lib/email/mail-types";
@@ -59,7 +60,7 @@ export interface ThreadPatch {
   suggestionDone?: boolean;
 }
 
-export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version }: {
+export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version, onSplit }: {
   summary: ThreadSummary;
   canAi: boolean;
   onBack: () => void;
@@ -67,12 +68,13 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
   onCompose: (r: ComposeRequest) => void;
   /** Změna = načíst vlákno znovu (po odeslání, živá pošta). */
   version: number;
+  /** Zpráva oddělena do vlastního vlákna (seznam se obnoví). */
+  onSplit?: () => void;
 }) {
-  const router = useRouter();
   const [detail, setDetail] = React.useState<ThreadDetail | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [busy, setBusy] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState<{ ok: boolean; text: string } | null>(null);
+  const [notice, setNotice] = React.useState<MailActionNotice | null>(null);
   const [shareOpen, setShareOpen] = React.useState(false);
   const [flagged, setFlagged] = React.useState(summary.flagged);
   const [priority, setPriority] = React.useState({ value: summary.priority, manual: summary.priorityManual });
@@ -145,17 +147,28 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
       onBack();
     } else setNotice({ ok: false, text: r.error ?? "Chyba" });
   };
-  const createJob = async () => {
+  // Pošta E: hlavní akce podle kategorie (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu …)
+  const [choices, setChoices] = React.useState<OrderChoice[] | null>(null);
+  const actions = useMailActionRunner({
+    onLinked: (tid, id, number) => onPatch(tid, { jobId: id, jobNumber: number }),
+    onNotice: (n) => setNotice(n),
+    onChoices: (_tid, c) => setChoices(c),
+  });
+  const runAction = (key: MailActionKey) => {
     if (!target) return;
-    setBusy("job");
-    const res = await createJobFromEmail(target.id);
-    if (res.ok && res.id) {
-      onPatch(threadId, { jobId: res.id, jobNumber: res.number });
-      router.push(`/orders/${res.id}`);
-    } else {
-      setBusy(null);
-      setNotice({ ok: false, text: res.error ?? "Zakázku se nepodařilo založit." });
-    }
+    setNotice(null);
+    void actions.run(key, { threadId, emailId: target.id, jobId });
+  };
+  // „Oddělit z vlákna": zpráva, která do vlákna nepatří (jen podobný předmět)
+  const split = async (m: ThreadMessage) => {
+    if (!window.confirm(`Oddělit zprávu „${m.subject || "(bez předmětu)"}“ od ${m.fromName || m.fromEmail} do samostatného vlákna?`)) return;
+    setBusy("split");
+    const r = await splitFromThreadAction(m.id).catch(() => ({ ok: false as const, error: "Spojení se nepovedlo — zkus to znovu." }));
+    setBusy(null);
+    if (!r.ok) return setNotice({ ok: false, text: r.error });
+    setNotice({ ok: true, text: `Zpráva oddělena do samostatného vlákna${r.unlinked ? " a odpojena od zakázky vlákna (posoudí se znovu)" : ""}.` });
+    onSplit?.();
+    setDetail(await openThreadAction(threadId, { markRead: false }));
   };
   const runAi = async () => {
     setBusy("ai");
@@ -208,7 +221,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-full text-muted-foreground" aria-label="Další akce" title="Další akce" data-testid="thread-more" disabled={busy !== null}>
-                {busy === "ai" || busy === "unread" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                {busy === "ai" || busy === "unread" || busy === "split" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -220,6 +233,13 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
                   <Sparkles className="h-4 w-4" /> Roztřídit AI
                 </DropdownMenuItem>
               )}
+              {/* zpráva, která do vlákna nepatří (jen podobný předmět) → samostatné vlákno */}
+              {messages.length > 1 && [...messages].reverse().slice(0, 8).map((m) => (
+                <DropdownMenuItem key={`split-${m.id}`} onSelect={() => void split(m)} data-testid="thread-split" data-email={m.id}>
+                  <Scissors className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 truncate">Oddělit z vlákna: {m.direction === "out" ? "odeslaná" : m.fromName || m.fromEmail} · {timeOf(m.receivedAt)}</span>
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
           <button
@@ -254,7 +274,10 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
         {notice && (
           <p className={cn("flex items-start gap-1.5 rounded-md px-2.5 py-2 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")} role="status">
             {notice.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
-            <span className="min-w-0 break-words">{notice.text}</span>
+            <span className="min-w-0 break-words" data-testid="thread-notice">
+              {notice.text}
+              {notice.href && <> <Link href={notice.href} className="font-medium underline underline-offset-4">{notice.hrefLabel ?? "Otevřít"}</Link></>}
+            </span>
           </p>
         )}
 
@@ -312,10 +335,13 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
             linkSource={[...messages].reverse().find((m) => m.jobId)?.jobLinkSource ?? summary.jobLinkSource}
             linkActor={[...messages].reverse().find((m) => m.jobId)?.jobLinkActor ?? summary.jobLinkActor}
             suggestion={detail ? detail.suggestion ?? null : summary.suggestion ?? null}
-            canCreate
-            createDisabled={!lastIn}
-            creating={busy === "job"}
-            onCreate={() => void createJob()}
+            category={asking ? "K zakázce" : target?.category ?? summary.category}
+            direction={target?.direction ?? summary.direction}
+            actionsDisabled={!target}
+            busyAction={actions.busy?.threadId === threadId ? actions.busy.key : null}
+            onAction={runAction}
+            choices={choices}
+            onChoicesDone={() => setChoices(null)}
             onError={(text) => setNotice({ ok: false, text })}
             onChanged={(c) => {
               setNotice({ ok: true, text: c.text });

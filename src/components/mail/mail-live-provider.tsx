@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  LIVE_INTERVAL_MS, RESULT_KEY, mailChanged, nextDelay, nextFailures, releaseLease, shouldPoll, tryLease, type LiveResult,
+  RESULT_KEY, fastOverride, liveInterval, mailChanged, nextDelay, nextFailures, releaseLease, shouldPoll, tryLease, type LiveResult,
 } from "@/lib/email/live-poll";
 
 /**
@@ -10,6 +10,7 @@ import {
  * všechny, při chybách s odstupem) a hned po návratu do karty zavolá /api/emails/live — ten stáhne
  * nové e-maily a vrátí počet nepřečtených (odznak v menu) a razítko změny (Přijatá pošta se obnoví
  * bez načtení stránky). Na Vercel Hobby je plánovač jen 1× denně, „real-time" zajišťuje tohle.
+ * Otevřená Pošta (useMailLiveFast) zrychlí kontrolu na 30 s; skrytá karta nekontroluje vůbec.
  */
 
 interface LiveState {
@@ -19,14 +20,28 @@ interface LiveState {
   /** Počítadlo změn pošty (seznam se má obnovit). */
   version: number;
   error?: string;
+  /** Čas poslední dokončené kontroly (ms) — „Aktualizováno před X s". */
+  at: number | null;
   /** Okamžitá kontrola (po odeslání, po stažení). */
   pokeNow: () => void;
+  /** Zapnout rychlou kontrolu (otevřená Pošta); vrací vypínač. */
+  setFast: (on: boolean) => void;
 }
 
-const LiveContext = React.createContext<LiveState>({ unread: null, stamp: null, remaining: 0, version: 0, pokeNow: () => {} });
+const LiveContext = React.createContext<LiveState>({ unread: null, stamp: null, remaining: 0, version: 0, at: null, pokeNow: () => {}, setFast: () => {} });
 
 export function useMailLive(): LiveState {
   return React.useContext(LiveContext);
+}
+
+/** Dokud je komponenta připojená (Pošta otevřená), kontroluje se nová pošta každých 30 s. */
+export function useMailLiveFast(enabled = true): void {
+  const { setFast } = useMailLive();
+  React.useEffect(() => {
+    if (!enabled) return;
+    setFast(true);
+    return () => setFast(false);
+  }, [enabled, setFast]);
 }
 
 function storage(): Storage | null {
@@ -38,7 +53,7 @@ function storage(): Storage | null {
 }
 
 export function MailLiveProvider({ enabled, initialUnread, children }: { enabled: boolean; initialUnread?: number; children: React.ReactNode }) {
-  const [state, setState] = React.useState<Omit<LiveState, "pokeNow">>({ unread: initialUnread ?? null, stamp: null, remaining: 0, version: 0 });
+  const [state, setState] = React.useState<Omit<LiveState, "pokeNow" | "setFast">>({ unread: initialUnread ?? null, stamp: null, remaining: 0, version: 0, at: null });
   const tab = React.useRef(`t${Math.random().toString(36).slice(2)}`);
   const failures = React.useRef(0);
   const last = React.useRef<LiveResult | null>(null);
@@ -46,12 +61,14 @@ export function MailLiveProvider({ enabled, initialUnread, children }: { enabled
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = React.useRef(false);
   const channel = React.useRef<BroadcastChannel | null>(null);
+  const fast = React.useRef(0);
+  const interval = () => liveInterval(fast.current > 0);
 
   const apply = React.useCallback((r: LiveResult) => {
     if (last.current && last.current.at === r.at && last.current.stamp === r.stamp) return; // stejný výsledek (BroadcastChannel i storage)
     const changed = mailChanged(last.current, r);
     last.current = r;
-    setState((s) => ({ unread: r.unread, stamp: r.stamp, remaining: r.remaining, error: r.error, version: changed ? s.version + 1 : s.version }));
+    setState((s) => ({ unread: r.unread, stamp: r.stamp, remaining: r.remaining, error: r.error, at: r.at, version: changed ? s.version + 1 : s.version }));
   }, []);
 
   const poll = React.useCallback(async (force = false) => {
@@ -59,15 +76,18 @@ export function MailLiveProvider({ enabled, initialUnread, children }: { enabled
     const visible = typeof document === "undefined" || document.visibilityState === "visible";
     const online = typeof navigator === "undefined" || navigator.onLine !== false;
     if (!shouldPoll({ visible, online, enabled })) return;
-    // jedna karta za všechny: zápůjčka na dobu intervalu (vynucená kontrola ji přebere)
+    // jedna karta za všechny: zápůjčka na dobu intervalu (vynucená kontrola ji přebere; otevřená Pošta
+    // nečeká na pomalejší kartu, když je poslední výsledek starší než 30 s)
     const store = storage();
-    if (!force && !tryLease(store, tab.current, Date.now(), LIVE_INTERVAL_MS - 5_000)) return;
-    if (force) tryLease(store, tab.current, Date.now(), LIVE_INTERVAL_MS - 5_000);
+    const ttl = liveInterval(fast.current > 0) - 5_000;
+    const now = Date.now();
+    if (!force && !tryLease(store, tab.current, now, ttl) && !fastOverride(fast.current > 0, last.current?.at, now)) return;
+    if (force) tryLease(store, tab.current, now, ttl);
     inFlight.current = true;
     lastPollAt.current = Date.now();
     const run = async () => {
       try {
-        const res = await fetch("/api/emails/live", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sync: true }) });
+        const res = await fetch("/api/emails/live", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sync: true, fast: fast.current > 0 }) });
         const data = (await res.json().catch(() => null)) as Partial<LiveResult> | null;
         if (!res.ok || !data) throw new Error(`HTTP ${res.status}`);
         const r: LiveResult = {
@@ -93,13 +113,25 @@ export function MailLiveProvider({ enabled, initialUnread, children }: { enabled
     } else await run();
   }, [enabled, apply]);
 
-  const schedule = React.useCallback(() => {
+  const schedule = React.useCallback((delay?: number) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       await poll();
       schedule();
-    }, nextDelay(failures.current));
-  }, [poll]);
+    }, delay ?? nextDelay(failures.current, interval()));
+  }, [poll]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setFast = React.useCallback((on: boolean) => {
+    const was = fast.current > 0;
+    fast.current = Math.max(0, fast.current + (on ? 1 : -1));
+    const is = fast.current > 0;
+    if (!enabled || was === is) return;
+    // přepnutí rychlosti: další kontrola podle nového intervalu (už prošlý → hned)
+    // ještě žádná kontrola (první proběhne 4 s po načtení) → další až po celém intervalu
+    const since = lastPollAt.current ? Date.now() - lastPollAt.current : 0;
+    const base = nextDelay(failures.current, interval());
+    schedule(Math.max(1_000, base - since));
+  }, [enabled, schedule]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -116,7 +148,8 @@ export function MailLiveProvider({ enabled, initialUnread, children }: { enabled
     };
     window.addEventListener("storage", onStorage);
     const onVisible = () => {
-      if (document.visibilityState === "visible" && Date.now() - lastPollAt.current > 15_000) void poll();
+      // návrat do karty: hned zkontrolovat (otevřená Pošta už po 10 s, jinak po 15 s od minula)
+      if (document.visibilityState === "visible" && Date.now() - lastPollAt.current > (fast.current > 0 ? 10_000 : 15_000)) void poll();
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
@@ -138,6 +171,6 @@ export function MailLiveProvider({ enabled, initialUnread, children }: { enabled
   }, [enabled, poll, schedule, apply]);
 
   const pokeNow = React.useCallback(() => void poll(true), [poll]);
-  const value = React.useMemo<LiveState>(() => ({ ...state, pokeNow }), [state, pokeNow]);
+  const value = React.useMemo<LiveState>(() => ({ ...state, pokeNow, setFast }), [state, pokeNow, setFast]);
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

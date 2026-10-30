@@ -216,6 +216,9 @@ await T("Nastavení pošty (ozubené kolo): výchozí Firemní, živý náhled s
   await openInbox(page);
   await page.getByTestId("btn-mail-settings").click();
   const panel = page.getByTestId("mail-settings-panel");
+  // ozubené kolo otevře záložku Schránka (servery a heslo); podpis je vedlejší záložka
+  await panel.getByTestId("mail-settings-mailboxes").waitFor({ timeout: 20_000 });
+  await panel.getByTestId("mail-settings-tab-podpis").click();
   await panel.getByTestId("signature-editor").waitFor({ timeout: 20_000 });
   const boxes = panel.getByTestId("signature-mailboxes");
   if (await boxes.count()) {
@@ -398,6 +401,8 @@ await T("mobil 390 px: horní lišta nepřetéká, Menu nese Můj účet / motiv
   await snap(page, "posta-390");
   await page.getByTestId("btn-mail-settings").click();
   const panel = page.getByTestId("mail-settings-panel");
+  await panel.getByTestId("mail-settings-mailboxes").waitFor({ timeout: 20_000 });
+  await panel.getByTestId("mail-settings-tab-podpis").click();
   await panel.getByTestId("signature-editor").waitFor({ timeout: 20_000 });
   const pb = await panel.boundingBox();
   expect(pb && pb.width >= 385, `Nastavení pošty přes celou šířku (${pb?.width})`);
