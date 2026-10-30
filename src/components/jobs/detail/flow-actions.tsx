@@ -592,7 +592,8 @@ function FlowDialog({
           jobId={jobId}
           kind={key === "production.advance" ? "dalsi_krok" : key === "production.finish" ? "ukonceni" : key === "production.replan" ? "plan" : key === "production.undo" ? "zpet" : undefined}
           replan={key === "production.replan"}
-          target={key === "production.undo" ? "potvrzeno" : null}
+          // vrácení: cíl = stav před předáním (dialog ho má z předání / historie), ne vždy Potvrzená
+          target={null}
           onDone={(d) => onDone(d.message)}
         />
       );

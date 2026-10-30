@@ -91,8 +91,26 @@ const OPS: JobOperation[] = [
 ];
 
 describe("Záložka Výroba — render", () => {
-  it("prázdný stav nabídne kompletní dodávku, šablony a dlaždice operací", () => {
+  it("ve výrobě bez postupu (přesun bez předání): jen žlutý banner „Doplnit kdo a termín…“, ne druhá výzva prázdného stavu", () => {
     const html = render(job(), data([]));
+    expect(html).toContain('data-testid="handoff-legacy"');
+    expect(html).toContain("Doplnit kdo a termín…");
+    expect(html).not.toContain("Jak se zakázka vyrobí?");
+    expect(html).not.toContain("Kompletní dodávka");
+    expect(html).not.toContain("Nebo poskládej sám");
+    // technologie po položkách a dodání zůstávají
+    expect(html).toContain("Dodání, faktura a platba");
+  });
+
+  it("mobil: celé jméno firmy na kartě kroku, „(částečný dodavatel)“ pod jménem — ne vlastní sloupec", () => {
+    const html = render(job(), data(OPS));
+    expect(html).toMatch(/<span class="block break-words leading-snug">TepKal s\.r\.o\.<\/span><span class="block text-\[11px\][^"]*">částečný dodavatel<\/span>/);
+    expect(html).toMatch(/<span class="block break-words leading-snug">Galvanika Zlín<\/span><span class="block text-\[11px\][^"]*">částečný dodavatel · mimo adresář<\/span>/);
+    expect(html).not.toContain("(částečný dodavatel)");
+  });
+
+  it("prázdný stav nabídne kompletní dodávku, šablony a dlaždice operací", () => {
+    const html = render(job({ stage: "dodano_k_nam" }), data([]));
     expect(html).toContain("Jak se zakázka vyrobí?");
     expect(html).toContain("Kompletní dodávka");
     expect(html).toContain("Soustružený díl — kalený a broušený");

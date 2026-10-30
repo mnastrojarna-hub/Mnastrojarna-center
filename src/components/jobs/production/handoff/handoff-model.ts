@@ -5,7 +5,8 @@ import { OPERATION_KINDS, type OperationKind, type OperationStatus } from "@/lib
 import { stepLabel } from "@/lib/jobs/production";
 import { addCalendarDays, addWorkingDays } from "@/lib/jobs/purchasing";
 import { canSubmitHandoff, stepHasWho, validateHandoff, type HandoffValidationStep } from "@/lib/jobs/production-handoff";
-import { leadTimeLabel, money, shortDay, suggestStepDeadline } from "@/lib/jobs/production-suggest";
+import { coveredHint, coveringStep, isMachiningKind, leadTimeLabel, money, shortDay, suggestStepDeadline } from "@/lib/jobs/production-suggest";
+import { stageMeta } from "@/lib/jobs/stages";
 import type {
   DeadlineSource, HandoffInput, HandoffIssue, HandoffKind, HandoffPlan, HandoffStepInput, StepPlan, StepWho, WhoSource, WhoSuggestion,
 } from "@/lib/jobs/production-handoff-types";
@@ -178,9 +179,19 @@ export function plainMoveOf(
     return to ? { to, label: "Přesunout bez zápisu výroby", note: "Přesunuto bez zápisu, kdo díl vyrobil" } : null;
   }
   if (kind === "zpet") {
-    return opts.target ? { to: opts.target, label: "Jen přesunout stav (kroky a objednávky zůstanou)", note: "Stav vrácen bez vrácení předání (kroky a objednávky zůstaly)" } : null;
+    return opts.target
+      ? { to: opts.target, label: `Jen přesunout stav na „${stageMeta(opts.target).label}“ (kroky a objednávky zůstanou)`, note: "Stav vrácen bez vrácení předání (kroky a objednávky zůstaly)" }
+      : null;
   }
   return null;
+}
+
+/**
+ * Kam „Vrátit předání do výroby" zakázku vrátí: stav vybraný ve výběru stavu (target) → stav před předáním ze
+ * serveru (záznam předání / historie: objednávka, potvrzeno, pozastaveno, reklamace …) → Potvrzená.
+ */
+export function undoTargetOf(plan: Pick<HandoffPlan, "client"> | null, target?: JobStage | null): JobStage {
+  return target ?? plan?.client?.undoStage ?? "potvrzeno";
 }
 
 // ── Nabídka telefonem ───────────────────────────────────────
@@ -454,6 +465,7 @@ export function setEndsAtFinal(plan: HandoffPlan, state: HandoffState, i: number
  */
 export function withoutUsedQuotes(
   plan: HandoffPlan, state: Pick<HandoffState, "steps">, sug: { primary: WhoSuggestion | null; alternatives: WhoSuggestion[] }, exceptIndex = -1,
+  opts: { quoteOnly?: boolean } = {},
 ): { primary: WhoSuggestion | null; alternatives: WhoSuggestion[] } {
   const used = new Map<string, string>();
   state.steps.forEach((s, i) => {
@@ -473,14 +485,105 @@ export function withoutUsedQuotes(
     .filter((d) => !free.some((a) => whoKey(a.who) === whoKey(d.who)) && !(sug.primary && !isUsed(sug.primary) && whoKey(sug.primary.who) === whoKey(d.who)));
   if (!isUsed(sug.primary)) return { primary: sug.primary, alternatives: [...free, ...demoted] };
   const next = free.find((a) => a.supplierQuoteId) ?? null;
-  const primary = next ?? demoted[0] ?? free[0] ?? null;
+  // další výroba: předvyplní se jen nabídka na tuto operaci (stejná firma bez ceny zůstane volbou)
+  const primary = opts.quoteOnly ? next : next ?? demoted[0] ?? free[0] ?? null;
   return { primary, alternatives: [...free.filter((a) => a !== primary), ...demoted.filter((d) => d !== primary)] };
+}
+
+// ── Další výroba (Výroba 2, 3 …) ────────────────────────────
+/** Díly kroku už dělá dřívější krok obrábění / kompletní dodávky (hotový / běžící, nebo dřívější v dialogu) → jeho popisek. */
+export function coveredByOf(
+  plan: HandoffPlan, steps: Pick<DraftStep, "key" | "kind" | "title" | "orderItemIds">[], index: number,
+  step: { kind: OperationKind; orderItemIds: string[] | null } = steps[index],
+): string | null {
+  if (!step) return null;
+  const before = (plan.client?.otherSteps ?? []).filter((o) => BEFORE.includes(o.status));
+  const labels = stepLabels(plan, steps);
+  return coveringStep(step, [
+    ...before.map((o, n) => ({ kind: o.kind, orderItemIds: o.orderItemIds ?? null, label: `krok ${n + 1} (${OPERATION_KINDS[o.kind].label})` })),
+    ...steps.slice(0, Math.max(0, index)).map((s, k) => ({ kind: s.kind, orderItemIds: s.orderItemIds, label: `krok ${before.length + k + 1} (${labels[k]})` })),
+  ]);
+}
+
+/** Nápověda u kroku bez návrhu: další výroba → proč se nic nepředvyplnilo; jinak null (běžná „nemáme nabídku"). */
+export function coverHintOf(plan: HandoffPlan, state: Pick<HandoffState, "steps">, i: number): string | null {
+  const by = coveredByOf(plan, state.steps, i);
+  return by ? coveredHint(by) : null;
+}
+
+const completeIds = (plan: HandoffPlan) => new Set((plan.client?.quotes ?? []).filter((q) => q.complete).map((q) => q.id));
+
+/**
+ * Návrhy kdo pro krok podle druhu: další výroba (díly už dělá dřívější krok) dostane návrhy BEZ kompletní dodávky
+ * (serverová varianta `covered`; pojistka: nabídky označené jako komplet se vyřadí i tady) a předvyplní jen
+ * nabídku na tuto operaci — jinak kdo zůstane prázdný s nápovědou.
+ */
+function kindSuggestionFor(plan: HandoffPlan, state: Pick<HandoffState, "steps">, kind: OperationKind, coveredBy: string | null, exceptIndex = -1) {
+  const ks0 = plan.client?.kindSuggestions?.[kind] ?? null;
+  if (!ks0) return null;
+  if (!coveredBy || !isMachiningKind(kind)) return { ...ks0, ...withoutUsedQuotes(plan, state, ks0, exceptIndex) };
+  const base = ks0.covered ?? { primary: ks0.primary, alternatives: ks0.alternatives };
+  const complete = completeIds(plan);
+  const isComplete = (s: WhoSuggestion | null) => Boolean(s?.supplierQuoteId && complete.has(s.supplierQuoteId));
+  const quoteBased = (s: WhoSuggestion | null) => Boolean(s && (s.source === "nejlevnejsi_nabidka" || s.source === "nabidka" || s.source === "objednavka"));
+  const alternatives = base.alternatives.filter((a) => !isComplete(a));
+  const primary0 = base.primary && !isComplete(base.primary) ? base.primary : null;
+  // primární jen z nabídky na operaci; stejná firma / historie jen jako volba
+  const primary = quoteBased(primary0) ? primary0 : alternatives.find((a) => a.supplierQuoteId && quoteBased(a)) ?? null;
+  const rest = [...(primary0 && primary0 !== primary ? [primary0] : []), ...alternatives.filter((a) => a !== primary)];
+  return { ...ks0, ...withoutUsedQuotes(plan, state, { primary, alternatives: rest }, exceptIndex, { quoteOnly: true }) };
+}
+
+/**
+ * Varování u kroku: firma kroku má nabídku, která už kryje díly jiného kroku (kompletní dodávka, nebo nabídka
+ * jiného kroku / objednávky) — obrábění by se objednalo dvakrát. Bez cen (vidí i zaměstnanec).
+ */
+export function overlapWarning(plan: HandoffPlan, state: HandoffState, i: number): string | null {
+  const s = state.steps[i];
+  if (!s || (s.who.type !== "supplier" && s.who.type !== "free") || state.kind === "zpet" || state.kind === "ukonceni") return null;
+  if (!isMachiningKind(s.kind)) return null;
+  const who = s.who;
+  const firmQuotes = (plan.client?.quotes ?? []).filter((q) => (who.type === "supplier"
+    ? q.supplierId === who.id
+    : !q.supplierId && q.supplierName.trim().toLowerCase() === who.name.trim().toLowerCase()));
+  if (!firmQuotes.length) return null;
+  const firm = whoName(who) ?? "Firma";
+  const labels = stepLabels(plan, state.steps);
+  const other = (plan.client?.otherSteps ?? []).filter((o) => o.status !== "preskoceno");
+  const before = other.filter((o) => BEFORE.includes(o.status));
+  const after = other.filter((o) => !BEFORE.includes(o.status));
+  const overlap = (a: string[] | null | undefined, b: string[] | null | undefined) => !a || !b || a.some((x) => b.includes(x));
+  const dialogLabel = (k: number) => `krok ${before.length + k + 1} (${labels[k]})`;
+  const others = [
+    ...before.map((o, n) => ({ kind: o.kind, ids: o.orderItemIds ?? null, label: `krok ${n + 1} (${OPERATION_KINDS[o.kind].label})` })),
+    ...state.steps.map((x, k) => ({ kind: x.kind, ids: x.orderItemIds, label: dialogLabel(k), k })).filter((x) => x.k !== i),
+    ...after.map((o, n) => ({ kind: o.kind, ids: o.orderItemIds ?? null, label: `krok ${before.length + state.steps.length + n + 1} (${OPERATION_KINDS[o.kind].label})` })),
+  ].filter((o) => isMachiningKind(o.kind) && overlap(o.ids, s.orderItemIds));
+  const num = (n: string | null) => (n ? ` ${n}` : "");
+  // a) kompletní dodávka téže firmy, i když díly dělá i jiný krok obrábění
+  const complete = firmQuotes.find((q) => q.complete && overlap(q.itemIds, s.orderItemIds));
+  if (complete && others.length) {
+    return `Pozor: ${firm} má nabídku na kompletní dodávku${num(complete.number)} — díly dělá i ${others[0].label}. Obrábění by se objednalo dvakrát.`;
+  }
+  // b) nabídka téže firmy už patří jinému kroku / objednávce zakázky
+  for (const q of firmQuotes) {
+    if (q.complete || !overlap(q.itemIds, s.orderItemIds)) continue;
+    const k = state.steps.findIndex((x, j) => j !== i && x.supplierQuoteId === q.id);
+    let by: string | null = k >= 0 ? dialogLabel(k) : null;
+    if (!by && q.usedBy && !(q.usedByOpId && (q.usedByOpId === s.operationId || state.steps.some((x) => x.operationId === q.usedByOpId)))) by = q.usedBy;
+    if (by) return `Pozor: nabídku ${firm}${num(q.number)} už má ${by} — tady se díly objednají znovu (cena dle nové nabídky).`;
+  }
+  return null;
 }
 
 /** Přidat krok (na konec, nebo hned za krok `after`) — kdo předvyplní nejlevnější nabídka k druhu kroku. */
 export function addStep(plan: HandoffPlan, state: HandoffState, kind: OperationKind, opts: { after?: number; start?: boolean } = {}): HandoffState {
-  const ks0 = plan.client?.kindSuggestions?.[kind] ?? null;
-  const ks = ks0 ? { ...ks0, ...withoutUsedQuotes(plan, state, ks0) } : null;
+  const at0 = opts.after === undefined ? state.steps.length : Math.min(state.steps.length, opts.after + 1);
+  const ids0 = plan.client?.kindSuggestions?.[kind]?.orderItemIds ?? null;
+  // další výroba (díly už dělá dřívější krok): žádná kompletní dodávka, předvyplní se jen nabídka na tuto operaci
+  const probe = [...state.steps.slice(0, at0), { key: "_new", kind, title: null, orderItemIds: ids0 }, ...state.steps.slice(at0)];
+  const coveredBy = coveredByOf(plan, probe, at0);
+  const ks = kindSuggestionFor(plan, state, kind, coveredBy);
   const primary = ks?.primary ?? null;
   const who: StepWho = primary && stepHasWho(primary.who) ? primary.who : { type: "none" };
   const start = Boolean(opts.start);
@@ -494,7 +597,7 @@ export function addStep(plan: HandoffPlan, state: HandoffState, kind: OperationK
           : { mode: start || state.kind === "plan" ? "vystavit" : "pri_predani", ...(primary?.coverage?.uncovered.length ? { includeUncovered: true } : {}) },
     note: null, suggestions: { primary, alternatives: ks?.alternatives ?? [] }, serverPreview: null, previewKey: "", added: true,
   };
-  const at = opts.after === undefined ? state.steps.length : Math.min(state.steps.length, opts.after + 1);
+  const at = at0;
   let steps = [...state.steps.slice(0, at), s, ...state.steps.slice(at)];
   steps = demoteFinal(steps);
   steps = reflow(plan, state, steps, at);
@@ -515,13 +618,16 @@ export function removeStep(plan: HandoffPlan, state: HandoffState, i: number): H
 /** Jiný druh kroku: návrhy kdo pro nový druh; firma z návrhu se vymění za nejlevnější k novému druhu. */
 export function setStepKind(plan: HandoffPlan, state: HandoffState, i: number, kind: OperationKind): HandoffState {
   const s = state.steps[i];
-  const ks0 = plan.client?.kindSuggestions?.[kind] ?? null;
-  const ks = ks0 ? { ...ks0, ...withoutUsedQuotes(plan, state, ks0, i) } : null;
+  const ids0 = plan.client?.kindSuggestions?.[kind]?.orderItemIds;
+  const coveredBy = coveredByOf(plan, state.steps, i, { kind, orderItemIds: s.operationId || ids0 === undefined ? s.orderItemIds : ids0 });
+  const ks = kindSuggestionFor(plan, state, kind, coveredBy, i);
   let next: HandoffState = { ...state, steps: updateStep(state, i, { kind, ...(ks ? { suggestions: { primary: ks.primary, alternatives: ks.alternatives } } : {}) }) };
   const fromSuggestion = !s.whoSource || s.whoSource === "nejlevnejsi_nabidka" || s.whoSource === "nabidka" || s.who.type === "none";
   if (ks && fromSuggestion && !s.operationId) {
     if (ks.orderItemIds !== undefined) next = { ...next, steps: updateStep(next, i, { orderItemIds: ks.orderItemIds }) };
     if (ks.primary && stepHasWho(ks.primary.who)) next = setStepWho(plan, next, i, ks.primary.who, ks.primary);
+    // další výroba bez nabídky na operaci: firma z předchozího návrhu (třeba kompletní dodávka) nezůstane předvyplněná
+    else if (coveredBy && s.who.type !== "u_nas") next = patchStep(next, i, { who: { type: "none" }, whoSource: null, supplierQuoteId: null });
   }
   return next;
 }

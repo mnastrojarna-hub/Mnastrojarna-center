@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CalendarClock, ChevronDown, FileText, Flag, Home, Loader2, PencilLine, Phone, Play, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronDown, FileText, Flag, Home, Loader2, PencilLine, Phone, Play, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { recordPhoneQuote } from "@/app/actions/production-handoff";
 import { OPERATION_KINDS, type OperationKind } from "@/lib/jobs/operations";
@@ -12,8 +12,8 @@ import { KindGrid } from "../operation-dialog";
 import { WhoIcon, WhoPicker } from "../who-picker";
 import type { WhoValue } from "../production-helpers";
 import {
-  applyPhoneQuote, deadlineLine, finalDateOf, itemNoteOf, patchStep, poLineOf, quickDate, roleOf, setEndsAtFinal, setStepDate, setStepKind, setStepWho,
-  stepCounter, stepItems, whoKey, whoName, type DraftStep, type HandoffState,
+  applyPhoneQuote, coverHintOf, deadlineLine, finalDateOf, itemNoteOf, overlapWarning, patchStep, poLineOf, quickDate, roleOf, setEndsAtFinal, setStepDate,
+  setStepKind, setStepWho, stepCounter, stepItems, whoKey, whoName, type DraftStep, type HandoffState,
 } from "./handoff-model";
 import { AiLabel, AlternativesList, PrimaryCard } from "./handoff-suggestions";
 
@@ -167,8 +167,10 @@ export function HandoffStepCard({
   const cur = whoKey(step.who);
   const meta = OPERATION_KINDS[step.kind];
   const KindIcon = meta.icon;
+  // firma kroku má nabídku, která už kryje díly jiného kroku (kompletní dodávka / nabídka jiného kroku)
+  const overlap = overlapWarning(plan, state, index);
 
-  const pick = (who: StepWho, s?: WhoSuggestion | null) => {
+  const pick =(who: StepWho, s?: WhoSuggestion | null) => {
     setPickerOpen(false);
     onChange(setStepWho(plan, state, index, who, s ?? null));
   };
@@ -203,6 +205,7 @@ export function HandoffStepCard({
                 : line.mode === "existing" ? `Použije se vystavená objednávka ${line.number}`
                   : line.mode === "other" ? `Objednáno jinak: ${line.reason || "—"}` : line.mode === "u_nas" ? "U nás — bez objednávky" : ""}
           </p>
+          {overlap && <OverlapWarning text={overlap} />}
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5 pl-10">
           <button type="button" onClick={onExpand} className="inline-flex h-9 items-center gap-1 rounded-full border px-3 text-xs font-semibold hover:bg-accent sm:h-8">
@@ -260,7 +263,9 @@ export function HandoffStepCard({
             date={cur === whoKey(primary.who) ? step.plannedEnd || null : null} onPick={() => pick(primary.who, primary)} />
         )}
         {!primary && step.who.type === "none" && (
-          <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">K tomuto kroku nemáme nabídku — vyber firmu, nebo „U nás“.</p>
+          <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground" data-testid="handoff-who-hint">
+            {coverHintOf(plan, state, index) ?? "K tomuto kroku nemáme nabídku — vyber firmu, nebo „U nás“."}
+          </p>
         )}
         {/* vybraná jiná nabídka (i nabídka telefonem) — vidět hned, ne až v rozbaleném seznamu */}
         {(() => {
@@ -278,7 +283,9 @@ export function HandoffStepCard({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-1.5">
-          <AlternativesList items={step.suggestions.alternatives} current={cur} canSeePrices={prices} onPick={(s) => pick(s.who, s)} />
+          {/* bez předvyplněného návrhu (další výroba) jsou volby hned vidět — stejná firma / naposledy dělal */}
+          <AlternativesList items={step.suggestions.alternatives} current={cur} canSeePrices={prices} onPick={(s) => pick(s.who, s)}
+            defaultOpen={!primary && step.who.type === "none"} />
           <button
             type="button"
             onClick={() => pick({ type: "u_nas" })}
@@ -320,6 +327,7 @@ export function HandoffStepCard({
           />
         )}
         {role && role !== "u nás" && <p className="text-xs text-muted-foreground">Kdo: {firm} ({role})</p>}
+        {overlap && <OverlapWarning text={overlap} />}
       </div>
 
       {/* díly */}
@@ -612,6 +620,15 @@ function PhoneQuoteForm({ jobId, plan, step, onCancel, onSaved }: {
         </button>
       </div>
     </div>
+  );
+}
+
+/** „Pozor: Hrubý má nabídku na kompletní dodávku — díly dělá i krok 1 (Výroba 1)…" (bez cen). */
+function OverlapWarning({ text }: { text: string }) {
+  return (
+    <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" data-testid="handoff-overlap-warning">
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span className="min-w-0">{text}</span>
+    </p>
   );
 }
 

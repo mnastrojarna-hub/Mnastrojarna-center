@@ -16,13 +16,13 @@ import {
   validateHandoff, canSubmitHandoff, type HandoffValidationStep,
 } from "@/lib/jobs/production-handoff";
 import {
-  familyScopeOf, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, purchaseItemsForStep, quoteKinds, quoteValue,
+  coveringStep, familyScopeOf, isCompleteQuote, isMachiningKind, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, purchaseItemsForStep, quoteKinds, quoteValue,
   scopeItemsOf, shortDay, stepPurchaseOrderNote, suggestRoute, suggestStepDeadline, suggestWhoForStep,
   type RouteStepSuggestion, type SuggestHistory, type SuggestItem, type SuggestOpenPurchaseOrder, type SuggestQuote,
 } from "@/lib/jobs/production-suggest";
 import type {
   ApplyPurchaseItem, ApplyPurchaseOrder, ApplyStep, DeadlineSource, HandoffErrorCode, HandoffInput, HandoffIssue, HandoffKind,
-  HandoffPlan, HandoffResult, HandoffStepInput, PhoneQuoteInput, ProductionApplyPayload, ProductionApplyResult, StepPlan, StepWho, WhoSource, WhoSuggestion,
+  HandoffPlan, HandoffResult, HandoffStepInput, PhoneQuoteInput, ProductionApplyPayload, ProductionApplyResult, QuoteCover, StepPlan, StepWho, WhoSource, WhoSuggestion,
 } from "@/lib/jobs/production-handoff-types";
 import { HANDOFF_KINDS } from "@/lib/jobs/production-handoff-types";
 import { DEFAULT_PAYMENT_TERMS, addWorkingDays, deliveryTermsFor, isPurchaseOrderEditable, r2, splitItemNote, supplierNoteSegment } from "@/lib/jobs/purchasing";
@@ -85,8 +85,10 @@ export interface HandoffContext {
   history: SuggestHistory;
   routeVersion: string;
   pendingCapturedQuotes: number;
-  /** Poslední nevrácené předání (kind predani) — pro „Vrátit předání do výroby". */
-  lastPredani: { id: string; createdBy: string | null; createdAt: string } | null;
+  /** Poslední nevrácené předání (kind predani) — pro „Vrátit předání do výroby"; stageFrom = stav před předáním. */
+  lastPredani: { id: string; createdBy: string | null; createdAt: string; stageFrom?: JobStage | null } | null;
+  /** Stav před posledním přesunem do výroby podle historie (přesun bez předání nemá záznam předání). */
+  stageBeforeProduction?: JobStage | null;
   today: string;
 }
 
@@ -154,7 +156,7 @@ async function loadHistory(db: JobsDb, jobId: string, items: SuggestItem[]): Pro
 /** Vše, co předání potřebuje (servisní klient; práva hlídá volající). null = zakázka neexistuje. */
 export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<HandoffContext | null> {
   if (!isUuid(jobId)) return null;
-  const [jobRes, itemsRes, opsRes, quotes, kindsRes, poRes, routeRes, pendingRes, handoffRes] = await Promise.all([
+  const [jobRes, itemsRes, opsRes, quotes, kindsRes, poRes, routeRes, pendingRes, handoffRes, stageRes] = await Promise.all([
     db.from("orders").select("id, number, title, status, currency, due_date, customer_required_date, max_tolerated_date, owner_id, customer:customers!customer_id(name)").eq("id", jobId).maybeSingle(),
     db.from("order_items").select("id, position, drawing_number, revision, name, description, material, material_group, material_designation, quantity, unit, weight_kg, heat_treatment, surface_treatment, hardness, purchase_unit_price, supplier_note").eq("order_id", jobId).order("position"),
     db.from("job_operations").select(OPERATION_SELECT).eq("job_id", jobId).order("position").order("created_at"),
@@ -163,7 +165,9 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
     db.from("purchase_orders").select("id, number, status, supplier_id, supplier_quote_id, required_date, confirmed_date, handoff_id, file_id, revision, supplier:suppliers!supplier_id(id, name, email), items:purchase_order_items!purchase_order_id(id, position, drawing_number, name, quantity, received_quantity, unit, unit_price)").eq("job_id", jobId).order("created_at"),
     db.rpc("production_route_version", { p_job: jobId }),
     db.from("job_files").select("id", { count: "exact", head: true }).eq("job_id", jobId).eq("archived", false).eq("ai_extracted->>purchasingPending", "true"),
-    db.from("production_handoffs").select("id, kind, created_by, created_at, undone_at").eq("job_id", jobId).order("created_at", { ascending: false }).limit(50),
+    db.from("production_handoffs").select("id, kind, stage_from, created_by, created_at, undone_at").eq("job_id", jobId).order("created_at", { ascending: false }).limit(50),
+    // poslední přesun do výroby (i bez předání) — odkud zakázka přišla
+    db.from("job_events").select("data").eq("job_id", jobId).eq("type", "stage").eq("data->>to", "ve_vyrobe").order("created_at", { ascending: false }).limit(1),
   ]);
   const j = jobRes.data as Row | null;
   if (!j) return null;
@@ -221,8 +225,10 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
     };
   });
   const hist = await loadHistory(db, jobId, items);
-  const handoffs = (handoffRes.data ?? []) as { id: string; kind: string; created_by: string | null; created_at: string; undone_at: string | null }[];
+  const handoffs = (handoffRes.data ?? []) as { id: string; kind: string; stage_from: string | null; created_by: string | null; created_at: string; undone_at: string | null }[];
   const last = handoffs.find((h) => h.kind === "predani" && !h.undone_at) ?? null;
+  const stageEvent = ((stageRes.data ?? []) as { data: Row | null }[])[0]?.data ?? null;
+  const fromEvent = stageEvent && isJobStage(stageEvent.from) ? stageEvent.from : null;
   return {
     job: {
       id: String(j.id), number: String(j.number ?? ""), title: String(j.title ?? ""), status: (isJobStage(j.status) ? j.status : "poptavka") as JobStage,
@@ -238,7 +244,8 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
     history: { ...hist, suppliers: [...suppliers.values()].filter((s) => s.technologies.length).map((s) => ({ id: s.id, name: s.name, technologies: s.technologies, leadDays: s.leadDays, rating: s.rating })) },
     routeVersion: String(routeRes.data ?? ""),
     pendingCapturedQuotes: pendingRes.count ?? 0,
-    lastPredani: last ? { id: last.id, createdBy: last.created_by, createdAt: last.created_at } : null,
+    lastPredani: last ? { id: last.id, createdBy: last.created_by, createdAt: last.created_at, stageFrom: isJobStage(last.stage_from) ? last.stage_from : null } : null,
+    stageBeforeProduction: fromEvent,
     today,
   };
 }
@@ -331,6 +338,31 @@ export function quoteOnOtherPurchaseOrder(ctx: Pick<HandoffContext, "purchaseOrd
   return ctx.purchaseOrders.some((p) => p.status !== "zrusena" && p.supplierQuoteId === quoteId && p.id !== exceptPoId);
 }
 
+/**
+ * Kam „Vrátit předání do výroby" zakázku vrátí: stav před předáním (záznam předání — stejně jako skutečné
+ * vrácení v DB), jinak stav před posledním přesunem do výroby v historii (přesun bez předání). null = neznámo.
+ */
+export function undoStageOf(ctx: Pick<HandoffContext, "lastPredani" | "stageBeforeProduction">): JobStage | null {
+  const ok = (s: JobStage | null | undefined): s is JobStage => Boolean(s) && s !== "ve_vyrobe" && !CLOSED_STAGES.includes(s as JobStage);
+  if (ok(ctx.lastPredani?.stageFrom)) return ctx.lastPredani!.stageFrom!;
+  if (ok(ctx.stageBeforeProduction)) return ctx.stageBeforeProduction!;
+  return null;
+}
+
+/** Nabídky zakázky a co kryjí (bez cen) — dialog varuje, když firma kroku má nabídku, která už kryje díly jiného kroku. */
+export function quoteCoverOf(ctx: Pick<HandoffContext, "quotes" | "items" | "ops" | "purchaseOrders">): QuoteCover[] {
+  const used = usedQuotesOf(ctx, {});
+  return ctx.quotes.map((q) => {
+    const lines = quoteValue(q, ctx.items, ctx.items).lines;
+    const ids = q.items.length ? lines.filter((l) => l.quoteItem !== null).map((l) => l.orderItemId) : null;
+    const op = ctx.ops.find((o) => o.status !== "preskoceno" && o.supplierQuoteId === q.id) ?? null;
+    return {
+      id: q.id, number: q.number, supplierId: q.supplierId, supplierName: q.supplierName, complete: isCompleteQuote(q),
+      itemIds: ids && ids.length < ctx.items.length ? ids : null, usedBy: used[q.id] ?? null, usedByOpId: op?.id ?? null,
+    };
+  });
+}
+
 function sameSupplierQuote(q: SuggestQuote, who: StepWho): boolean {
   if (who.type === "supplier") return q.supplierId ? q.supplierId === who.id : false;
   if (who.type === "free") return !q.supplierId && q.supplierName.trim().toLowerCase() === who.name.trim().toLowerCase();
@@ -416,9 +448,9 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   const rankCtx = { items: ctx.items, currency: ctx.job.currency, today };
 
   const suggestFor = (kindOf: OperationKind, orderItemIds: string[] | null, plannedWho: StepWho | null, onlyStep: boolean, neighbours: (string | null)[],
-    usedQuotes: Record<string, string> = {}) =>
+    usedQuotes: Record<string, string> = {}, coveredBy: string | null = null) =>
     suggestWhoForStep({
-      step: { kind: kindOf, orderItemIds, plannedWho, onlyStep },
+      step: { kind: kindOf, orderItemIds, plannedWho, onlyStep, coveredBy },
       quotes: ctx.quotes, openPurchaseOrders: openPos, history: ctx.history,
       ctx: { ...rankCtx, neighbourSupplierIds: neighbours }, canSeePrices: margins, usedQuotes,
     });
@@ -486,13 +518,21 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
     drafts.forEach((d, j) => {
       if (d.supplierQuoteId && !used[d.supplierQuoteId]) used[d.supplierQuoteId] = `krok ${before + j + 1} (${OPERATION_KINDS[d.kind].label})`;
     });
+    // další výroba (díly už dělá dřívější krok obrábění): kompletní dodávka se nenabízí ani nepředvyplní
+    const coveredBy = coveringStep({ kind: kindOf, orderItemIds }, [
+      ...live.filter((o) => (o.status === "hotovo" || RUNNING.has(o.status)) && !inDialog.has(o.id))
+        .map((o) => ({ kind: o.kind, orderItemIds: o.orderItemIds ?? null, label: `krok ${live.findIndex((x) => x.id === o.id) + 1} (${stepLabel(o, live)})` })),
+      ...drafts.map((d, j) => ({ kind: d.kind, orderItemIds: d.orderItemIds, label: `krok ${before + j + 1} (${OPERATION_KINDS[d.kind].label})` })),
+    ]);
     const sug = suggestFor(kindOf, orderItemIds, stepHasWho(opWho) ? opWho : null, bases.length === 1 && live.length <= 1,
-      [prevWho?.type === "supplier" ? prevWho.id : null], used);
+      [prevWho?.type === "supplier" ? prevWho.id : null], used, coveredBy);
     let who = opWho;
     let whoSource: WhoSource | null = b.op?.whoSource ?? null;
     let quoteId: string | null = b.op?.supplierQuoteId ?? b.route?.supplierQuoteId ?? null;
-    if (quoteId && used[quoteId]) {
-      // krok nesl nabídku, kterou už má jiná objednávka (např. „Výroba 2" naplánovaná s nabídkou Výroby 1)
+    const coveredComplete = Boolean(coveredBy && quoteId && quoteFor(ctx, quoteId) && isCompleteQuote(quoteFor(ctx, quoteId)!));
+    if (quoteId && (used[quoteId] || coveredComplete)) {
+      // krok nesl nabídku, kterou už má jiná objednávka (např. „Výroba 2" naplánovaná s nabídkou Výroby 1),
+      // nebo kompletní dodávku, i když díly už dělá dřívější krok (obrábění by se objednalo dvakrát)
       quoteId = null;
       if (whoSource === "nejlevnejsi_nabidka" || whoSource === "nabidka") whoSource = "posledni_operace";
     }
@@ -702,7 +742,11 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
   for (const k of Object.keys(OPERATION_KINDS) as OperationKind[]) {
     const ids = familyScopeOf(k, ctx.items);
     const s = suggestFor(k, ids, null, false, [lastWho?.type === "supplier" ? lastWho.id : null], usedForAdded);
-    kindSuggestions[k] = { orderItemIds: ids, primary: s.primary, alternatives: s.alternatives };
+    // další výroba (dialog ví, jestli díly už dělá dřívější krok): bez kompletní dodávky, předvyplní jen nabídku na operaci
+    const c = isMachiningKind(k)
+      ? suggestFor(k, ids, null, false, [lastWho?.type === "supplier" ? lastWho.id : null], usedForAdded, "jiný krok")
+      : null;
+    kindSuggestions[k] = { orderItemIds: ids, primary: s.primary, alternatives: s.alternatives, covered: c ? { primary: c.primary, alternatives: c.alternatives } : null };
   }
   const vctx = validationContext(ctx, steps.map((s) => s.operationId ?? null), today);
   const remainingFrom = running ? live.findIndex((o) => o.id === running.id) + 1 : 0;
@@ -724,6 +768,8 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
       return { id: o.id, label: labels.get(o.id) ?? o.label, location: o.location, purchaseOrder: p ? { id: p.id, number: p.number, status: p.status } : null };
     }),
     undoHandoffId: ctx.lastPredani?.id ?? null,
+    undoStage: undoStageOf(ctx),
+    quotes: quoteCoverOf(ctx),
   };
   return {
     token: randomUUID(),
@@ -1052,6 +1098,16 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
   const labelOf = (i: number) => stepLabel(finalRoute.find((r) => r.id === (steps[i].operationId ?? `new:${i}`))!, finalRoute);
   const liveRoute = finalRoute.filter((r) => r.status !== "preskoceno");
   const stepNoOf = (i: number) => liveRoute.findIndex((r) => r.id === (steps[i].operationId ?? `new:${i}`)) + 1;
+  // další výroba: díly kroku už dělá dřívější krok obrábění / kompletní dodávky (popisek kroku), jinak null
+  const coveredOf = (i: number): string | null => {
+    const at = liveRoute.findIndex((r) => r.id === (steps[i].operationId ?? `new:${i}`));
+    const earlier = liveRoute.slice(0, Math.max(0, at)).map((r, n) => {
+      const j = r.id.startsWith("new:") ? Number(r.id.slice(4)) : steps.findIndex((x) => x.operationId === r.id);
+      const ids = j >= 0 ? steps[j].orderItemIds ?? null : byId.get(r.id)?.orderItemIds ?? null;
+      return { kind: r.kind, orderItemIds: ids, label: `krok ${n + 1} (${stepLabel(r, finalRoute)})` };
+    });
+    return coveringStep({ kind: steps[i].kind, orderItemIds: steps[i].orderItemIds ?? null }, earlier);
+  };
 
   const deliveryUs = await ourDeliveryAddressCore();
   const purchaseOrders: ApplyPurchaseOrder[] = [];
@@ -1070,6 +1126,9 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
     let q = quoteFor(ctx, s.supplierQuoteId);
     if (q && r.supplierId && q.supplierId && q.supplierId !== r.supplierId) q = null;
     if (q && !r.supplierId && !sameSupplierQuote(q, steps[first].who)) q = null;
+    // kompletní dodávka u další výroby (díly už dělá dřívější krok) by obrábění nacenila podruhé — objednávka bez cen z ní
+    const coveredComplete = q && isCompleteQuote(q) && idx.some((i) => coveredOf(i)) ? q : null;
+    if (coveredComplete) q = null;
     const reusedQuote = q && (quoteOnOtherPurchaseOrder(ctx, q.id) || pricedNow.has(q.id)) ? q : null;
     if (reusedQuote) q = null;
     else if (q) pricedNow.add(q.id);
@@ -1146,7 +1205,7 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
       queue: {
         title: "",
         // firma bez nabídky nemá výkresy (dostala je jen ta, která nabízela) — připomenout
-        summary: `${stepsText}${requiredDate ? ` · požadovaný termín ${shortDay(requiredDate)}` : ""}${q || reusedQuote ? "" : ` · ${NO_DRAWINGS_HINT}`}${reusedQuote ? " · cena dle nové nabídky (nabídka už je na jiné objednávce)" : ""}`,
+        summary: `${stepsText}${requiredDate ? ` · požadovaný termín ${shortDay(requiredDate)}` : ""}${q || reusedQuote || coveredComplete ? "" : ` · ${NO_DRAWINGS_HINT}`}${reusedQuote ? " · cena dle nové nabídky (nabídka už je na jiné objednávce)" : ""}${coveredComplete ? " · bez ceny z kompletní dodávky (díly už dělá jiný krok)" : ""}`,
         target: email,
         payload: { to: email ?? "", senderId: actor.id },
       },
@@ -1154,7 +1213,7 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
     // ověřený zdroj „kdo": nejlevnější jen když opravdu je (prohlížeči se nevěří)
     let whoSource: WhoSource | null = s.whoSource ?? null;
     const sugAll = suggestWhoForStep({
-      step: { kind: s.kind, orderItemIds: s.orderItemIds ?? null }, quotes: ctx.quotes, openPurchaseOrders: [],
+      step: { kind: s.kind, orderItemIds: s.orderItemIds ?? null, coveredBy: coveredOf(first) }, quotes: ctx.quotes, openPurchaseOrders: [],
       ctx: { items: ctx.items, currency: ctx.job.currency, today }, canSeePrices: true,
       usedQuotes: usedQuotesOf(ctx, { selfOpId: s.operationId ?? null }),
     });
@@ -1196,8 +1255,9 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
       deadlineState: deadlineStateFor({ who: s.who, deadlineAgreed: s.deadlineAgreed, deadlineSource, purchaseOrderStatus: existingPo?.status ?? null }),
       deadlineSource,
       whoSource: s.whoSource ?? (stepHasWho(s.who) ? "rucne" : null),
-      // nabídka, kterou už nacenila jiná objednávka, se ke kroku s novou objednávkou nepřipíše
-      supplierQuoteId: quoteOk && !(ordersNow && quoteOnOtherPurchaseOrder(ctx, q!.id, existingPo?.id)) ? q!.id : null,
+      // nabídka, kterou už nacenila jiná objednávka, se ke kroku s novou objednávkou nepřipíše; kompletní dodávka
+      // ani k další výrobě (díly už dělá dřívější krok — náklady by se započítaly dvakrát)
+      supplierQuoteId: quoteOk && !(ordersNow && quoteOnOtherPurchaseOrder(ctx, q!.id, existingPo?.id)) && !(isCompleteQuote(q!) && coveredOf(i)) ? q!.id : null,
       poMode: poMode as ApplyStep["poMode"],
       poNoneReason: poMode === "neobjednavat" ? cleanText(s.po.noneReason, 500) : null,
       poGroup: ordersNow ? groupOfStep.get(keys[i]) ?? null : null,

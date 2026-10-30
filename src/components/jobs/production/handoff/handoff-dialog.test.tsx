@@ -29,8 +29,10 @@ import { ProductionHandoffDialog } from "./handoff-dialog";
 import { HandoffResultView, resultLine } from "./handoff-result";
 import {
   applyPhoneQuote, canSubmit, inputFromState, issuesOf, itemNoteOf, itemNotePatches, plainMoveOf, setStepWho, stateFromPlan, stepItems, stepLabels,
-  suggestionLine, addStep, poLineOf,
+  suggestionLine, addStep, poLineOf, coverHintOf, overlapWarning, setStepKind, undoTargetOf,
 } from "./handoff-model";
+import { HandoffStepCard } from "./handoff-step-card";
+import { coveredHint } from "@/lib/jobs/production-suggest";
 import type { HandoffPlan, StepPlan, WhoSuggestion } from "@/lib/jobs/production-handoff-types";
 
 const NOVAK = "11111111-1111-4111-8111-111111111111";
@@ -246,6 +248,9 @@ describe("ProductionHandoffDialog — předání do výroby", () => {
     expect(f).toContain("Zbývající kroky (1) se přeskočí");
     expect(f).toContain("Proč končíš dřív? *");
     expect(f).toContain("Zrušit i odeslanou objednávku OV-2026-013?");
+    // dokud uživatel na nic nesáhl, červená chyba „Napiš, proč končíš…“ nesvítí (pole je označené „*“, tlačítko šedé)
+    expect(f).not.toContain("Napiš, proč končíš výrobu dřív");
+    expect(submitTag(f)).toContain(`disabled=""`);
   });
 
   it("nehlídá (majitel 29. 10.): vždy jde „Přesunout bez dodavatele a termínu“ — i když kdo chybí", () => {
@@ -302,15 +307,20 @@ describe("ProductionHandoffDialog — předání do výroby", () => {
     expect(s.steps[2].plannedEnd >= s.steps[1].plannedEnd).toBe(true);
   });
 
-  it("review: přidaná „Výroba 2“ nepřevezme nabídku Výroby 1 (cena by byla dvakrát) — stejná firma bez ceny, jinak další volná nabídka", () => {
+  it("review: přidaná „Výroba 2“ nepřevezme nabídku Výroby 1 (cena by byla dvakrát) — stejná firma bez ceny jen jako volba, jinak další volná nabídka", () => {
     const novak = sug({});
     const hruby = sug({ source: "nabidka", who: { type: "supplier", id: HRUBY, name: "Kovoobrábění Hrubý s.r.o." }, supplierQuoteId: "q2", price: 13_400, reason: "Další nabídka" });
     const p = plan({ client: { ...plan().client!, kindSuggestions: { vyroba: { orderItemIds: null, primary: novak, alternatives: [] } } } });
     let s = addStep(p, stateFromPlan(p), "vyroba");
-    expect(s.steps[2]).toMatchObject({ who: { type: "supplier", id: NOVAK }, supplierQuoteId: null, whoSource: "posledni_operace" });
-    expect(s.steps[2].suggestions.primary?.reason).toBe("Stejná firma jako krok 1 — cena dle nové nabídky");
-    // objednávka podle návrhu bez nabídky = položky bez ceny (žádných 12 200 Kč podruhé)
+    // další výroba: nic se nepředvyplní (kdo prázdný), stejná firma bez ceny je jedna volba
+    expect(s.steps[2]).toMatchObject({ who: { type: "none" }, supplierQuoteId: null });
+    expect(s.steps[2].suggestions.primary).toBeNull();
+    const same = s.steps[2].suggestions.alternatives.find((a) => a.who.type === "supplier" && a.who.id === NOVAK);
+    expect(same).toMatchObject({ supplierQuoteId: null, price: null, reason: "Stejná firma jako krok 1 — cena dle nové nabídky" });
+    // vybraná stejná firma = objednávka bez ceny (žádných 12 200 Kč podruhé)
+    s = setStepWho(p, s, 2, same!.who, same);
     s = { ...s, steps: s.steps.map((x, i) => (i === 2 ? { ...x, po: { ...x.po, orderNow: true } } : x)) };
+    expect(s.steps[2]).toMatchObject({ who: { type: "supplier", id: NOVAK }, supplierQuoteId: null, whoSource: "posledni_operace" });
     expect(poLineOf(p, s, 2)).toMatchObject({ mode: "new", total: null, unpriced: 2 });
     // volná nabídka jiné firmy vyhraje
     const p2 = plan({ client: { ...plan().client!, kindSuggestions: { vyroba: { orderItemIds: null, primary: novak, alternatives: [hruby] } } } });
@@ -334,7 +344,7 @@ describe("ProductionHandoffDialog — předání do výroby", () => {
   it("review: vrácení předání má jednu volbu „jen přesunout stav“ (odkaz v patičce), ne druhé zaškrtávátko s prázdným důvodem", () => {
     const running = { id: "op1", label: "Výroba 1", location: "Frézy Novák s.r.o.", status: "probiha" as const, purchaseOrder: null };
     const h = dialog(plan({ kind: "zpet", stage: "ve_vyrobe", current: running, steps: [], client: { ...plan().client!, undoHandoffId: "h1" } }), { target: "potvrzeno" });
-    expect(h).toContain("Jen přesunout stav (kroky a objednávky zůstanou)");
+    expect(h).toContain("Jen přesunout stav na „Potvrzená objednávka“ (kroky a objednávky zůstanou)");
     expect(h).not.toContain("Jen opravit stav");
     expect(h.match(/data-testid="handoff-plain-move"/g)).toHaveLength(1);
   });
@@ -368,5 +378,113 @@ describe("ProductionHandoffDialog — předání do výroby", () => {
     expect(w).toContain("Odešle obchodník nebo admin");
     expect(w).not.toContain("Otevřít PDF");
     expect(resultLine(res.purchaseOrders[1], null)).toBe("OV-2026-013 · TepKal s.r.o. · PDF ✓ · čeká na odeslání");
+  });
+});
+
+describe("follow-up WP3: další výroba, vrácení předání, mobil", () => {
+  // Hrubý: nabídka na kompletní dodávku (celá zakázka, 15 000 Kč) — bez pravidla by byla „Jediná nabídka“ i pro Výrobu 2
+  const komplet = sug({
+    source: "nejlevnejsi_nabidka", who: { type: "supplier", id: HRUBY, name: "Kovoobrábění Hrubý s.r.o." }, supplierQuoteId: "qK", quoteNumber: "NAB-K",
+    price: 15_000, reason: "Jediná nabídka", badges: ["nejlevnejsi"],
+  });
+  const sameNovak = sug({
+    source: "posledni_operace", supplierQuoteId: null, quoteNumber: null, price: null, badges: [], order: null,
+    reason: "Stejná firma jako jiný krok — cena dle nové nabídky",
+  });
+  const quotes = [
+    { id: "q1", number: "NAB-1", supplierId: NOVAK, supplierName: "Frézy Novák s.r.o.", complete: false, itemIds: null, usedBy: null, usedByOpId: null },
+    { id: "qK", number: "NAB-K", supplierId: HRUBY, supplierName: "Kovoobrábění Hrubý s.r.o.", complete: true, itemIds: null, usedBy: null, usedByOpId: null },
+  ];
+  const withKomplet = (margins: boolean, covered = true) => plan({
+    client: {
+      ...plan({}, margins).client!, quotes,
+      kindSuggestions: {
+        vyroba: {
+          orderItemIds: null, primary: komplet, alternatives: [],
+          ...(covered ? { covered: { primary: null, alternatives: [sameNovak] } } : {}),
+        },
+      },
+    },
+  }, margins);
+
+  for (const margins of [true, false]) {
+    it(`krok 1 z nabídky Nováka + „Výroba 2“: kompletní dodávka Hrubý se nepředvyplní, kdo prázdný s nápovědou (${margins ? "obchodník" : "zaměstnanec"})`, () => {
+      const p = withKomplet(margins);
+      const s = addStep(p, stateFromPlan(p), "vyroba");
+      expect(s.steps[2]).toMatchObject({ who: { type: "none" }, supplierQuoteId: null });
+      expect(s.steps[2].suggestions.primary).toBeNull();
+      expect([s.steps[2].suggestions.primary, ...s.steps[2].suggestions.alternatives].some((x) => x?.supplierQuoteId === "qK")).toBe(false);
+      expect(coverHintOf(p, s, 2)).toBe(coveredHint("krok 1 (Výroba 1)"));
+      const card = html(<HandoffStepCard plan={p} state={s} index={2} label="Výroba 2" expanded onExpand={() => {}} onChange={() => {}} />);
+      expect(card).toContain("Díly už dělá krok 1 (Výroba 1) — kompletní dodávka se tu znovu nenabízí");
+      expect(card).not.toContain("Jediná nabídka");
+      expect(card).not.toContain("nejlevnější");
+      expect(card).not.toContain("15 000");
+      expect(card).toContain("Stejná firma jako jiný krok");      // volba jedním ťuknutím, ne předvyplněná
+    });
+  }
+
+  it("pojistka bez serverové varianty: nabídka označená jako kompletní dodávka se pro další výrobu vyřadí i v dialogu", () => {
+    const p = withKomplet(true, false);
+    const s = addStep(p, stateFromPlan(p), "vyroba");
+    expect(s.steps[2].who).toEqual({ type: "none" });
+    expect(s.steps[2].suggestions.alternatives.some((x) => x.supplierQuoteId === "qK")).toBe(false);
+  });
+
+  it("první krok (nic nekryje) kompletní dodávku dál dostane — „Výroba“ na prázdném postupu", () => {
+    const p = withKomplet(true);
+    const empty = { ...stateFromPlan(p), steps: [] };
+    const s = addStep(p, empty, "vyroba");
+    expect(s.steps[0]).toMatchObject({ who: { type: "supplier", id: HRUBY }, supplierQuoteId: "qK" });
+  });
+
+  it("změna druhu kroku na obrábění u další výroby: firma z kompletní dodávky nezůstane předvyplněná", () => {
+    const p = withKomplet(true);
+    let s = stateFromPlan(p);
+    // krok 2 (kalírna, z návrhu) → přepnout na Výrobu
+    s = setStepKind(p, s, 1, "vyroba");
+    expect(s.steps[1]).toMatchObject({ kind: "vyroba", who: { type: "none" }, supplierQuoteId: null });
+  });
+
+  it("varování: firma kroku má nabídku, která už kryje díly jiného kroku (komplet / nabídka kroku 1) — bez cen", () => {
+    const p = withKomplet(false);
+    let s = addStep(p, stateFromPlan(p), "vyroba");
+    expect(overlapWarning(p, s, 2)).toBeNull();
+    // ručně Hrubý (má kompletní dodávku)
+    s = setStepWho(p, s, 2, { type: "supplier", id: HRUBY, name: "Kovoobrábění Hrubý s.r.o." });
+    expect(overlapWarning(p, s, 2)).toBe("Pozor: Kovoobrábění Hrubý s.r.o. má nabídku na kompletní dodávku NAB-K — díly dělá i krok 1 (Výroba 1). Obrábění by se objednalo dvakrát.");
+    const card = html(<HandoffStepCard plan={p} state={s} index={2} label="Výroba 2" expanded onExpand={() => {}} onChange={() => {}} />);
+    expect(card).toContain('data-testid="handoff-overlap-warning"');
+    expect(card).not.toContain("Kč");
+    // stejná firma jako krok 1 (její nabídku má krok 1)
+    s = setStepWho(p, s, 2, { type: "supplier", id: NOVAK, name: "Frézy Novák s.r.o." });
+    expect(overlapWarning(p, s, 2)).toBe("Pozor: nabídku Frézy Novák s.r.o. NAB-1 už má krok 1 (Výroba 1) — tady se díly objednají znovu (cena dle nové nabídky).");
+    // krok 1 sám sebe nevaruje (jeho vlastní nabídka), kalírna se neřeší
+    expect(overlapWarning(p, s, 0)).toBeNull();
+    expect(overlapWarning(p, s, 1)).toBeNull();
+  });
+
+  it("Vrátit předání: cíl = stav před předáním (pozastaveno / objednávka / reklamace), ne vždy Potvrzená", () => {
+    const running = { id: "op1", label: "Výroba 1", location: "Frézy Novák s.r.o.", status: "probiha" as const, purchaseOrder: null };
+    for (const [stage, label] of [["pozastaveno", "Pozastaveno"], ["objednavka", "Objednávka"], ["reklamace", "Reklamace"]] as const) {
+      const p = plan({ kind: "zpet", stage: "ve_vyrobe", current: running, steps: [], client: { ...plan().client!, undoHandoffId: "h1", undoStage: stage } });
+      expect(undoTargetOf(p, null)).toBe(stage);
+      const h = dialog(p);    // z menu postupu / akce toku — bez cíle
+      expect(h).toContain(`Jen přesunout stav na „${label}“ (kroky a objednávky zůstanou)`);
+      expect(h).toContain(`zakázka do stavu před předáním: <strong class="text-foreground">${label}</strong>`);
+    }
+    // výběr stavu (StageSelect) určí cíl sám; bez údajů ze serveru Potvrzená
+    expect(undoTargetOf(plan({ client: { ...plan().client!, undoStage: "pozastaveno" } }), "objednavka")).toBe("objednavka");
+    expect(undoTargetOf(null, null)).toBe("potvrzeno");
+    expect(plainMoveOf("zpet", { target: undoTargetOf(plan({ client: { ...plan().client!, undoStage: "reklamace" } })) })).toMatchObject({ to: "reklamace" });
+  });
+
+  it("mobil: „Převzato od …“ — celé jméno firmy, objednávka pod ním (ne vlastní sloupec)", () => {
+    const running = {
+      id: "op1", label: "Výroba 1", location: "VERIFY-WALK-Frezy Novak s.r.o.", status: "probiha" as const,
+      purchaseOrder: { id: "po1", number: "OV-2026-1968", status: "vystavena" as const, items: [{ id: "pi1", label: "PR-7075-20", quantity: 200, received: 0, unit: "ks" }] },
+    };
+    const h = dialog(plan({ kind: "dalsi_krok", stage: "ve_vyrobe", current: running }));
+    expect(h).toMatch(/<span class="block break-words">Převzato od VERIFY-WALK-Frezy Novak s\.r\.o\.<\/span><span class="block[^"]*">objednávka OV-2026-1968<\/span>/);
   });
 });

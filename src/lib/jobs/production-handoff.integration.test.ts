@@ -1548,6 +1548,71 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect(r.result?.purchaseOrders).toHaveLength(1);
   }, 90_000);
 
+  it("follow-up WP3 #1: krok 1 z nabídky Nováka + „Výroba 2“ — kompletní dodávka Hrubý se nenabízí ani nenacení (obrábění dvakrát)", async () => {
+    const K = await newJob();
+    const nq = await newQuote(K.id, novak, [40, 42]);                                                       // 12 200 Kč obrábění
+    const kq = await newQuote(K.id, hruby, [50, 50], { operation_kinds: ["kompletni_dodavka"], selected: true, note: "kompletně" }); // 15 000 Kč komplet
+    await newQuote(K.id, tepkal, [5, 5], { note: "kalení" });                                               // kalení příruby 1 000 Kč → Novák + TepKal 13 200 < 15 000
+    for (const u of ["sales", "worker"] as const) {
+      as(u);
+      const p = await plan(K.id);
+      expect(p.steps[0]).toMatchObject({ who: { type: "supplier", id: novak }, supplierQuoteId: nq });
+      const ks = p.client!.kindSuggestions.vyroba!;
+      // bez pravidla: zbylá „Jediná nabídka" = komplet Hrubý — dialog pro další výrobu bere variantu „covered"
+      expect(ks.covered).toBeTruthy();
+      expect(ks.covered!.primary).toBeNull();
+      expect(ks.covered!.alternatives.some((a) => a.supplierQuoteId === kq || (a.who.type === "supplier" && a.who.id === hruby))).toBe(false);
+      expect(ks.covered!.alternatives.find((a) => a.who.type === "supplier" && a.who.id === novak)).toMatchObject({ supplierQuoteId: null, price: null });
+      expect(p.client!.quotes!.find((q) => q.id === kq)).toMatchObject({ complete: true, supplierId: hruby });
+      expect(p.client!.quotes!.find((q) => q.id === nq)).toMatchObject({ complete: false });
+      if (u === "worker") expect(JSON.stringify(p.client!.kindSuggestions)).not.toMatch(/"price":\d/);
+    }
+    // zastaralý / ruční dialog pošle Výrobu 2 u Hrubého s kompletní nabídkou: objednávka bez cen, náklady jednou
+    as("sales");
+    const p = await plan(K.id);
+    const r = await act.submitProductionHandoff(K.id, inputOf(p, { acceptLate: true }, [
+      ...p.steps.map((s) => ({ ...s })),
+      supplierStep(hruby, "2026-12-16", { start: false, supplierQuoteId: kq, whoSource: "nejlevnejsi_nabidka", po: { mode: "pri_predani", orderNow: true } }),
+    ]));
+    expect(r.ok, r.error).toBe(true);
+    const all = await pos(K.id);
+    const ph = all.find((x) => x.supplier_id === hruby)!;
+    expect(ph).toBeTruthy();
+    expect(ph.supplier_quote_id).toBeNull();
+    expect((ph.items as Row[]).map((i) => i.unit_price)).toEqual([null, null]);
+    const o = await ops(K.id);
+    expect(o.find((x) => x.supplier_id === hruby)).toMatchObject({ supplier_quote_id: null });
+    const q = (await queue(K.id)).find((x) => (x.payload as Row)?.purchaseOrderId === ph.id)!;
+    expect(String(q.summary)).toContain("bez ceny z kompletní dodávky");
+    expect((await jobCost(K.id))).toMatchObject({ cost: 12_200 });
+  }, 150_000);
+
+  it("follow-up WP3 #2: „Vrátit předání“ = zpět do stavu před předáním (pozastaveno / objednávka), i po přesunu bez předání", async () => {
+    as("sales");
+    // a) předání z „Pozastaveno": plán zná cíl, skutečné vrácení tam zakázku vrátí
+    const Z = await newJob({ status: "pozastaveno" });
+    await newQuote(Z.id, novak, [40, 42]);
+    const p = await plan(Z.id);
+    const r = await act.submitProductionHandoff(Z.id, inputOf(p));
+    expect(r.ok, r.error).toBe(true);
+    expect((await job(Z.id)).status).toBe("ve_vyrobe");
+    const pz = await plan(Z.id, { kind: "zpet" });
+    expect(pz.client!.undoStage).toBe("pozastaveno");
+    const u = await act.submitProductionHandoff(Z.id, inputOf(pz, { kind: "zpet" }, []));
+    expect(u.ok, u.error).toBe(true);
+    expect((await job(Z.id)).status).toBe("pozastaveno");
+    // b) přesun bez předání z „Objednávka" (žádný záznam předání): cíl z historie stavu
+    const O = await newJob({ status: "objednavka" });
+    await svc.from("orders").update({ status: "ve_vyrobe", stage_change_note: "Přesunuto do výroby bez dodavatele a termínu (bez předání)" }).eq("id", O.id);
+    const po = await plan(O.id, { kind: "zpet" });
+    expect(po.client!.undoHandoffId).toBeNull();
+    expect(po.client!.undoStage).toBe("objednavka");
+    // c) bez historie (stará data) → null (dialog pak použije Potvrzenou)
+    expect(store.undoStageOf({ lastPredani: null, stageBeforeProduction: null })).toBeNull();
+    expect(store.undoStageOf({ lastPredani: { id: "h", createdBy: null, createdAt: "", stageFrom: "reklamace" }, stageBeforeProduction: "objednavka" })).toBe("reklamace");
+    expect(store.undoStageOf({ lastPredani: { id: "h", createdBy: null, createdAt: "", stageFrom: "ve_vyrobe" }, stageBeforeProduction: "potvrzeno" })).toBe("potvrzeno");
+  }, 120_000);
+
   it("čisté pomocníky: druh předání z faktů, tvar vstupu, práva", () => {
     expect(store.deriveHandoffKind("poptavka", [])).toMatchObject({ code: "NO_CUSTOMER_ORDER" });
     expect(store.deriveHandoffKind("zruseno", [])).toMatchObject({ code: "STAGE_CHANGED" });

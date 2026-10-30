@@ -198,11 +198,17 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
                   <Plus className="h-3 w-3" /> Kdo to dělá?
                 </button>
               ) : (
-                <span className="inline-flex min-w-0 items-center gap-1.5 font-medium">
-                  <WhoIcon who={who} className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{op.location}</span>
-                  {role && role !== "u nás" && <span className="text-[11px] font-normal text-muted-foreground">({role})</span>}
-                  {who.type === "free" && <span className="text-[11px] font-normal text-muted-foreground">mimo adresář</span>}
+                // na mobilu celé jméno firmy; role („částečný dodavatel") pod jménem, ne ve vlastním sloupci
+                <span className="inline-flex min-w-0 max-w-full items-start gap-1.5 font-medium" data-testid="operation-who">
+                  <WhoIcon who={who} className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block break-words leading-snug">{op.location}</span>
+                    {((role && role !== "u nás") || who.type === "free") && (
+                      <span className="block text-[11px] font-normal leading-tight text-muted-foreground">
+                        {[role && role !== "u nás" ? role : null, who.type === "free" ? "mimo adresář" : null].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </span>
                 </span>
               )}
               {po && <PoChip op={op} chip={po} canSend={Boolean(permissions?.canSend)} />}

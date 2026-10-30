@@ -211,6 +211,27 @@ export interface KindSuggestion {
   orderItemIds: string[] | null;
   primary: WhoSuggestion | null;
   alternatives: WhoSuggestion[];
+  /**
+   * Návrhy pro DALŠÍ výrobu (díly už dělá dřívější krok obrábění / kompletní dodávky — coveringStep): bez nabídek
+   * na kompletní dodávku, předvyplní se jen nabídka na tuto operaci. Chybí u druhů mimo obrábění (platí výchozí).
+   */
+  covered?: { primary: WhoSuggestion | null; alternatives: WhoSuggestion[] } | null;
+}
+
+/** Nabídka dodavatele k zakázce — co kryje (varování „nabídka firmy už kryje díly jiného kroku"). Bez cen. */
+export interface QuoteCover {
+  id: string;
+  number: string | null;
+  supplierId: string | null;
+  supplierName: string;
+  /** Nabídka na kompletní dodávku. */
+  complete: boolean;
+  /** Díly zakázky, které nabídka kryje (null = všechny / nejde určit). */
+  itemIds: string[] | null;
+  /** Nabídku už spotřeboval krok / objednávka zakázky („krok 1 (Výroba 1)" / „objednávka OV-…"). */
+  usedBy: string | null;
+  /** Krok, který ji spotřeboval (v dialogu se pak bere jeho aktuální stav). */
+  usedByOpId: string | null;
 }
 
 export interface HandoffPlanClient {
@@ -235,6 +256,13 @@ export interface HandoffPlanClient {
   remaining: { id: string; label: string; location: string; purchaseOrder: { id: string; number: string; status: PurchaseOrderStatus } | null }[];
   /** Poslední nevrácené předání (Vrátit předání do výroby). */
   undoHandoffId: string | null;
+  /**
+   * Stav před předáním do výroby (objednávka / potvrzeno / pozastaveno / reklamace …) — kam „Vrátit předání"
+   * i „Jen přesunout stav" zakázku vrátí: z předání (stage_from), jinak z posledního přesunu do výroby v historii.
+   */
+  undoStage?: JobStage | null;
+  /** Nabídky dodavatelů a co kryjí (varování u kroku). */
+  quotes?: QuoteCover[];
 }
 
 export interface HandoffResult {

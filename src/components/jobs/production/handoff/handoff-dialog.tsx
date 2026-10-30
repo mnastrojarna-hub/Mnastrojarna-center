@@ -19,7 +19,7 @@ import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { KindGrid } from "../operation-dialog";
 import {
-  addStep, autoSendsAll, busyLabel, canSubmit, doneToast, firstOrderEmail, inputFromState, issuesOf, itemNotePatches, newOrderCount, plainMoveOf,
+  addStep, autoSendsAll, busyLabel, canSubmit, doneToast, firstOrderEmail, inputFromState, issuesOf, itemNotePatches, newOrderCount, plainMoveOf, undoTargetOf,
   quickKinds, removeStep, stateFromPlan, stepLabels, submitLabel, summaryLine, titleOf, type HandoffState,
 } from "./handoff-model";
 import { saveItemTechnology } from "@/app/actions/technology";
@@ -256,7 +256,12 @@ export function ProductionHandoffDialog({
   // přesun „postaru" bez předání — hlídání předání je zatím vypnuté (majitel 29. 10.): dialog nikdy nezablokuje
   const move = plainAction
     ? { to: (target ?? "ve_vyrobe") as JobStage, label: plainAction.label, note: "" }
-    : plainMoveOf(state?.kind ?? kindNow ?? (kind as HandoffKind), { stage: plan?.stage ?? null, target, finishTarget: state?.finishTarget ?? null });
+    : plainMoveOf(state?.kind ?? kindNow ?? (kind as HandoffKind), {
+      stage: plan?.stage ?? null,
+      // vrácení: zpět do stavu před předáním (objednávka / potvrzeno / pozastaveno / reklamace), ne vždy Potvrzená
+      target: (state?.kind ?? kindNow ?? kind) === "zpet" ? undoTargetOf(plan, target) : target,
+      finishTarget: state?.finishTarget ?? null,
+    });
   async function movePlain() {
     if (plainAction) { if (!busy) plainAction.run(); return; }
     if (!move) return;
@@ -291,7 +296,7 @@ export function ProductionHandoffDialog({
       }
       if (plainNote.on) {
         // korekce bez kroku / bez výroby (enforcement je zatím vypnutý — WP4 doplní correctionOnly / skipProduction)
-        const to: JobStage = state.kind === "zpet" ? (target ?? "potvrzeno") : state.kind === "zaznam" ? state.finishTarget : "ve_vyrobe";
+        const to: JobStage = state.kind === "zpet" ? undoTargetOf(plan, target) : state.kind === "zaznam" ? state.finishTarget : "ve_vyrobe";
         const r = await moveJobStage(jobId, to, { note: plainNote.text.trim() });
         if (!r.ok) { setError({ message: r.error ?? "Stav se nepodařilo změnit." }); return; }
         onDone?.({ kind: state.kind, stage: r.stage ?? to, message: `Stav opraven: ${stageMeta(r.stage ?? to).label}` });
@@ -387,7 +392,11 @@ export function ProductionHandoffDialog({
                 onFinish={() => { setKindNow("ukonceni"); void load("ukonceni"); }}
                 plainNote={plainNote} setPlainNote={setPlainNote}
               />
-              {!plainNote.on && <IssueList issues={issues} acceptLate={state.acceptLate} onAcceptLate={(v) => setState({ ...state, acceptLate: v })} show={tried || issues.some((x) => x.level === "error" && x.code !== "deadline_missing" && x.code !== "who_missing")} />}
+              {/* chyby polí, která má uživatel před sebou s „*" (kdo, termín, důvod), nekřičí dřív, než na něco sáhne */}
+              {!plainNote.on && (() => {
+                const shown = tried ? issues : issues.filter((x) => !(x.level === "error" && QUIET_UNTIL_TRIED.includes(x.code)));
+                return <IssueList issues={shown} acceptLate={state.acceptLate} onAcceptLate={(v) => setState({ ...state, acceptLate: v })} show={shown.some((x) => x.level === "error")} />;
+              })()}
               {error && (
                 <div role="alert" className="flex flex-wrap items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> <span className="min-w-0 flex-1">{error.message}</span>
@@ -406,6 +415,9 @@ export function ProductionHandoffDialog({
     </Dialog>
   );
 }
+
+/** Chyby povinných polí s „*" — v seznamu až po pokusu odeslat (tlačítko je do té doby šedé, pole označené). */
+const QUIET_UNTIL_TRIED: HandoffIssue["code"][] = ["deadline_missing", "who_missing", "po_reason_missing"];
 
 function initState(plan: HandoffPlan, target?: JobStage | null): HandoffState {
   const s = stateFromPlan(plan, { target: target ?? null });
@@ -493,7 +505,9 @@ function Body({
     return (
       <div className="space-y-3 text-sm">
         <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>Běžící krok se vrátí na Čeká, zakázka do stavu před předáním.</li>
+          <li data-testid="handoff-undo-stage">
+            Běžící krok se vrátí na Čeká, zakázka do stavu před předáním{plan.client?.undoStage ? <>: <strong className="text-foreground">{stageMeta(plan.client.undoStage).label}</strong></> : ""}.
+          </li>
           <li>Neodeslané objednávky z předání se zruší (dodavatel nic nedostal).</li>
         </ul>
         {!plan.client?.undoHandoffId && <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">K zakázce není předání, které jde vrátit.</p>}

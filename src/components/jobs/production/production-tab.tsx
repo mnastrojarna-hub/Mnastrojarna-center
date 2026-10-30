@@ -194,7 +194,8 @@ export function ProductionTab({ job, data, flow }: { job: JobDetail; data: JobPr
                   <Plus className="h-4 w-4" /> Přidat další operaci
                 </button>
               </section>
-            ) : (
+            ) : job.stage === "ve_vyrobe" ? null : (
+              // ve výrobě bez postupu (přesun bez předání) je jediná výzva banner „Doplnit kdo a termín…" nahoře
               <ProductionEmpty stage={job.stage} />
             ))}
             {/* technologie po položkách (postup / kompletně zadáno / poznámky pro dodavatele → objednávka) */}
@@ -287,7 +288,8 @@ function RouteMenu({ onOpen }: { onOpen: (d: Exclude<DialogState, null>) => void
         <DropdownMenuItem onSelect={() => onOpen({ type: "handoff", kind: "dalsi_krok" })}><ArrowRightCircle /> Posunout dál…</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onOpen({ type: "handoff", kind: "ukonceni" })}><Flag /> Ukončit výrobu…</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onOpen({ type: "handoff", kind: "plan", replan: true })}><Clock /> Přeplánovat výrobu…</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onOpen({ type: "handoff", kind: "zpet", target: "potvrzeno" })} className="text-red-600 focus:text-red-700 dark:text-red-400">
+        {/* cíl = stav před předáním (dialog ho má z předání / historie) — ne vždy Potvrzená */}
+        <DropdownMenuItem onSelect={() => onOpen({ type: "handoff", kind: "zpet" })} className="text-red-600 focus:text-red-700 dark:text-red-400">
           <Undo2 className="!text-current" /> Vrátit předání do výroby
         </DropdownMenuItem>
       </DropdownMenuContent>

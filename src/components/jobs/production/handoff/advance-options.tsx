@@ -95,9 +95,13 @@ export function ReceiptBlock({ plan, state, onChange, nextFirm }: {
   const direct = nextFirm && nextFirm !== from && nextFirm !== "U nás";
   return (
     <section className="space-y-2 rounded-xl border bg-muted/30 p-3" aria-label="Převzetí od dodavatele">
-      <h4 className="flex items-center gap-1.5 text-sm font-semibold">
-        <PackageCheck className="h-4 w-4 text-green-600" /> Převzato od {from}
-        <span className="font-normal text-muted-foreground">· objednávka {po.number}</span>
+      {/* na mobilu celé jméno firmy, objednávka pod ním (ne vlastní sloupec) */}
+      <h4 className="flex items-start gap-1.5 text-sm font-semibold">
+        <PackageCheck className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+        <span className="min-w-0">
+          <span className="block break-words">Převzato od {from}</span>
+          <span className="block text-xs font-normal text-muted-foreground">objednávka {po.number}</span>
+        </span>
       </h4>
       {direct && <p className="text-xs text-muted-foreground">Když {from} dodává přímo do {nextFirm}, potvrď jen, kolik kusů odešlo.</p>}
       <ul className="space-y-1.5">

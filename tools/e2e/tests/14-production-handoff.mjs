@@ -5,7 +5,9 @@
 // povinné, předvyplní se nejlevnější firma z nabídek (jen potvrdím / vyplním ručně); při předání vznikne
 // automatická objednávka dodavateli a vygeneruje se PDF.
 // Scénáře 1–15 (spec I.4) + 16 „Přesunout bez dodavatele a termínu" (hlídání předání je zatím vypnuté —
-// majitel 29. 10.), 17 Technologie → poznámky pro dodavatele v PDF a e-mailu objednávky, 18 nabídka telefonem.
+// majitel 29. 10.), 17 Technologie → poznámky pro dodavatele v PDF a e-mailu objednávky, 18 nabídka telefonem,
+// 24 „Výroba 2" nikdy nedostane kompletní dodávku (i zaměstnanec), 25 Vrátit předání do stavu před předáním,
+// 26 mobil 390 px světlý + tmavý (karta kroku, Ukončit výrobu, Technologie po přesunu bez předání).
 // Vlastní data „E2E-14-"; na konci se uklidí.
 import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary } from "../lib.mjs";
 import { lit, userIds, eventually, waitHydrated, expectNoOverflow, isoDays, removeStorageFiles, mailsTo, waitMail } from "../lib-quotes-docs-flow.mjs";
@@ -72,8 +74,11 @@ const SUP_NAME = Object.fromEntries([[HRUBY, "Kovoobrábění Hrubý"], [NOVAK, 
 const MAIL = { novak: `e2e14-${tl}-novak@local.test`, tepkal: `e2e14-${tl}-tepkal@local.test`, hruby: `e2e14-${tl}-hruby@local.test` };
 
 let seq = 0;
-/** Zakázka s vlastním číslem (nespotřebuje čítač) a díly; heat = kalení na prvním dílu. */
-function job(title, { status = "potvrzeno", due = 30, owner = ID.obchod, items = [["PR-20", "Příruba", 2, "kalit 58–60 HRC"], ["PR-21", "Pouzdro", 1, null]] } = {}) {
+/**
+ * Zakázka s vlastním číslem (nespotřebuje čítač) a díly; heat = kalení na prvním dílu. Výchozí konečný termín
+ * za 40 dní: Novák (3 týdny) + doprava + kalení (5 dní) se vejde v každý den v týdnu (za 30 dní padal o víkendu o den).
+ */
+function job(title, { status = "potvrzeno", due = 40, owner = ID.obchod, items = [["PR-20", "Příruba", 2, "kalit 58–60 HRC"], ["PR-21", "Pouzdro", 1, null]] } = {}) {
   seq += 1;
   const number = `Z-E2E14-${TAG}-${seq}`;
   const id = sql(`insert into orders (number, title, status, source, owner_id, created_by, customer_id, order_date, due_date, value, currency)
@@ -470,6 +475,8 @@ await T("16 · „Přesunout bez dodavatele a termínu“: stav postaru (v histo
   const banner = page.locator('[data-testid="handoff-legacy"]');
   await banner.waitFor({ timeout: 20_000 });
   expect(norm(await banner.innerText()).includes("chybí, kdo to dělá a termín"), "Technologie: upozornění chybí kdo a termín");
+  // jediná výzva = banner (žádný starý prázdný stav „Jak se zakázka vyrobí?“ pod ním)
+  expect(await page.getByText("Jak se zakázka vyrobí?").count() === 0 && await page.getByText("Nebo poskládej sám").count() === 0, "bez druhé výzvy prázdného stavu");
   expect(await page.getByRole("tab", { name: /^Technologie/ }).count() > 0, "záložka se jmenuje „Technologie“");
   await page.goto(`${BASE}/orders?q=${encodeURIComponent(H.number)}`);
   const line = page.locator('[data-testid="production-line"]:visible').first();
@@ -583,9 +590,15 @@ await T("19 · Výroba → Tepelné zpracování → Výroba u stejné firmy: dr
   await eventually(async () => expect((await dialogText(page)).includes("Krok 3/3 · Výroba 2"), "přidaný krok 3/3 · Výroba 2"));
   const t = await dialogText(page);
   const k3 = t.slice(t.indexOf("Krok 3/3 · Výroba 2"));
-  expect(/Stejná firma jako krok 1( \(Výroba 1\))? — cena dle nové nabídky/.test(k3), `krok 3: stejná firma bez ceny (${k3.slice(0, 400)})`);
+  // další výroba: nic se nepředvyplní (Výroba 1/2/3 bývá u různých firem) — nápověda + stejná firma jako volba
+  expect(/Díly už dělá krok 1 \(Výroba 1\)/.test(k3), `krok 3: kdo prázdný s nápovědou (${k3.slice(0, 400)})`);
+  expect(/Stejná firma jako krok 1( \(Výroba 1\))? — cena dle nové nabídky/.test(k3), `krok 3: stejná firma bez ceny jako volba (${k3.slice(0, 400)})`);
   expect(!/Krok 3\/3 · Výroba 2[^]*Nejlevnější nabídka: .*12 200 Kč/.test(t), "krok 3 nemá „Nejlevnější nabídka … 12 200 Kč“");
-  await dialog(page).getByText(/Stejná firma jako krok 1/).first().scrollIntoViewIfNeeded();
+  const card3 = dialog(page).locator('section[aria-label^="Krok 3/3"]');
+  await card3.getByRole("button", { name: /Stejná firma jako krok 1/ }).first().click();
+  // varování: nabídku téže firmy už má krok 1 → tady se díly objednají znovu (bez ceny)
+  await eventually(async () => expect(/už má krok 1 \(Výroba 1\) — tady se díly objednají znovu/.test(norm(await card3.innerText())), "varování u stejné firmy"));
+  await card3.locator('[data-testid="handoff-overlap-warning"]').scrollIntoViewIfNeeded();
   await shot(page, S("19-three-steps-same-firm"));
   await submit(page).click();
   await waitResult(page);
@@ -737,6 +750,168 @@ await T("23 · po „Přesunout bez…“: v hlavičce jen jedno „Doplnit kdo 
   const ht = norm(await page.locator('main section[aria-label="Zakázka"]').innerText());
   expect(ht.includes("Předat do kroku…"), "detail: „Předat do kroku…“");
 });
+
+// ── 24–26: follow-up WP3 ─────────────────────────────────────
+/** Světlý / tmavý motiv bez načtení stránky (otevřený dialog zůstane). */
+async function setTheme(page, dark) {
+  await page.evaluate((d) => {
+    try { localStorage.setItem("theme", d ? "dark" : "light"); } catch { /* bez úložiště */ }
+    document.documentElement.classList.toggle("dark", d);
+    document.documentElement.classList.toggle("light", !d);
+    document.documentElement.style.colorScheme = d ? "dark" : "light";
+  }, dark);
+}
+async function addVyroba2(page) {
+  await dialog(page).locator('[data-testid="handoff-add-step"]').click();
+  await page.getByRole("menuitem", { name: "Výroba", exact: true }).click();
+  await eventually(async () => expect((await dialogText(page)).includes("Krok 3/3 · Výroba 2"), "přidaný krok 3/3 · Výroba 2"));
+  return dialog(page).locator('section[aria-label^="Krok 3/3"]');
+}
+
+// 24. Krok 1 z nabídky + „Výroba 2": kompletní dodávka (Hrubý 15 000, vybraná v Nákupu) se nikdy nepředvyplní
+const KJ = job("komplet a výroba 2", { due: 60 });
+const qKJ = quote(KJ, HRUBY, [5000, 5000], { kinds: "kompletni_dodavka", selected: true, lead: 25 });
+const qKJn = quote(KJ, NOVAK, [4000, 4200], { lead: 21, note: "frézování" });
+const qKJt = sql(`insert into supplier_quotes (job_id, supplier_id, number, currency, lead_time_days, source, total, valid_until, operation_kinds, note)
+  values (${lit(KJ.id)}, ${lit(TEPKAL)}, ${lit(`NAB-${TAG}-kjt`)}, 'CZK', 5, 'manual', 2100, current_date + 30, '{tepelne_zpracovani}'::text[], 'kalení') returning id`).split("\n")[0];
+sql(`insert into supplier_quote_items (supplier_quote_id, position, drawing_number, name, quantity, unit, unit_price) values (${lit(qKJt)}, 0, ${lit(KJ.dn[0])}, 'Příruba — kalení', 2, 'ks', 1050)`);
+await T("24a · zaměstnanec 390 px: krok 1 z nabídky Nováka + „Výroba 2“ → žádná „Jediná nabídka: Hrubý“, kdo prázdný s nápovědou, žádné „Kč“", async (ctx) => {
+  const page = await ctx.newPage();
+  await login(page, USERS.dilna);
+  await openJob(page, KJ);
+  await openHandoffFromNext(page);
+  expect((await dialogText(page)).includes(SUP_NAME[NOVAK]), "krok 1 = Novák z nabídky");
+  const card3 = await addVyroba2(page);
+  const k3 = norm(await card3.innerText());
+  expect(k3.includes("Díly už dělá krok 1 (Výroba 1)"), `nápověda u prázdného kdo (${k3.slice(0, 400)})`);
+  expect(!k3.includes(SUP_NAME[HRUBY]) && !/Jediná nabídka|Doporučeno podle nabídek|nejlevnější/.test(k3), `kompletní dodávka není návrh (${k3.slice(0, 400)})`);
+  expect(!(await dialogText(page)).includes("Kč"), "zaměstnanec nevidí ceny");
+  await card3.locator('[data-testid="handoff-who-hint"]').scrollIntoViewIfNeeded();
+  await expectNoOverflow(page, "dialog předání 390 px");
+  await shot(page, S("24a-vyroba2-worker-light"));
+  await setTheme(page, true);
+  await shot(page, S("24a-vyroba2-worker-dark"));
+  await setTheme(page, false);
+  await dialog(page).getByRole("button", { name: "Zrušit" }).click();
+  expect(ops(KJ).length === 0 && pos(KJ).length === 0, "nic nevzniklo");
+}, { mobile: true });
+
+await T("24b · obchodník: „Výroba 2“ bez kompletní dodávky; ručně Hrubý → varování „má nabídku na kompletní dodávku“; předání nepřipíše nabídku Hrubého", async (ctx) => {
+  const page = await ctx.newPage();
+  await login(page, USERS.obchod);
+  await openJob(page, KJ);
+  await openHandoffFromNext(page);
+  const card3 = await addVyroba2(page);
+  const k3 = norm(await card3.innerText());
+  expect(k3.includes("Díly už dělá krok 1 (Výroba 1)") && !k3.includes("15 000") && !k3.includes("Jediná nabídka"), `bez kompletní dodávky (${k3.slice(0, 400)})`);
+  // ručně firma s kompletní nabídkou → varování (bez cen)
+  await card3.getByRole("button", { name: "Jiná firma…" }).click();
+  await card3.getByPlaceholder("Hledej dodavatele, nebo napiš název firmy…").fill("Kovoobrábění Hrubý");
+  await card3.getByRole("option").filter({ hasText: SUP_NAME[HRUBY] }).first().getByRole("button").click();
+  const warn = card3.locator('[data-testid="handoff-overlap-warning"]');
+  await warn.waitFor({ timeout: 10_000 });
+  const w = norm(await warn.innerText());
+  expect(/má nabídku na kompletní dodávku .* díly dělá i krok 1 \(Výroba 1\)\. Obrábění by se objednalo dvakrát\./.test(w) && !w.includes("Kč"), `varování (${w})`);
+  await warn.scrollIntoViewIfNeeded();
+  await shot(page, S("24b-overlap-warning"));
+  await submit(page).click();
+  await waitResult(page);
+  const o = ops(KJ);
+  expect(o.length === 3 && o[0].supplier_quote_id === qKJn && o[2].supplier_id === HRUBY && o[2].supplier_quote_id === null,
+    `krok 3 Hrubý bez kompletní nabídky (${o.map((x) => `${x.kind}:${x.supplier_quote_id}`).join(", ")})`);
+  expect(!o.some((x) => x.supplier_quote_id === qKJ), "kompletní nabídka u žádného kroku");
+  expect(pos(KJ).length === 1 && Number(pos(KJ)[0].total) === 12200, "jen objednávka kroku 1 (12 200)");
+});
+
+// 25. Vrátit předání = zpět do stavu před předáním (ne vždy Potvrzená): menu postupu (Objednávka) i akce toku (Reklamace)
+const UJ = job("vrácení z objednávky", { status: "objednavka" });
+quote(UJ, NOVAK, [4000, 4200], { lead: 21, note: "frézování" });
+const RJ2 = job("vrácení z reklamace", { status: "reklamace" });
+quote(RJ2, NOVAK, [4000, 4200], { lead: 21, note: "frézování" });
+async function handoffFromTech(page, j) {
+  await openJob(page, j, "?tab=vyroba");
+  await page.locator('main [role=tabpanel][data-state=active] [data-testid="handoff-empty"]').getByRole("button", { name: "Předat do výroby…" }).click();
+  await submit(page).waitFor({ timeout: 20_000 });
+  await submit(page).click();
+  await waitResult(page);
+  await eventually(async () => expect(stage(j) === "ve_vyrobe", `předáno (${stage(j)})`), { timeout: 30_000 });
+}
+await T("25 · „Vrátit předání“ vrací do stavu před předáním: z menu postupu → Objednávka („Jen přesunout stav“ kroky ponechá); z akcí toku → Reklamace", async (ctx) => {
+  const page = await ctx.newPage();
+  await login(page, USERS.obchod);
+  await handoffFromTech(page, UJ);
+  await openJob(page, UJ, "?tab=vyroba");
+  await page.getByRole("button", { name: "Výroba — další akce" }).click();
+  await page.getByRole("menuitem", { name: "Vrátit předání do výroby" }).click();
+  await submit(page).waitFor({ timeout: 20_000 });
+  const t = await dialogText(page);
+  expect(t.includes("zakázka do stavu před předáním: Objednávka"), `cíl Objednávka (${t.slice(0, 300)})`);
+  const move = dialog(page).locator('[data-testid="handoff-plain-move"]');
+  expect(norm(await move.innerText()) === "Jen přesunout stav na „Objednávka“ (kroky a objednávky zůstanou)", `odkaz (${norm(await move.innerText())})`);
+  await shot(page, S("25-undo-to-objednavka"));
+  await move.click();
+  await eventually(async () => expect(stage(UJ) === "objednavka", `zpět Objednávka, ne Potvrzená (${stage(UJ)})`), { timeout: 30_000 });
+  expect(ops(UJ).length === 2 && ops(UJ)[0].status === "probiha" && pos(UJ).length === 1 && pos(UJ)[0].status !== "zrusena",
+    `kroky a objednávky zůstaly (${ops(UJ).map((x) => x.status).join(",")}; ${pos(UJ).map((x) => x.status).join(",")})`);
+  // akce toku (⋯ Akce se stavem) — skutečné vrácení do Reklamace
+  await handoffFromTech(page, RJ2);
+  await openJob(page, RJ2);
+  await page.locator('main section[aria-label="Zakázka"]').getByRole("button", { name: "Akce se stavem" }).first().click();
+  await page.getByRole("menuitem", { name: "Vrátit předání do výroby" }).click();
+  await submit(page).waitFor({ timeout: 20_000 });
+  const t2 = await dialogText(page);
+  expect(t2.includes("zakázka do stavu před předáním: Reklamace") && t2.includes("Jen přesunout stav na „Reklamace“"), `cíl Reklamace (${t2.slice(0, 300)})`);
+  await submit(page).click();
+  await eventually(async () => expect(stage(RJ2) === "reklamace", `skutečné vrácení do Reklamace (${stage(RJ2)})`), { timeout: 30_000 });
+  expect(pos(RJ2)[0].status === "zrusena" && ops(RJ2).every((x) => x.status === "ceka"), "neodeslaná objednávka zrušena, kroky čekají");
+});
+
+// 26. Mobil 390 px, světlý + tmavý: karta kroku (celé jméno, role pod ním), Ukončit výrobu (bez červené chyby předem), Technologie po přesunu bez předání
+const FJ = job("mobil ukončení", { status: "ve_vyrobe" });
+sql(`insert into job_operations (job_id, kind, status, position, in_house, supplier_id, planned_end, started_at) values (${lit(FJ.id)}, 'vyroba', 'probiha', 0, false, ${lit(NOVAK)}, current_date + 9, now())`);
+sql(`insert into job_operations (job_id, kind, status, position, in_house, supplier_id, planned_end) values (${lit(FJ.id)}, 'tepelne_zpracovani', 'ceka', 1, false, ${lit(TEPKAL)}, current_date + 14)`);
+await T("26 · 390 px světlý + tmavý: karta kroku s celým jménem firmy, „Ukončit výrobu“ bez červené chyby předem, Technologie po přesunu bez předání jen s bannerem", async (ctx) => {
+  const page = await ctx.newPage();
+  await login(page, USERS.obchod);
+  await openJob(page, FJ, "?tab=vyroba");
+  const who = page.locator('main [role=tabpanel][data-state=active] [data-testid="operation-who"]').first();
+  await who.waitFor({ timeout: 20_000 });
+  const wt = norm(await who.innerText());
+  expect(wt.includes(SUP_NAME[NOVAK]) && wt.includes("částečný dodavatel") && !wt.includes("(částečný dodavatel)"), `celé jméno + role pod ním (${wt})`);
+  const cut = await who.locator("span.block").first().evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+  expect(!cut, "jméno firmy není oříznuté");
+  await expectNoOverflow(page, "Technologie 390 px");
+  await who.scrollIntoViewIfNeeded();
+  await shot(page, S("26-step-card-light"));
+  await setTheme(page, true);
+  await shot(page, S("26-step-card-dark"));
+  await setTheme(page, false);
+  await page.getByRole("button", { name: "Výroba — další akce" }).click();
+  await page.getByRole("menuitem", { name: "Ukončit výrobu…" }).click();
+  await submit(page).waitFor({ timeout: 20_000 });
+  const t = await dialogText(page);
+  expect(t.includes("Proč končíš dřív? *") && !t.includes("Napiš, proč končíš"), `bez červené chyby, dokud uživatel nic neudělal (${t.slice(0, 500)})`);
+  expect(await submit(page).isDisabled(), "bez důvodu nejde ukončit");
+  await shot(page, S("26-finish-light"));
+  await setTheme(page, true);
+  await shot(page, S("26-finish-dark"));
+  await setTheme(page, false);
+  await dialog(page).getByLabel("Proč končíš dřív? *").fill("kalení odpadá");
+  expect(!(await submit(page).isDisabled()), "s důvodem jde ukončit");
+  await dialog(page).getByRole("button", { name: "Zrušit" }).click();
+  // Technologie po přesunu bez předání (zakázka H ze scénáře 16, jinak vlastní)
+  const plain = stage(H) === "ve_vyrobe" && ops(H).length === 0 ? H : job("bez předání mobil", { status: "ve_vyrobe" });
+  await openJob(page, plain, "?tab=vyroba");
+  const banner = page.locator('[data-testid="handoff-legacy"]');
+  await banner.waitFor({ timeout: 20_000 });
+  expect(await page.getByText("Jak se zakázka vyrobí?").count() === 0, "jen banner, bez prázdného stavu");
+  await expectNoOverflow(page, "Technologie bez postupu 390 px");
+  await banner.scrollIntoViewIfNeeded();
+  await shot(page, S("26-technologie-plain-light"));
+  await setTheme(page, true);
+  await shot(page, S("26-technologie-plain-dark"));
+  await setTheme(page, false);
+}, { mobile: true });
 
 const ok = summary(errors.filter((e) => !/HTTP 5\d\d .*\/_next\/|favicon/.test(e)));
 if (!process.env.KEEP) await cleanup();

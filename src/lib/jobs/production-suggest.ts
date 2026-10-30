@@ -206,6 +206,41 @@ export function quoteStepMatch(kinds: OperationKind[], stepKind: OperationKind):
   return 0;
 }
 
+/** Nabídka na kompletní dodávku (obrábění i úpravy jednou firmou). */
+export function isCompleteQuote(q: Pick<SuggestQuote, "operationKinds" | "note" | "items" | "supplierTechnologies">): boolean {
+  return quoteKinds(q).kinds.includes("kompletni_dodavka");
+}
+
+/** Krok obrábění nebo kompletní dodávky (díly z něj vycházejí hotové / obrobené). */
+export function isMachiningKind(kind: OperationKind): boolean {
+  const f = operationFamily(kind);
+  return f === "obrabeni" || f === "komplet";
+}
+
+function scopesOverlap(a: string[] | null | undefined, b: string[] | null | undefined): boolean {
+  if (!a || !b) return true;
+  return a.some((id) => b.includes(id));
+}
+
+/**
+ * Díly kroku už dělá jiný (dřívější) krok obrábění / kompletní dodávky → popisek toho kroku („krok 1 (Výroba 1)"),
+ * jinak null. Takový krok je DALŠÍ výroba (Výroba 2, 3 …): kompletní dodávka by díly objednala podruhé.
+ * Platí jen pro krok obrábění / kompletní dodávky (kalírna, povrch … se neřeší).
+ */
+export function coveringStep(
+  step: { kind: OperationKind; orderItemIds?: string[] | null },
+  earlier: { kind: OperationKind; orderItemIds?: string[] | null; label: string }[],
+): string | null {
+  if (!isMachiningKind(step.kind)) return null;
+  const hit = earlier.find((o) => isMachiningKind(o.kind) && scopesOverlap(o.orderItemIds ?? null, step.orderItemIds ?? null));
+  return hit ? hit.label : null;
+}
+
+/** Nápověda ke kroku bez návrhu, když díly už dělá jiný krok (žádná kompletní dodávka ani cizí nabídka se nepředvyplní). */
+export function coveredHint(coveredBy: string): string {
+  return `Díly už dělá ${coveredBy} — kompletní dodávka se tu znovu nenabízí (obrábění by se objednalo dvakrát). Vyber firmu na tento krok, nebo „U nás“.`;
+}
+
 // ── Porovnatelná cena (D.4) ─────────────────────────────────
 /** = SQL drawing_norm(): velká písmena, bez mezer, teček, pomlček a lomítek. */
 export function normalizeDrawingNumber(v: string | null | undefined): string | null {
@@ -480,6 +515,12 @@ export interface SuggestWhoInput {
     plannedWho?: StepWho | null;
     /** Jediný krok postupu (objednávka obrábění se počítá i bez druhů). */
     onlyStep?: boolean;
+    /**
+     * Díly kroku už dělá dřívější krok obrábění / kompletní dodávky (popisek „krok 1 (Výroba 1)" — coveringStep).
+     * Pak se nenabízí žádná nabídka na kompletní dodávku (ani její objednávka) a předvyplní se jen nabídka
+     * na tuto operaci; „stejná firma" a historie zůstanou jen jako volby (kdo zůstane prázdný s nápovědou).
+     */
+    coveredBy?: string | null;
   };
   quotes: SuggestQuote[];
   openPurchaseOrders?: SuggestOpenPurchaseOrder[];
@@ -569,18 +610,22 @@ function stampText(by: string | null | undefined, at: string | null | undefined)
  */
 export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
   const { step, canSeePrices } = input;
+  // další výroba (díly už dělá dřívější krok obrábění): kompletní dodávka by je objednala podruhé — vůbec se nenabízí
+  const covered = step.coveredBy && isMachiningKind(step.kind) ? step.coveredBy : null;
+  const quotes = covered ? input.quotes.filter((q) => !isCompleteQuote(q)) : input.quotes;
   const used = input.usedQuotes ?? {};
   const usedIds = Object.keys(used);
   const ctx: RankContext = usedIds.length ? { ...input.ctx, excludeQuoteIds: [...(input.ctx.excludeQuoteIds ?? []), ...usedIds] } : input.ctx;
   const fam = operationFamily(step.kind);
-  const ranked = rankQuotesForStep(step, input.quotes, ctx);
+  const ranked = rankQuotesForStep(step, quotes, ctx);
   const best = ranked.comparable[0]?.value.value ?? null;
   const alternatives: WhoSuggestion[] = [];
   let primary: WhoSuggestion | null = null;
   let warning: string | null = null;
 
   // 0) existující otevřená objednávka
-  const pos = (input.openPurchaseOrders ?? []).filter((p) => ["navrh", "vystavena", "odeslana", "potvrzena"].includes(p.status));
+  const pos = (input.openPurchaseOrders ?? []).filter((p) => ["navrh", "vystavena", "odeslana", "potvrzena"].includes(p.status)
+    && !(covered && (p.kinds ?? []).includes("kompletni_dodavka")));
   const poMatch = pos.find((p) => sameSupplier(step.plannedWho, p))
     ?? pos.find((p) => (p.kinds ?? []).length > 0 && quoteStepMatch(p.kinds ?? [], step.kind) >= 2)
     ?? ((fam === "obrabeni" || fam === "komplet") && pos.length === 1 && !(pos[0].kinds ?? []).length ? pos[0] : undefined);
@@ -638,7 +683,7 @@ export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
   // 2b) firma, jejíž nabídku už spotřeboval jiný krok / objednávka zakázky: návrh bez ceny („cena dle nové nabídky")
   const sameFirm: WhoSuggestion[] = [];
   for (const [qid, label] of Object.entries(used)) {
-    const q = input.quotes.find((x) => x.id === qid);
+    const q = quotes.find((x) => x.id === qid);
     if (!q || quoteStepMatch(quoteKinds(q).kinds, step.kind) === 0) continue;
     const who = whoOfQuote(q);
     const key = who.type === "supplier" ? `s:${who.id}` : `f:${q.supplierName.trim().toLowerCase()}`;
@@ -646,11 +691,16 @@ export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
     if (has(primary) || alternatives.some(has) || sameFirm.some(has)) continue;
     sameFirm.push(blank("posledni_operace", who, `Stejná firma jako ${label} — cena dle nové nabídky`));
   }
-  if (!primary && sameFirm.length) primary = sameFirm.shift() ?? null;
+  // další výroba: předvyplní se jen nabídka na tuto operaci — stejná firma / historie jsou jen volby
+  if (!primary && sameFirm.length && !covered) primary = sameFirm.shift() ?? null;
   alternatives.push(...sameFirm);
 
   // 3) historie
-  if (!primary) primary = historySuggestion(input);
+  if (!primary) {
+    const h = historySuggestion(input);
+    if (!covered) primary = h;
+    else if (h && !alternatives.some((a) => a.who.type === h.who.type && whoKeyOf(a.who) === whoKeyOf(h.who))) alternatives.push(h);
+  }
 
   // nejrychlejší dodání mezi návrhy z nabídek
   const all = [primary, ...alternatives].filter((x): x is WhoSuggestion => Boolean(x && x.supplierQuoteId && x.deliveryDate));
@@ -682,8 +732,14 @@ export function suggestWhoForStep(input: SuggestWhoInput): WhoSuggestionResult {
       .slice(0, 5)
       .map((a) => withOrder(a) as WhoSuggestion),
     warning,
-    message: primary ? null : "K tomuto kroku nemáme nabídku — vyber firmu, nebo „U nás“.",
+    message: primary ? null : covered ? coveredHint(covered) : "K tomuto kroku nemáme nabídku — vyber firmu, nebo „U nás“.",
   };
+}
+
+function whoKeyOf(w: StepWho): string {
+  if (w.type === "supplier") return `s:${w.id}`;
+  if (w.type === "free") return `f:${w.name.trim().toLowerCase()}`;
+  return w.type;
 }
 
 function historySuggestion(input: SuggestWhoInput): WhoSuggestion | null {

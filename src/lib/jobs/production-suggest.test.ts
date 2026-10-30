@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  familyScopeOf, kindAccusative, leadTimeLabel, money, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, operationKindsOfText,
+  coveredHint, coveringStep, familyScopeOf, isCompleteQuote, kindAccusative, leadTimeLabel, money, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, operationKindsOfText,
   purchaseItemsForStep, quoteKinds, quoteStepMatch, quoteValue, rankQuotesForStep, stepPurchaseOrderNote,
   suggestRoute, suggestStepDeadline, suggestWhoForStep, unitClass, workingDayOnOrAfter,
   type SuggestItem, type SuggestQuote,
@@ -547,5 +547,66 @@ describe("review WP3: spotřebovaná nabídka a objednávka podle návrhu", () =
     expect(n.primary?.order).toEqual({ itemCount: 2, unpriced: 0, total: 12_200 });
     // bez práva na ceny bez částky
     expect(suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [NOVAK], ctx: CTX, canSeePrices: false }).primary?.order).toEqual({ itemCount: 2, unpriced: 0, total: null });
+  });
+});
+
+describe("follow-up WP3: další výroba nikdy nedostane kompletní dodávku", () => {
+  const COVER = "krok 1 (Výroba 1)";
+
+  it("coveringStep: jen obrábění / komplet s překryvem dílů; kalírna ani jiné díly nekryjí", () => {
+    expect(coveringStep({ kind: "vyroba" }, [{ kind: "vyroba", label: COVER }])).toBe(COVER);
+    expect(coveringStep({ kind: "frezovani", orderItemIds: [POUZDRO.id] }, [{ kind: "kompletni_dodavka", orderItemIds: null, label: "krok 1 (Kompletní dodávka)" }]))
+      .toBe("krok 1 (Kompletní dodávka)");
+    expect(coveringStep({ kind: "vyroba" }, [{ kind: "tepelne_zpracovani", label: "krok 2" }])).toBeNull();
+    expect(coveringStep({ kind: "vyroba", orderItemIds: [POUZDRO.id] }, [{ kind: "vyroba", orderItemIds: [PRIRUBA.id], label: COVER }])).toBeNull();
+    expect(coveringStep({ kind: "tepelne_zpracovani" }, [{ kind: "vyroba", label: COVER }])).toBeNull();     // kalení po obrábění je v pořádku
+    expect(coveringStep({ kind: "vyroba" }, [])).toBeNull();
+    expect(isCompleteQuote(HRUBY)).toBe(true);
+    expect(isCompleteQuote(NOVAK)).toBe(false);
+  });
+
+  it("Výroba 2 po Výrobě 1 z nabídky Nováka: ne „Jediná nabídka: Hrubý 15 000 Kč“ — kdo prázdný s nápovědou, stejná firma jen jako volba", () => {
+    // bez pravidla: jediná zbylá nabídka je komplet Hrubý (= obrábění podruhé)
+    const before = suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [HRUBY, NOVAK, TEPKAL], ctx: CTX, canSeePrices: true, usedQuotes: { novak: COVER } });
+    expect(before.primary).toMatchObject({ supplierQuoteId: "hruby", reason: "Jediná nabídka" });
+    for (const canSeePrices of [true, false]) {
+      const r = suggestWhoForStep({
+        step: { kind: "vyroba", coveredBy: COVER }, quotes: [HRUBY, NOVAK, TEPKAL], ctx: CTX, canSeePrices, usedQuotes: { novak: COVER },
+      });
+      expect(r.primary).toBeNull();
+      expect([r.primary, ...r.alternatives].some((s) => s?.supplierQuoteId === "hruby" || (s?.who.type === "supplier" && s.who.id === "sup-hruby"))).toBe(false);
+      expect(r.alternatives.find((a) => a.who.type === "supplier" && a.who.id === "sup-novak"))
+        .toMatchObject({ supplierQuoteId: null, price: null, reason: "Stejná firma jako krok 1 (Výroba 1) — cena dle nové nabídky" });
+      expect(r.message).toBe(coveredHint(COVER));
+      expect(r.message).toContain("Díly už dělá krok 1 (Výroba 1)");
+    }
+  });
+
+  it("nabídka na tuto operaci od jiné firmy se dál předvyplní (Výroba 2 jinde, s cenou)", () => {
+    const brus = quote({ id: "brus", supplierName: "Brusírna Malá s.r.o.", operationKinds: ["vyroba"], leadTimeDays: 7,
+      items: [{ drawingNumber: "PR-7075-20", name: "Příruba", quantity: 200, unit: "ks", unitPrice: 15, note: null },
+        { drawingNumber: "PR-7075-21", name: "Pouzdro", quantity: 100, unit: "ks", unitPrice: 10, note: null }] });
+    const r = suggestWhoForStep({ step: { kind: "vyroba", coveredBy: COVER }, quotes: [HRUBY, NOVAK, brus], ctx: CTX, canSeePrices: true, usedQuotes: { novak: COVER } });
+    expect(r.primary).toMatchObject({ supplierQuoteId: "brus", source: "nejlevnejsi_nabidka", price: 4_000 });
+    expect(r.alternatives.some((a) => a.supplierQuoteId === "hruby")).toBe(false);
+  });
+
+  it("vystavená objednávka na kompletní dodávku se pro další výrobu nepoužije; historie jen jako volba", () => {
+    const r = suggestWhoForStep({
+      step: { kind: "vyroba", coveredBy: COVER }, quotes: [HRUBY], ctx: CTX, canSeePrices: true,
+      openPurchaseOrders: [{ id: "po1", number: "OV-1", status: "vystavena", supplierId: "sup-hruby", supplierName: "Kovoobrábění Hrubý s.r.o.",
+        supplierQuoteId: "hruby", requiredDate: null, confirmedDate: null, kinds: ["kompletni_dodavka"] }],
+      history: { operations: [{ kind: "vyroba", inHouse: false, supplierId: "sup-x", supplierName: "Starý Dodavatel", jobNumber: "Z-1", material: null }] },
+    });
+    expect(r.primary).toBeNull();
+    expect(r.alternatives.map((a) => a.reason)).toEqual(["Naposledy dělal výrobu: Starý Dodavatel (Z-1)"]);
+    // první krok (nic nekryje) dál dostane kompletní dodávku i historii jako dřív
+    const first = suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [HRUBY], ctx: CTX, canSeePrices: true });
+    expect(first.primary).toMatchObject({ supplierQuoteId: "hruby" });
+  });
+
+  it("kalírna po obrábění se pravidlem nemění (coveredBy u jiné rodiny nic nedělá)", () => {
+    const r = suggestWhoForStep({ step: { kind: "tepelne_zpracovani", coveredBy: COVER }, quotes: [HRUBY, NOVAK, TEPKAL], ctx: CTX, canSeePrices: true });
+    expect(r.primary).toMatchObject({ supplierQuoteId: "tepkal" });
   });
 });
