@@ -8,7 +8,7 @@ import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/su
 import { userActor } from "@/lib/supabase/actor-headers";
 import { settingsFromRow, settingsToRow, configHash, type AnonSettings } from "@/lib/anonymize/settings";
 import { anonRunnerStatus, appOrigin, approve, enqueue, kick, promoteLegacy, skip, type AnonDb, type AnonTable } from "@/lib/anonymize/queue";
-import { cancelSend, enqueueSend, sendWithoutPending, validateSendRequest, type SendKind, type SendPayload } from "@/lib/anonymize/send-queue";
+import { allowQueuedOriginals, cancelSend, enqueueSend, sendWithoutPending, validateSendRequest, type SendKind, type SendPayload } from "@/lib/anonymize/send-queue";
 import { assertJobFileAccess } from "@/lib/jobs/job-file-access";
 import { getAccess } from "@/lib/auth/session";
 
@@ -198,6 +198,22 @@ export async function cancelQueuedSend(id: string): Promise<Result> {
   if (!UUID_RE.test(id)) return { ok: false, error: "Odeslání nenalezeno." };
   const r = await cancelSend(c.db, id, c.user.id, c.user.role === "super_admin");
   return r.ok ? { ok: true } : { ok: false, error: r.error ?? "Zrušení selhalo." };
+}
+
+/**
+ * „Poslat originál…" u odeslání zablokovaného souborem, který anonymizovat nejde (DWG, Word…): jen super admin,
+ * s výslovným potvrzením v dialogu, zapíše audit a hned odešle (ostatní výkresy jen anonymizované).
+ */
+export async function sendQueuedWithOriginals(id: string, confirm: boolean): Promise<Result<{ sent: boolean }>> {
+  const c = await begin("orders");
+  if ("error" in c) return { ok: false, error: c.error as string };
+  if (!UUID_RE.test(id)) return { ok: false, error: "Odeslání nenalezeno." };
+  if (c.user.role !== "super_admin") {
+    return { ok: false, error: "Originál bez anonymizace smí dodavateli poslat jen super admin — požádej ho o odeslání, nebo soubor převeď (PDF, DXF, STEP) a nahraj znovu, pak se anonymizuje sám." };
+  }
+  if (confirm !== true) return { ok: false, error: "Potvrď, že posíláš originál bez anonymizace." };
+  const r = await allowQueuedOriginals(c.db, id, c.user, c.actor);
+  return r.ok ? { ok: true, sent: Boolean(r.sent) } : { ok: false, error: r.error ?? "Odeslání selhalo." };
 }
 
 /** „Odeslat hned bez těchto výkresů". */

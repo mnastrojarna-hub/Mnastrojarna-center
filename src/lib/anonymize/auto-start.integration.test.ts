@@ -12,7 +12,7 @@ import { makeVectorDrawing } from "./__fixtures__/samples";
  * výkres, ho zařadí a zpracování začne hned v témže požadavku (after()), BEZ CRON_SECRET a s NEDOSAŽITELNOU
  * adresou aplikace (APP_URL → 127.0.0.1:9, jako chráněné / špatné nasazení na Vercelu):
  *   dokumenty zakázky (registerJobFile + šťouchnutí), focení (apply), dávka (batch/apply), přílohy pošty
- *   (/api/emails/sync), archiv výkresů (uploadDrawing + šťouchnutí), samostatný nástroj, ruční zařazení,
+ *   (/api/emails/sync), archiv výkresů (registerDrawing + šťouchnutí), samostatný nástroj, ruční zařazení,
  *   řetěz interního běhu; převzetí přerušeného běhu, 3 pokusy → selhání s českým důvodem, Nastavení.
  * Celá sada běží dvakrát: bez CRON_SECRET a s ním.
  *   set -a; . .local-supabase/env; set +a; LOCAL_SUPABASE=1 npx vitest run src/lib/anonymize/auto-start.integration.test.ts
@@ -279,15 +279,19 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace se spustí sama hned po nahrání (
         expect(finished((await status(id)).anon_status)).toBe(true);
       }, 120_000);
 
-      it("Archiv výkresů (uploadDrawing) → id + pending → šťouchnutí (table drawings) → zpracováno", async () => {
+      it("Archiv výkresů (podepsaná URL + registerDrawing) → id + pending → šťouchnutí (table drawings) → zpracováno", async () => {
         h.extract = {
           drawing_number: `E2E-AUTO-${STAMP}-${mode.secret ? "s" : "n"}`, revision: "A", material: "S235JR", blank_dimensions: "", heat_treatment: "", surface_treatment: "",
           requirements: "", part_name: "Hřídel", quantity: 2, heat_status: "none", surface_status: "none", summary: "", confidence: 0.9,
         };
-        const { uploadDrawing } = await import("@/app/actions/drawings");
-        const fd = new FormData();
-        fd.append("file", new File([Buffer.from(pdf)], "hridel.pdf", { type: "application/pdf" }));
-        const r = await uploadDrawing(fd);
+        const { createDrawingUpload, registerDrawing } = await import("@/app/actions/drawings");
+        // soubor jde přímo do úložiště (žádné bajty přes server action), akce dostane jen cestu
+        const prep = await createDrawingUpload({ filename: "hridel.pdf", size: pdf.length, mimeType: "application/pdf" });
+        expect(prep.ok, prep.error).toBe(true);
+        expect(prep.path).toMatch(/^vykresy\/upload\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf$/);
+        const up = await svc.storage.from(prep.bucket!).uploadToSignedUrl(prep.path!, prep.token!, pdf, { contentType: "application/pdf" });
+        expect(up.error).toBeNull();
+        const r = await registerDrawing({ path: prep.path!, filename: "hridel.pdf", mimeType: "application/pdf" });
         expect(r.ok, r.error).toBe(true);
         drawings.push(r.id!);
         expect(r.anonStatus).toBe("pending");

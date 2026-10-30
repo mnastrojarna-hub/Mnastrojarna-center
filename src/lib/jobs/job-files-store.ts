@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { FILE_KINDS, guessFileKind, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
-  cleanNumber, cleanText, isGenericCaptureName, isUuid, isValidJobFilePath, rowToJobFile, translateDbError,
+  cleanNumber, cleanText, isGenericCaptureName, isUuid, isValidJobFilePath, jobMasterPath, rowToJobFile, translateDbError,
   JOB_FILE_SELECT, type FileRow,
 } from "@/lib/jobs/mapping";
 import type { DocIssuerKey, JobFileKind, JobFileOrigin } from "@/lib/supabase/database.types";
@@ -60,6 +60,11 @@ export interface RegisterJobFileInput {
   anonStatus?: "skipped";
   /** Master fotky v plném rozlišení (zdroj anonymizace místo zmenšeného hlavního souboru). */
   anonSourcePath?: string | null;
+  /**
+   * Hlavní soubor JE originál v plném rozlišení (prohlížeč ho nezmenšil, obsah archivu…) → zdroj
+   * anonymizace = on sám (anon_source_path = storage_path), bez varování „Fotka v nízkém rozlišení".
+   */
+  anonSourceIsMain?: boolean;
 }
 
 const PATH_TAKEN = "Tento soubor už patří jinému dokumentu.";
@@ -130,10 +135,12 @@ export async function registerJobFileCore(
   if (input.origin !== undefined && input.origin !== null && !ORIGINS.includes(input.origin)) return fail("Neznámý původ dokumentu.");
   if (input.issuer !== undefined && input.issuer !== null && !ISSUERS.includes(input.issuer)) return fail("Neznámý vystavitel dokladu.");
   if (input.anonStatus !== undefined && input.anonStatus !== "skipped") return fail("Neplatný stav anonymizace.");
-  const anonSource = typeof input.anonSourcePath === "string" && input.anonSourcePath ? input.anonSourcePath : null;
-  if (anonSource && (anonSource === input.path || !(isValidJobFilePath(jobId, anonSource) || isCaptureMasterPath(userId, anonSource)))) {
+  const masterPath = typeof input.anonSourcePath === "string" && input.anonSourcePath ? input.anonSourcePath : null;
+  if (masterPath && (masterPath === input.path
+    || !(isValidJobFilePath(jobId, masterPath) || masterPath === jobMasterPath(input.path) || isCaptureMasterPath(userId, masterPath)))) {
     return fail("Neplatná cesta zdroje anonymizace.");
   }
+  const anonSource = masterPath ?? (input.anonSourceIsMain ? input.path : null);
   const orderRevision = cleanNumber(input.orderRevision);
   if (orderRevision !== null && (!Number.isInteger(orderRevision) || orderRevision < 1 || orderRevision > 10_000)) return fail("Neplatná revize objednávky.");
 

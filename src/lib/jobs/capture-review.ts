@@ -54,6 +54,22 @@ export function captureSortPath(userId: string, pagePath: string): string {
   return `${captureFolder(userId)}/${uuid}.sort.jpg`;
 }
 
+/**
+ * Master fotky v plném rozlišení (originál z fotoaparátu vedle zmenšené stránky, zdroj anonymizace):
+ * capture/<uživatel>/<uuid stránky>.hires — pevně odvozený z cesty stránky (prohlížeč nic neposílá navíc,
+ * uložení ho přesune k dokumentu zakázky). null = cesta není stránka focení.
+ */
+export function captureHiresPath(pagePath: string): string | null {
+  const m = new RegExp(`^capture/(${UUID_SRC})/(${UUID_SRC})-[A-Za-z0-9._-]{1,120}$`, "i").exec(pagePath ?? "");
+  return m ? `capture/${m[1].toLowerCase()}/${m[2].toLowerCase()}.hires` : null;
+}
+
+/** Master fotky patří přihlášenému uživateli. */
+export function isCaptureHiresPath(userId: string, path: unknown): path is string {
+  if (!isUuid(userId) || typeof path !== "string" || path.includes("..")) return false;
+  return new RegExp(`^capture/${userId.toLowerCase()}/${UUID_SRC}\\.hires$`).test(path);
+}
+
 /** Náhled roztřídění patří přihlášenému uživateli. */
 export function isCaptureSortPath(userId: string, path: unknown): path is string {
   if (!isUuid(userId) || typeof path !== "string" || path.includes("..")) return false;
@@ -80,6 +96,17 @@ export interface CaptureFileRef {
   size: number;
   /** Náhled 1280 px pro roztřídění (jen fotky v dávce). */
   sortPath?: string | null;
+}
+
+/** Podepsané URL pro nahrání stránky focení (+ náhled roztřídění, + master fotky v plném rozlišení). */
+export interface CaptureUploadPrep {
+  path: string;
+  token: string;
+  bucket: string;
+  sortPath?: string;
+  sortToken?: string;
+  masterPath?: string;
+  masterToken?: string;
 }
 
 /** Fotka nebo PDF (jiné soubory patří do dokumentů zakázky, ne do „Vyfotit doklad"). */

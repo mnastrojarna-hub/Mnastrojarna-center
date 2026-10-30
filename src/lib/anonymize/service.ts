@@ -53,8 +53,13 @@ function truthy(v: string | undefined, d: boolean): boolean {
   return ["1", "true", "ano", "yes", "on"].includes(v.trim().toLowerCase());
 }
 
-/** Smí běh použít AI? (klíč, hlavní vypínač, ai_capture autora — u systému „AI pro všechny"). */
-export async function aiConfigFor(db: AnonDb, userId: string | null, deadline: number, sha: string): Promise<AiCallConfig | null> {
+/**
+ * Smí běh použít AI? Klíč z JEDNOHO zdroje s celou aplikací (getAiConfig: Nastavení → Integrace
+ * integration_settings.anthropic_api_key, jinak env ANTHROPIC_API_KEY — stejně jako čtení dokladů a pošta)
+ * a hlavní vypínač AI. Automatická anonymizace po nahrání je systémová ochrana (jako třídění pošty) — běží s AI
+ * za každého autora, cenu hlídá denní limit; ruční běh (tlačítko) jen s právem AI čtení toho, kdo ho spustil.
+ */
+export async function aiConfigFor(db: AnonDb, userId: string | null, deadline: number, sha: string, opts: { manual?: boolean } = {}): Promise<AiCallConfig | null> {
   if (isFakeAnon()) return { apiKey: "fake", model: (await getAiConfig().catch(() => ({ model: "claude-opus-5-5" }))).model || "claude-opus-5-5", deadline, sha };
   const ai = await getAiConfig();
   if (!ai.apiKey) return null;
@@ -64,6 +69,7 @@ export async function aiConfigFor(db: AnonDb, userId: string | null, deadline: n
     aiConfigured: true,
   };
   if (!ctx.aiEnabled) return null;
+  if (!opts.manual) return { apiKey: ai.apiKey, model: ai.model, deadline, sha };
   if (userId) {
     const { data } = await db.from("profiles").select("role, ai_access, active").eq("id", userId).maybeSingle();
     const p = data as { role: "super_admin" | "obchodnik" | "zamestnanec"; ai_access: boolean; active: boolean } | null;
@@ -460,7 +466,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     // které v ní chybí (navazující dávky PDF), proto se konfigurace připraví i při existující cache.
     let ai: AiCallConfig | null = null;
     if (!ctx.manualSave && ctx.allowAi !== false && (fmt === "pdf" || fmt === "image" || fmt === "tiff" || fmt === "heic")) {
-      ai = await aiConfigFor(db, ctx.manual ? ctx.actor.id : s.uploadedBy, ctx.deadline, sha);
+      ai = await aiConfigFor(db, ctx.manual ? ctx.actor.id : s.uploadedBy, ctx.deadline, sha, { manual: ctx.manual && ctx.actor.kind === "user" });
       if (ai) ai.onUsage = (u) => { spend.usage = addUsage(spend.usage, u); spend.calls++; };
     }
     // denní limit jen pro automatiku (s hotovou cache se nic neplatí)

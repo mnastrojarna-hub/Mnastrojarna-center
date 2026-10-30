@@ -112,13 +112,20 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
   /** Stránky nahrané tímto testem (úklid nesmí sáhnout na soubory souběžné sady — dávka používá stejnou složku). */
   const ownPaths = new Set<string>();
 
-  async function upload(filename: string, mimeType = "image/jpeg", body: Buffer = FAKE_JPEG) {
-    const prep = await s.prepareCaptureUpload({ filename, size: body.length, mimeType });
+  async function upload(filename: string, mimeType = "image/jpeg", body: Buffer = FAKE_JPEG, opts: { master?: Buffer } = {}) {
+    const prep = await s.prepareCaptureUpload({ filename, size: body.length, mimeType, ...(opts.master ? { master: { size: opts.master.length, mimeType } } : {}) });
     expect(prep.ok, prep.error).toBe(true);
     if (prep.path) ownPaths.add(prep.path);
     const { error } = await db.storage.from("job-files").uploadToSignedUrl(prep.path!, prep.token!, body, { contentType: mimeType });
     expect(error).toBeNull();
-    return { path: prep.path!, filename, mimeType, size: body.length };
+    if (opts.master) {
+      // master fotky v plném rozlišení vedle zmenšené stránky (capture/<uživatel>/<uuid>.hires)
+      expect(prep.masterPath).toBe(r.captureHiresPath(prep.path!));
+      ownPaths.add(prep.masterPath!);
+      const m = await db.storage.from("job-files").uploadToSignedUrl(prep.masterPath!, prep.masterToken!, opts.master, { contentType: mimeType });
+      expect(m.error).toBeNull();
+    }
+    return { path: prep.path!, filename, mimeType, size: body.length, ...(prep.masterPath ? { masterPath: prep.masterPath } : {}) };
   }
 
   async function exists(p: string): Promise<boolean> {
@@ -150,6 +157,9 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
       const { data: files } = await db.storage.from("job-files").list(`zakazky/${id}`, { limit: 100 });
       const paths = (files ?? []).map((f) => `zakazky/${id}/${f.name}`);
       if (paths.length) await db.storage.from("job-files").remove(paths);
+      const { data: masters } = await db.storage.from("job-files").list(`zakazky/${id}/master`, { limit: 100 });
+      const mp = (masters ?? []).map((f) => `zakazky/${id}/master/${f.name}`);
+      if (mp.length) await db.storage.from("job-files").remove(mp);
     }
     for (const u of [admin, sales]) {
       if (!u) continue;
@@ -172,9 +182,10 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
   it("objednávka zákazníka: AI přečte, spáruje zákazníka, nabídne zakázky → nová zakázka", async () => {
     h.user = admin;
     process.env.AI_FAKE_CAPTURE = path.join(FIXTURES, "objednavka-strojmetal.json");
-    const page = await upload("objednavka-4795.jpg");
+    const page = await upload("objednavka-4795.jpg", "image/jpeg", FAKE_JPEG, { master: Buffer.concat([FAKE_JPEG, Buffer.alloc(64)]) });
+    const { masterPath: _m, ...pageRef } = page;
 
-    const res = await s.analyzeCapture({ files: [page] });
+    const res = await s.analyzeCapture({ files: [pageRef] });
     expect(res.ok, res.ok ? "" : res.error).toBe(true);
     if (!res.ok) return;
     const m: ReviewModel = single(res).model;
@@ -222,10 +233,14 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     const { data: items } = await db.from("order_items").select("drawing_number, quantity, unit_price").eq("order_id", jobId).order("position");
     expect((items ?? []).map((i) => [i.drawing_number, Number(i.quantity), Number(i.unit_price)])).toEqual([["VK-2291", 50, 1180], ["VK-2292", 50, 960]]);
 
-    const { data: files } = await db.from("job_files").select("kind, storage_path, ai_extracted, note, title").eq("job_id", jobId);
+    const { data: files } = await db.from("job_files").select("kind, storage_path, ai_extracted, note, title, anon_source_path").eq("job_id", jobId);
     expect(files).toHaveLength(1);
     expect(files![0]).toMatchObject({ kind: "objednavka", title: "Objednávka zákazníka 4795-2026" });
     expect(files![0].storage_path).toMatch(new RegExp(`^zakazky/${jobId}/`));
+    // master fotky přesunutý k dokumentu → zdroj anonymizace v plném rozlišení
+    expect(files![0].anon_source_path).toBe(`zakazky/${jobId}/master/${String(files![0].storage_path).split("/").pop()!.slice(0, 36)}`);
+    expect(await exists(String(files![0].anon_source_path))).toBe(true);
+    expect(await exists(page.masterPath!)).toBe(false);
     expect(files![0].ai_extracted).toBeTruthy();
     expect(files![0].note).toContain("atest");
     expect(await exists(page.path)).toBe(false); // přesunuto k zakázce

@@ -5,7 +5,11 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ storage: { from: () => ({ uploadToSignedUrl: vi.fn() }) } }) }));
 vi.mock("@/app/actions/drawing-anon", () => ({
   cancelQueuedSend: vi.fn(), sendQueuedWithoutPending: vi.fn(), saveAnonSettings: vi.fn(), requeueChangedConfig: vi.fn(),
-  queueLegacyDrawings: vi.fn(), setAnonMode: vi.fn(),
+  queueLegacyDrawings: vi.fn(), setAnonMode: vi.fn(), sendQueuedWithOriginals: vi.fn(),
+}));
+const acc = vi.hoisted(() => ({ role: null as string | null }));
+vi.mock("@/components/access-provider", () => ({
+  useAccess: () => ({ role: acc.role, features: [], userId: null, can: () => false }),
 }));
 
 import { FileAnonBadge, JobAnonBadge } from "./anon-badge";
@@ -13,7 +17,7 @@ import { describeCounts, drawingsWord, fileAnonLabel, jobAnonBadge, sendQueueTex
 import { AnonReviewList } from "./anon-review-section";
 import { AnonymizeToolButton, AnonymizeToolDialog, toolRejectReason } from "./anonymize-tool-dialog";
 import { AnonymizeEditor } from "./anonymize-editor";
-import { SupplierPackButton, AnonSummaryLine, canAnonymize, ForSupplierLink } from "./anon-file-menu";
+import { SupplierPackButton, AnonSummaryLine, canAnonymize, ForSupplierLink, ORIGINAL_CONFIRM } from "./anon-file-menu";
 import { previewUrl, downloadUrl } from "./anon-api";
 import { DrawingAnonSettings } from "@/components/settings/drawing-anon-settings";
 import { DEFAULT_ANON_SETTINGS } from "@/lib/anonymize/settings";
@@ -177,6 +181,21 @@ describe("render komponent anonymizace", () => {
     expect(html(<AnonSummaryLine file={empty} />)).toContain("Nic se nesmazalo");
   });
 
+  it("„Poslat originál…“ u formátu, který anonymizovat nejde: jen super admin, stažení přes ?original=1", () => {
+    const dwg = file({ filename: "sestava.dwg", mimeType: null, anon: { ...file().anon!, status: "unsupported", reason: "DWG nejde anonymizovat — ulož jako DXF." } });
+    acc.role = "obchodnik";
+    expect(html(<ForSupplierLink file={dwg} onReviewDownload={() => undefined} />)).toBe("");
+    acc.role = "super_admin";
+    const out = html(<ForSupplierLink file={dwg} onReviewDownload={() => undefined} />);
+    expect(out).toContain("Poslat originál…");
+    expect(out).toContain('data-testid="anon-send-original"');
+    // hotová kopie: super admin dostane „Pro dodavatele", ne originál
+    expect(html(<ForSupplierLink file={file()} onReviewDownload={() => undefined} />)).not.toContain("Poslat originál");
+    acc.role = null;
+    expect(downloadUrl("f9", { original: true })).toBe("/api/drawings/anonymize/f9/download?original=1");
+    expect(ORIGINAL_CONFIRM).toMatch(/ORIGINÁL.*super admin/);
+  });
+
   it("nastavení: skupiny, termíny, limit, přepočet a staré výkresy; jen super admin ukládá", () => {
     const props = { settings: DEFAULT_ANON_SETTINGS, mode: "full" as const, runnerWarning: "Chybí CRON_SECRET — …", spentTodayUsd: 1.234, legacyCount: 7, changedCount: 2, reviewCount: 3 };
     const out = html(<DrawingAnonSettings {...props} canEdit />);
@@ -187,5 +206,10 @@ describe("render komponent anonymizace", () => {
     expect(out).not.toContain("$1.23");
     const ro = html(<DrawingAnonSettings {...props} canEdit={false} />);
     expect(ro).toContain("Nastavení mění jen super admin");
+    // AI pro fotky a skeny: chybějící klíč řečeno jasně
+    const noKey = html(<DrawingAnonSettings {...props} canEdit aiWarning="AI klíč chybí — fotky a skeny čekají na ruční kontrolu." />);
+    expect(noKey).toContain("AI klíč chybí — fotky a skeny čekají na ruční kontrolu");
+    expect(noKey).toContain('data-testid="anon-ai-status" data-tone="warn"');
+    expect(html(<DrawingAnonSettings {...props} canEdit aiOk="AI pro fotky a skeny je zapnutá" />)).toContain('data-tone="ok"');
   });
 });

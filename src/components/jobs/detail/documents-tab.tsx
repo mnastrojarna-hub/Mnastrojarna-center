@@ -164,8 +164,9 @@ function FileRow({
         </div>
         {file.note && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{file.note}</p>}
         {!file.archived && <AnonSummaryLine file={file} stalled={anonStalled} onRetry={onAnonAction ? (f) => onAnonAction(f, "enqueue") : undefined} />}
-        {forSupplier && onReviewDownload && (
-          <div className="mt-1"><ForSupplierLink file={file} onReviewDownload={onReviewDownload} /></div>
+        {(forSupplier || (!file.archived && file.anon?.status === "unsupported")) && onReviewDownload && (
+          // hotová kopie „Pro dodavatele"; u formátu, který anonymizovat nejde, super admin „Poslat originál…"
+          <ForSupplierLink file={file} onReviewDownload={onReviewDownload} wrapClassName="mt-1" />
         )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">

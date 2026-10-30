@@ -93,6 +93,8 @@ export async function explodeContainer(db: AnonDb, s: Subject, bytes: Uint8Array
       job_id: jobId, kind, filename: e.name.slice(0, 200), mime_type: e.mime || null, size_bytes: e.data.length, storage_path: path,
       origin: s.origin ?? "upload", issuer: s.issuer, uploaded_by: s.uploadedBy, note: `Z ${fmt === "zip" ? "archivu" : "e-mailu"} ${s.filename}`.slice(0, 500),
       content_sha256: createHash("sha256").update(e.data).digest("hex"),
+      // obsah archivu / e-mailu je originál (nikdo ho nezmenšoval) → zdroj anonymizace v plném rozlišení
+      anon_source_path: path,
     }).select("id").single();
     if (error || !ins) {
       await db.storage.from("job-files").remove([path]).catch(() => undefined);

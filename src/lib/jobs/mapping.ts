@@ -470,6 +470,17 @@ export function jobFilePath(jobId: string, uuid: string, filename: string): stri
   return `zakazky/${jobId.toLowerCase()}/${uuid}-${safeStorageName(filename)}`;
 }
 
+/**
+ * Master fotky v plném rozlišení k dokumentu zakázky (zdroj anonymizace, hlavní soubor je zmenšený):
+ * zakazky/<zakázka>/master/<uuid hlavního souboru>. Pevně odvozený z cesty hlavního souboru — prohlížeč
+ * ho nemůže namířit na cizí dokument. null = cesta není soubor zakázky.
+ */
+export function jobMasterPath(mainPath: string): string | null {
+  const m = /^zakazky\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-[A-Za-z0-9._-]{1,120}$/i
+    .exec(String(mainPath ?? ""));
+  return m ? `zakazky/${m[1].toLowerCase()}/master/${m[2].toLowerCase()}` : null;
+}
+
 // ── Selecty (PostgREST, vždy s nápovědou FK sloupce) ────────
 const PERSON = "id, full_name, email";
 

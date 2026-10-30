@@ -30,6 +30,13 @@ export interface SendPayload {
   purchaseOrderId?: string;
   /** Text do historie („dodavateli XY"). */
   recipientLabel?: string;
+  /**
+   * Soubory, které anonymizovat nejde (DWG, Word…) a super admin výslovně potvrdil „Poslat originál"
+   * (allowQueuedOriginals — nikdy z požadavku klienta: cleanPayload je zahodí). Platí jen, dokud je
+   * originalConfirmedBy aktivní super admin a soubor je stále „Nelze anonymizovat".
+   */
+  originalFileIds?: string[];
+  originalConfirmedBy?: string;
 }
 
 export interface SendQueueRow {
@@ -150,10 +157,11 @@ export async function queueReadiness(db: AnonDb, row: Pick<SendQueueRow, "file_i
   const rows = (data ?? []) as FileRowWithAnon[];
   const reviewed = new Set(row.payload.reviewedFileIds ?? []);
   const price = await sharePriceDocIds(db as never, row.file_ids);
+  const originals = await confirmedOriginals(db, row.payload);
   for (const id of row.file_ids) {
     const f = rows.find((r) => r.id === id);
     if (!f) { out.blocked.push({ id, message: "Výkres byl smazán." }); continue; }
-    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()) });
+    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...originalOpts(originals, f) });
     if (d.ok) out.ready.push(id);
     else if (d.reason === "pending") out.pending.push(id);
     else out.blocked.push({ id, message: d.message });
@@ -185,6 +193,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
   const rows = (data ?? []) as FileRowWithAnon[];
   const reviewed = new Set(p.reviewedFileIds ?? []);
   const price = await sharePriceDocIds(db as never, ids);
+  const confirmed = await confirmedOriginals(db, p);
   const attachments: { filename: string; content: Buffer; contentType?: string }[] = [];
   const names = new Set<string>();
   /** Externí originály, které odešly (audit). */
@@ -195,13 +204,17 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
     if (!f) return { status: "blocked", reason: "Příloha byla smazána." };
     // pojistka: příloha musí patřit k zakázce řádku fronty (kontrola i při zařazení — validateSendRequest)
     if (!row.job_id || String(f.job_id ?? "").toLowerCase() !== row.job_id.toLowerCase()) return { status: "blocked", reason: "Příloha nepatří k zakázce." };
-    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()) });
+    const asOriginal = row.file_ids.includes(id) ? originalOpts(confirmed, f) : {};
+    const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...asOriginal });
     if (!d.ok) return { status: d.reason === "pending" ? "waiting" : "blocked", reason: d.message };
     const bytes = await verifyShareBytes(db as never, d, f);
     if (d.audit) originals.push(id);
     total += bytes.length;
-    let name = d.filename;
-    for (let i = 2; names.has(name.toLowerCase()); i++) name = d.filename.replace(/(\.[^.]+)?$/, `-${i}$1`);
+    // originál bez anonymizace (super admin) bez původního názvu — ten často nese jméno zákazníka
+    const ext = /\.[A-Za-z0-9]{1,8}$/.exec(d.filename)?.[0]?.toLowerCase() ?? "";
+    const base = asOriginal.original && d.source === "original" ? `original${ext}` : d.filename;
+    let name = base;
+    for (let i = 2; names.has(name.toLowerCase()); i++) name = base.replace(/(\.[^.]+)?$/, `-${i}$1`);
     names.add(name.toLowerCase());
     attachments.push({ filename: name, content: Buffer.from(bytes), contentType: d.mime });
   }
@@ -232,7 +245,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
       entity: row.kind === "purchase_order" ? "purchase_order" : "file", entityId: row.ref_id ?? undefined,
     });
   }
-  await logAudit({ action: "anon_send_queue_sent", entity: "anon_send_queue", entityId: row.id, diff: { kind: row.kind, to: p.to, files: row.file_ids.length, originals }, actor });
+  await logAudit({ action: "anon_send_queue_sent", entity: "anon_send_queue", entityId: row.id, diff: { kind: row.kind, to: p.to, files: row.file_ids.length, originals, ...(originals.length && p.originalConfirmedBy ? { originalConfirmedBy: p.originalConfirmedBy } : {}) }, actor });
   return { status: "sent", reason: null };
 }
 
@@ -297,4 +310,51 @@ export async function sendWithoutPending(db: AnonDb, id: string, userId: string,
   await db.from("anon_send_queue").update({ file_ids: r.ready, updated_at: new Date().toISOString() }).eq("id", id).in("status", ["waiting", "blocked"]);
   const res = await flushSendQueue(db, { ids: [id], sender });
   return res.sent ? { ok: true } : { ok: false, error: "Odeslání se nepodařilo — zkontroluj frontu." };
+}
+
+// ── „Poslat originál" ve frontě (jen super admin) ─────────────
+
+/** Potvrzené originály řádku — jen dokud je potvrzující aktivní super admin (role se ověřuje při každém odeslání). */
+async function confirmedOriginals(db: AnonDb, p: SendPayload): Promise<Set<string>> {
+  const ids = (p.originalFileIds ?? []).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  if (!ids.length || !p.originalConfirmedBy || !/^[0-9a-f-]{36}$/i.test(p.originalConfirmedBy)) return new Set();
+  const { data } = await db.from("profiles").select("role, active").eq("id", p.originalConfirmedBy).maybeSingle();
+  const pr = data as { role: string; active: boolean | null } | null;
+  return pr && pr.role === "super_admin" && pr.active !== false ? new Set(ids.map((x) => x.toLowerCase())) : new Set();
+}
+
+/** Originál jen u souboru, který anonymizovat nejde (hotovou kopii nikdy neobchází) — stejné pravidlo jako ZIP. */
+function originalOpts(confirmed: Set<string>, f: FileRowWithAnon): { original?: true; isSuperAdmin?: true } {
+  return confirmed.has(f.id.toLowerCase()) && f.anon_status === "unsupported" ? { original: true, isSuperAdmin: true } : {};
+}
+
+/** Soubory řádku fronty, které anonymizovat nejde (kandidáti na „Poslat originál"). */
+export async function unsupportedQueueFiles(db: AnonDb, fileIds: string[]): Promise<string[]> {
+  if (!fileIds.length) return [];
+  const { data } = await db.from("job_files").select("id, anon_status").in("id", fileIds.slice(0, 80));
+  return ((data ?? []) as { id: string; anon_status: string | null }[]).filter((r) => r.anon_status === "unsupported").map((r) => r.id);
+}
+
+/**
+ * „Poslat originál…" u odeslání zablokovaného souborem, který anonymizovat nejde: super admin výslovně
+ * potvrdí, potvrzení se zapíše do auditu a řádek se hned zkusí odeslat (ostatní výkresy dál jen anonymizované).
+ */
+export async function allowQueuedOriginals(db: AnonDb, id: string, user: { id: string; role: string }, actor: Parameters<typeof logAudit>[0]["actor"], sender?: Sender): Promise<{ ok: boolean; error?: string; sent?: boolean }> {
+  if (user.role !== "super_admin") return { ok: false, error: "Originál bez anonymizace smí dodavateli poslat jen super admin." };
+  const { data } = await db.from("anon_send_queue").select("*").eq("id", id).maybeSingle();
+  const row = data as SendQueueRow | null;
+  if (!row) return { ok: false, error: "Odeslání nenalezeno." };
+  if (row.status !== "waiting" && row.status !== "blocked") return { ok: false, error: "Odeslání už neběží." };
+  const ids = await unsupportedQueueFiles(db, row.file_ids);
+  if (!ids.length) return { ok: false, error: "Ve frontě není soubor, který by šlo poslat jen jako originál." };
+  const payload: SendPayload = { ...row.payload, originalFileIds: ids, originalConfirmedBy: user.id };
+  const { data: upd, error } = await db.from("anon_send_queue").update({ payload, updated_at: new Date().toISOString() }).eq("id", id).in("status", ["waiting", "blocked"]).select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!(upd ?? []).length) return { ok: false, error: "Odeslání už neběží." };
+  await logAudit({ action: "anon_send_queue_original", entity: "anon_send_queue", entityId: id, diff: { jobId: row.job_id, fileIds: ids }, actor });
+  const res = await flushSendQueue(db, { ids: [id], sender });
+  if (res.sent) return { ok: true, sent: true };
+  const { data: after } = await db.from("anon_send_queue").select("status, reason").eq("id", id).maybeSingle();
+  const a = after as { status: string; reason: string | null } | null;
+  return a?.status === "waiting" ? { ok: true, sent: false } : { ok: false, error: a?.reason ?? "Odeslání se nepodařilo — zkontroluj frontu." };
 }

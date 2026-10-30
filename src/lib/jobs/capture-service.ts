@@ -21,7 +21,7 @@ import { isSupplierSideDoc, matchCustomer, matchJob, matchParty } from "@/lib/jo
 import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
-  cleanDate, cleanNumber, cleanText, computeItemTotals, isUuid, jobFilePath, jobInputToRow, jobItemToRow, stageEventMessage,
+  cleanDate, cleanNumber, cleanText, computeItemTotals, isUuid, jobFilePath, jobInputToRow, jobItemToRow, jobMasterPath, stageEventMessage,
   todayIso, translateDbError, validateItems, validateJobInput,
 } from "@/lib/jobs/mapping";
 import { recordCapturedDeliveryNote } from "@/lib/jobs/delivery-notes-db";
@@ -50,15 +50,16 @@ import type { ActionResult, JobDetail } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
 import {
   CAPTURE_BATCH_MAX_FILES, CAPTURE_BUCKET, CAPTURE_MAX_PAGES, CAPTURE_TTL_MS, REVIEW_FIELD_KEYS, REVIEW_FIELDS,
-  canAutoApply, captureEventMessage, captureFolder, capturePagePath,
+  canAutoApply, captureEventMessage, captureFolder, captureHiresPath, capturePagePath,
   captureSessionPath, captureSortPath, chipByKey, chipFor, defaultCustomerChoice, defaultSupplierChoice, documentNumberFor,
-  initialReviewState, isAiReadableMime, isAiValue, isBatchUploadable, isCaptureDocKind, isCapturePagePath, isCaptureSortPath,
+  initialReviewState, isAiReadableMime, isAiValue, isBatchUploadable, isCaptureDocKind, isCaptureHiresPath, isCapturePagePath, isCaptureSortPath,
   isFieldLocked,
   reviewChanges, reviewItemsToInputs, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
   sniffDocumentMime,
-  type AnalyzeCaptureResponse, type CaptureFileRef, type CapturePreview, type PartyMatchView, type ReviewFieldKey,
+  type AnalyzeCaptureResponse, type CaptureFileRef, type CapturePreview, type CaptureUploadPrep, type PartyMatchView, type ReviewFieldKey,
   type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
+import { masterUploadAllowed, moveMaster } from "@/lib/anonymize/master";
 
 /**
  * „📷 Vyfotit doklad" — serverová orchestrace:
@@ -271,7 +272,9 @@ export async function prepareCaptureUpload(input: {
   mimeType?: string;
   /** Fotka v dávce: i podepsaná URL pro náhled roztřídění (1280 px). */
   sortPreview?: boolean;
-}): Promise<ActionResult<{ path: string; token: string; bucket: string; sortPath?: string; sortToken?: string }>> {
+  /** Fotka: i podepsaná URL pro master v plném rozlišení (originál z fotoaparátu → anonymizace výkresu). */
+  master?: { size: number; mimeType: string } | null;
+}): Promise<ActionResult<CaptureUploadPrep>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   const filename = cleanText(input?.filename, 255);
@@ -284,9 +287,18 @@ export async function prepareCaptureUpload(input: {
     const path = capturePagePath(c.user.id, crypto.randomUUID(), filename);
     const { data, error } = await bucket(c.db).createSignedUploadUrl(path);
     if (error || !data?.token) return fail(error?.message ?? "Nahrání se nepodařilo připravit.");
-    const out: { path: string; token: string; bucket: string; sortPath?: string; sortToken?: string } = {
+    const out: CaptureUploadPrep = {
       path: (data.path as string | undefined) ?? path, token: data.token as string, bucket: CAPTURE_BUCKET,
     };
+    const hires = input.master ? captureHiresPath(out.path) : null;
+    if (hires && (await masterUploadAllowed(c.db, input.master?.mimeType, cleanNumber(input.master?.size)))) {
+      // master je jen pomůcka anonymizace — bez URL se nahraje jen zmenšená fotka
+      const m = await bucket(c.db).createSignedUploadUrl(hires);
+      if (!m.error && m.data?.token) {
+        out.masterPath = (m.data.path as string | undefined) ?? hires;
+        out.masterToken = m.data.token as string;
+      }
+    }
     const mime = (cleanText(input.mimeType, 200) ?? "").toLowerCase();
     if (input.sortPreview === true && (mime.startsWith("image/") || IMAGE_EXT.test(filename))) {
       const sortPath = captureSortPath(c.user.id, out.path);
@@ -308,12 +320,14 @@ export async function discardCapture(input: { captureId?: string | null; paths?:
   if ("error" in c) return fail(c.error);
   try {
     const paths = (Array.isArray(input?.paths) ? input.paths : [])
-      .filter((p) => isCapturePagePath(c.user.id, p) || isCaptureSortPath(c.user.id, p));
-    // odebraná stránka dávky: i její náhled roztřídění (cesta je deterministická)
+      .filter((p) => isCapturePagePath(c.user.id, p) || isCaptureSortPath(c.user.id, p) || isCaptureHiresPath(c.user.id, p));
+    // odebraná stránka dávky: i její náhled roztřídění a master (cesty jsou deterministické)
     for (const p of [...paths]) {
       if (!isCapturePagePath(c.user.id, p)) continue;
       const sp = captureSortPath(c.user.id, p);
       if (isCaptureSortPath(c.user.id, sp) && !paths.includes(sp) && !sp.includes("00000000-0000-0000-0000-000000000000")) paths.push(sp);
+      const hp = captureHiresPath(p);
+      if (hp && isCaptureHiresPath(c.user.id, hp) && !paths.includes(hp)) paths.push(hp);
     }
     let session: CaptureSession | null = null;
     if (input?.captureId && isUuid(input.captureId)) {
@@ -327,6 +341,8 @@ export async function discardCapture(input: { captureId?: string | null; paths?:
       for (const f of session?.files ?? []) {
         if (!paths.includes(f.path)) paths.push(f.path);
         if (f.sortPath && !paths.includes(f.sortPath)) paths.push(f.sortPath);
+        const hp = captureHiresPath(f.path);
+        if (hp && !paths.includes(hp)) paths.push(hp);
       }
     }
     for (let i = 0; i < paths.length; i += 100) {
@@ -1034,7 +1050,11 @@ export async function applyBusinessDoc(
       warnings.push(`Stránku ${f.filename} se nepodařilo přiložit (${message(mvErr.message)}).`);
       continue;
     }
+    // fotka: master v plném rozlišení (nahrál ho prohlížeč vedle zmenšené stránky) → zdroj anonymizace
+    const master = (f.mimeType ?? "").toLowerCase().startsWith("image/") ? jobMasterPath(dest) : null;
+    const hasMaster = master ? await moveMaster(db, CAPTURE_BUCKET, captureHiresPath(f.path), master) : false;
     const reg = await registerJobFileCore(db, user.id, {
+      ...(hasMaster && master ? { anonSourcePath: master } : {}),
       jobId,
       path: dest,
       filename: f.filename,

@@ -160,6 +160,10 @@ export interface SendQueueDto {
   mine: boolean;
   /** Výkres, který odeslání blokuje (ke kontrole / selhal) — „Zkontrolovat výkres". */
   blockingFileId?: string | null;
+  /** Počet souborů, které anonymizovat nejde (DWG, Word…). */
+  unsupportedCount?: number;
+  /** Super admin smí „Poslat originál…" (s potvrzením a auditem). */
+  canSendOriginal?: boolean;
 }
 
 /**
@@ -181,10 +185,12 @@ export function previewUrl(id: string, opts: { table?: AnonTableParam; page?: nu
   return `/api/drawings/anonymize/${id}/preview${s ? `?${s}` : ""}`;
 }
 
-export function downloadUrl(id: string, opts: { table?: AnonTableParam; reviewed?: boolean } = {}): string {
+export function downloadUrl(id: string, opts: { table?: AnonTableParam; reviewed?: boolean; original?: boolean } = {}): string {
   const p = new URLSearchParams();
   if (opts.table && opts.table !== "job_files") p.set("table", opts.table);
   if (opts.reviewed) p.set("reviewed", "1");
+  // originál bez anonymizace (formát, který nejde) — jen super admin, server ověří roli a zapíše audit
+  if (opts.original) p.set("original", "1");
   const s = p.toString();
   return `/api/drawings/anonymize/${id}/download${s ? `?${s}` : ""}`;
 }
