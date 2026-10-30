@@ -143,9 +143,10 @@ export function ConfirmOrderDialog({
       const draft = await draftJobDocumentEmail(job.id, f.id);
       setMail({
         to: (draft.ok && draft.to) || job.email || "",
-        cc: "",
+        cc: (draft.ok && draft.cc) || "",
         subject: (draft.ok && draft.subject) || `Potvrzení objednávky ${f.number}`,
         body: (draft.ok && draft.body) || "",
+        reason: (draft.ok && draft.to && draft.recipientReason) || undefined,
       });
       setStep("mail");
     } catch {
@@ -207,7 +208,7 @@ export function ConfirmOrderDialog({
           <form onSubmit={send} className="space-y-4 p-4 sm:p-5" noValidate>
             <ErrorBox error={error} />
             {file && <AttachmentChip fileId={file.id} filename={file.filename} />}
-            <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} />
+            <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId: job.id }} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" className="min-h-11 sm:min-h-9" disabled={step === "sending"} onClick={() => void confirmOther(file)}>
                 {mode === "send" ? "Neposílat teď" : "Neposílat, jen potvrdit"}

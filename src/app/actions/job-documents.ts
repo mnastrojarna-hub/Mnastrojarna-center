@@ -34,6 +34,8 @@ import {
   FLOW_QUOTE_COLUMNS, invoiceDeliveryOf, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent,
 } from "@/lib/jobs/flow-status";
 import { FV_SERIES, invoiceDeliveryError, isOwnInvoiceFile } from "@/lib/jobs/invoice-file";
+import { recipientsFor, toneFor } from "@/lib/contacts/server";
+import { normEmail } from "@/lib/contacts/roles";
 import { quoteSnapshotSha } from "@/lib/jobs/quote-approval-store";
 import { assertJobFileAccess, FILE_PRICE_SEND } from "@/lib/jobs/job-file-access";
 import { deliveredRows, deliveryNoteNumberOf, undocumentedRows } from "@/lib/jobs/delivery-notes";
@@ -792,11 +794,23 @@ export async function sendJobDocument(
   }
 }
 
+/** Návrh e-mailu k dokladu: Komu, Kopie, proč tahle adresa, předmět a text (s tykáním / vykáním). */
+export interface DocumentDraft {
+  to: string;
+  cc: string;
+  /** „Fakturační e-mail zákazníka", „Kontaktní osoba zakázky (Pavel Novák)"… */
+  recipientReason: string;
+  subject: string;
+  body: string;
+  filename: string;
+  kind: DocumentEmailKind;
+}
+
 /** Výchozí předmět a text e-mailu k dokladu (zákazník, čísla, termín). */
 export async function draftJobDocumentEmail(
   jobId: string,
   fileId: string,
-): Promise<ActionResult<{ to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind }>> {
+): Promise<ActionResult<DocumentDraft>> {
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
   const c = await begin();
@@ -826,7 +840,7 @@ export async function draftJobDocumentEmail(
 export async function draftInvoiceEmail(
   jobId: string,
 ): Promise<ActionResult<{
-  to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind; unpriced: number;
+  to: string; cc: string; recipientReason: string; subject: string; body: string; filename: string; kind: DocumentEmailKind; unpriced: number;
   existing: { fileId: string; filename: string; number: string } | null; code: "rights" | "delivery" | "invoiced";
   /** Faktura by vznikla bez QR / čísla účtu (chybí bankovní spojení v Nastavení) — jen před vystavením. */
   bankWarning: string | null;
@@ -875,7 +889,7 @@ export async function draftInvoiceEmail(
 export async function draftQuoteEmail(
   jobId: string,
   quoteId: string,
-): Promise<ActionResult<{ to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind }>> {
+): Promise<ActionResult<DocumentDraft>> {
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (!isUuid(quoteId)) return fail("Nabídka nenalezena.");
   const c = await begin();
@@ -898,7 +912,7 @@ async function composeDocumentEmail(
   file: { filename: string; quoteId: string | null; createdAt: string },
   /** Faktura před vystavením: značky místo čísla a VS (přidělí se až při vystavení). */
   invoicePending?: { invoiceNumber: string; variableSymbol: string },
-): Promise<ActionResult<{ to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind }>> {
+): Promise<ActionResult<DocumentDraft>> {
   await refreshCompanyFromSettings();
   const [{ data: me }, signatureText] = await Promise.all([
     db.from("profiles").select("phone, position, email").eq("id", user.id).maybeSingle(),
@@ -968,17 +982,27 @@ async function composeDocumentEmail(
       ?? (invoice?.variable_symbol || spdVariableSymbol(job.invoiceNumber ?? undefined) || null);
   }
 
-  let to = firstEmail(job.customerContactEmail, job.customerDetail?.email);
-  if (!to && job.customer?.id) {
-    const { data: contacts } = await db
-      .from("customer_contacts")
-      .select("email, is_primary")
-      .eq("customer_id", job.customer.id)
-      .order("is_primary", { ascending: false })
-      .limit(10);
-    to = firstEmail(...((contacts ?? []) as { email: string | null }[]).map((r) => r.email));
+  // Komu / Kopie podle účelu dokladu (karta zákazníka → E-maily podle účelu): faktura vždy na fakturační
+  // e-mail (+ kontakt zakázky v kopii), ostatní na kontakt zakázky, jinak e-mail role / firmy / hlavní kontakt
+  const pick = await recipientsFor(db, kind === "ostatni" ? "ostatni" : kind, { customerId: job.customer?.id ?? null }, {
+    email: job.customerContactEmail, name: job.customerContact,
+  });
+  let to = pick.to[0] ?? firstEmail(job.customerContactEmail, job.customerDetail?.email);
+  let reason = pick.reason;
+  if (!to && !pick.to.length) reason = "";
+  if (to && !pick.to.length) reason = job.customerContactEmail ? "Kontaktní osoba zakázky" : "E-mail zákazníka";
+  to = to ?? null;
+
+  // tykání / vykání odesílatele s hlavním adresátem → oslovení a tvary textu
+  const tone = await toneFor(db, user.id, to ? [to] : [], to && normEmail(job.customerContactEmail) === to ? job.customerContact : null).catch(() => null);
+  if (tone) {
+    input.address = tone.setting.address;
+    input.salutation = tone.salutation;
   }
 
   const draft = draftDocumentEmail(input);
-  return { ok: true, to: to ?? "", subject: draft.subject, body: draft.body, filename: file.filename, kind };
+  return {
+    ok: true, to: to ?? "", cc: pick.cc.filter((e) => e !== to).join(", "), recipientReason: reason,
+    subject: draft.subject, body: draft.body, filename: file.filename, kind,
+  };
 }

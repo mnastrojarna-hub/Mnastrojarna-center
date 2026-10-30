@@ -1,14 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Paperclip, Send, X, FolderOpen, ChevronDown, AlertCircle } from "lucide-react";
+import { Loader2, Paperclip, Send, X, FolderOpen, ChevronDown, AlertCircle, Sparkles } from "lucide-react";
+import { ToneToggle, type ToneChange } from "@/components/contacts/tone-toggle";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RecipientField } from "@/components/mail/recipient-field";
 import {
-  composeContextAction, prepareMailUploadAction, sendComposedAction, type BlockedAttachment, type ComposeAttachmentRef, type SendComposedResult,
+  composeContextAction, draftComposeAction, prepareMailUploadAction, sendComposedAction, type BlockedAttachment, type ComposeAttachmentRef, type SendComposedResult,
 } from "@/app/actions/mail-compose";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -95,9 +96,51 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  /** Podpis schránky (pro „AI návrh" a výchozí text). */
+  const [signature, setSignature] = React.useState("");
+  /** Oslovení, které okno samo vložilo na začátek textu (přepnutí tykání ho vymění). */
+  const greetingRef = React.useRef<string | null>(null);
+  const bodyRef = React.useRef(body);
+  bodyRef.current = body;
+  const [drafting, setDrafting] = React.useState(false);
+  const mainTo = to.find((a) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(a)) ?? null;
+  const composeJobId = request?.jobId ?? request?.source?.jobId ?? null;
+  const composeCtx = React.useMemo(() => (composeJobId ? { jobId: composeJobId } : null), [composeJobId]);
+  const toneName = request?.source && mainTo && request.source.fromEmail?.toLowerCase() === mainTo ? request.source.fromName ?? null : null;
+
+  /** Moje tykání / vykání s hlavním adresátem → oslovení v textu (jen dokud text nikdo nepsal, nebo výměna vloženého). */
+  const onTone = React.useCallback((c: ToneChange) => {
+    if (!request) return;
+    const b = bodyRef.current;
+    const prev = greetingRef.current;
+    if (prev && b.startsWith(prev)) {
+      greetingRef.current = c.salutation;
+      setBody(c.salutation + b.slice(prev.length));
+      return;
+    }
+    const pristine = initialBody(request, signature);
+    if (b === pristine || b === initialBody(request, "")) {
+      greetingRef.current = c.salutation;
+      setBody(`${c.salutation}\n${b.startsWith("\n") ? b : `\n${b}`}`);
+    }
+  }, [request, signature]);
+
+  /** AI návrh odpovědi s mým tykáním / vykáním (bez podpisu — podpis schránky zůstává pod ním). */
+  const aiDraft = async () => {
+    if (!request?.source) return;
+    setDrafting(true);
+    setError(null);
+    const res = await draftComposeAction({ sourceEmailId: request.source.id, to }).catch(() => null);
+    setDrafting(false);
+    if (!res?.ok || !res.body) return setError(res?.error ?? "Návrh se nepodařilo připravit.");
+    greetingRef.current = res.salutation ?? null;
+    setBody(`${res.body}\n${initialBody(request, signature)}`);
+  };
 
   React.useEffect(() => {
     if (!request) return;
+    greetingRef.current = null;
+    setSignature("");
     const src = request.source ?? null;
     const mine = request.myAddresses ?? [];
     setError(null);
@@ -138,7 +181,19 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
       setFrom(ctx.from ?? null);
       setFromError(ctx.fromError ?? (ctx.ok ? null : ctx.error ?? null));
       setJobFiles(ctx.jobFiles ?? []);
-      if (ctx.signature) setBody((b) => (b === initialBody(request, "") ? initialBody(request, ctx.signature ?? "") : b));
+      setSignature(ctx.signature ?? "");
+      if (ctx.signature) {
+        setBody((b) => {
+          if (b === initialBody(request, "")) return initialBody(request, ctx.signature ?? "");
+          // oslovení už vložené (tykání se načetlo dřív než podpis) → podpis pod něj
+          const g = greetingRef.current;
+          if (g && b === `${g}\n${initialBody(request, "").startsWith("\n") ? initialBody(request, "") : `\n${initialBody(request, "")}`}`) {
+            const sig = initialBody(request, ctx.signature ?? "");
+            return `${g}\n${sig.startsWith("\n") ? sig : `\n${sig}`}`;
+          }
+          return b;
+        });
+      }
     });
     return () => {
       alive = false;
@@ -220,17 +275,25 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
           <p className="text-xs text-muted-foreground" data-testid="compose-from">
             {from ? <>Odešle se z <b className="text-foreground">{from}</b></> : fromError ? <span className="text-destructive">{fromError}</span> : "Zjišťuji, odkud se odešle…"}
           </p>
-          <RecipientField id="compose-to" label="Komu" value={to} onChange={setTo} autoFocus={request?.mode === "new" || request?.mode === "forward"} />
+          <RecipientField id="compose-to" label="Komu" value={to} onChange={setTo} context={composeCtx} autoFocus={request?.mode === "new" || request?.mode === "forward"} />
           {showCc ? (
             <>
-              <RecipientField id="compose-cc" label="Kopie" value={cc} onChange={setCc} />
-              <RecipientField id="compose-bcc" label="Skrytá" value={bcc} onChange={setBcc} />
+              <RecipientField id="compose-cc" label="Kopie" value={cc} onChange={setCc} context={composeCtx} />
+              <RecipientField id="compose-bcc" label="Skrytá" value={bcc} onChange={setBcc} context={composeCtx} />
             </>
           ) : (
             <button type="button" onClick={() => setShowCc(true)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
               <ChevronDown className="h-3.5 w-3.5" /> Kopie / skrytá kopie
             </button>
           )}
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            {mainTo ? <ToneToggle email={mainTo} nameHint={toneName} compact onChange={onTone} className="min-w-0 flex-1" /> : <span />}
+            {request?.source && (request.mode === "reply" || request.mode === "replyAll") && (
+              <Button type="button" size="sm" variant="outline" onClick={() => void aiDraft()} disabled={drafting || sending} data-testid="compose-ai-draft">
+                {drafting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-violet-500" />} AI návrh odpovědi
+              </Button>
+            )}
+          </div>
           <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Předmět" aria-label="Předmět" />
           <Textarea
             value={body}

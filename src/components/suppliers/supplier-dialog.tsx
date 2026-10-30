@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { EmailSuggestInput } from "@/components/mail/recipient-field";
+import { SupplierContactsSection } from "@/components/suppliers/supplier-contacts";
 import { Field, FormSection } from "@/components/customers/form-bits";
 import { StarRatingInput, TagInput } from "@/components/suppliers/tag-input";
 import { createSupplier, updateSupplier } from "@/app/actions/crm";
@@ -177,7 +179,18 @@ export function SupplierDialog({
                 {text("contactPerson", { placeholder: "Pavel Dvořák", autoComplete: "name" })}
               </Field>
               <Field id={fid("email")} label="E-mail" error={errors.email}>
-                {text("email", { type: "email", inputMode: "email", placeholder: "obchod@kalirna.cz", autoComplete: "email" })}
+                <EmailSuggestInput
+                  id={fid("email")}
+                  value={values.email}
+                  onChange={(v) => set("email", v)}
+                  context={supplier ? { supplierId: supplier.id } : null}
+                  placeholder="obchod@kalirna.cz"
+                  className={cn(errors.email && "border-destructive focus-visible:ring-destructive")}
+                  onPicked={(s) => {
+                    if (!values.contactPerson.trim() && s.name !== s.email && (s.kind === "kontakt" || s.kind === "konverzace" || s.kind === "dodavatel") && s.name !== s.company) set("contactPerson", s.name);
+                    if (!values.phone.trim() && s.phone) set("phone", s.phone);
+                  }}
+                />
               </Field>
               <Field id={fid("phone")} label="Telefon">
                 {text("phone", { type: "tel", inputMode: "tel", placeholder: "+420 777 123 456", autoComplete: "tel" })}
@@ -186,6 +199,14 @@ export function SupplierDialog({
                 {text("website", { inputMode: "url", placeholder: "kalirna.cz" })}
               </Field>
             </FormSection>
+
+            {supplier ? (
+              <div className="rounded-2xl border bg-muted/20 p-3 sm:p-4">
+                <SupplierContactsSection supplierId={supplier.id} />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Další kontaktní osoby a e-maily pro objednávky / poptávky přidáš po založení dodavatele (Upravit).</p>
+            )}
 
             <FormSection icon={<Wrench />} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="Co umí" hint="Enter nebo čárka přidá štítek.">
               <Field id={fid("technologies")} label="Technologie" className="sm:col-span-2">

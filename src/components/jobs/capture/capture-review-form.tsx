@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { EmailSuggestInput } from "@/components/mail/recipient-field";
 import { StageBadge, FileKindBadge } from "@/components/jobs/stage-badge";
 import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { NativeSelect } from "@/components/jobs/book/native-select";
@@ -386,14 +387,29 @@ function PartyFields({
         return (
           <div key={f.key} className={cn(f.full && "sm:col-span-2")}>
             <FieldLabel htmlFor={id} extra={ai ? <AiMark /> : undefined}>{f.label}</FieldLabel>
-            <Input
-              id={id}
-              type={f.type ?? "text"}
-              value={party[f.key]}
-              onChange={(e) => onChange({ ...party, [f.key]: e.target.value })}
-              className={cn(ai && AI_FIELD)}
-              autoComplete="off"
-            />
+            {f.key === "email" ? (
+              // e-mail: našeptávač z adresáře a pošty (výběrem doplní i prázdnou kontaktní osobu a telefon)
+              <EmailSuggestInput
+                id={id}
+                value={party.email}
+                onChange={(v) => onChange({ ...party, email: v })}
+                onPicked={(s) => onChange({
+                  ...party, email: s.email,
+                  contactPerson: party.contactPerson || (s.name !== s.email && (s.kind === "kontakt" || s.kind === "konverzace") ? s.name : ""),
+                  phone: party.phone || s.phone || "",
+                })}
+                className={cn(ai && AI_FIELD)}
+              />
+            ) : (
+              <Input
+                id={id}
+                type={f.type ?? "text"}
+                value={party[f.key]}
+                onChange={(e) => onChange({ ...party, [f.key]: e.target.value })}
+                className={cn(ai && AI_FIELD)}
+                autoComplete="off"
+              />
+            )}
           </div>
         );
       })}

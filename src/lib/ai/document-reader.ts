@@ -120,8 +120,23 @@ const DOC_FIELDS = [
   "customerOrderNumber", "customerInquiryNumber", "ourQuoteNumber", "ourJobNumber",
   "ourOrderConfirmationNumber", "supplierNumberAtCustomer", "requiredDeliveryDate",
   "promisedDeliveryDate", "items", "totalWithoutVat", "currency", "paymentTerms",
-  "deliveryTerms", "deliveryLeadTime", "note", "summary", "confidence", "needsClarification",
+  "deliveryTerms", "deliveryLeadTime", "note", "summary", "confidence", "needsClarification", "roleEmails",
 ];
+
+/** E-maily odběratele / dodavatele s účelem („faktury zasílejte na …") — vyplní e-maily podle účelu v kartě firmy. */
+const roleEmailSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    party: { type: "string", enum: ["customer", "supplier"], description: "Čí adresa: customer = odběratel (náš zákazník), supplier = dodavatel" },
+    role: {
+      type: "string", enum: ["fakturace", "nakup", "nabidky", "komunikace"],
+      description: "fakturace = faktury / účetní doklady, nakup = objednávky / nákup, nabidky = poptávky a nabídky, komunikace = obecný kontakt",
+    },
+    email: str("E-mailová adresa přesně z dokladu"),
+  },
+  required: ["party", "role", "email"],
+};
 
 /** Strukturovaná dodací lhůta (nabídka naše i dodavatelská, potvrzení) — jen DODACÍ / výrobní lhůta. */
 const leadTimeSchema = {
@@ -173,6 +188,7 @@ export const BUSINESS_DOC_SCHEMA = {
     summary: str("1–2 věty česky"),
     confidence: num("0–1"),
     needsClarification: { type: "array", items: { type: "string" } },
+    roleEmails: { type: "array", items: roleEmailSchema },
   },
   required: DOC_FIELDS,
 };
@@ -241,6 +257,10 @@ export function systemPrompt(): string {
 
     "KVALITA: co nelze spolehlivě přečíst, nech prázdné / 0 — nikdy nedomýšlej. Při rozmazané, oříznuté nebo neúplné " +
       "fotce sniž confidence (0–1) a do needsClarification napiš česky a konkrétně, co má člověk ověřit.",
+
+    "roleEmails: jen když doklad VÝSLOVNĚ říká, kam co posílat (‚faktury zasílejte na …‘, ‚Fakturace: …‘, ‚objednávky na …‘, " +
+      "‚poptávky / RFQ: …‘), uveď adresu s účelem (fakturace, nakup, nabidky, komunikace) a čí je (customer / supplier). " +
+      "Obyčejný e-mail v hlavičce bez účelu sem nepatří (ten je v customer.email / supplier.email). Jinak prázdné pole.",
   ].join("\n\n");
 }
 

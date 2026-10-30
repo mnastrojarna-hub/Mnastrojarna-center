@@ -8,7 +8,7 @@
 // Vlastní data „E2E-21-" (zákazník, zakázky), na konci se uklidí.
 import fs from "node:fs";
 import path from "node:path";
-import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary, recipients } from "../lib.mjs";
 import { lit, userIds, eventually, waitHydrated, expectNoOverflow, waitMail, removeStorageFiles } from "../lib-quotes-docs-flow.mjs";
 
 const browser = await launch();
@@ -129,12 +129,14 @@ await test("Dodáno k nám: další krok „Zapsat dodání a dodací list“ �
   await res.getByRole("button", { name: /Poslat zákazníkovi/ }).click();
   const send = page.getByRole("dialog").filter({ hasText: `Poslat dodací list ${number} zákazníkovi` });
   await send.waitFor({ timeout: 15_000 });
-  await eventually(async () => expect((await send.getByLabel("Komu").inputValue()) === EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
+  await eventually(async () => expect((await recipients(send, "Komu")) === EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
   expect((await send.getByLabel("Předmět").inputValue()).includes(number), "předmět nese číslo tohoto DL");
   const t0 = new Date().toISOString();
   await send.getByRole("button", { name: "Odeslat dodací list" }).click();
   const mail = await waitMail(EMAIL, (m) => m.receivedAt > t0 && String(m.subject).includes(number), 30_000);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].filename === `Dodaci_list_${number}.pdf`, `mail s PDF (${JSON.stringify(mail?.attachments)})`);
+  // vedle PDF jen vložené logo podpisu (grafický podpis s logem pro každého, 3dfcb3e)
+  const pdfs21 = (mail?.attachments ?? []).filter((a) => a.contentType !== "image/png" || a.filename !== "mnastrojarna-logo.png");
+  expect(mail && pdfs21.length === 1 && pdfs21[0].filename === `Dodaci_list_${number}.pdf`, `mail s PDF (${JSON.stringify(mail?.attachments)})`);
   await res.getByText(`Odesláno na ${EMAIL}.`).waitFor({ timeout: 15_000 });
   await res.getByRole("button", { name: "Hotovo" }).click();
   await dlg.waitFor({ state: "hidden", timeout: 10_000 });

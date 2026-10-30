@@ -3,6 +3,7 @@ import { apiRequire } from "@/lib/auth/session";
 import { generateQuote } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
 import { runPricingFlow } from "@/lib/ai/pricing-flow";
+import { userAiTone } from "@/lib/contacts/ai-tone";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -23,7 +24,9 @@ export async function POST(req: Request) {
     }
 
     const quoteRules = await getAgentInstructions("quote");
-    const quote = await generateQuote({ customer, inquiry, estimate, rules: quoteRules });
+    // průvodní e-mail s tykáním / vykáním obchodníka k adresátovi (když je e-mail zákazníka)
+    const tone = await userAiTone(auth.user.id, body.customerEmail);
+    const quote = await generateQuote({ customer, inquiry, estimate, rules: quoteRules, tone });
     return NextResponse.json({ quote, estimate });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Chyba generování nabídky";

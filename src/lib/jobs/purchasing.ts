@@ -867,26 +867,30 @@ export function purchaseOrderEmail(input: {
   itemNotes?: SupplierItemNote[];
   /** Podpis odesílatele z Nastavení pošty (text s pozdravem → při odeslání grafický s logem). */
   signatureText?: string | null;
+  /** Tykání / vykání odesílatele s adresátem a hotový první řádek (src/lib/contacts/tone.ts). */
+  address?: "ty" | "vy" | null;
+  salutation?: string | null;
 }): { subject: string; body: string } {
   const days = input.confirmWithinDays ?? CONFIRM_WITHIN_WORKING_DAYS;
   const quote = (input.supplierQuoteNumber ?? "").trim();
   const req = cleanDate(input.requiredDate);
+  const v = (vy: string, ty: string) => (input.address === "ty" ? ty : vy);
   const lines = [
-    "Dobrý den,",
+    greetingOf(input),
     "",
-    `v příloze Vám zasíláme naši objednávku č. ${input.number}${quote ? ` na základě Vaší nabídky č. ${quote}` : ""}.`,
+    `v příloze ${v("Vám zasíláme", "ti posíláme")} naši objednávku č. ${input.number}${quote ? ` na základě ${v("Vaší", "tvé")} nabídky č. ${quote}` : ""}.`,
   ];
   if (req) lines.push(`Požadovaný termín dodání: ${czDate(req)} (${czWeekday(req)}).`);
   const notes = (input.itemNotes ?? []).filter((n) => n.note.trim());
   if (notes.length) {
-    lines.push("", "Prosíme, věnujte pozornost poznámkám u položek:");
+    lines.push("", v("Prosíme, věnujte pozornost poznámkám u položek:", "Prosím, věnuj pozornost poznámkám u položek:"));
     for (const n of notes.slice(0, 20)) lines.push(`– ${n.ref}: ${n.note.trim()}`);
   }
-  if (input.drawingsSeparately && !quote) lines.push("Výkresovou dokumentaci k položkám Vám pošleme samostatně, pokud ji od nás ještě nemáte.");
+  if (input.drawingsSeparately && !quote) lines.push(`Výkresovou dokumentaci k položkám ${v("Vám pošleme samostatně, pokud ji od nás ještě nemáte", "ti pošleme samostatně, pokud ji od nás ještě nemáš")}.`);
   lines.push(
     "",
-    `Prosíme o potvrzení objednávky a termínu dodání do ${days} ${days === 1 ? "pracovního dne" : "pracovních dnů"} — stačí odpovědět na tento e-mail.`,
-    `Číslo objednávky ${input.number} prosíme uvádějte na dodacím listu i faktuře.`,
+    `${v("Prosíme o potvrzení", "Prosím o potvrzení")} objednávky a termínu dodání do ${days} ${days === 1 ? "pracovního dne" : "pracovních dnů"} — stačí odpovědět na tento e-mail.`,
+    `Číslo objednávky ${input.number} ${v("prosíme uvádějte", "prosím uváděj")} na dodacím listu i faktuře.`,
     "",
     "Děkujeme za spolupráci.",
     "",
@@ -907,6 +911,14 @@ export interface SupplierMailSender {
   companyWeb?: string | null;
   /** Podpis odesílatele z Nastavení pošty (text s pozdravem → při odeslání grafický s logem). */
   signatureText?: string | null;
+  /** Tykání / vykání odesílatele s adresátem a hotový první řádek (src/lib/contacts/tone.ts). */
+  address?: "ty" | "vy" | null;
+  salutation?: string | null;
+}
+
+/** První řádek e-mailu dodavateli — oslovení dle tykání / vykání, jinak „Dobrý den,". */
+function greetingOf(input: { salutation?: string | null }): string {
+  return (input.salutation ?? "").trim() || "Dobrý den,";
 }
 
 function supplierSignature(input: SupplierMailSender): string[] {
@@ -936,17 +948,18 @@ export function purchaseOrderChangeEmail(input: SupplierMailSender & {
   const req = cleanDate(input.requiredDate);
   const prev = cleanDate(input.previousRequiredDate);
   const reason = (input.reason ?? "").trim();
+  const ty = input.address === "ty";
   const lines = [
-    "Dobrý den,",
+    greetingOf(input),
     "",
-    `posíláme změnu naší objednávky č. ${input.number} (změna ${input.revision}) — aktuální znění je v příloze.`,
+    `${ty ? "posílám ti" : "posíláme"} změnu naší objednávky č. ${input.number} (změna ${input.revision}) — aktuální znění je v příloze.`,
   ];
   if (req && prev && req !== prev) lines.push(`Požadovaný termín dodání se mění z ${czDate(prev)} na ${czDate(req)} (${czWeekday(req)}).`);
   else if (req) lines.push(`Požadovaný termín dodání: ${czDate(req)} (${czWeekday(req)}).`);
   if (reason) lines.push(`Důvod: ${reason}`);
   lines.push(
     "",
-    "Prosíme o potvrzení změny — stačí odpovědět na tento e-mail.",
+    `${ty ? "Prosím o" : "Prosíme o"} potvrzení změny — stačí odpovědět na tento e-mail.`,
     "",
     "Děkujeme za pochopení.",
     "",
@@ -960,11 +973,14 @@ export function purchaseOrderChangeEmail(input: SupplierMailSender & {
 /** Storno objednávky u dodavatele. */
 export function purchaseOrderCancelEmail(input: SupplierMailSender & { reason?: string | null }): { subject: string; body: string } {
   const reason = (input.reason ?? "").trim();
+  const ty = input.address === "ty";
   const lines = [
-    "Dobrý den,",
+    greetingOf(input),
     "",
     `rušíme naši objednávku č. ${input.number}${reason ? ` — ${reason}` : ""}.`,
-    "Prosíme, nepokračujte ve výrobě a potvrďte nám storno odpovědí na tento e-mail. Pokud už vznikly náklady, dejte nám prosím vědět.",
+    ty
+      ? "Prosím, nepokračuj ve výrobě a potvrď nám storno odpovědí na tento e-mail. Pokud už vznikly náklady, dej nám prosím vědět."
+      : "Prosíme, nepokračujte ve výrobě a potvrďte nám storno odpovědí na tento e-mail. Pokud už vznikly náklady, dejte nám prosím vědět.",
     "",
     "Děkujeme a omlouváme se za komplikace.",
     "",
@@ -978,11 +994,14 @@ export function purchaseOrderCancelEmail(input: SupplierMailSender & { reason?: 
 /** Pozastavení objednávky u dodavatele (zakázka čeká). */
 export function purchaseOrderHoldEmail(input: SupplierMailSender & { reason?: string | null }): { subject: string; body: string } {
   const reason = (input.reason ?? "").trim();
+  const ty = input.address === "ty";
   const lines = [
-    "Dobrý den,",
+    greetingOf(input),
     "",
     `prosíme o pozastavení naší objednávky č. ${input.number}${reason ? ` — ${reason}` : ""}.`,
-    "Ve výrobě zatím nepokračujte; jakmile bude možné pokračovat, ozveme se s novým termínem.",
+    ty
+      ? "Ve výrobě zatím nepokračuj; jakmile bude možné pokračovat, ozveme se s novým termínem."
+      : "Ve výrobě zatím nepokračujte; jakmile bude možné pokračovat, ozveme se s novým termínem.",
     "",
     "Děkujeme za pochopení.",
     "",

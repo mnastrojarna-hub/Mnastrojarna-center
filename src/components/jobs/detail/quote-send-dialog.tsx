@@ -4,18 +4,11 @@ import * as React from "react";
 import { AlertTriangle, Send, Loader2, FileText, ExternalLink, RotateCcw, Paperclip } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { generateJobDocument, sendJobDocument, draftJobDocumentEmail } from "@/app/actions/job-documents";
+import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
+import { applySalutation } from "@/lib/contacts/tone";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
-
-interface MailDraft {
-  to: string;
-  cc: string;
-  subject: string;
-  body: string;
-}
 
 type Step = "preparing" | "unpriced" | "form" | "sending";
 
@@ -52,16 +45,28 @@ export function QuoteSendDialog({
   const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const run = React.useRef(0);
+  /** Text posledního návrhu ze serveru — po změně tykání se připraví znovu, jen když ho uživatel neupravil. */
+  const lastDraftBody = React.useRef<string | null>(null);
+  const mailNow = React.useRef(mail);
+  mailNow.current = mail;
+  const redraft = React.useCallback(async (salutation: string) => {
+    const before = lastDraftBody.current;
+    if (!file || before === null || applySalutation(before, salutation) !== mailNow.current.body) return;
+    const d = await draftJobDocumentEmail(jobId, file.id).catch(() => null);
+    if (!d?.ok || !d.body) return;
+    lastDraftBody.current = d.body;
+    setMail((m) => (applySalutation(before, salutation) === m.body ? { ...m, body: d.body ?? m.body } : m));
+  }, [file, jobId]);
 
   const fallbackMail = React.useCallback((): MailDraft => {
-    const hello = fallback.contact ? `Dobrý den, ${fallback.contact},` : "Dobrý den,";
+    const hello = "Dobrý den,";
     return {
       to: fallback.to,
       cc: "",
       subject: `Nabídka ${quote.number} — ${fallback.title}`,
       body: `${hello}\n\nv příloze posíláme nabídku ${quote.number} k Vaší poptávce (${fallback.title}).\nV případě dotazů jsme Vám k dispozici.\n\nS pozdravem\nMnástrojárna s.r.o.`,
     };
-  }, [fallback.to, fallback.title, fallback.contact, quote.number]);
+  }, [fallback.to, fallback.title, quote.number]);
 
   const prepare = React.useCallback(async (force = false) => {
     const token = ++run.current;
@@ -88,7 +93,11 @@ export function QuoteSendDialog({
       const draft = await draftJobDocumentEmail(jobId, gen.fileId);
       if (token !== run.current) return;
       if (draft.ok && (draft.subject || draft.body)) {
-        setMail((m) => ({ to: draft.to || m.to || fallback.to, cc: m.cc, subject: draft.subject ?? "", body: draft.body ?? "" }));
+        lastDraftBody.current = draft.body ?? null;
+        setMail((m) => ({
+          to: draft.to || m.to || fallback.to, cc: m.cc || draft.cc || "", subject: draft.subject ?? "", body: draft.body ?? "",
+          reason: draft.to ? draft.recipientReason : undefined,
+        }));
       }
       setStep("form");
     } catch {
@@ -203,24 +212,7 @@ export function QuoteSendDialog({
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
               )}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Komu</span>
-                  <Input type="email" value={mail.to} onChange={(e) => setMail({ ...mail, to: e.target.value })} placeholder="zakaznik@firma.cz" autoFocus />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Kopie (nepovinné)</span>
-                  <Input type="email" value={mail.cc} onChange={(e) => setMail({ ...mail, cc: e.target.value })} placeholder="kolega@mnastrojarna.cz" />
-                </label>
-              </div>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-muted-foreground">Předmět</span>
-                <Input value={mail.subject} onChange={(e) => setMail({ ...mail, subject: e.target.value })} />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-muted-foreground">Text e-mailu</span>
-                <Textarea rows={9} value={mail.body} onChange={(e) => setMail({ ...mail, body: e.target.value })} />
-              </label>
+              <MailFields mail={mail} onChange={setMail} context={{ jobId }} idPrefix="quote-mail" onToneSaved={(c) => void redraft(c.salutation)} />
             </>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

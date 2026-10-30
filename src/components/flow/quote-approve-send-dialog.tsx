@@ -43,7 +43,7 @@ export function QuoteApproveSendDialog({
     draftQuoteEmail(jobId, quoteId).then((d) => {
       if (token !== run.current) return;
       if (d.ok) {
-        setMail({ to: d.to ?? "", cc: "", subject: d.subject ?? "", body: d.body ?? "" });
+        setMail({ to: d.to ?? "", cc: d.cc ?? "", subject: d.subject ?? "", body: d.body ?? "", reason: d.to ? d.recipientReason : undefined });
         setFilename(d.filename ?? null);
       } else {
         setError(d.error ?? "Návrh e-mailu se nepodařilo připravit.");
@@ -107,7 +107,7 @@ export function QuoteApproveSendDialog({
                   <span className="shrink-0 text-xs text-muted-foreground">vystaví se po schválení</span>
                 </p>
               )}
-              <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} />
+              <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} />
             </>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

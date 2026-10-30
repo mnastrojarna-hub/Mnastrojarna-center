@@ -26,6 +26,8 @@ import { categoryAfterLink, STRONG_SIGNALS } from "@/lib/email/job-match";
 import { aiActor, cronActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import type { MailboxConfig, MailboxStatus } from "@/lib/supabase/database.types";
+import { detectRoleEmails } from "@/lib/contacts/role-detect";
+import { aiToneFor, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/server";
 
 /**
  * Stahování a (volitelně) AI-analýza pošty.
@@ -391,6 +393,8 @@ export async function ingestEmailsProgress(
   // Pošta B: přiřazení k zakázce (✨ AI za vlastníka schránky) — jisté hned, nejisté jako návrh
   let jobActor: MailJobActor | null = null;
   const jobBudget = policy.jobBudget ?? (policy.jobBudget = await loadMailJobAiBudget());
+  /** Naše adresy (schránky, uživatelé, doména) — nikdy se nepřiřadí zákazníkovi jako fakturační apod. */
+  let ownFilter: ((email: string) => boolean) | null = null;
 
   for (let i = 0; i < emails.length; i++) {
     if (!isFresh[i]) continue;
@@ -475,10 +479,25 @@ export async function ingestEmailsProgress(
       console.error(`[mail:ingest] Přiřazení k zakázce selhalo: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    // „Faktury zasílejte na …" → e-mail podle účelu u zákazníka / dodavatele (ruční nastavení nepřepíše)
+    if (direction === "in" && !isSpam && (customerId || supplierId)) {
+      const found = detectRoleEmails(e.body);
+      if (found.length) {
+        try {
+          ownFilter ??= await ownAddressFilter(db);
+          await rememberRoleEmails(db, customerId ? { customerId } : { supplierId }, found, { exclude: ownFilter });
+        } catch (err) {
+          console.error(`[mail:ingest] Uložení e-mailu podle účelu selhalo: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+
     // Návrh odpovědi jen s AI, ne u spamu a jen u čerstvé pošty: plná automatika = odeslat hned, jinak fronta
     if (!analysis || isSpam || !isRecent(e.receivedAt, policy.replyWindowHours / 24)) continue;
     try {
-      const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category, rules, signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS) });
+      // tykání / vykání vlastníka schránky (odpověď odejde pod jeho jménem) s odesílatelem
+      const tone = await aiToneFor(db, opts.ownerId ?? null, e.fromEmail, e.fromName);
+      const draft = await draftReply({ from: e.fromEmail, subject: e.subject, body: e.body, category, rules, tone, signal: AbortSignal.timeout(AI_CALL_TIMEOUT_MS) });
       if (!draft.trim()) continue;
 
       let sentAuto = false;

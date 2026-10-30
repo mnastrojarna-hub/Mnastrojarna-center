@@ -12,8 +12,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { AiConfidence } from "@/components/ai-confidence";
+import { RecipientInput, isValidRecipient, tokensOf } from "@/components/mail/recipient-field";
+import { ToneToggle } from "@/components/contacts/tone-toggle";
+import { applySalutation } from "@/lib/contacts/tone";
 import { useAutomation } from "@/components/automation-provider";
 import { OUTBOUND_APPROVAL_TYPES, type ApprovalItem } from "@/lib/data/types";
 import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
@@ -221,10 +223,10 @@ function ApprovalRow({
           {editing ? (
             <>
               {isOutbound && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Příjemce (e-mail)</label>
-                  <Input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="adresa@firma.cz" />
-                </div>
+                <RecipientInput id={`approval-${item.id}-to`} label="Příjemce" value={target ?? ""} onChange={setTarget} placeholder="adresa@firma.cz" />
+              )}
+              {isOutbound && target && (
+                <ToneToggle email={tokensOf(target).find(isValidRecipient) ?? null} compact onChange={(c) => c.changed && setBody((b) => applySalutation(b, c.salutation))} />
               )}
               <Textarea
                 value={body}

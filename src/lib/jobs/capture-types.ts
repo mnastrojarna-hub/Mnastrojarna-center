@@ -89,6 +89,14 @@ export interface ExtractedBusinessDoc {
   summary: string;
   confidence: number;
   needsClarification: string[];
+  /** Adresy s účelem („faktury zasílejte na …") → e-maily podle účelu u zákazníka / dodavatele. */
+  roleEmails?: ExtractedRoleEmail[];
+}
+
+export interface ExtractedRoleEmail {
+  party: "customer" | "supplier";
+  role: "fakturace" | "nakup" | "nabidky" | "komunikace";
+  email: string;
 }
 
 /** Zakázka jako kandidát pro párování dokladu (načítá datová vrstva, páruje čistá logika). */

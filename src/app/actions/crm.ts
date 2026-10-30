@@ -5,6 +5,7 @@ import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/serve
 import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
+import { ensureContactPerson, moveToneEmail } from "@/lib/contacts/server";
 import { fetchPaged, isUuid, translateDbError } from "@/lib/jobs/mapping";
 import {
   matchCustomer, normalizeCountry, normalizeDic, normalizeIco, composeAddress, type CustomerLookupRow,
@@ -141,6 +142,8 @@ export async function createCustomer(
     const { data, error } = await db.from("customers").insert(row as never).select("id, customer_number").single();
     if (error || !data) return { ok: false, error: dbError(error?.message ?? "Zákazníka se nepodařilo uložit.", number) };
     const created = data as { id: string; customer_number: string | null };
+    // „Kontaktní osoba" z formuláře = první kontaktní osoba (jméno, e-mail, telefon) — maily se pak řídí jí
+    await ensureContactPerson(db, { customerId: created.id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     await logAudit({ action: "customer_created", entity: "customers", entityId: created.id, diff: { name: row.name } });
     revalidateCustomer(created.id);
     return { ok: true, id: created.id, customerNumber: created.customer_number };
@@ -180,6 +183,7 @@ export async function updateCustomer(
     if (number) row.customer_number = number; // prázdné = ponechat stávající číslo
     const { data, error } = await db.from("customers").update(row as never).eq("id", id).select("id, customer_number").maybeSingle();
     if (error || !data) return { ok: false, error: dbError(error?.message ?? "Zákazníka se nepodařilo uložit.", number) };
+    await ensureContactPerson(db, { customerId: id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     await logAudit({ action: "customer_updated", entity: "customers", entityId: id, diff: { name: row.name } });
     revalidateCustomer(id);
     return { ok: true, customerNumber: (data as { customer_number: string | null }).customer_number };
@@ -213,10 +217,13 @@ export async function saveCustomerContact(
     const db = await createOperatorClient({ actor: userActor(auth.user) });
     let id = contactId;
     if (contactId) {
+      const { data: before } = await db.from("customer_contacts").select("email").eq("id", contactId).eq("customer_id", customerId).maybeSingle();
       const { data, error } = await db.from("customer_contacts").update(row as never)
         .eq("id", contactId).eq("customer_id", customerId).select("id").maybeSingle();
       if (error) return { ok: false, error: translateDbError(error.message) };
       if (!data) return { ok: false, error: "Kontakt nenalezen." };
+      // tykání všech kolegů s kontaktem jde za ním na novou adresu
+      await moveToneEmail(db, (before as { email: string | null } | null)?.email, row.email);
     } else {
       const { data, error } = await db.from("customer_contacts").insert(row as never).select("id").single();
       if (error || !data) return { ok: false, error: translateDbError(error?.message ?? "Kontakt se nepodařilo uložit.") };
@@ -306,6 +313,9 @@ export async function createSupplier(input: SupplierFormValues): Promise<ActionR
     const { data, error } = await db.from("suppliers").insert(mapped.cols as never).select("id").single();
     if (error || !data) return { ok: false, error: translateDbError(error?.message ?? "Dodavatele se nepodařilo uložit.") };
     const id = (data as { id: string }).id;
+    await ensureContactPerson(db, { supplierId: id }, {
+      name: mapped.cols.contact_person as string | null, email: mapped.cols.email as string | null, phone: mapped.cols.phone as string | null,
+    }).catch(() => null);
     await logAudit({ action: "supplier_created", entity: "suppliers", entityId: id, diff: { name: mapped.cols.name } });
     revalidateSuppliers();
     return { ok: true, id };
@@ -326,6 +336,9 @@ export async function updateSupplier(id: string, input: SupplierFormValues): Pro
     const { data, error } = await db.from("suppliers").update(mapped.cols as never).eq("id", id).select("id").maybeSingle();
     if (error) return { ok: false, error: translateDbError(error.message) };
     if (!data) return { ok: false, error: "Dodavatel neexistuje (možná ho někdo smazal)." };
+    await ensureContactPerson(db, { supplierId: id }, {
+      name: mapped.cols.contact_person as string | null, email: mapped.cols.email as string | null, phone: mapped.cols.phone as string | null,
+    }).catch(() => null);
     await logAudit({ action: "supplier_updated", entity: "suppliers", entityId: id, diff: { name: mapped.cols.name } });
     revalidateSuppliers();
     return { ok: true };

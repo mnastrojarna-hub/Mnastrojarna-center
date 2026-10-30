@@ -4,7 +4,7 @@
 // adminem, odeslání autorem (obchodník i zaměstnanec), znovuschválení po změně, odznaky (i mobilní
 // „Menu“), AI focení pro všechny, přepnutí vlastníka schránky, fronta bez anonymního čtení.
 // Vlastní data „E2E15-<značka>“ (zakázky, nabídky, PO, soubory, e-maily) — úklid na konci i na začátku.
-import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest, restLogin, localEnv } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest, restLogin, localEnv, recipients } from "../lib.mjs";
 import { lit, userIds, eventually, waitHydrated, expectNoOverflow, waitToast, waitMail, removeStorageFiles } from "../lib-quotes-docs-flow.mjs";
 import { captureDialog, pngFile, removeStorage, storageObjects } from "../lib-capture.mjs";
 
@@ -463,7 +463,7 @@ try {
       await page.getByRole("menuitem", { name: "Schválit a odeslat" }).click();
       const dlg = page.getByRole("dialog");
       await dlg.getByRole("heading", { name: `Schválit a odeslat nabídku ${QS.number}` }).waitFor({ timeout: 15_000 });
-      await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu předvyplněno"));
+      await eventually(async () => expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu předvyplněno"));
       return dlg;
     };
     let dlg = await openDialog();
@@ -494,7 +494,7 @@ try {
       await card.getByRole("button", { name: "Odeslat zákazníkovi" }).click();
       const dlg = op.getByRole("dialog");
       await dlg.locator('a[href^="/api/jobs/files/"]').waitFor({ timeout: 30_000 });
-      await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu předvyplněno"));
+      await eventually(async () => expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu předvyplněno"));
       await dlg.getByRole("button", { name: "Odeslat zákazníkovi" }).click();
       await waitToast(op, new RegExp(`${esc(st.q1.number)} odeslána`), 30_000);
     });
@@ -565,7 +565,7 @@ try {
       await card.getByRole("button", { name: "Odeslat zákazníkovi" }).click();
       const dlg = dp.getByRole("dialog");
       await dlg.locator('a[href^="/api/jobs/files/"]').waitFor({ timeout: 30_000 });
-      await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu předvyplněno"));
+      await eventually(async () => expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu předvyplněno"));
       await dlg.getByRole("button", { name: "Odeslat zákazníkovi" }).click();
       await waitToast(dp, new RegExp(`${esc(q2[1])} odeslána`), 30_000);
     });

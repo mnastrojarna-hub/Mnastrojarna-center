@@ -11,19 +11,13 @@ import type { PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import { parseEmailList } from "@/lib/jobs/purchasing";
 import type { Notify } from "@/components/jobs/detail/toast";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
+import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
 import { isoToday } from "@/components/jobs/detail/detail-helpers";
 import { PurchaseOrderForm } from "./purchase-order-form";
 import { FULLSCREEN_DIALOG, Field } from "./ui-bits";
 import {
   purchaseDraftsToInput, purchaseOrderFormFromView, validatePurchaseOrderForm, type PurchaseOrderFormState,
 } from "./purchasing-model";
-
-interface MailDraft {
-  to: string;
-  cc: string;
-  subject: string;
-  body: string;
-}
 
 type Step = "preparing" | "form" | "sending";
 
@@ -44,6 +38,8 @@ export function SendPurchaseOrderDialog({
   const [error, setError] = React.useState<string | null>(null);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const [attachment, setAttachment] = React.useState<string | null>(null);
+  /** Dodavatel objednávky — jeho kontakty a e-maily podle účelu nahoře v našeptávači. */
+  const [supplierId, setSupplierId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   const orderId = order?.id ?? null;
 
@@ -63,7 +59,8 @@ export function SendPurchaseOrderDialog({
         if (token !== run.current) return;
         if (!res.ok) setError(res.error ?? "Návrh e-mailu se nepodařilo připravit.");
         else {
-          setMail({ to: res.to ?? "", cc: "", subject: res.subject ?? "", body: res.body ?? "" });
+          setMail({ to: res.to ?? "", cc: res.cc ?? "", subject: res.subject ?? "", body: res.body ?? "", reason: res.to ? res.recipientReason : undefined });
+          setSupplierId(res.supplierId ?? null);
           setAttachment(res.attachmentName ?? null);
         }
       } catch {
@@ -130,24 +127,7 @@ export function SendPurchaseOrderDialog({
                 <span className="min-w-0 flex-1 truncate font-medium">{attachment ?? `Objednávka ${order?.number ?? ""}.pdf`}</span>
                 <span className="inline-flex items-center gap-1 text-xs text-red-700 dark:text-red-300">Náhled <ExternalLink className="h-3 w-3" /></span>
               </a>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Komu</span>
-                  <Input type="email" value={mail.to} onChange={(e) => setMail({ ...mail, to: e.target.value })} placeholder="obchod@dodavatel.cz" autoFocus />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Kopie (nepovinné)</span>
-                  <Input type="email" value={mail.cc} onChange={(e) => setMail({ ...mail, cc: e.target.value })} placeholder="kolega@mnastrojarna.cz" />
-                </label>
-              </div>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-muted-foreground">Předmět</span>
-                <Input value={mail.subject} onChange={(e) => setMail({ ...mail, subject: e.target.value })} />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-muted-foreground">Text e-mailu</span>
-                <Textarea rows={10} value={mail.body} onChange={(e) => setMail({ ...mail, body: e.target.value })} />
-              </label>
+              <MailFields mail={mail} onChange={setMail} context={supplierId ? { supplierId } : null} idPrefix="po-mail" />
             </>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

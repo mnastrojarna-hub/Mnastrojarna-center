@@ -22,6 +22,7 @@ import { isOperationKind, type OperationKind } from "@/lib/jobs/operations";
 import { operationFamily } from "@/lib/jobs/production-suggest";
 import { pragueToday } from "@/lib/jobs/flow-status";
 import { czDate } from "@/lib/pdf/types";
+import { recipientsFor, toneFor } from "@/lib/contacts/server";
 
 /**
  * Objednávka dodavateli — jádro PDF a odeslání bez session (sdílí akce Nákupu, předání do výroby,
@@ -218,13 +219,18 @@ export async function purchaseOrderMailFor(
   signerId: string | null,
   kind: PoMailKind = "issue",
   extra: { previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null } = {},
-): Promise<PurchaseOrderMail & { attachmentName: string }> {
+): Promise<PurchaseOrderMail & { attachmentName: string; recipientReason: string }> {
   await refreshCompanyFromSettings();
-  const [me, signatureText] = await Promise.all([
+  const [me, signatureText, pick] = await Promise.all([
     signerId ? fetchProfileContact(db, signerId) : Promise.resolve({ name: null, email: null, phone: null }),
     // podpis podepisujícího z Nastavení pošty (při odeslání z jeho schránky → grafický s logem)
     senderSignatureText(signerId, { ownerId: signerId ?? "" }),
+    // dodavatel → e-mail pro objednávky (karta dodavatele → E-maily podle účelu), jinak e-mail firmy / kontakt
+    recipientsFor(db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null),
   ]);
+  const to = pick?.to[0] ?? po.supplier?.email ?? "";
+  // tykání / vykání podepisujícího s dodavatelem
+  const tone = to ? await toneFor(db, signerId, [to]).catch(() => null) : null;
   const sender = {
     number: po.number,
     companyName: COMPANY.name,
@@ -233,6 +239,8 @@ export async function purchaseOrderMailFor(
     senderPhone: me.phone ?? COMPANY.phone,
     companyWeb: COMPANY.web,
     signatureText,
+    address: tone?.setting.address ?? null,
+    salutation: tone?.salutation ?? null,
   };
   const mail = kind === "change"
     ? purchaseOrderChangeEmail({ ...sender, revision: Math.max(2, po.revision ?? 2), requiredDate: po.requiredDate, previousRequiredDate: extra.previousRequiredDate, reason: extra.reason })
@@ -244,7 +252,10 @@ export async function purchaseOrderMailFor(
           ...sender, supplierQuoteNumber: po.supplierQuote?.number, requiredDate: po.confirmedDate ?? po.requiredDate, drawingsSeparately: !po.supplierQuote,
           itemNotes: supplierNotesOfItems(po.items ?? []),
         });
-  return { to: po.supplier?.email ?? "", ...mail, attachmentName: purchaseOrderFileName(po.number) };
+  return {
+    to, ...(pick?.cc.length ? { cc: pick.cc.join(", ") } : {}), ...mail,
+    attachmentName: purchaseOrderFileName(po.number), recipientReason: pick?.to.length ? pick.reason : to ? "E-mail dodavatele" : "",
+  };
 }
 
 export interface SendPoOptions {

@@ -239,6 +239,15 @@ describe("výchozí texty", () => {
     expect(purchaseOrderNote("Z-1", ["A"], "Dle výkresů")).toBe("Objednávka k naší zakázce Z-1. Dle výkresů: A.");
   });
 
+  it("e-mail objednávky: tykání podepisujícího s dodavatelem (oslovení, ti / tvé)", () => {
+    const base = { number: "OV-2026-1", companyName: "MNástrojárna s.r.o.", supplierQuoteNumber: "N-1" };
+    const ty = purchaseOrderEmail({ ...base, salutation: "Ahoj Pavle,", address: "ty" }).body;
+    expect(ty.startsWith("Ahoj Pavle,\n\nv příloze ti posíláme naši objednávku č. OV-2026-1 na základě tvé nabídky č. N-1.")).toBe(true);
+    expect(ty).not.toMatch(/\bV(ám|aší)\b/);
+    expect(purchaseOrderEmail({ ...base, salutation: "Dobrý den, pane Nováku,", address: "vy" }).body.startsWith("Dobrý den, pane Nováku,\n\nv příloze Vám zasíláme")).toBe(true);
+    expect(purchaseOrderEmail(base).body.startsWith("Dobrý den,\n")).toBe(true);
+  });
+
   it("poznámka: naše zakázka + výkresy, bez duplicit", () => {
     expect(purchaseOrderNote("Z-2026-105", ["VK-1", "VK-2", "VK-1", null, " "]))
       .toBe("Objednávka k naší zakázce Z-2026-105. Výroba dle výkresů: VK-1, VK-2.");

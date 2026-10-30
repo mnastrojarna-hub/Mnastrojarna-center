@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Eye, ExternalLink, Loader2, Paperclip, RotateCcw, Save, Send } from "lucide-react";
+import { AlertTriangle, Eye, ExternalLink, Info, Loader2, Paperclip, RotateCcw, Save, Send } from "lucide-react";
+import { RecipientInput, isValidRecipient, tokensOf, type RecipientContext } from "@/components/mail/recipient-field";
+import { ToneToggle, type ToneChange } from "@/components/contacts/tone-toggle";
+import { applySalutation } from "@/lib/contacts/tone";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +20,8 @@ export interface MailDraft {
   cc: string;
   subject: string;
   body: string;
+  /** Proč zrovna tahle adresa („Fakturační e-mail zákazníka") — ukáže se pod Komu. */
+  reason?: string;
 }
 
 const KIND_TEXT: Record<JobDocumentKind, { what: string; preparing: string }> = {
@@ -37,19 +42,44 @@ export function mailDraftError(mail: MailDraft): string | null {
   return null;
 }
 
-/** Komu / kopie / předmět / text — sdílí odeslání nabídky i potvrzení. */
-export function MailFields({ mail, onChange, disabled }: { mail: MailDraft; onChange: (m: MailDraft) => void; disabled?: boolean }) {
+/**
+ * Komu / kopie / předmět / text — sdílí odeslání nabídky, potvrzení, dodacího listu i faktury.
+ * Adresy s našeptávačem (kontakty zákazníka zakázky nahoře), pod Komu proč byla adresa vybrána
+ * a moje tykání / vykání s adresátem (změna hned přepíše oslovení v textu).
+ */
+export function MailFields({ mail, onChange, disabled, context, idPrefix = "doc-mail", onToneSaved }: {
+  mail: MailDraft;
+  onChange: (m: MailDraft) => void;
+  disabled?: boolean;
+  context?: RecipientContext | null;
+  idPrefix?: string;
+  /** Tykání / vykání změněno — dialog může nechat text připravit znovu (tvary „ti / Vám"). */
+  onToneSaved?: (c: ToneChange) => void;
+}) {
+  const mainTo = tokensOf(mail.to).find(isValidRecipient) ?? null;
+  const mailRef = React.useRef(mail);
+  mailRef.current = mail;
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
+  const savedRef = React.useRef(onToneSaved);
+  savedRef.current = onToneSaved;
+  const onTone = React.useCallback((c: ToneChange) => {
+    if (!c.changed) return;
+    const m = mailRef.current;
+    onChangeRef.current({ ...m, body: applySalutation(m.body, c.salutation) });
+    savedRef.current?.(c);
+  }, []);
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Komu</span>
-          <Input type="text" inputMode="email" autoComplete="email" value={mail.to} disabled={disabled} onChange={(e) => onChange({ ...mail, to: e.target.value })} placeholder="nakup@zakaznik.cz" className="h-10" />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">Kopie (nepovinné)</span>
-          <Input type="text" inputMode="email" autoComplete="email" value={mail.cc} disabled={disabled} onChange={(e) => onChange({ ...mail, cc: e.target.value })} placeholder="kolega@mnastrojarna.cz" className="h-10" />
-        </label>
+      <div className="space-y-2">
+        <RecipientInput id={`${idPrefix}-to`} label="Komu" value={mail.to} disabled={disabled} context={context} onChange={(to) => onChange({ ...mail, to, reason: undefined })} placeholder="nakup@zakaznik.cz" />
+        {mail.reason && (
+          <p className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground" data-testid="recipient-reason">
+            <Info className="h-3.5 w-3.5 shrink-0 text-sky-500" /> {mail.reason}
+          </p>
+        )}
+        <RecipientInput id={`${idPrefix}-cc`} label="Kopie" value={mail.cc} disabled={disabled} context={context} onChange={(cc) => onChange({ ...mail, cc })} placeholder="nepovinné" />
+        {mainTo && !disabled && <ToneToggle email={mainTo} compact onChange={onTone} className="px-1" />}
       </div>
       <label className="block space-y-1">
         <span className="text-xs font-medium text-muted-foreground">Předmět</span>
@@ -139,6 +169,20 @@ export function DocumentSendDialog({
   const run = React.useRef(0);
   const onPreparedRef = React.useRef(onPrepared);
   onPreparedRef.current = onPrepared;
+  /** Text posledního návrhu ze serveru — po změně tykání se připraví znovu, jen když ho uživatel neupravil. */
+  const lastDraftBody = React.useRef<string | null>(null);
+  const mailNow = React.useRef(mail);
+  mailNow.current = mail;
+
+  /** Po přepnutí tykání / vykání: celý text znovu (tvary „ti posíláme / Vám zasíláme"), když ho uživatel neměnil. */
+  const redraft = React.useCallback(async (salutation: string) => {
+    const before = lastDraftBody.current;
+    if (before === null || applySalutation(before, salutation) !== mailNow.current.body) return;
+    const d = deferred ? await draftInvoiceEmail(jobId).catch(() => null) : file ? await draftJobDocumentEmail(jobId, file.id).catch(() => null) : null;
+    if (!d?.ok || !d.body) return;
+    lastDraftBody.current = d.body;
+    setMail((m) => (applySalutation(before, salutation) === m.body ? { ...m, body: d.body ?? m.body } : m));
+  }, [deferred, file, jobId]);
 
   const prepare = React.useCallback(async (force = false) => {
     const token = ++run.current;
@@ -169,7 +213,8 @@ export function DocumentSendDialog({
           // chybí bankovní účet / IBAN v Nastavení → upozornit ještě před vystavením (faktura bez QR)
           setBankWarning(d.bankWarning ?? null);
         }
-        setMail((m) => ({ to: d.to || m.to, cc: m.cc, subject: d.subject ?? m.subject, body: d.body ?? m.body }));
+        lastDraftBody.current = d.body ?? null;
+        setMail((m) => ({ to: d.to || m.to, cc: m.cc || d.cc || "", subject: d.subject ?? m.subject, body: d.body ?? m.body, reason: d.to ? d.recipientReason : m.reason }));
         setStep("form");
         return;
       }
@@ -200,7 +245,8 @@ export function DocumentSendDialog({
       const draft = await draftJobDocumentEmail(jobId, f.id);
       if (token !== run.current) return;
       if (draft.ok) {
-        setMail((m) => ({ to: draft.to || m.to, cc: m.cc, subject: draft.subject ?? m.subject, body: draft.body ?? m.body }));
+        lastDraftBody.current = draft.body ?? null;
+        setMail((m) => ({ to: draft.to || m.to, cc: m.cc || draft.cc || "", subject: draft.subject ?? m.subject, body: draft.body ?? m.body, reason: draft.to ? draft.recipientReason : m.reason }));
       } else if (draft.error) {
         setError(`Návrh e-mailu se nepodařilo připravit: ${draft.error}`);
       }
@@ -391,7 +437,9 @@ export function DocumentSendDialog({
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
               )}
-              {!blocked && <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} />}
+              {!blocked && (
+                <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} onToneSaved={(c) => void redraft(c.salutation)} />
+              )}
               {hasPlaceholder && (
                 <p className="text-[11px] text-muted-foreground">„{INVOICE_NUMBER_PLACEHOLDER}“ se při vystavení nahradí přiděleným číslem faktury.</p>
               )}

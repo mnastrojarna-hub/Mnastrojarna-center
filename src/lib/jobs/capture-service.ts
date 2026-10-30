@@ -43,6 +43,8 @@ import { createSupplierInvoiceFromFile, type InvoiceFileInput } from "@/lib/supp
 import { invoiceFromBusinessDoc } from "@/lib/supplier-invoices/extract";
 import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
 import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
+import { detectRoleEmails } from "@/lib/contacts/role-detect";
+import { ensureContactPerson, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/server";
 import type {
   CaptureDocKind, CaptureResult, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedParty,
 } from "@/lib/jobs/capture-types";
@@ -683,6 +685,30 @@ async function jobByCaptureKey(db: JobsDb, captureKey: string): Promise<string |
   return (await resolveMergeTarget(db, row.id))?.id ?? row.merged_into_id;
 }
 
+/**
+ * Adresy s účelem z dokladu (AI roleEmails, a k tomu rozpoznání „faktury zasílejte na …" v poznámce a
+ * podmínkách) → e-maily podle účelu u zákazníka / dodavatele. Ruční nastavení nepřepíše (rememberRoleEmails).
+ */
+export async function rememberDocRoleEmails(
+  db: JobsDb, doc: ExtractedBusinessDoc, party: { customerId: string | null; supplierId: string | null },
+): Promise<number> {
+  if (!party.customerId && !party.supplierId) return 0;
+  const text = [doc.note, doc.paymentTerms, doc.deliveryTerms].filter(Boolean).join("\n");
+  const fromText = detectRoleEmails(text);
+  const ai = doc.roleEmails ?? [];
+  let added = 0;
+  const own = await ownAddressFilter(db);
+  if (party.customerId) {
+    const list = [...ai.filter((r) => r.party === "customer"), ...(party.supplierId ? [] : fromText)];
+    if (list.length) added += await rememberRoleEmails(db, { customerId: party.customerId }, list, { exclude: own });
+  }
+  if (party.supplierId) {
+    const list = [...ai.filter((r) => r.party === "supplier"), ...fromText];
+    if (list.length) added += await rememberRoleEmails(db, { supplierId: party.supplierId }, list, { exclude: own });
+  }
+  return added;
+}
+
 /** Dodavatel podle IČO / DIČ / názvu, jinak nový. */
 export async function findOrCreateSupplier(db: JobsDb, party: ExtractedParty): Promise<{ id: string; name: string; created: boolean } | null> {
   return findOrCreateSupplierByParty(db, party);
@@ -808,6 +834,8 @@ export async function applyBusinessDoc(
     if (!found) return failResult("Zákazníka se nepodařilo založit.", aiUsed);
     customerId = found.id;
     customerCreated = found.created;
+    // nový zákazník z dokladu: kontaktní osoba z dokladu = první kontaktní osoba (jméno, e-mail, telefon)
+    if (found.created) await ensureContactPerson(db, { customerId: found.id }, { name: p.contactPerson, email: p.email, phone: p.phone }).catch(() => null);
     customerAttached = true;
     const { data } = await db.from("customers").select("name, owner_id").eq("id", found.id).maybeSingle();
     const row = data as { name: string; owner_id: string | null } | null;
@@ -829,6 +857,11 @@ export async function applyBusinessDoc(
     supplierId = s.id;
     supplierName = s.name;
   }
+
+  // „Faktury zasílejte na …" z dokladu (AI roleEmails + rozpoznání v poznámce / podmínkách) → e-maily podle účelu
+  await rememberDocRoleEmails(db, doc, { customerId, supplierId }).catch((err) => {
+    console.error(`[capture] E-maily podle účelu se nepodařilo uložit: ${err instanceof Error ? err.message : String(err)}`);
+  });
 
   let jobId: string;
   let jobNumber: string;

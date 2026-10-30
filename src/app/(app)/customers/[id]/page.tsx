@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft, Banknote, BookOpen, Building2, CalendarClock, ClipboardList, ExternalLink, FileBox, FileText, Globe, Hash,
-  Inbox, Mail, MapPin, Phone, ReceiptText, StickyNote, Truck, UserRound, Users,
+  Inbox, Mail, MapPin, Phone, ReceiptText, Send, StickyNote, Truck, UserRound, Users,
 } from "lucide-react";
+import { RoleEmailsEditor } from "@/components/contacts/role-emails";
+import { getContactBook } from "@/lib/contacts/page-data";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge, QuoteStatusBadge } from "@/components/status-badge";
 import { CustomerPricingProfile } from "@/components/customer-pricing-profile";
@@ -25,7 +27,7 @@ import { cn, formatCZK, formatDate, relativeTime } from "@/lib/utils";
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireFeature("customers");
   const { id } = await params;
-  const [detail, options] = await Promise.all([getCustomerDetail(id), getJobFormOptions()]);
+  const [detail, options, book] = await Promise.all([getCustomerDetail(id), getJobFormOptions(), getContactBook("customer", id)]);
   if (!detail) notFound();
   const { customer: c, contacts, jobs, quotes, emails, drawings, pricingRow } = detail;
   const owners = options.users.map((u) => ({ id: u.id, name: u.name, role: u.role }));
@@ -267,7 +269,15 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
           {/* Kontaktní osoby */}
           <Panel icon={<Users />} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title={`Kontaktní osoby (${contacts.length})`}>
-            <ContactsManager customerId={c.id} contacts={contacts} />
+            <ContactsManager customerId={c.id} contacts={contacts} roles={book.roles} tones={book.tones} />
+          </Panel>
+
+          {/* Kam co posílat — faktury, objednávky, nabídky, běžná pošta */}
+          <Panel icon={<Send />} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="E-maily podle účelu">
+            <p className="mb-2.5 text-xs text-muted-foreground">
+              Faktura jde vždy na Fakturaci, nabídka na Nabídky, potvrzení a dodací listy na Nákup. Kontakt zakázky má přednost (u faktury jde do kopie).
+            </p>
+            <RoleEmailsEditor kind="customer" partyId={c.id} roles={book.roles} contacts={book.contacts} partyEmail={c.email} />
           </Panel>
 
           {/* Výkresy — jen s právem na archiv výkresů */}

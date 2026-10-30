@@ -38,6 +38,7 @@ import {
 } from "@/lib/jobs/purchasing-store";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { normalizeExtracted } from "@/lib/jobs/extracted-normalize";
+import { recipientsFor, toneFor } from "@/lib/contacts/server";
 import { czDate } from "@/lib/pdf/types";
 import type { JobStage, PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type { ActionResult } from "@/lib/jobs/types";
@@ -866,7 +867,9 @@ export async function regeneratePurchaseOrderPdf(id: string): Promise<ActionResu
 /** Návrh e-mailu s objednávkou: adresát z adresáře dodavatelů, předmět, zdvořilý text, podpis. */
 export async function draftPurchaseOrderEmail(
   id: string,
-): Promise<ActionResult<{ to: string; subject: string; body: string; attachmentName: string }>> {
+): Promise<ActionResult<{
+  to: string; cc: string; recipientReason: string; supplierId: string | null; subject: string; body: string; attachmentName: string;
+}>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(PO_NOT_FOUND);
@@ -879,7 +882,13 @@ export async function draftPurchaseOrderEmail(
     const { data: jobRow } = await c.db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
     const sender = await purchaseOrderSender(c.db, { id: c.user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
     const signatureText = await senderSignatureText(sender.signerId, sender.from);
+    // dodavatel → e-mail pro objednávky (karta dodavatele), tykání / vykání podepisujícího s adresátem
+    const pick = await recipientsFor(c.db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null);
+    const to = pick?.to[0] ?? po.supplier?.email ?? "";
+    const tone = to ? await toneFor(c.db, sender.signerId ?? c.user.id, [to]).catch(() => null) : null;
     const mail = purchaseOrderEmail({
+      address: tone?.setting.address ?? null,
+      salutation: tone?.salutation ?? null,
       number: po.number,
       companyName: COMPANY.name,
       supplierQuoteNumber: po.supplierQuote?.number,
@@ -891,7 +900,10 @@ export async function draftPurchaseOrderEmail(
       companyWeb: COMPANY.web,
       signatureText,
     });
-    return { ok: true, to: po.supplier?.email ?? "", ...mail, attachmentName: purchaseOrderFileName(po.number) };
+    return {
+      ok: true, to, cc: (pick?.cc ?? []).join(", "), recipientReason: pick?.to.length ? pick.reason : to ? "E-mail dodavatele" : "",
+      supplierId: po.supplier?.id ?? null, ...mail, attachmentName: purchaseOrderFileName(po.number),
+    };
   } catch (err) {
     return fail(err);
   }

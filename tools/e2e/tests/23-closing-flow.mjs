@@ -11,7 +11,7 @@
 // Vlastní data „E2E-23-" (zákazník, zakázky), na konci se uklidí.
 import fs from "node:fs";
 import path from "node:path";
-import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary, recipients } from "../lib.mjs";
 import { lit, userIds, eventually, waitHydrated, expectNoOverflow, waitMail, waitToast, removeStorageFiles } from "../lib-quotes-docs-flow.mjs";
 
 const browser = await launch();
@@ -119,7 +119,7 @@ async function openInvoice(page) {
   await dlg.waitFor({ timeout: 15_000 });
   const pending = dlg.locator('[data-testid="send-pending-attachment"]');
   await pending.waitFor({ timeout: 45_000 });
-  await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
+  await eventually(async () => expect((await recipients(dlg, "Komu")) === EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
   return { dlg, pending };
 }
 
@@ -181,7 +181,9 @@ await test("desktop: Ve výrobě → „Zapsat dodání a dodací list“ z výr
   const fv = row(A).inv;
   expect(/^FV-\d{4}-\d{3,}$/.test(fv), `číslo faktury z řady FV (${fv})`);
   const mail = await waitMail(EMAIL, (m) => m.receivedAt > t0 && String(m.subject).includes(fv), 30_000);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].filename === `Faktura_${fv}.pdf`, `mail s PDF faktury (${JSON.stringify(mail?.attachments)})`);
+  // vedle PDF jen vložené logo podpisu (grafický podpis s logem pro každého, 3dfcb3e)
+  const pdfs23 = (mail?.attachments ?? []).filter((a) => a.contentType !== "image/png" || a.filename !== "mnastrojarna-logo.png");
+  expect(mail && pdfs23.length === 1 && pdfs23[0].filename === `Faktura_${fv}.pdf`, `mail s PDF faktury (${JSON.stringify(mail?.attachments)})`);
   expect(!String(mail?.subject).includes("[číslo faktury]") && !String(mail?.text ?? "").includes("[číslo faktury]"), "v e-mailu přidělené číslo (žádná značka)");
   await waitToast(page, new RegExp(`Faktura ${fv} odeslána na`), 20_000);
   await eventually(() => {
