@@ -3,6 +3,7 @@ import { syncMailbox } from "@/lib/email/ingest";
 import { cronAuthStatus } from "@/lib/email/visibility";
 import { runFlowReminders } from "@/lib/email/flow-reminders";
 import { cronActor } from "@/lib/supabase/actor-headers";
+import { processInBackground } from "@/lib/anonymize/runner";
 
 // IMAP klient vyžaduje Node runtime
 export const runtime = "nodejs";
@@ -31,7 +32,10 @@ export async function GET(req: Request) {
     // Authorization: Bearer <CRON_SECRET>. Stahuje se dávka za dávkou do limitu (kurzor, nic se neztratí);
     // nová schránka / e-mail jen do konce − 60 s (pod maxDuration 300 s, zbývá čas i na plánovač toku).
     // Plánovač se se známým odmítnutým heslem nepřihlašuje (manual: false).
-    const result = await syncMailbox({ limit: 100, actor: cronActor("cron-mail"), deadline: Date.now() + 240_000 });
+    const start = Date.now();
+    const result = await syncMailbox({ limit: 100, actor: cronActor("cron-mail"), deadline: start + 240_000 });
+    // přílohy uložené k zakázkám (i zbytek fronty anonymizace) — po odpovědi, ve zbytku času funkce
+    processInBackground({ table: "job_files", deadline: start + 270_000, maxFiles: 3, label: "přílohy pošty (plánovač)" });
     const flow = await runFlowReminders().catch((err: unknown) => ({ error: err instanceof Error ? err.message : "Plánovač toku selhal" }));
     return NextResponse.json({ ...result, flow });
   } catch (err) {

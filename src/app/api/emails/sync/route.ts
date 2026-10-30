@@ -4,6 +4,7 @@ import { apiRequire, getAccess } from "@/lib/auth/session";
 import { isUuidLike, selectMailboxesToSync } from "@/lib/email/visibility";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { userActor } from "@/lib/supabase/actor-headers";
+import { processInBackground } from "@/lib/anonymize/runner";
 
 // IMAP klient vyžaduje Node runtime
 export const runtime = "nodejs";
@@ -45,7 +46,11 @@ export async function POST(req: Request) {
   const auto = body.auto === true;
   const manual = !auto; // tlačítko / po uložení schránky: přihlásí se i se známým odmítnutým heslem
   const only = typeof body.mailboxId === "string" && isUuidLike(body.mailboxId) ? body.mailboxId : undefined;
-  const deadline = Date.now() + SYNC_BUDGET_MS;
+  const start = Date.now();
+  const deadline = start + SYNC_BUDGET_MS;
+  // přílohy e-mailů uložené k zakázkám (výkresy) se anonymizují hned — po odpovědi, ve zbytku času funkce
+  // (výběr fronty proběhne až po stažení, takže zachytí i právě uložené přílohy)
+  if (isSupabaseConfigured()) processInBackground({ table: "job_files", deadline: start + 270_000, maxFiles: 5, label: "přílohy pošty" });
 
   if (can("mail_all")) {
     return NextResponse.json(

@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { cronAuthStatus } from "@/lib/email/visibility";
 import { createAdminClient, hasServiceKey } from "@/lib/supabase/server";
 import { cronActor } from "@/lib/supabase/actor-headers";
-import { ANON_TABLES, appOrigin, kick, type AnonDb } from "@/lib/anonymize/service";
+import { routeDeadline } from "@/lib/ai/ai-call";
+import { ANON_TABLES, appOrigin, runnableIds, type AnonDb } from "@/lib/anonymize/service";
+import { processInBackground } from "@/lib/anonymize/runner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * Záchranná síť anonymizace (externí plánovač každých 5 min; Vercel Hobby cron 1× denně nestačí):
- * rozvětví čekající soubory (i backfill s prioritou 9 — denní limit hlídá služba), projde frontu
+ * zpracuje čekající soubory přímo po odpovědi (i backfill s prioritou 9 — denní limit hlídá služba;
+ * přerušené běhy převezme, po 3 pokusech označí jako selhané), projde frontu
  * odeslání a uklidí prošlé soubory samostatného nástroje (7 dní). `Authorization: Bearer <CRON_SECRET>`.
  */
 export async function GET(req: Request) {
@@ -18,12 +21,16 @@ export async function GET(req: Request) {
   if (status === 503) return NextResponse.json({ error: "CRON_SECRET není nastaven — anonymizace na pozadí je vypnutá." }, { status: 503 });
   if (status === 401) return NextResponse.json({ error: "Neautorizováno." }, { status: 401 });
   if (!hasServiceKey()) return NextResponse.json({ error: "Chybí SUPABASE_SECRET_KEY." }, { status: 503 });
+  const start = Date.now();
   const db = createAdminClient({ actor: cronActor("drawing-anon") }) as AnonDb;
   const origin = appOrigin(req.url);
-  const kicked: Record<string, number> = {};
+  const queued: Record<string, number> = {};
   for (const table of ANON_TABLES) {
-    const k = await kick({ origin, table, db });
-    kicked[table] = k.kicked;
+    queued[table] = (await runnableIds(db, table, { includeBackfill: true, limit: 50 })).length;
+    // zpracovat PŘÍMO tady po odpovědi (první soubory hned; kick jen přidá souběh, když adresa funguje)
+    if (queued[table]) {
+      processInBackground({ table, actor: cronActor("drawing-anon"), deadline: routeDeadline(start), maxFiles: 10, includeBackfill: true, origin, label: `plánovač ${table}` });
+    }
   }
   const { flushSendQueue } = await import("@/lib/anonymize/send-queue");
   const sendQueue = await flushSendQueue(db).catch((err: unknown) => ({ error: err instanceof Error ? err.message : "Fronta odeslání selhala" }));
@@ -38,5 +45,5 @@ export async function GET(req: Request) {
     await db.from("drawing_anon_adhoc").delete().in("id", rows.map((r) => r.id));
     expired = rows.length;
   }
-  return NextResponse.json({ ok: true, kicked, sendQueue, expired });
+  return NextResponse.json({ ok: true, queued, sendQueue, expired });
 }

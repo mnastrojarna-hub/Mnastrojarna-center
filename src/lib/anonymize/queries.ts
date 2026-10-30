@@ -35,6 +35,8 @@ export interface JobAnonBadge {
   sendWaiting: number;
   /** Čeká na denní limit AI (pending s důvodem). */
   waitingBudget?: number;
+  /** Staré výkresy (backfill) — čekají na ruční / hromadné spuštění. */
+  waitingLegacy?: number;
 }
 
 /** Souhrn po zakázkách pro odznak „Výkresy 3/3 ✓ · 1 ke kontrole · Čeká… · DWG nelze · Odeslání čeká". */
@@ -42,11 +44,11 @@ export async function getAnonSummary(db: AnonDb, jobIds: string[]): Promise<Reco
   const out: Record<string, JobAnonBadge> = {};
   const ids = [...new Set(jobIds)].slice(0, 2000);
   if (!ids.length) return out;
-  for (const id of ids) out[id] = { jobId: id, total: 0, done: 0, review: 0, failed: 0, pending: 0, unsupported: 0, skipped: 0, sendWaiting: 0, waitingBudget: 0 };
+  for (const id of ids) out[id] = { jobId: id, total: 0, done: 0, review: 0, failed: 0, pending: 0, unsupported: 0, skipped: 0, sendWaiting: 0, waitingBudget: 0, waitingLegacy: 0 };
   for (const part of chunks(ids)) {
-    const { data, error } = await db.from("job_files").select("job_id, anon_status, anon_reason").in("job_id", part).eq("archived", false).not("anon_status", "is", null);
+    const { data, error } = await db.from("job_files").select("job_id, anon_status, anon_reason, anon_priority").in("job_id", part).eq("archived", false).not("anon_status", "is", null);
     logErr("summary", error);
-    for (const r of (data ?? []) as { job_id: string; anon_status: AnonStatus; anon_reason: string | null }[]) {
+    for (const r of (data ?? []) as { job_id: string; anon_status: AnonStatus; anon_reason: string | null; anon_priority: number | null }[]) {
       const b = out[r.job_id];
       if (!b) continue;
       b.total++;
@@ -56,6 +58,8 @@ export async function getAnonSummary(db: AnonDb, jobIds: string[]): Promise<Reco
       else if (r.anon_status === "pending" || r.anon_status === "processing") {
         b.pending++;
         if (r.anon_status === "pending" && /limit/i.test(r.anon_reason ?? "")) b.waitingBudget = (b.waitingBudget ?? 0) + 1;
+        // starý výkres (backfill, priorita ≥ 9) — sám se nespouští, nesmí svítit jako „běží"
+        else if (r.anon_status === "pending" && (r.anon_priority ?? 0) >= 9) b.waitingLegacy = (b.waitingLegacy ?? 0) + 1;
       } else if (r.anon_status === "unsupported") b.unsupported++;
       else if (r.anon_status === "skipped") b.skipped++;
     }

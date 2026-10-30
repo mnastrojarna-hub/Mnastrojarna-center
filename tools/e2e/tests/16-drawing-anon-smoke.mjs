@@ -109,6 +109,10 @@ await test("příprava: zakázka v poptávce s PDF výkresem (e-mail) a fotkou v
   expect(sql(`select anon_status from job_files where id='${pdfId}'`) === "pending", "trigger zařadil PDF (pending)");
   const a = await runAnon(pdfId);
   const b = await runAnon(photoId);
+  // běh po svém souboru sám pokračuje frontou (fotku mohl převzít dřív než druhé volání) → počkat na výsledek
+  for (let i = 0; i < 60 && /pending|processing/.test(sql(`select string_agg(anon_status, ',') from job_files where job_id='${jobId}'`)); i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
   const st = sql(`select string_agg(anon_status, ',' order by filename) from job_files where job_id='${jobId}'`);
   console.log(`    stavy: ${st} · ${JSON.stringify(a.results?.[0]?.status)} ${JSON.stringify(b.results?.[0]?.status)}`);
   expect(/done|review/.test(sql(`select anon_status from job_files where id='${pdfId}'`)), "PDF hotové / ke kontrole");

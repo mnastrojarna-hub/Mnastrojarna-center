@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { queueLegacyDrawings, requeueChangedConfig, saveAnonSettings, setAnonMode } from "@/app/actions/drawing-anon";
+import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import type { AnonSettings } from "@/lib/anonymize/settings";
 import type { RedactToggles } from "@/lib/anonymize/rules";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,8 @@ export interface DrawingAnonSettingsProps {
   settings: AnonSettings;
   mode: "full" | "approval";
   runnerWarning: string | null;
+  /** Stav zpracování na pozadí, když je vše v pořádku (zelený řádek). */
+  runnerOk?: string | null;
   spentTodayUsd: number;
   legacyCount: number;
   changedCount: number;
@@ -81,7 +84,13 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
     try {
       const r = await fn();
       if (!r.ok) setMsg({ tone: "err", text: r.error ?? "Nepovedlo se." });
-      else { setMsg({ tone: "ok", text: ok(r) }); router.refresh(); }
+      else {
+        setMsg({ tone: "ok", text: ok(r) });
+        // zařazené výkresy zpracuje route na serveru hned (akce samy nevykreslují)
+        const ids = Array.isArray(r.ids) ? (r.ids as string[]) : [];
+        if (ids.length) void nudgeAnonymize({ fileIds: ids });
+        router.refresh();
+      }
     } catch {
       setMsg({ tone: "err", text: "Spojení se nepovedlo — zkus to znovu." });
     } finally {
@@ -93,11 +102,15 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
 
   return (
     <div className="space-y-5" data-testid="anon-settings">
-      {p.runnerWarning && (
-        <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+      {p.runnerWarning ? (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" data-testid="anon-runner-status" data-tone="warn">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {p.runnerWarning}
         </p>
-      )}
+      ) : p.runnerOk ? (
+        <p className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100" data-testid="anon-runner-status" data-tone="ok">
+          <EyeOff className="mt-0.5 h-4 w-4 shrink-0" /> {p.runnerOk}
+        </p>
+      ) : null}
       {!p.canEdit && <p className="text-sm text-muted-foreground">Nastavení mění jen super admin — tady ho vidíš jen pro informaci.</p>}
 
       <div className="grid gap-5 lg:grid-cols-2">

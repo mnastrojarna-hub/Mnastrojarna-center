@@ -49,9 +49,14 @@ const nextConfig = {
     "/**": ["./public/fonts/**"],
     "/api/pdf/**": ["./public/fonts/**"],
     "/api/setup/**": ["./supabase/migrations/**"],
-    // Anonymizace výkresů vykresluje JEN v těchto routách (nikdy v server action)
+    // Anonymizace výkresů vykresluje JEN v těchto routách (nikdy v server action) — přímo po nahrání
+    // (after(), src/lib/anonymize/runner.ts): focení, dávka, stažení pošty, plánovače, šťouchnutí z UI
     "/api/drawings/anonymize/**": ANON_TRACE,
     "/api/cron/drawing-anonymize/**": ANON_TRACE,
+    "/api/cron/sync-mail": ANON_TRACE,
+    "/api/jobs/capture/apply": ANON_TRACE,
+    "/api/jobs/capture/batch/apply": ANON_TRACE,
+    "/api/emails/sync": ANON_TRACE,
   },
   // musl binárky (Alpine) do funkce na Vercelu (glibc) nepatří
   outputFileTracingExcludes: {

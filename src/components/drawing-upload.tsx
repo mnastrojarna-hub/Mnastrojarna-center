@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FileBox, Sparkles, Loader2, Check, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { uploadDrawing } from "@/app/actions/drawings";
+import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 
 export function DrawingUpload() {
   const router = useRouter();
@@ -23,7 +24,9 @@ export function DrawingUpload() {
     setBusy(false);
     if (fileRef.current) fileRef.current.value = "";
     if (res.ok) {
-      setMsg({ ok: true, text: `Výkres ${res.number} přečten AI a uložen do archivu.` });
+      setMsg({ ok: true, text: `Výkres ${res.number} přečten AI a uložen do archivu.${res.anonStatus === "pending" ? " Kopie pro dodavatele se anonymizuje…" : ""}` });
+      // anonymizace hned po nahrání (zpracuje route na serveru)
+      if (res.id && res.anonStatus === "pending") void nudgeAnonymize({ table: "drawings", fileIds: [res.id] });
       router.refresh();
     } else {
       setMsg({ ok: false, text: res.error ?? "Chyba uploadu." });

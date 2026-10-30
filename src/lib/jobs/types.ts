@@ -271,6 +271,10 @@ export interface JobFileAnon {
   /** Vyřazené stránky (dopis, faktura ve smíšeném PDF). */
   excludedPages: number[];
   method: string | null;
+  /** Starý výkres z doby před anonymizací (backfill) — čeká na „Zpracovat staré výkresy", nic neběží. */
+  backfill?: boolean;
+  /** Zámek běhu (processing) — po termínu je běh přerušený a převezme ho další běh. */
+  lockUntil?: string | null;
 }
 
 export type FileLock = "price" | "unapproved" | "stale" | null;

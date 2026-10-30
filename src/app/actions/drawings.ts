@@ -7,10 +7,11 @@ import { getAgentInstructions } from "@/lib/ai/corrections";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import { checkFeature } from "@/lib/auth/session";
+import { kickInBackground } from "@/lib/anonymize/queue";
 import { emptyDrawing } from "@/lib/jobs/capture-batch";
 import { initialSpecState, insertSpecRow, normalizeDrawingSpec, specColumns, specSources } from "@/lib/jobs/drawing-spec";
 
-type Result = { ok: boolean; error?: string; number?: string };
+type Result = { ok: boolean; error?: string; number?: string; id?: string; anonStatus?: string | null };
 
 const ALLOWED = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 
@@ -105,7 +106,13 @@ export async function uploadDrawing(form: FormData): Promise<Result> {
       diff: { drawingNumber, revision, aiConfidence: x.confidence ?? null }, actor: userActor(auth.user),
     });
     revalidatePath("/drawings");
-    return { ok: true, number: drawingNumber };
+    // anonymizace (DB trigger zařadil pending): akce nevykresluje — šťouchnutí po odpovědi a prohlížeč
+    // hned volá /api/drawings/anonymize/process (zpracuje route); id + stav pro prohlížeč
+    const id = (data[0] as { id: string }).id;
+    const { data: st } = await db.from("drawings").select("anon_status").eq("id", id).maybeSingle();
+    const anonStatus = (st as { anon_status: string | null } | null)?.anon_status ?? null;
+    if (anonStatus === "pending") kickInBackground({ table: "drawings", ids: [id] });
+    return { ok: true, number: drawingNumber, id, anonStatus };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba uploadu" };
   }

@@ -28,8 +28,9 @@ import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
 import { anonApi } from "@/components/anonymize/anon-api";
+import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import {
-  AnonFileBadge, AnonMenuItems, AnonSummaryLine, ForSupplierLink, ReviewDownloadDialog, SendQueueNotice, SupplierPackButton, supplierReady, supplierSummary,
+  AnonFileBadge, AnonMenuItems, AnonSummaryLine, ForSupplierLink, ReviewDownloadDialog, SendQueueNotice, SupplierPackButton, anonInFlight, supplierReady, supplierSummary,
 } from "@/components/anonymize/anon-file-menu";
 import { AnonymizeEditor } from "@/components/anonymize/anonymize-editor";
 
@@ -83,9 +84,11 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
 }
 
 function FileRow({
-  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload,
+  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload, anonStalled,
 }: {
   file: JobFile;
+  /** Anonymizace čeká déle než obvykle (UI přestalo čekat) → „Zkusit znovu" místo spinneru. */
+  anonStalled?: boolean;
   all: JobFile[];
   quotes: Pick<JobQuote, "id" | "number">[];
   onEdit: (f: JobFile) => void;
@@ -149,7 +152,7 @@ function FileRow({
           )}
           {replaced && <span className="rounded-full bg-muted px-1.5 py-px text-[10px] text-muted-foreground">{replaced}</span>}
           {quote && <span className="rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-medium text-violet-800 dark:bg-violet-500/15 dark:text-violet-300">k nabídce {quote.number}</span>}
-          {!file.archived && <AnonFileBadge file={file} />}
+          {!file.archived && <AnonFileBadge file={file} stalled={anonStalled} />}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {file.title && <span className="max-w-[14rem] truncate">{file.filename}</span>}
@@ -159,7 +162,7 @@ function FileRow({
           </span>
         </div>
         {file.note && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{file.note}</p>}
-        {!file.archived && <AnonSummaryLine file={file} />}
+        {!file.archived && <AnonSummaryLine file={file} stalled={anonStalled} onRetry={onAnonAction ? (f) => onAnonAction(f, "enqueue") : undefined} />}
         {forSupplier && onReviewDownload && (
           <div className="mt-1"><ForSupplierLink file={file} onReviewDownload={onReviewDownload} /></div>
         )}
@@ -410,14 +413,27 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
   const [anonEditing, setAnonEditing] = React.useState<JobFile | null>(null);
   const [reviewDl, setReviewDl] = React.useState<JobFile | null>(null);
 
-  // výkresy v anonymizaci → obnovovat, dokud nedoběhne (nejvýš ~5 min)
-  const anonBusy = files.some((f) => !f.archived && (f.anon?.status === "pending" || f.anon?.status === "processing"));
+  // výkresy v anonymizaci → šťouchnout do fronty (zpracuje route na serveru, bez plánovače) a obnovovat,
+  // dokud nedoběhnou. Když se 5 min nic nezmění, přestat čekat a ukázat „Zkusit znovu" (žádný nekonečný spinner).
+  const anonKey = files.filter(anonInFlight).map((f) => `${f.id}:${f.anon?.status}`).join(",");
+  const [anonStalled, setAnonStalled] = React.useState(false);
   React.useEffect(() => {
-    if (!anonBusy) return;
+    setAnonStalled(false);
+    if (!anonKey) return;
+    void nudgeAnonymize({ jobId });
     let n = 0;
-    const t = window.setInterval(() => { n += 1; if (n > 50) window.clearInterval(t); else refresh(); }, 6000);
+    const t = window.setInterval(() => {
+      n += 1;
+      if (n > 50) {
+        window.clearInterval(t);
+        setAnonStalled(true);
+        return;
+      }
+      if (n % 3 === 0) void nudgeAnonymize({ jobId });
+      refresh();
+    }, 6000);
     return () => window.clearInterval(t);
-  }, [anonBusy, refresh]);
+  }, [anonKey, jobId, refresh]);
 
   async function anonAction(f: JobFile, action: "enqueue" | "approve" | "skip") {
     if (action === "enqueue") {
@@ -490,6 +506,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
                       <FileRow
                         key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview}
                         onSend={canSend ? setSending : undefined} onAnonEdit={setAnonEditing} onAnonAction={(x, a) => void anonAction(x, a)} onReviewDownload={setReviewDl}
+                        anonStalled={anonStalled && anonInFlight(f)}
                       />
                     )
                   ))}

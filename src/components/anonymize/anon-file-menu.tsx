@@ -43,10 +43,15 @@ function relevant(f: JobFile): boolean {
   return canAnonymize(f);
 }
 
-export function AnonFileBadge({ file }: { file: JobFile }) {
+export function AnonFileBadge({ file, stalled }: { file: JobFile; stalled?: boolean }) {
   const a = anonOf(file);
   if (!a.status || !relevant(file)) return null;
-  return <FileAnonBadge status={a.status} reviewed={a.reviewed} reason={a.reason} total={a.total} />;
+  return <FileAnonBadge status={a.status} reviewed={a.reviewed} reason={a.reason} total={a.total} backfill={Boolean(file.anon?.backfill)} stalled={stalled} />;
+}
+
+/** Výkres čeká / běží na serveru (ne starý výkres z backfillu — ten se sám nespouští). */
+export function anonInFlight(f: JobFile): boolean {
+  return !f.archived && !f.anon?.backfill && (f.anon?.status === "pending" || f.anon?.status === "processing") && !isBudgetWait(f.anon.status, f.anon.reason);
 }
 
 /** Hotová / ke kontrole kopie pro dodavatele (stáhnout smí jen kandidát, ne zamčený). */
@@ -291,12 +296,22 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
 }
 
 /** Souhrn anonymizace dokumentu (pod názvem): co se smazalo, nebo důvod (vidět i na mobilu, ne jen v tooltipu). */
-export function AnonSummaryLine({ file }: { file: JobFile }) {
+export function AnonSummaryLine({ file, onRetry, stalled }: { file: JobFile; onRetry?: (f: JobFile) => void; stalled?: boolean }) {
   const a = file.anon;
   if (!a || !relevant(file)) return null;
   const reason = displayReason(a.status, a.reason);
+  const retry = onRetry && (a.status === "failed" || stalled) ? (
+    <button type="button" onClick={() => onRetry(file)} data-testid="anon-retry"
+      className="ml-1 inline-flex min-h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-semibold text-foreground hover:bg-muted">
+      <RefreshCw className="h-3 w-3" /> Zkusit znovu
+    </button>
+  ) : null;
+  if (stalled && (a.status === "pending" || a.status === "processing")) {
+    return <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300">Anonymizace se nerozběhla.{retry}</p>;
+  }
   if (a.status === "failed" || a.status === "unsupported") {
-    return reason ? <p className={cn("mt-0.5 text-[11px]", a.status === "failed" ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>{reason}</p> : null;
+    if (!reason && !retry) return null;
+    return <p className={cn("mt-0.5 text-[11px]", a.status === "failed" ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>{reason}{retry}</p>;
   }
   if (a.status === "pending" && isBudgetWait(a.status, a.reason)) return <p className="mt-0.5 text-[11px] text-muted-foreground">{a.reason}</p>;
   if (a.status !== "done" && a.status !== "review") return null;

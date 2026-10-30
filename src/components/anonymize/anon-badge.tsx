@@ -27,15 +27,16 @@ export function JobAnonBadge({ badge, className }: { badge: JobBadgeInput | null
 }
 
 export function FileAnonBadge({
-  status, reviewed, reason, total, className,
-}: { status: AnonUiStatus | null | undefined; reviewed?: boolean; reason?: string | null; total?: number | null; className?: string }) {
+  status, reviewed, reason, total, backfill, stalled, className,
+}: { status: AnonUiStatus | null | undefined; reviewed?: boolean; reason?: string | null; total?: number | null; backfill?: boolean; stalled?: boolean; className?: string }) {
   if (!status) return null;
-  const l = fileAnonLabel({ status, reviewed, reason, total });
+  const l = fileAnonLabel({ status, reviewed, reason, total, backfill, stalled });
   const busy = l.tone === "busy";
   return (
     <span
       title={l.hint}
       data-anon-status={status}
+      {...(stalled ? { "data-anon-stalled": "1" } : {})}
       className={cn("inline-flex items-center gap-0.5 whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold", ANON_TONE_CLASS[l.tone], className)}
     >
       {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden /> : <EyeOff className="h-2.5 w-2.5" aria-hidden />}

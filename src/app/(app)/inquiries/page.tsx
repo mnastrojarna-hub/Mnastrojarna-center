@@ -27,6 +27,7 @@ import { CLOSED_JOB_KEYS, STATE_PARAM, actionPalette, parseStateParam } from "@/
 import { getAnonPending, getAnonReviewList, getJobAnonBadges } from "@/lib/data/anonymize";
 import { AnonymizeToolButton } from "@/components/anonymize/anonymize-tool-dialog";
 import { JobAnonBadge } from "@/components/anonymize/anon-badge";
+import { AnonQueueNudge } from "@/components/anonymize/anon-queue-nudge";
 import { AnonReviewChip, AnonReviewList, type AnonReviewRowView } from "@/components/anonymize/anon-review-section";
 import type { AnonUiStatus } from "@/components/anonymize/anon-status";
 
@@ -86,6 +87,8 @@ export default async function InquiriesPage({
       count={reviewRows.length}
     >
       <AnonReviewList items={reviewRows} pendingFileIds={anonPending.fileIds} pendingCount={anonPending.count} />
+      {/* čekající výkresy se zpracují i bez plánovače — stačí, že je někdo vidí */}
+      <AnonQueueNudge ids={anonPending.fileIds} />
     </FlowSection>
   ) : null;
   const chips = chipsForTab("inquiries", counts);

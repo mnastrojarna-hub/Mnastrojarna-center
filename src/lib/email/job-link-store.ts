@@ -20,6 +20,7 @@ import {
 import { createSupplierInvoiceFromFile } from "@/lib/supplier-invoices/service";
 import { extractMailChanges, pickJobForEmail } from "@/lib/ai/mail-job";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
+import { kickInBackground } from "@/lib/anonymize/queue";
 import { guessFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import { jobFilePath } from "@/lib/jobs/mapping";
 import type { JobsDb } from "@/lib/jobs/events";
@@ -1034,6 +1035,7 @@ export async function copyEmailAttachmentsToJob(a: MailJobActor, emailId: string
     const issuer = mail ? (attachmentIssuer({ category: mail.category, supplierId: mail.supplier_id, customerId: mail.customer_id }) ?? (viaSupplier ? "dodavatel" : null)) : null;
     const notes: string[] = [];
     const invoiceIds: string[] = [];
+    const anonIds: string[] = [];
     for (const att of list.slice(0, 20)) {
       if (att.job_file_id && fileIds.has(att.job_file_id)) continue; // už uloženo
       const name = (att.filename ?? "").trim() || "priloha";
@@ -1074,6 +1076,7 @@ export async function copyEmailAttachmentsToJob(a: MailJobActor, emailId: string
         continue;
       }
       await db.from("email_attachments").update({ job_file_id: reg.file.id }).eq("id", att.id);
+      if (reg.file.anon?.status === "pending") anonIds.push(reg.file.id);
       jobFiles.push({ id: reg.file.id, filename: name, kind, content_sha256: sha, archived: false, version: reg.file.version ?? 1 });
       fileIds.add(reg.file.id);
       out.copied++;
@@ -1082,6 +1085,9 @@ export async function copyEmailAttachmentsToJob(a: MailJobActor, emailId: string
         notes.push(`${drawingNo ?? name} jako nová revize (v${reg.file.version ?? (prevRev.version ?? 1) + 1})`);
       } else notes.push(name);
     }
+    // výkresy z přílohy → anonymizace hned: šťouchnutí po odpovědi (stahování pošty v routě je navíc zpracuje
+    // přímo — /api/emails/sync, plánovač; jinak je dokončí otevření zakázky / Poptávek)
+    if (anonIds.length) kickInBackground({ table: "job_files", ids: anonIds });
     if (invoiceIds.length && mail) await supplierInvoicesFromMail(a, { ...mail, order_id: mail.order_id ?? jobId }, invoiceIds);
     if (out.copied) {
       await jobEvent(a, {

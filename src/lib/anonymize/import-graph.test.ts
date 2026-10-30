@@ -14,7 +14,7 @@ const SRC = path.join(ROOT, "src");
 const FORBIDDEN = [
   "lib/anonymize/pdf-node", "lib/anonymize/pdf-text", "lib/anonymize/pdf-raster", "lib/anonymize/pdf-pipeline",
   "lib/anonymize/image", "lib/anonymize/vision", "lib/anonymize/photo-pipeline", "lib/anonymize/service",
-  "lib/anonymize/pdf-prepare",
+  "lib/anonymize/pdf-prepare", "lib/anonymize/runner",
 ];
 const FORBIDDEN_PKGS = ["pdfjs-dist", "@napi-rs/canvas", "sharp"];
 

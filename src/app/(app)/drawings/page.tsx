@@ -3,6 +3,7 @@ import { Box, Briefcase, Download, FileBox, FileImage, FileText, Paperclip, Penc
 import { FileAnonBadge } from "@/components/anonymize/anon-badge";
 import type { AnonUiStatus } from "@/components/anonymize/anon-status";
 import { getDrawingAnonStatuses } from "@/lib/data/anonymize";
+import { AnonQueueNudge } from "@/components/anonymize/anon-queue-nudge";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { DrawingUpload } from "@/components/drawing-upload";
@@ -55,6 +56,9 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
       />
 
       <DrawingUpload />
+      {/* čekající výkresy (přímé nahrání i z dokumentů zakázky) se zpracují při zobrazení archivu */}
+      <AnonQueueNudge table="drawings" ids={Object.values(anon).filter((a) => a.status === "pending" && a.table === "drawings").map((a) => a.fileId).slice(0, 50)} />
+      <AnonQueueNudge ids={Object.values(anon).filter((a) => a.status === "pending" && a.table === "job_files").map((a) => a.fileId).slice(0, 50)} />
 
       <section className="space-y-3 rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
         <form action="/drawings" className="relative">
