@@ -1,7 +1,6 @@
 import "server-only";
 import { addUsage, AiCallError, classifyAiError, routeDeadline } from "@/lib/ai/ai-call";
 import { getAiConfig, getSetting } from "@/lib/settings";
-import { can } from "@/lib/auth/permissions";
 import { aiActor, SYSTEM_ACTOR, userActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { logUsage, spentToday } from "./budget";
@@ -56,26 +55,14 @@ function truthy(v: string | undefined, d: boolean): boolean {
 /**
  * Smí běh použít AI? Klíč z JEDNOHO zdroje s celou aplikací (getAiConfig: Nastavení → Integrace
  * integration_settings.anthropic_api_key, jinak env ANTHROPIC_API_KEY — stejně jako čtení dokladů a pošta)
- * a hlavní vypínač AI. Automatická anonymizace po nahrání je systémová ochrana (jako třídění pošty) — běží s AI
- * za každého autora, cenu hlídá denní limit; ruční běh (tlačítko) jen s právem AI čtení toho, kdo ho spustil.
+ * a hlavní vypínač AI. Anonymizace je systémová ochrana (jako třídění pošty) — automaticky i ručně běží s AI
+ * pro všechny uživatele (rozhodnutí majitele 30. 10.: „všechny výkresy všech uživatelů"), cenu hlídá denní limit.
  */
-export async function aiConfigFor(db: AnonDb, userId: string | null, deadline: number, sha: string, opts: { manual?: boolean } = {}): Promise<AiCallConfig | null> {
+export async function aiConfigFor(deadline: number, sha: string): Promise<AiCallConfig | null> {
   if (isFakeAnon()) return { apiKey: "fake", model: (await getAiConfig().catch(() => ({ model: "claude-opus-5-5" }))).model || "claude-opus-5-5", deadline, sha };
   const ai = await getAiConfig();
   if (!ai.apiKey) return null;
-  const ctx = {
-    aiEnabled: truthy(await getSetting("ai_enabled"), true),
-    aiCaptureForAll: truthy(await getSetting("ai_capture_for_all"), true),
-    aiConfigured: true,
-  };
-  if (!ctx.aiEnabled) return null;
-  if (!opts.manual) return { apiKey: ai.apiKey, model: ai.model, deadline, sha };
-  if (userId) {
-    const { data } = await db.from("profiles").select("role, ai_access, active").eq("id", userId).maybeSingle();
-    const p = data as { role: "super_admin" | "obchodnik" | "zamestnanec"; ai_access: boolean; active: boolean } | null;
-    if (p && !can({ role: p.role, aiAccess: Boolean(p.ai_access), active: p.active !== false }, "ai_capture", ctx)) return null;
-    if (!p && !ctx.aiCaptureForAll) return null;
-  } else if (!ctx.aiCaptureForAll) return null;
+  if (!truthy(await getSetting("ai_enabled"), true)) return null;
   return { apiKey: ai.apiKey, model: ai.model, deadline, sha };
 }
 
@@ -104,7 +91,7 @@ export interface RunContext {
   manualSave?: boolean;
   /** Nová detekce AI i při existující cache (Přepočítat „i AI znovu"). */
   forceAi?: boolean;
-  /** false = běh bez AI (jen pravidla → review), např. uživatel bez práva AI čtení. */
+  /** false = běh bez AI (jen pravidla → review) (zatím nikdo nevolá). */
   allowAi?: boolean;
   /** Uložení editoru: uživatel potvrdil zásah do chráněného pole (číslo výkresu, materiál, kóta). */
   confirmKeep?: boolean;
@@ -466,7 +453,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     // které v ní chybí (navazující dávky PDF), proto se konfigurace připraví i při existující cache.
     let ai: AiCallConfig | null = null;
     if (!ctx.manualSave && ctx.allowAi !== false && (fmt === "pdf" || fmt === "image" || fmt === "tiff" || fmt === "heic")) {
-      ai = await aiConfigFor(db, ctx.manual ? ctx.actor.id : s.uploadedBy, ctx.deadline, sha, { manual: ctx.manual && ctx.actor.kind === "user" });
+      ai = await aiConfigFor(ctx.deadline, sha);
       if (ai) ai.onUsage = (u) => { spend.usage = addUsage(spend.usage, u); spend.calls++; };
     }
     // denní limit jen pro automatiku (s hotovou cache se nic neplatí)
