@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   Building2, UserRound, Mail, Phone, Hash, FileDigit, Users, Factory, Truck, StickyNote, Tag, Calculator, Percent,
-  ShoppingCart, ReceiptText, MessageSquareQuote, Banknote, Wrench, MapPin, ClipboardList, X, Plus, Loader2,
+  ShoppingCart, ReceiptText, MessageSquareQuote, Banknote, MapPin, ClipboardList, X, Plus, Loader2,
   CalendarDays, BadgeCheck, PenLine, ExternalLink, Handshake, Lock, type LucideIcon,
 } from "lucide-react";
 import type { JobDetail } from "@/lib/jobs/types";
@@ -18,6 +18,9 @@ import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ChangeStamp } from "@/lib/jobs/flow-status";
 import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 import { ownInvoiceFile } from "@/components/jobs/production/invoice-dialog";
+import type { JobProductionData } from "@/components/jobs/production/production-tab";
+import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
+import { TechnologyCard } from "./technology-card";
 
 /** „změna · J. Novák · před 2 dny" pod klíčovým polem (M12). */
 function FieldStamp({ stamps, column }: { stamps?: Record<string, ChangeStamp>; column: string }) {
@@ -175,8 +178,20 @@ function TagsEditor({ tags }: { tags: string[] }) {
 }
 
 /** Záložka Přehled — vše upravitelné na místě (klik → uprav → Enter). */
-export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?: Record<string, ChangeStamp> }) {
+export function OverviewTab({ job, fieldStamps, production, purchasing }: {
+  job: JobDetail;
+  fieldStamps?: Record<string, ChangeStamp>;
+  /** Postup výroby (karta Technologie). */
+  production?: JobProductionData | null;
+  /** Nabídky dodavatelů a objednávky — jen s právem na nákup (jinak null). */
+  purchasing?: JobPurchasing | null;
+}) {
   const { options, perms, save } = useJobDetail();
+  // firmy kroků výroby (dodavatel zakázky nevybraný ≠ „vyrábíme sami")
+  const stepSuppliers = React.useMemo(() => [...new Set((production?.operations ?? [])
+    .filter((o) => o.status !== "preskoceno" && !o.inHouse)
+    .map((o) => (o.supplier?.name ?? o.supplierName ?? "").trim())
+    .filter(Boolean))], [production?.operations]);
   // #25: obchodníka zakázky mění jen super admin (bez údaje platí mazání — také jen super admin)
   const ownerEditable = perms.ownerEditable ?? perms.canDelete;
 
@@ -350,10 +365,14 @@ export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?
           value={job.supplier?.id ?? null}
           valueLabel={job.supplier?.name ?? null}
           options={supplierOptions}
-          emptyLabel="Vyrábíme sami / nevybráno"
+          emptyLabel={stepSuppliers.length ? "Po krocích — viz Technologie" : "Vyrábíme sami / nevybráno"}
           placeholder="Hledej dodavatele…"
           onSave={(id) => save({ supplierId: id })}
         />
+        {!job.supplier && stepSuppliers.length > 0 && (
+          // dodavatel zakázky nevybraný, ale kroky výroby dělají firmy — ne „vyrábíme sami" (majitel 30. 10.)
+          <p className="-mt-2 text-[11px] text-muted-foreground" data-testid="step-suppliers">Kroky dělá: {stepSuppliers.join(", ")}</p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
           <JobField
             field="value" kind="money" currency={job.currency} label="Prodejní hodnota (bez DPH)" value={job.value}
@@ -384,14 +403,8 @@ export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?
         )}
       </InfoCard>
 
-      <InfoCard icon={Wrench} tone="bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300" title="Technologie" subtitle="Jak a kde se díly dělají — kroky a postup v záložce Technologie">
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
-          <JobField field="technology" label="Technologie" value={job.technology} icon={Wrench} iconClass="text-yellow-600" placeholder="např. frézování, kalení" />
-          <JobField field="manufacturingLocation" label="Místo výroby" value={job.manufacturingLocation} icon={MapPin} iconClass="text-yellow-600" placeholder="u nás / u dodavatele" />
-        </div>
-        <JobField field="specificRequirements" kind="textarea" label="Specifické požadavky" value={job.specificRequirements} icon={ClipboardList} iconClass="text-yellow-600" placeholder="atesty, tolerance, balení…" />
-        <JobField field="deliveryMethod" label="Způsob dodání" value={job.deliveryMethod} icon={Truck} iconClass="text-yellow-600" placeholder="např. naše doprava, PPL, osobní odběr" />
-      </InfoCard>
+      {/* kroky po položkách, kdo, stav, termíny, objednávky, další krok (majitel 30. 10.) — širší karta */}
+      <TechnologyCard job={job} production={production} purchasing={purchasing} className="md:col-span-2" />
 
       <InfoCard icon={StickyNote} tone="bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300" title="Poznámka & štítky" subtitle="Interní — zákazník je neuvidí">
         <JobField field="note" kind="textarea" label="Interní poznámka" value={job.note} icon={StickyNote} iconClass="text-slate-500" placeholder="Napiš poznámku pro kolegy" hint="Ctrl + Enter uloží." />

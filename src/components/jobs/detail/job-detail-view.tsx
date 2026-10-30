@@ -166,7 +166,7 @@ export function JobDetailView({
             </div>
 
             <TabsContent value="prehled">
-              <OverviewTab job={job} fieldStamps={flow?.fieldStamps} />
+              <OverviewTab job={job} fieldStamps={flow?.fieldStamps} production={production ?? null} purchasing={purchasing ?? null} />
             </TabsContent>
             <TabsContent value="vyroba">
               <ProductionTab job={job} data={production ?? null} flow={flow ?? null} />
