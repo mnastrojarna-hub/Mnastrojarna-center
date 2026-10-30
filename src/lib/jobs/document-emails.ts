@@ -78,10 +78,13 @@ export interface DocumentEmailInput {
   quoteNumber?: string | null;
   /** Potvrzení / dodací list: potvrzený termín dodání. */
   deliveryDate?: string | null;
-  /** Faktura: splatnost, VS a částka k úhradě (s DPH). */
+  /** Faktura: splatnost, VS a částka k úhradě (s DPH) — po odečtení záloh / plateb = zbývá uhradit. */
   dueDate?: string | null;
   variableSymbol?: string | null;
   amount?: number | null;
+  /** Faktura se zálohami: celkem s DPH a uhrazeno (s DPH); bez úhrad null. */
+  invoiceTotal?: number | null;
+  paidAmount?: number | null;
   currency?: string | null;
   /** Název přílohy (u ostatních dokumentů). */
   filename?: string | null;
@@ -187,13 +190,28 @@ export function documentEmailBody(d: DocumentEmailInput): string {
     }
     case "faktura": {
       intro = `v příloze Vám zasíláme fakturu${number ? ` č. ${number}` : ""}${po ? ` k Vaší objednávce č. ${po}` : ""}.`;
-      if (d.amount !== null && d.amount !== undefined && Number.isFinite(d.amount) && d.amount > 0) {
-        facts.push(line("Částka k úhradě", czk(d.amount, t(d.currency) || "CZK")));
+      const cur = t(d.currency) || "CZK";
+      const due = d.amount !== null && d.amount !== undefined && Number.isFinite(d.amount) ? d.amount : null;
+      const paid = d.paidAmount !== null && d.paidAmount !== undefined && Number.isFinite(d.paidAmount) && d.paidAmount > 0 ? d.paidAmount : null;
+      let paidUp = false;
+      if (paid !== null) {
+        // zálohy / platby: celková částka faktury, uhrazeno a co zbývá (stejně jako PDF a QR)
+        if (d.invoiceTotal !== null && d.invoiceTotal !== undefined && Number.isFinite(d.invoiceTotal)) {
+          facts.push(line("Celkem s DPH", czk(d.invoiceTotal, cur)));
+        }
+        facts.push(line("Uhrazeno (zálohy a platby)", czk(paid, cur)));
+        if (due !== null && due > 0) facts.push(line("Zbývá uhradit", czk(due, cur)));
+        else {
+          paidUp = true;
+          facts.push(line("Zbývá uhradit", `${czk(0, cur)} — Faktura je již uhrazena, nic dalšího neplaťte.`));
+        }
+      } else if (due !== null && due > 0) {
+        facts.push(line("Částka k úhradě", czk(due, cur)));
       }
-      if (t(d.dueDate)) facts.push(line("Datum splatnosti", dateText(d.dueDate)));
+      if (t(d.dueDate) && !paidUp) facts.push(line("Datum splatnosti", dateText(d.dueDate)));
       if (t(d.variableSymbol)) facts.push(line("Variabilní symbol", t(d.variableSymbol)));
       if (job) facts.push(line("Naše číslo zakázky", job));
-      outro = "Děkujeme za spolupráci a za úhradu v termínu splatnosti.";
+      outro = paidUp ? "Děkujeme za spolupráci a za úhradu." : "Děkujeme za spolupráci a za úhradu v termínu splatnosti.";
       break;
     }
     default: {

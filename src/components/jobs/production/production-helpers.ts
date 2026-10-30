@@ -149,7 +149,34 @@ export function isBeforeProduction(stage: JobStage): boolean {
   return (rank >= 0 && rank < 5) || stage === "pozastaveno" || stage === "reklamace";
 }
 
+/**
+ * Výroba je uzavřená dodáním: zakázka je dodaná zákazníkovi, vyfakturovaná nebo dokončená (např. po
+ * „Zapsat dodání bez ukončení kroků"). Neukončené kroky se pak jen ukážou jako uzavřené — žádné
+ * „Začít / Hotovo" ani „probíhá" u hotové zakázky.
+ */
+export function isProductionClosed(stage: JobStage | null | undefined): boolean {
+  return stage === "dodano_zakaznikovi" || stage === "fakturovano" || stage === "dokonceno";
+}
+
+/** Krok, který u uzavřené výroby zůstal neukončený (čeká / probíhá / problém). */
+export function isOpenStep(op: Pick<JobOperation, "status">): boolean {
+  return op.status !== "hotovo" && op.status !== "preskoceno";
+}
+
+/**
+ * Pohled na postup uzavřené výroby: neukončené kroky jako přeskočené (jen zobrazení — v DB zůstávají,
+ * v menu kroku je jde vrátit). `closedOpen` = kolik jich tak je; u výroby v běhu beze změny.
+ */
+export function closedProductionView(ops: JobOperation[], stage: JobStage | null | undefined): { ops: JobOperation[]; closedOpen: number } {
+  if (!isProductionClosed(stage)) return { ops, closedOpen: 0 };
+  const closedOpen = ops.filter(isOpenStep).length;
+  if (!closedOpen) return { ops, closedOpen: 0 };
+  return { ops: ops.map((o) => (isOpenStep(o) ? { ...o, status: "preskoceno" as const } : o)), closedOpen };
+}
+
 export function stepAction(op: JobOperation, ops: JobOperation[], stage: JobStage): StepAction | null {
+  // dodaná / vyfakturovaná / dokončená zakázka: neukončený krok už nic nenabízí (zůstává jen menu „⋯")
+  if (isProductionClosed(stage) && isOpenStep(op)) return null;
   const live = sortOperations(ops).filter((o) => o.status !== "preskoceno");
   const current = live.find((o) => RUN.includes(o.status)) ?? live.find((o) => o.status === "ceka") ?? null;
   const before = isBeforeProduction(stage);

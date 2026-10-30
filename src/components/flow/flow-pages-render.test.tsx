@@ -234,6 +234,33 @@ describe("#25 zamčené dokumenty", async () => {
     expect(text(html)).toContain("Nabídka Kalírna");
     expect(text(html)).toContain("Z-2026-101");
   });
+
+  // beta 30. 10.: naše faktura zamčená pro zaměstnance má vlastní text (ne „Nákupní doklad…"), faktura dodavatele ne
+  it("naše faktura bez práva: text faktury, ne nákupního dokladu; faktura dodavatele = nákupní doklad", () => {
+    const html = renderToString(<DocumentsBrowser today={TODAY} files={[
+      f({ id: "f1", kind: "faktura", title: "Faktura FV-2026-001", locked: "price" }),
+      f({ id: "f2", kind: "faktura", title: "Faktura dodavatele", locked: "price", flow: { origin: "capture", issuer: "dodavatel", orderRevision: null, uploaded: null, archived: null } }),
+    ]} />);
+    const t = text(html);
+    expect(t).toContain("Faktura — obsah vidí obchodník a super admin.");
+    expect(t.match(/Nákupní doklad — obsah vidí obchodník a super admin\./g) ?? []).toHaveLength(1);
+  });
+});
+
+describe("Dokumenty → vystavit fakturu: text podle toho, zda má faktura PDF", async () => {
+  const { invoiceLinkText } = await import("./issue-document-panel");
+  const { toIssueJob } = await import("./flow-data");
+  it("faktura mimo systém (bez PDF) neslibuje „otevřeš nebo pošleš znovu“", () => {
+    const ext = invoiceLinkText({ invoiceNumber: "2026-0142", invoiceHasPdf: false });
+    expect(ext).toContain("vystavenou mimo systém");
+    expect(ext).not.toContain("pošleš znovu");
+    expect(invoiceLinkText({ invoiceNumber: "FV-2026-001", invoiceHasPdf: true })).toContain("otevřeš nebo pošleš znovu");
+    expect(invoiceLinkText({ invoiceNumber: null, invoiceable: true })).toContain("PDF s QR platbou");
+    const base = { id: "j1", number: "Z-1", title: "T", customer: null, stage: "fakturovano", quoteCount: 0, invoiceNumber: "2026-0142", flow: null };
+    expect(toIssueJob(base as never, new Set()).invoiceHasPdf).toBe(false);
+    expect(toIssueJob(base as never, new Set(["j1"])).invoiceHasPdf).toBe(true);
+    expect(toIssueJob(base as never).invoiceHasPdf).toBeUndefined();
+  });
 });
 
 describe("#25 lišta rozsahu a proužek toku", async () => {

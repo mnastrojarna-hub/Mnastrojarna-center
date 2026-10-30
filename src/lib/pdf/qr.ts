@@ -89,6 +89,25 @@ export function buildSpdString(input: SpdInput): string | null {
   return parts.join("*");
 }
 
+/**
+ * Varování před vystavením faktury: bez bankovního účtu v Nastavení nebude na faktuře číslo účtu
+ * ani QR platba; bez platného IBANu (u CZK) jen chybí QR. Jinak null.
+ */
+export function invoiceBankWarning(bank: { accountNumber?: string | null; iban?: string | null }, currency = "CZK"): string | null {
+  const account = (bank.accountNumber ?? "").trim();
+  const iban = (bank.iban ?? "").trim();
+  const validIban = Boolean(iban) && isValidIban(iban);
+  if (!account && !iban) {
+    return "Faktura bude bez QR a čísla účtu — doplň bankovní účet v Nastavení → Firemní údaje.";
+  }
+  if (!validIban && (currency || "CZK").toUpperCase() === "CZK") {
+    return iban
+      ? "Faktura bude bez QR platby — IBAN v Nastavení → Firemní údaje není platný."
+      : "Faktura bude bez QR platby — doplň IBAN v Nastavení → Firemní údaje.";
+  }
+  return null;
+}
+
 // ── Matice QR kódu (vektorové vykreslení v PDF) ─────────────
 
 export interface QrMatrix {

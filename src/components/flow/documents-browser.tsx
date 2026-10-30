@@ -151,7 +151,8 @@ export function DocumentsBrowser({ files, today }: { files: FlowFile[]; today: s
  */
 function LockedFileCard({ file: f, today }: { file: FlowFile; today: string }) {
   const m = FILE_KINDS[f.kind] ?? FILE_KINDS.ostatni;
-  const text = fileLockText(f.locked) ?? "";
+  // naše faktura má vlastní text (ne „Nákupní doklad…") — stejně jako v kartě zakázky
+  const text = fileLockText(f.locked, { kind: f.kind, issuer: f.flow?.issuer ?? null }) ?? "";
   return (
     <li
       className={cn("flex overflow-hidden rounded-xl border border-dashed bg-card/70 shadow-sm sm:flex-col", f.archived && "opacity-70")}

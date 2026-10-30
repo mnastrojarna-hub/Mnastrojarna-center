@@ -27,6 +27,23 @@ export interface IssueJob {
   invoiceNumber?: string | null;
   /** Fakturu jde vystavit (dodáno vše, faktura ještě není) — stejné pravidlo jako karta. */
   invoiceable?: boolean;
+  /** Vystavená faktura má PDF v Dokumentech (false = zapsaná mimo systém, PDF z aplikace není). */
+  invoiceHasPdf?: boolean;
+}
+
+/**
+ * Text u faktury v panelu Dokumenty: faktura z aplikace (otevřeš / pošleš znovu v kartě), faktura zapsaná
+ * mimo systém (PDF z aplikace není — nic neslibovat), nebo kdy ji jde vystavit.
+ */
+export function invoiceLinkText(job: Pick<IssueJob, "invoiceNumber" | "invoiceable" | "invoiceHasPdf">): string {
+  if (job.invoiceNumber) {
+    return job.invoiceHasPdf === false
+      ? `Zakázka má fakturu ${job.invoiceNumber} vystavenou mimo systém — PDF z aplikace k ní není (druhá faktura nevznikne). Další krok je „Zadat platbu“ v kartě zakázky.`
+      : `Zakázka už má fakturu ${job.invoiceNumber} — v kartě zakázky ji otevřeš nebo pošleš znovu (druhá faktura nevznikne).`;
+  }
+  return job.invoiceable
+    ? "Fakturu vystavíš v kartě zakázky — vznikne PDF s QR platbou a rovnou ji pošleš zákazníkovi."
+    : "Fakturu vystavíš po dodání všeho zboží (Zapsat dodání a dodací list) — v kartě zakázky.";
 }
 
 /** Jaký doklad se k zakázce v daném stavu nejspíš hodí. */
@@ -228,13 +245,7 @@ export function IssueDocumentPanel({ jobs, canInvoice = true }: { jobs: IssueJob
       {kind === "faktura" && job && (
         // A2: faktura má jednu cestu — karta zakázky „Vystavit fakturu" (PDF + odeslání jako u nabídky)
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm dark:border-emerald-500/30 dark:bg-emerald-500/10" data-testid="issue-invoice-link">
-          <p className="text-emerald-900 dark:text-emerald-100">
-            {job.invoiceNumber
-              ? `Zakázka už má fakturu ${job.invoiceNumber} — v kartě zakázky ji otevřeš nebo pošleš znovu (druhá faktura nevznikne).`
-              : job.invoiceable
-                ? "Fakturu vystavíš v kartě zakázky — vznikne PDF s QR platbou a rovnou ji pošleš zákazníkovi."
-                : "Fakturu vystavíš po dodání všeho zboží (Zapsat dodání a dodací list) — v kartě zakázky."}
-          </p>
+          <p className="text-emerald-900 dark:text-emerald-100">{invoiceLinkText(job)}</p>
         </div>
       )}
       {warning && (

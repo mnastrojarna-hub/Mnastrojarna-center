@@ -15,8 +15,9 @@ import type { JobOperation } from "@/lib/jobs/production-types";
 import { cn } from "@/lib/utils";
 import { useProduction } from "./production-context";
 import {
-  PLANNED_TONE, STATUS_STAMP, dayLabel, isBeforeProduction, lastNoteLine, operationStatusStamp, operationVisuals, plannedState, poChipOf, primaryAction,
-  stampLabel, stepAction, stepCounterOf, whoOfOperation, type ChangedByFields, type OperationVisual,
+  PLANNED_TONE, STATUS_STAMP, closedProductionView, dayLabel, isBeforeProduction, isOpenStep, isProductionClosed, lastNoteLine, operationStatusStamp,
+  operationVisuals, plannedState, poChipOf, primaryAction, stampLabel, stepAction, stepCounterOf, whoOfOperation, type ChangedByFields,
+  type OperationVisual,
 } from "./production-helpers";
 import { useOperationActions } from "./use-operation-actions";
 import { WhoIcon } from "./who-picker";
@@ -77,8 +78,10 @@ function PoChip({ op, chip, canSend }: { op: JobOperation; chip: NonNullable<Ret
  * operace s jedním velkým tlačítkem (Začít / Hotovo) a menu „⋯".
  */
 export function OperationTimeline({ ops }: { ops: JobOperation[] }) {
+  const { stage } = useProduction();
   const sorted = sortOperations(ops);
-  const visuals = operationVisuals(sorted);
+  // dodaná / dokončená zakázka: neukončené kroky jako uzavřené (přeskočené), ne „probíhá"
+  const visuals = operationVisuals(closedProductionView(sorted, stage).ops);
   return (
     <ol aria-label="Postup výroby" className="relative">
       {sorted.map((op, i) => (
@@ -143,6 +146,8 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
   const m = OPERATION_KINDS[op.kind];
   const st = OPERATION_STATUSES[op.status];
   const StIcon = st.icon;
+  /** Neukončený krok dodané / dokončené zakázky (zobrazen jako uzavřený, v DB beze změny). */
+  const closedOpen = isProductionClosed(stage) && isOpenStep(op);
   const planned = plannedState(op, today);
   const who = whoOfOperation(op);
   const note = lastNoteLine(op.note);
@@ -181,11 +186,12 @@ function OperationItem({ op, index, count, visual }: { op: JobOperation; index: 
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                  visual === "next" ? "bg-foreground text-background" : st.badge,
+                  visual === "next" ? "bg-foreground text-background" : closedOpen ? "bg-muted text-muted-foreground" : st.badge,
                 )}
+                data-testid={closedOpen ? "step-closed" : undefined}
               >
-                <StIcon className={cn("h-3 w-3", op.status === "probiha" && "animate-spin [animation-duration:2.5s]")} />
-                {VISUAL_LABEL[visual] ?? st.label}
+                {closedOpen ? <SkipForward className="h-3 w-3" /> : <StIcon className={cn("h-3 w-3", op.status === "probiha" && "animate-spin [animation-duration:2.5s]")} />}
+                {closedOpen ? "Uzavřeno bez ukončení" : VISUAL_LABEL[visual] ?? st.label}
               </span>
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">

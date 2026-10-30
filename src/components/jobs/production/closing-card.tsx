@@ -132,7 +132,10 @@ function DeliveryStep({
   const file = confirmedDeliveryFile(job.files);
   const confirmed = closing.deliveryNoteConfirmedAt;
   const busy = phase !== null || isBusy("dl");
-  const notes = currentDeliveryNotes(job.files ?? []);
+  // čísla DL z delivery_notes (jediný zdroj čísla DL, jako Přehled); starší data bez řádku → ze souborů
+  const notes: { id: string | null; number: string }[] = job.deliveryNotes?.length
+    ? job.deliveryNotes
+    : currentDeliveryNotes(job.files ?? []);
 
   async function upload(f: File | undefined) {
     if (!f) return;
@@ -167,10 +170,15 @@ function DeliveryStep({
       {notes.length > 0 ? (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" data-testid="closing-delivery-notes">
           <span>{delivered === "all" ? "Dodáno —" : delivered === "part" ? "Dodáno částečně —" : "Vystaveno —"}</span>
-          {notes.map((n) => (
+          {notes.map((n, i) => n.id ? (
             <a key={n.id} href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono font-medium text-foreground underline-offset-2 hover:underline">
               <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden /> {n.number}
             </a>
+          ) : (
+            // DL bez PDF v Dokumentech (smazaný soubor) — číslo zůstává, odkaz ne
+            <span key={`${n.number}-${i}`} className="inline-flex items-center gap-1 font-mono font-medium text-foreground">
+              <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden /> {n.number}
+            </span>
           ))}
         </p>
       ) : (

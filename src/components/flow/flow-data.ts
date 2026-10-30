@@ -202,8 +202,10 @@ export function toConfirmJob(j: JobDetail): ConfirmJob {
   };
 }
 
-export function toIssueJob(j: JobListItem): IssueJob {
+export function toIssueJob(j: JobListItem, invoicePdfJobs?: ReadonlySet<string>): IssueJob {
   return {
+    // vystavená faktura bez PDF (zapsaná mimo systém) → panel neslibuje „otevřeš nebo pošleš znovu"
+    ...(invoicePdfJobs ? { invoiceHasPdf: invoicePdfJobs.has(j.id) } : {}),
     id: j.id,
     number: j.number,
     title: j.title,

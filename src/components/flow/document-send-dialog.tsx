@@ -129,6 +129,8 @@ export function DocumentSendDialog({
   const [step, setStep] = React.useState<Step>("preparing");
   const [error, setError] = React.useState<string | null>(null);
   const [warning, setWarning] = React.useState<string | null>(null);
+  /** Faktura před vystavením: chybí bankovní spojení v Nastavení (bez QR / čísla účtu). */
+  const [bankWarning, setBankWarning] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
   /** Doklad vznikne až odesláním (název přílohy předem) — jen issueOnSend. */
   const [pending, setPending] = React.useState<{ filename: string; force: boolean } | null>(null);
@@ -164,6 +166,8 @@ export function DocumentSendDialog({
             return;
           }
           setPending({ filename: d.filename ?? "Faktura.pdf", force });
+          // chybí bankovní účet / IBAN v Nastavení → upozornit ještě před vystavením (faktura bez QR)
+          setBankWarning(d.bankWarning ?? null);
         }
         setMail((m) => ({ to: d.to || m.to, cc: m.cc, subject: d.subject ?? m.subject, body: d.body ?? m.body }));
         setStep("form");
@@ -215,6 +219,7 @@ export function DocumentSendDialog({
       setFile(null);
       setPending(null);
       setWarning(null);
+      setBankWarning(null);
       setError(null);
       setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
@@ -353,6 +358,15 @@ export function DocumentSendDialog({
           )}
           {(step === "form" || step === "sending") && (
             <>
+              {pending && bankWarning && !blocked ? (
+                <p
+                  className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+                  data-testid="invoice-bank-warning"
+                  role="status"
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> {bankWarning}
+                </p>
+              ) : null}
               {file ? (
                 <AttachmentChip fileId={file.id} filename={file.filename} />
               ) : pending ? (
@@ -360,7 +374,7 @@ export function DocumentSendDialog({
                 <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-dashed bg-violet-50/60 px-3 py-2 text-sm dark:bg-violet-500/5" data-testid="send-pending-attachment">
                   <Paperclip className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium">PDF faktury s QR platbou</span>
+                    <span className="block font-medium">{bankWarning ? "PDF faktury" : "PDF faktury s QR platbou"}</span>
                     <span className="block text-xs text-muted-foreground">vznikne a přiloží se při vystavení — číslo přidělí řada faktur</span>
                   </span>
                   <a

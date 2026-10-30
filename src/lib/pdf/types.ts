@@ -89,6 +89,22 @@ export interface InvoiceData extends DocRefs {
   note?: string;
   constantSymbol?: string;
   deliveryNoteNumber?: string;
+  /** Přijaté zálohy / platby (s DPH) — odečtou se z částky k úhradě (invoice-payments.ts). */
+  payments?: InvoicePayment[];
+  /** Zakázka je vyrovnaná („Zaplaceno") → zbývá 0. */
+  settled?: boolean;
+}
+
+/** Úhrada odečtená na faktuře (zálohy a platby zakázky). */
+export interface InvoicePayment {
+  /** Datum úhrady YYYY-MM-DD. */
+  date: string;
+  /** Odečtená částka s DPH. */
+  amount: number;
+  /** Zapsaná částka bez DPH; null = „celá / zbývající částka" (bez částky). */
+  net: number | null;
+  /** Záloha = přišla před vystavením faktury; platba = v den vystavení nebo později. */
+  kind: "zaloha" | "platba";
 }
 
 export interface QuoteData extends DocRefs {

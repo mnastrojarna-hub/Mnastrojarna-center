@@ -433,14 +433,63 @@ export function TotalsCard({
   currency,
   grandLabel = "Celkem s DPH",
   hint,
+  deductions,
+  due,
 }: {
   items: DocItem[];
   currency: string;
   grandLabel?: string;
   hint?: string;
+  /** Faktura: přijaté zálohy / platby (s DPH) odečtené od celkové částky. */
+  deductions?: { label: string; amount: number; sub?: string }[];
+  /** Faktura se zálohami: velký řádek = zbývá uhradit (místo celkové částky). */
+  due?: { label: string; amount: number };
 }) {
   const { breakdown, subtotal, total } = computeTotals(items);
   const multi = breakdown.length > 1;
+  if (due) {
+    return (
+      <View style={styles.totalsCard} wrap={false}>
+        <View style={styles.totalLine}>
+          <Text style={styles.totalKey}>Celkem bez DPH</Text>
+          <Text style={styles.totalVal}>{czk(subtotal, currency)}</Text>
+        </View>
+        {breakdown.map((r) => (
+          <View key={r.rate}>
+            {multi ? (
+              <View style={styles.totalLine}>
+                <Text style={styles.totalKey}>Základ {czNumber(r.rate)} %</Text>
+                <Text style={styles.totalVal}>{czk(r.base, currency)}</Text>
+              </View>
+            ) : null}
+            <View style={styles.totalLine}>
+              <Text style={styles.totalKey}>DPH {czNumber(r.rate)} %</Text>
+              <Text style={styles.totalVal}>{czk(r.vat, currency)}</Text>
+            </View>
+          </View>
+        ))}
+        <View style={[styles.totalLine, { borderTopWidth: 0.6, borderColor: C.hair, marginTop: 2, paddingTop: 3 }]}>
+          <Text style={{ color: C.ink, fontWeight: "bold" }}>Celkem s DPH</Text>
+          <Text style={{ color: C.ink, fontWeight: "bold" }}>{czk(total, currency)}</Text>
+        </View>
+        {(deductions ?? []).map((p, i) => (
+          <View key={i} style={styles.totalLine}>
+            <View style={{ flex: 1, paddingRight: 6 }}>
+              <Text style={styles.totalKey}>{p.label}</Text>
+              {p.sub ? <Text style={{ fontSize: 6.8, lineHeight: 1.25, color: C.muted }}>{p.sub}</Text> : null}
+            </View>
+            <Text style={styles.totalVal}>−{czk(p.amount, currency)}</Text>
+          </View>
+        ))}
+        <View style={styles.totalDivider} />
+        <View style={styles.totalGrandRow}>
+          <Text style={styles.totalGrandLabel}>{due.label}</Text>
+          <Text style={styles.totalGrandValue}>{czk(due.amount, currency)}</Text>
+        </View>
+        {hint ? <Text style={styles.totalHint}>{hint}</Text> : null}
+      </View>
+    );
+  }
   return (
     <View style={styles.totalsCard} wrap={false}>
       <View style={styles.totalLine}>

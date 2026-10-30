@@ -246,6 +246,31 @@ describe("Záložka Výroba — render", () => {
     expect(worker).not.toContain("bez DPH");
   });
 
+  // beta 30. 10.: „Zapsat dodání bez ukončení kroků" → Dokončeno; krok nesmí „probíhat" s velkým „Hotovo"
+  it("dokončená zakázka s neukončenými kroky: žádné „Hotovo / Začít“, kroky uzavřené jako přeskočené", () => {
+    const c = closing({ stage: "dokonceno", invoiceNumber: "FV-1", invoiceDate: "2026-10-21", paidAt: "2026-11-03" });
+    const ops = [
+      op({ id: "a", position: 0, status: "hotovo", finishedAt: "2026-10-10T08:00:00Z" }),
+      op({ id: "b", position: 1, kind: "frezovani", label: "Výroba", status: "probiha", startedAt: "2026-10-12T08:00:00Z" }),
+      op({ id: "c", position: 2, kind: "brouseni", label: "Broušení", status: "ceka" }),
+    ];
+    for (const stage of ["dokonceno", "fakturovano", "dodano_zakaznikovi"] as const) {
+      const html = render(job({ stage }), data(ops, { ...c, stage }));
+      expect(html).not.toMatch(/Hotovo: /);
+      expect(html).not.toContain("Začít:");
+      expect(html).not.toContain('data-testid="step-advance"');
+      expect(html).not.toContain('data-testid="production-now"');
+      expect(html).toContain("Výroba uzavřena ✓");
+      expect(html).toContain('data-testid="production-closed-note"');
+      expect((html.match(/data-testid="step-closed"/g) ?? []).length).toBe(2);
+      expect(html).toContain("Uzavřeno bez ukončení");
+    }
+    // ve výrobě beze změny: probíhající krok má své tlačítko
+    const running = render(job({ stage: "dodano_k_nam" }), data(ops));
+    expect(running).not.toContain("Výroba uzavřena");
+    expect(running).toContain("Hotovo: ");
+  });
+
   it("bez dat výroby nabídne obnovení a domluvy ze zakázky", () => {
     const html = render(job({ customerNote: "Atest 3.1" }), null);
     expect(html).toContain("Výrobu se teď nepodařilo načíst");
@@ -259,15 +284,20 @@ describe("Hlavička — výroba a splatnost", () => {
   const html = (j: JobListItem) => renderToString(<ProductionHeaderBadges job={j} />).replace(/<!-- -->/g, "");
 
   it("aktuální operace, problém, po splatnosti", () => {
-    const out = html({
+    const running = {
       ...base, productionStep: "tepelne_zpracovani", productionLocation: "TepKal s.r.o.", productionDone: 1, productionTotal: 4,
-      productionProblem: true, stage: "fakturovano", invoiceDueDate: "2020-01-01",
-    });
+      productionProblem: true,
+    } as JobListItem;
+    const out = html({ ...running, stage: "ve_vyrobe" });
     expect(out).toContain("Teď: Tepelné zpracování · TepKal s.r.o.");
     expect(out).toContain("1/4");
     expect(out).toContain("Problém ve výrobě");
-    expect(out).toContain("Po splatnosti");
     expect(out).toContain('href="?tab=vyroba"');
+    // beta 30. 10.: vyfakturovaná (dodaná) zakázka s neukončeným krokem → „Výroba uzavřena", ne „Teď: …"
+    const billed = html({ ...running, stage: "fakturovano", invoiceDueDate: "2020-01-01" });
+    expect(billed).toContain("Po splatnosti");
+    expect(billed).toContain("Výroba uzavřena");
+    expect(billed).not.toContain("Teď:");
   });
 
   it("hotová výroba a nenaplánovaná objednávka", () => {

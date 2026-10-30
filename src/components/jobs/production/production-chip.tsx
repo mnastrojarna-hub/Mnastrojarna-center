@@ -10,6 +10,7 @@ import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { ProductionMiniBar } from "./production-mini";
 import { useFlowActions } from "@/components/jobs/detail/flow-actions";
+import { isProductionClosed } from "./production-helpers";
 
 /** Stavy, ve kterých má smysl nabídnout „Předat do výroby…". */
 const PLAN_STAGES: JobStage[] = ["objednavka", "potvrzeno", "ve_vyrobe"];
@@ -57,7 +58,9 @@ export function ProductionHeaderBadges({ job, className }: { job: JobListItem; c
   const done = job.productionDone ?? 0;
   const problem = Boolean(job.productionProblem);
   const overdue = paymentStateOf(job, todayInPrague()) === "po_splatnosti";
-  const kind = isOperationKind(step) ? OPERATION_KINDS[step] : null;
+  // dodaná / vyfakturovaná / dokončená zakázka s neukončeným krokem: výroba uzavřená, ne „Teď: …"
+  const closed = isProductionClosed(job.stage) && isOperationKind(step);
+  const kind = isOperationKind(step) && !closed ? OPERATION_KINDS[step] : null;
   // před výrobou (i s připraveným postupem) a ve výrobě bez kroku: předání do výroby (kdo + termín)
   // hlavní tlačítko karty už je „Předat do výroby… / Doplnit kdo a termín…" → druhý stejný chip by se opakoval
   const plan = PLAN_STAGES.includes(job.stage) && (job.stage !== "ve_vyrobe" ? true : !step && !total)
@@ -71,6 +74,11 @@ export function ProductionHeaderBadges({ job, className }: { job: JobListItem; c
       {step === "hotovo" && (
         <ChipLink title={`Výroba hotová (${done}/${total})`} className="bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300">
           <CircleCheckBig className="h-3.5 w-3.5 shrink-0" /> Výroba hotová
+        </ChipLink>
+      )}
+      {closed && (
+        <ChipLink title={`Výroba uzavřena dodáním — hotovo ${done} z ${total}, ostatní kroky neukončené`} className="bg-muted text-muted-foreground">
+          <CircleCheckBig className="h-3.5 w-3.5 shrink-0" /> Výroba uzavřena
         </ChipLink>
       )}
       {kind && (

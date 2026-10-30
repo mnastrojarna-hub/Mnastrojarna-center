@@ -20,11 +20,12 @@ import {
 } from "@/lib/jobs/document-emails";
 import {
   buildConfirmationDoc, buildInvoiceDoc, buildQuoteDoc, confirmationNumber, dateOnly,
-  pdfFileName, pickPricedItems, relevantQuote, unpricedCount,
+  jobPaymentRows, pdfFileName, pickPricedItems, relevantQuote, unpricedCount,
 } from "@/lib/pdf/job-docs";
+import { invoiceBalance, invoicePaymentsFromRows } from "@/lib/pdf/invoice-payments";
 import { renderConfirmationPdf, renderInvoicePdf, renderQuotePdf } from "@/lib/pdf/render";
 import { addDaysIso, computeTotals, plural, todayIso, type DocItem } from "@/lib/pdf/types";
-import { spdVariableSymbol } from "@/lib/pdf/qr";
+import { invoiceBankWarning, spdVariableSymbol } from "@/lib/pdf/qr";
 import { sendMail } from "@/lib/email/send";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
@@ -493,6 +494,8 @@ export async function generateJobDocument(
       const issueDate = dateOnly(row?.issue_date) ?? undefined;
       const data = await buildInvoiceDoc(job, {
         number, preparedBy, note,
+        // zálohy / platby zakázky → „Uhrazeno zálohou…", „Zbývá uhradit", QR na zbytek
+        payments: await jobPaymentRows(db, jobId),
         ...(issueDate ? { issueDate, taxableDate: dateOnly(row?.taxable_date) ?? issueDate } : {}),
         ...(issueDate && row?.due_date ? { dueDays: daysBetween(issueDate, row.due_date) } : {}),
       });
@@ -822,6 +825,8 @@ export async function draftInvoiceEmail(
 ): Promise<ActionResult<{
   to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind; unpriced: number;
   existing: { fileId: string; filename: string; number: string } | null; code: "rights" | "delivery" | "invoiced";
+  /** Faktura by vznikla bez QR / čísla účtu (chybí bankovní spojení v Nastavení) — jen před vystavením. */
+  bankWarning: string | null;
 }>> {
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   const c = await begin();
@@ -849,7 +854,12 @@ export async function draftInvoiceEmail(
       filename: pdfFileName("faktura", reserved ?? "FV"), quoteId: null, createdAt: new Date().toISOString(),
     }, reserved ? undefined : { invoiceNumber: INVOICE_NUMBER_PLACEHOLDER, variableSymbol: INVOICE_VS_PLACEHOLDER });
     if (!draft.ok) return draft;
-    return { ...draft, filename: reserved ? draft.filename ?? "" : "Faktura_[číslo].pdf", unpriced: unpricedCount(pickPricedItems(job)), existing: null };
+    // „PDF s QR": bez bankovního účtu / IBANu v Nastavení varovat PŘED vystavením (COMPANY načetl compose)
+    const bankWarning = invoiceBankWarning({ accountNumber: COMPANY.bank.accountNumber, iban: COMPANY.bank.iban }, job.currency || "CZK");
+    return {
+      ...draft, filename: reserved ? draft.filename ?? "" : "Faktura_[číslo].pdf", unpriced: unpricedCount(pickPricedItems(job)), existing: null,
+      bankWarning,
+    };
   } catch (err) {
     return fail(err);
   }
@@ -919,20 +929,32 @@ async function composeDocumentEmail(
     input.deliveryDate = dateOnly(job.dueDate) ?? null;
   } else if (kind === "faktura") {
     input.number = invoicePending?.invoiceNumber ?? job.invoiceNumber;
-    type InvoiceRow = { due_date: string | null; total: number | string | null; variable_symbol: string | null; currency: string | null };
+    type InvoiceRow = {
+      issue_date: string | null; due_date: string | null; total: number | string | null; variable_symbol: string | null; currency: string | null;
+    };
     let invoice: InvoiceRow | null = null;
     if (job.invoiceNumber && !invoicePending) {
       const { data } = await db
         .from("invoices")
-        .select("due_date, total, variable_symbol, currency")
+        .select("issue_date, due_date, total, variable_symbol, currency")
         .eq("number", job.invoiceNumber)
         .maybeSingle();
       invoice = (data as InvoiceRow | null) ?? null;
     }
     const issued = dateOnly(file.createdAt) ?? todayIso();
     input.dueDate = invoice?.due_date ?? addDaysIso(issued, Math.max(0, job.customerDetail?.paymentTermsDays ?? 14));
-    const total = invoice?.total !== null && invoice?.total !== undefined ? Number(invoice.total) : computeTotals(pickPricedItems(job)).total;
-    input.amount = Number.isFinite(total) ? total : null;
+    const items = pickPricedItems(job);
+    const total = invoice?.total !== null && invoice?.total !== undefined ? Number(invoice.total) : computeTotals(items).total;
+    // zálohy / platby: e-mail uvádí stejně jako PDF a QR „Zbývá uhradit"
+    const { payments, settled } = invoicePaymentsFromRows(await jobPaymentRows(db, job.id), items, dateOnly(invoice?.issue_date) ?? issued);
+    const { paid } = invoiceBalance(items, payments, settled);
+    if (Number.isFinite(total) && (paid > 0 || settled)) {
+      input.invoiceTotal = total;
+      input.paidAmount = paid;
+      input.amount = settled ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
+    } else {
+      input.amount = Number.isFinite(total) ? total : null;
+    }
     input.currency = invoice?.currency || job.currency;
     input.variableSymbol = invoicePending?.variableSymbol
       ?? (invoice?.variable_symbol || spdVariableSymbol(job.invoiceNumber ?? undefined) || null);

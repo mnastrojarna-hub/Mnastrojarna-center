@@ -305,6 +305,46 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     }
   }, 60_000);
 
+  // beta 30. 10.: faktura po záloze — „Uhrazeno zálohou…", „Zbývá uhradit" v PDF i e-mailu; bez účtu varování
+  it("záloha 3 000 bez DPH: faktura i e-mail „Zbývá uhradit 26 620“, rekapitulace DPH za celé plnění; bez účtu varování", async () => {
+    as("sales");
+    const j = await newJob("dodano_k_nam", [{ qty: 5, price: 3000 }, { qty: 10, price: 1000 }]);
+    const res = await dn.recordDelivery(j.id, [{ itemId: j.items[0], from: 0, to: 5 }, { itemId: j.items[1], from: 0, to: 10 }], { issueNote: true });
+    expect(res.ok, res.error).toBe(true);
+    const dep = await flow.recordJobPayment(j.id, { date: "2026-10-12", amount: 3_000 });
+    expect(dep.ok, dep.error).toBe(true);
+    const flatText = (s: string) => s.replace(/[\s  ]+/g, " ");
+    const d = await docs.draftInvoiceEmail(j.id);
+    expect(d.ok, d.error).toBe(true);
+    const body = flatText(d.body ?? "");
+    expect(body).toContain("• Celkem s DPH: 30 250,00 Kč");
+    expect(body).toContain("• Uhrazeno (zálohy a platby): 3 630,00 Kč");
+    expect(body).toContain("• Zbývá uhradit: 26 620,00 Kč");
+    // lokální Nastavení nemá bankovní účet ani IBAN → varování před vystavením
+    const { data: bank } = await svc.from("integration_settings").select("key, value").in("key", ["company_bank_account", "company_iban"]);
+    if (!((bank ?? []) as { value: string | null }[]).some((r) => r.value?.trim())) {
+      expect(d.bankWarning).toBe("Faktura bude bez QR a čísla účtu — doplň bankovní účet v Nastavení → Firemní údaje.");
+    }
+    const fv = await docs.generateJobDocument(j.id, "faktura");
+    expect(fv.ok, fv.error).toBe(true);
+    const { data: file } = await svc.from("job_files").select("storage_path").eq("id", fv.fileId!).single();
+    const { data: blob, error: dlErr } = await svc.storage.from("job-files").download((file as { storage_path: string }).storage_path);
+    expect(dlErr).toBeNull();
+    // text PDF jen testovým pomocníkem (pdf.js) — samotné akce nic nevykreslují
+    const { pdfText } = await import("@/test/pdf-text");
+    const text = await pdfText(await blob!.arrayBuffer());
+    const squash = (s: string) => s.replace(/[\s  ]+/g, "");
+    expect(squash(text)).toContain(squash("Uhrazeno zálohou 12. 10. 2026"));
+    expect(squash(text)).toContain(squash("Zbývá uhradit26 620,00 Kč"));
+    expect(squash(text)).toContain(squash("21 %25 000,00 Kč5 250,00 Kč30 250,00 Kč"));
+    // evidence faktur = celé zdanitelné plnění (záloha není daňový doklad)
+    expect(Number((await invoicesOf(j.id))[0].total)).toBe(30250);
+    // e-mail k vystavené faktuře: stále zbytek
+    const again = await docs.draftInvoiceEmail(j.id);
+    expect(flatText(again.body ?? "")).toContain("• Zbývá uhradit: 26 620,00 Kč");
+    expect(again.bankWarning ?? null).toBeNull();
+  }, 90_000);
+
   // review A2 #6: obecná úprava zakázky čísla dokladů nepřepíše (zaměstnanec ani obchodník)
   it("updateJob nezapíše číslo faktury ani DL (jediná cesta: Vystavit fakturu / mimo systém / zápis dodání)", async () => {
     const { updateJob } = await import("./jobs");

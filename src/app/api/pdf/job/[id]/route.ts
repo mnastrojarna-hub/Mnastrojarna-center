@@ -3,8 +3,8 @@ import { apiRequire, getAccess } from "@/lib/auth/session";
 import { getJob } from "@/lib/data/jobs";
 import { isUuid } from "@/lib/jobs/mapping";
 import {
-  buildConfirmationDoc, buildDeliveryDoc, buildDeliveryNoteDoc, buildInvoiceDoc, buildQuoteDoc, dateOnly, pdfFileName, relevantQuote,
-  type JobDocKind,
+  buildConfirmationDoc, buildDeliveryDoc, buildDeliveryNoteDoc, buildInvoiceDoc, buildQuoteDoc, dateOnly, jobPaymentRows, pdfFileName,
+  relevantQuote, type JobDocKind,
 } from "@/lib/pdf/job-docs";
 import { createOperatorClient } from "@/lib/supabase/server";
 import { userActor } from "@/lib/supabase/actor-headers";
@@ -107,7 +107,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }
     } else {
       number = job.invoiceNumber?.trim() || "FV-NÁHLED";
-      buffer = await renderInvoicePdf(await buildInvoiceDoc(job, { number, preparedBy }));
+      // náhled = totéž co vystavení: zálohy / platby zakázky se odečtou („Zbývá uhradit", QR na zbytek)
+      const db = await createOperatorClient({ actor: userActor(auth.user) });
+      buffer = await renderInvoicePdf(await buildInvoiceDoc(job, { number, preparedBy, payments: await jobPaymentRows(db, job.id) }));
     }
 
     const filename = watermarked ? pdfFileName(kind, number).replace(/\.pdf$/, "-NESCHVALENO.pdf") : pdfFileName(kind, number);

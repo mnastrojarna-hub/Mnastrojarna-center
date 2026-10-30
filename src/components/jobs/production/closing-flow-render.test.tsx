@@ -127,6 +127,23 @@ describe("karta „Dodání, faktura a platba“ (A2)", () => {
     expect(t).toMatch(/1\s*\/3/);
   });
 
+  // beta 30. 10.: čísla DL z delivery_notes (jediný zdroj), ne z názvů souborů; DL bez PDF = číslo bez odkazu
+  it("čísla dodacích listů z delivery_notes, ne z názvu souboru", () => {
+    const j = job({
+      files: [dlFile({ filename: "Dodaci_list_PREJMENOVANO.pdf", title: "Dodací list (přejmenováno)" })],
+      deliveryNotes: [
+        { id: "dl1", number: "DL-2026-071", createdAt: "2026-10-28T08:00:00Z" },
+        { id: null, number: "DL-2026-065", createdAt: "2026-10-20T08:00:00Z" },
+      ],
+    });
+    const html = render(j, <ClosingCard job={j} closing={closing()} margins />);
+    const t = text(html);
+    expect(t).toContain("Dodáno — DL-2026-071 DL-2026-065");
+    expect(t).not.toContain("PREJMENOVANO");
+    expect(html).toContain('href="/api/jobs/files/dl1"');
+    expect((html.match(/\/api\/jobs\/files\//g) ?? []).length).toBe(1);
+  });
+
   // review A2 #4: „dílčí" faktura účtovala celou objednávku → při dílčí dodávce se faktura z aplikace nenabízí
   it("dílčí dodávka: faktura až po dodání všeho (žádné „Vystavit fakturu (dílčí)“), záloha jde", () => {
     const j = job({

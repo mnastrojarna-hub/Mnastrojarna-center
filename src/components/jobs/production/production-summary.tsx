@@ -11,8 +11,8 @@ import type { JobOperation } from "@/lib/jobs/production-types";
 import { cn } from "@/lib/utils";
 import { useProduction } from "./production-context";
 import {
-  currentOperation, dayLabel, lastNoteLine, operationStatusStamp, overdueOperations, plannedState, primaryAction,
-  problemOperations, progressSegments, stepAction, stepCounterOf, upcomingOperation, type ChangedByFields, type ProgressSegment,
+  closedProductionView, currentOperation, dayLabel, isProductionClosed, lastNoteLine, operationStatusStamp, overdueOperations, plannedState,
+  primaryAction, problemOperations, progressSegments, stepAction, stepCounterOf, upcomingOperation, type ChangedByFields, type ProgressSegment,
 } from "./production-helpers";
 import { useOperationActions } from "./use-operation-actions";
 
@@ -134,15 +134,18 @@ function DeliveryShortcut() {
  * Souhrn nahoře: kde se zakázka právě nachází, kolik je hotovo, velký pruh
  * průběhu, hlavní tlačítko pro aktuální operaci, problémy a zpoždění.
  */
-export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
-  const { today, events, finalDate } = useProduction();
+export function ProductionSummary({ ops: allOps }: { ops: JobOperation[] }) {
+  const { today, events, finalDate, stage } = useProduction();
+  // dodaná / vyfakturovaná / dokončená zakázka: neukončené kroky jsou uzavřené (žádné „probíhá" ani „Hotovo")
+  const { ops, closedOpen } = closedProductionView(allOps, stage);
+  const delivered = isProductionClosed(stage);
   const summary = summarizeOperations(ops);
   const segments = progressSegments(ops);
   const current = currentOperation(ops);
   const upcoming = upcomingOperation(ops);
   const problems = problemOperations(ops);
   const late = overdueOperations(ops, today).filter((o) => o.status !== "problem");
-  const finished = summary.step === "hotovo";
+  const finished = summary.step === "hotovo" || closedOpen > 0;
   const meta = current ? OPERATION_KINDS[current.kind] : null;
   const Icon = meta?.icon ?? CircleCheckBig;
   const running = current && (current.status === "probiha" || current.status === "problem");
@@ -176,7 +179,9 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
               {finished ? "Výroba" : running ? "Teď" : "Na řadě"}
             </p>
             {finished ? (
-              <p className="text-lg font-bold leading-tight text-green-700 dark:text-green-400 sm:text-xl">Výroba hotová ✓</p>
+              <p className="text-lg font-bold leading-tight text-green-700 dark:text-green-400 sm:text-xl" data-testid="production-finished">
+                {closedOpen > 0 ? "Výroba uzavřena ✓" : "Výroba hotová ✓"}
+              </p>
             ) : current ? (
               <p className="break-words text-lg font-bold leading-tight sm:text-xl" data-testid="production-now">
                 {stepCounterOf(current, ops) && <span className="font-semibold text-muted-foreground">{stepCounterOf(current, ops)} · </span>}
@@ -187,7 +192,18 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
               <p className="text-lg font-bold">Bez postupu</p>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              {finished && <span>Všechny operace jsou hotové — dodej zákazníkovi: „Zapsat dodání a dodací list“, pak faktura.</span>}
+              {finished && closedOpen > 0 && (
+                <span data-testid="production-closed-note">
+                  Zakázka je dodaná — neukončené kroky ({closedOpen}) jsou uzavřené jako přeskočené (dodání zapsané bez ukončení kroků).
+                </span>
+              )}
+              {finished && closedOpen === 0 && (
+                <span>
+                  {delivered
+                    ? "Všechny operace jsou hotové — zakázka je dodaná zákazníkovi."
+                    : "Všechny operace jsou hotové — dodej zákazníkovi: „Zapsat dodání a dodací list“, pak faktura."}
+                </span>
+              )}
               {!finished && current?.status === "ceka" && <span>čeká na začátek</span>}
               {!finished && running && (since || stamp) && (
                 <span>
@@ -218,9 +234,11 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
           <div className="shrink-0 text-right">
             <p className="text-2xl font-bold leading-none tabular-nums sm:text-3xl">
               {summary.done}
-              <span className="text-base font-semibold text-muted-foreground sm:text-lg">/{summary.total}</span>
+              <span className="text-base font-semibold text-muted-foreground sm:text-lg">/{summary.total + closedOpen}</span>
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">hotovo · {summary.percent} %</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {closedOpen > 0 ? `hotovo · ${closedOpen} uzavřeno` : `hotovo · ${summary.percent} %`}
+            </p>
           </div>
         </div>
 

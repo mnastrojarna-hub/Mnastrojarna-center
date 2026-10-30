@@ -12,7 +12,7 @@ type DocEl = ReactElement<DocumentProps>;
 
 /** PDF objednávky vydané dodavateli. */
 export async function renderPurchaseOrderPdf(data: PurchaseOrderData): Promise<Buffer> {
-  ensureFonts();
+  await ensureFonts(); // await: oprava sdílené mezipaměti glyfů (mizející písmena), viz theme.tsx
   return renderToBuffer(createElement(PurchaseOrderDocument, { data }) as unknown as DocEl);
 }
 

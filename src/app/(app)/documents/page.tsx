@@ -39,10 +39,14 @@ export default async function DocumentsPage(props: {
   const info = await getFileFlowInfo(files.map((f) => f.id));
   const flowFiles = files.map((f) => toFlowFile(f, info[f.id] ?? null));
   const current = flowFiles.filter((f) => !f.archived).length;
+  // zakázky, jejichž faktura má PDF v Dokumentech (naše faktura, ne faktura dodavatele)
+  const invoicePdfJobs = new Set(
+    flowFiles.filter((f) => f.kind === "faktura" && !f.archived && f.flow?.issuer !== "dodavatel").map((f) => f.job.id),
+  );
   // aktivní zakázky nahoře, uzavřené na konci výběru
   const issueJobs = [...jobs]
     .sort((a, b) => Number(CLOSED_STAGES.includes(a.stage)) - Number(CLOSED_STAGES.includes(b.stage)))
-    .map(toIssueJob);
+    .map((j) => toIssueJob(j, invoicePdfJobs));
   const today = todayPrague();
 
   return (

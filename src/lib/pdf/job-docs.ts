@@ -5,6 +5,8 @@ import type { JobDetail, JobQuote, JobItem, JobQuoteItem } from "@/lib/jobs/type
 import { quoteApprovalBlock } from "@/lib/jobs/flow-status";
 import { supplierParty } from "./components";
 import { spdVariableSymbol } from "./qr";
+import { invoicePaymentsFromRows, type PaymentRowLike } from "./invoice-payments";
+import type { JobsDb } from "@/lib/jobs/events";
 import {
   UNAPPROVED_WATERMARK, addDaysIso, leadTimeLabel, todayIso,
   type ConfirmationData, type DeliveryItem, type DeliveryNoteData, type DocItem, type DocRefs,
@@ -356,6 +358,8 @@ export async function buildInvoiceDoc(
     preparedBy?: string;
     note?: string;
     constantSymbol?: string;
+    /** Úhrady zakázky (job_payments, bez DPH) — zálohy a platby se na faktuře odečtou. */
+    payments?: readonly PaymentRowLike[] | null;
   },
 ): Promise<InvoiceData> {
   await refreshCompanyFromSettings();
@@ -363,6 +367,8 @@ export async function buildInvoiceDoc(
   const issueDate = opts.issueDate ?? todayIso();
   const taxableDate = opts.taxableDate ?? dateOnly(job.deliveredAt ?? job.shippedAt) ?? issueDate;
   const dueDays = opts.dueDays ?? job.customerDetail?.paymentTermsDays ?? 14;
+  const items = pickPricedItems(job);
+  const { payments, settled } = invoicePaymentsFromRows(opts.payments, items, issueDate);
   return {
     ...refs,
     number: opts.number,
@@ -381,10 +387,24 @@ export async function buildInvoiceDoc(
       swift: u(COMPANY.bank.swift),
       bankName: u(COMPANY.bank.bankName),
     },
-    items: pickPricedItems(job),
+    items,
     deliveryNoteNumber: u(job.deliveryNoteNumber),
     constantSymbol: u(opts.constantSymbol),
     note: u(opts.note),
     preparedBy: u(opts.preparedBy) ?? u(job.owner?.name) ?? refs.contactPerson,
+    ...(payments.length || settled ? { payments, settled } : {}),
   };
+}
+
+/**
+ * Úhrady zakázky pro fakturu (zálohy, dílčí platby, vyrovnání). Čte je role s právem na faktury
+ * (RLS job_payments = obchodník / admin); chyba čtení = faktura bez odečtů (zaloguje se).
+ */
+export async function jobPaymentRows(db: JobsDb, jobId: string): Promise<PaymentRowLike[]> {
+  const { data, error } = await db.from("job_payments").select("paid_on, amount, settles").eq("job_id", jobId).order("paid_on");
+  if (error) {
+    console.error(`[job-docs] Úhrady zakázky se nepodařilo načíst: ${error.message}`);
+    return [];
+  }
+  return (data ?? []) as PaymentRowLike[];
 }
