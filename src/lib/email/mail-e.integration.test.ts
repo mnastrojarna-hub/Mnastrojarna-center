@@ -382,6 +382,128 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta E — nastavení schránky v Poště + P
     await svc.from("customers").delete().eq("id", customerId).then(() => undefined, () => undefined);
   }, 120_000);
 
+  it("přeposlání e-mailu zákazníka s původními přílohami: zákazníkovi originál, dodavateli anonymizace na požádání (blok do dokončení) → ověřená kopie; uložená v zakázce → kopie zakázky; originál jen super admin (audit)", async () => {
+    asVit();
+    delete process.env.APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    const crypto = await import("node:crypto");
+    const tag = TAG.toLowerCase();
+    const custDomain = `zakfw-${tag}.test`;
+    const supplier = `kalirna@dodfw-${tag}.test`;
+    const pdf = Buffer.from(`%PDF-1.4 ORIGINAL vykres zakaznika FW ${TAG} ${"x".repeat(20_000)}`);
+    srv.addMessage(BOX, {
+      subject: `Výkres FW ${TAG}`, body: "Dobrý den, v příloze výkres.", from: `Petr Nákup <nakup@${custDomain}>`,
+      attachments: [
+        { filename: `vykres-FW-${TAG}.pdf`, contentType: "application/pdf", content: pdf },
+        { filename: `logo-${TAG}.png`, contentType: "image/png", content: Buffer.from("\x89PNG\r\n\x1a\n male logo") },
+        { filename: `sestava-${TAG}.dwg`, contentType: "application/octet-stream", content: Buffer.from("AC1032 dwg") },
+      ],
+    });
+    const ingest = await import("./ingest");
+    await ingest.syncMailbox({ mailboxIds: [boxId], manual: true });
+    const emailId = localSql(`select id from emails where mailbox_id = '${boxId}' and subject = 'Výkres FW ${TAG}'`);
+    expect(emailId).toMatch(/^[0-9a-f-]{36}$/);
+    const { data: atts } = await svc.from("email_attachments").select("id, filename").eq("email_id", emailId);
+    const attId = (n: string) => ((atts ?? []) as { id: string; filename: string }[]).find((a) => a.filename.startsWith(n))!.id;
+    const pdfId = attId("vykres-FW-");
+    const logoId = attId("logo-");
+    const dwgId = attId("sestava-");
+    await svc.from("email_attachments").update({ job_file_id: null }).eq("email_id", emailId); // nezávisle na automatickém přiřazení
+    const compose = await import("@/app/actions/mail-compose");
+    const fwd = (to: string, refs: { ref: string; original?: boolean }[]) => compose.sendComposedAction({
+      mode: "forward", sourceEmailId: emailId, to, subject: `Fwd: Výkres FW ${TAG}`, body: "Posílám dál.",
+      attachments: refs.map((r) => ({ kind: "original" as const, ...r })),
+    });
+    const adhoc = () => localSql(`select count(*) from drawing_anon_adhoc where user_id = '${users.vit!.id}'`);
+
+    // dodavatel: výkres → anonymizace na požádání (blok „ještě není anonymizovaný“), DWG → nelze, logo projde; nic neodešlo
+    const before = srv.sent.length;
+    const p = await fwd(supplier, [{ ref: pdfId }, { ref: logoId }, { ref: dwgId }]);
+    expect(p.ok).toBe(false);
+    expect(p.blocked?.map((b) => [b.kind, b.ref, b.reason])).toEqual([["original", pdfId, "pending"], ["original", dwgId, "unsupported"]]);
+    expect(p.blocked![0].message).toMatch(/Výkres ještě není anonymizovaný/);
+    expect(p.blocked![1].message).toMatch(/ulož výkres jako PDF a přilož ho z počítače/);
+    expect(p.canSendOriginal).toBe(false);
+    expect(p.queued).toBeUndefined();
+    expect(srv.sent.length).toBe(before);
+    expect(adhoc()).toBe("1");
+    const row = localSql(`select id || '|' || anon_status || '|' || storage_path || '|' || coalesce(anon_via, '') from drawing_anon_adhoc where user_id = '${users.vit!.id}'`).split("|");
+    const adhocId = row[0];
+    // zamrazit (žádný jiný běh sdílené DB ho nezpracuje uprostřed testu)
+    localSql(`update drawing_anon_adhoc set anon_lock_until = now() + interval '1 hour' where id = '${adhocId}'`);
+    expect(row[1]).toBe("pending");
+    expect(row[2].startsWith(`capture/${users.vit!.id}/anon/`)).toBe(true);
+    expect(row[3]).toBe("email");
+    const { data: src } = await svc.storage.from("job-files").download(row[2]);
+    expect(Buffer.from(await src!.arrayBuffer()).equals(pdf)).toBe(true);
+    // opakovaně → stejná anonymizace (žádná druhá)
+    expect((await fwd(supplier, [{ ref: pdfId }])).blocked?.[0]).toMatchObject({ reason: "pending" });
+    expect(adhoc()).toBe("1");
+
+    // zákazník (jiná adresa jeho domény) → originál, bez anonymizace
+    const c = await fwd(`technik@${custDomain}`, [{ ref: pdfId }, { ref: dwgId }]);
+    expect(c).toMatchObject({ ok: true });
+    expect(srv.sent.at(-1)!.raw).toContain(`vykres-FW-${TAG}.pdf`);
+    expect(srv.sent.at(-1)!.raw).toContain(`sestava-${TAG}.dwg`);
+
+    // anonymizace hotová → dodavatel dostane ověřenou kopii, ne originál
+    const anon = Buffer.from(`%PDF-1.4 ANON FW ${TAG}`);
+    const anonPath = `capture/${users.vit!.id}/anon/out/${adhocId}.pdf`;
+    await svc.storage.from("job-files").upload(anonPath, new Blob([anon], { type: "application/pdf" }), { contentType: "application/pdf", upsert: true });
+    const sha = crypto.createHash("sha256").update(anon).digest("hex");
+    await svc.from("drawing_anon_adhoc").update({ anon_status: "done", anon_path: anonPath, anon_filename: `anonym-FW-${TAG}.pdf`, anon_mime: "application/pdf", anon_sha256: sha }).eq("id", adhocId);
+    const d = await fwd(supplier, [{ ref: pdfId }, { ref: logoId }]);
+    expect(d).toMatchObject({ ok: true });
+    const raw = srv.sent.at(-1)!.raw;
+    expect(raw).toContain(`anonym-FW-${TAG}.pdf`);
+    expect(raw).not.toContain(`vykres-FW-${TAG}.pdf`);
+    expect(raw).not.toContain(pdf.toString("base64").slice(0, 40));
+    expect(raw).toContain(`logo-${TAG}.png`);
+    // podvržená kopie (jiný sha) nebo kopie mimo můj prefix → blok
+    await svc.from("drawing_anon_adhoc").update({ anon_sha256: "0".repeat(64) }).eq("id", adhocId);
+    expect((await fwd(supplier, [{ ref: pdfId }])).blocked?.[0]).toMatchObject({ reason: "failed" });
+    await svc.from("drawing_anon_adhoc").update({ anon_sha256: sha, anon_path: row[2] }).eq("id", adhocId);
+    expect((await fwd(supplier, [{ ref: pdfId }])).blocked?.[0]).toMatchObject({ reason: "failed" });
+    // ke kontrole → blok s radou, kde ji zkontrolovat
+    await svc.from("drawing_anon_adhoc").update({ anon_status: "review", anon_path: anonPath }).eq("id", adhocId);
+    expect((await fwd(supplier, [{ ref: pdfId }])).blocked?.[0].message).toMatch(/Moje anonymizace/);
+    // obchodník originál poslat nesmí; super admin ano (audit s id přílohy)
+    expect((await fwd(supplier, [{ ref: pdfId, original: true }])).blocked?.[0]).toMatchObject({ reason: "forbidden" });
+    session.current = { id: users.vit!.id, email: users.vit!.email, fullName: "Vít Volný", role: "super_admin" };
+    const s = await fwd(supplier, [{ ref: pdfId, original: true }]);
+    expect(s).toMatchObject({ ok: true });
+    expect(srv.sent.at(-1)!.raw).toContain(`vykres-FW-${TAG}.pdf`);
+    expect(localSql(`select count(*) from audit_log where action = 'email_attachment_original_sent' and diff::text like '%${pdfId}%'`)).toBe("1");
+    asVit();
+
+    // příloha uložená do dokumentů zakázky → platí anonymizace toho souboru zakázky
+    const { data: job } = await svc.from("orders").insert({
+      number: `MEF-${TAG}`, title: "Mail E přeposlání", source: "manual", status: "poptavka", inquiry_date: "2026-10-30", owner_id: users.vit!.id,
+    }).select("id").single();
+    const jobId = (job as { id: string }).id;
+    jobIds.push(jobId);
+    const jpath = `${jobId}/vykres-FW-${TAG}.pdf`;
+    await svc.storage.from("job-files").upload(jpath, new Blob([pdf], { type: "application/pdf" }), { contentType: "application/pdf", upsert: true });
+    const { data: jf } = await svc.from("job_files").insert({ job_id: jobId, kind: "vykres", filename: `vykres-FW-${TAG}.pdf`, mime_type: "application/pdf", storage_path: jpath, origin: "email" }).select("id").single();
+    const jfId = (jf as { id: string }).id;
+    await svc.from("email_attachments").update({ job_file_id: jfId }).eq("id", pdfId);
+    await svc.from("job_files").update({ anon_status: "processing", anon_path: null, anon_sha256: null, anon_lock_until: new Date(Date.now() + 3600_000).toISOString() }).eq("id", jfId);
+    expect((await fwd(supplier, [{ ref: pdfId }])).blocked?.[0]).toMatchObject({ kind: "original", ref: pdfId, reason: "pending" });
+    const janon = Buffer.from(`%PDF-1.4 ANON ZAKAZKA FW ${TAG}`);
+    const janonPath = `zakazky/${jobId.toLowerCase()}/anon/${jfId}.pdf`;
+    await svc.storage.from("job-files").upload(janonPath, new Blob([janon], { type: "application/pdf" }), { contentType: "application/pdf", upsert: true });
+    await svc.from("job_files").update({
+      anon_status: "done", anon_path: janonPath, anon_filename: `zakazka-anonym-FW-${TAG}.pdf`, anon_mime: "application/pdf",
+      anon_sha256: crypto.createHash("sha256").update(janon).digest("hex"),
+    }).eq("id", jfId);
+    const j = await fwd(supplier, [{ ref: pdfId }]);
+    expect(j).toMatchObject({ ok: true });
+    expect(srv.sent.at(-1)!.raw).toContain(`zakazka-anonym-FW-${TAG}.pdf`);
+    expect(srv.sent.at(-1)!.raw).not.toContain(`vykres-FW-${TAG}.pdf`);
+    expect(adhoc()).toBe("1"); // žádná další anonymizace na požádání
+    await svc.storage.from("job-files").remove([row[2], anonPath]).catch(() => undefined);
+  }, 180_000);
+
   it("zahodit: jen moje čekající zpráva, neodejde", async () => {
     asVit();
     await svc.from("mailboxes").update({ config: { ...manual(), imap_password: "Spatne-heslo-2" } }).eq("id", boxId);

@@ -1,5 +1,6 @@
 /**
- * Pošta → přílohy z dokumentů zakázky (čistá logika, testy v attachment-anon.test.ts): výkres zákazníka
+ * Pošta → přílohy z dokumentů zakázky i původní přílohy přeposílaného e-mailu (čistá logika, testy
+ * v attachment-anon.test.ts; přeposlání → anonymizace na požádání přes drawing_anon_adhoc): výkres zákazníka
  * smí ven v originále jen zákazníkovi té zakázky (jeho adresy / doména) nebo kolegům. Komukoli jinému
  * (dodavatel, kooperace) jde anonymizovaná kopie (src/lib/anonymize/share.ts); bez ní se příloha
  * zablokuje s českou hláškou — originál smí výslovně poslat jen super admin (audit).
@@ -34,18 +35,34 @@ export function recipientsAllowOriginals(recipients: readonly string[], aud: Ori
   return list.every((r) => cust.has(r) || internal.has(r) || custDomains.has(domainOf(r)) || internalDomains.has(domainOf(r)));
 }
 
-export type BlockReason = "pending" | "review" | "failed" | "unsupported" | "needs_confirm" | "excluded" | "forbidden";
+/** Přípony, které anonymizuje samostatný nástroj (shodně s /api/drawings/anonymize/adhoc). */
+export const ADHOC_ANON_EXT_RE = /\.(pdf|jpe?g|png|webp|gif|tiff?|heic|heif|dxf|stp|step|stl|igs|iges)$/i;
+
+/** Kam smí samostatný nástroj uložit anonymizovanou kopii uživatele (anonymize/queue.ts subjectOf → outPrefix). */
+export function adhocAnonPrefix(userId: string): string {
+  return `capture/${userId}/anon/out/`;
+}
+
+/** Drobný vložený obrázek (logo, podpis) — stejná hranice jako kopírování příloh do zakázky. */
+export const MIN_INLINE_IMAGE_BYTES = 15 * 1024;
+export function isInlineImage(mime: string | null | undefined, size: number | null | undefined): boolean {
+  return String(mime ?? "").toLowerCase().startsWith("image/") && (size ?? 0) > 0 && (size ?? 0) < MIN_INLINE_IMAGE_BYTES;
+}
+
+export type BlockReason ="pending" | "review" | "failed" | "unsupported" | "needs_confirm" | "excluded" | "forbidden";
 
 /** Hláška do okna psaní pro zablokovaný výkres (co udělat). */
-export function blockedAttachmentMessage(filename: string, reason: BlockReason, detail?: string): string {
+export function blockedAttachmentMessage(filename: string, reason: BlockReason, detail?: string, where: "job" | "mail" = "job"): string {
   switch (reason) {
     case "pending":
       return `„${filename}": Výkres ještě není anonymizovaný — počkej, až se dokončí (pár minut), nebo ho pošli bez něj.`;
     case "review":
-      return `„${filename}": Anonymizace čeká na schválení — zkontroluj a schval ji v zakázce (Dokumenty → náhled), pak odešli.`;
+      return where === "mail"
+        ? `„${filename}": Anonymizace čeká na schválení — zkontroluj náhled v Poptávky → Anonymizovat výkres (Moje anonymizace) a anonymizovaný výkres přilož z počítače, nebo e-mail přiřaď k zakázce a schval ho v Dokumentech.`
+        : `„${filename}": Anonymizace čeká na schválení — zkontroluj a schval ji v zakázce (Dokumenty → náhled), pak odešli.`;
     case "failed":
     case "unsupported":
-      return `„${filename}": Nelze anonymizovat automaticky — ulož výkres jako PDF a nahraj ho do zakázky znovu.${detail ? ` (${detail})` : ""}`;
+      return `„${filename}": Nelze anonymizovat automaticky — ulož výkres jako PDF a ${where === "mail" ? "přilož ho z počítače" : "nahraj ho do zakázky znovu"}.${detail ? ` (${detail})` : ""}`;
     case "forbidden":
       return `„${filename}": Originál výkresu zákazníka smí poslat ven jen super admin.`;
     default:

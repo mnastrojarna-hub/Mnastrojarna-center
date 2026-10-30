@@ -13,12 +13,17 @@ import { outgoingSignature } from "@/lib/email/signature-server";
 import { loadEmailAttachment, MAX_ATTACHMENT_BYTES } from "@/lib/email/attachments";
 import { replyHeaders, splitAddresses } from "@/lib/email/threading";
 import { sentCopyLabel } from "@/lib/email/mail-folders";
-import { isDbEmailCategory, isUuidLike } from "@/lib/email/visibility";
+import { attachmentIssuer, isDbEmailCategory, isUuidLike } from "@/lib/email/visibility";
 import { assertJobFileAccess, fileLocks } from "@/lib/jobs/job-file-access";
+import { guessFileKind } from "@/lib/jobs/file-kinds";
 import { SHARE_FILE_SELECT, pickShareFile, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "@/lib/anonymize/share";
-import { isAnonCandidate } from "@/lib/anonymize/candidate";
-import { blockedAttachmentMessage, recipientsAllowOriginals, type BlockReason } from "@/lib/email/attachment-anon";
+import { isAnonCandidate, isUnsupportedExt, unsupportedHowTo } from "@/lib/anonymize/candidate";
+import { enqueue as enqueueAnon, kickInBackground } from "@/lib/anonymize/queue";
+import {
+  ADHOC_ANON_EXT_RE, adhocAnonPrefix, blockedAttachmentMessage, isInlineImage, recipientsAllowOriginals, type BlockReason,
+} from "@/lib/email/attachment-anon";
 import type { JobsDb } from "@/lib/jobs/events";
+import type { EmailCategory as DbEmailCategory } from "@/lib/supabase/database.types";
 
 /**
  * Psaní e-mailů z aplikace: nová zpráva, odpověď, odpovědět všem, přeposlání (s původními
@@ -42,12 +47,14 @@ export interface ComposeAttachmentRef {
   ref: string;
   filename?: string;
   contentType?: string;
-  /** Dokument zakázky: výslovně „Poslat originál" (výkres zákazníka bez anonymizace — jen super admin, audit). */
+  /** Dokument zakázky / příloha přeposílaného e-mailu: výslovně „Poslat originál" (výkres zákazníka bez anonymizace — jen super admin, audit). */
   original?: boolean;
 }
 
 /** Příloha zablokovaná ochranou výkresů zákazníka (komu nepatří, jde jen anonymizovaná kopie). */
 export interface BlockedAttachment {
+  /** Druh odkazu v okně psaní (dokument zakázky / příloha přeposílaného e-mailu). */
+  kind: "job" | "original";
   ref: string;
   filename: string;
   reason: string;
@@ -244,26 +251,45 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
 // ── Výkresy zákazníka v příloze (ochrana anonymizace, audit 30. 10.) ──
 
 type Guarded =
-  | { kind: "plain" }
+  | { kind: "plain"; original?: boolean }
   | { kind: "file"; file: OutgoingAttachment; original: boolean }
   | { kind: "blocked"; blocked: BlockedAttachment };
 
-/** Jsou všichni adresáti zákazník zakázky (jeho adresy / doména) nebo my? Pak smí jít originál. */
-async function originalsAllowed(c: Db, jobId: string | null, recipients: string[]): Promise<boolean> {
-  if (!jobId || !recipients.length) return false;
-  const { data: job } = await c.from("orders").select("customer_id").eq("id", jobId).maybeSingle();
-  const cid = (job as { customer_id: string | null } | null)?.customer_id ?? null;
+/** Komu výkres zákazníka patří: zákazník zakázky / e-mailu (adresy, kontakty, doména) a odesílatel přeposílané zprávy. */
+interface OriginalScope {
+  jobId?: string | null;
+  customerId?: string | null;
+  customerEmails?: string[];
+}
+
+/** Jsou všichni adresáti zákazník (jeho adresy / doména) nebo my? Pak smí jít originál. */
+async function originalsAllowed(c: Db, scope: OriginalScope, recipients: string[]): Promise<boolean> {
+  if (!recipients.length) return false;
+  const ids = new Set<string>();
+  if (scope.customerId) ids.add(scope.customerId);
+  if (scope.jobId) {
+    const { data: job } = await c.from("orders").select("customer_id").eq("id", scope.jobId).maybeSingle();
+    const cid = (job as { customer_id: string | null } | null)?.customer_id ?? null;
+    if (cid) ids.add(cid);
+  }
+  if (!ids.size && !scope.customerEmails?.length) return false;
+  const cids = [...ids];
   const [cust, contacts, profs, boxes] = await Promise.all([
-    cid ? c.from("customers").select("email").eq("id", cid) : Promise.resolve({ data: [] }),
-    cid ? c.from("customer_contacts").select("email").eq("customer_id", cid) : Promise.resolve({ data: [] }),
+    cids.length ? c.from("customers").select("email").in("id", cids) : Promise.resolve({ data: [] }),
+    cids.length ? c.from("customer_contacts").select("email").in("customer_id", cids) : Promise.resolve({ data: [] }),
     c.from("profiles").select("email").not("email", "is", null),
     c.from("mailboxes").select("email"),
   ]);
   const emails = (rows: unknown) => ((rows ?? []) as { email: string | null }[]).flatMap((r) => splitAddresses(r.email));
+  const internalEmails = emails(profs.data);
+  const internalDomains = emails(boxes.data).map((e) => e.split("@")[1] ?? "");
+  // odesílatel přeposílané zprávy se za zákazníka počítá, jen když to není kolega (náš odeslaný e-mail)
+  const internal = new Set([...internalEmails, ...emails(boxes.data)].map((e) => e.toLowerCase()));
+  const extra = (scope.customerEmails ?? []).flatMap((e) => splitAddresses(e)).filter((e) => !internal.has(e.toLowerCase()));
   return recipientsAllowOriginals(recipients, {
-    customerEmails: [...emails(cust.data), ...emails(contacts.data)],
-    internalEmails: emails(profs.data),
-    internalDomains: emails(boxes.data).map((e) => e.split("@")[1] ?? ""),
+    customerEmails: [...emails(cust.data), ...emails(contacts.data), ...extra],
+    internalEmails,
+    internalDomains,
   });
 }
 
@@ -276,21 +302,149 @@ async function guardJobFile(c: Db, a: ComposeAttachmentRef, recipients: string[]
   const { data } = await c.from("job_files").select(SHARE_FILE_SELECT).eq("id", a.ref).maybeSingle();
   const row = data as FileRowWithAnon | null;
   if (!row) return { kind: "plain" };
+  return guardShareRow(c, row, { kind: "job", ref: a.ref, filename: row.filename, original: a.original === true }, { jobId: row.job_id }, recipients, user);
+}
+
+/** Společné jádro: řádek job_files (dokument zakázky nebo příloha e-mailu uložená do zakázky). */
+async function guardShareRow(
+  c: Db, row: FileRowWithAnon, at: { kind: BlockedAttachment["kind"]; ref: string; filename: string; original: boolean },
+  scope: OriginalScope, recipients: string[], user: SessionUser,
+): Promise<Guarded> {
   if ((row.origin ?? "upload") === "generated" || row.issuer === "my") return { kind: "plain" };
   const candidate = isAnonCandidate(row.kind, row.filename, row.mime_type, row.origin, row.issuer);
   if (!candidate && (row.anon_status === null || row.anon_status === "skipped")) return { kind: "plain" };
-  if (await originalsAllowed(c, row.job_id, recipients)) return { kind: "plain" };
+  if (await originalsAllowed(c, { ...scope, jobId: scope.jobId ?? row.job_id }, recipients)) return { kind: "plain" };
   const price = await sharePriceDocIds(c as never, [row.id]);
-  const d = pickShareFile(row, { original: a.original === true, isSuperAdmin: user.role === "super_admin", priceDocument: price.has(row.id.toLowerCase()) });
+  const d = pickShareFile(row, { original: at.original, isSuperAdmin: user.role === "super_admin", priceDocument: price.has(row.id.toLowerCase()) });
   const block = (reason: BlockReason, detail?: string): Guarded => ({
-    kind: "blocked", blocked: { ref: a.ref, filename: row.filename, reason, message: blockedAttachmentMessage(row.filename, reason, detail) },
+    kind: "blocked", blocked: { kind: at.kind, ref: at.ref, filename: at.filename, reason, message: blockedAttachmentMessage(at.filename, reason, detail) },
   });
-  if (!d.ok) return block(d.reason, d.message);
+  if (!d.ok) {
+    // výkres, který ještě nikdo nezařadil (starý soubor bez stavu) → anonymizovat teď, odeslat po dokončení
+    if (d.reason === "pending" && row.anon_status === null && candidate) {
+      const q = await enqueueAnon(c as never, { table: "job_files", fileIds: [row.id], via: "email" }).catch(() => null);
+      if (q?.queued) kickInBackground({ table: "job_files", ids: [row.id], manualBy: user.id });
+      if (q?.statuses[row.id] === "unsupported") return block("unsupported", unsupportedHowTo(row.filename));
+    }
+    return block(d.reason, d.message);
+  }
   try {
     const bytes = await verifyShareBytes(c as never, d, row);
     return { kind: "file", file: { filename: d.filename, content: Buffer.from(bytes), contentType: d.mime }, original: d.source === "original" };
   } catch (err) {
     return block("failed", err instanceof Error ? err.message : undefined);
+  }
+}
+
+// ── Přeposlání e-mailu s původními přílohami (stejná ochrana jako dokumenty zakázky) ──
+
+type MailSource = {
+  id: string; direction: string | null; category: DbEmailCategory | null; customer_id: string | null; supplier_id: string | null;
+  order_id: string | null; from_email: string | null;
+};
+type AdhocRow = {
+  id: string; user_id: string; storage_path: string; filename: string; anon_status: string; anon_path: string | null; anon_filename: string | null;
+  anon_mime: string | null; anon_sha256: string | null; anon_reason: string | null; anon_lock_until: string | null;
+};
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer);
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Původní příloha přeposílaného / přikládaného e-mailu: komu nepatří (není zákazník e-mailu / zakázky ani
+ * kolega), dostane jen ověřenou anonymizovanou kopii — uloženou v zakázce (email_attachments.job_file_id),
+ * jinak z anonymizace na požádání (samostatný nástroj drawing_anon_adhoc, fronta + šťouchnutí); do dokončení
+ * zablokovat. Originál výslovně jen super admin (audit).
+ */
+async function guardMailAttachment(
+  c: Db, a: ComposeAttachmentRef, att: { id: string; filename: string | null; mime_type: string | null; size_bytes: number | null; job_file_id: string | null },
+  mail: MailSource, recipients: string[], user: SessionUser,
+): Promise<Guarded> {
+  const name = (att.filename ?? "").trim() || "priloha";
+  if (isInlineImage(att.mime_type, att.size_bytes)) return { kind: "plain" }; // logo / podpis v těle zprávy
+  const outbound = mail.direction === "outbound";
+  const issuer = outbound ? null : attachmentIssuer({ category: mail.category, supplierId: mail.supplier_id, customerId: mail.customer_id });
+  const candidate = isAnonCandidate(guessFileKind(name, att.mime_type ?? undefined), name, att.mime_type, "email", issuer);
+  const scope: OriginalScope = { jobId: mail.order_id, customerId: mail.customer_id, customerEmails: !outbound && mail.from_email ? [mail.from_email] : [] };
+
+  // uložená v dokumentech zakázky → stav anonymizace toho souboru (stejně jako dokument zakázky)
+  if (att.job_file_id) {
+    const { data } = await c.from("job_files").select(SHARE_FILE_SELECT).eq("id", att.job_file_id).maybeSingle();
+    const row = data as FileRowWithAnon | null;
+    if (row) return guardShareRow(c, row, { kind: "original", ref: a.ref, filename: name, original: a.original === true }, scope, recipients, user);
+  }
+  if (!candidate) return { kind: "plain" };
+  if (await originalsAllowed(c, scope, recipients)) return { kind: "plain" };
+  const block = (reason: BlockReason, detail?: string): Guarded => ({
+    kind: "blocked", blocked: { kind: "original", ref: a.ref, filename: name, reason, message: blockedAttachmentMessage(name, reason, detail, "mail") },
+  });
+  if (a.original === true) {
+    if (user.role !== "super_admin") return block("forbidden");
+    return { kind: "plain", original: true }; // originál výslovně (super admin) — audit u odeslání
+  }
+  if (isUnsupportedExt(name) || !ADHOC_ANON_EXT_RE.test(name)) return block("unsupported", unsupportedHowTo(name));
+
+  const loaded = await loadEmailAttachment(att.id);
+  if (!loaded.ok) return block("failed", loaded.error);
+  const bytes = new Uint8Array(loaded.file.content);
+  const sha = await sha256Hex(bytes);
+  const prefix = adhocAnonPrefix(user.id);
+  const { data: found } = await c.from("drawing_anon_adhoc")
+    .select("id, user_id, storage_path, filename, anon_status, anon_path, anon_filename, anon_mime, anon_sha256, anon_reason, anon_lock_until")
+    .eq("user_id", user.id).eq("content_sha256", sha).neq("anon_status", "uploading").gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false }).limit(1);
+  const row = ((found ?? []) as AdhocRow[])[0] ?? null;
+
+  if (!row) {
+    // anonymizace na požádání (stejná cesta jako Poptávky → „Anonymizovat výkres"): zdroj do capture/<uid>/anon/
+    const safe = name.replace(/[^A-Za-z0-9._-]/g, "_").slice(-100) || "vykres";
+    const path = `capture/${user.id}/anon/${crypto.randomUUID()}-${safe}`;
+    const { error: upErr } = await c.storage.from("job-files").upload(path, bytes, { contentType: loaded.file.contentType || "application/octet-stream", upsert: false });
+    if (upErr) return block("failed", `Výkres se nepodařilo připravit k anonymizaci: ${upErr.message}`);
+    const { data: ins, error } = await c.from("drawing_anon_adhoc").insert({
+      user_id: user.id, storage_path: path, filename: name.slice(0, 200), mime_type: loaded.file.contentType || att.mime_type, size_bytes: bytes.length,
+      content_sha256: sha, anon_status: "pending", anon_via: "email",
+    }).select("id").single();
+    if (error || !ins) {
+      await c.storage.from("job-files").remove([path]).catch(() => undefined);
+      return block("failed", error?.message);
+    }
+    const id = (ins as { id: string }).id;
+    kickInBackground({ table: "drawing_anon_adhoc", ids: [id], manualBy: user.id });
+    await logAudit({
+      action: "drawing_anon_adhoc", entity: "drawing_anon_adhoc", entityId: id,
+      diff: { sha256: sha, size: bytes.length, source: "email_forward", emailId: mail.id, attachmentId: att.id }, actor: userActor(user),
+    });
+    return block("pending");
+  }
+  switch (row.anon_status) {
+    case "done": {
+      try {
+        const path = row.anon_path ?? "";
+        if (!path.startsWith(prefix) || path.includes("..") || path === row.storage_path || !row.anon_sha256) throw new Error("Anonymizovaná kopie je na nečekaném místě — anonymizuj znovu.");
+        const { data: blob, error } = await c.storage.from("job-files").download(path);
+        if (error || !blob) throw new Error(`Anonymizovanou kopii se nepodařilo načíst: ${error?.message ?? "prázdný soubor"}`);
+        const out = new Uint8Array(await blob.arrayBuffer());
+        if ((await sha256Hex(out)) !== row.anon_sha256) throw new Error("Anonymizovaná kopie byla změněna — anonymizuj znovu.");
+        return { kind: "file", file: { filename: row.anon_filename || "vykres.pdf", content: Buffer.from(out), contentType: row.anon_mime || "application/pdf" }, original: false };
+      } catch (err) {
+        return block("failed", err instanceof Error ? err.message : undefined);
+      }
+    }
+    case "review":
+      return block("review");
+    case "pending":
+    case "processing":
+      if (row.anon_status === "pending" || (row.anon_lock_until && Date.parse(row.anon_lock_until) < Date.now())) {
+        kickInBackground({ table: "drawing_anon_adhoc", ids: [row.id], manualBy: user.id });
+      }
+      return block("pending");
+    case "unsupported":
+      return block("unsupported", row.anon_reason ?? undefined);
+    default:
+      return block("failed", row.anon_reason ?? undefined);
   }
 }
 
@@ -514,6 +668,8 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
   const blocked: BlockedAttachment[] = [];
   /** Výkresy zákazníka poslané výslovně v originále (super admin) — audit. */
   const originals: string[] = [];
+  /** Totéž u příloh přeposílaného e-mailu (id email_attachments). */
+  const originalAttachments: string[] = [];
   for (const a of (input.attachments ?? []).slice(0, 30)) {
     if (!a || typeof a.ref !== "string") continue;
     let file: OutgoingAttachment | null = null;
@@ -549,12 +705,27 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
       }
     } else if (a.kind === "original") {
       if (!isUuidLike(a.ref)) continue;
-      const { data: att } = await c.from("email_attachments").select("email_id").eq("id", a.ref).maybeSingle();
-      const emailId = (att as { email_id: string } | null)?.email_id;
-      if (!emailId || !(await getVisibleEmailRow(emailId, "id"))) return { ok: false, error: "Původní příloha nenalezena." };
-      const loaded = await loadEmailAttachment(a.ref);
-      if (!loaded.ok) return { ok: false, error: loaded.error };
-      file = loaded.file;
+      const { data: attRow } = await c.from("email_attachments").select("id, email_id, filename, mime_type, size_bytes, job_file_id").eq("id", a.ref).maybeSingle();
+      const att = attRow as { id: string; email_id: string; filename: string | null; mime_type: string | null; size_bytes: number | null; job_file_id: string | null } | null;
+      const visible = att?.email_id
+        ? await getVisibleEmailRow<MailSource>(att.email_id, "id, direction, category, customer_id, supplier_id, order_id, from_email")
+        : null;
+      if (!att || !visible) return { ok: false, error: "Původní příloha nenalezena." };
+      // výkres zákazníka komukoli mimo zákazníka (dodavatel …) → jen anonymizovaná kopie, jinak zablokovat
+      const guarded = await guardMailAttachment(c, a, att, visible.row, [...to.valid, ...cc.valid, ...bcc.valid], user);
+      if (guarded.kind === "blocked") {
+        blocked.push(guarded.blocked);
+        continue;
+      }
+      if (guarded.kind === "file") {
+        file = guarded.file;
+        if (guarded.original) originalAttachments.push(a.ref);
+      } else {
+        const loaded = await loadEmailAttachment(a.ref);
+        if (!loaded.ok) return { ok: false, error: loaded.error };
+        file = loaded.file;
+        if (guarded.original) originalAttachments.push(a.ref);
+      }
     }
     if (!file) continue;
     total += file.content.length;
@@ -565,7 +736,7 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
     // nic neodeslat: v okně psaní se ukáže proč a nabídne „Odeslat bez nich" (super admin i „Poslat originál")
     return {
       ok: false, stage: "check", blocked, canSendOriginal: user.role === "super_admin",
-      error: `${blocked.length === 1 ? "Výkres zákazníka nejde" : "Výkresy zákazníka nejdou"} adresátovi mimo zákazníka zakázky poslat bez anonymizace. ${blocked.map((b) => b.message).join(" ")}`,
+      error: `${blocked.length === 1 ? "Výkres zákazníka nejde" : "Výkresy zákazníka nejdou"} adresátovi mimo zákazníka${blocked.every((b) => b.kind === "job") ? " zakázky" : ""} poslat bez anonymizace. ${blocked.map((b) => b.message).join(" ")}`,
     };
   }
 
@@ -606,10 +777,14 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
     diff: { mode: input.mode, to: to.valid, cc: cc.valid, bcc: bcc.valid.length, subject, attachments: attachments.length, from: res.fromAddress, sentCopy: res.sentCopy },
     actor: userActor(access.user),
   });
-  if (originals.length) {
+  if (originals.length || originalAttachments.length) {
     await logAudit({
       action: "email_attachment_original_sent", entity: "emails", entityId: res.emailId,
-      diff: { fileIds: originals, to: to.valid, cc: cc.valid, bcc: bcc.valid.length, subject }, actor: userActor(access.user),
+      diff: {
+        fileIds: originals, ...(originalAttachments.length ? { attachmentIds: originalAttachments, sourceEmailId: source?.id ?? null } : {}),
+        to: to.valid, cc: cc.valid, bcc: bcc.valid.length, subject,
+      },
+      actor: userActor(access.user),
     });
   }
   revalidatePath("/inbox");

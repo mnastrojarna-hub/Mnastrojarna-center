@@ -264,8 +264,15 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta A ↔ lokální Supabase + testovací IM
     expect(loaded.ok && loaded.file.content.equals(pdf)).toBe(true);
 
     const compose = await import("@/app/actions/mail-compose");
-    const fwd = await compose.sendComposedAction({
+    // výkres zákazníka: komukoli mimo zákazníka by šla jen anonymizovaná kopie (mail-e) → kolega zákazníka (jeho doména) dostane originál
+    const blockedFwd = await compose.sendComposedAction({
       mode: "forward", sourceEmailId: (em as { id: string }).id, to: "technolog@nekde.test", subject: `Fwd: Výkres ${TAG}`, body: "Posílám dál.",
+      attachments: [{ kind: "original", ref: (att![0] as { id: string }).id }],
+    });
+    expect(blockedFwd.blocked?.[0]).toMatchObject({ kind: "original", reason: "pending" });
+    await svc.from("drawing_anon_adhoc").delete().eq("user_id", users.a!.id);
+    const fwd = await compose.sendComposedAction({
+      mode: "forward", sourceEmailId: (em as { id: string }).id, to: "technolog@firma.test", subject: `Fwd: Výkres ${TAG}`, body: "Posílám dál.",
       attachments: [{ kind: "original", ref: (att![0] as { id: string }).id }],
     });
     expect(fwd).toMatchObject({ ok: true });

@@ -252,6 +252,8 @@ await T("obchodník vidí jen svou schránku (+ stav na Můj účet), nemá př�
   const d = await page.request.post(`${BASE}/api/mailboxes/diagnose`, { data: { action: "detect", email: "jmeno@nastrojarstvi.test", password: "x" } });
   expect(d.status() === 403, `diagnostika jen pro super admina (je ${d.status()})`);
   await page.goto(`${BASE}/account`);
+  // karta schránky se dočítá po vykreslení stránky — počkat na ni (jinak občas prázdný text)
+  await page.locator("main").getByText("kolega@mnastrojarna.test").first().waitFor({ timeout: 20_000 }).catch(() => undefined);
   const acc = await page.locator("main").innerText();
   expect(acc.includes("kolega@mnastrojarna.test") && /staženo/.test(acc), "Můj účet: schránka a čas stažení");
   await shot(page, "12-inbox-obchod");

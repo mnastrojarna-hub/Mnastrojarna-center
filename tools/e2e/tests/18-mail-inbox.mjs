@@ -179,7 +179,8 @@ await T("přeposlání s původní přílohou + nová zpráva (Komu/Kopie/Skryt�
   await page.getByTestId("btn-forward").click();
   const dlg = page.getByTestId("compose-dialog");
   await dlg.getByTestId("compose-attachments").filter({ hasText: "vykres-H200.pdf" }).waitFor();
-  await dlg.locator("#compose-to").fill("technolog@nekde.test");
+  // kolega zákazníka (jeho doména) → výkres v originále; cizí adresát by dostal jen anonymizovanou kopii (test 26)
+  await dlg.locator("#compose-to").fill("technolog@firma.test");
   await dlg.locator("#compose-to").press("Enter");
   const f0 = (await sentRaw()).length;
   await dlg.getByTestId("compose-send").click();

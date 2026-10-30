@@ -4,7 +4,8 @@
 //    Otestovat připojení (příjem + odesílání), uložit — bez odchodu z Pošty,
 //  - zpráva vhozená do testovací schránky se v otevřené Poště objeví SAMA (bez kliknutí, ≤ 30 s interval),
 //  - „Přijmout a odeslat" (místo „Stáhnout poštu"): odešle zprávu čekající v K odeslání a přijme novou,
-//  - telefon 390 px: vše proklikatelné, nic nepřetéká.
+//  - telefon 390 px: vše proklikatelné, nic nepřetéká,
+//  - výkres zákazníka dodavateli (dokument zakázky i příloha přeposílaného e-mailu) jen anonymizovaný.
 // Spuštění (aplikace musí znát testovací poštovní server a jeho CA — viz 12-mailbox-setup.mjs):
 //   node tools/e2e/mail-test-server.mjs --dir <dir> &
 //   MAIL_TEST_PROVIDERS="$(cat <dir>/providers.json)" NODE_EXTRA_CA_CERTS=<dir>/ca.crt <spusť aplikaci>
@@ -332,6 +333,47 @@ await T("výkres zákazníka v odpovědi dodavateli: neanonymizovaný se zabloku
   await page.getByTestId("sync-msg").filter({ hasText: /Odesláno/ }).waitFor({ timeout: 60_000 });
   const sent = await ctl("/sent?full=1");
   expect(sent.length === sentBefore + 1 && !sent.at(-1).raw.includes(fname), "odešlo bez výkresu zákazníka");
+  await page.close();
+});
+
+await T("přeposlání e-mailu zákazníka s výkresem dodavateli: výkres se anonymizuje na požádání a do té doby zablokuje, „Odeslat bez tohoto výkresu“ odešle zbytek", async (context) => {
+  sql(`update mailboxes set config = jsonb_set(config, '{imap_password}', to_jsonb('${BOX_PASS}'::text)) where email = '${BOX}'`);
+  const S = `Výkres k přeposlání ${TAG}`;
+  const fname = `vykres-FW-${TAG}.pdf`;
+  await addMsg({
+    subject: S, body: "Dobrý den, v příloze výkres příruby.", from: "Petr Nákup <nakup@zakaznik-fw.test>",
+    attachments: [{ filename: fname, contentType: "application/pdf", base64: Buffer.from(`%PDF-1.4 vykres zakaznika ${TAG} ${"x".repeat(20_000)}`).toString("base64") }],
+  });
+  const page = await context.newPage();
+  await loginAs(page);
+  await page.goto(`${BASE}/inbox`);
+  await page.waitForLoadState("networkidle");
+  await page.getByTestId("btn-send-receive").click();
+  await page.getByTestId("sync-msg").filter({ hasText: /Přijato \d+/ }).waitFor({ timeout: 90_000 });
+  await page.getByTestId("mail-search").fill(TAG);
+  const row = rowOf(page, S);
+  await row.waitFor({ timeout: 20_000 });
+  await row.locator("button").first().click();
+  await page.getByTestId("message-attachment").filter({ hasText: fname }).waitFor({ timeout: 20_000 });
+  await page.getByTestId("btn-forward").click();
+  const dlg = page.getByTestId("compose-dialog");
+  await dlg.getByTestId("compose-attachments").filter({ hasText: fname }).waitFor({ timeout: 20_000 });
+  await dlg.locator("#compose-to").fill(`kalirna@dodavatel-fw-${TAG.toLowerCase()}.test`);
+  await dlg.locator("#compose-to").press("Enter");
+  const sentBefore = (await ctl("/sent")).length;
+  await dlg.getByTestId("compose-send").click();
+  const blocked = dlg.getByTestId("compose-blocked");
+  await blocked.waitFor({ timeout: 30_000 });
+  const bt = await blocked.innerText();
+  expect(/Výkres ještě není anonymizovaný/.test(bt) && bt.includes(fname), `hláška: ${bt}`);
+  expect(!(await dlg.getByTestId("compose-send-original").count()), "obchodník nemá „Poslat originál“");
+  expect((await ctl("/sent")).length === sentBefore, "nic neodešlo");
+  expect(sql(`select count(*) from drawing_anon_adhoc where user_id = '${uid}' and filename = '${fname}' and anon_via = 'email'`) === "1", "výkres zařazen k anonymizaci na požádání");
+  await snap(page, "posta-preposlani-vykres-blokovan");
+  await dlg.getByTestId("compose-send-without").click();
+  await page.getByTestId("sync-msg").filter({ hasText: /Odesláno/ }).waitFor({ timeout: 60_000 });
+  const sent = await ctl("/sent?full=1");
+  expect(sent.length === sentBefore + 1 && !sent.at(-1).raw.includes(fname), "přeposláno bez výkresu zákazníka");
   await page.close();
 });
 

@@ -68,7 +68,7 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
   const [needsSettings, setNeedsSettings] = React.useState(false);
   /** Výkresy zákazníka, které adresát nesmí dostat bez anonymizace. */
   const [blocked, setBlocked] = React.useState<{ items: BlockedAttachment[]; canOriginal: boolean } | null>(null);
-  const isBlocked = (a: LocalAttachment) => Boolean(blocked?.items.some((b) => a.ref.kind === "job" && b.ref === a.ref.ref));
+  const isBlocked = (a: LocalAttachment) => Boolean(blocked?.items.some((b) => a.ref.kind === (b.kind ?? "job") && b.ref === a.ref.ref));
   const sendWithout = () => {
     const rest = atts.filter((a) => !isBlocked(a));
     setAtts(rest);
@@ -289,7 +289,7 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
             <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100" role="alert" data-testid="compose-blocked">
               <p className="flex items-start gap-1.5 font-medium">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Adresát není zákazník zakázky — výkres zákazníka smí dostat jen anonymizovaný.</span>
+                <span>Adresát není zákazník{blocked.items.every((b) => (b.kind ?? "job") === "job") ? " zakázky" : ""} — výkres zákazníka smí dostat jen anonymizovaný.</span>
               </p>
               <ul className="space-y-1 pl-6 text-xs">
                 {blocked.items.map((b) => <li key={b.ref} className="break-words" data-testid="compose-blocked-item" data-reason={b.reason}>{b.message}</li>)}
