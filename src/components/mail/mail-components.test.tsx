@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/inbox",
 }));
 vi.mock("@/app/actions/mail", () => ({ createJobFromEmail: vi.fn(), setEmailCategory: vi.fn() }));
+vi.mock("@/app/actions/mail-actions", () => ({ processOrderFromEmailAction: vi.fn(), recordSupplierInvoiceFromEmailAction: vi.fn(), splitFromThreadAction: vi.fn() }));
 vi.mock("@/app/actions/mail-inbox", () => ({
   openThreadAction: vi.fn(() => new Promise(() => {})), markThreadReadAction: vi.fn(), setThreadFlagAction: vi.fn(), setThreadPriorityAction: vi.fn(),
   shareCandidatesAction: vi.fn(() => new Promise(() => {})), shareThreadAction: vi.fn(), runAiOnThreadAction: vi.fn(),
@@ -32,6 +33,25 @@ const t: ThreadSummary = {
   hasDraft: false, messageCount: 3, unreadCount: 2, flagged: true, priority: 1, priorityManual: true, hasAttachments: true, aiPending: false,
   share: { note: "Prosím nacenit", by: "Petr", unread: true },
 };
+
+describe("řádek vlákna — hlavní akce podle kategorie (Pošta E)", () => {
+  const row = (p: Partial<ThreadSummary>) => html(<ThreadRow t={{ ...t, ...p }} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} onAction={() => {}} />);
+  it("poptávka → Vytvořit nabídku; u zakázky Pokračovat v nabídce (odkaz)", () => {
+    expect(row({})).toMatch(/data-testid="row-action" data-action="quote.create"[^>]*>Vytvořit nabídku/);
+    const linked = row({ jobId: "j1", jobNumber: "Z-1" });
+    expect(linked).toContain('href="/orders/j1?tab=nabidky"');
+    expect(linked).toContain('data-action="quote.continue"');
+  });
+  it("faktura → Zapsat fakturu dodavatele, objednávka → Zpracovat objednávku; ostatní / odeslaná / spam bez rychlé akce", () => {
+    expect(row({ category: "Faktura" })).toContain("Zapsat fakturu dodavatele");
+    expect(row({ category: "Objednávka" })).toContain("Zpracovat objednávku");
+    expect(row({ category: "Ostatní" })).not.toContain('data-testid="row-action"');
+    expect(row({ direction: "out" })).not.toContain('data-testid="row-action"');
+    expect(row({ category: "Spam" })).not.toContain('data-testid="row-action"');
+    // bez onAction (Komunikace zakázky) žádná akce
+    expect(html(<ThreadRow t={t} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} />)).not.toContain("row-action");
+  });
+});
 
 describe("řádek vlákna", () => {
   it("vlaječka, priorita, počet zpráv, příloha, poznámka kolegy, nepřečtené", () => {
@@ -68,7 +88,14 @@ describe("řádek vlákna", () => {
 describe("detail vlákna", () => {
   it("akce: Odpovědět, Odpovědět všem, Přeposlat, Předat kolegovi, vlaječka a priorita 1–5", () => {
     const h = html(<ThreadView summary={t} canAi={false} onBack={() => {}} onPatch={() => {}} onCompose={() => {}} version={0} />);
-    for (const s of ["Odpovědět", "Odpovědět všem", "Přeposlat", "Předat kolegovi", "Založit zakázku", "Priorita"]) expect(h).toContain(s);
+    for (const s of ["Odpovědět", "Odpovědět všem", "Přeposlat", "Předat kolegovi", "Priorita"]) expect(h).toContain(s);
+    // Pošta E: poptávka → hlavní akce „Vytvořit nabídku“, ne „Založit zakázku“ (ta jen v ⋯)
+    expect(h).toContain("Vytvořit nabídku");
+    expect(h).toMatch(/data-testid="mail-primary-action" data-action="quote.create"/);
+    expect(h).not.toContain(">Založit zakázku<");
+    const inv = html(<ThreadView summary={{ ...t, category: "Faktura" }} canAi={false} onBack={() => {}} onPatch={() => {}} onCompose={() => {}} version={0} />);
+    expect(inv).toContain("Zapsat fakturu dodavatele");
+    expect(inv).not.toContain("Vytvořit nabídku");
     // review #9: vedlejší akce (Nepřečtené, Roztřídit AI) v menu „Další akce" — tělo zprávy výš
     expect(h).toContain('data-testid="thread-more"');
     expect(h).toContain('aria-label="Odpovědět všem"');
@@ -111,7 +138,28 @@ describe("Moje e-mailová schránka", () => {
     id: "b1", email: "jan@nastrojarstvi.com", displayName: null, active: true, provider: "imap",
     incoming: "IMAP mail.hosting90.cz:993 SSL/TLS", smtp: "SMTP smtp.hosting90.cz:465 SSL/TLS", canSend: true, passwordStored: true,
     incomplete: false, lastSyncAt: null, lastSyncError: null, authBlocked: false, createdByOther: false, remaining: 120, total: 2150,
+    settings: {
+      preset: "hosting90", incomingProtocol: "imap", imapHost: "mail.hosting90.cz", imapPort: 993, imapTls: "tls", imapUser: "",
+      smtpHost: "smtp.nastrojarstvi.com", smtpPort: 366, smtpTls: "none", smtpUser: "", imapSkipNameCheck: false, smtpSkipNameCheck: false,
+    },
+    editable: true,
+    lockedReason: null,
   };
+  it("úprava (z Pošty rovnou otevřená): servery IMAP i SMTP předvyplněné, SMTP heslo zvlášť, test i uložení", () => {
+    const h = html(<MyMailboxCard initial={[box]} isAdmin={false} inPanel initialEditId="b1" />);
+    for (const s of [
+      "Upravit jan@nastrojarstvi.com", 'value="mail.hosting90.cz"', 'value="993"', 'value="smtp.nastrojarstvi.com"', 'value="366"',
+      'aria-label="Uživatelské jméno"', 'aria-label="Uživatelské jméno SMTP"', "SMTP má jiné heslo než schránka", "Otestovat připojení", "Ověřit a uložit",
+    ]) expect(h).toContain(s);
+    expect(h).toMatch(/<option value="none" selected="">Žádné/);
+    expect(h).not.toContain("Otevřít poštu"); // v panelu Pošty bez odkazu na Poštu
+  });
+  it("Microsoft 365 (nastavuje admin): bez Upravit, vysvětlení a koho požádat — žádné mrtvé tlačítko", () => {
+    const h = html(<MyMailboxCard initial={[{ ...box, provider: "outlook", editable: false, lockedReason: "Schránka Microsoft 365 … nastavuje super admina (Eva Admin) …" }]} isAdmin={false} />);
+    expect(h).toContain('data-testid="my-box-locked"');
+    expect(h).toContain("Eva Admin");
+    expect(h).not.toContain('data-testid="my-box-edit"');
+  });
   it("bez schránky: rovnou formulář e-mail + heslo → Najít nastavení a připojit", () => {
     const h = html(<MyMailboxCard initial={[]} isAdmin={false} />);
     expect(h).toContain("Připojit e-mailovou schránku");

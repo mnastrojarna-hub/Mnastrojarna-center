@@ -213,21 +213,31 @@ describe("pickShareFile (matice)", () => {
   });
   it("failed / unsupported", () => {
     expect(pickShareFile(row({ anon_status: "failed" }))).toMatchObject({ ok: false, reason: "failed" });
-    expect(pickShareFile(row({ anon_status: "unsupported" }))).toMatchObject({ ok: false, reason: "excluded" });
+    expect(pickShareFile(row({ anon_status: "unsupported" }))).toMatchObject({ ok: false, reason: "unsupported" });
+    // DWG: návod + originál jen super admin
+    const dwg = pickShareFile(row({ filename: "sestava.dwg", anon_status: "unsupported", anon_reason: null }));
+    expect(dwg).toMatchObject({ ok: false, reason: "unsupported" });
+    expect((dwg as { message: string }).message).toMatch(/^Nelze anonymizovat automaticky \(DWG\).*super admin/);
+    expect(pickShareFile(row({ filename: "sestava.dwg", anon_status: "unsupported" }), { original: true })).toMatchObject({ ok: false, reason: "forbidden" });
+    expect(pickShareFile(row({ filename: "sestava.dwg", anon_status: "unsupported" }), { original: true, isSuperAdmin: true })).toMatchObject({ ok: true, source: "original", audit: true });
   });
   it("skipped: poptávka nikdy originál, jinak s potvrzením", () => {
     expect(pickShareFile(row({ kind: "poptavka", anon_status: "skipped" }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: false, reason: "excluded" });
     expect(pickShareFile(row({ anon_status: "skipped" }))).toMatchObject({ ok: false, reason: "needs_confirm" });
     expect(pickShareFile(row({ anon_status: "skipped" }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: true, source: "original" });
   });
-  it("original:true → audit; poptávka zákazníka jen super admin", () => {
-    expect(pickShareFile(row(), { original: true })).toMatchObject({ ok: true, source: "original", audit: true });
+  it("original:true → jen super admin, vždy s auditem", () => {
+    expect(pickShareFile(row(), { original: true })).toMatchObject({ ok: false, reason: "forbidden" });
+    expect(pickShareFile(row(), { original: true, isSuperAdmin: true })).toMatchObject({ ok: true, source: "original", audit: true });
     expect(pickShareFile(row({ kind: "objednavka" }), { original: true })).toMatchObject({ ok: false, reason: "forbidden" });
     expect(pickShareFile(row({ kind: "objednavka" }), { original: true, isSuperAdmin: true })).toMatchObject({ ok: true, audit: true });
   });
   it("externí ne-kandidát bez stavu (faktura, ZIP z e-mailu) → jen po potvrzení a s auditem", () => {
     expect(pickShareFile(row({ kind: "faktura", anon_status: null }))).toMatchObject({ ok: false, reason: "needs_confirm" });
-    expect(pickShareFile(row({ kind: "ostatni", filename: "podklady.zip", mime_type: "application/zip", anon_status: null }))).toMatchObject({ ok: false, reason: "needs_confirm" });
+    // ZIP / Word / Excel zákazníka je kandidát (rozbalí se / „nelze automaticky") — bez stavu čeká, nikdy potvrzením
+    expect(pickShareFile(row({ kind: "ostatni", filename: "podklady.zip", mime_type: "application/zip", anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: false, reason: "pending" });
+    expect(pickShareFile(row({ kind: "ostatni", filename: "kusovnik.xlsx", mime_type: null, anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: false, reason: "pending" });
+    expect(pickShareFile(row({ kind: "ostatni", filename: "poznamky.txt", mime_type: "text/plain", anon_status: null }))).toMatchObject({ ok: false, reason: "needs_confirm" });
     expect(pickShareFile(row({ kind: "faktura", anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: true, source: "original", audit: true });
     // skipped + potvrzení → originál s auditem
     expect(pickShareFile(row({ kind: "vykres", anon_status: "skipped" }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: true, source: "original", audit: true });
@@ -295,7 +305,14 @@ describe("kandidát (TS zrcadlo SQL)", () => {
     ["nabidka", "x.pdf", "application/pdf", "generated", "my", false],
     ["vykres", "x.pdf", "application/pdf", "generated", null, false],
     ["faktura", "x.pdf", "application/pdf", "email", null, false],
-    ["vykres", "x.docx", null, "upload", null, false],
+    ["vykres", "x.docx", null, "upload", null, true],
+    ["ostatni", "podklady.zip", "application/zip", "email", "zakaznik", true],
+    ["korespondence", "poptavka.eml", null, "upload", null, true],
+    ["korespondence", "poptavka.msg", null, "upload", null, true],
+    ["korespondence", "poptavka.eml", null, "upload", "dodavatel", false],
+    ["korespondence", "zapis.pdf", null, "upload", null, false],
+    ["model_3d", "dil.stl", null, "upload", null, true],
+    ["ostatni", "poznamky.txt", "text/plain", "upload", null, false],
   ])("%s %s %s %s %s → %s", (kind, fn, mime, origin, issuer, exp) => {
     expect(isAnonCandidate(kind, fn, mime, origin, issuer)).toBe(exp);
   });

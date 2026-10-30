@@ -3,7 +3,7 @@ import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccess, getSessionUser } from "@/lib/auth/session";
 import { userActor } from "@/lib/supabase/actor-headers";
 import type { JobsDb } from "@/lib/jobs/events";
-import { CAPTURE_BATCH_MAX_FILES, CAPTURE_BUCKET, sniffDocumentMime } from "@/lib/jobs/capture-review";
+import { CAPTURE_BATCH_MAX_FILES, CAPTURE_BUCKET, captureHiresPath, sniffDocumentMime } from "@/lib/jobs/capture-review";
 import { cleanFileRefs } from "@/lib/jobs/capture-service";
 import { isUuid } from "@/lib/jobs/mapping";
 import { fakeGroupFor, isFakeCapture } from "@/lib/ai/fake-capture";
@@ -43,7 +43,8 @@ async function captureFiles(db: JobsDb, userId: string, raw: unknown): Promise<{
     if (error || !data) return { ok: false, error: `Soubor ${f.filename} se nepodařilo načíst — nahraj ho prosím znovu.` };
     files.push({ bytes: new Uint8Array(await (data as Blob).arrayBuffer()), filename: f.filename, mimeType: f.mimeType });
   }
-  return { files, paths: refs.flatMap((f) => [f.path, ...(f.sortPath ? [f.sortPath] : [])]), names: refs.map((f) => f.filename) };
+  const hires = (p: string) => { const h = captureHiresPath(p); return h ? [h] : []; };
+  return { files, paths: refs.flatMap((f) => [f.path, ...(f.sortPath ? [f.sortPath] : []), ...hires(f.path)]), names: refs.map((f) => f.filename) };
 }
 
 function sourceOf(raw: unknown, files: InvoiceFileInput[]): SupplierInvoiceSource {

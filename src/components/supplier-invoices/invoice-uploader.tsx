@@ -63,7 +63,8 @@ export function InvoiceUploader({
     setError(null);
     const refs: CaptureFileRef[] = [];
     for (const p of pages) {
-      const r = await uploadCapturePage(p.file, { sortPreview: false });
+      // faktura dodavatele se neanonymizuje → bez masteru v plném rozlišení (mobilní data)
+      const r = await uploadCapturePage(p.file, { sortPreview: false, master: false });
       if (!r.ok) { setBusy(null); setError(r.error); return; }
       refs.push(r.ref);
     }

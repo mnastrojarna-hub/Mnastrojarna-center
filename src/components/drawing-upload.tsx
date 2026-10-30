@@ -4,8 +4,37 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { FileBox, Sparkles, Loader2, Check, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { uploadDrawing } from "@/app/actions/drawings";
+import { createDrawingUpload, registerDrawing } from "@/app/actions/drawings";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
+import { createClient } from "@/lib/supabase/client";
+import { downscaleImage } from "@/lib/jobs/upload-client";
+
+/** Velká fotka: AI čte zmenšenou kopii (originál v plném rozlišení zůstává v archivu pro anonymizaci). */
+const AI_COPY_FROM_BYTES = 3_500_000;
+
+/**
+ * Nahrání výkresu do archivu: originál jde z prohlížeče PŘÍMO do Supabase Storage (podepsaná URL — žádné
+ * bajty přes server action / funkci Vercelu), pak registerDrawing (AI metadata, duplicity, záznam) a hned
+ * šťouchnutí do anonymizace.
+ */
+async function uploadArchiveDrawing(file: File): Promise<Awaited<ReturnType<typeof registerDrawing>>> {
+  const mimeType = (file.type || (/\.pdf$/i.test(file.name) ? "application/pdf" : "")).toLowerCase();
+  const wantsAiCopy = mimeType.startsWith("image/") && file.size > AI_COPY_FROM_BYTES;
+  const prep = await createDrawingUpload({ filename: file.name, size: file.size, mimeType, aiCopy: wantsAiCopy });
+  if (!prep.ok || !prep.path || !prep.token || !prep.bucket) return { ok: false, error: prep.error ?? "Nahrání se nepodařilo připravit." };
+  const storage = createClient().storage.from(prep.bucket);
+  const { error } = await storage.uploadToSignedUrl(prep.path, prep.token, file, { contentType: mimeType, upsert: false });
+  if (error) return { ok: false, error: `Nahrání selhalo: ${error.message}` };
+  let aiPath: string | null = null;
+  if (wantsAiCopy && prep.aiPath && prep.aiToken) {
+    const small = await downscaleImage(file);
+    if (small !== file) {
+      const up = await storage.uploadToSignedUrl(prep.aiPath, prep.aiToken, small, { contentType: "image/jpeg", upsert: false });
+      if (!up.error) aiPath = prep.aiPath;
+    }
+  }
+  return registerDrawing({ path: prep.path, filename: file.name, mimeType, aiPath });
+}
 
 export function DrawingUpload() {
   const router = useRouter();
@@ -18,9 +47,12 @@ export function DrawingUpload() {
     if (!file) return;
     setBusy(true);
     setMsg(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await uploadDrawing(fd);
+    let res: Awaited<ReturnType<typeof registerDrawing>>;
+    try {
+      res = await uploadArchiveDrawing(file);
+    } catch {
+      res = { ok: false, error: "Nahrání selhalo — zkontroluj připojení a zkus to znovu." };
+    }
     setBusy(false);
     if (fileRef.current) fileRef.current.value = "";
     if (res.ok) {
@@ -42,6 +74,7 @@ export function DrawingUpload() {
           accept="application/pdf,image/png,image/jpeg,image/webp"
           onChange={onFile}
           className="hidden"
+          data-testid="drawing-upload-input"
         />
         <button
           onClick={() => fileRef.current?.click()}

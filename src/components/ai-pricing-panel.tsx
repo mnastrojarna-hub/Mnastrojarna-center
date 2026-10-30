@@ -14,6 +14,7 @@ import { AiConfidence } from "@/components/ai-confidence";
 import { CorrectionButton } from "@/components/correction-button";
 import { submitAiQuote, type SubmitQuoteResult } from "@/app/actions/ai-quote";
 import { submitPricingFeedback } from "@/app/actions/pricing";
+import { uploadCapturePage } from "@/components/jobs/capture/capture-client";
 import { STRATEGY_LABEL } from "@/lib/pricing/strategy";
 import { LEAD_MODE_LABEL } from "@/lib/pricing/lead-time";
 import { formatCZK } from "@/lib/utils";
@@ -120,8 +121,13 @@ export function AiPricingPanel() {
     if (!file) return;
     setExtracting(true); setError(null);
     try {
-      const fd = new FormData(); fd.append("file", file);
-      const res = await fetch("/api/ai/extract", { method: "POST", body: fd });
+      // soubor jde přímo do úložiště (podepsaná URL, fotka zmenšená) — funkce dostane jen cestu (limit Vercelu 4,5 MB)
+      const up = await uploadCapturePage(file, { sortPreview: false, master: false });
+      if (!up.ok) { setError(up.error); return; }
+      const res = await fetch("/api/ai/extract", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: up.ref.path, filename: up.ref.filename }),
+      });
       const data = await res.json();
       if (data.error) setError(data.error);
       else {

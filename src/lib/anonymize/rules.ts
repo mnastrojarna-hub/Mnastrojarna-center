@@ -270,7 +270,9 @@ const CONTACT_RULES: { re: RegExp; rule: string; check?: (m: string) => boolean 
   { re: /\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){2,4}/gu, rule: "phone",
     check: (m) => (m.match(/\d/g)?.length ?? 0) >= 9 && !/^\+0/.test(m) },
   { re: /(?<![\p{L}])(?:IČO|IČ|ICO|IC|Reg\.?\s?No\.?|KRS|REGON|HRB|HRA|Firmenbuch|FN)\s*[:.]?\s*\d[\d ]{4,}\d/giu, rule: "ico" },
-  { re: /(?<![\p{L}])(?:DIČ|DIC|VAT(?:\s?(?:ID|No\.?|Reg\.?))?|USt-?Id(?:Nr)?\.?|UID|NIP|TVA|P\.?\s?IVA|CIF|Tax\s?ID|IČ\s?DPH)\s*[:.]?\s*[A-Z]{0,2}\s?[\dA-Z][\dA-Z -]{6,}/giu, rule: "vat" },
+  // za popiskem nesmí hned pokračovat slovo („DICTIONARYVAR", „Dictionary…" z DXF) a číslo musí mít ≥ 6 číslic
+  { re: /(?<![\p{L}])(?:DIČ|DIC|VAT(?:\s?(?:ID|No\.?|Reg\.?))?|USt-?Id(?:Nr)?\.?|UID|NIP|TVA|P\.?\s?IVA|CIF|Tax\s?ID|IČ\s?DPH)(?![\p{L}])\s*[:.]?\s*[A-Z]{0,2}\s?[\dA-Z][\dA-Z -]{6,}/giu, rule: "vat",
+    check: (m) => (m.match(/\d/g)?.length ?? 0) >= 6 },
   { re: /(?<![\p{L}\p{N}])(?:CZ|SK|DE|AT|PL|HU|ATU)\d{8,10}(?![\p{N}])/gu, rule: "vat" },
 ];
 const ADDRESS_RE = /(?<![\p{N}])(?:\d{3}\s\d{2}|(?:D-|A-|CH-|PL-)?\d{5}|\d{2}-\d{3}|\d{4})\s+\p{Lu}\p{Ll}{2,}/u;
@@ -1011,9 +1013,14 @@ export function isRevisionAnchor(text: string): boolean {
 }
 
 /** Řetězec, který nesmí zůstat ve STEP/DXF (e-mail, doména, právní forma kdekoli). */
-export function isSuspiciousLiteral(text: string): boolean {
+export function isSuspiciousLiteral(text: string, keepTerms: readonly string[] = []): boolean {
   if (/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/u.test(text)) return true;
   if (new RegExp(String.raw`(?<![@\p{L}\p{N}.\-])[a-z][a-z0-9-]+\.(?:${TLD})(?![\p{L}\p{N}\-])`, "iu").test(text)) return true;
+  // právní forma u NAŠÍ firmy („Výroba pro: Mnástrojárna s.r.o.") není podezřelá
+  if (keepTerms.length) {
+    const compact = normalizeText(text).replace(/[^\p{L}\p{N}]+/gu, "");
+    if (keepTerms.some((k) => { const c = normalizeText(k).replace(/[^\p{L}\p{N}]+/gu, ""); return c.length >= 3 && compact.includes(c); })) return false;
+  }
   LEGAL_DOTTED_RE.lastIndex = 0;
   if (LEGAL_DOTTED_RE.test(text)) return true;
   LEGAL_CAPS_RE.lastIndex = 0;

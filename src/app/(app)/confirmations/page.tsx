@@ -183,7 +183,7 @@ export default async function ConfirmationsPage({
         >
           {inbox.length === 0 ? (
             <FlowEmpty icon={Mail} iconClass="bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300" title="V poště žádná objednávka">
-              Jakmile AI v tvé poště rozpozná objednávku, objeví se tady s tlačítkem „Založit zakázku“.
+              Jakmile AI v tvé poště rozpozná objednávku, objeví se tady s tlačítkem „Zpracovat objednávku“.
             </FlowEmpty>
           ) : (
             <FlowMailList emails={inbox} />

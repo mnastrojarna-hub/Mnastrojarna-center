@@ -108,9 +108,11 @@ export const anonApi = {
   skip(id: string, reason?: string, table?: AnonTableParam) {
     return call<{ ok: boolean }>(`/api/drawings/anonymize/${id}/skip`, { method: "POST", body: JSON.stringify({ table, reason }) });
   },
-  supplierPack(jobId: string, files: string[], reviewed: string[] = []) {
+  supplierPack(jobId: string, files: string[], reviewed: string[] = [], original: string[] = []) {
     const p = new URLSearchParams({ files: files.join(",") });
     if (reviewed.length) p.set("reviewed", reviewed.join(","));
+    // originál bez anonymizace — jen super admin (server ověří roli)
+    if (original.length) p.set("original", original.join(","));
     return call<{ url: string | null; included: number; missing: { id: string; filename: string; reason: string }[] }>(`/api/jobs/${jobId}/supplier-pack?${p}`);
   },
   adhocList() {
@@ -158,6 +160,10 @@ export interface SendQueueDto {
   mine: boolean;
   /** Výkres, který odeslání blokuje (ke kontrole / selhal) — „Zkontrolovat výkres". */
   blockingFileId?: string | null;
+  /** Počet souborů, které anonymizovat nejde (DWG, Word…). */
+  unsupportedCount?: number;
+  /** Super admin smí „Poslat originál…" (s potvrzením a auditem). */
+  canSendOriginal?: boolean;
 }
 
 /**
@@ -179,10 +185,12 @@ export function previewUrl(id: string, opts: { table?: AnonTableParam; page?: nu
   return `/api/drawings/anonymize/${id}/preview${s ? `?${s}` : ""}`;
 }
 
-export function downloadUrl(id: string, opts: { table?: AnonTableParam; reviewed?: boolean } = {}): string {
+export function downloadUrl(id: string, opts: { table?: AnonTableParam; reviewed?: boolean; original?: boolean } = {}): string {
   const p = new URLSearchParams();
   if (opts.table && opts.table !== "job_files") p.set("table", opts.table);
   if (opts.reviewed) p.set("reviewed", "1");
+  // originál bez anonymizace (formát, který nejde) — jen super admin, server ověří roli a zapíše audit
+  if (opts.original) p.set("original", "1");
   const s = p.toString();
   return `/api/drawings/anonymize/${id}/download${s ? `?${s}` : ""}`;
 }

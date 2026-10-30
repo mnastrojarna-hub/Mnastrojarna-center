@@ -4,7 +4,7 @@
  * kopii (prefix cesty + sha256 proti anon_sha256 — chytí podvržený objekt v úložišti).
  */
 
-import { isAnonCandidate } from "./candidate";
+import { isAnonCandidate, unsupportedHowTo } from "./candidate";
 import type { AnonStatus } from "./types";
 
 export interface FileRowWithAnon {
@@ -69,8 +69,14 @@ export function pickShareFile(row: FileRowWithAnon, opts: ShareOptions = {}): Sh
   const customerDoc = CUSTOMER_DOC_KINDS.has(row.kind ?? "");
 
   if (opts.original) {
-    if (customerDoc && !opts.isSuperAdmin) {
-      return { ok: false, reason: "forbidden", message: "Originál poptávky nebo objednávky zákazníka smí poslat ven jen super admin." };
+    // originál podkladu zákazníka (i formát, který nejde anonymizovat — DWG, Word…) jen po výslovném
+    // potvrzení super admina, vždy s auditem
+    if (!opts.isSuperAdmin) {
+      return {
+        ok: false, reason: "forbidden",
+        message: customerDoc ? "Originál poptávky nebo objednávky zákazníka smí poslat ven jen super admin."
+          : "Originál podkladu zákazníka (bez anonymizace) smí dodavateli poslat jen super admin.",
+      };
     }
     return original(row, true, "Posílá se ORIGINÁL — zákazník a projektant jsou viditelní.");
   }
@@ -103,7 +109,7 @@ export function pickShareFile(row: FileRowWithAnon, opts: ShareOptions = {}): Sh
     case "failed":
       return { ok: false, reason: "failed", message: row.anon_reason ? `Anonymizace selhala: ${row.anon_reason}` : "Anonymizace selhala — anonymizuj znovu." };
     case "unsupported":
-      return { ok: false, reason: "excluded", message: row.anon_reason || "Formát nelze anonymizovat — pošli PDF, DXF nebo STEP (originál jen výslovně)." };
+      return { ok: false, reason: "unsupported", message: `${row.anon_reason || unsupportedHowTo(row.filename)} Originál bez anonymizace smí poslat jen super admin.` };
     case "skipped":
       if (customerDoc) {
         return { ok: false, reason: "excluded", message: "Poptávku / objednávku zákazníka nelze poslat ven bez anonymizace — přilož anonymizované výkresy, nebo ji vyřaď." };

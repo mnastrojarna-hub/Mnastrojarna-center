@@ -112,12 +112,38 @@ export interface AnonSettingsPanelData {
   runnerWarning: string | null;
   /** Všechno v pořádku: krátký popis, jak zpracování běží. */
   runnerOk: string | null;
+  /** AI pro fotky a skeny (vision): null = funguje, jinak proč ne („AI klíč chybí — …"). */
+  aiWarning: string | null;
+  /** AI funguje: odkud je klíč (stejný zdroj jako čtení dokladů a pošta). */
+  aiOk: string | null;
   spentTodayUsd: number;
   /** Staré výkresy čekající na zpracování v rámci denního limitu (backfill, priorita 9). */
   legacyCount: number;
   /** Hotové / ke kontrole s jinou verzí pravidel (přepočet po změně nastavení). */
   changedCount: number;
   reviewCount: number;
+}
+
+export const AI_KEY_MISSING = "AI klíč chybí — fotky a skeny čekají na ruční kontrolu. Doplň Claude API klíč v Nastavení → Integrace (stejný klíč čte doklady i poštu).";
+export const AI_SWITCHED_OFF = "AI je vypnutá hlavním vypínačem — fotky a skeny čekají na ruční kontrolu.";
+
+/**
+ * Stav AI pro anonymizaci fotek a skenů — stejný zdroj klíče jako zbytek aplikace (getAiConfig:
+ * integration_settings.anthropic_api_key, jinak env ANTHROPIC_API_KEY) a stejný hlavní vypínač.
+ */
+export async function anonAiStatus(): Promise<{ warning: string | null; ok: string | null }> {
+  try {
+    const { isFakeAnon } = await import("@/lib/anonymize/detect-ai");
+    if (isFakeAnon()) return { warning: null, ok: "AI pro fotky a skeny: testovací režim (AI_FAKE_ANON)." };
+    const { getAiConfig, getSetting } = await import("@/lib/settings");
+    const ai = await getAiConfig();
+    if (!ai.apiKey) return { warning: AI_KEY_MISSING, ok: null };
+    const on = await getSetting("ai_enabled");
+    if (on !== undefined && on !== "" && !["1", "true", "ano", "yes", "on"].includes(on.trim().toLowerCase())) return { warning: AI_SWITCHED_OFF, ok: null };
+    return { warning: null, ok: "AI pro fotky a skeny je zapnutá — stejný Claude klíč jako čtení dokladů a pošta." };
+  } catch {
+    return { warning: null, ok: null };
+  }
 }
 
 /** Data karty Nastavení → Anonymizace výkresů. */
@@ -135,18 +161,21 @@ export async function getAnonSettingsPanel(): Promise<AnonSettingsPanelData | nu
     const settings = settingsFromRow(row as Record<string, unknown> | null);
     const hash = await configHash(settings);
     const m = mode as { mode: "full" | "approval"; enabled: boolean } | null;
-    const [legacy, changed, review, spent, health] = await Promise.all([
+    const [legacy, changed, review, spent, health, ai] = await Promise.all([
       c.from("job_files").select("id", { count: "exact", head: true }).eq("anon_status", "pending").gte("anon_priority", 9).eq("archived", false),
       c.from("job_files").select("id", { count: "exact", head: true }).in("anon_status", ["done", "review"]).neq("anon_config_hash", hash).eq("archived", false),
       countAnonReview(c, null),
       spentToday(c),
       anonRunnerHealth(c),
+      anonAiStatus(),
     ]);
     return {
       settings,
       mode: m && m.enabled === false ? "approval" : m?.mode ?? ((glob as { mode: "full" | "approval" } | null)?.mode ?? "approval"),
       runnerWarning: health.warning,
       runnerOk: health.ok,
+      aiWarning: ai.warning,
+      aiOk: ai.ok,
       spentTodayUsd: spent,
       legacyCount: legacy.count ?? 0,
       changedCount: changed.count ?? 0,

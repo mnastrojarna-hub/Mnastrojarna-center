@@ -29,6 +29,7 @@ import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
 import { anonApi } from "@/components/anonymize/anon-api";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
+import { unsupportedHowTo } from "@/lib/anonymize/candidate";
 import {
   AnonFileBadge, AnonMenuItems, AnonSummaryLine, ForSupplierLink, ReviewDownloadDialog, SendQueueNotice, SupplierPackButton, anonInFlight, supplierReady, supplierSummary,
 } from "@/components/anonymize/anon-file-menu";
@@ -163,8 +164,9 @@ function FileRow({
         </div>
         {file.note && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{file.note}</p>}
         {!file.archived && <AnonSummaryLine file={file} stalled={anonStalled} onRetry={onAnonAction ? (f) => onAnonAction(f, "enqueue") : undefined} />}
-        {forSupplier && onReviewDownload && (
-          <div className="mt-1"><ForSupplierLink file={file} onReviewDownload={onReviewDownload} /></div>
+        {(forSupplier || (!file.archived && file.anon?.status === "unsupported")) && onReviewDownload && (
+          // hotová kopie „Pro dodavatele"; u formátu, který anonymizovat nejde, super admin „Poslat originál…"
+          <ForSupplierLink file={file} onReviewDownload={onReviewDownload} wrapClassName="mt-1" />
         )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -442,7 +444,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
       // server soubor nezařadil (není kandidát, nákupní doklad…) → říct proč, ne „anonymizuje se"
       const st = r.data.statuses[f.id];
       const why = r.data.skipped.find((s) => s.id === f.id)?.reason;
-      if (st !== "pending") notify("error", why ?? (st === "unsupported" ? "Formát nelze anonymizovat — pošli PDF, DXF nebo STEP." : "Soubor se nepodařilo zařadit."));
+      if (st !== "pending") notify("error", why ?? (st === "unsupported" ? unsupportedHowTo(f.filename) : "Soubor se nepodařilo zařadit."));
       else if (r.data.backfill?.includes(f.id)) notify("success", `${f.filename}: starší výkres — zpracuje se v rámci denního limitu.`);
       else notify("success", `${f.filename}: anonymizuje se…`);
       refresh();

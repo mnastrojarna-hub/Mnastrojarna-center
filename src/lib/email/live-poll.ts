@@ -7,6 +7,34 @@
  */
 
 export const LIVE_INTERVAL_MS = 60_000;
+/** Otevřená Pošta (viditelná karta): kontrola každých 30 s — nová pošta se objeví sama, bez klikání. */
+export const LIVE_FAST_MS = 30_000;
+/** Server: schránku staženou před méně než tolik ms živá pošta znovu nestahuje (ochrana poskytovatele). */
+export const LIVE_FAST_MIN_INTERVAL_MS = 25_000;
+export const LIVE_MIN_INTERVAL_MS = 45_000;
+
+/** Interval kontroly: otevřená Pošta rychleji, jinak základní. */
+export function liveInterval(fast: boolean): number {
+  return fast ? LIVE_FAST_MS : LIVE_INTERVAL_MS;
+}
+
+/**
+ * Smí karta s otevřenou Poštou zkontrolovat i bez zápůjčky (zápůjčku drží jiná karta s pomalým
+ * intervalem)? Ano, když poslední známý výsledek je starší než rychlý interval.
+ */
+export function fastOverride(fast: boolean, lastAt: number | null | undefined, now: number): boolean {
+  return fast && now - (lastAt ?? 0) > LIVE_FAST_MS - 5_000;
+}
+
+/** „Aktualizováno před 12 s" / „před 2 min" (krátce, nenápadně). */
+export function updatedAgoLabel(at: number | null | undefined, now: number): string {
+  if (!at) return "Aktualizuji…";
+  const s = Math.max(0, Math.round((now - at) / 1000));
+  if (s < 5) return "Aktualizováno právě teď";
+  if (s < 60) return `Aktualizováno před ${s} s`;
+  const m = Math.round(s / 60);
+  return `Aktualizováno před ${m} min`;
+}
 export const LIVE_MAX_BACKOFF_MS = 10 * 60_000;
 export const LEASE_KEY = "mail-live-lease";
 export const RESULT_KEY = "mail-live-result";

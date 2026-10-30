@@ -7,7 +7,8 @@ vi.mock("@/app/actions/mail-signature", () => ({
   saveSignatureSettingsAction: vi.fn(),
 }));
 
-import { MailSettingsContent, MailSettingsPanel } from "./mail-settings-panel";
+import { MailboxSettingsContent, MailSettingsContent, MailSettingsPanel } from "./mail-settings-panel";
+import type { MyMailbox } from "@/lib/email/my-mailbox";
 import { defaultSignatureFor, signatureCompanyFrom } from "@/lib/email/signature";
 import type { SignatureEditorState } from "@/app/actions/mail-signature";
 
@@ -49,5 +50,43 @@ describe("Nastavení pošty — podpis", () => {
 
   it("zavřený panel nic nevykreslí", () => {
     expect(html(<MailSettingsPanel open={false} onOpenChange={() => {}} />)).toBe("");
+  });
+
+  it("podpis: místo odkazu pryč z Pošty tlačítko na záložku Schránka", () => {
+    const h = html(<MailSettingsContent initial={state()} onOpenMailbox={() => {}} />);
+    expect(h).toContain("heslo a servery v záložce Schránka");
+    expect(h).not.toContain('href="/account');
+  });
+});
+
+describe("Nastavení pošty — Schránka (každý uživatel, i obchodník)", () => {
+  const box: MyMailbox = {
+    id: "b1", email: "vit.volny@mnastrojarna.cz", displayName: null, active: true, provider: "imap",
+    incoming: "IMAP mail.hosting90.cz:993 SSL/TLS", smtp: null, canSend: false, passwordStored: true, incomplete: false,
+    lastSyncAt: null, lastSyncError: null, authBlocked: false, createdByOther: true, remaining: null, total: null,
+    settings: {
+      preset: "hosting90", incomingProtocol: "imap", imapHost: "mail.hosting90.cz", imapPort: 993, imapTls: "tls", imapUser: "",
+      smtpHost: "", smtpPort: null, smtpTls: "", smtpUser: "", imapSkipNameCheck: false, smtpSkipNameCheck: false,
+    },
+    editable: true,
+    lockedReason: null,
+  };
+  it("bez předaného stavu: načítání", () => {
+    expect(html(<MailboxSettingsContent isAdmin={false} />)).toContain("Načítám schránku…");
+  });
+  it("bez schránky: rovnou formulář e-mail + heslo, servery ručně v Upřesnit", () => {
+    const h = html(<MailboxSettingsContent isAdmin={false} initial={[]} />);
+    for (const s of ['data-testid="my-mailbox-form"', "Najít nastavení a připojit", "Otestovat připojení", "Upřesnit — servery IMAP / SMTP ručně"]) expect(h).toContain(s);
+    expect(h).not.toContain("Otevřít poštu");
+  });
+  it("schránka přiřazená adminem (bez SMTP): Upravit, Otestovat připojení, odesílání nenastaveno", () => {
+    const h = html(<MailboxSettingsContent isAdmin={false} initial={[box]} />);
+    for (const s of ['data-testid="my-box-edit"', "Otestovat připojení", "Odesílání: nenastaveno — doplň v Upravit"]) expect(h).toContain(s);
+  });
+  it("z Pošty „Opravit nastavení“: úprava rovnou otevřená s předvyplněnými servery", () => {
+    const h = html(<MailboxSettingsContent isAdmin={false} initial={[box]} editMailboxId="b1" />);
+    expect(h).toContain("Upravit vit.volny@mnastrojarna.cz");
+    expect(h).toContain('value="mail.hosting90.cz"');
+    expect(h).toContain('aria-label="Odchozí server"');
   });
 });

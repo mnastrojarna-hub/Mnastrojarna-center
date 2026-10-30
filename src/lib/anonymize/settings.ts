@@ -30,7 +30,7 @@ export interface AnonSettings {
 export const DEFAULT_ANON_SETTINGS: AnonSettings = {
   enabled: true, autoCapture: true, autoUpload: true, autoEmail: true, hiresCapture: true,
   redact: { ...DEFAULT_REDACT }, extraTerms: [], keepTerms: ["Mnástrojárna", "Mnastrojarna"], includeCrmCustomer: true,
-  fillPdf: "white", fillPhoto: "background", maxDpi: 300, maxMpx: 40, verifyPhotos: true, dailyUsd: 5,
+  fillPdf: "white", fillPhoto: "background", maxDpi: 300, maxMpx: 40, verifyPhotos: true, dailyUsd: 50,
 };
 
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
@@ -103,7 +103,7 @@ export function settingsToRow(s: Partial<AnonSettings>): Record<string, unknown>
     max_dpi: Math.round(clampNum(m.maxDpi, 100, 600, 300)),
     max_mpx: Math.round(clampNum(m.maxMpx, 4, 60, 40)),
     verify_photos: Boolean(m.verifyPhotos),
-    daily_usd: Math.round(clampNum(m.dailyUsd, 0, 1000, 5) * 100) / 100,
+    daily_usd: Math.round(clampNum(m.dailyUsd, 0, 1000, 50) * 100) / 100,
   };
 }
 

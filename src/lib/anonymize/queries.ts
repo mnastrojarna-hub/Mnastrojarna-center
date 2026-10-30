@@ -60,7 +60,8 @@ export async function getAnonSummary(db: AnonDb, jobIds: string[]): Promise<Reco
         if (r.anon_status === "pending" && /limit/i.test(r.anon_reason ?? "")) b.waitingBudget = (b.waitingBudget ?? 0) + 1;
         // starý výkres (backfill, priorita ≥ 9) — sám se nespouští, nesmí svítit jako „běží"
         else if (r.anon_status === "pending" && (r.anon_priority ?? 0) >= 9) b.waitingLegacy = (b.waitingLegacy ?? 0) + 1;
-      } else if (r.anon_status === "unsupported") b.unsupported++;
+      } else if (r.anon_status === "unsupported" && /^Rozbaleno/i.test(r.anon_reason ?? "")) b.skipped++; // archiv rozbalený do souborů
+      else if (r.anon_status === "unsupported") b.unsupported++;
       else if (r.anon_status === "skipped") b.skipped++;
     }
     const { data: q, error: qErr } = await db.from("anon_send_queue").select("job_id").in("job_id", part).in("status", ["waiting", "blocked"]);

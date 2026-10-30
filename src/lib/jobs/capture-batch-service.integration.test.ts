@@ -120,13 +120,27 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
   const jobIds = new Set<string>();
   const captureIds = new Set<string>();
 
-  async function upload(filename: string, body: Buffer, mimeType: string) {
-    const prep = await s.prepareCaptureUpload({ filename, size: body.length, mimeType });
+  async function upload(filename: string, body: Buffer, mimeType: string, master?: Buffer) {
+    const prep = await s.prepareCaptureUpload({ filename, size: body.length, mimeType, ...(master ? { master: { size: master.length, mimeType } } : {}) });
     expect(prep.ok, prep.ok ? "" : prep.error).toBe(true);
     if (!prep.ok) throw new Error(prep.error);
     const { error } = await db.storage.from("job-files").uploadToSignedUrl(prep.path!, prep.token!, body, { contentType: mimeType });
     expect(error).toBeNull();
+    if (master) {
+      // master fotky v plném rozlišení (capture/<uživatel>/<uuid>.hires) — v relaci se nic neposílá navíc
+      expect(prep.masterPath).toMatch(/\.hires$/);
+      const m = await db.storage.from("job-files").uploadToSignedUrl(prep.masterPath!, prep.masterToken!, master, { contentType: mimeType });
+      expect(m.error).toBeNull();
+      hires.set(prep.path!, prep.masterPath!);
+    }
     return { path: prep.path!, filename, mimeType, size: body.length };
+  }
+  /** stránka → její master (jen kde test master nahrál) */
+  const hires = new Map<string, string>();
+  async function stored(p: string): Promise<boolean> {
+    const dir = p.slice(0, p.lastIndexOf("/"));
+    const { data } = await db.storage.from("job-files").list(dir, { search: p.slice(p.lastIndexOf("/") + 1) });
+    return (data ?? []).some((o) => o.name === p.slice(p.lastIndexOf("/") + 1));
   }
 
   async function analyze(files: Awaited<ReturnType<typeof upload>>[], jobId?: string): Promise<BatchSortModel> {
@@ -164,7 +178,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
   };
 
   const files = async (jobId: string) => {
-    const { data } = await db.from("job_files").select("id, kind, title, filename, storage_path, ai_extracted, order_item_id, drawing_id, capture_id, content_sha256, note").eq("job_id", jobId);
+    const { data } = await db.from("job_files").select("id, kind, title, filename, storage_path, ai_extracted, order_item_id, drawing_id, capture_id, content_sha256, note, anon_source_path").eq("job_id", jobId);
     return (data ?? []) as Record<string, unknown>[];
   };
 
@@ -188,8 +202,8 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     const { data: own } = await db.from("orders").select("id").in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).gte("created_at", startedAt);
     const created = ((own ?? []) as { id: string }[]).map((r) => r.id);
     if (created.length) {
-      const { data: f } = await db.from("job_files").select("storage_path").in("job_id", created);
-      const paths = ((f ?? []) as { storage_path: string }[]).map((x) => x.storage_path);
+      const { data: f } = await db.from("job_files").select("storage_path, anon_source_path").in("job_id", created);
+      const paths = ((f ?? []) as { storage_path: string; anon_source_path: string | null }[]).flatMap((x) => [x.storage_path, ...(x.anon_source_path ? [x.anon_source_path] : [])]);
       for (let i = 0; i < paths.length; i += 100) await db.storage.from("job-files").remove(paths.slice(i, i + 100));
       await db.from("drawings").delete().in("job_id", created);
       await db.from("orders").delete().in("id", created);
@@ -220,9 +234,9 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
   it("plná dávka: objednávka (2 fotky), výkres, STEP, nabídka dodavatele, PDF s DL a fakturou → 1 zakázka", async () => {
     h.user = admin;
     const up = [
-      await upload(`${TAG}__objednavka_zakaznik-s1.png`, png(1), "image/png"),
+      await upload(`${TAG}__objednavka_zakaznik-s1.png`, png(1), "image/png", png(101)),
       await upload(`${TAG}__objednavka_zakaznik-s2.png`, png(2), "image/png"),
-      await upload(`${TAG}__vykres.png`, png(3), "image/png"),
+      await upload(`${TAG}__vykres.png`, png(3), "image/png", png(103)),
       await upload("4711-02_rev_B.step", STEP("4711-02"), "application/octet-stream"),
       await upload(`${TAG}__nabidka_dodavatel.png`, png(4), "image/png"),
       await upload(`${TAG}__sada-dl-faktura.pdf`, await pdf(2), "application/pdf"),
@@ -275,6 +289,13 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     expect((model.ai_extracted as Record<string, unknown>).format).toBe("STEP");
     const drawingFile = jf.find((f) => f.kind === "vykres")!;
     expect(drawingFile.order_item_id).toBeTruthy();
+    // výkres z fotky: master přesunutý k dokumentu (zdroj anonymizace v plném rozlišení)
+    const { jobMasterPath } = await import("./mapping");
+    expect(drawingFile.anon_source_path).toBe(jobMasterPath(String(drawingFile.storage_path)));
+    expect(await stored(String(drawingFile.anon_source_path))).toBe(true);
+    expect(await stored(hires.get(up[2].path)!)).toBe(false);
+    // 2 fotky objednávky → 1 PDF: master se nepoužije a s relací zmizí
+    expect(orderFile.anon_source_path).toBeNull();
     expect(model.order_item_id).toBe(drawingFile.order_item_id);
     expect(jf.every((f) => f.capture_id === batch.captureId)).toBe(true);
     const { data: dr } = await db.from("drawings").select("*").eq("drawing_number", "4711-02").eq("revision", "B").maybeSingle();
@@ -299,6 +320,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     // relace hotová, zbylé soubory pryč
     const { data: sess } = await db.from("capture_sessions").select("status").eq("id", batch.captureId).single();
     expect(sess!.status).toBe("done");
+    expect(await stored(hires.get(up[0].path)!)).toBe(false);
 
     // idempotence: opakované uložení nic nezdvojí
     const twice = await apply(batch.captureId, rv.initial);
@@ -366,11 +388,13 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
   it("odebraná stránka před čtením: smaže se i její náhled roztřídění", async () => {
     h.user = admin;
     const body = png(30);
-    const prep = await s.prepareCaptureUpload({ filename: `${TAG}-drop.png`, size: body.length, mimeType: "image/png", sortPreview: true });
+    const prep = await s.prepareCaptureUpload({ filename: `${TAG}-drop.png`, size: body.length, mimeType: "image/png", sortPreview: true, master: { size: body.length, mimeType: "image/png" } });
     if (!prep.ok) throw new Error(prep.error);
     expect(prep.sortPath).toMatch(/\.sort\.jpg$/);
+    expect(prep.masterPath).toMatch(/\.hires$/);
     await db.storage.from("job-files").uploadToSignedUrl(prep.path!, prep.token!, body, { contentType: "image/png" });
     await db.storage.from("job-files").uploadToSignedUrl(prep.sortPath!, prep.sortToken!, body, { contentType: "image/jpeg" });
+    await db.storage.from("job-files").uploadToSignedUrl(prep.masterPath!, prep.masterToken!, body, { contentType: "image/png" });
     const res = await s.discardCapture({ paths: [prep.path!] });
     expect(res.ok).toBe(true);
     const folder = prep.path!.slice(0, prep.path!.lastIndexOf("/"));
@@ -378,6 +402,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     const names = (data ?? []).map((o) => `${folder}/${o.name}`);
     expect(names).not.toContain(prep.path);
     expect(names).not.toContain(prep.sortPath);
+    expect(names).not.toContain(prep.masterPath);
   }, 60_000);
 
   it("částečné selhání → ostatní uloženy, zavření přiloží neuložené jako Ostatní", async () => {
@@ -460,11 +485,14 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     h.user = admin;
     const batch = await analyze([
       await upload(`${TAG}__objednavka_zakaznik.png`, png(40), "image/png"),
-      await upload(`${TAG}__vykres.png`, png(41), "image/png"),
+      await upload(`${TAG}__vykres.png`, png(41), "image/png", png(141)),
     ]);
     const store = await import("./capture-store");
     const live = await store.liveSessionPaths(db as never, admin.id);
     for (const f of batch.files) expect(live.has(f.path)).toBe(true);
+    // master otevřené dávky se úklidem také nesmaže
+    const vk = batch.files.find((f) => f.filename.endsWith("__vykres.png"))!;
+    expect(live.has(hires.get(vk.path)!)).toBe(true);
     await db.from("capture_sessions").update({ status: "partial" }).eq("id", batch.captureId);
     const live2 = await store.liveSessionPaths(db as never, admin.id);
     expect(live2.has(batch.files[0].path)).toBe(true);

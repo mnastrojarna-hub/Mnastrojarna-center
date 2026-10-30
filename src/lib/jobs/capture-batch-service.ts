@@ -34,9 +34,10 @@ import {
   classifyPages, docAiInput, downloadFull, extractPdfPages, imagesToPdf, prepareBatchFiles, type PreparedBatch,
 } from "@/lib/jobs/capture-files";
 import {
-  CAPTURE_BUCKET, CAPTURE_MAX_PAGES, captureEventMessage, chipByKey, chipFor, reviewToFinalDoc, sniffDocumentMime,
+  CAPTURE_BUCKET, CAPTURE_MAX_PAGES, captureEventMessage, captureHiresPath, chipByKey, chipFor, reviewToFinalDoc, sniffDocumentMime,
   type CaptureFileRef, type PartyMatchView, type ReviewOptions,
 } from "@/lib/jobs/capture-review";
+import { moveMaster } from "@/lib/anonymize/master";
 import type { CaptureDocKind, CustomerMatchCandidate, ExtractedBusinessDoc } from "@/lib/jobs/capture-types";
 import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { docNumbersEqual, matchCustomer, matchJob, matchParty, type JobMatchCandidateExt } from "@/lib/jobs/matching";
@@ -59,7 +60,7 @@ import { captureUuid, emptyDrawing } from "@/lib/jobs/capture-batch";
 import {
   SPEC_GROUP_LABEL, initialSpecState, materialDifference, mergeSpecPatch, specColumns, specExtractFields, specForMaterial, specSources,
 } from "@/lib/jobs/drawing-spec";
-import { cleanNumber, isUuid, jobFilePath, stageEventMessage, todayIso } from "@/lib/jobs/mapping";
+import { cleanNumber, isUuid, jobFilePath, jobMasterPath, stageEventMessage, todayIso } from "@/lib/jobs/mapping";
 import { isForward, isJobStage } from "@/lib/jobs/stages";
 import { plural } from "@/lib/jobs/deadlines";
 import type { JobDetail } from "@/lib/jobs/types";
@@ -1131,8 +1132,10 @@ async function attachDocFiles(
     if (last && last.file.id === f.id) last.pages.push(p);
     else byFile.push({ file: f, pages: [p] });
   }
-  const register = async (path: string, filename: string, mimeType: string, size: number, part: number, total: number, sha?: string | null) => {
+  const register = async (path: string, filename: string, mimeType: string, size: number, part: number, total: number, sha?: string | null,
+    anon: { anonSourcePath?: string; anonSourceIsMain?: boolean } = {}) => {
     const reg = await registerJobFileCore(db, user.id, {
+      ...anon,
       jobId, path, filename, mimeType: mimeType || undefined, size: size || undefined, kind: meta.kind,
       title: `${meta.title}${total > 1 ? ` · str. ${part + 1}/${total}` : ""}`,
       note: part === 0 ? meta.note : undefined,
@@ -1167,6 +1170,17 @@ async function attachDocFiles(
     const { error } = await bucket(db).upload(dest, bytes, { contentType, upsert: true });
     return !error;
   };
+  /**
+   * Zdroj anonymizace fotky: master v plném rozlišení (prohlížeč ho nahrál vedle zmenšené stránky) se přesune
+   * k dokumentu; fotka rozbalená ze ZIPu je originál sama (prohlížeč ji nezmenšoval).
+   */
+  const photoSource = async (f: BatchFile, dest: string): Promise<{ anonSourcePath?: string; anonSourceIsMain?: boolean }> => {
+    const mime = (f.sniffedMime ?? f.mimeType ?? "").toLowerCase();
+    if (!mime.startsWith("image/")) return {};
+    if (f.fromZip || (f.bundle ?? "").startsWith("zip:")) return { anonSourceIsMain: true };
+    const master = jobMasterPath(dest);
+    return master && (await moveMaster(db, CAPTURE_BUCKET, captureHiresPath(f.path), master)) ? { anonSourcePath: master } : {};
+  };
 
   // vícestránkový doklad z fotek → jedno PDF
   const allImages = byFile.length > 1 && byFile.every((b) => b.pages.length === 1 && b.pages[0].source === "image");
@@ -1199,7 +1213,7 @@ async function attachDocFiles(
     if (whole) {
       const dest = jobFilePath(jobId, captureUuid(session.captureId, `file-${f.id}`, 0), f.filename);
       if (await moveTo(f.path, dest)) {
-        const id = await register(dest, f.filename, f.mimeType, f.size, part, total, f.sha256);
+        const id = await register(dest, f.filename, f.mimeType, f.size, part, total, f.sha256, await photoSource(f, dest));
         if (id) out.push(id);
         else complete = false;
       } else {
@@ -2042,7 +2056,10 @@ function draftPaths(session: BatchSession, draft: BatchDocDraft): string[] {
   // soubor sdílený s jiným dokladem (PDF s více doklady) se nemaže
   const sort = session.lastSort ?? session.aiSort;
   const shared = new Set(sort.docs.filter((d) => d.id !== draft.id && !d.excluded).flatMap((d) => d.pageIds.map((id) => session.pages.find((p) => p.id === id)?.fileId)));
-  return session.files.filter((f) => files.has(f.id) && !shared.has(f.id)).flatMap((f) => [f.path, ...(f.sortPath ? [f.sortPath] : [])]);
+  return session.files.filter((f) => files.has(f.id) && !shared.has(f.id)).flatMap((f) => {
+    const hires = captureHiresPath(f.path);
+    return [f.path, ...(f.sortPath ? [f.sortPath] : []), ...(hires ? [hires] : [])];
+  });
 }
 
 function jobKey(jobId: string): Map<string, JobDetail> {

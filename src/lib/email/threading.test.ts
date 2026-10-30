@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  bracketId, firstAddress, forwardBlock, forwardSubject, isReplySubject, normalizeSubject, parseMessageIds, quoteForReply,
-  replyHeaders, replyRecipients, replySubject, sortThread, splitAddresses, subjectKey, withSignature,
+  assignThread, bracketId, firstAddress, forwardBlock, forwardSubject, isReplySubject, normalizeSubject, parseMessageIds, quoteForReply, quotesMessage,
+  replyHeaders, replyRecipients, replySubject, sortThread, splitAddresses, subjectKey, threadsToAdopt, withSignature, type NewThreadMessage, type ThreadCandidate,
 } from "./threading";
 
 describe("vlákna — předmět a klíč", () => {
@@ -80,5 +80,68 @@ describe("citace, přeposlání, podpis, adresáti", () => {
   it("vlákno od nejstarší", () => {
     const s = sortThread([{ id: "b", receivedAt: "2026-10-22T09:00:00Z" }, { id: "a", receivedAt: "2026-10-22T08:00:00Z" }, { id: "c", receivedAt: "2026-10-22T09:00:00Z" }]);
     expect(s.map((x) => x.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("pravidlo vlákna — jen skutečná konverzace (Pošta E, „Poptávka Brisk“)", () => {
+  const BOX = "b1";
+  const first: ThreadCandidate = {
+    id: "e1", threadId: "m:b1:<a1@brisk.cz>", mailboxId: BOX, messageId: "<a1@brisk.cz>", subject: "Poptávka Brisk", direction: "in",
+    fromEmail: "nakup@brisk.cz", receivedAt: "2026-10-01T08:00:00Z", snippet: "Dobrý den, poptáváme 50 ks pouzder dle výkresu BR-100, termín do konce měsíce.",
+  };
+  const replied: ThreadCandidate = { ...first, id: "e0", threadId: "m:b1:<a0@brisk.cz>", messageId: "<a0@brisk.cz>", subject: "Re: Poptávka Brisk", receivedAt: "2026-09-01T08:00:00Z", snippet: "Děkujeme za nabídku, objednáme." };
+  const msg = (p: Partial<NewThreadMessage>): NewThreadMessage => ({
+    id: "n1", mailboxId: BOX, messageId: "<n1@brisk.cz>", subject: "Poptávka Brisk", direction: "in", fromEmail: "nakup@brisk.cz", receivedAt: "2026-10-08T08:00:00Z", ...p,
+  });
+
+  it("stejný předmět i odesílatel, jiná poptávka o týden později → nové vlákno (i když starší vlákno má „Re:“)", () => {
+    expect(assignThread(msg({}), [first, replied])).toBe("m:b1:<n1@brisk.cz>");
+  });
+  it("odpověď s In-Reply-To / References → vlákno původní zprávy (i bez „Re:“ v předmětu)", () => {
+    expect(assignThread(msg({ subject: "Re: Poptávka Brisk", inReplyTo: "<a1@brisk.cz>" }), [first])).toBe(first.threadId);
+    expect(assignThread(msg({ subject: "Doplnění", references: ["a1@brisk.cz"] }), [first])).toBe(first.threadId);
+  });
+  it("původní zpráva stažená až po odpovědi → vlákno odpovědi", () => {
+    const reply: ThreadCandidate = { ...first, id: "r", threadId: "m:b1:<r@x>", messageId: "<r@x>", inReplyTo: "<n1@brisk.cz>", subject: "Re: Poptávka Brisk", receivedAt: "2026-10-09T08:00:00Z" };
+    expect(assignThread(msg({}), [reply])).toBe("m:b1:<r@x>");
+  });
+  it("Fw:/Re: bez hlaviček → nové vlákno; s prokazatelnou citací dřívější zprávy → její vlákno", () => {
+    expect(assignThread(msg({ subject: "Fw: Poptávka Brisk", body: "Posílám dál." }), [first])).toBe("m:b1:<n1@brisk.cz>");
+    const quoted = `Ano, termín platí.\n\n> Dobrý den, poptáváme 50 ks\n> pouzder dle výkresu BR-100, termín do konce měsíce.`;
+    expect(assignThread(msg({ subject: "Re: Poptávka Brisk", body: quoted }), [first])).toBe(first.threadId);
+    expect(quotesMessage(quoted, first.snippet)).toBe(true);
+    expect(quotesMessage("krátké", "krátké")).toBe(false); // krátký text citaci neprokáže
+  });
+  it("„Re:“ bez hlaviček s citací přišlo dřív než originál (stahování od nejnovější) → originál do jejího vlákna", () => {
+    const quotingReply: ThreadCandidate = {
+      ...first, id: "q", threadId: "m:b1:<q@x>", messageId: "<q@x>", subject: "Re: Poptávka Brisk", receivedAt: "2026-10-09T08:00:00Z",
+      body: "Platí.\n> Dobrý den, poptáváme 50 ks pouzder dle výkresu BR-100, termín do konce měsíce.",
+    };
+    expect(assignThread(msg({ snippet: first.snippet, receivedAt: "2026-10-01T08:00:00Z" }), [quotingReply])).toBe("m:b1:<q@x>");
+    // jiná poptávka se stejným předmětem citovaná není → nové vlákno
+    expect(assignThread(msg({ snippet: "Dobrý den, nová poptávka: 200 ks čepů dle výkresu BR-555." }), [quotingReply])).toBe("m:b1:<n1@brisk.cz>");
+  });
+  it("první stažení od nejnovější: odpovědi (hlavičky i citace) čekající na originál se k němu připojí, jiná poptávka ne", () => {
+    const hdr: ThreadCandidate = { ...first, id: "h", threadId: "m:b1:<h@x>", messageId: "<h@x>", inReplyTo: "<n1@brisk.cz>", subject: "Re: Poptávka Brisk", receivedAt: "2026-10-09T08:00:00Z" };
+    const quo: ThreadCandidate = {
+      ...first, id: "q", threadId: "m:b1:<q@x>", messageId: "<q@x>", subject: "Re: Poptávka Brisk", receivedAt: "2026-10-10T08:00:00Z",
+      body: "Platí.\n> Dobrý den, poptáváme 50 ks pouzder dle výkresu BR-100, termín do konce měsíce.",
+    };
+    const other: ThreadCandidate = { ...first, id: "o", threadId: "m:b1:<o@x>", messageId: "<o@x>", subject: "Poptávka Brisk", receivedAt: "2026-10-11T08:00:00Z", snippet: "Jiná poptávka 200 ks." };
+    const orig = msg({ snippet: first.snippet, receivedAt: "2026-10-01T08:00:00Z" });
+    const tid = assignThread(orig, [hdr, quo, other]);
+    expect(tid).toBe("m:b1:<h@x>"); // hlavičky první
+    expect(threadsToAdopt({ ...orig, threadId: tid }, [hdr, quo, other])).toEqual(["m:b1:<q@x>"]);
+  });
+  it("jiná schránka se nespojí ani s hlavičkami", () => {
+    expect(assignThread(msg({ mailboxId: "b2", inReplyTo: "<a1@brisk.cz>" }), [first])).toBe("m:b2:<n1@brisk.cz>");
+  });
+  it("Outlook conversationId: jen bez hlaviček a u „Re:“; hlavičky mají přednost", () => {
+    const conv: ThreadCandidate = { ...first, id: "c", threadId: "m:b1:<c@x>", messageId: "<c@x>", conversationId: "CONV-1", receivedAt: "2026-10-02T08:00:00Z" };
+    expect(assignThread(msg({ subject: "Re: Poptávka Brisk", conversationId: "CONV-1" }), [conv, first])).toBe("m:b1:<c@x>");
+    // bez „Re:“ conversationId nestačí
+    expect(assignThread(msg({ conversationId: "CONV-1" }), [conv])).toBe("m:b1:<n1@brisk.cz>");
+    // hlavičky ukazují jinam než conversationId → platí hlavičky
+    expect(assignThread(msg({ subject: "Re: Poptávka Brisk", conversationId: "CONV-1", inReplyTo: "<a1@brisk.cz>" }), [conv, first])).toBe(first.threadId);
   });
 });

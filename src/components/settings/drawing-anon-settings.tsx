@@ -25,6 +25,10 @@ export interface DrawingAnonSettingsProps {
   runnerWarning: string | null;
   /** Stav zpracování na pozadí, když je vše v pořádku (zelený řádek). */
   runnerOk?: string | null;
+  /** AI pro fotky a skeny chybí / je vypnutá („AI klíč chybí — fotky a skeny čekají na ruční kontrolu"). */
+  aiWarning?: string | null;
+  /** AI pro fotky a skeny funguje. */
+  aiOk?: string | null;
   spentTodayUsd: number;
   legacyCount: number;
   changedCount: number;
@@ -109,6 +113,15 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
       ) : p.runnerOk ? (
         <p className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100" data-testid="anon-runner-status" data-tone="ok">
           <EyeOff className="mt-0.5 h-4 w-4 shrink-0" /> {p.runnerOk}
+        </p>
+      ) : null}
+      {p.aiWarning ? (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" data-testid="anon-ai-status" data-tone="warn">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {p.aiWarning}
+        </p>
+      ) : p.aiOk ? (
+        <p className="flex items-start gap-2 text-sm text-muted-foreground" data-testid="anon-ai-status" data-tone="ok">
+          <EyeOff className="mt-0.5 h-4 w-4 shrink-0" /> {p.aiOk}
         </p>
       ) : null}
       {!p.canEdit && <p className="text-sm text-muted-foreground">Nastavení mění jen super admin — tady ho vidíš jen pro informaci.</p>}

@@ -4,7 +4,8 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Loader2, Check, AlertCircle, Mail, FileUp, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { importOutlookFiles, type ImportFileResult } from "@/app/actions/email-import";
+import { createOutlookImportUploads, importOutlookFiles, type ImportFileResult } from "@/app/actions/email-import";
+import { createClient } from "@/lib/supabase/client";
 import { debug } from "@/lib/debug/logger";
 import { cn } from "@/lib/utils";
 
@@ -34,11 +35,25 @@ export function OutlookImport() {
       files.map((f) => ({ name: f.name, type: f.type || "—", sizeKB: Math.round(f.size / 1024) })),
     );
 
-    const fd = new FormData();
-    for (const f of files) fd.append("files", f);
-
     try {
-      const res = await importOutlookFiles(fd);
+      // soubory jdou přímo do úložiště (podepsaná URL) — server action dostane jen cesty (limit těla 1 MB / 4,5 MB)
+      const MAX = 25 * 1024 * 1024;
+      const fit = files.filter((f) => f.size > 0 && f.size <= MAX);
+      const tooBig = files.filter((f) => f.size > MAX).map((f) => f.name);
+      const prep = fit.length ? await createOutlookImportUploads(fit.map((f) => ({ filename: f.name, size: f.size }))) : { ok: true, slots: [] };
+      if (!prep.ok) throw new Error(prep.error ?? "Nahrání se nepodařilo připravit.");
+      const storage = createClient().storage;
+      const uploaded: { path: string; filename: string }[] = [];
+      const failed: ImportFileResult[] = [];
+      for (let i = 0; i < prep.slots.length; i++) {
+        const s = prep.slots[i];
+        const f = fit[i];
+        const { error } = await storage.from(s.bucket).uploadToSignedUrl(s.path, s.token, f, { contentType: f.type || "application/octet-stream", upsert: false });
+        if (error) failed.push({ fileName: f.name, ok: false, error: `Nahrání selhalo: ${error.message}` });
+        else uploaded.push({ path: s.path, filename: f.name });
+      }
+      const imported = await importOutlookFiles({ files: uploaded, tooBig });
+      const res = { ...imported, files: [...imported.files, ...failed] };
       setResults(res.files);
       const ok = res.files.filter((r) => r.ok).length;
       const fail = res.files.length - ok;

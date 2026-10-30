@@ -23,7 +23,7 @@ export function credentialFingerprint(provider: MailboxProvider, email: string, 
 /**
  * Server naposledy odmítl heslo a od té doby se přihlašovací údaje nezměnily → automatické
  * stahování (otevření pošty, plánovač) se přihlásit NEzkouší (opakované špatné přihlášení
- * může u hosting90 zablokovat IP). Ruční „Stáhnout poštu" funguje dál.
+ * může u hosting90 zablokovat IP). Ruční „Přijmout a odeslat" funguje dál.
  */
 export function isAuthBlocked(
   status: Pick<MailboxStatus, "last_sync_error_kind" | "last_sync_auth_fp"> | null | undefined,
@@ -35,7 +35,7 @@ export function isAuthBlocked(
 
 /** Text pro UI / výsledek synchronizace u zablokovaného automatického stahování. */
 export function authBlockedMessage(email: string): string {
-  return `${email}: Heslo odmítnuto — oprav ho v Nastavení → E-mailové schránky (Upravit schránku → Změnit heslo), případně požádej admina. Automatické stahování je do opravy pozastavené (ochrana před zablokováním IP); ručně: Stáhnout poštu.`;
+  return `${email}: Heslo odmítnuto — oprav ho v Nastavení pošty (Pošta → ozubené kolo → Schránka → Upravit → nové heslo); firemní schránku opraví super admin v Nastavení → E-mailové schránky. Automatické stahování je do opravy pozastavené (ochrana před zablokováním IP); ručně: Přijmout a odeslat.`;
 }
 
 /**

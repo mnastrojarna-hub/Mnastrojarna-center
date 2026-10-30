@@ -34,7 +34,10 @@ function isBlankable(code: number, inProps: boolean, inPlot: boolean): boolean {
   return code === 1 || code === 3 || code === 4 || (code >= 300 && code <= 309) || code === 999 || code === 1000 || code === 470;
 }
 
-const HEADER_BLANK = new Set(["$LASTSAVEDBY", "$PROJECTNAME", "$HYPERLINKBASE", "$STYLESHEET"]);
+/** Proměnné hlavičky, které nesou autora / projekt / vlastní vlastnosti výkresu (hodnoty pryč, ne názvy). */
+const HEADER_BLANK = new Set(["$LASTSAVEDBY", "$PROJECTNAME", "$HYPERLINKBASE", "$STYLESHEET", "$CUSTOMPROPERTY"]);
+/** Kódy s názvy hladin, bloků, stylů, typů čar a kót (přejmenují se jednotně všude). */
+const RENAME_CODES = new Set([2, 3, 6, 7, 8]);
 /** Entity s obrazem / vloženým objektem / binární proxy grafikou — odstraní se celé. */
 const DROP_ENTITIES = new Set(["IMAGE", "OLE2FRAME", "OLEFRAME", "ACAD_PROXY_ENTITY"]);
 /** Ve výstupu nesmí zůstat (kontrola po zápisu). */
@@ -141,12 +144,73 @@ function fromLatin1(s: string): Uint8Array {
   return out;
 }
 
-export function anonymizeDxf(bytes: Uint8Array, ctx: RuleContext): DxfResult {
+/** Typ hodnoty skupinového kódu (binární DXF R13+). */
+function binType(code: number): "str" | "f64" | "i16" | "i32" | "i64" | "bool" | "bin" {
+  if ((code >= 310 && code <= 319) || code === 1004) return "bin";
+  if ((code >= 10 && code <= 59) || (code >= 110 && code <= 149) || (code >= 210 && code <= 239) || (code >= 460 && code <= 469) || (code >= 1010 && code <= 1059)) return "f64";
+  if ((code >= 60 && code <= 79) || (code >= 170 && code <= 179) || (code >= 270 && code <= 289) || (code >= 370 && code <= 389) || (code >= 400 && code <= 409) || (code >= 1060 && code <= 1070)) return "i16";
+  if ((code >= 90 && code <= 99) || (code >= 420 && code <= 429) || (code >= 440 && code <= 459) || code === 1071) return "i32";
+  if (code >= 160 && code <= 169) return "i64";
+  if (code >= 290 && code <= 299) return "bool";
+  return "str";
+}
+
+/**
+ * Binární DXF (R13+, 2bajtové kódy) → ASCII DXF se stejnými páry (čísla v plné přesnosti). Pak projde
+ * stejnou anonymizací jako textové DXF. null = neznámá / poškozená struktura (R12 binární, zkrácený soubor).
+ */
+export function binaryDxfToAscii(bytes: Uint8Array): Uint8Array | null {
+  const SENT = "AutoCAD Binary DXF\r\n\x1a\0";
+  if (toLatin1(bytes.subarray(0, SENT.length)) !== SENT) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out: string[] = [];
+  let o = SENT.length;
+  // R12 binární má 1bajtové kódy — první pár je vždy 0/SECTION: u R13+ jsou bajty kódu 0x00 0x00
+  if (bytes.length < o + 3 || bytes[o] !== 0 || bytes[o + 1] !== 0) return null;
+  try {
+    while (o + 2 <= bytes.length) {
+      const code = view.getInt16(o, true);
+      o += 2;
+      const t = binType(code);
+      let val: string;
+      if (t === "str") {
+        const end = bytes.indexOf(0, o);
+        if (end < 0) return null;
+        val = toLatin1(bytes.subarray(o, end));
+        o = end + 1;
+      } else if (t === "f64") { val = String(view.getFloat64(o, true)); o += 8; }
+      else if (t === "i16") { val = String(view.getInt16(o, true)); o += 2; }
+      else if (t === "i32") { val = String(view.getInt32(o, true)); o += 4; }
+      else if (t === "i64") { val = String(view.getBigInt64(o, true)); o += 8; }
+      else if (t === "bool") { val = String(bytes[o]); o += 1; }
+      else {
+        const n = bytes[o];
+        val = Array.from(bytes.subarray(o + 1, o + 1 + n), (b) => b.toString(16).toUpperCase().padStart(2, "0")).join("");
+        o += 1 + n;
+      }
+      if (o > bytes.length) return null;
+      out.push(String(code).padStart(3, " "), val);
+      if (code === 0 && val === "EOF") break;
+    }
+  } catch {
+    return null;
+  }
+  if (out[out.length - 1] !== "EOF") return null;
+  return fromLatin1(out.join("\r\n") + "\r\n");
+}
+
+export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
   const res: DxfResult = { ok: false, bytes: null, redacted: 0, removedImages: 0, warnings: [], texts: [], verified: false, problems: [] };
+  let bytes = bytesIn;
   const head = toLatin1(bytes.subarray(0, 32));
   if (head.startsWith("AutoCAD Binary DXF")) {
-    res.unsupported = "Binární DXF nelze anonymizovat — ulož výkres jako ASCII DXF nebo PDF.";
-    return res;
+    const ascii = binaryDxfToAscii(bytes);
+    if (!ascii) {
+      res.unsupported = "Nelze anonymizovat automaticky (binární DXF starší verze) — ulož výkres jako DXF v textové podobě (ASCII) nebo PDF a nahraj znovu.";
+      return res;
+    }
+    // výstup je textové DXF (stejné entity a čísla) — přečte ho každý CAD
+    bytes = ascii;
   }
   const parsed = parseDxfPairs(toLatin1(bytes));
   if (!parsed) {
@@ -164,6 +228,58 @@ export function anonymizeDxf(bytes: Uint8Array, ctx: RuleContext): DxfResult {
   }
   const verNum = Number(acadver.replace(/^AC/, "")) || 0;
   const codec = verNum >= 1021 ? utf8Codec() : singleByteCodec(CODEPAGES[codepage] ?? "windows-1252");
+
+  // názvy (hladiny, bloky, styly…) s údajem o firmě → jednotné přejmenování všude, kde se na ně odkazuje
+  // (DXF odkazuje názvem, ne id) — „RAZITKO_STROJMETAL" → „RAZITKO"; kolize → „_2"
+  const renames = new Map<string, string>();
+  {
+    const used = new Set<string>();
+    const found: string[] = [];
+    let sec = "";
+    let ent = "";
+    for (let i = 0; i < pairs.length; i++) {
+      const p = pairs[i];
+      if (p.code === 0) { ent = p.raw.trim(); continue; }
+      if (p.code === 2 && pairs[i - 1]?.code === 0 && pairs[i - 1].raw.trim() === "SECTION") { sec = p.raw.trim(); continue; }
+      if (!RENAME_CODES.has(p.code) || sec === "THUMBNAILIMAGE") continue;
+      // u textových entit je kód 3 pokračování textu / výzva atributu — to řeší hlavní průchod
+      if (p.code === 3 && /^(MTEXT|ATTDEF|ATTRIB|MULTILEADER|MLEADER|TEXT|DIMENSION)$/.test(ent)) continue;
+      const v = p.raw.trim();
+      if (!v || v.length > 255) continue;
+      used.add(v.toUpperCase());
+      const text = codec.decode(v);
+      if (/\s{2,}|\\P|[{}]/.test(text)) continue; // formátovaný text (MTEXT), ne název
+      if (/[\\/]/.test(text)) continue; // cesta (soubor písma, obrázku) — vyprázdní ji hlavní průchod
+      if (containsTerm(text, ctx.terms) && !found.includes(v.toUpperCase())) found.push(v.toUpperCase());
+    }
+    for (const up of found) {
+      const raw = pairs.find((p) => RENAME_CODES.has(p.code) && p.raw.trim().toUpperCase() === up)!.raw.trim();
+      const text = codec.decode(raw);
+      const hits = ruleLine(text, "title_block", ctx).hits.filter((h) => h.category !== "path");
+      let kept = "";
+      let last = 0;
+      for (const h of [...hits].sort((a, b) => a.start - b.start)) {
+        if (h.start > last) kept += text.slice(last, h.start);
+        last = Math.max(last, h.end);
+      }
+      kept += text.slice(last);
+      let base = kept.replace(/[\s_.-]{2,}/g, "_").replace(/^[\s_.-]+|[\s_.-]+$/g, "");
+      if (!base || containsTerm(base, ctx.terms)) base = "NAZEV";
+      let name = base;
+      for (let k = 2; used.has(name.toUpperCase()) && name.toUpperCase() !== up; k++) name = `${base}_${k}`;
+      used.add(name.toUpperCase());
+      renames.set(up, codec.encode(name) ?? "NAZEV");
+      res.texts.push({ category: "company", text });
+    }
+    if (renames.size) {
+      for (const p of pairs) {
+        if (!RENAME_CODES.has(p.code)) continue;
+        const to = renames.get(p.raw.trim().toUpperCase());
+        if (to !== undefined) p.raw = to;
+      }
+      res.redacted += renames.size;
+    }
+  }
 
   // průchod: sekce, entity, příznaky
   let section = "";
@@ -278,6 +394,10 @@ export function anonymizeDxf(bytes: Uint8Array, ctx: RuleContext): DxfResult {
         sec = p.raw.trim();
         if (FORBIDDEN_DXF.has(sec)) res.problems.push(`zůstal náhled výkresu (${sec})`);
       }
+      if (RENAME_CODES.has(p.code) && containsTerm(codec.decode(p.raw.trim()), ctx.terms) && !/\s{2,}|\\P|[{}]/.test(codec.decode(p.raw))) {
+        res.problems.push(`zůstal název s údajem o firmě (${sec || "?"})`);
+        break;
+      }
       if (!isStringCode(p.code) || NAME_CODES.has(p.code)) continue;
       const t = dxfPlainText(codec.decode(p.raw));
       if (!t.trim()) continue;
@@ -285,7 +405,7 @@ export function anonymizeDxf(bytes: Uint8Array, ctx: RuleContext): DxfResult {
         res.problems.push(`zbyl citlivý text (${sec || "?"})`);
         break;
       }
-      if (isSuspiciousLiteral(t)) {
+      if (isSuspiciousLiteral(t, ctx.keepTerms)) {
         res.warnings.push({ code: "step_suspicious", message: "V DXF zůstal podezřelý text (e-mail, doména, právní forma) — zkontroluj." });
       }
     }

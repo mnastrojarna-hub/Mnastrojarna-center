@@ -5,7 +5,7 @@ import type {
 } from "@/lib/jobs/capture-batch-types";
 import type { CaptureDocKind, DocIssuer } from "@/lib/jobs/capture-types";
 import type { PartyMatchView } from "@/lib/jobs/capture-review";
-import { CAPTURE_BUCKET } from "@/lib/jobs/capture-review";
+import { CAPTURE_BUCKET, captureHiresPath } from "@/lib/jobs/capture-review";
 import { isUuid } from "@/lib/jobs/mapping";
 
 /**
@@ -146,12 +146,15 @@ export async function deleteSessionRow(db: JobsDb, captureId: string): Promise<v
   await db.from("capture_sessions").delete().eq("id", captureId);
 }
 
-/** Všechny cesty úložiště relace (stránky, náhledy roztřídění). */
+/** Všechny cesty úložiště relace (stránky, náhledy roztřídění, mastery fotek v plném rozlišení). */
 export function sessionPaths(s: Pick<BatchSession, "files">): string[] {
   const out: string[] = [];
   for (const f of s.files ?? []) {
     if (f.path) out.push(f.path);
     if (f.sortPath) out.push(f.sortPath);
+    // master (capture/<uživatel>/<uuid>.hires) — odvozený z cesty stránky, nemusí existovat
+    const hires = f.path ? captureHiresPath(f.path) : null;
+    if (hires) out.push(hires);
   }
   return [...new Set(out)];
 }

@@ -425,10 +425,11 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
     const it0 = itemOf(closed.id);
     const old = await rawMail({ direction: "out", from_email: USER, to_email: `jan@${DOM}`, subject: "Re: Poptávka", order_id: closed.id, job_link_source: "sent", body_text: "Děkujeme", is_read: true, received_at: new Date(Date.now() - 200 * 86_400_000).toISOString() });
     const m = await rawMail({ subject: "Poptávka", category: "poptavka", body_text: "Dobrý den,\nposíláme novou poptávku na jiný díl, potřebujeme celkem 50 ks, prosím kalit.\n\nS pozdravem Jan" });
-    expect(m.thread_id).toBe(old.thread_id); // vlákna Pošty A spojí podle předmětu
+    // Pošta E: vlákno jen podle skutečné konverzace — stejný předmět bez hlaviček = nové vlákno už při uložení
+    expect(m.thread_id).not.toBe(old.thread_id);
     await proc(m.id);
     expect(mailRow(m.id)).toMatchObject({ order_id: null, category: "poptavka" });
-    // … Pošta B novou poptávku oddělí do vlastního vlákna (v poště se neukáže pod starou zakázkou)
+    // … a zůstává ve vlastním vlákně (v poště se neukáže pod starou zakázkou)
     expect(mailRow(m.id).thread_id).not.toBe(old.thread_id);
     expect(localSql(`select count(*) from email_job_suggestions where email_id = '${m.id}'`)).toBe("0");
     expect(itemRow(it0)).toMatchObject({ q: 10, heat_status: "bez" });

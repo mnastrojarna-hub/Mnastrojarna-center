@@ -2,15 +2,32 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Check, FolderOpen, FolderPlus, HelpCircle, Link2, Link2Off, Loader2, Search, Sparkles, X } from "lucide-react";
+import {
+  Check, FileSpreadsheet, FilePlus2, FolderOpen, FolderPlus, HelpCircle, Link2, Link2Off, Loader2, MoreHorizontal, PackageCheck, ReceiptText, Search, Sparkles, X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { confirmJobSuggestionAction, rejectJobSuggestionAction, searchJobsForMailAction, setThreadJobAction, type JobPick } from "@/app/actions/mail-jobs";
+import type { OrderChoice } from "@/app/actions/mail-actions";
 import { LINK_SOURCE_LABEL } from "@/lib/email/job-match";
+import { MAIL_ACTION_LABEL, mailActionHref, mailActionPlan, type MailActionKey } from "@/lib/email/mail-actions";
 import type { JobSuggestionRef } from "@/lib/email/mail-types";
+import type { EmailCategory } from "@/lib/data/types";
 import { isJobStage, stageMeta } from "@/lib/jobs/stages";
 import { cn } from "@/lib/utils";
+
+const ACTION_ICON: Record<MailActionKey, React.ComponentType<{ className?: string }>> = {
+  "quote.create": FilePlus2,
+  "quote.continue": FilePlus2,
+  "order.process": PackageCheck,
+  "invoice.record": ReceiptText,
+  "supplierQuote.record": FileSpreadsheet,
+  "job.open": FolderOpen,
+  "job.assign": Link2,
+  "job.create": FolderPlus,
+};
 
 export interface JobLinkChange {
   jobId: string | null;
@@ -21,10 +38,15 @@ export interface JobLinkChange {
 }
 
 /**
- * Zakázka vlákna (Pošta B): chip zakázky + jak ji přiřadila AI / kdo, změnit nebo odpojit jedním ťuknutím;
- * bez zakázky návrh „Patří k Z-…?" (Ano / Ne / Jiná…), jinak Založit zakázku / Přiřadit k zakázce.
+ * Zakázka vlákna (Pošta B) a hlavní akce zprávy (Pošta E): chip zakázky + jak ji přiřadila AI / kdo,
+ * změnit nebo odpojit jedním ťuknutím; bez zakázky návrh „Patří k Z-…?" (Ano / Ne / Jiná…). Hlavní
+ * tlačítko podle kategorie (Poptávka → Vytvořit nabídku, Objednávka → Zpracovat objednávku, Faktura →
+ * Zapsat fakturu dodavatele …), ostatní v ⋯ — „Založit zakázku" jen jako obecná možnost v ⋯.
  */
-export function JobLinkBar({ threadId, jobId, jobNumber, jobTitle, linkSource, linkActor, suggestion, canCreate, createDisabled, creating, onCreate, onChanged, onError }: {
+export function JobLinkBar({
+  threadId, jobId, jobNumber, jobTitle, linkSource, linkActor, suggestion, category = "Ostatní", direction = "in", actionsDisabled, busyAction = null,
+  onAction, choices, onChoicesDone, onChanged, onError,
+}: {
   threadId: string;
   jobId?: string | null;
   jobNumber?: string | null;
@@ -32,16 +54,62 @@ export function JobLinkBar({ threadId, jobId, jobNumber, jobTitle, linkSource, l
   linkSource?: string | null;
   linkActor?: string | null;
   suggestion?: JobSuggestionRef | null;
-  canCreate: boolean;
-  /** Založit zakázku zatím nejde (vlákno se načítá / bez příchozí zprávy). */
-  createDisabled?: boolean;
-  creating: boolean;
-  onCreate: () => void;
+  /** Kategorie a směr zprávy, ke které se akce vztahují (detail: poslední příchozí). */
+  category?: EmailCategory | string;
+  direction?: "in" | "out";
+  /** Akce zatím nejdou (vlákno se načítá). */
+  actionsDisabled?: boolean;
+  busyAction?: MailActionKey | null;
+  /** Akce se serverovým krokem (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu, Založit zakázku). */
+  onAction: (key: MailActionKey) => void;
+  /** „Zpracovat objednávku" našla víc možných zakázek → výběr. */
+  choices?: OrderChoice[] | null;
+  onChoicesDone?: () => void;
   onChanged: (c: JobLinkChange) => void;
   onError: (text: string) => void;
 }) {
   const [busy, setBusy] = React.useState<string | null>(null);
   const [picker, setPicker] = React.useState(false);
+  const plan = mailActionPlan({ category, direction, jobId });
+  const disabled = busy !== null || busyAction !== null || Boolean(actionsDisabled);
+
+  /** Tlačítko akce: odkaz (bez serveru), výběr zakázky (dialog), jinak serverová akce. */
+  const actionButton = (key: MailActionKey, primary: boolean) => {
+    const Icon = ACTION_ICON[key];
+    const href = mailActionHref(key, jobId);
+    const label = MAIL_ACTION_LABEL[key];
+    const common = { size: "sm" as const, variant: primary ? ("success" as const) : ("outline" as const), "data-testid": primary ? "mail-primary-action" : `mail-action-${key}`, "data-action": key };
+    if (href) {
+      return <Button key={key} asChild {...common}><Link href={href}><Icon className="h-4 w-4" /> {label}</Link></Button>;
+    }
+    return (
+      <Button key={key} {...common} disabled={disabled} onClick={() => (key === "job.assign" ? setPicker(true) : onAction(key))}>
+        {busyAction === key || (key === "job.assign" && busy === "pick") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />} {label}
+      </Button>
+    );
+  };
+  const moreMenu = (keys: MailActionKey[]) => keys.length ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon-sm" variant="ghost" aria-label="Další akce se zakázkou" title="Další akce" data-testid="mail-actions-more" disabled={disabled}>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {keys.map((key) => {
+          const Icon = ACTION_ICON[key];
+          const href = mailActionHref(key, jobId);
+          return href ? (
+            <DropdownMenuItem key={key} asChild data-testid={`mail-action-${key}`}><Link href={href}><Icon className="h-4 w-4" /> {MAIL_ACTION_LABEL[key]}</Link></DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem key={key} onSelect={() => (key === "job.assign" ? setPicker(true) : onAction(key))} data-testid={`mail-action-${key}`}>
+              <Icon className="h-4 w-4" /> {MAIL_ACTION_LABEL[key]}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
 
   const run = async <T extends { ok: boolean; error?: string }>(key: string, fn: () => Promise<T>, done: (r: T) => void) => {
     setBusy(key);
@@ -68,9 +136,12 @@ export function JobLinkBar({ threadId, jobId, jobNumber, jobTitle, linkSource, l
       {jobId ? (
         <div className="space-y-1.5 rounded-xl border border-primary/20 bg-primary/5 p-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="success" size="sm">
-              <Link href={`/orders/${jobId}?tab=komunikace`} data-testid="thread-job-open"><FolderOpen className="h-4 w-4" /> {jobNumber ?? "Zakázka"}</Link>
+            {/* hlavní akce (Pokračovat v nabídce, Zapsat fakturu …); „Otevřít zakázku" = chip zakázky */}
+            {plan.main && plan.main !== "job.open" && actionButton(plan.main, true)}
+            <Button asChild variant={plan.main && plan.main !== "job.open" ? "outline" : "success"} size="sm">
+              <Link href={`/orders/${jobId}?tab=komunikace`} data-testid="thread-job-open" title="Otevřít zakázku"><FolderOpen className="h-4 w-4" /> {jobNumber ?? "Zakázka"}</Link>
             </Button>
+            {moreMenu(plan.more.filter((k) => k !== "job.open"))}
             <span className="ml-auto flex items-center gap-1">
               <Button size="sm" variant="outline" onClick={() => setPicker(true)} disabled={busy !== null} data-testid="thread-job-change">Změnit</Button>
               <Button
@@ -150,17 +221,36 @@ export function JobLinkBar({ threadId, jobId, jobNumber, jobTitle, linkSource, l
           </Button>
           <Button size="sm" variant="outline" onClick={() => setPicker(true)} disabled={busy !== null}>Jiná…</Button>
           </div>
+          {/* hlavní akce i u návrhu (Vytvořit nabídku …) — výběr zakázky je výš (Ano / Ne / Jiná) */}
+          {(plan.main && plan.main !== "job.assign") || plan.more.some((k) => k !== "job.assign") ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-amber-200 pt-2 dark:border-amber-500/30">
+              {plan.main && plan.main !== "job.assign" && actionButton(plan.main, true)}
+              {moreMenu(plan.more.filter((k) => k !== "job.assign"))}
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          {canCreate && (
-            <Button variant="success" size="sm" onClick={onCreate} disabled={creating || createDisabled || busy !== null}>
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />} Založit zakázku
+      ) : plan.main || plan.more.length ? (
+        <div className="flex flex-wrap items-center gap-2" data-testid="mail-actions">
+          {plan.main && actionButton(plan.main, true)}
+          {moreMenu(plan.more)}
+        </div>
+      ) : null}
+      {choices && choices.length > 0 && !jobId && (
+        <div className="space-y-1.5 rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-sm dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="order-choices">
+          <p className="font-medium text-amber-900 dark:text-amber-100">Ke které zakázce objednávka patří?</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {choices.map((c) => (
+              <Button key={c.jobId} size="sm" variant="outline" className="bg-background" disabled={disabled} title={c.reason ?? undefined}
+                onClick={() => { onChoicesDone?.(); pick({ id: c.jobId, number: c.number, title: c.title, customer: null, stage: "" }); }}
+              >
+                <Link2 className="h-4 w-4" /> {c.number}{c.title ? <span className="max-w-[10rem] truncate font-normal text-muted-foreground"> {c.title}</span> : null}
+              </Button>
+            ))}
+            <Button size="sm" variant="success" disabled={disabled} onClick={() => { onChoicesDone?.(); onAction("job.create"); }} data-testid="order-choice-new">
+              <FolderPlus className="h-4 w-4" /> Založit novou zakázku
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setPicker(true)} disabled={busy !== null} data-testid="thread-job-assign">
-            {busy === "pick" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />} Přiřadit k zakázce
-          </Button>
+            <Button size="sm" variant="ghost" onClick={() => onChoicesDone?.()}>Zrušit</Button>
+          </div>
         </div>
       )}
       <JobPicker open={picker} onClose={() => setPicker(false)} onPick={pick} currentId={jobId ?? null} threadId={threadId} />

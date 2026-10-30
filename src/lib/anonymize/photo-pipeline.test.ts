@@ -203,18 +203,32 @@ describe("anonymizace fotky výkresu", () => {
     expect(d.status).toBe("review");
   }, 120_000);
 
-  it("fallback modelu → review; bez masteru → review (nízké rozlišení)", async () => {
+  it("fallback modelu → review; fotka 4032 px bez masteru = originál (prohlížeč ji nezmenšil)", async () => {
     setFakeAnonHandler(handler(s, p, "fallback"));
     const r = await anonymizeImage({ bytes: p.jpeg, hasMaster: false, ctx: ctx(), ai: AI, verify: false, fill: "white" });
     expect(r.fallback).toBe(true);
-    expect(r.warnings.some((w) => w.code === "no_master")).toBe(true);
+    expect(r.hasMaster).toBe(true);
+    expect(r.warnings.some((w) => w.code === "no_master")).toBe(false);
     const d = decideAnonStatus({
       mode: "full", method: "image", aiUsed: true, modelFallback: r.fallback, confidence: r.confidence, ruleHitsCovered: true, outputChecksPassed: true,
-      verifyClean: r.verifyClean, verifyKeepPresent: r.verifyKeepPresent, pxPerMm: r.pxPerMm, isPhoto: true, hasMaster: false, warnings: r.warnings,
+      verifyClean: r.verifyClean, verifyKeepPresent: r.verifyKeepPresent, pxPerMm: r.pxPerMm, isPhoto: true, hasMaster: r.hasMaster, warnings: r.warnings,
       customerStandard: false, termInKeep: false, titleBlockFound: true,
     });
     expect(d.status).toBe("review");
-    expect(d.warnings.map((w) => w.code)).toEqual(expect.arrayContaining(["model_fallback", "no_master"]));
+    expect(d.warnings.map((w) => w.code)).toEqual(expect.arrayContaining(["model_fallback"]));
+  }, 120_000);
+
+  it("zmenšená fotka z prohlížeče (JPEG ≤ 2400 px) bez masteru → no_master; PNG je vždy originál", async () => {
+    const sharp = (await import("sharp")).default;
+    setFakeAnonHandler(() => null);
+    const small = new Uint8Array(await sharp(Buffer.from(p.jpeg)).rotate().resize({ width: 2400 }).jpeg({ quality: 85 }).toBuffer());
+    const r = await anonymizeImage({ bytes: small, hasMaster: false, ctx: ctx(), ai: null, verify: false, fill: "white" });
+    expect(r.hasMaster).toBe(false);
+    expect(r.warnings.some((w) => w.code === "no_master")).toBe(true);
+    const png = new Uint8Array(await sharp(Buffer.from(small)).resize({ width: 1200 }).png().toBuffer());
+    const r2 = await anonymizeImage({ bytes: png, hasMaster: false, ctx: ctx(), ai: null, verify: false, fill: "white" });
+    expect(r2.hasMaster).toBe(true);
+    expect(r2.warnings.some((w) => w.code === "no_master")).toBe(false);
   }, 120_000);
 
   it("vícestránkový TIFF → PDF se všemi stránkami", async () => {
@@ -234,11 +248,27 @@ describe("anonymizace fotky výkresu", () => {
     }
   }, 120_000);
 
-  it("HEIC bez převodu → unsupported", async () => {
+  it("poškozený HEIC → unsupported s návodem", async () => {
     const heicLike = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0]);
     const r = await anonymizeImage({ bytes: heicLike, hasMaster: false, ctx: ctx(), ai: null, verify: false, fill: "white" });
-    expect(r.unsupported).toBeTruthy();
+    expect(r.unsupported).toMatch(/^Nelze anonymizovat automaticky.*JPEG/);
   });
+
+  it("HEIC z iPhonu (HEVC) se dekóduje na serveru: orientace zapečená, výstup JPEG bez EXIF / GPS", async () => {
+    const { HEIC_SAMPLE_B64 } = await import("./__fixtures__/heic-sample");
+    const sharp = (await import("sharp")).default;
+    setFakeAnonHandler(() => null);
+    const heic = new Uint8Array(Buffer.from(HEIC_SAMPLE_B64, "base64"));
+    const r = await anonymizeImage({ bytes: heic, hasMaster: false, ctx: ctx(), ai: AI, verify: false, fill: "white" });
+    expect(r.unsupported).toBeNull();
+    expect(r.hasMaster).toBe(true);
+    expect(r.mime).toBe("image/jpeg");
+    const m = await sharp(Buffer.from(r.bytes!)).metadata();
+    expect([m.width, m.height]).toEqual([320, 240]);
+    expect(m.exif).toBeUndefined();
+    expect(m.xmp).toBeUndefined();
+    expect(Buffer.from(r.bytes!).toString("latin1")).not.toMatch(/Dvorak|GPS/);
+  }, 60_000);
 
   it("úklid env", () => {
     if (prevFake === undefined) delete process.env.AI_FAKE_ANON;

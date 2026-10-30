@@ -1,6 +1,7 @@
 import { createCaptureUpload, discardCapture } from "@/app/actions/capture";
 import { createClient } from "@/lib/supabase/client";
 import { downscaleImage, fitWithin, isDownscalableImage, jpegName } from "@/lib/jobs/upload-client";
+import { prepareHiresMaster } from "@/lib/anonymize/hires-client";
 import { CAPTURE_BATCH_MAX_FILE_BYTES, CAPTURE_SORT_SIDE } from "@/lib/jobs/capture-review";
 import type { CaptureDocKind, CaptureResult } from "@/lib/jobs/capture-types";
 import type {
@@ -72,7 +73,7 @@ async function sortPreview(file: Blob): Promise<Blob | null> {
  */
 export async function uploadCapturePage(
   file: File,
-  opts: { sortPreview?: boolean } = {},
+  opts: { sortPreview?: boolean; master?: boolean } = {},
 ): Promise<{ ok: true; ref: CaptureFileRef } | { ok: false; error: string }> {
   try {
     let body: Blob = file;
@@ -89,20 +90,31 @@ export async function uploadCapturePage(
     }
     if (body.size > CAPTURE_BATCH_MAX_FILE_BYTES) return { ok: false, error: "Soubor je větší než 50 MB." };
     const preview = image && opts.sortPreview !== false ? await sortPreview(body) : null;
-    const prep = await createCaptureUpload({ filename, size: body.size, mimeType: contentType, sortPreview: Boolean(preview) });
+    // fotka (může být výkres): originál z fotoaparátu vedle zmenšené stránky → anonymizace v plném rozlišení.
+    // HEIC, který prohlížeč neumí zmenšit, je originál sám (server ho přečte celý).
+    const master = image && opts.master !== false && !(body === file && /^image\/hei[cf]$/.test(contentType)) ? prepareHiresMaster(file) : null;
+    const prep = await createCaptureUpload({
+      filename, size: body.size, mimeType: contentType, sortPreview: Boolean(preview),
+      ...(master ? { master: { size: master.blob.size, mimeType: master.mime } } : {}),
+    });
     if (!prep.ok || !prep.path || !prep.token || !prep.bucket) return { ok: false, error: prep.error ?? "Nahrání se nepodařilo připravit." };
     const storage = createClient().storage.from(prep.bucket);
-    // stránka a náhled roztřídění souběžně (mobilní data: jedno čekání místo dvou)
+    // stránka, náhled roztřídění a master souběžně (mobilní data: jedno čekání místo tří)
     const withPreview = Boolean(preview && prep.sortPath && prep.sortToken);
-    const [main, side] = await Promise.all([
+    const withMaster = Boolean(master && prep.masterPath && prep.masterToken);
+    const [main, side, hires] = await Promise.all([
       storage.uploadToSignedUrl(prep.path, prep.token, body, { contentType, upsert: false }),
       withPreview ? storage.uploadToSignedUrl(prep.sortPath!, prep.sortToken!, preview!, { contentType: "image/jpeg", upsert: false }) : null,
+      withMaster ? storage.uploadToSignedUrl(prep.masterPath!, prep.masterToken!, master!.blob, { contentType: master!.mime, upsert: false }) : null,
     ]);
     if (main.error) {
       console.error(`[capture] Nahrání ${filename} selhalo: ${main.error.message}`);
-      if (withPreview && side && !side.error) discardCaptureQuietly({ paths: [prep.sortPath!] });
+      const extra = [...(withPreview && side && !side.error ? [prep.sortPath!] : []), ...(withMaster && hires && !hires.error ? [prep.masterPath!] : [])];
+      if (extra.length) discardCaptureQuietly({ paths: extra });
       return { ok: false, error: UPLOAD_FAILED };
     }
+    // master je jen pomůcka — bez něj se fotka anonymizuje ze zmenšené stránky (ke kontrole)
+    if (withMaster && hires?.error) console.error(`[capture] Originál ${filename} se nenahrál: ${hires.error.message}`);
     let sortPath: string | null = null;
     if (withPreview && side) {
       // náhled je jen pomůcka — když se nenahraje, server použije originál

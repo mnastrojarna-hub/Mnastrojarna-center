@@ -38,9 +38,12 @@ export async function GET(req: Request) {
     const pendingIds = (r.file_ids ?? []).filter((id) => { const s = statuses.get(id) ?? null; return s !== "done"; });
     // výkres, který odeslání blokuje (ke kontrole / selhal) → „Zkontrolovat výkres"
     const blockingFileId = pendingIds.find((id) => { const s = statuses.get(id); return s === "review" || s === "failed"; }) ?? null;
+    // soubor, který anonymizovat nejde (DWG, Word…) → super admin smí „Poslat originál…" (s potvrzením a auditem)
+    const unsupportedCount = (r.file_ids ?? []).filter((id) => statuses.get(id) === "unsupported").length;
     return {
       id: r.id, kind: r.kind, status: r.status, to: mine ? (label ?? to) : null, fileCount: (r.file_ids ?? []).length, pendingCount: pendingIds.length,
       createdAt: r.created_at, reason: mine ? r.reason : null, mine, blockingFileId: mine ? blockingFileId : null,
+      unsupportedCount: mine ? unsupportedCount : 0, canSendOriginal: admin && unsupportedCount > 0 && (r.status === "waiting" || r.status === "blocked"),
     };
   });
   return json({ items });

@@ -11,8 +11,9 @@ import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { FILE_KINDS, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
-  isUuid, jobFilePath, cleanText, cleanNumber, JOB_FILE_SELECT, translateDbError, type FileRow,
+  isUuid, jobFilePath, jobMasterPath, cleanText, cleanNumber, JOB_FILE_SELECT, translateDbError, type FileRow,
 } from "@/lib/jobs/mapping";
+import { masterUploadAllowed, storageHas } from "@/lib/anonymize/master";
 import type { DocIssuerKey, JobFileKind, JobFileOrigin } from "@/lib/supabase/database.types";
 import type { ActionResult, JobFile } from "@/lib/jobs/types";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
@@ -74,7 +75,9 @@ export async function createJobFileUpload(input: {
   filename: string;
   size: number;
   mimeType?: string;
-}): Promise<ActionResult<{ path: string; token: string; bucket: string }>> {
+  /** Zmenšená fotka: i podepsaná URL pro master v plném rozlišení (originál z fotoaparátu → anonymizace). */
+  master?: { size: number; mimeType: string } | null;
+}): Promise<ActionResult<{ path: string; token: string; bucket: string; masterPath?: string; masterToken?: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!input || !isUuid(input.jobId)) return fail("Neplatná zakázka.");
@@ -90,7 +93,19 @@ export async function createJobFileUpload(input: {
     const path = jobFilePath(input.jobId, crypto.randomUUID(), filename);
     const { data, error } = await c.db.storage.from(BUCKET).createSignedUploadUrl(path);
     if (error || !data?.token) return fail(error?.message ?? "Nepodařilo se připravit nahrání souboru.");
-    return { ok: true, path: (data.path as string | undefined) ?? path, token: data.token as string, bucket: BUCKET };
+    const out: { path: string; token: string; bucket: string; masterPath?: string; masterToken?: string } = {
+      path: (data.path as string | undefined) ?? path, token: data.token as string, bucket: BUCKET,
+    };
+    const masterPath = input.master ? jobMasterPath(out.path) : null;
+    if (masterPath && (await masterUploadAllowed(c.db, input.master?.mimeType, cleanNumber(input.master?.size)))) {
+      // master je jen pomůcka anonymizace — když URL nevznikne, nahraje se jen zmenšená fotka (jako dřív)
+      const m = await c.db.storage.from(BUCKET).createSignedUploadUrl(masterPath);
+      if (!m.error && m.data?.token) {
+        out.masterPath = (m.data.path as string | undefined) ?? masterPath;
+        out.masterToken = m.data.token as string;
+      }
+    }
+    return { ok: true, ...out };
   } catch (err) {
     return fail(err);
   }
@@ -119,10 +134,18 @@ export async function registerJobFile(input: {
   issuer?: DocIssuerKey | null;
   /** Revize objednávky, ke které doklad patří. */
   orderRevision?: number | null;
+  /** Fotka: master v plném rozlišení nahraný na podepsanou URL z createJobFileUpload (zdroj anonymizace). */
+  master?: boolean;
+  /** Fotka: hlavní soubor je nezmenšený originál (zdroj anonymizace = on sám). */
+  original?: boolean;
 }): Promise<ActionResult<{ file: JobFile }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!input || typeof input !== "object") return fail("Neplatná zakázka.");
+  // master: cesta pevně odvozená od hlavního souboru a jen když v úložišti opravdu je
+  const master = input.master === true ? jobMasterPath(String(input.path ?? "")) : null;
+  const masterOk = master ? await storageHas(c.db, BUCKET, master) : false;
+  const image = String(input.mimeType ?? "").toLowerCase().startsWith("image/");
   // náš vystavený doklad (potvrzení → „vystaveno“) zapisuje jen generateJobDocument přímo jádrem
   if ((input.origin as string | null | undefined) === "generated") return fail("Neplatný původ dokumentu.");
   // #25: doklad dodavatele k naší nabídce nepatří (jinak by se poslal jako „naše nabídka“ mimo schválení)
@@ -147,6 +170,7 @@ export async function registerJobFile(input: {
     kind: input.kind, title: input.title, quoteId: input.quoteId, note: input.note, replaceFileId: input.replaceFileId,
     aiExtracted: input.aiExtracted, aiConfidence: input.aiConfidence, silent: input.silent, noAutoVersion: input.noAutoVersion,
     origin: input.origin ?? null, issuer: input.issuer ?? null, orderRevision: input.orderRevision ?? null,
+    ...(masterOk && master ? { anonSourcePath: master } : image && input.original === true ? { anonSourceIsMain: true } : {}),
   });
   // výkres čeká na anonymizaci: akce nevykresluje — prohlížeč hned volá /api/drawings/anonymize/process
   // (upload-client), tohle je jen druhá šance (šťouchnutí po odpovědi), kdyby se prohlížeč zavřel
@@ -240,6 +264,10 @@ export async function deleteJobFile(fileId: string): Promise<ActionResult> {
       ? { data: [] }
       : await db.from("job_files").select("id").eq("replaced_by", fileId);
     const prevIds = ((prev ?? []) as { id: string }[]).map((r) => r.id);
+    // master fotky v plném rozlišení (zakazky/<zakázka>/master/…) patří jen tomuto dokumentu
+    const { data: src } = await db.from("job_files").select("anon_source_path").eq("id", fileId).maybeSingle();
+    const masterPath = (src as { anon_source_path: string | null } | null)?.anon_source_path ?? null;
+    const ownMaster = masterPath && file.storage_path && masterPath === jobMasterPath(file.storage_path) ? masterPath : null;
 
     const { error } = await db.from("job_files").delete().eq("id", fileId);
     if (error) return fail(error.message);
@@ -250,7 +278,7 @@ export async function deleteJobFile(fileId: string): Promise<ActionResult> {
 
     if (file.storage_path) {
       try {
-        const { error: stErr } = await db.storage.from(BUCKET).remove([file.storage_path]);
+        const { error: stErr } = await db.storage.from(BUCKET).remove([file.storage_path, ...(ownMaster ? [ownMaster] : [])]);
         if (stErr) console.error(`[job-files] Mazání z úložiště selhalo: ${stErr.message}`);
       } catch (e) {
         console.error(`[job-files] Mazání z úložiště selhalo: ${e instanceof Error ? e.message : String(e)}`);

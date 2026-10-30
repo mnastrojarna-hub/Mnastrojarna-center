@@ -42,11 +42,27 @@ export async function decodeImage(bytes: Uint8Array, page?: number): Promise<Ras
   return { width: info.width, height: info.height, channels: 3, data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), format: meta.format ?? "", downscaled };
 }
 
+/**
+ * Fotka HEIC / HEIF z iPhonu (kodek HEVC — sharp ho v předkompilované knihovně neumí) → JPEG q95 BEZ
+ * metadat (EXIF / GPS / XMP zahozeny). Dekóduje libheif (WebAssembly, heic-decode), orientace (irot /
+ * imir) je už zapečená. AVIF (AV1) přečte sharp sám — sem se nedostane.
+ */
+export async function heicToJpeg(bytes: Uint8Array): Promise<Uint8Array> {
+  const decode = (await import("heic-decode")).default;
+  const img = await decode({ buffer: bytes });
+  if (!img?.width || !img?.height || img.width * img.height > MAX_INPUT_PIXELS) throw new Error("Fotku HEIC nejde dekódovat.");
+  const sharp = await sharpLib();
+  const data = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
+  const jpeg = await sharp(data, { raw: { width: img.width, height: img.height, channels: 4 }, limitInputPixels: MAX_INPUT_PIXELS })
+    .removeAlpha().jpeg({ quality: 95 }).toBuffer();
+  return new Uint8Array(jpeg);
+}
+
 /** Počet stránek obrázku (vícestránkový TIFF). */
-export async function imagePages(bytes: Uint8Array): Promise<{ pages: number; format: string; compression?: string }> {
+export async function imagePages(bytes: Uint8Array): Promise<{ pages: number; format: string; compression?: string; width?: number; height?: number }> {
   const sharp = await sharpLib();
   const m = await sharp(Buffer.from(bytes), { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  return { pages: m.pages ?? 1, format: m.format ?? "", compression: (m as { compression?: string }).compression };
+  return { pages: m.pages ?? 1, format: m.format ?? "", compression: (m as { compression?: string }).compression, width: m.width, height: m.height };
 }
 
 /** Výřez rastru (px) → JPEG pro Claude (fitForClaude, q85). */

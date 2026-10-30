@@ -30,6 +30,11 @@ const ANON_TRACE = [
   "./node_modules/sharp/**",
   "./node_modules/@img/sharp-linux-x64/**",
   "./node_modules/@img/sharp-libvips-linux-x64/**",
+  // fotky HEIC z iPhonu (HEVC — sharp je neumí): libheif ve WebAssembly (wasm vložený v JS balíku)
+  "./node_modules/heic-decode/**",
+  "./node_modules/libheif-js/package.json",
+  "./node_modules/libheif-js/wasm-bundle.js",
+  "./node_modules/libheif-js/libheif-wasm/libheif-bundle.js",
 ];
 
 /** @type {import('next').NextConfig} */
@@ -42,7 +47,7 @@ const nextConfig = {
   // výchozím seznamu Next.js). pdfjs-dist se bundluje (klientské náhledy PDF ho importují přes
   // new URL(…, import.meta.url), což externí balík nedovolí); worker se v Node předává přímo
   // (globalThis.pdfjsWorker) a písma / cmaps se čtou z node_modules (tracing níže).
-  serverExternalPackages: ["@react-pdf/renderer", "@napi-rs/canvas"],
+  serverExternalPackages: ["@react-pdf/renderer", "@napi-rs/canvas", "heic-decode", "libheif-js"],
   // Zahrnout fonty do serverless funkce generující PDF + SQL migrace pro průvodce
   outputFileTracingIncludes: {
     // PDF se generuje i v akcích zakázek (uložení do dokumentů, odeslání nabídky)

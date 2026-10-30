@@ -39,6 +39,10 @@ export const ACCOUNTS = [
   { user: "smtpheal@nastrojarstvi.test", pass: "Smtpheal-Heslo-1", imap: true, pop3: true },
   // Pošta D: podpis s logem (src/lib/email/mail-d.integration.test.ts) a E2E 25 (kategorie, podpis, mobil)
   { user: "podpis@nastrojarstvi.test", pass: "Podpis-Heslo-1", imap: true, pop3: true },
+  // Pošta E: fronta K odeslání + „Přijmout a odeslat" (src/lib/email/mail-e.integration.test.ts) a E2E 26
+  // (obchodník si v Pošta → Nastavení pošty sám nastaví schránku, živá pošta)
+  { user: "outbox@nastrojarstvi.test", pass: "Outbox-Heslo-1", imap: true, pop3: true },
+  { user: "vit26@nastrojarstvi.test", pass: "Vit26-Heslo-1", imap: true, pop3: true },
   { user: "podpis25@nastrojarstvi.test", pass: "Podpis25-Heslo-1", imap: true, pop3: true },
 ];
 

@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Flag, Paperclip, FolderOpen, Building2, MessageSquareText, Sparkles, Send, Check, X, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import { Flag, Paperclip, FolderOpen, Building2, MessageSquareText, Sparkles, Send, Check, X, HelpCircle, Loader2 } from "lucide-react";
+import { MAIL_ACTION_LABEL, ROW_ACTIONS, mailActionHref, mailActionPlan, type MailActionKey } from "@/lib/email/mail-actions";
 import { PrioritySelect, type PriorityValue } from "@/components/priority";
 import { CategoryPicker, CategoryPill } from "@/components/mail/category-editor";
 import type { EmailCategory } from "@/lib/data/types";
@@ -30,7 +32,7 @@ export function AskingCategoryPill({ className }: { className?: string }) {
  * Řádek vlákna: vlaječka a priorita jedním ťuknutím, odesílatel, předmět, náhled, poznámka kolegy,
  * štítek kategorie (s `onCategory` jde opravit ťuknutím — přijatá i odeslaná zpráva řádku).
  */
-export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPriority, hideJob, onSuggestion, suggestionBusy, onCategory, onError }: {
+export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPriority, hideJob, onSuggestion, suggestionBusy, onCategory, onError, onAction, actionBusy }: {
   t: ThreadSummary;
   active: boolean;
   canAi: boolean;
@@ -46,9 +48,15 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
   /** Oprava kategorie zprávy řádku (t.emailId) — nová kategorie hned, při chybě zpět. */
   onCategory?: (c: EmailCategory) => void;
   onError?: (text: string) => void;
+  /** Pošta E: hlavní akce zprávy přímo z řádku (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu …). */
+  onAction?: (key: MailActionKey) => void;
+  actionBusy?: MailActionKey | null;
 }) {
   // zpráva řádku čeká na otázku „Patří k …?" → do rozhodnutí neutrální „K zakázce?" (ne kategorie z pravidel)
   const asking = neutralWhileAsking(t.category, Boolean(t.suggestion?.forMessage && (!t.suggestion.emailId || t.suggestion.emailId === t.emailId)));
+  const plan = mailActionPlan({ category: asking ? "K zakázce" : t.category, direction: t.direction, jobId: t.jobId });
+  const rowAction = onAction && plan.main && ROW_ACTIONS.includes(plan.main) && !(t.suggestion && !t.jobId) ? plan.main : null;
+  const rowHref = rowAction ? mailActionHref(rowAction, t.jobId) : null;
   const st = categoryStyle(asking ? "K zakázce" : t.category);
   const unread = t.unreadCount > 0 || Boolean(t.share?.unread);
   return (
@@ -120,6 +128,23 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
             <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px]"><Sparkles className="h-3 w-3" /> Návrh připraven</span>
           )}
           {canAi && t.aiConfidence > 0 && <AiConfidence value={t.aiConfidence} className="ml-auto" />}
+          {rowAction && (rowHref ? (
+            <Link
+              href={rowHref} className="ml-auto inline-flex min-h-7 items-center gap-1 rounded-full bg-emerald-600 px-2.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
+              data-testid="row-action" data-action={rowAction}
+            >
+              {MAIL_ACTION_LABEL[rowAction]}
+            </Link>
+          ) : (
+            <button
+              type="button" onClick={() => onAction?.(rowAction)} disabled={Boolean(actionBusy)}
+              className="ml-auto inline-flex min-h-7 items-center gap-1 rounded-full bg-emerald-600 px-2.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              data-testid="row-action" data-action={rowAction}
+            >
+              {actionBusy === rowAction && <Loader2 className="h-3 w-3 animate-spin" />}
+              {MAIL_ACTION_LABEL[rowAction]}
+            </button>
+          ))}
         </div>
       </div>
       {t.suggestion && (!t.jobNumber || t.suggestion.forMessage) && onSuggestion && (

@@ -7,6 +7,7 @@ import { createOperatorClient, hasServiceKey, isSupabaseConfigured } from "@/lib
 import { checkFeature } from "@/lib/auth/session";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
+import { CAPTURE_BUCKET, capturePagePath, isCapturePagePath } from "@/lib/jobs/capture-review";
 
 export interface ImportFileResult {
   fileName: string;
@@ -45,33 +46,74 @@ async function firstOwnMailboxId(userId: string): Promise<string | null> {
   }
 }
 
+export interface OutlookUploadSlot {
+  filename: string;
+  path: string;
+  token: string;
+  bucket: string;
+}
+
 /**
- * Import kompletních e-mailových souborů z Outlooku (.msg / .eml).
- * Každý soubor se naparsuje, projde stejnou ingest pipeline jako stažená
- * pošta (s AI jen při zapnutém hlavním vypínači) a uloží se do pošty toho,
- * kdo importuje (owner_id = já, schránka = moje první schránka).
+ * Krok 1 importu: podepsané URL pro přímé nahrání .msg / .eml do capture/<já>/ (e-mail s výkresy mívá
+ * desítky MB — přes server action by neprošel: limit těla 1 MB, Vercel 4,5 MB).
  */
-export async function importOutlookFiles(form: FormData): Promise<ImportResult> {
+export async function createOutlookImportUploads(files: { filename: string; size: number }[]): Promise<{ ok: boolean; error?: string; slots: OutlookUploadSlot[] }> {
+  const access = await checkFeature("mail");
+  if ("error" in access) return { ok: false, error: access.error, slots: [] };
+  if (!isSupabaseConfigured() || !hasServiceKey()) {
+    return { ok: false, error: "Pro import doplň Supabase servisní klíč (Nastavení → Integrace).", slots: [] };
+  }
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) return { ok: false, error: "Nebyly vybrány žádné soubory.", slots: [] };
+  if (list.length > MAX_FILES) return { ok: false, error: `Najednou lze nahrát max ${MAX_FILES} souborů.`, slots: [] };
+  const db = await createOperatorClient({ actor: userActor(access.user, "import") });
+  const slots: OutlookUploadSlot[] = [];
+  for (const f of list) {
+    const filename = String(f?.filename ?? "").slice(0, 255) || "email.eml";
+    if (!(Number(f?.size) > 0) || Number(f.size) > MAX_SIZE) return { ok: false, error: `Soubor ${filename} je prázdný nebo větší než 25 MB.`, slots: [] };
+    const path = capturePagePath(access.user.id, crypto.randomUUID(), filename);
+    const { data, error } = await db.storage.from(CAPTURE_BUCKET).createSignedUploadUrl(path);
+    if (error || !data?.token) return { ok: false, error: error?.message ?? "Nahrání se nepodařilo připravit.", slots: [] };
+    slots.push({ filename, path: (data.path as string | undefined) ?? path, token: data.token as string, bucket: CAPTURE_BUCKET });
+  }
+  return { ok: true, slots };
+}
+
+/**
+ * Import kompletních e-mailových souborů z Outlooku (.msg / .eml) — krok 2: soubory už leží v úložišti
+ * (createOutlookImportUploads), server je přečte, smaže a každý projde stejnou ingest pipeline jako stažená
+ * pošta (s AI jen při zapnutém hlavním vypínači); uloží se do pošty toho, kdo importuje (owner_id = já,
+ * schránka = moje první schránka).
+ */
+export async function importOutlookFiles(input: { files: { path: string; filename: string }[]; tooBig?: string[] }): Promise<ImportResult> {
   const access = await checkFeature("mail");
   if ("error" in access) return { ok: false, files: [], ingested: 0, message: access.error };
   const { user } = access;
-  if (!(form instanceof FormData)) return { ok: false, files: [], ingested: 0, message: "Neplatný požadavek." };
-  const files = form.getAll("files").filter((f): f is File => f instanceof File);
-  if (files.length === 0) return { ok: false, files: [], ingested: 0, message: "Nebyly vybrány žádné soubory." };
-  if (files.length > MAX_FILES) {
+  const refs = (Array.isArray(input?.files) ? input.files : []).filter((f) => isCapturePagePath(user.id, f?.path));
+  const tooBig = (Array.isArray(input?.tooBig) ? input.tooBig : []).map((n) => String(n).slice(0, 255));
+  if (refs.length === 0 && tooBig.length === 0) return { ok: false, files: [], ingested: 0, message: "Nebyly vybrány žádné soubory." };
+  if (refs.length > MAX_FILES) {
     return { ok: false, files: [], ingested: 0, message: `Najednou lze nahrát max ${MAX_FILES} souborů.` };
   }
 
-  const results: ImportFileResult[] = [];
+  const results: ImportFileResult[] = tooBig.map((fileName) => ({ fileName, ok: false, error: "Soubor je větší než 25 MB." }));
   const parsed: RawEmail[] = [];
+  const db = refs.length ? await createOperatorClient({ actor: userActor(user, "import") }) : null;
 
-  for (const file of files) {
-    if (file.size > MAX_SIZE) {
-      results.push({ fileName: file.name, ok: false, error: "Soubor je větší než 25 MB." });
-      continue;
-    }
+  for (const ref of refs) {
+    const name = String(ref.filename ?? "").slice(0, 255) || ref.path.split("/").pop() || "email";
+    const file = { name };
     try {
-      const buf = Buffer.from(await file.arrayBuffer());
+      const { data, error } = await db!.storage.from(CAPTURE_BUCKET).download(ref.path);
+      if (error || !data) {
+        results.push({ fileName: name, ok: false, error: "Soubor se nepodařilo načíst — nahraj ho znovu." });
+        continue;
+      }
+      const buf = Buffer.from(await (data as Blob).arrayBuffer());
+      if (buf.length > MAX_SIZE) {
+        results.push({ fileName: name, ok: false, error: "Soubor je větší než 25 MB." });
+        continue;
+      }
       const p = parseEmailFile(file.name, buf);
       if (!p.ok || !p.email) {
         results.push({ fileName: file.name, ok: false, error: p.error ?? "Nelze přečíst." });
@@ -87,6 +129,10 @@ export async function importOutlookFiles(form: FormData): Promise<ImportResult> 
     } catch (err) {
       results.push({ fileName: file.name, ok: false, error: err instanceof Error ? err.message : "Chyba čtení souboru." });
     }
+  }
+  // nahrané soubory jen dočasně (obsah je teď v poště)
+  if (db && refs.length) {
+    try { await db.storage.from(CAPTURE_BUCKET).remove(refs.map((r) => r.path)); } catch { /* vyprší samy (24 h) */ }
   }
 
   // Uložení (+ AI analýza, pokud je zapnutá) — vyžaduje Supabase + servisní klíč

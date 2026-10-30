@@ -5,11 +5,12 @@ import { CheckCircle2, Clock, Download, EyeOff, FileArchive, Loader2, Pencil, Re
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { cancelQueuedSend, sendQueuedWithoutPending } from "@/app/actions/drawing-anon";
+import { cancelQueuedSend, sendQueuedWithOriginals, sendQueuedWithoutPending } from "@/app/actions/drawing-anon";
 import { isAnonCandidate } from "@/lib/anonymize/candidate";
+import { useAccess } from "@/components/access-provider";
 import type { JobFile } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
-import { anonApi, downloadUrl, previewUrl, type SendQueueDto } from "./anon-api";
+import { anonApi, downloadUrl, previewUrl, type AnonTableParam, type SendQueueDto } from "./anon-api";
 import { FileAnonBadge } from "./anon-badge";
 import { describeCounts, displayReason, isBudgetWait, NOTHING_REMOVED, sendQueueText, sendQueueWhat, type AnonUiStatus } from "./anon-status";
 
@@ -63,20 +64,70 @@ export function supplierReady(f: JobFile): boolean {
  * Viditelná akce řádku „Pro dodavatele" (anonymizovaná kopie) — vedle stažení originálu, aby
  * nejzřetelnější stažení u anonymizovaného výkresu nebyl originál zákazníka.
  */
-export function ForSupplierLink({ file, onReviewDownload }: { file: JobFile; onReviewDownload: (f: JobFile) => void }) {
+export function ForSupplierLink({ file, onReviewDownload, wrapClassName }: { file: JobFile; onReviewDownload: (f: JobFile) => void; wrapClassName?: string }) {
+  const superAdmin = useAccess().role === "super_admin";
+  const wrap = (el: React.ReactElement) => (wrapClassName ? <div className={wrapClassName}>{el}</div> : el);
+  // formát, který anonymizovat nejde (DWG, Word…): originál ven jen super admin s výslovným potvrzením
+  if (!file.archived && file.anon?.status === "unsupported" && canAnonymize(file)) return superAdmin ? wrap(<OriginalForSupplier file={file} />) : null;
   if (!supplierReady(file)) return null;
   const cls = "inline-flex min-h-8 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200";
   if (file.anon?.status === "review") {
-    return (
+    return wrap(
       <button type="button" className={cn(cls, "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100")} onClick={() => onReviewDownload(file)} data-testid="anon-for-supplier">
         <Download className="h-3.5 w-3.5" /> Pro dodavatele…
-      </button>
+      </button>,
     );
   }
-  return (
+  return wrap(
     <a href={downloadUrl(file.id)} className={cls} title={`Anonymizovaná kopie: ${file.anon?.filename ?? ""}`} data-testid="anon-for-supplier">
       <Download className="h-3.5 w-3.5" /> Pro dodavatele
-    </a>
+    </a>,
+  );
+}
+
+/** Text výslovného potvrzení originálu (stejný v ZIPu, u souboru i ve frontě odeslání). */
+export const ORIGINAL_CONFIRM = "Poslat ORIGINÁL bez anonymizace (zákazník bude vidět) — potvrzuji jako super admin";
+
+/**
+ * „Poslat originál…" u souboru, který anonymizovat nejde (jen super admin): potvrzení s varováním, stažení
+ * přes /download?original=1 (server ověří roli a stav, zapíše audit, soubor bez původního názvu).
+ */
+export function OriginalForSupplier({ file, table }: { file: Pick<JobFile, "id" | "filename" | "anon">; table?: AnonTableParam }) {
+  const [open, setOpen] = React.useState(false);
+  const [ok, setOk] = React.useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => { setOk(false); setOpen(true); }} data-testid="anon-send-original"
+        className="inline-flex min-h-8 items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 text-[11px] font-semibold text-red-800 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+        <ShieldOff className="h-3.5 w-3.5" /> Poslat originál…
+      </button>
+      {open && (
+        <Dialog open onOpenChange={(o) => !o && setOpen(false)}>
+          <DialogContent aria-describedby={undefined} className="w-[calc(100%-1.5rem)] sm:max-w-lg">
+            <div className="space-y-3 p-5">
+              <DialogTitle>Poslat originál bez anonymizace?</DialogTitle>
+              <p className="text-sm text-muted-foreground">{file.anon?.reason ?? "Tento formát nejde anonymizovat automaticky."}</p>
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-900 dark:bg-red-500/10 dark:text-red-100">
+                Dodavatel uvidí zákazníka, projektanta i razítko. Soubor se stáhne bez původního názvu a stažení se zapíše do auditu.
+              </p>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm text-red-900 dark:border-red-500/30 dark:text-red-100" data-testid="anon-send-original-confirm">
+                <input type="checkbox" className="h-5 w-5" checked={ok} onChange={(e) => setOk(e.target.checked)} /> {ORIGINAL_CONFIRM}
+              </label>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="ghost" onClick={() => setOpen(false)}>Zrušit</Button>
+                <Button asChild={ok} variant="send" disabled={!ok}>
+                  {ok ? (
+                    <a href={downloadUrl(file.id, { table, original: true })} onClick={() => setTimeout(() => setOpen(false), 300)} data-testid="anon-send-original-download">
+                      <Download className="h-4 w-4" /> Stáhnout originál
+                    </a>
+                  ) : <span className="inline-flex items-center gap-2"><Download className="h-4 w-4" /> Stáhnout originál</span>}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 
@@ -198,6 +249,9 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   const [open, setOpen] = React.useState(false);
   const [sel, setSel] = React.useState<Set<string>>(new Set());
   const [reviewed, setReviewed] = React.useState<Set<string>>(new Set());
+  /** Super admin výslovně potvrdil originál bez anonymizace (formát, který anonymizovat nejde). */
+  const [originals, setOriginals] = React.useState<Set<string>>(new Set());
+  const superAdmin = useAccess().role === "super_admin";
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<{ url: string | null; included: number; missing: { filename: string; reason: string }[] } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -206,6 +260,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   function openDialog() {
     setSel(new Set(candidates.filter((f) => f.anon?.status === "done").map((f) => f.id)));
     setReviewed(new Set());
+    setOriginals(new Set());
     setResult(null);
     setError(null);
     setOpen(true);
@@ -214,7 +269,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   async function build() {
     setBusy(true);
     setError(null);
-    const r = await anonApi.supplierPack(jobId, [...sel], [...reviewed].filter((id) => sel.has(id)));
+    const r = await anonApi.supplierPack(jobId, [...sel], [...reviewed].filter((id) => sel.has(id)), [...originals].filter((id) => sel.has(id)));
     setBusy(false);
     if (!r.ok) {
       const d = r.data as { missing?: { filename: string; reason: string }[] } | undefined;
@@ -239,7 +294,8 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
               <ul className="divide-y rounded-lg border">
                 {candidates.map((f) => {
                   const st = f.anon!.status;
-                  const usable = st === "done" || st === "review";
+                  const unsupported = st === "unsupported";
+                  const usable = st === "done" || st === "review" || (unsupported && superAdmin && originals.has(f.id));
                   return (
                     <li key={f.id} className="flex flex-col gap-1 px-3 py-2">
                       <label className={cn("flex min-h-11 items-center gap-2 text-sm", !usable && "opacity-60")}>
@@ -256,6 +312,22 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
                         </span>
                         <FileAnonBadge status={st} reviewed={f.anon?.reviewed} reason={f.anon?.reason} total={usable ? f.anon?.total : null} />
                       </label>
+                      {unsupported && (
+                        <div className="ml-7 space-y-1">
+                          {f.anon?.reason && <p className="text-[11px] text-muted-foreground">{f.anon.reason}</p>}
+                          {superAdmin && (
+                            <label className="flex min-h-9 items-center gap-2 text-xs text-red-800 dark:text-red-300" data-testid="supplier-pack-original">
+                              <input type="checkbox" className="h-4 w-4" checked={originals.has(f.id)}
+                                onChange={(e) => {
+                                  const on = e.target.checked;
+                                  setOriginals((s) => { const n = new Set(s); if (on) n.add(f.id); else n.delete(f.id); return n; });
+                                  setSel((s) => { const n = new Set(s); if (on) n.add(f.id); else n.delete(f.id); return n; });
+                                }} />
+                              {ORIGINAL_CONFIRM}
+                            </label>
+                          )}
+                        </div>
+                      )}
                       {st === "review" && sel.has(f.id) && (
                         <div className="ml-7 flex flex-wrap items-center gap-x-3 gap-y-1">
                           {onEdit && EDITABLE.test(f.filename) && (
@@ -368,6 +440,23 @@ export function SendQueueNotice({ jobId, refreshKey, files = [], onEdit }: { job
     void load();
   }
 
+  /** „Poslat originál…" (super admin): potvrzení v dialogu → server ověří roli, zapíše audit a odešle. */
+  const [originalFor, setOriginalFor] = React.useState<SendQueueDto | null>(null);
+  const [confirmOk, setConfirmOk] = React.useState(false);
+  async function sendOriginal(id: string) {
+    setBusy(id);
+    setError(null);
+    try {
+      const r = await sendQueuedWithOriginals(id, true);
+      if (!r.ok) setError(r.error);
+      else setOriginalFor(null);
+    } catch {
+      setError("Spojení se nepovedlo — zkus to znovu.");
+    }
+    setBusy(null);
+    void load();
+  }
+
   if (!items.length) return null;
   return (
     <div className="space-y-2" data-testid="send-queue-notice">
@@ -392,6 +481,12 @@ export function SendQueueNotice({ jobId, refreshKey, files = [], onEdit }: { job
                     <ScanSearch className="h-4 w-4" /> Zkontrolovat výkres
                   </Button>
                 )}
+                {q.canSendOriginal && (
+                  <Button size="sm" variant="outline" className="min-h-11 border-red-300 text-red-800 sm:min-h-8 dark:text-red-200" disabled={busy === q.id}
+                    onClick={() => { setConfirmOk(false); setOriginalFor(q); }} data-testid="send-queue-original">
+                    <ShieldOff className="h-4 w-4" /> Poslat originál…
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" className="min-h-11 sm:min-h-8" disabled={busy === q.id} onClick={() => void act(q.id, "cancel")}><X className="h-4 w-4" /> Zrušit</Button>
                 <Button size="sm" variant="outline" className="min-h-11 sm:min-h-8" disabled={busy === q.id} onClick={() => void act(q.id, "send")}>
                   {busy === q.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Odeslat hned bez těchto výkresů
@@ -402,6 +497,31 @@ export function SendQueueNotice({ jobId, refreshKey, files = [], onEdit }: { job
         );
       })}
       {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {originalFor && (
+        <Dialog open onOpenChange={(o) => !o && busy === null && setOriginalFor(null)}>
+          <DialogContent aria-describedby={undefined} className="w-[calc(100%-1.5rem)] sm:max-w-lg">
+            <div className="space-y-3 p-5">
+              <DialogTitle>Poslat originál bez anonymizace?</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {originalFor.unsupportedCount === 1 ? "1 soubor" : `${originalFor.unsupportedCount ?? 0} soubory`} v tomto odeslání nejde anonymizovat automaticky
+                (např. DWG, Word). Ostatní výkresy odejdou jen jako anonymizované kopie.
+              </p>
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-900 dark:bg-red-500/10 dark:text-red-100">
+                Dodavatel uvidí zákazníka, projektanta i razítko. Originál odejde bez původního názvu a zapíše se do auditu.
+              </p>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm text-red-900 dark:border-red-500/30 dark:text-red-100" data-testid="send-queue-original-confirm">
+                <input type="checkbox" className="h-5 w-5" checked={confirmOk} onChange={(e) => setConfirmOk(e.target.checked)} /> {ORIGINAL_CONFIRM}
+              </label>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="ghost" onClick={() => setOriginalFor(null)} disabled={busy !== null}>Zrušit</Button>
+                <Button variant="send" disabled={!confirmOk || busy !== null} onClick={() => void sendOriginal(originalFor.id)} data-testid="send-queue-original-send">
+                  {busy === originalFor.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Odeslat s originálem
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

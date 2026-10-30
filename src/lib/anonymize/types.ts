@@ -5,7 +5,7 @@
  */
 
 export type AnonStatus = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";
-export type AnonMethod = "raster_pdf" | "image" | "image_pdf" | "dxf" | "step";
+export type AnonMethod = "raster_pdf" | "image" | "image_pdf" | "dxf" | "step" | "stl" | "iges";
 export type AnonCategory =
   | "company" | "logo" | "person" | "signature" | "path" | "contact" | "code" | "copyright_owner" | "custom" | "other";
 export type RegionSource = "rule" | "ai" | "manual" | "cache";
@@ -135,7 +135,8 @@ export type AnonWarningCode =
   | "customer_standard" | "term_in_keep" | "area_cap" | "keep_overlap" | "verify_leak" | "verify_keep_missing"
   | "verify_new_graphic" | "no_title_block" | "dxf_graphics" | "dxf_layer_term" | "step_suspicious" | "residue"
   | "text_layer_untrusted" | "ai_failed" | "budget" | "too_large" | "approval_mode" | "low_confidence"
-  | "scan_page" | "excluded_pages" | "mixed_content" | "ai_removed_text" | "truncated" | "no_terms" | "cut_uncertain" | "hidden_text" | "plot_stamp";
+  | "scan_page" | "excluded_pages" | "mixed_content" | "ai_removed_text" | "truncated" | "no_terms" | "cut_uncertain" | "hidden_text" | "plot_stamp"
+  | "nothing_found";
 
 export interface AnonWarning {
   code: AnonWarningCode;

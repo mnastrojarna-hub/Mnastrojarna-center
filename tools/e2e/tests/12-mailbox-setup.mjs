@@ -219,15 +219,15 @@ await T("certifikát jen na cizí jméno → nabídne potvrzení, po souhlasu na
   await page.close();
 });
 
-await T("Přijatá pošta: Stáhnout poštu → zprávy v seznamu, stav schránky", async (context) => {
+await T("Přijatá pošta: Přijmout a odeslat → zprávy v seznamu, stav schránky", async (context) => {
   const id = boxId("jmeno@nastrojarstvi.test");
   sql(`delete from emails where mailbox_id = '${id}'`);
   sql(`update mailbox_status set sync_state = '{}'::jsonb where mailbox_id = '${id}'`);
   const page = await context.newPage();
   await login(page, USERS.admin);
   await page.goto(`${BASE}/inbox?schranka=${id}`);
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
-  await page.getByText(/Staženo \d+, nových 3/).waitFor({ timeout: 90_000 });
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
+  await page.getByText(/Přijato 3, odesláno \d+/).waitFor({ timeout: 90_000 });
   await page.getByText("Nabídka materiálu").first().waitFor({ timeout: 20_000 });
   const body = await page.locator("main").innerText();
   expect(body.includes("Objednávka 4500123") && body.includes("Poptávka hřídele 50 ks"), "zprávy jmeno@ v Přijaté poště");
@@ -252,6 +252,8 @@ await T("obchodník vidí jen svou schránku (+ stav na Můj účet), nemá př�
   const d = await page.request.post(`${BASE}/api/mailboxes/diagnose`, { data: { action: "detect", email: "jmeno@nastrojarstvi.test", password: "x" } });
   expect(d.status() === 403, `diagnostika jen pro super admina (je ${d.status()})`);
   await page.goto(`${BASE}/account`);
+  // karta schránky se dočítá po vykreslení stránky — počkat na ni (jinak občas prázdný text)
+  await page.locator("main").getByText("kolega@mnastrojarna.test").first().waitFor({ timeout: 20_000 }).catch(() => undefined);
   const acc = await page.locator("main").innerText();
   expect(acc.includes("kolega@mnastrojarna.test") && /staženo/.test(acc), "Můj účet: schránka a čas stažení");
   await shot(page, "12-inbox-obchod");
@@ -275,7 +277,7 @@ await T("odmítnuté heslo: ručně se zkusí, automatické stažení při otev�
   await page.goto(`${BASE}/inbox`);
   await page.waitForLoadState("networkidle");
   const n0 = await logins();
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).click();
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).click();
   await page.getByText(/Přihlášení odmítnuto/).first().waitFor({ timeout: 60_000 });
   const n1 = await logins();
   expect(n1 === n0 + 1, `ruční stažení se přihlásilo jednou (${n0} → ${n1})`);
@@ -342,7 +344,7 @@ await T("mobil: nastavení schránek a Přijatá pošta bez vodorovného přeté
   await shot(page, "12-mobile-settings");
   expect(over <= 1, `nastavení: přetéká o ${over}px`);
   await page.goto(`${BASE}/inbox`);
-  await page.getByRole("button", { name: /Stáhnout poštu/ }).waitFor();
+  await page.getByRole("button", { name: /Přijmout a odeslat/ }).waitFor();
   const over2 = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   await shot(page, "12-mobile-inbox");
   expect(over2 <= 1, `pošta: přetéká o ${over2}px`);

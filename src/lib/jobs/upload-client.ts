@@ -1,13 +1,17 @@
 import { createJobFileUpload, registerJobFile } from "@/app/actions/job-files";
 import { createClient } from "@/lib/supabase/client";
-import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
+import { guessFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
+import { prepareHiresMaster } from "@/lib/anonymize/hires-client";
+import { CANDIDATE_KINDS } from "@/lib/anonymize/candidate";
 import type { JobFileKind } from "@/lib/supabase/database.types";
 import type { JobFile } from "@/lib/jobs/types";
 
 /**
  * Nahrání dokumentu zakázky z prohlížeče: velké fotky se nejdřív zmenší,
  * soubor jde přímo do Supabase Storage (podepsaná URL), pak se zaregistruje.
+ * U zmenšené fotky, která může být výkres, jde vedle ní i originál (master v plném rozlišení —
+ * zdroj anonymizace); nezmenšená fotka je originál sama.
  */
 
 export type UploadPhase = "zmenseni" | "nahravani" | "ukladani";
@@ -98,11 +102,18 @@ export async function downscaleImage(file: File): Promise<Blob> {
   }
 }
 
+/** Fotka, která může být výkresem zákazníka (anonymizace) — ne fotka dodacího listu / faktury. */
+function mayBeDrawing(file: File, kind: JobFileKind | undefined): boolean {
+  const k = kind ?? guessFileKind(file.name || "foto.jpg", file.type || undefined);
+  return (CANDIDATE_KINDS as readonly string[]).includes(k);
+}
+
 export async function uploadJobFile(file: File, opts: UploadJobFileOptions): Promise<UploadJobFileResult> {
   try {
     let body: Blob = file;
     let filename = file.name || "soubor";
     let contentType = file.type || "application/octet-stream";
+    let downscaled = false;
 
     if (isDownscalableImage(file.type)) {
       opts.onPhase?.("zmenseni");
@@ -111,22 +122,32 @@ export async function uploadJobFile(file: File, opts: UploadJobFileOptions): Pro
         body = small;
         filename = jpegName(filename);
         contentType = "image/jpeg";
+        downscaled = true;
       }
     }
     if (body.size > JOB_FILE_MAX_BYTES) {
       return { ok: false, error: `Soubor ${file.name} je příliš velký (max. ${Math.round(JOB_FILE_MAX_BYTES / 1024 / 1024)} MB).` };
     }
+    // zmenšená fotka výkresu: originál z fotoaparátu jde vedle ní (anonymizace v plném rozlišení)
+    const master = downscaled && mayBeDrawing(file, opts.kind) ? prepareHiresMaster(file) : null;
 
     opts.onPhase?.("nahravani");
-    const prep = await createJobFileUpload({ jobId: opts.jobId, filename, size: body.size, mimeType: contentType });
+    const prep = await createJobFileUpload({
+      jobId: opts.jobId, filename, size: body.size, mimeType: contentType,
+      ...(master ? { master: { size: master.blob.size, mimeType: master.mime } } : {}),
+    });
     if (!prep.ok || !prep.path || !prep.token || !prep.bucket) {
       return { ok: false, error: prep.error ?? "Nahrání se nepodařilo připravit." };
     }
-    const supabase = createClient();
-    const { error: upErr } = await supabase.storage
-      .from(prep.bucket)
-      .uploadToSignedUrl(prep.path, prep.token, body, { contentType, upsert: false });
-    if (upErr) return { ok: false, error: `Nahrání selhalo: ${upErr.message}` };
+    const storage = createClient().storage.from(prep.bucket);
+    const withMaster = Boolean(master && prep.masterPath && prep.masterToken);
+    const [main, side] = await Promise.all([
+      storage.uploadToSignedUrl(prep.path, prep.token, body, { contentType, upsert: false }),
+      withMaster ? storage.uploadToSignedUrl(prep.masterPath!, prep.masterToken!, master!.blob, { contentType: master!.mime, upsert: false }) : null,
+    ]);
+    if (main.error) return { ok: false, error: `Nahrání selhalo: ${main.error.message}` };
+    // master je jen pomůcka — bez něj se fotka anonymizuje ze zmenšené kopie (ke kontrole)
+    if (side?.error) console.error(`[upload] Originál ${file.name} se nenahrál: ${side.error.message}`);
 
     opts.onPhase?.("ukladani");
     const reg = await registerJobFile({
@@ -140,6 +161,8 @@ export async function uploadJobFile(file: File, opts: UploadJobFileOptions): Pro
       quoteId: opts.quoteId,
       note: opts.note,
       replaceFileId: opts.replaceFileId,
+      ...(withMaster && side && !side.error ? { master: true } : {}),
+      ...(!downscaled && contentType.toLowerCase().startsWith("image/") ? { original: true } : {}),
     });
     if (!reg.ok || !reg.file) return { ok: false, error: reg.error ?? "Dokument se nepodařilo uložit." };
     // výkres čeká na anonymizaci → hned spustit zpracování na serveru (route, ne server action; bez čekání)

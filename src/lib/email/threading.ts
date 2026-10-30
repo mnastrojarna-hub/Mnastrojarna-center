@@ -1,9 +1,9 @@
 /**
  * Vlákna a odpovědi — čistá logika (server i klient, testy v threading.test.ts).
  *
- * Do vlákna řadí e-maily DB (trigger emails_thread_assign, migrace 20261029100000): podle
- * In-Reply-To / References (Message-ID), jinak odpověď bez hlaviček podle předmětu bez „Re:" +
- * protistrany. TS dvojče normalizace předmětu (`normalizeSubject`, `isReplySubject`, `subjectKey`)
+ * Do vlákna řadí e-maily DB (trigger emails_thread_assign, migrace 20261030130000 — dvojče `assignThread`
+ * níže): podle In-Reply-To / References (Message-ID); odpověď bez hlaviček jen s prokazatelnou citací
+ * dřívější zprávy — nikdy jen podle stejného předmětu. TS dvojče normalizace předmětu (`normalizeSubject`, `isReplySubject`, `subjectKey`)
  * MUSÍ odpovídat SQL funkcím mail_subject_norm / mail_subject_is_reply / mail_first_address.
  */
 
@@ -166,4 +166,115 @@ export interface ThreadMessageLike {
 /** Zprávy vlákna od nejstarší po nejnovější (stabilně podle času, pak id). */
 export function sortThread<T extends ThreadMessageLike>(messages: readonly T[]): T[] {
   return messages.slice().sort((a, b) => (Date.parse(a.receivedAt) || 0) - (Date.parse(b.receivedAt) || 0) || a.id.localeCompare(b.id));
+}
+
+// ── Pravidlo vlákna (Pošta E, majitel 30. 10.: „Poptávka Brisk" ≠ jedna konverzace) ──
+// TS dvojče SQL triggeru emails_thread_assign (migrace 20261030130000). Vlákno = JEN skutečná konverzace:
+//  1. In-Reply-To / References → vlákno odkazované zprávy (stejná schránka),
+//  2. starší zpráva přišla až po odpovědi → vlákno odpovědi, která na ni odkazuje (hlavičkami, nebo
+//     „Re:" bez hlaviček, která ji prokazatelně cituje),
+//  3. Outlook / M365 conversationId — jen bez hlaviček odpovědi a jen u „Re:/Fw:" (hlavičky mají přednost),
+//  4. „Re:/Fw:" BEZ hlaviček jen tehdy, když tělo cituje dřívější zprávu se stejným předmětem a protistranou,
+//  5. jinak nové vlákno. Stejný předmět bez „Re:/Fw:" = vždy nové vlákno (žádné párování podle předmětu).
+
+/** Minimální délka citovaného začátku zprávy (bez mezer a „>"), aby citace byla průkazná. */
+export const QUOTE_MIN_CHARS = 30;
+
+function squash(v: string | null | undefined): string {
+  return (v ?? "").toLowerCase().replace(/[\s>]+/g, "");
+}
+
+/** Cituje tělo `body` začátek zprávy `snippet`? (= SQL mail_quotes) */
+export function quotesMessage(body: string | null | undefined, snippet: string | null | undefined): boolean {
+  const s = squash(snippet).slice(0, 60);
+  return s.length >= QUOTE_MIN_CHARS && squash(body).includes(s);
+}
+
+export interface ThreadCandidate {
+  id: string;
+  threadId: string;
+  mailboxId: string | null;
+  messageId: string | null;
+  inReplyTo?: string | null;
+  references?: readonly string[] | null;
+  subject: string | null;
+  /** Začátek těla (snippet) — pro ověření citace. */
+  snippet?: string | null;
+  /** Tělo (jen pro „Re:" bez hlaviček, které přišlo dřív než citovaný originál). */
+  body?: string | null;
+  direction: "in" | "out";
+  fromEmail?: string | null;
+  toEmail?: string | null;
+  receivedAt: string;
+  conversationId?: string | null;
+}
+
+export interface NewThreadMessage extends Omit<ThreadCandidate, "threadId"> {
+  body?: string | null;
+}
+
+function idVariants(ids: readonly (string | null | undefined)[]): Set<string> {
+  const out = new Set<string>();
+  for (const raw of ids) {
+    const v = (raw ?? "").trim();
+    if (!v) continue;
+    const bare = v.replace(/^<|>$/g, "");
+    out.add(bare);
+    out.add(`<${bare}>`);
+  }
+  return out;
+}
+
+/** Vlákno nové zprávy podle pravidel výše (existing = už uložené zprávy). */
+export function assignThread(msg: NewThreadMessage, existing: readonly ThreadCandidate[]): string {
+  const sameBox = existing.filter((e) => e.mailboxId === msg.mailboxId);
+  const latest = (list: ThreadCandidate[]) => list.sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))[0];
+  const refs = idVariants([...(msg.references ?? []), msg.inReplyTo]);
+  if (refs.size) {
+    const hit = latest(sameBox.filter((e) => e.messageId && refs.has(e.messageId)));
+    if (hit) return hit.threadId;
+  }
+  if (msg.messageId) {
+    const own = idVariants([msg.messageId]);
+    const child = sameBox
+      .filter((e) => [...idVariants([...(e.references ?? []), e.inReplyTo])].some((r) => own.has(r)))
+      .sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt))[0];
+    if (child) return child.threadId;
+  }
+  const reply = isReplySubject(msg.subject);
+  // původní zpráva stažená až po „Re:" bez hlaviček, která ji prokazatelně cituje → vlákno té odpovědi
+  if (normalizeSubject(msg.subject) && msg.snippet !== undefined) {
+    const key = subjectKey(msg);
+    const quoting = sameBox
+      .filter((e) => isReplySubject(e.subject) && !(e.references?.length) && !e.inReplyTo && subjectKey(e) === key
+        && Date.parse(e.receivedAt) >= Date.parse(msg.receivedAt) && quotesMessage(e.body, msg.snippet))
+      .sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt))[0];
+    if (quoting) return quoting.threadId;
+  }
+  if (!refs.size && reply && msg.conversationId) {
+    const conv = latest(sameBox.filter((e) => e.conversationId && e.conversationId === msg.conversationId));
+    if (conv) return conv.threadId;
+  }
+  if (reply && normalizeSubject(msg.subject)) {
+    const key = subjectKey(msg);
+    const quoted = latest(sameBox.filter((e) => subjectKey(e) === key && Date.parse(e.receivedAt) <= Date.parse(msg.receivedAt) && quotesMessage(msg.body, e.snippet)));
+    if (quoted) return quoted.threadId;
+  }
+  return `m:${msg.mailboxId ?? "-"}:${(msg.messageId ?? "").trim() || msg.id}`;
+}
+
+/**
+ * Po uložení původní zprávy (stažené až po odpovědích): vlákna odpovědí, která na ni odkazují hlavičkami
+ * nebo ji prokazatelně citují a nemají nic staršího — připojí se k jejímu vláknu (= SQL emails_thread_adopt).
+ */
+export function threadsToAdopt(msg: NewThreadMessage & { threadId: string }, existing: readonly ThreadCandidate[]): string[] {
+  const own = idVariants([msg.messageId]);
+  const at = Date.parse(msg.receivedAt);
+  const key = subjectKey(msg);
+  const kids = existing.filter((e) => e.mailboxId === msg.mailboxId && e.threadId !== msg.threadId && Date.parse(e.receivedAt) >= at && (
+    (own.size > 0 && [...idVariants([...(e.references ?? []), e.inReplyTo])].some((r) => own.has(r)))
+    || (isReplySubject(e.subject) && !e.inReplyTo && !(e.references?.length) && subjectKey(e) === key && quotesMessage(e.body, msg.snippet))
+  ));
+  const tids = [...new Set(kids.map((k) => k.threadId))];
+  return tids.filter((t) => !existing.some((o) => o.threadId === t && Date.parse(o.receivedAt) < at));
 }

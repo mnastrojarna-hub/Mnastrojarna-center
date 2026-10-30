@@ -65,7 +65,7 @@ export async function processQueue(opts: ProcessOptions = {}): Promise<ProcessOu
   const db = opts.db ?? (createAdminClient({ actor }) as AnonDb);
   const out: ProcessOutcome = { results: [], remaining: 0, kicked: 0, kickFailed: 0, stoppedBy: "empty" };
   const tried: string[] = [];
-  const filter = { ids: opts.ids ?? null, jobIds: table === "job_files" ? opts.jobIds ?? null : null, includeBackfill: Boolean(opts.includeBackfill) };
+  const filter: { ids: string[] | null; jobIds: string[] | null; includeBackfill: boolean } = { ids: opts.ids ?? null, jobIds: table === "job_files" ? opts.jobIds ?? null : null, includeBackfill: Boolean(opts.includeBackfill) };
   let fannedOut = opts.fanOut === false;
   for (;;) {
     if (out.results.length >= maxFiles) { out.stoppedBy = "max"; break; }
@@ -91,6 +91,9 @@ export async function processQueue(opts: ProcessOptions = {}): Promise<ProcessOu
       console.error(`[anonymize] Běh fronty ${table}/${id}: ${err instanceof Error ? err.message : String(err)}`);
     }
     out.results.push(...res);
+    // rozbalený archiv / e-mail: nové soubory zakázky se zpracují ve stejném běhu (jinak by čekaly na plánovač)
+    const spawned = res.flatMap((r) => r.spawned ?? []);
+    if (spawned.length && filter.ids) filter.ids = [...new Set([...filter.ids, ...spawned])];
   }
   out.remaining = (await runnableIds(db, table, { ...filter, limit: 50 })).length;
   return out;

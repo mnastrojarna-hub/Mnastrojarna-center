@@ -2,6 +2,7 @@
 
 import { discardCapture as discardCaptureFiles, prepareCaptureUpload } from "@/lib/jobs/capture-service";
 import type { ActionResult } from "@/lib/jobs/types";
+import type { CaptureUploadPrep } from "@/lib/jobs/capture-review";
 
 /**
  * „📷 Vyfotit doklad" — nahrání stránek přímo do Supabase Storage (Vercel omezuje tělo
@@ -15,7 +16,9 @@ export async function createCaptureUpload(input: {
   mimeType?: string;
   /** Fotka v dávce: i podepsaná URL pro náhled roztřídění. */
   sortPreview?: boolean;
-}): Promise<ActionResult<{ path: string; token: string; bucket: string; sortPath?: string; sortToken?: string }>> {
+  /** Fotka: i podepsaná URL pro master v plném rozlišení (anonymizace výkresu). */
+  master?: { size: number; mimeType: string } | null;
+}): Promise<ActionResult<CaptureUploadPrep>> {
   return prepareCaptureUpload(input);
 }
 

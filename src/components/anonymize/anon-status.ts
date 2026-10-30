@@ -112,7 +112,9 @@ export function fileAnonLabel(a: {
     case "failed":
       return { label: "Anonymizace selhala", tone: "error", hint: displayReason("failed", a.reason) ?? "Zkus to znovu." };
     case "unsupported":
-      return { label: "Nelze anonymizovat", tone: "muted", hint: a.reason ?? "Formát nelze anonymizovat — pošli PDF, DXF nebo STEP." };
+      // archiv / e-mail rozbalený do samostatných souborů (ty se anonymizují samy)
+      if (/^Rozbaleno/i.test(a.reason ?? "")) return { label: "Rozbaleno", tone: "muted", hint: a.reason ?? "" };
+      return { label: "Nelze anonymizovat automaticky", tone: "warn", hint: a.reason ?? "Formát nelze anonymizovat — pošli PDF, DXF nebo STEP." };
     case "skipped":
       return { label: skippedLabel(a.reason), tone: "muted", hint: a.reason ?? "Bez anonymizace." };
     default:
@@ -175,7 +177,7 @@ export function jobAnonBadge(b: JobBadgeInput | null | undefined): JobBadgeView 
     const all = b.done === anonymizable;
     parts.push({ text: `Výkresy ${b.done}/${anonymizable}${all ? " ✓" : ""}`, tone: all ? "ok" : "muted" });
   }
-  if (b.unsupported) parts.push({ text: `${b.unsupported} nejde (DWG)`, tone: "muted" });
+  if (b.unsupported) parts.push({ text: `${b.unsupported} nelze automaticky`, tone: "muted" });
   const tone: AnonTone = b.failed ? "error" : b.review || b.sendWaiting ? "warn" : parts.some((p) => p.tone === "busy") ? "busy" : parts.every((p) => p.tone === "ok") ? "ok" : "muted";
   const title = `Výkresy pro dodavatele (firma, jména, logo, cesty smazané): ${parts.map((p) => p.text).join(" · ")}`;
   const visible = parts.slice(0, 2);

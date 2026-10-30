@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiRequire } from "@/lib/auth/session";
 import { isUuidLike } from "@/lib/email/visibility";
-import { detectMine, listMyMailboxes, removeMine, saveMine, setMineActive, testMine, testSendMine } from "@/lib/email/my-mailbox";
+import { detectMine, listMyMailboxes, removeMine, saveMine, setMineActive, testDraftMine, testMine, testSendMine } from "@/lib/email/my-mailbox";
 import { logAudit } from "@/lib/audit";
 import { userActor } from "@/lib/supabase/actor-headers";
 import type { MailboxConfig } from "@/lib/supabase/database.types";
@@ -14,8 +14,9 @@ export const dynamic = "force-dynamic";
 /**
  * Moje e-mailová schránka (každý uživatel s poštou, jen svou vlastní — owner_id = já):
  *   GET → moje schránky (bez hesel)
- *   POST { action: "detect", email, password?, mailboxId?, preset?, host?, smtpHost?, smtpPort?, smtpTls? } → najít nastavení (IMAP/POP3 + SMTP)
- *   POST { action: "save", mailboxId?, email, displayName?, password?, smtpPassword?, config } → uložit
+ *   POST { action: "detect", email, password?, mailboxId?, preset?, host?, port?, protocol?, smtpHost?, smtpPort?, smtpTls?, user? } → najít nastavení (IMAP/POP3 + SMTP)
+ *   POST { action: "save", mailboxId?, email, displayName?, password?, smtpPassword?, keepSmtpPassword?, config } → uložit
+ *   POST { action: "testDraft", mailboxId?, email, password?, separateSmtp?, smtpPassword?, config } → test vyplněného (před uložením)
  *   POST { action: "test", mailboxId } → test příjmu i odesílání (spojení + přihlášení)
  *   POST { action: "testSend", mailboxId } → zkušební e-mail na vlastní adresu (+ kopie do Odeslaných)
  *   POST { action: "active", mailboxId, active } / { action: "delete", mailboxId } → vypnout / odpojit
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
       case "detect": {
         const r = await detectMine(uid, {
           mailboxId, email: str("email") ?? "", password: str("password"), preset: str("preset"), host: str("host"),
+          port: Number(body.port) || undefined, protocol: str("protocol"),
           smtpHost: str("smtpHost"), smtpPort: Number(body.smtpPort) || undefined, smtpTls: str("smtpTls"),
           user: str("user"), allowNameMismatch: body.allowNameMismatch === true,
         });
@@ -56,10 +58,16 @@ export async function POST(req: Request) {
       case "save": {
         const r = await saveMine(uid, {
           mailboxId, email: str("email") ?? "", displayName: str("displayName"), password: str("password"), smtpPassword: str("smtpPassword"),
+          keepSmtpPassword: body.keepSmtpPassword === true,
           config: (typeof body.config === "object" && body.config ? body.config : {}) as MailboxConfig,
         });
         return NextResponse.json(r, { status: r.ok ? 200 : 400 });
       }
+      case "testDraft":
+        return NextResponse.json(await testDraftMine(uid, {
+          mailboxId, email: str("email") ?? "", password: str("password"), separateSmtp: body.separateSmtp === true, smtpPassword: str("smtpPassword"),
+          config: (typeof body.config === "object" && body.config ? body.config : {}) as MailboxConfig,
+        }));
       case "test":
         if (!mailboxId) return NextResponse.json({ error: "Schránka nenalezena." }, { status: 400 });
         return NextResponse.json(await testMine(uid, mailboxId));
