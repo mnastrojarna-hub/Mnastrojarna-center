@@ -431,7 +431,7 @@ export const DELIVERY_STATES: Record<DeliveryState, FlowStateMeta<DeliveryState>
   }),
   k_expedici: meta({
     key: "k_expedici", phase: "delivery", label: "K expedici", short: "Expedice",
-    description: "Výroba je hotová — zapiš dodání (vystav DL).",
+    description: "Zboží je hotové / u nás — zapiš dodání a vystav dodací list.",
     icon: Package, tone: "action", palette: "green.action", source: "derived", terminal: false,
   }),
 };
@@ -1670,7 +1670,7 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "production.sendPo": act({ key: "production.sendPo", label: "Odeslat objednávku dodavateli", icon: Send, intent: "primary", feature: "margins", kind: "link", href: tab("vyroba") }),
   "production.undo": act({ key: "production.undo", label: "Vrátit předání do výroby", icon: Undo2, intent: "secondary", feature: "orders", kind: "dialog" }),
   "purchasing.notifySuppliers": act({ key: "purchasing.notifySuppliers", label: "Stornovat u dodavatelů…", icon: Ban, intent: "secondary", feature: "margins", kind: "dialog" }),
-  "delivery.record": act({ key: "delivery.record", label: "Zapsat dodání", icon: Truck, intent: "primary", feature: "workflow", kind: "dialog" }),
+  "delivery.record": act({ key: "delivery.record", label: "Zapsat dodání a dodací list", icon: Truck, intent: "primary", feature: "workflow", kind: "dialog" }),
   "delivery.closeShort": act({ key: "delivery.closeShort", label: "Uzavřít s menším množstvím…", icon: PackageCheck, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "delivery.partialNote": act({ key: "delivery.partialNote", label: "Částečná dodávka…", icon: CircleDotDashed, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "delivery.confirmNote": act({ key: "delivery.confirmNote", label: "Potvrdit DL", icon: ClipboardCheck, intent: "primary", feature: "orders", kind: "dialog" }),
@@ -1913,7 +1913,7 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     // ve výrobě má přednost dodání (= chip řádku); chybějící potvrzení je pak jen v menu
     if (rank >= 5) {
       if (s.delivery === "castecne") return allowed(ctx, "delivery.record", "Dodat zbytek");
-      if (s.delivery === "k_expedici") return allowed(ctx, "delivery.record", "Zapsat dodání");
+      if (s.delivery === "k_expedici") return allowed(ctx, "delivery.record", "Zapsat dodání a dodací list");
       if (f.stage === "ve_vyrobe") return productionNext(f, ctx);
       return null;
     }

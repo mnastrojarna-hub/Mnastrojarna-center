@@ -23,6 +23,7 @@ import { useJobDetail } from "./detail-context";
 import { InlineEditor, PersonChip, useOptimisticValue } from "./inline-field";
 import { UploadButton } from "./upload-controls";
 import { DocumentsMenu } from "./documents-menu";
+import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 import { ConfirmDialog } from "./confirm-dialog";
 import { MergeJobDialog } from "./merge-job-dialog";
 import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty } from "./detail-helpers";
@@ -64,7 +65,7 @@ export function JobToolbar({ job }: { job: JobDetail }) {
           <CaptureButton jobId={job.id} label="Foto" size="sm" className="sm:hidden" />
           <CaptureButton jobId={job.id} label="Přidat doklad (foto)" size="sm" className="hidden sm:inline-flex" />
           <UploadButton size="sm" compact className="px-2.5 sm:px-3" />
-          <DocumentsMenu quotes={job.quotes} acceptedQuoteId={job.acceptedQuoteId} size="sm" compact className="px-2.5 sm:px-3" />
+          <DocumentsMenu quotes={job.quotes} acceptedQuoteId={job.acceptedQuoteId} items={job.items} files={job.files} size="sm" compact className="px-2.5 sm:px-3" />
           {(perms.canDelete || perms.canMerge) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -282,7 +283,7 @@ export function JobHeader({ job }: { job: JobDetail }) {
               <StageSelect jobId={job.id} stage={job.stage} flow={job.flow} quotes={job.flowQuotes} />
               <StageStamp className="max-w-[18rem]" />
             </div>
-            <FlowStageChip hidePendingQuote={approval?.flag.kind === "pending"} />
+            <FlowStageChip hidePendingQuote={approval?.flag.kind === "pending"} deliveryNote={currentDeliveryNotes(job.files ?? [])[0] ?? null} />
             {approval && (
               // #25: neschválenou nabídku vidí všichni, ale výrazně označenou; po schválení razítko kdo a kdy
               <QuoteApprovalFlag flag={approval.flag} suffix={approval.suffix} wrap className="lg:self-end" />

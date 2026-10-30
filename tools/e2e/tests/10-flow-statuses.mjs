@@ -44,6 +44,7 @@ async function cleanup() {
     sql(`delete from purchase_order_items where purchase_order_id in (select id from purchase_orders where job_id in (${inList}))`);
     sql(`delete from purchase_orders where job_id in (${inList})`);
     sql(`delete from documents where order_id in (${inList})`);
+    sql(`delete from delivery_notes where order_id in (${inList})`); // DL dodávek (order_id on delete set null)
     sql(`delete from invoices where order_id in (${inList})`);
     sql(`delete from emails where order_id in (${inList}) and direction = 'out'`);
     sql(`update emails set order_id = null where order_id in (${inList})`);
@@ -418,6 +419,7 @@ await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → 
   // výroba ještě běží (krok U nás) → nejdřív „Ukončit výrobu"; tady dodání postaru (částečné dodání během výroby)
   await skipFinish(dlg);
   await dlg.getByRole("button", { name: `Vše — Deska A ${TAG}` }).click();
+  await dlg.getByLabel(`Dodávám teď — Čep B ${TAG}`).fill(""); // předvyplněný zbytek → dílčí dodávka jen Desky A
   await dlg.getByRole("button", { name: "Zapsat dodání" }).click();
   await eventually(() => {
     const o = row(J);

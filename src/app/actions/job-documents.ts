@@ -31,6 +31,8 @@ import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
 import { FLOW_QUOTE_COLUMNS, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent } from "@/lib/jobs/flow-status";
 import { quoteSnapshotSha } from "@/lib/jobs/quote-approval-store";
 import { assertJobFileAccess, FILE_PRICE_SEND } from "@/lib/jobs/job-file-access";
+import { deliveredRows, deliveryNoteNumberOf } from "@/lib/jobs/delivery-notes";
+import { fileOfNote, issueDeliveryNote, issuedDeliveryNotes, reissueFromSnapshot } from "@/lib/jobs/delivery-notes-store";
 
 /**
  * Doklady ze zakázky: PDF (nabídka, potvrzení, dodací list, faktura) se vygeneruje
@@ -223,11 +225,12 @@ function docFingerprint(kind: JobDocumentKind, data: unknown, extra: Record<stri
 export async function generateJobDocument(
   jobId: string,
   kind: JobDocumentKind,
-  opts?: { quoteId?: string; note?: string; force?: boolean; reuse?: boolean },
+  opts?: { quoteId?: string; note?: string; force?: boolean; reuse?: boolean; deliveryNoteId?: string },
 ): Promise<ActionResult<{ fileId: string; number: string; filename: string; version: number; unpriced: number; code: "approval" }>> {
   if (!isDocKind(kind)) return fail("Neznámý druh dokladu.");
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (opts?.quoteId !== undefined && opts.quoteId !== "" && !isUuid(opts.quoteId)) return fail("Nabídka nenalezena.");
+  if (opts?.deliveryNoteId !== undefined && opts.deliveryNoteId !== "" && !isUuid(opts.deliveryNoteId)) return fail("Dodací list nenalezen.");
   const c = await begin();
   if ("error" in c) return fail(c.error);
   const { db, user } = c;
@@ -303,6 +306,34 @@ export async function generateJobDocument(
       fpData = data;
       render = () => renderConfirmationPdf(data);
     } else if (kind === "dodaci_list") {
+      // dodávky s vlastními DL: stáhnout vystavený DL (žádné nové číslo); DL na zbytek = „Zapsat dodání"
+      const notes = await issuedDeliveryNotes(db, jobId);
+      if (notes.length) {
+        const pick = opts?.deliveryNoteId ? notes.find((n) => n.id === opts.deliveryNoteId!.toLowerCase()) : notes[notes.length - 1];
+        if (!pick) return fail("Dodací list k této zakázce nepatří.");
+        const file = await fileOfNote(db, jobId, pick.storage_path);
+        if (file) return { ok: true, fileId: file.id, number: pick.number, filename: file.filename, version: file.version ?? 1, unpriced: 0 };
+        // PDF se ztratilo (smazaný dokument) → nové PDF se stejným číslem ze záznamu DL
+        const re = await reissueFromSnapshot(db, user.id, job, pick, preparedBy);
+        revalidateDocs(jobId);
+        return { ok: true, fileId: re.fileId, number: pick.number, filename: re.filename, version: re.version, unpriced: 0 };
+      }
+      // dodáno bez DL (starší dodání / nezaškrtnuté „Vystavit dodací list") → DL na dodané zboží,
+      // ne na objednané množství; uloží se jako DL dodávky (příště se jen stáhne, číslo se nemění)
+      const shipped = deliveredRows(job.items);
+      if (shipped.length) {
+        try {
+          const dn = await issueDeliveryNote(db, user.id, job, shipped, { note: note ?? null, preparedBy });
+          await logAudit({
+            action: "document_issued", entity: "job_files", entityId: dn.fileId,
+            diff: { jobId, kind: "dodaci_list", number: dn.number, version: dn.version, deliveryNoteId: dn.id, delivered: true },
+          });
+          revalidateDocs(jobId);
+          return { ok: true, fileId: dn.fileId, number: dn.number, filename: dn.filename, version: dn.version, unpriced: 0 };
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
+        }
+      }
       const existing = (job.deliveryNoteNumber ?? "").trim();
       const allocated = existing || (await nextDocNumber(db, "DL"));
       if (!allocated) return fail("Nepodařilo se přidělit číslo dodacího listu.");
@@ -329,6 +360,9 @@ export async function generateJobDocument(
       }
       number = allocated;
       const data = await buildInvoiceDoc(job, { number, preparedBy, note });
+      // dodávky s vlastními DL → na faktuře všechna čísla dodacích listů
+      const dls = await issuedDeliveryNotes(db, jobId).catch(() => []);
+      if (dls.length) data.deliveryNoteNumber = dls.map((n) => n.number).join(", ");
       invoice = {
         number, variableSymbol: data.variableSymbol, issueDate: data.issueDate, taxableDate: data.taxableDate,
         dueDate: data.dueDate, currency: data.currency, items: data.items, note,
@@ -442,7 +476,7 @@ interface FileForMail {
 async function docNumberForFile(
   db: JobsDb,
   kind: DocumentEmailKind,
-  file: { quote_id: string | null },
+  file: { quote_id: string | null; filename?: string | null },
   job: { number: string | null; invoice_number: string | null; delivery_note_number: string | null },
 ): Promise<string | null> {
   if (kind === "nabidka" && file.quote_id) {
@@ -450,7 +484,7 @@ async function docNumberForFile(
     return (data as { number: string | null } | null)?.number ?? null;
   }
   if (kind === "potvrzeni") return job.number ? confirmationNumber(job.number) : null;
-  if (kind === "dodaci_list") return job.delivery_note_number ?? null;
+  if (kind === "dodaci_list") return deliveryNoteNumberOf(file.filename) ?? job.delivery_note_number ?? null;
   if (kind === "faktura") return job.invoice_number ?? null;
   return null;
 }
@@ -683,7 +717,8 @@ async function composeDocumentEmail(
     input.deliveryDate = dateOnly(job.dueDate ?? job.customerRequiredDate) ?? null;
     input.quoteNumber = relevantQuote(job)?.number ?? null;
   } else if (kind === "dodaci_list") {
-    input.number = job.deliveryNoteNumber;
+    // každá dodávka má vlastní DL — číslo z dokumentu, ne jediné číslo zakázky
+    input.number = deliveryNoteNumberOf(file.filename) ?? job.deliveryNoteNumber;
     input.deliveryDate = dateOnly(job.dueDate) ?? null;
   } else if (kind === "faktura") {
     input.number = job.invoiceNumber;

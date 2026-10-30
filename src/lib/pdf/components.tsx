@@ -378,9 +378,20 @@ export function DeliveryItemsTable({ items }: { items: DeliveryItem[] }) {
           <Text style={[styles.cellNum, { width: W.num }]}>{i + 1}</Text>
           {hasDrawing ? <DrawingCell it={it} width={drawingW} /> : null}
           <ItemText it={it} />
-          <Text style={[styles.cellRight, { width: qtyW, paddingRight: 4, fontWeight: "bold" }]}>
-            {czNumber(it.quantity)} <Text style={[styles.cellUnit, { fontWeight: "normal" }]}>{it.unit}</Text>
-          </Text>
+          <View style={{ width: qtyW, paddingRight: 4 }}>
+            <Text style={[styles.cellRight, { fontWeight: "bold" }]}>
+              {czNumber(it.quantity)} <Text style={[styles.cellUnit, { fontWeight: "normal" }]}>{it.unit}</Text>
+            </Text>
+            {it.ordered !== undefined && it.deliveredTotal !== undefined && !(it.quantity === it.ordered && it.deliveredTotal === it.ordered) ? (
+              // dílčí / konečná dodávka: kolik je dodáno celkem (i s touto dodávkou) z objednaného
+              <>
+                <Text style={[styles.cellSub, { textAlign: "right" }]}>celkem dodáno</Text>
+                <Text style={[styles.cellSub, { textAlign: "right" }]}>{czNumber(it.deliveredTotal)} z {czNumber(it.ordered)} {it.unit}</Text>
+              </>
+            ) : it.ordered !== undefined && it.ordered !== it.quantity ? (
+              <Text style={[styles.cellSub, { textAlign: "right" }]}>z {czNumber(it.ordered)} {it.unit}</Text>
+            ) : null}
+          </View>
           <View style={{ width: W.check, alignItems: "center" }}>
             <View style={styles.checkBox} />
           </View>

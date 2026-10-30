@@ -7,6 +7,7 @@ import { AlertTriangle, CheckCircle2, Eye, FileOutput, Loader2, Send, ExternalLi
 import { Button } from "@/components/ui/button";
 import { ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { generateJobDocument, type JobDocumentKind } from "@/app/actions/job-documents";
+import { listDeliveryNotes, type DeliveryNoteListItem } from "@/app/actions/delivery-notes";
 import { FILE_KINDS } from "@/lib/jobs/file-kinds";
 import { stageMeta } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
@@ -57,8 +58,21 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
   const [warning, setWarning] = React.useState<string | null>(null);
   const [done, setDone] = React.useState<{ fileId: string; filename: string; number: string; version: number; kind: JobDocumentKind; jobId: string; sentTo?: string } | null>(null);
   const [sending, setSending] = React.useState(false);
+  // dodací listy dodávek vybrané zakázky (stáhnout; další DL = „Zapsat dodání" v kartě zakázky)
+  const [notes, setNotes] = React.useState<{ jobId: string; list: DeliveryNoteListItem[] } | null>(null);
 
   const job = jobs.find((j) => j.id === jobId) ?? null;
+
+  React.useEffect(() => {
+    if (!jobId || kind !== "dodaci_list") return;
+    if (notes?.jobId === jobId) return;
+    let live = true;
+    listDeliveryNotes(jobId)
+      .then((res) => { if (live) setNotes({ jobId, list: res.ok ? res.notes ?? [] : [] }); })
+      .catch(() => { if (live) setNotes({ jobId, list: [] }); });
+    return () => { live = false; };
+  }, [jobId, kind, notes?.jobId]);
+  const jobNotes = kind === "dodaci_list" && notes && notes.jobId === jobId ? notes.list : [];
   const items: ComboItem[] = React.useMemo(
     () => jobs.map((j) => ({
       id: j.id,
@@ -158,6 +172,32 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
         </div>
       </div>
 
+      {jobNotes.length > 0 && job && (
+        <div className="space-y-2 rounded-xl border border-green-200 bg-green-50/60 p-3 text-sm dark:border-green-500/30 dark:bg-green-500/10" data-testid="issue-delivery-notes">
+          <p className="font-medium text-green-900 dark:text-green-100">
+            Zakázka má {jobNotes.length === 1 ? "dodací list k dodávce" : `${jobNotes.length} dodací listy k dodávkám`} — stáhni ho, nový DL nevzniká.
+          </p>
+          <ul className="space-y-1">
+            {jobNotes.map((n) => (
+              <li key={n.id} className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-semibold">{n.number}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {n.lines.map((l) => `${l.description} ${new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 3 }).format(l.quantity)} ${l.unit}`).join(" · ")}
+                </span>
+                {n.fileId && (
+                  <Button asChild size="sm" variant="outline" className="h-8">
+                    <a href={`/api/jobs/files/${n.fileId}`} target="_blank" rel="noopener noreferrer">PDF <ExternalLink className="h-3.5 w-3.5" /></a>
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            DL na zbývající položky vystavíš v kartě zakázky:{" "}
+            <Link href={`/orders/${job.id}?tab=vyroba&akce=delivery.record`} className="font-medium text-foreground underline underline-offset-2">Zapsat dodání a dodací list</Link>.
+          </p>
+        </div>
+      )}
       <ErrorBox error={error} />
       {warning && (
         <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">

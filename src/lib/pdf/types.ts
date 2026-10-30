@@ -40,6 +40,10 @@ export interface DeliveryItem {
   revision?: string;
   material?: string;
   note?: string;
+  /** Objednáno celkem — u dílčí dodávky se pod množstvím ukáže „z 10 ks". */
+  ordered?: number;
+  /** Dodáno celkem i s touto dodávkou — pod množstvím „celkem dodáno 10 z 10 ks". */
+  deliveredTotal?: number;
 }
 
 /** Společné nepovinné reference všech dokladů (zakázka, zákazník, lidé). */
@@ -152,6 +156,10 @@ export interface DeliveryNoteData extends DocRefs {
   weightKg?: number;
   /** Způsob dopravy. */
   transport?: string;
+  /** Označení dodávky („2. dílčí dodávka", „3. dodávka — konečná"); jediná kompletní dodávka bez označení. */
+  deliveryLabel?: string;
+  /** Co ještě zbývá dodat (dílčí dodávka), např. „1 položka". */
+  remainingText?: string;
 }
 
 // ── Formátování (cs-CZ) ─────────────────────────────────────

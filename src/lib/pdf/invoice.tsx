@@ -143,7 +143,9 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
             {data.customerOrderNumber
               ? ` Plnění dle Vaší objednávky č. ${data.customerOrderNumber}${data.customerOrderDate ? ` ze dne ${czDate(data.customerOrderDate)}` : ""}.`
               : ""}
-            {data.deliveryNoteNumber ? ` Dodáno dodacím listem č. ${data.deliveryNoteNumber}.` : ""}
+            {data.deliveryNoteNumber
+              ? ` Dodáno ${data.deliveryNoteNumber.includes(",") ? "dodacími listy" : "dodacím listem"} č. ${data.deliveryNoteNumber}.`
+              : ""}
           </Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 8 }}>
             <Text style={{ fontSize: 9, lineHeight: 1.3, color: C.ink }}>Děkujeme za Vaši objednávku a těšíme se na další spolupráci.</Text>

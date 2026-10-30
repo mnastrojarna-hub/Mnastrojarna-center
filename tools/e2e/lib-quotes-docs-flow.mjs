@@ -218,6 +218,7 @@ export async function cleanupOwnData() {
     const paths = sql(`select storage_path from job_files where job_id in (${inList}) and storage_path is not null`).split("\n").filter(Boolean);
     await removeStorageFiles(paths);
     sql(`delete from documents where order_id in (${inList})`);
+    sql(`delete from delivery_notes where order_id in (${inList})`); // DL dodávek (order_id on delete set null)
     sql(`delete from invoices where order_id in (${inList})`);
     sql(`delete from emails where order_id in (${inList}) and direction = 'out'`);
     sql(`update emails set order_id = null where order_id in (${inList})`);

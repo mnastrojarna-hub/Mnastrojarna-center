@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, PackageCheck, Truck } from "lucide-react";
+import { Check, Download, FileText, PackageCheck, Send, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProgressPill } from "@/components/flow-status/progress-pill";
 import { StateChip } from "@/components/flow-status/state-chip";
@@ -11,6 +11,9 @@ import { DELIVERY_STATES, flowRank } from "@/lib/jobs/flow-status";
 import type { JobDetail } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { deliveredSummary } from "./delivery-dialog";
+import { noteDownloadHref } from "./delivery-note-result";
+import { DocumentSendDialog } from "@/components/flow/document-send-dialog";
+import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 
 /**
  * Dodání zákazníkovi po položkách: „2/3 položek" (nikdy součet kusů různých dílů), u každé
@@ -19,6 +22,7 @@ import { deliveredSummary } from "./delivery-dialog";
  */
 export function DeliveryCard({ job, className }: { job: JobDetail; className?: string }) {
   const flow = useFlowActions();
+  const [sending, setSending] = React.useState<{ id: string; filename: string; number: string } | null>(null);
   const facts = flow?.facts;
   if (!flow || !facts?.orderStatus) return null;
   if (job.stage === "reklamace" || job.stage === "nerealizovano" || job.stage === "zruseno") return null;
@@ -29,6 +33,7 @@ export function DeliveryCard({ job, className }: { job: JobDetail; className?: s
   const summary = items.length ? deliveredSummary(items) : null;
   const allDone = summary ? summary.done === summary.total : rank >= 9;
   const can = flow.ctx.can("workflow");
+  const notes = currentDeliveryNotes(job.files ?? []);
 
   return (
     <section aria-label="Dodání zákazníkovi" className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", className)}>
@@ -67,7 +72,7 @@ export function DeliveryCard({ job, className }: { job: JobDetail; className?: s
         {can && !allDone && (
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="success" className="h-11 sm:h-9" onClick={() => flow.run(items.length ? "delivery.record" : "delivery.partialNote")}>
-              <Truck /> {key === "castecne" ? "Dodat zbytek" : "Zapsat dodání"}
+              <Truck /> {key === "castecne" ? "Dodat zbytek" : items.length ? "Zapsat dodání a dodací list" : "Zapsat dodání"}
             </Button>
             {key === "castecne" && items.length > 0 && (
               <Button type="button" variant="outline" className="h-11 sm:h-9" onClick={() => flow.run("delivery.closeShort")}>
@@ -76,7 +81,40 @@ export function DeliveryCard({ job, className }: { job: JobDetail; className?: s
             )}
           </div>
         )}
+        {notes.length > 0 && (
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-medium text-muted-foreground">Dodací listy</h4>
+            <ul className="divide-y rounded-lg border text-sm" aria-label="Dodací listy">
+              {notes.map((n) => (
+                <li key={n.id} className="flex flex-wrap items-center gap-2 px-2.5 py-1.5">
+                  <FileText className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" aria-hidden />
+                  <a href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-mono text-xs font-medium hover:underline">
+                    {n.number}{n.label && <span className="font-sans font-normal text-muted-foreground"> · {n.label}</span>}
+                  </a>
+                  <Button asChild size="sm" variant="ghost" className="h-9 px-2">
+                    <a href={noteDownloadHref(n.id)} download={n.filename} aria-label={`Stáhnout ${n.number}`}><Download /></a>
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-9 px-2" aria-label={`Poslat ${n.number} zákazníkovi`} onClick={() => setSending(n)}>
+                    <Send />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
+      {sending && (
+        <DocumentSendDialog
+          open
+          onOpenChange={(o) => { if (!o) setSending(null); }}
+          jobId={job.id}
+          kind="dodaci_list"
+          fileId={sending.id}
+          filename={sending.filename}
+          title={`Poslat dodací list ${sending.number} zákazníkovi`}
+          onSent={() => setSending(null)}
+        />
+      )}
     </section>
   );
 }

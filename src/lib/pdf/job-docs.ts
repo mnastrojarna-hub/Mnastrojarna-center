@@ -306,6 +306,46 @@ export async function buildDeliveryNoteDoc(
   };
 }
 
+/**
+ * Dodací list jedné dodávky („Zapsat dodání"): jen položky a množství, které odešly teď
+ * (u dílčí dodávky „z 10 ks"), bez cen. Řádky bez položky zakázky (fallback ze záznamu
+ * delivery_note_items) nesou jen popis, množství a jednotku.
+ */
+export async function buildDeliveryDoc(
+  job: JobDetail,
+  opts: {
+    number: string;
+    lines: { itemId?: string | null; quantity: number; ordered?: number; deliveredTotal?: number; description?: string; unit?: string }[];
+    issueDate?: string;
+    deliveryLabel?: string;
+    remainingText?: string;
+    preparedBy?: string;
+    note?: string;
+  },
+): Promise<DeliveryNoteData> {
+  await refreshCompanyFromSettings();
+  const refs = jobRefs(job);
+  const items: DeliveryItem[] = opts.lines.map((l) => {
+    const it = l.itemId ? job.items.find((i) => i.id === l.itemId) : undefined;
+    if (!it) return { description: u(l.description) ?? "Položka", quantity: l.quantity, unit: u(l.unit) ?? "ks", ordered: l.ordered };
+    const { description, unit, drawingNumber, revision, material, note } = jobItemToDoc(it);
+    return { description, unit, drawingNumber, revision, material, note, quantity: l.quantity, ordered: l.ordered ?? it.quantity, deliveredTotal: l.deliveredTotal };
+  });
+  return {
+    ...refs,
+    number: opts.number,
+    issueDate: opts.issueDate ?? todayIso(),
+    supplier: supplierParty(),
+    customer: jobCustomerParty(job),
+    items,
+    transport: u(job.deliveryMethod),
+    note: u(opts.note),
+    preparedBy: u(opts.preparedBy) ?? refs.contactPerson,
+    deliveryLabel: u(opts.deliveryLabel),
+    remainingText: u(opts.remainingText),
+  };
+}
+
 export async function buildInvoiceDoc(
   job: JobDetail,
   opts: {

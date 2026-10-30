@@ -397,7 +397,7 @@ describe("nextAction (tabulka 1.12)", () => {
     expect(next(o({ stage: "potvrzeno", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1, hasOperations: true }))?.key).toBe("production.handoff");
     const vv = o({ stage: "ve_vyrobe", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1 });
     expect(next({ ...vv, itemsCount: 2, itemsDelivered: 1 })).toEqual({ key: "delivery.record", label: "Dodat zbytek" });
-    expect(next({ ...vv, productionDone: 2, productionTotal: 2 })).toEqual({ key: "delivery.record", label: "Zapsat dodání" });
+    expect(next({ ...vv, productionDone: 2, productionTotal: 2 })).toEqual({ key: "delivery.record", label: "Zapsat dodání a dodací list" });
     // ve výrobě bez kroků (starší zakázka) → doplnit kdo a termín (dřív žádný další krok)
     expect(next(vv)).toEqual({ key: "production.handoff", label: "Doplnit kdo a termín…" });
     // ve výrobě bez odeslaného potvrzení: dodání má přednost, potvrzení jen v menu (review UX 3)
