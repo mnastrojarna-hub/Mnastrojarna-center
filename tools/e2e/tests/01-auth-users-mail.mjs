@@ -29,9 +29,11 @@ await T("super admin: přihlášení → Kniha zakázek, plné menu", async (con
   await login(page, USERS.admin);
   expect(new URL(page.url()).pathname === "/orders", `po přihlášení /orders, je ${page.url()}`);
   const nav = await navTexts(page);
-  for (const item of ["Kniha zakázek", "Uživatelé", "AI Asistent", "Archiv výkresů", "Znalostní DB", "Nastavení", "Přijatá pošta"]) {
+  for (const item of ["Kniha zakázek", "Uživatelé", "AI Asistent", "Archiv výkresů", "Znalostní DB", "Nastavení", "Pošta"]) {
     expect(nav.some((t) => t.includes(item)), `admin vidí „${item}" (menu: ${nav.join(", ")})`);
   }
+  // Pošta D: jedna položka „Pošta" (Odeslané je složka uvnitř)
+  expect(!nav.some((t) => /Odeslaná pošta|Přijatá pošta/.test(t)), `v menu jen „Pošta" (menu: ${nav.join(", ")})`);
   await shot(page, "01-admin-orders");
   await page.close();
   await context.clearCookies();
@@ -41,7 +43,7 @@ await T("obchodník: bez AI, výkresů, znalostí, nastavení a uživatelů", as
   const page = await context.newPage();
   await login(page, USERS.obchod);
   const nav = await navTexts(page);
-  for (const item of ["Kniha zakázek", "Zákazníci", "Dodavatelé", "Přijatá pošta", "Provize"]) {
+  for (const item of ["Kniha zakázek", "Zákazníci", "Dodavatelé", "Pošta", "Provize"]) {
     expect(nav.some((t) => t.includes(item)), `obchodník vidí „${item}"`);
   }
   for (const item of ["AI Asistent", "Archiv výkresů", "Znalostní DB", "Nastavení", "Uživatelé", "AI přehled", "Ladění"]) {

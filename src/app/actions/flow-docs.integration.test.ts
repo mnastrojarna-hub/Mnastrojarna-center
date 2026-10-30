@@ -252,7 +252,9 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
     expect(info.stamps.approved?.by?.id).toBe(id("admin"));
   }, 60_000);
 
-  it("faktura při částečném dodání stav neposouvá; po dodání všeho ano (stejné číslo faktury)", async () => {
+  // review A2 #4: faktura při dílčí dodávce účtovala celou objednávku → z aplikace až po dodání všeho
+  // (dřív: dílčí faktura bez posunu stavu, po dodání stejné číslo + Vyfakturováno)
+  it("faktura při částečném dodání nevznikne (číslo se nespotřebuje); po dodání všeho ano → Vyfakturováno", async () => {
     const jobId = await newJob({ status: "ve_vyrobe" }, [
       { name: "Hřídel", drawing_number: "FD-1", quantity: 4, unit_price: 1000 },
       { name: "Pouzdro", drawing_number: "FD-2", quantity: 2, unit_price: 500 },
@@ -261,15 +263,18 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
     const [a, b] = items as { id: string }[];
     as("sales");
     expect((await flow.setDeliveredQuantities(jobId, [{ itemId: a.id, delivered: 4 }])).ok).toBe(true);
-    const inv = await docs.generateJobDocument(jobId, "faktura");
-    expect(inv.ok, inv.error).toBe(true);
-    expect(await job(jobId)).toMatchObject({ status: "ve_vyrobe", invoice_number: inv.number });
-    expect((await events(jobId, "file")).at(-1)?.message).toBe(`Vystavena faktura ${inv.number} (PDF) · dílčí dodávka, stav zakázky zůstává`);
+    const early = await docs.generateJobDocument(jobId, "faktura");
+    expect(early).toMatchObject({ ok: false, code: "delivery" });
+    expect(await job(jobId)).toMatchObject({ status: "ve_vyrobe", invoice_number: null });
 
     expect((await flow.setDeliveredQuantities(jobId, [{ itemId: b.id, delivered: 2 }])).stage).toBe("dodano_zakaznikovi");
+    const inv = await docs.generateJobDocument(jobId, "faktura");
+    expect(inv.ok, inv.error).toBe(true);
+    expect((await events(jobId, "file")).at(-1)?.message).toBe(`Vystavena faktura ${inv.number} (PDF)`);
+    // druhé vystavení = stejná faktura (žádné nové PDF)
     const again = await docs.generateJobDocument(jobId, "faktura");
-    expect(again.number).toBe(inv.number);
-    expect(await job(jobId)).toMatchObject({ status: "fakturovano", invoiced_by: id("sales") });
+    expect(again).toMatchObject({ number: inv.number, fileId: inv.fileId, existing: true });
+    expect(await job(jobId)).toMatchObject({ status: "fakturovano", invoiced_by: id("sales"), invoice_number: inv.number });
     const last = (await events(jobId, "stage")).at(-1)!;
     expect(last).toMatchObject({ actor_id: id("sales") });
     expect(last.message).toContain("Vyfakturováno");

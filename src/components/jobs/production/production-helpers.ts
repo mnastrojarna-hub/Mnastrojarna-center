@@ -2,8 +2,11 @@ import type { JobEvent, JobFile, JobListItem, PersonRef } from "@/lib/jobs/types
 import type { JobClosingInfo, JobOperation, JobOperationInput } from "@/lib/jobs/production-types";
 import type { OperationKind, OperationStatus } from "@/lib/jobs/operations";
 import {
-  IN_HOUSE_KEY, czDay, daysBetween, isOperationOverdue, moveOperation, sortOperations,
+  IN_HOUSE_KEY, czDay, daysBetween, hasWho, isOperationOverdue, isStepReady, isStepStartable, moveOperation, sortOperations,
 } from "@/lib/jobs/production";
+import { stageRank } from "@/lib/jobs/stages";
+import type { HandoffKind } from "@/lib/jobs/production-handoff-types";
+import type { JobStage } from "@/lib/supabase/database.types";
 import { paymentStateOf } from "@/lib/jobs/mapping";
 import { shortDate } from "@/components/jobs/book/book-params";
 
@@ -120,6 +123,120 @@ export function primaryAction(status: OperationStatus): { label: string; next: O
   if (status === "ceka") return { label: "Začít", next: "probiha" };
   if (status === "probiha") return { label: "Hotovo", next: "hotovo" };
   if (status === "problem") return { label: "Vyřešeno — hotovo", next: "hotovo" };
+  return null;
+}
+
+/** Hlavní tlačítko kroku s předáním do výroby: buď jedno klepnutí (Začít / Hotovo), nebo dialog předání. */
+export type StepAction =
+  | { mode: "advance"; label: string; next: OperationStatus }
+  | { mode: "handoff"; label: string; kind?: HandoffKind; operationId?: string };
+
+const RUN: OperationStatus[] = ["probiha", "problem"];
+
+/**
+ * Hlavní tlačítko kroku podle stavu zakázky (H.4 / B.2 #7):
+ *  • před výrobou: aktuální krok → „Předat do výroby…" (ostatní bez tlačítka);
+ *  • ve výrobě: krok bez kdo / termínu → „Doplnit kdo a termín…"; běžící → „Hotovo — posunout dál…";
+ *    čekající u dodavatele bez objednávky → „Předat do kroku…"; čekající u nás → „Začít";
+ *  • po výrobě (dodáno k nám, sklad, montáž…) jako dřív (Začít / Hotovo).
+ */
+/**
+ * Zakázka je před výrobou (poptávka … potvrzená objednávka, pozastavená, reklamace): krok „Probíhá /
+ * Hotovo" by ji sám přesunul do výroby bez kdo a termínu — vede se přes dialog předání.
+ */
+export function isBeforeProduction(stage: JobStage): boolean {
+  const rank = stageRank(stage);
+  return (rank >= 0 && rank < 5) || stage === "pozastaveno" || stage === "reklamace";
+}
+
+/**
+ * Výroba je uzavřená dodáním: zakázka je dodaná zákazníkovi, vyfakturovaná nebo dokončená (např. po
+ * „Zapsat dodání bez ukončení kroků"). Neukončené kroky se pak jen ukážou jako uzavřené — žádné
+ * „Začít / Hotovo" ani „probíhá" u hotové zakázky.
+ */
+export function isProductionClosed(stage: JobStage | null | undefined): boolean {
+  return stage === "dodano_zakaznikovi" || stage === "fakturovano" || stage === "dokonceno";
+}
+
+/** Krok, který u uzavřené výroby zůstal neukončený (čeká / probíhá / problém). */
+export function isOpenStep(op: Pick<JobOperation, "status">): boolean {
+  return op.status !== "hotovo" && op.status !== "preskoceno";
+}
+
+/**
+ * Pohled na postup uzavřené výroby: neukončené kroky jako přeskočené (jen zobrazení — v DB zůstávají,
+ * v menu kroku je jde vrátit). `closedOpen` = kolik jich tak je; u výroby v běhu beze změny.
+ */
+export function closedProductionView(ops: JobOperation[], stage: JobStage | null | undefined): { ops: JobOperation[]; closedOpen: number } {
+  if (!isProductionClosed(stage)) return { ops, closedOpen: 0 };
+  const closedOpen = ops.filter(isOpenStep).length;
+  if (!closedOpen) return { ops, closedOpen: 0 };
+  return { ops: ops.map((o) => (isOpenStep(o) ? { ...o, status: "preskoceno" as const } : o)), closedOpen };
+}
+
+export function stepAction(op: JobOperation, ops: JobOperation[], stage: JobStage): StepAction | null {
+  // dodaná / vyfakturovaná / dokončená zakázka: neukončený krok už nic nenabízí (zůstává jen menu „⋯")
+  if (isProductionClosed(stage) && isOpenStep(op)) return null;
+  const live = sortOperations(ops).filter((o) => o.status !== "preskoceno");
+  const current = live.find((o) => RUN.includes(o.status)) ?? live.find((o) => o.status === "ceka") ?? null;
+  const before = isBeforeProduction(stage);
+  if (before) {
+    if (op.status !== "ceka" || current?.id !== op.id) return null;
+    return { mode: "handoff", label: "Předat do výroby…", kind: "predani" };
+  }
+  if (stage !== "ve_vyrobe") {
+    const pa = primaryAction(op.status);
+    return pa ? { mode: "advance", ...pa } : null;
+  }
+  if (RUN.includes(op.status)) {
+    if (!isStepReady(op)) return { mode: "handoff", label: "Doplnit kdo a termín…", kind: "doplneni", operationId: op.id };
+    return { mode: "handoff", label: "Hotovo — posunout dál…", kind: "dalsi_krok" };
+  }
+  if (op.status !== "ceka") return null;
+  const running = live.some((o) => RUN.includes(o.status));
+  if (!isStepReady(op)) {
+    return current?.id === op.id && !running
+      ? { mode: "handoff", label: "Doplnit kdo a termín…", kind: "doplneni", operationId: op.id }
+      : null;
+  }
+  if (!isStepStartable(op)) return running ? null : { mode: "handoff", label: "Předat do kroku…", kind: "dalsi_krok", operationId: op.id };
+  return running ? null : { mode: "advance", label: "Začít", next: "probiha" };
+}
+
+/** „Krok n/m" (pořadí mezi nepřeskočenými kroky). */
+export function stepCounterOf(op: JobOperation, ops: JobOperation[]): string | null {
+  const live = sortOperations(ops).filter((o) => o.status !== "preskoceno");
+  const i = live.findIndex((o) => o.id === op.id);
+  return i >= 0 ? `Krok ${i + 1}/${live.length}` : null;
+}
+
+export type PoChipAction = "send" | "reissue" | "pdf";
+
+/** Objednávka kroku jako štítek („OV-2026-012 · čeká na odeslání" [Odeslat], „· potvrzena na 14. 11." …). */
+export function poChipOf(op: JobOperation, today: string): { text: string; tone: "amber" | "green" | "grey" | "red" | "lime"; action?: PoChipAction; title?: string } | null {
+  const po = op.purchaseOrder ?? null;
+  const number = po?.number ?? op.purchaseOrderNumber ?? null;
+  if (po && number) {
+    switch (po.status) {
+      case "navrh":
+      case "vystavena":
+        return { text: `${number} · čeká na odeslání`, tone: "amber", action: "send" };
+      case "odeslana":
+        return { text: `${number} · odeslána${po.sentAt ? ` ${dayLabel(po.sentAt, today)}` : ""}`, tone: "lime" };
+      case "potvrzena":
+        return { text: `${number} · potvrzena${po.confirmedDate ? ` na ${dayLabel(po.confirmedDate, today)}` : ""}`, tone: "green" };
+      case "dodana":
+        return { text: `${number} · dodána`, tone: "green" };
+      case "zrusena":
+        return { text: `${number} · zrušena — vystavit znovu`, tone: "red", action: "reissue" };
+      default:
+        return { text: number, tone: "grey" };
+    }
+  }
+  if (number) return { text: number, tone: "lime" };
+  if (op.inHouse || op.status === "hotovo" || op.status === "preskoceno") return null;
+  if (op.poMode === "neobjednavat") return { text: `Objednáno jinak: ${op.poNoneReason ?? "—"}`, tone: "grey" };
+  if (op.poMode === "pri_predani" || (op.status === "ceka" && hasWho(op))) return { text: "Objednávka se vystaví, až díl půjde do tohoto kroku", tone: "grey" };
   return null;
 }
 

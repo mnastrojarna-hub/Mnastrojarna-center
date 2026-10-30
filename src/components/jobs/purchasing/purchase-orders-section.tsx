@@ -16,13 +16,15 @@ import { isPurchaseOrderLate, purchaseChips, purchaseSteps } from "./purchasing-
 
 /** Objednávka dodavateli v záložce zakázky: stav, termíny, položky (převzato), kdo co udělal, akce. */
 export function PurchaseOrderCard({
-  order, today, notify, onChanged, onEdit,
+  order, today, notify, onChanged, onEdit, stepLabel,
 }: {
   order: PurchaseOrderView;
   today: string;
   notify: Notify;
   onChanged: () => void;
   onEdit: () => void;
+  /** Krok výroby, ke kterému objednávka patří („Krok 2: Tepelné zpracování"). */
+  stepLabel?: string | null;
 }) {
   const m = PURCHASE_ORDER_STATUS_META[order.status];
   const late = isPurchaseOrderLate(order, today);
@@ -40,6 +42,11 @@ export function PurchaseOrderCard({
               <span className={cn("font-mono text-sm font-bold", cancelled && "line-through")}>{order.number}</span>
               <PurchaseOrderStatusBadge status={order.status} />
               <PurchaseExtraChips order={order} today={today} />
+              {stepLabel && (
+                <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-300" data-testid="po-step">
+                  {stepLabel}
+                </span>
+              )}
             </div>
             <p className="flex items-center gap-1 truncate text-sm font-medium">
               <Factory className="h-3.5 w-3.5 shrink-0 text-orange-600" /> {order.supplier?.name ?? "Dodavatel"}

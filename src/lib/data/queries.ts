@@ -12,6 +12,7 @@ import { periodStart } from "@/lib/data/periods";
 import { getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
+import { usableMailbox } from "@/lib/jobs/production-handoff-store";
 import { fetchPaged, isUuid } from "@/lib/jobs/mapping";
 import type { JobListItem } from "@/lib/jobs/types";
 import { getEmails as getMailEmails, getSentMail, getUnreadCount, getMailScope } from "@/lib/data/mail";
@@ -72,7 +73,12 @@ export async function getEmails(): Promise<EmailItem[]> {
 
 /** Položka fronty + kdo návrh připravil (AI / plánovač) — fronta ukazuje oba autory (minor 16). */
 /** quoteHref = odkaz „Otevřít nabídku“ u řádku nabídky (#25: karta zakázky → Nabídky). */
-export type ApprovalQueueItem = ApprovalItem & { proposedBy: string; quoteHref?: string | null };
+export type ApprovalQueueItem = ApprovalItem & {
+  proposedBy: string;
+  quoteHref?: string | null;
+  /** Řádek „Objednávka dodavateli": PDF, zakázka a odkud e-mail odejde (schránka obchodníka zakázky, jinak moje). */
+  purchaseOrder?: ApprovalPurchaseOrder | null;
+};
 
 export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!(await allowedAccess("dashboard"))) return [];
@@ -80,12 +86,41 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (!db) return [];
   const { data, error } = await db
     .from("approval_queue")
-    .select("*, po:purchase_orders!purchase_order_id(id, creator:profiles!created_by(id, full_name, email))")
+    .select("*, po:purchase_orders!purchase_order_id(id, number, file_id, job_id, creator:profiles!created_by(id, full_name, email), job:orders!job_id(owner_id))")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   warn("approval_queue", error);
   if (error || !data) return [];
-  type PoEmbed = { creator?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null };
+  type PoEmbed = {
+    id?: string; number?: string | null; file_id?: string | null; job_id?: string | null;
+    creator?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
+    job?: { owner_id: string | null } | { owner_id: string | null }[] | null;
+  };
+  // odkud objednávka odejde: schránka obchodníka zakázky (použitelná), jinak toho, kdo schvaluje
+  const senders = new Map<string, string | null>();
+  for (const a of data as (ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null })[]) {
+    const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
+    const job = po ? (Array.isArray(po.job) ? po.job[0] ?? null : po.job ?? null) : null;
+    const owner = job?.owner_id ?? null;
+    if (a.type !== "purchase_order" || !owner || senders.has(owner)) continue;
+    try {
+      const box = await usableMailbox(db as never, owner);
+      senders.set(owner, box?.email ?? null);
+    } catch {
+      senders.set(owner, null);
+    }
+  }
+  const poOf = (a: ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null }): ApprovalPurchaseOrder | null => {
+    if (a.type !== "purchase_order") return null;
+    const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
+    if (!po?.id) return null;
+    const job = Array.isArray(po.job) ? po.job[0] ?? null : po.job ?? null;
+    return {
+      id: po.id, number: po.number ?? null, fileId: po.file_id ?? null, jobId: po.job_id ?? a.order_id ?? null,
+      senderEmail: job?.owner_id ? senders.get(job.owner_id) ?? null : null,
+      kind: ((a.payload as { kind?: unknown } | null)?.kind as ApprovalPurchaseOrder["kind"] | undefined) ?? "issue",
+    };
+  };
   // objednávku dodavateli připravil ten, kdo zakázku předal do výroby (purchase_orders.created_by), ne AI
   const poCreator = (a: ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null }): string | null => {
     const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
@@ -110,7 +145,19 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
     quoteHref: a.type === "quote" && (a.quote_id || a.order_id)
       ? a.order_id ? `/orders/${a.order_id}?tab=nabidky` : "/quotes"
       : null,
+    purchaseOrder: poOf(a),
   }));
+}
+
+/** Objednávka dodavateli v řádku fronty (PDF, zakázka, odkud odejde). */
+export interface ApprovalPurchaseOrder {
+  id: string;
+  number: string | null;
+  fileId: string | null;
+  jobId: string | null;
+  /** Schránka obchodníka zakázky, ze které e-mail odejde (null = schránka toho, kdo schvaluje). */
+  senderEmail: string | null;
+  kind: "issue" | "change" | "cancel" | "hold";
 }
 
 /** Naposledy vyřízené položky fronty — kdo schválil / zamítl (resolved_by) nebo „✨ AI odeslala automaticky". */

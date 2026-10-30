@@ -537,28 +537,42 @@ await T("Doklady ▾: Potvrzení podruhé → v2, v1 v archivu (nahrazeno v2)", 
   await eventually(async () => expect(norm(await group.innerText()).includes("1 v archivu"), `skupina: 1 v archivu (${norm(await group.innerText()).slice(0, 120)})`));
 });
 
-await T("Doklady ▾: Dodací list → DL-RRRR-NNN, orders.delivery_note_number, uložen v Dokumentech", async (context) => {
+// A2 (sk. 2): DL vzniká jen se zápisem dodání — Doklady ▾ → Dodací list otevře tentýž dialog jako hlavní
+// „Zapsat dodání a dodací list" (dřív samostatný DL „na celou zakázku" bez dodávky = druhé číslo / úložiště)
+await T("Doklady ▾: Dodací list → zápis dodání (předvyplněno vše) → DL-RRRR-NNN, orders.delivery_note_number, uložen v Dokumentech", async (context) => {
   const page = await context.newPage();
   await openJob(page, USERS.obchod, D1);
   await issueFromMenu(page, "Dodací list");
-  const toast = await waitToast(page, /Dodací list DL-\d{4}-\d+ je hotový/, 30_000);
-  const dl = /DL-\d{4}-\d+/.exec(toast)[0];
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).click();
+  const result = dlg.locator('[data-testid="delivery-note-result"]');
+  await result.waitFor({ timeout: 30_000 });
+  const dl = /DL-\d{4}-\d+/.exec(await result.innerText())[0];
   expect(await page.getByRole("heading", { name: "Doklad má položky bez ceny" }).count() === 0, "dodací list se na ceny neptá");
+  await dlg.getByRole("button", { name: "Hotovo" }).click();
+  await eventually(() => expect(sql(`select status from orders where id = ${lit(D1.id)}`) === "dodano_zakaznikovi", "vše dodáno → Dodáno zákazníkovi"));
   await eventually(() => expect(sql(`select delivery_note_number from orders where id = ${lit(D1.id)}`) === dl, `orders.delivery_note_number = ${dl}`));
   const f = filesOf(D1.id, "dodaci_list");
   expect(f.length === 1 && f[0][1] === "1" && f[0][3].includes(dl.replace(/^DL-/, "")), `job_files dodací list v1 (${f.map((x) => x.join("|")).join(" ; ")})`);
   expectPdf(await fetchPdf(page.request, `${BASE}/api/jobs/files/${f[0][0]}`), "uložený dodací list");
 });
 
-await T("Doklady ▾: Faktura (neoceněná položka → Přesto vystavit) → FV-…, evidence faktur + archiv dokladů, zakázka Vyfakturováno", async (context) => {
+// A2 (sk. 1, 9): Doklady ▾ → Faktura = tentýž dialog jako hlavní „Vystavit fakturu" (PDF + odeslání jako u nabídky);
+// neoceněná položka → „Přesto vystavit" v dialogu, pak „Vystavit, neposílat" (faktura vznikne až tímto tlačítkem)
+await T("Doklady ▾: Faktura (neoceněná položka → Přesto vystavit → Vystavit, neposílat) → FV-…, evidence faktur + archiv dokladů, zakázka Vyfakturováno", async (context) => {
   const page = await context.newPage();
   await openJob(page, USERS.obchod, D1);
   await issueFromMenu(page, "Faktura");
   const dlg = page.getByRole("dialog");
-  await dlg.getByRole("heading", { name: "Doklad má položky bez ceny" }).waitFor({ timeout: 15_000 });
+  await dlg.getByRole("heading", { name: "Vystavit fakturu a poslat zákazníkovi" }).waitFor({ timeout: 15_000 });
+  await dlg.getByRole("button", { name: "Přesto vystavit" }).waitFor({ timeout: 20_000 });
   expect(sql(`select coalesce(invoice_number,'-') from orders where id = ${lit(D1.id)}`) === "-", "bez potvrzení se číslo faktury nespotřebovalo");
   await dlg.getByRole("button", { name: "Přesto vystavit" }).click();
-  const toast = await waitToast(page, /Faktura FV-\S+ je hotový/, 30_000);
+  await dlg.getByRole("button", { name: "Vystavit, neposílat" }).waitFor({ timeout: 30_000 });
+  // review A2 #5: ani „Přesto vystavit" fakturu nevystaví — vznikne až tlačítkem
+  expect(sql(`select coalesce(invoice_number,'-') from orders where id = ${lit(D1.id)}`) === "-", "před vystavením bez čísla faktury");
+  await dlg.getByRole("button", { name: "Vystavit, neposílat" }).click();
+  const toast = await waitToast(page, /Faktura FV-\S+ je vystaven/, 30_000);
   const fv = /FV-[\w-]+/.exec(toast)[0];
   await eventually(() => {
     const o = sql(`select coalesce(invoice_number,'-') || '|' || status from orders where id = ${lit(D1.id)}`);
@@ -572,7 +586,11 @@ await T("Doklady ▾: Faktura (neoceněná položka → Přesto vystavit) → FV
   expect(f.length === 1 && f[0][1] === "1", `job_files faktura v1 (${f.length})`);
   expectPdf(await fetchPdf(page.request, `${BASE}/api/jobs/files/${f[0][0]}`), "uložená faktura");
   const stage = sql(`select message || '|' || actor_id || '|' || actor_name from job_events where job_id = ${lit(D1.id)} and type = 'stage' order by created_at desc limit 1`);
-  expect(stage.startsWith("Stav: Objednávka → Vyfakturováno") && stage.includes(fv) && stage.endsWith(`|${ID.obchod}|Petr Obchodník`), `historie stavu s číslem faktury a autorem: ${stage}`);
+  // DL výše zapsal dodání všeho → zakázka šla přes „Dodáno zákazníkovi" (dřív DL bez dodání stav neměnil)
+  expect(stage.startsWith("Stav: Dodáno zákazníkovi → Vyfakturováno") && stage.includes(fv) && stage.endsWith(`|${ID.obchod}|Petr Obchodník`), `historie stavu s číslem faktury a autorem: ${stage}`);
+  // A2: datum a splatnost faktury i na zakázce (hlídání „po splatnosti") = splatnost z evidence faktur
+  const due = sql(`select o.invoice_date || '|' || o.invoice_due_date || '|' || i.due_date from orders o join invoices i on i.number = o.invoice_number where o.id = ${lit(D1.id)}`).split("|");
+  expect(due[0] && due[1] && due[1] === due[2], `orders.invoice_due_date = invoices.due_date (${due.join("|")})`);
   expect(sql(`select coalesce(invoiced_by::text, '-') from orders where id = ${lit(D1.id)}`) === ID.obchod, "orders.invoiced_by = obchodník");
   await eventually(async () => {
     await page.reload();
@@ -1047,14 +1065,21 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   // zpětná vazba po odeslání (UX)
   await panel.locator('[role="status"]').filter({ hasText: `Odesláno na ${CUST_EMAIL}.` }).waitFor({ timeout: 10_000 });
   expect(sql(`select coalesce(confirmation_sent_by::text, '-') || '|' || coalesce(confirmation_sent_via, '-') from orders where id = ${lit(DOC1.id)}`) === `${ID.obchod}|email`, "DB: potvrzení odeslal obchodník e-mailem");
-  // dodací list
+  // dodací list: bez dodávky nevzniká (A2 sk. 2) — panel vysvětlí a vede do karty na „Zapsat dodání a dodací list"
   await kindBtn("Dodací list").click();
   await panel.getByRole("button", { name: "Vystavit PDF" }).click();
-  const dl = panel.locator('[role="status"]').filter({ hasText: /Hotovo: Dodací list DL-\d{4}-\d+/ });
+  await panel.locator('[role="alert"]').filter({ hasText: "Dodací list vzniká se zápisem dodání" }).waitFor({ timeout: 30_000 });
+  expect(sql(`select coalesce(delivery_note_number, '-') from orders where id = ${lit(DOC1.id)}`) === "-", "bez dodání se číslo DL nespotřebovalo");
+  const toCard = panel.getByRole("link", { name: /Zapsat dodání a dodací list/ });
+  expect((await toCard.getAttribute("href")) === `/orders/${DOC1.id}?tab=vyroba&akce=delivery.record`, "odkaz do karty na zápis dodání");
+  await shot(page, S("53-documents-dl"));
+  await toCard.click();
+  const ddlg = page.getByRole("dialog");
+  await ddlg.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).click({ timeout: 30_000 });
+  const dl = ddlg.locator('[data-testid="delivery-note-result"]');
   await dl.waitFor({ timeout: 30_000 });
   const dlNum = /DL-\d{4}-\d+/.exec(await dl.innerText())[0];
   await eventually(() => expect(sql(`select delivery_note_number from orders where id = ${lit(DOC1.id)}`) === dlNum, `orders.delivery_note_number = ${dlNum}`));
-  await shot(page, S("53-documents-dl"));
 });
 
 await T("stránky toku renderují pro super admina i obchodníka (nadpis, žádná chybová hláška)", async (context) => {

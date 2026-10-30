@@ -40,6 +40,10 @@ export interface DeliveryItem {
   revision?: string;
   material?: string;
   note?: string;
+  /** Objednáno celkem — u dílčí dodávky se pod množstvím ukáže „z 10 ks". */
+  ordered?: number;
+  /** Dodáno celkem i s touto dodávkou — pod množstvím „celkem dodáno 10 z 10 ks". */
+  deliveredTotal?: number;
 }
 
 /** Společné nepovinné reference všech dokladů (zakázka, zákazník, lidé). */
@@ -85,6 +89,22 @@ export interface InvoiceData extends DocRefs {
   note?: string;
   constantSymbol?: string;
   deliveryNoteNumber?: string;
+  /** Přijaté zálohy / platby (s DPH) — odečtou se z částky k úhradě (invoice-payments.ts). */
+  payments?: InvoicePayment[];
+  /** Zakázka je vyrovnaná („Zaplaceno") → zbývá 0. */
+  settled?: boolean;
+}
+
+/** Úhrada odečtená na faktuře (zálohy a platby zakázky). */
+export interface InvoicePayment {
+  /** Datum úhrady YYYY-MM-DD. */
+  date: string;
+  /** Odečtená částka s DPH. */
+  amount: number;
+  /** Zapsaná částka bez DPH; null = „celá / zbývající částka" (bez částky). */
+  net: number | null;
+  /** Záloha = přišla před vystavením faktury; platba = v den vystavení nebo později. */
+  kind: "zaloha" | "platba";
 }
 
 export interface QuoteData extends DocRefs {
@@ -152,6 +172,10 @@ export interface DeliveryNoteData extends DocRefs {
   weightKg?: number;
   /** Způsob dopravy. */
   transport?: string;
+  /** Označení dodávky („2. dílčí dodávka", „3. dodávka — konečná"); jediná kompletní dodávka bez označení. */
+  deliveryLabel?: string;
+  /** Co ještě zbývá dodat (dílčí dodávka), např. „1 položka". */
+  remainingText?: string;
 }
 
 // ── Formátování (cs-CZ) ─────────────────────────────────────

@@ -94,7 +94,7 @@ export const STAGES: Record<JobStage, StageMeta> = {
   },
   dodano_k_nam: {
     key: "dodano_k_nam", label: "Dodáno k nám", short: "U nás",
-    description: "Díly dorazily od dodavatele k nám.",
+    description: "Hotové díly jsou u nás — od dodavatele nebo z naší výroby.",
     icon: PackageOpen,
     badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300",
     solid: "bg-cyan-700 text-white", dot: "bg-cyan-500", bar: "bg-cyan-500",

@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { apiRequire } from "@/lib/auth/session";
+import { apiRequire, getAccess } from "@/lib/auth/session";
 import { getJob } from "@/lib/data/jobs";
 import { isUuid } from "@/lib/jobs/mapping";
 import {
-  buildConfirmationDoc, buildDeliveryNoteDoc, buildInvoiceDoc, buildQuoteDoc, pdfFileName, relevantQuote,
-  type JobDocKind,
+  buildConfirmationDoc, buildDeliveryDoc, buildDeliveryNoteDoc, buildInvoiceDoc, buildQuoteDoc, dateOnly, jobPaymentRows, pdfFileName,
+  relevantQuote, type JobDocKind,
 } from "@/lib/pdf/job-docs";
+import { createOperatorClient } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
+import { deliveredRows, deliveryLines } from "@/lib/jobs/delivery-notes";
+import { deliveryNoteLines, fileOfNote, issuedDeliveryNotes } from "@/lib/jobs/delivery-notes-store";
 import { renderConfirmationPdf, renderDeliveryNotePdf, renderInvoicePdf, renderQuotePdf } from "@/lib/pdf/render";
 import { logAudit } from "@/lib/audit";
 
@@ -16,7 +20,9 @@ export const dynamic = "force-dynamic";
 /**
  * Náhled dokladu ze zakázky (nic se neukládá — uložení dělá generateJobDocument):
  *   GET /api/pdf/job/<jobId>?type=nabidka|potvrzeni|dodaci-list|faktura[&quoteId=…][&download=1]
- * Dodací list / faktura bez přiděleného čísla se zobrazí jako „NÁHLED".
+ * Dodací list / faktura bez přiděleného čísla se zobrazí jako „NÁHLED". Dodací list zakázky s DL
+ * dodávek = poslední vystavený DL (uložené PDF, ne všechny položky pod jeho číslem); zakázka
+ * s dodaným zbožím bez DL = náhled DL na dodané množství.
  * #25: neschválená nabídka má vodoznak „NESCHVÁLENO — NEODESÍLAT" (hlavička X-Doc-Watermark, název
  * souboru …-NESCHVALENO.pdf) a každé takové zobrazení se zapíše do auditu. Čistý náhled před schválením není.
  */
@@ -43,6 +49,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const rawType = (sp.get("type") ?? "nabidka").trim().toLowerCase();
   const kind = Object.hasOwn(TYPES, rawType) ? TYPES[rawType] : undefined;
   if (!kind) return json("Neznámý typ dokladu (nabidka, potvrzeni, dodaci-list, faktura).", 400);
+  // A2: faktura (i náhled) jen pro finance — stejně jako vystavení a odeslání
+  if (kind === "faktura" && !(await getAccess()).can("margins")) return json("Fakturu vystavuje obchodník nebo super admin.", 403);
   const quoteId = sp.get("quoteId")?.trim() || null;
   if (quoteId && !isUuid(quoteId)) return json("Nabídka nenalezena.", 404);
   const download = sp.get("download") === "1";
@@ -73,11 +81,35 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       number = data.number;
       buffer = await renderConfirmationPdf(data);
     } else if (kind === "dodaci_list") {
-      number = job.deliveryNoteNumber?.trim() || "DL-NÁHLED";
-      buffer = await renderDeliveryNotePdf(await buildDeliveryNoteDoc(job, { number, preparedBy }));
+      const db = await createOperatorClient({ actor: userActor(auth.user) });
+      const notes = await issuedDeliveryNotes(db, job.id);
+      const last = notes[notes.length - 1];
+      if (last) {
+        const file = await fileOfNote(db, job.id, last.storage_path);
+        if (file) {
+          // stejné oprávnění a stažení jako Dokumenty zakázky
+          return NextResponse.redirect(new URL(`/api/jobs/files/${file.id}${download ? "?download=1" : ""}`, req.url), 307);
+        }
+        number = last.number;
+        const lines = await deliveryNoteLines(db, last.id);
+        buffer = await renderDeliveryNotePdf(await buildDeliveryDoc(job, {
+          number, issueDate: dateOnly(last.issue_date) ?? undefined, preparedBy, note: last.note ?? undefined,
+          lines: lines.map((l) => ({ quantity: l.quantity, description: l.description, unit: l.unit })),
+        }));
+      } else if (deliveredRows(job.items).length) {
+        // dodáno bez DL → náhled DL na to, co už odešlo (stejně jako Doklady → DL na dodané zboží)
+        number = job.deliveryNoteNumber?.trim() || "DL-NÁHLED";
+        const lines = deliveryLines(job.items, deliveredRows(job.items));
+        buffer = await renderDeliveryNotePdf(await buildDeliveryDoc(job, { number, preparedBy, lines }));
+      } else {
+        number = job.deliveryNoteNumber?.trim() || "DL-NÁHLED";
+        buffer = await renderDeliveryNotePdf(await buildDeliveryNoteDoc(job, { number, preparedBy }));
+      }
     } else {
       number = job.invoiceNumber?.trim() || "FV-NÁHLED";
-      buffer = await renderInvoicePdf(await buildInvoiceDoc(job, { number, preparedBy }));
+      // náhled = totéž co vystavení: zálohy / platby zakázky se odečtou („Zbývá uhradit", QR na zbytek)
+      const db = await createOperatorClient({ actor: userActor(auth.user) });
+      buffer = await renderInvoicePdf(await buildInvoiceDoc(job, { number, preparedBy, payments: await jobPaymentRows(db, job.id) }));
     }
 
     const filename = watermarked ? pdfFileName(kind, number).replace(/\.pdf$/, "-NESCHVALENO.pdf") : pdfFileName(kind, number);

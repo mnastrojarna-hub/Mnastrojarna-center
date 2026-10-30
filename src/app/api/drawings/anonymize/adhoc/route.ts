@@ -1,7 +1,7 @@
-import { after } from "next/server";
+import { routeDeadline } from "@/lib/ai/ai-call";
 import { logAudit } from "@/lib/audit";
 import { anonGuard, isUuid, json, readBody } from "@/lib/anonymize/route-helpers";
-import { appOrigin, defaultDeadline, kick, runClaimed } from "@/lib/anonymize/service";
+import { processInBackground } from "@/lib/anonymize/runner";
 import { cleanNamePart } from "@/lib/anonymize/filename";
 import { sha256Hex } from "@/lib/anonymize/text";
 
@@ -20,6 +20,7 @@ const EXT_RE = /\.(pdf|jpe?g|png|webp|tiff?|heic|heif|dxf|stp|step)$/i;
  *  GET → „Moje anonymizace" (7 dní).
  */
 export async function POST(req: Request) {
+  const start = Date.now();
   const body = await readBody(req);
   if (body instanceof Response) return body;
   const guard = await anonGuard("job_files");
@@ -41,13 +42,11 @@ export async function POST(req: Request) {
       anon_via: "rucne", updated_at: new Date().toISOString(),
     }).eq("id", row.id);
     await logAudit({ action: "drawing_anon_adhoc", entity: "drawing_anon_adhoc", entityId: row.id, diff: { sha256: sha, size: bytes.length }, actor: guard.actor });
-    const k = await kick({ origin: appOrigin(req.url), table: "drawing_anon_adhoc", ids: [row.id], manualBy: user.id });
-    if (!k.kicked) {
-      const actor = guard.actor;
-      after(async () => {
-        await runClaimed(db, "drawing_anon_adhoc", [row.id], { actor, deadline: defaultDeadline(), manual: true }, 1);
-      });
-    }
+    // zpracuje TATO funkce po odpovědi (bez HTTP volání sama sebe — to na Vercelu může skončit 401)
+    processInBackground({
+      table: "drawing_anon_adhoc", ids: [row.id], actor: guard.actor, manual: true, deadline: routeDeadline(start), maxFiles: 1,
+      fanOut: false, db, label: "samostatný nástroj",
+    });
     return json({ ok: true, id: row.id, status: "pending" });
   }
 

@@ -41,6 +41,17 @@ describe("#25 navigace podle role", () => {
     for (const role of ["super_admin", "obchodnik", "zamestnanec"] as const) expect(hrefsOf(role)).toContain("/account");
   });
 
+  it("Pošta D: v menu jedna položka „Pošta“ (žádná „Odeslaná pošta“); na archivu /sent svítí Pošta", () => {
+    for (const role of ["super_admin", "obchodnik", "zamestnanec"] as const) {
+      const items = navForFeatures(allowedFeatures({ role, aiAccess: false, active: true }, ctx)).flatMap((s) => s.items);
+      expect(items.filter((i) => i.href === "/inbox").map((i) => i.title)).toEqual(["Pošta"]);
+      expect(items.some((i) => i.href === "/sent" || /Odeslan|Přijatá/.test(i.title))).toBe(false);
+    }
+    const hrefs = allNavItems.map((i) => i.href);
+    expect(activeNavHref("/sent", hrefs)).toBe("/inbox");
+    expect(activeNavHref("/inbox", hrefs)).toBe("/inbox");
+  });
+
   it("neaktivní účet nevidí nic", () => {
     expect(navForFeatures(allowedFeatures({ role: "super_admin", aiAccess: true, active: false }, ctx))).toEqual([]);
   });

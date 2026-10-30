@@ -6,7 +6,7 @@ import {
   resolveQuoteDeliveryDate, pickRequiredDate, defaultDeliveryAddress, ourDeliveryAddressOf, deliveryTermsFor, purchaseOrderNote, purchaseOrderFileName,
   buildPurchaseOrderDraft, itemsFromJob, validatePurchaseOrderDraft, supplierQuoteInputToRow, purchasingTotals,
   issueStageHint, parseEmailList, purchaseOrderEmail, purchaseOrderChangeEmail, purchaseOrderCancelEmail, purchaseOrderHoldEmail, splitAddress, rowToSupplierQuoteView, rowToPurchaseOrderView,
-  rowToPurchaseOrderListItem, rowToCommissionView, filterPurchaseOrders, draftToPurchaseOrderView,
+  rowToPurchaseOrderListItem, rowToCommissionView, filterPurchaseOrders, draftToPurchaseOrderView, supplierNotesOfItems,
   DEFAULT_DELIVERY_TERMS, DEFAULT_PAYMENT_TERMS, REQUIRED_DATE_SOURCE_LABELS,
   type DraftJob, type PurchaseOrderDbRow, type SupplierQuoteDbRow,
 } from "./purchasing";
@@ -296,6 +296,17 @@ describe("návrh objednávky", () => {
     expect(d.requiredDateSource).toBe("termin_zakaznika");
   });
 
+  it("review WP3: poznámka pro dodavatele z Technologie jde do objednávky z Nákupu u položky („Pozor: …“) — z nabídky i ze zakázky", () => {
+    const j = job();
+    const withNote = { ...j, items: j.items.map((it, i) => (i === 0 ? { ...it, tech: { procedure: null, complete: false, completeBy: null, supplierNote: "pozor popsat na čele" } } : it)) };
+    const fromQuote = buildPurchaseOrderDraft({ job: withNote, quote: quote(), deliveryAddress: ADDR, today: "2026-10-22" });
+    expect(fromQuote.items[0].note).toBe("Pozor: popsat na čele");
+    expect(fromQuote.items[1].note).toBe("broušeno");
+    const fromJob = buildPurchaseOrderDraft({ job: withNote, supplier: SUPPLIER, deliveryAddress: ADDR, today: "2026-10-22" });
+    expect(fromJob.items[0].note).toBe("Pozor: popsat na čele · Frézovaný díl, kaleno");
+    expect(supplierNotesOfItems(fromJob.items)).toEqual([{ ref: "VK-2291", note: "popsat na čele" }]);
+  });
+
   it("nabídka jen s celkovou cenou: 1 položka → cena za MJ, víc položek → upozornění", () => {
     const one = job({ items: [job().items[1]] });
     const d1 = buildPurchaseOrderDraft({ job: one, quote: quote({ items: [], total: 12_000 }), deliveryAddress: ADDR, today: "2026-10-22" });
@@ -467,7 +478,7 @@ describe("marže a doporučení stavu", () => {
   });
 
   it("stav zakázky se nemění — jen doporučení", () => {
-    expect(issueStageHint("potvrzeno")).toMatchObject({ suggestStage: "ve_vyrobe" });
+    expect(issueStageHint("potvrzeno")).toMatchObject({ suggestStage: "ve_vyrobe", message: "Objednávka u dodavatele je vystavena — předej zakázku do výroby (kdo + termín)." });
     expect(issueStageHint("objednavka")).toMatchObject({ suggestStage: "potvrzeno" });
     expect(issueStageHint("nabidka")?.message).toContain("zákazník ještě neobjednal");
     expect(issueStageHint("nabidka")?.suggestStage).toBeNull();

@@ -561,6 +561,16 @@ describe("řádky → podrobné stavy toku a autor", () => {
     expect(item.stamps?.proposal).toMatchObject({ kind: "ai", at: "2026-10-04T08:00:00Z" });
   });
 
+  it("stavy kroků (embed ops) → počet kroků i „běží krok“ (Kniha = detail: Předat do kroku… / Posunout dál…)", () => {
+    const waiting = flowFactsOfRow({ ...flowRow, status: "ve_vyrobe", ops: [{ status: "hotovo" }, { status: "ceka" }] } as unknown as JobRow);
+    expect(waiting).toMatchObject({ hasOperations: true, productionRunning: false });
+    const running = flowFactsOfRow({ ...flowRow, status: "ve_vyrobe", ops: [{ status: "hotovo" }, { status: "problem" }] } as unknown as JobRow);
+    expect(running.productionRunning).toBe(true);
+    // starší embed (count): běh kroku neznámý
+    expect(flowFactsOfRow(flowRow).productionRunning).toBeUndefined();
+    expect(flowFactsOfRow({ ...flowRow, ops: [] } as unknown as JobRow)).toMatchObject({ hasOperations: false, productionRunning: false });
+  });
+
   it("bez sloupců toku (starší výběr) se fakta nedopočítávají", () => {
     const item = rowToJobListItem(base, { margins: false });
     expect(item.flow).toBeUndefined();

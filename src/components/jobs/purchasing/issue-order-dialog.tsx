@@ -18,6 +18,7 @@ import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { formatMoney, isoToday } from "@/components/jobs/detail/detail-helpers";
 import { cn } from "@/lib/utils";
 import { PurchaseOrderForm } from "./purchase-order-form";
+import { ProductionHandoffDialog } from "@/components/jobs/production/handoff/handoff-dialog";
 import { FULLSCREEN_DIALOG, openPdfPreview } from "./ui-bits";
 import {
   draftsFromJobItems, purchaseDraftsTotal, purchaseOrderFormFromDraft, purchaseOrderFormToInput, validatePurchaseOrderForm,
@@ -64,6 +65,7 @@ export function IssueOrderDialog({
   const [quoteId, setQuoteId] = React.useState<string | null>(null);
   const [issued, setIssued] = React.useState<Issued | null>(null);
   const [busy, setBusy] = React.useState<null | "preview" | "stage" | "pdf">(null);
+  const [handoffOpen, setHandoffOpen] = React.useState(false);
   const run = React.useRef(0);
 
   const winner = quotes.find((q) => q.selected) ?? null;
@@ -81,7 +83,7 @@ export function IssueOrderDialog({
         setForm({
           supplierId: job.supplier?.id ?? null, supplierName: "", supplierQuoteId, orderDate: isoToday(), requiredDate: "",
           currency: job.currency, deliveryTerms: "", paymentTerms: "", deliveryAddress: "", note: "",
-          items: draftsFromJobItems(job.items),
+          items: draftsFromJobItems(job.items, { supplierNotes: true }),
         });
         setSupplierLabel(job.supplier?.name ?? null);
         setWarnings([]);
@@ -275,7 +277,12 @@ export function IssueOrderDialog({
               <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-950 sm:flex-row sm:items-center dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
                 <Info className="h-4 w-4 shrink-0 text-sky-600" />
                 <span className="flex-1">{issued.hint}</span>
-                {issued.suggestStage && (
+                {issued.suggestStage === "ve_vyrobe" ? (
+                  // do výroby jen předáním (kdo + termín) — krok 1 použije právě vystavenou objednávku
+                  <Button size="sm" variant="success" onClick={() => setHandoffOpen(true)} disabled={busy !== null} data-testid="issue-handoff">
+                    <Factory className="h-4 w-4" /> Předat do výroby…
+                  </Button>
+                ) : issued.suggestStage && (
                   <Button size="sm" variant="success" onClick={() => void switchStage(issued.suggestStage as JobStage)} disabled={busy !== null}>
                     {busy === "stage" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                     Přepnout zakázku do {STAGES[issued.suggestStage].label}
@@ -350,6 +357,20 @@ export function IssueOrderDialog({
           </form>
         )}
       </DialogContent>
+      {handoffOpen && issued && (
+        <ProductionHandoffDialog
+          open
+          onOpenChange={(o) => { if (!o) setHandoffOpen(false); }}
+          jobId={job.id}
+          kind="predani"
+          existingPurchaseOrderId={issued.id}
+          onDone={(d) => {
+            notify("success", d.message);
+            setIssued((i) => (i ? { ...i, suggestStage: null, hint: undefined } : i));
+            refresh();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

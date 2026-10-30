@@ -14,23 +14,31 @@ import { isForward, isJobStage } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cleanText, isUuid, jobFilePath, translateDbError } from "@/lib/jobs/mapping";
 import {
-  DOCUMENT_KIND_LABEL, documentEmailHtml, draftDocumentEmail, firstEmail, isDocumentEmailKind, issuedEventMessage,
-  parseEmailList, sentEventMessage, type DocumentEmailInput, type DocumentEmailKind,
+  DOCUMENT_KIND_LABEL, INVOICE_NUMBER_PLACEHOLDER, INVOICE_VS_PLACEHOLDER, documentEmailHtml, draftDocumentEmail,
+  fillInvoicePlaceholders, firstEmail, isDocumentEmailKind, issuedEventMessage, parseEmailList, sentEventMessage,
+  type DocumentEmailInput, type DocumentEmailKind,
 } from "@/lib/jobs/document-emails";
 import {
-  buildConfirmationDoc, buildDeliveryNoteDoc, buildInvoiceDoc, buildQuoteDoc, confirmationNumber, dateOnly,
-  pdfFileName, pickPricedItems, relevantQuote, unpricedCount,
+  buildConfirmationDoc, buildInvoiceDoc, buildQuoteDoc, confirmationNumber, dateOnly,
+  jobPaymentRows, pdfFileName, pickPricedItems, relevantQuote, unpricedCount,
 } from "@/lib/pdf/job-docs";
-import { renderConfirmationPdf, renderDeliveryNotePdf, renderInvoicePdf, renderQuotePdf } from "@/lib/pdf/render";
+import { invoiceBalance, invoicePaymentsFromRows } from "@/lib/pdf/invoice-payments";
+import { renderConfirmationPdf, renderInvoicePdf, renderQuotePdf } from "@/lib/pdf/render";
 import { addDaysIso, computeTotals, plural, todayIso, type DocItem } from "@/lib/pdf/types";
-import { spdVariableSymbol } from "@/lib/pdf/qr";
-import { sendMail } from "@/lib/email/send";
+import { invoiceBankWarning, spdVariableSymbol } from "@/lib/pdf/qr";
+import { sendMail, senderSignatureText } from "@/lib/email/send";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
-import { FLOW_QUOTE_COLUMNS, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent } from "@/lib/jobs/flow-status";
+import {
+  FLOW_QUOTE_COLUMNS, invoiceDeliveryOf, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent,
+} from "@/lib/jobs/flow-status";
+import { FV_SERIES, invoiceDeliveryError, isOwnInvoiceFile } from "@/lib/jobs/invoice-file";
 import { quoteSnapshotSha } from "@/lib/jobs/quote-approval-store";
 import { assertJobFileAccess, FILE_PRICE_SEND } from "@/lib/jobs/job-file-access";
+import { deliveredRows, deliveryNoteNumberOf, undocumentedRows } from "@/lib/jobs/delivery-notes";
+import { fileOfNote, issueDeliveryNote, issuedDeliveryNotes, reissueFromSnapshot } from "@/lib/jobs/delivery-notes-store";
+import { documentedQuantities } from "@/lib/jobs/delivery-notes-db";
 
 /**
  * Doklady ze zakázky: PDF (nabídka, potvrzení, dodací list, faktura) se vygeneruje
@@ -64,6 +72,16 @@ async function begin(): Promise<{ db: JobsDb; user: CurrentUser } | { error: str
   if ("error" in access) return { error: access.error };
   const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user };
+}
+
+/** Fakturu (PDF, odeslání, návrh e-mailu) vystavuje jen role s právem na marže — i přes /documents a Doklady. */
+const INVOICE_NO_RIGHT = "Fakturu vystavuje a posílá obchodník nebo super admin.";
+/** Dodací list vzniká jen se zápisem dodání (jedno číslo = jedna dodávka). */
+const DELIVERY_NOTE_NEEDS_DELIVERY = "Dodací list vzniká se zápisem dodání — v kartě zakázky „Zapsat dodání a dodací list“.";
+
+async function canInvoice(): Promise<boolean> {
+  const { can } = await getAccess();
+  return can("margins");
 }
 
 function revalidateDocs(jobId: string) {
@@ -160,17 +178,22 @@ async function recordInvoice(
       );
       if (error) console.error(`[job-documents] Položky faktury se nepodařilo uložit: ${error.message}`);
     }
-    const { error: docErr } = await db.from("documents").insert({
-      doc_type: "faktura",
-      number: inv.number,
-      title: `Faktura ${inv.number}${job.title ? ` — ${job.title}` : ""}`.slice(0, 300),
-      customer_id: job.customer?.id ?? null,
-      order_id: job.id,
-      invoice_id: invoiceId,
-      storage_path: storagePath,
-      total: totals.total,
-      created_by: userId,
-    } as never);
+    // jedna faktura = jeden řádek archivu dokladů (nové PDF téže faktury jen přepíše cestu)
+    const { data: archived } = await db.from("documents").select("id").eq("invoice_id", invoiceId).eq("doc_type", "faktura").limit(1);
+    const archivedId = ((archived ?? []) as { id: string }[])[0]?.id ?? null;
+    const { error: docErr } = archivedId
+      ? await db.from("documents").update({ storage_path: storagePath, total: totals.total } as never).eq("id", archivedId)
+      : await db.from("documents").insert({
+        doc_type: "faktura",
+        number: inv.number,
+        title: `Faktura ${inv.number}${job.title ? ` — ${job.title}` : ""}`.slice(0, 300),
+        customer_id: job.customer?.id ?? null,
+        order_id: job.id,
+        invoice_id: invoiceId,
+        storage_path: storagePath,
+        total: totals.total,
+        created_by: userId,
+      } as never);
     if (docErr) console.error(`[job-documents] Zápis do archivu dokladů selhal: ${docErr.message}`);
   } catch (err) {
     console.error(`[job-documents] Evidence faktury selhala: ${err instanceof Error ? err.message : String(err)}`);
@@ -198,18 +221,109 @@ async function docFacts(db: JobsDb, jobId: string) {
   const delivered = Number(r.items_delivered) || 0;
   const partial = (count > 0 && (delivered > 0 || (Number(r.items_partial) || 0) > 0) && delivered < count)
     || (count === 0 && Boolean(r.partial_delivery_at));
+  const stage = isJobStage(r.status) ? r.status : null;
   return {
-    stage: isJobStage(r.status) ? r.status : null,
+    stage,
     orderStatus: r.order_status ?? null,
     orderRevision: Math.max(1, Number(r.order_revision) || 1),
     /** Dodáno jen částečně — faktura stav neposouvá (M5). */
     partialDelivery: partial,
+    /** Dodání pro fakturu: faktura z aplikace jen po dodání všeho (stejné pravidlo jako karta). */
+    invoiceDelivery: invoiceDeliveryOf({
+      stage: stage ?? "poptavka", itemsCount: count, itemsDelivered: delivered,
+      itemsPartial: Number(r.items_partial) || 0, partialDeliveryAt: r.partial_delivery_at ?? null,
+    }),
   };
 }
 
 /** Otisk obsahu dokladu (data PDF, ne PDF samotné — to nese čas vytvoření). */
 function docFingerprint(kind: JobDocumentKind, data: unknown, extra: Record<string, unknown>): string {
   return `g:${createHash("sha256").update(JSON.stringify({ kind, data, ...extra })).digest("hex")}`;
+}
+
+// ── Faktura zakázky: jedna faktura, jedno číslo (A2) ─────────
+type InvoiceRow = {
+  id: string; order_id: string | null; storage_path: string | null;
+  issue_date: string | null; taxable_date: string | null; due_date: string | null;
+};
+type InvoiceFileRef = { fileId: string; filename: string; version: number };
+
+/** Co s fakturou zakázky: poslat vystavenou / vystavit (nové nebo rezervované číslo) / nejde. */
+type InvoicePlan =
+  | { kind: "existing"; number: string; file: InvoiceFileRef }
+  | { kind: "blocked"; error: string; code: "invoiced" }
+  | { kind: "issue"; reserved: string | null; row: InvoiceRow | null };
+
+/** PDF naší faktury s tímto číslem (nejnovější verze), nebo null. */
+function invoiceFileOf(job: JobDetail, number: string): InvoiceFileRef | null {
+  const name = pdfFileName("faktura", number);
+  const f = job.files
+    .filter((x) => isOwnInvoiceFile(x) && x.filename === name)
+    .sort((a, b) => (b.version ?? 1) - (a.version ?? 1) || b.createdAt.localeCompare(a.createdAt))[0];
+  return f ? { fileId: f.id, filename: f.filename, version: f.version ?? 1 } : null;
+}
+
+/**
+ * Faktura už je: vystavené PDF → jen poslat znovu (žádné nové datum ani verze, otevření dialogu nic
+ * nemění); faktura mimo systém / cizí číslo → druhá faktura nevznikne. Číslo z řady FV bez faktury
+ * = rezervace po nepovedeném vystavení → použije se znovu (žádná díra v řadě).
+ */
+async function planInvoice(db: JobsDb, job: JobDetail, reissue: boolean): Promise<InvoicePlan> {
+  const no = (job.invoiceNumber ?? "").trim();
+  if (!no) return { kind: "issue", reserved: null, row: null };
+  const file = invoiceFileOf(job, no);
+  if (file && !reissue) return { kind: "existing", number: no, file };
+  const { data } = await db.from("invoices")
+    .select("id, order_id, storage_path, issue_date, taxable_date, due_date").eq("number", no).maybeSingle();
+  const row = (data as InvoiceRow | null) ?? null;
+  if (row?.order_id && row.order_id !== job.id) {
+    return { kind: "blocked", code: "invoiced", error: `Faktura ${no} patří jiné zakázce — oprav číslo faktury této zakázky.` };
+  }
+  if (row && !row.storage_path) {
+    return { kind: "blocked", code: "invoiced", error: `Faktura ${no} je zapsaná jako vystavená mimo systém — PDF z aplikace k ní nevzniká. Další krok je „Zadat platbu“.` };
+  }
+  if (!row) {
+    if (!FV_SERIES.test(no)) {
+      return { kind: "blocked", code: "invoiced", error: `Zakázka už má zapsanou fakturu ${no} (mimo systém) — druhá faktura z aplikace nevznikne.` };
+    }
+    const { data: other } = await db.from("orders").select("id").eq("invoice_number", no).neq("id", job.id).limit(1);
+    if ((other ?? []).length) {
+      return { kind: "blocked", code: "invoiced", error: `Číslo faktury ${no} má i jiná zakázka — oprav číslo faktury této zakázky.` };
+    }
+  }
+  return { kind: "issue", reserved: no, row };
+}
+
+/** Číslo faktury zakázce atomicky (zámek řádku zakázky): vítěz souběhu číslo přidělí, ostatní ho dostanou. */
+async function assignInvoiceNumber(db: JobsDb, jobId: string): Promise<{ number: string; created: boolean } | null> {
+  const rpc = db.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  const { data, error } = await rpc.call(db, "assign_invoice_number", { p_job: jobId });
+  if (error) {
+    console.error(`[job-documents] Číslo faktury se nepodařilo přidělit: ${error.message}`);
+    return null;
+  }
+  const r = (data ?? {}) as { number?: unknown; created?: unknown };
+  return typeof r.number === "string" && r.number ? { number: r.number, created: r.created === true } : null;
+}
+
+/** Souběžné vystavení (druhá záložka / kolega): počkat na PDF vítěze místo druhé faktury. */
+async function waitForInvoiceFile(db: JobsDb, jobId: string, number: string): Promise<InvoiceFileRef | null> {
+  const name = pdfFileName("faktura", number);
+  for (let i = 0; i < 24; i++) {
+    const { data } = await db.from("job_files").select("id, filename, version")
+      .eq("job_id", jobId).eq("kind", "faktura").eq("archived", false).eq("origin", "generated").eq("filename", name)
+      .order("version", { ascending: false }).limit(1);
+    const f = ((data ?? []) as { id: string; filename: string; version: number | null }[])[0];
+    if (f) return { fileId: f.id, filename: f.filename, version: f.version ?? 1 };
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
+}
+
+function daysBetween(from: string, to: string): number {
+  const a = Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${to.slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.max(0, Math.round((b - a) / 86_400_000)) : 0;
 }
 
 /**
@@ -219,18 +333,27 @@ function docFingerprint(kind: JobDocumentKind, data: unknown, extra: Record<stri
  * „Přesto vystavit" (opts.force). S opts.reuse (dialogy „Odeslat…") vrátí beze změny obsahu
  * (otisk) poslední vystavený soubor — otevření dialogu nezakládá nové verze ani historii;
  * výslovné „Vystavit" dál zakládá novou verzi.
+ * Faktura: jedna na zakázku — vystavená se jen vrátí (žádné nové datum, verze ani zápis), nové PDF
+ * téže faktury jen s opts.reissue (se stejným datem a splatností); vystavit jde až po dodání všeho;
+ * číslo přidělí DB atomicky (souběh dvou vystavení = jedna faktura).
  */
 export async function generateJobDocument(
   jobId: string,
   kind: JobDocumentKind,
-  opts?: { quoteId?: string; note?: string; force?: boolean; reuse?: boolean },
-): Promise<ActionResult<{ fileId: string; number: string; filename: string; version: number; unpriced: number; code: "approval" }>> {
+  opts?: { quoteId?: string; note?: string; force?: boolean; reuse?: boolean; deliveryNoteId?: string; reissue?: boolean },
+): Promise<ActionResult<{
+  fileId: string; number: string; filename: string; version: number; unpriced: number; existing: boolean;
+  code: "approval" | "rights" | "delivery" | "invoiced";
+}>> {
   if (!isDocKind(kind)) return fail("Neznámý druh dokladu.");
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (opts?.quoteId !== undefined && opts.quoteId !== "" && !isUuid(opts.quoteId)) return fail("Nabídka nenalezena.");
+  if (opts?.deliveryNoteId !== undefined && opts.deliveryNoteId !== "" && !isUuid(opts.deliveryNoteId)) return fail("Dodací list nenalezen.");
   const c = await begin();
   if ("error" in c) return fail(c.error);
   const { db, user } = c;
+  // A2: jediná cesta k faktuře (karta → Vystavit fakturu) je pro finance — i zadní vrátka (/documents) hlídá server
+  if (kind === "faktura" && !(await canInvoice())) return { ok: false, error: INVOICE_NO_RIGHT, code: "rights" };
   const note = cleanText(opts?.note, 2000) ?? undefined;
   const force = opts?.force === true;
   const preparedBy = myName(user);
@@ -244,6 +367,8 @@ export async function generateJobDocument(
     let fpData: unknown;
     let quote: JobQuote | undefined;
     let invoice: Parameters<typeof recordInvoice>[2] | null = null;
+    /** Nové PDF už vystavené faktury (ztracené PDF / reissue) — datum a splatnost zůstávají. */
+    let invoiceReissue = false;
     /** Čas posledního schválení nabídky — znovupoužít jde jen PDF vystavené po něm. */
     let approvedAt: string | null = null;
 
@@ -303,32 +428,80 @@ export async function generateJobDocument(
       fpData = data;
       render = () => renderConfirmationPdf(data);
     } else if (kind === "dodaci_list") {
-      const existing = (job.deliveryNoteNumber ?? "").trim();
-      const allocated = existing || (await nextDocNumber(db, "DL"));
-      if (!allocated) return fail("Nepodařilo se přidělit číslo dodacího listu.");
-      if (!existing) {
-        const { error } = await db.from("orders").update({ delivery_note_number: allocated } as never).eq("id", jobId);
-        if (error) return fail(error.message);
-        job.deliveryNoteNumber = allocated;
+      // dodávky s vlastními DL: stáhnout vystavený DL (žádné nové číslo); DL na zbytek = „Zapsat dodání"
+      const notes = await issuedDeliveryNotes(db, jobId);
+      // dodáno bez DL (starší dodání, nezaškrtnuté „Vystavit dodací list", zavřená chyba DL) → DL jen
+      // na zboží, které ještě žádný DL nemá — i když zakázka jiné DL už má
+      const documented = notes.length ? await documentedQuantities(db, jobId) : new Map<string, number>();
+      const missing = notes.length ? undocumentedRows(job.items, documented) : deliveredRows(job.items);
+      if (notes.length && (opts?.deliveryNoteId || !missing.length)) {
+        const pick = opts?.deliveryNoteId ? notes.find((n) => n.id === opts.deliveryNoteId!.toLowerCase()) : notes[notes.length - 1];
+        if (!pick) return fail("Dodací list k této zakázce nepatří.");
+        const file = await fileOfNote(db, jobId, pick.storage_path);
+        if (file) return { ok: true, fileId: file.id, number: pick.number, filename: file.filename, version: file.version ?? 1, unpriced: 0 };
+        // PDF se ztratilo (smazaný dokument) → nové PDF se stejným číslem ze záznamu DL
+        const re = await reissueFromSnapshot(db, user.id, job, pick, preparedBy);
+        revalidateDocs(jobId);
+        return { ok: true, fileId: re.fileId, number: pick.number, filename: re.filename, version: re.version, unpriced: 0 };
       }
-      number = allocated;
-      const data = await buildDeliveryNoteDoc(job, { number, preparedBy, note });
-      fpData = data;
-      render = () => renderDeliveryNotePdf(data);
+      // ne na objednané množství; uloží se jako DL dodávky (příště se jen stáhne, číslo se nemění)
+      const shipped = missing;
+      if (shipped.length) {
+        try {
+          const dn = await issueDeliveryNote(db, user.id, job, shipped, { note: note ?? null, preparedBy, catchUp: true });
+          await logAudit({
+            action: "document_issued", entity: "job_files", entityId: dn.fileId,
+            diff: { jobId, kind: "dodaci_list", number: dn.number, version: dn.version, deliveryNoteId: dn.id, delivered: true },
+          });
+          revalidateDocs(jobId);
+          return { ok: true, fileId: dn.fileId, number: dn.number, filename: dn.filename, version: dn.version, unpriced: 0 };
+        } catch (err) {
+          return fail(err instanceof Error ? err.message : String(err));
+        }
+      }
+      // nic dodáno: DL „na celou zakázku" (vlastní číslo bez dodávky) už nevzniká — jedna cesta
+      // = „Zapsat dodání a dodací list" (dodávka + DL); náhled bez uložení zůstává (/api/pdf/job)
+      return { ok: false, error: DELIVERY_NOTE_NEEDS_DELIVERY, code: "delivery" };
     } else {
+      const plan = await planInvoice(db, job, opts?.reissue === true);
+      if (plan.kind === "existing") {
+        return { ok: true, fileId: plan.file.fileId, number: plan.number, filename: plan.file.filename, version: plan.file.version, unpriced: 0, existing: true };
+      }
+      if (plan.kind === "blocked") return { ok: false, error: plan.error, code: plan.code };
+      // nová faktura jen po dodání všeho (dílčí faktura by účtovala i nedodané kusy)
+      if (!plan.row) {
+        const gate = invoiceDeliveryError((await docFacts(db, jobId)).invoiceDelivery);
+        if (gate) return { ok: false, error: gate, code: "delivery" };
+      }
       // ceny zkontrolovat dřív, než se spotřebuje číslo z řady
       const missing = unpricedCount(pickPricedItems(job));
       if (missing && !force) return { ok: false, error: unpricedError(missing, kind), unpriced: missing };
-      const existing = (job.invoiceNumber ?? "").trim();
-      const allocated = existing || (await nextDocNumber(db, "FV"));
-      if (!allocated) return fail("Nepodařilo se přidělit číslo faktury.");
-      if (!existing) {
-        const { error } = await db.from("orders").update({ invoice_number: allocated } as never).eq("id", jobId);
-        if (error) return fail(error.message);
+      let allocated = plan.reserved;
+      if (!allocated) {
+        const assigned = await assignInvoiceNumber(db, jobId);
+        if (!assigned) return fail("Nepodařilo se přidělit číslo faktury.");
+        allocated = assigned.number;
+        if (!assigned.created) {
+          // souběh: číslo přidělilo jiné vystavení před chvílí → jeho PDF, žádná druhá faktura
+          const won = await waitForInvoiceFile(db, jobId, allocated);
+          if (won) return { ok: true, fileId: won.fileId, number: allocated, filename: won.filename, version: won.version, unpriced: 0, existing: true };
+        }
         job.invoiceNumber = allocated;
       }
       number = allocated;
-      const data = await buildInvoiceDoc(job, { number, preparedBy, note });
+      const row = plan.row;
+      invoiceReissue = Boolean(row);
+      const issueDate = dateOnly(row?.issue_date) ?? undefined;
+      const data = await buildInvoiceDoc(job, {
+        number, preparedBy, note,
+        // zálohy / platby zakázky → „Uhrazeno zálohou…", „Zbývá uhradit", QR na zbytek
+        payments: await jobPaymentRows(db, jobId),
+        ...(issueDate ? { issueDate, taxableDate: dateOnly(row?.taxable_date) ?? issueDate } : {}),
+        ...(issueDate && row?.due_date ? { dueDays: daysBetween(issueDate, row.due_date) } : {}),
+      });
+      // dodávky s vlastními DL → na faktuře všechna čísla dodacích listů
+      const dls = await issuedDeliveryNotes(db, jobId).catch(() => []);
+      if (dls.length) data.deliveryNoteNumber = dls.map((n) => n.number).join(", ");
       invoice = {
         number, variableSymbol: data.variableSymbol, issueDate: data.issueDate, taxableDate: data.taxableDate,
         dueDate: data.dueDate, currency: data.currency, items: data.items, note,
@@ -351,7 +524,7 @@ export async function generateJobDocument(
       const { data: same } = await sameQ.order("version", { ascending: false }).limit(1);
       const reuse = ((same ?? []) as { id: string; filename: string; version: number | null }[])[0];
       if (reuse) {
-        return { ok: true, fileId: reuse.id, number, filename: reuse.filename, version: reuse.version ?? 1, unpriced: 0 };
+        return { ok: true, fileId: reuse.id, number, filename: reuse.filename, version: reuse.version ?? 1, unpriced: 0, existing: true };
       }
     }
     const pdf = await render();
@@ -394,7 +567,16 @@ export async function generateJobDocument(
       const { error } = await db.from("quotes").update({ storage_path: path } as never).eq("id", quote.id);
       if (error) console.error(`[job-documents] Uložení PDF k nabídce selhalo: ${error.message}`);
     }
-    if (invoice) await recordInvoice(db, job, invoice, path, user.id);
+    if (invoice) {
+      await recordInvoice(db, job, invoice, path, user.id);
+      // datum a splatnost → Kniha a „po splatnosti" ji hlídají; orders.* = zrcadlo invoices (PDF a
+      // evidence nesou stejné datum i splatnost). Nové PDF už vystavené faktury data nemění.
+      if (!invoiceReissue) {
+        const { error } = await db.from("orders")
+          .update({ invoice_date: invoice.issueDate, invoice_due_date: invoice.dueDate } as never).eq("id", jobId);
+        if (error) console.error(`[job-documents] Datum a splatnost faktury se nezapsaly: ${error.message}`);
+      }
+    }
 
     const partialInvoice = kind === "faktura" && facts.partialDelivery;
     // historie jen přibývá: vlastní událost „Vystaveno …“ (registrace výše je tichá)
@@ -418,7 +600,7 @@ export async function generateJobDocument(
       diff: { jobId, kind, number, version: file.version, forced: force || undefined },
     });
     revalidateDocs(jobId);
-    return { ok: true, fileId: file.id, number, filename, version: file.version, unpriced: 0 };
+    return { ok: true, fileId: file.id, number, filename, version: file.version, unpriced: 0, existing: false };
   } catch (err) {
     return fail(err);
   }
@@ -442,7 +624,7 @@ interface FileForMail {
 async function docNumberForFile(
   db: JobsDb,
   kind: DocumentEmailKind,
-  file: { quote_id: string | null },
+  file: { quote_id: string | null; filename?: string | null },
   job: { number: string | null; invoice_number: string | null; delivery_note_number: string | null },
 ): Promise<string | null> {
   if (kind === "nabidka" && file.quote_id) {
@@ -450,7 +632,7 @@ async function docNumberForFile(
     return (data as { number: string | null } | null)?.number ?? null;
   }
   if (kind === "potvrzeni") return job.number ? confirmationNumber(job.number) : null;
-  if (kind === "dodaci_list") return job.delivery_note_number ?? null;
+  if (kind === "dodaci_list") return deliveryNoteNumberOf(file.filename) ?? job.delivery_note_number ?? null;
   if (kind === "faktura") return job.invoice_number ?? null;
   return null;
 }
@@ -469,9 +651,9 @@ export async function sendJobDocument(
   if (to.invalid.length || cc.invalid.length) return fail(`Neplatná e-mailová adresa: ${[...to.invalid, ...cc.invalid][0]}`);
   if (!to.valid.length) return fail("Vyplň, komu e-mail půjde.");
   if (to.valid.length + cc.valid.length > MAX_RECIPIENTS) return fail(`Najednou lze poslat nejvýš ${MAX_RECIPIENTS} adresátům.`);
-  const subject = cleanText(String(mail.subject ?? "").replace(/[\r\n]+/g, " "), 300);
+  let subject = cleanText(String(mail.subject ?? "").replace(/[\r\n]+/g, " "), 300);
   if (!subject) return fail("Doplň předmět e-mailu.");
-  const body = String(mail.body ?? "").replace(/\r\n/g, "\n").slice(0, 20_000);
+  let body = String(mail.body ?? "").replace(/\r\n/g, "\n").slice(0, 20_000);
 
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -504,6 +686,12 @@ export async function sendJobDocument(
     if (!job) return fail(NOT_FOUND);
 
     // #25: všechno ověřit DŘÍV, než e-mail odejde
+    if (file.kind === "faktura" && file.issuer !== "dodavatel" && !(await canInvoice())) return fail(INVOICE_NO_RIGHT);
+    // návrh psaný před vystavením faktury nese značky čísla a VS → přidělené číslo (i kdyby je klient nedoplnil)
+    if (file.kind === "faktura" && job.invoice_number) {
+      subject = fillInvoicePlaceholders(subject, job.invoice_number);
+      body = fillInvoicePlaceholders(body, job.invoice_number);
+    }
     if (file.kind === "nabidka") {
       const { can } = await getAccess();
       const isAdmin = user.role === "super_admin";
@@ -547,6 +735,9 @@ export async function sendJobDocument(
       from: { ownerId: user.id },
       jobId,
       senderId: user.id,
+      // podpis je v textu z návrhu (dialog ho ukázal k úpravě) → grafický s logem místo firemní šablony;
+      // bez podpisu v textu zůstane HTML výše (starý / vypnutý podpis)
+      signature: { userId: user.id, mode: "inline" },
     });
     if (!res.sent) return fail(res.reason ?? "E-mail se nepodařilo odeslat.");
 
@@ -618,9 +809,60 @@ export async function draftJobDocumentEmail(
     const file = job.files.find((f) => f.id === fileId.toLowerCase());
     if (!file) return fail(FILE_NOT_FOUND);
     // #25: nákupní doklad bez práva na marže ani nezačne odesílat (schválení nabídky hlídá až odeslání)
+    if (file.kind === "faktura" && file.issuer !== "dodavatel" && !(await canInvoice())) return fail(INVOICE_NO_RIGHT);
     if (file.locked === "price") return fail(FILE_PRICE_SEND);
     const kind: DocumentEmailKind = isDocumentEmailKind(file.kind) ? file.kind : "ostatni";
     return await composeDocumentEmail(db, user, job, kind, file);
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * „Vystavit fakturu": návrh e-mailu PŘED vystavením (otevření ani „Zrušit" nic nevystaví). Faktura už
+ * vystavená → existing (jen poslat znovu); nejde vystavit → chyba s kódem. Číslo faktury se přidělí až
+ * při vystavení — v návrhu je značka INVOICE_NUMBER_PLACEHOLDER (doplní ji klient i server při odeslání).
+ */
+export async function draftInvoiceEmail(
+  jobId: string,
+): Promise<ActionResult<{
+  to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind; unpriced: number;
+  existing: { fileId: string; filename: string; number: string } | null; code: "rights" | "delivery" | "invoiced";
+  /** Faktura by vznikla bez QR / čísla účtu (chybí bankovní spojení v Nastavení) — jen před vystavením. */
+  bankWarning: string | null;
+}>> {
+  if (!isUuid(jobId)) return fail(NOT_FOUND);
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!(await canInvoice())) return { ok: false, error: INVOICE_NO_RIGHT, code: "rights" };
+  try {
+    const job = await getJob(jobId);
+    if (!job) return fail(NOT_FOUND);
+    const plan = await planInvoice(c.db, job, false);
+    if (plan.kind === "blocked") return { ok: false, error: plan.error, code: plan.code };
+    if (plan.kind === "existing") {
+      const file = job.files.find((f) => f.id === plan.file.fileId);
+      const draft = await composeDocumentEmail(c.db, c.user, job, "faktura", {
+        filename: plan.file.filename, quoteId: null, createdAt: file?.createdAt ?? new Date().toISOString(),
+      });
+      if (!draft.ok) return draft;
+      return { ...draft, unpriced: 0, existing: { fileId: plan.file.fileId, filename: plan.file.filename, number: plan.number } };
+    }
+    if (!plan.row) {
+      const gate = invoiceDeliveryError((await docFacts(c.db, jobId)).invoiceDelivery);
+      if (gate) return { ok: false, error: gate, code: "delivery" };
+    }
+    const reserved = plan.reserved;
+    const draft = await composeDocumentEmail(c.db, c.user, job, "faktura", {
+      filename: pdfFileName("faktura", reserved ?? "FV"), quoteId: null, createdAt: new Date().toISOString(),
+    }, reserved ? undefined : { invoiceNumber: INVOICE_NUMBER_PLACEHOLDER, variableSymbol: INVOICE_VS_PLACEHOLDER });
+    if (!draft.ok) return draft;
+    // „PDF s QR": bez bankovního účtu / IBANu v Nastavení varovat PŘED vystavením (COMPANY načetl compose)
+    const bankWarning = invoiceBankWarning({ accountNumber: COMPANY.bank.accountNumber, iban: COMPANY.bank.iban }, job.currency || "CZK");
+    return {
+      ...draft, filename: reserved ? draft.filename ?? "" : "Faktura_[číslo].pdf", unpriced: unpricedCount(pickPricedItems(job)), existing: null,
+      bankWarning,
+    };
   } catch (err) {
     return fail(err);
   }
@@ -654,9 +896,15 @@ export async function draftQuoteEmail(
 async function composeDocumentEmail(
   db: JobsDb, user: CurrentUser, job: JobDetail, kind: DocumentEmailKind,
   file: { filename: string; quoteId: string | null; createdAt: string },
+  /** Faktura před vystavením: značky místo čísla a VS (přidělí se až při vystavení). */
+  invoicePending?: { invoiceNumber: string; variableSymbol: string },
 ): Promise<ActionResult<{ to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind }>> {
   await refreshCompanyFromSettings();
-  const { data: me } = await db.from("profiles").select("phone, position, email").eq("id", user.id).maybeSingle();
+  const [{ data: me }, signatureText] = await Promise.all([
+    db.from("profiles").select("phone, position, email").eq("id", user.id).maybeSingle(),
+    // můj podpis pro schránku, ze které doklad odejde (stejná volba jako sendJobDocument)
+    senderSignatureText(user.id, { ownerId: user.id }),
+  ]);
   const profile = (me ?? {}) as { phone?: string | null; position?: string | null; email?: string | null };
 
   const input: DocumentEmailInput = {
@@ -670,6 +918,7 @@ async function composeDocumentEmail(
     filename: file.filename,
     sender: { name: myName(user), position: profile.position, phone: profile.phone, email: profile.email ?? user.email },
     company: { name: COMPANY.name, web: COMPANY.web, phone: COMPANY.phone, email: COMPANY.email },
+    signatureText,
   };
 
   if (kind === "nabidka") {
@@ -683,26 +932,40 @@ async function composeDocumentEmail(
     input.deliveryDate = dateOnly(job.dueDate ?? job.customerRequiredDate) ?? null;
     input.quoteNumber = relevantQuote(job)?.number ?? null;
   } else if (kind === "dodaci_list") {
-    input.number = job.deliveryNoteNumber;
+    // každá dodávka má vlastní DL — číslo z dokumentu, ne jediné číslo zakázky
+    input.number = deliveryNoteNumberOf(file.filename) ?? job.deliveryNoteNumber;
     input.deliveryDate = dateOnly(job.dueDate) ?? null;
   } else if (kind === "faktura") {
-    input.number = job.invoiceNumber;
-    type InvoiceRow = { due_date: string | null; total: number | string | null; variable_symbol: string | null; currency: string | null };
+    input.number = invoicePending?.invoiceNumber ?? job.invoiceNumber;
+    type InvoiceRow = {
+      issue_date: string | null; due_date: string | null; total: number | string | null; variable_symbol: string | null; currency: string | null;
+    };
     let invoice: InvoiceRow | null = null;
-    if (job.invoiceNumber) {
+    if (job.invoiceNumber && !invoicePending) {
       const { data } = await db
         .from("invoices")
-        .select("due_date, total, variable_symbol, currency")
+        .select("issue_date, due_date, total, variable_symbol, currency")
         .eq("number", job.invoiceNumber)
         .maybeSingle();
       invoice = (data as InvoiceRow | null) ?? null;
     }
     const issued = dateOnly(file.createdAt) ?? todayIso();
     input.dueDate = invoice?.due_date ?? addDaysIso(issued, Math.max(0, job.customerDetail?.paymentTermsDays ?? 14));
-    const total = invoice?.total !== null && invoice?.total !== undefined ? Number(invoice.total) : computeTotals(pickPricedItems(job)).total;
-    input.amount = Number.isFinite(total) ? total : null;
+    const items = pickPricedItems(job);
+    const total = invoice?.total !== null && invoice?.total !== undefined ? Number(invoice.total) : computeTotals(items).total;
+    // zálohy / platby: e-mail uvádí stejně jako PDF a QR „Zbývá uhradit"
+    const { payments, settled } = invoicePaymentsFromRows(await jobPaymentRows(db, job.id), items, dateOnly(invoice?.issue_date) ?? issued);
+    const { paid } = invoiceBalance(items, payments, settled);
+    if (Number.isFinite(total) && (paid > 0 || settled)) {
+      input.invoiceTotal = total;
+      input.paidAmount = paid;
+      input.amount = settled ? 0 : Math.max(0, Math.round((total - paid) * 100) / 100);
+    } else {
+      input.amount = Number.isFinite(total) ? total : null;
+    }
     input.currency = invoice?.currency || job.currency;
-    input.variableSymbol = invoice?.variable_symbol || spdVariableSymbol(job.invoiceNumber ?? undefined) || null;
+    input.variableSymbol = invoicePending?.variableSymbol
+      ?? (invoice?.variable_symbol || spdVariableSymbol(job.invoiceNumber ?? undefined) || null);
   }
 
   let to = firstEmail(job.customerContactEmail, job.customerDetail?.email);

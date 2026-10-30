@@ -225,6 +225,7 @@ export async function cleanupOwnData() {
     const inList = jobIds.map(lit).join(",");
     const paths = sql(`select storage_path from job_files where job_id in (${inList}) and storage_path is not null`).split("\n").filter(Boolean);
     await removeStorageFiles(paths);
+    sql(`delete from delivery_notes where order_id in (${inList})`); // DL dodávek (order_id on delete set null)
     sql(`update orders set quote_id = null where id in (${inList})`);
     sql(`delete from quote_items where quote_id in (select id from quotes where job_id in (${inList}))`);
     sql(`delete from quotes where job_id in (${inList})`);

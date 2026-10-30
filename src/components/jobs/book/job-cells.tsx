@@ -8,7 +8,9 @@ import { OPERATION_KINDS, isOperationKind, productionLabel } from "@/lib/jobs/op
 import { ProductionMiniBar } from "@/components/jobs/production/production-mini";
 import { PAYMENT_MARK_TONE, listPaymentMark } from "@/components/jobs/production/production-helpers";
 import { deadlineInfo, DEADLINE_BADGE, type DeadlineInfo } from "@/lib/jobs/deadlines";
-import { avatarTone, countLabel, dateFromIso, initials, shortDate } from "@/components/jobs/book/book-params";
+import { avatarTone, countLabel, dateFromIso, initials, shortDate, todayInPrague } from "@/components/jobs/book/book-params";
+import { productionRowText } from "@/lib/jobs/production-handoff";
+import { PILL_TONE } from "@/components/jobs/production/handoff/deadline-chip";
 import type { JobListItem, PersonRef } from "@/lib/jobs/types";
 import { cn, formatCZK } from "@/lib/utils";
 
@@ -205,7 +207,15 @@ export function DeadlineBlock({ job, today, compact }: { job: JobListItem; today
           </Tip>
         )}
       </span>
-      {!compact && supplier && (
+      {!compact && job.stage === "ve_vyrobe" && job.productionDue && (
+        <span
+          title="Termín aktuálního kroku výroby"
+          className={cn("flex items-center gap-1 whitespace-nowrap text-[11px]", job.productionDue < today ? "font-semibold text-red-700 dark:text-red-400" : "text-muted-foreground")}
+        >
+          <CalendarClock className="h-3 w-3" /> {job.productionDue < today ? `krok po termínu ${shortDate(job.productionDue, today)}` : `krok do ${shortDate(job.productionDue, today)}`}
+        </span>
+      )}
+      {!compact && supplier && !(job.stage === "ve_vyrobe" && job.productionDue) && (
         <span
           title="Slíbeno dodavatelem"
           className={cn("flex items-center gap-1 whitespace-nowrap text-[11px]", info.supplierRisk ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
@@ -213,7 +223,7 @@ export function DeadlineBlock({ job, today, compact }: { job: JobListItem; today
           <Truck className="h-3 w-3" /> dod. {shortDate(supplier, today)}
         </span>
       )}
-      {!compact && !supplier && job.expectedDeliveryDate && (
+      {!compact && !supplier && job.expectedDeliveryDate && !(job.stage === "ve_vyrobe" && job.productionDue) && (
         <span title="Předpokládaný termín dodání" className="flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground">
           <CalendarClock className="h-3 w-3" /> předp. {shortDate(job.expectedDeliveryDate, today)}
         </span>
@@ -254,33 +264,47 @@ export function JobCounters({ job, className }: { job: Pick<JobListItem, "fileCo
  * Kde je výroba: mini pruh hotovo/celkem + ikona aktuální operace a místo
  * („Tepelné zpracování · TepKal"), červená tečka při problému. Odkaz na záložku Výroba.
  */
-export function ProductionLine({ job, compact, className }: { job: JobListItem; compact?: boolean; className?: string }) {
+export function ProductionLine({ job, compact, className, today }: { job: JobListItem; compact?: boolean; className?: string; today?: string }) {
   const step = job.productionStep ?? null;
   const total = job.productionTotal ?? 0;
   const done = job.productionDone ?? 0;
-  if (!step && !total) return null;
+  const day = today ?? todayInPrague();
+  // „Krok 2/3 · Tepelné zpracování · Kalírna XY · do 12. 11." (po termínu červeně, konečný termín, plán, chybí kdo)
+  const row = productionRowText(job, day);
+  if (!step && !total && row.kind !== "legacy") return null;
   const problem = Boolean(job.productionProblem);
   const finished = step === "hotovo";
   const kind = isOperationKind(step) ? OPERATION_KINDS[step] : null;
   const full = productionLabel(step, job.productionLocation ?? null) ?? "Výroba";
-  const text = finished ? "Výroba hotová" : kind ? `${compact ? kind.short : kind.label}${job.productionLocation ? ` · ${job.productionLocation}` : ""}` : full;
-  const Icon = finished ? CircleCheckBig : kind?.icon ?? CircleCheckBig;
+  const fallback = finished ? "Výroba hotová" : kind ? `${compact ? kind.short : kind.label}${job.productionLocation ? ` · ${job.productionLocation}` : ""}` : full;
+  const text = row.text ?? fallback;
+  const Icon = finished ? CircleCheckBig : row.kind === "legacy" ? AlertTriangle : kind?.icon ?? CircleCheckBig;
   return (
     <Link
       href={`/orders/${job.id}?tab=vyroba`}
       draggable={false}
-      title={`Výroba: ${full} — hotovo ${done} z ${total}${problem ? " · PROBLÉM" : ""}`}
-      aria-label={`Výroba: ${full}, hotovo ${done} z ${total}${problem ? ", problém" : ""}`}
+      title={`Výroba: ${text} — hotovo ${done} z ${total}${problem ? " · PROBLÉM" : ""}${row.dot ? ` · ${row.dot.title}` : ""}`}
+      aria-label={`Výroba: ${text}, hotovo ${done} z ${total}${problem ? ", problém" : ""}${row.dot ? `, ${row.dot.title.toLowerCase()}` : ""}`}
       className={cn("relative z-10 flex min-w-0 max-w-full flex-col gap-1 rounded-md outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring", className)}
+      data-testid="production-line"
     >
-      <span className="flex items-center gap-1.5">
-        <ProductionMiniBar done={done} total={total} step={step} problem={problem} className="min-w-0 flex-1" />
-        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground">{done}/{total}</span>
-      </span>
-      <span className={cn("flex min-w-0 items-center gap-1 text-[11px] font-medium", finished ? "text-green-700 dark:text-green-400" : "text-foreground/80")}>
+      {total > 0 && (
+        <span className="flex items-center gap-1.5">
+          <ProductionMiniBar done={done} total={total} step={step} problem={problem} className="min-w-0 flex-1" />
+          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground">{done}/{total}</span>
+        </span>
+      )}
+      <span className={cn(
+        "flex min-w-0 items-center gap-1 text-[11px] font-medium",
+        finished ? "text-green-700 dark:text-green-400" : row.overdue ? "text-red-700 dark:text-red-400" : row.kind === "legacy" ? "text-amber-800 dark:text-amber-300" : "text-foreground/80",
+      )}>
         {problem && <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />}
-        <Icon className={cn("h-3.5 w-3.5 shrink-0", finished ? "text-green-600 dark:text-green-400" : kind?.text)} />
-        <span className="min-w-0 truncate">{text}</span>
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", finished ? "text-green-600 dark:text-green-400" : row.kind === "legacy" ? "text-amber-600" : kind?.text)} />
+        <span className={cn("min-w-0", compact ? "line-clamp-2" : "truncate")}>{text}</span>
+        {row.dot && <span role="img" aria-label={row.dot.title} title={row.dot.title} className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />}
+        {row.pill && !compact && (
+          <span className={cn("shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold", PILL_TONE[row.pill.tone])}>{row.pill.label}</span>
+        )}
       </span>
     </Link>
   );

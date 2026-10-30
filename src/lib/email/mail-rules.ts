@@ -60,3 +60,18 @@ export function ruleCategorize(input: RuleInput): RuleResult {
   else if (!bulk && (category === "objednavka" || category === "poptavka") && URGENT_RE.test(body.slice(0, 1500))) priority = "vysoka";
   return { category, isSpam: false, priority, bulk };
 }
+
+/**
+ * Kategorie ODESLANÉ zprávy bez AI (štítek v Odeslaných, filtr, oprava jedním ťuknutím):
+ * odpověď převezme kategorii zprávy, na kterou odpovídá (`inherit`, kromě spamu / ostatní);
+ * jinak podle předmětu (text odpovědi obsahuje citace — ten se nečte). Naše „nabídka" je obchodní
+ * případ poptávky (ne „Nabídka dodavatele"); bez shody a se zakázkou „K zakázce".
+ */
+export function outgoingCategory(input: { subject?: string | null; jobId?: string | null; inherit?: EmailCategory | null }): EmailCategory {
+  if (input.inherit && input.inherit !== "spam" && input.inherit !== "ostatni") return input.inherit;
+  const subject = fold(input.subject);
+  let category: EmailCategory = RULES.find((r) => r.subject.test(subject))?.category ?? "ostatni";
+  if (category === "nabidka_dodavatele") category = "poptavka";
+  if (category === "ostatni" && input.jobId) category = "k_zakazce";
+  return category;
+}

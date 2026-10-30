@@ -10,6 +10,8 @@ import { getJob, getJobFormOptions } from "@/lib/data/jobs";
 import { getJobProduction } from "@/lib/data/production";
 import { getJobPurchasing } from "@/lib/data/purchasing";
 import { JobDetailView } from "@/components/jobs/detail/job-detail-view";
+import { getJobCommunication } from "@/lib/data/job-mail";
+import { JobMailProvider } from "@/components/jobs/communication/job-mail-context";
 
 export const dynamic = "force-dynamic";
 // předání do výroby: jedno odeslání = PDF objednávek + e-maily dodavatelům (akce běží ve funkci stránky)
@@ -31,11 +33,13 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
   const user = await requireFeature("orders");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const mergedFrom = typeof sp.slouceno === "string" ? sp.slouceno : null;
-  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions, mergedInto, banner] = await Promise.all([
+  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions, mergedInto, banner, communication] = await Promise.all([
     loadJob(id), getJobFormOptions(), getAccess(), getJobProduction(id), getJobPurchasing(id),
     getJobStamps(id), getFieldStamps(id, FIELD_STAMP_COLUMNS), listJobPayments(id), listOrderRevisions(id),
     // #24: sloučená zakázka (zdroj) → přesměrovat na tu, která zůstala; na ní banner
     getMergeRedirect(id), mergedFrom ? getMergeBanner(id, mergedFrom, sp.presmerovano === "1") : Promise.resolve(null),
+    // Pošta B: Komunikace (vlákna, návrhy, změny z e-mailů) — pošta jen podle pravidel viditelnosti
+    getJobCommunication(id).catch(() => null),
   ]);
   if (!job) notFound();
   // ?historie=1 = původní (sloučenou) zakázku jen zobrazit — odkaz z banneru cíle
@@ -46,6 +50,7 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
     <>
     {banner && <MergeBanner {...banner} />}
     {sourceInfo && <MergedSourceBanner number={job.number} {...sourceInfo} />}
+    <JobMailProvider jobId={job.id} initial={communication}>
     <JobDetailView
       job={job}
       options={options}
@@ -67,6 +72,7 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
       production={production}
       purchasing={purchasing}
     />
+    </JobMailProvider>
     </>
   );
 }

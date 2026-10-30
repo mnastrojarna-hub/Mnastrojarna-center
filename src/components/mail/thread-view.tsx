@@ -5,20 +5,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Reply, ReplyAll, Forward, Share2, Flag, MailOpen, FolderOpen, FolderPlus, Loader2, Paperclip, Sparkles,
-  ChevronDown, ChevronRight, Building2, CheckCircle2, AlertTriangle, Send, MessageSquareText, MoreHorizontal,
+  ChevronDown, ChevronRight, Building2, CheckCircle2, AlertTriangle, Send, MessageSquareText, MoreHorizontal, PenLine,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PrioritySelect, type PriorityValue } from "@/components/priority";
-import { CategoryEditor, CategoryPill } from "@/components/mail/category-editor";
+import { CategoryEditor, CategoryPicker, CategoryPill } from "@/components/mail/category-editor";
 import { ShareDialog } from "@/components/mail/share-dialog";
+import { JobLinkBar } from "@/components/mail/job-link-bar";
 import type { ComposeRequest } from "@/components/mail/compose-dialog";
 import { createJobFromEmail } from "@/app/actions/mail";
 import { markThreadReadAction, openThreadAction, runAiOnThreadAction, setThreadFlagAction, setThreadPriorityAction } from "@/app/actions/mail-inbox";
 import { sentCopyLabel } from "@/lib/email/mail-folders";
 import type { ThreadDetail, ThreadMessage, ThreadSummary } from "@/lib/email/mail-types";
-import { categoryStyle } from "@/lib/email/visibility";
+import { categoryStyle, neutralWhileAsking } from "@/lib/email/visibility";
+import { AskingCategoryPill } from "@/components/mail/thread-row";
 import type { EmailCategory } from "@/lib/data/types";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -52,6 +54,9 @@ export interface ThreadPatch {
   jobId?: string;
   jobNumber?: string;
   shareUnread?: boolean;
+  /** Pošta B: vlákno odpojeno od zakázky / návrh vyřízen. */
+  jobCleared?: boolean;
+  suggestionDone?: boolean;
 }
 
 export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version }: {
@@ -160,7 +165,18 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
     if (r.ok) setDetail(await openThreadAction(threadId, { markRead: false }));
   };
 
-  const st = categoryStyle(target?.category ?? summary.category);
+  // zpráva čeká na otázku „Patří k …?" (odpověď jmenuje jinou zakázku) → do rozhodnutí neutrální „K zakázce?"
+  const question = detail ? detail.suggestion ?? null : summary.suggestion ?? null;
+  const asking = neutralWhileAsking(target?.category ?? summary.category, Boolean(
+    question?.forMessage && (question.emailId ? question.emailId === (target?.id ?? summary.emailId) : true) && !target?.jobId,
+  ));
+  const st = categoryStyle(asking ? "K zakázce" : target?.category ?? summary.category);
+  // oprava kategorie jedné zprávy (přijaté i odeslané): vlákno hned, řádek seznamu, je-li to jeho zpráva
+  const setMessageCategory = (id: string, c: EmailCategory) => {
+    setDetail((d) => (d?.messages ? { ...d, messages: d.messages.map((m) => (m.id === id ? { ...m, category: c } : m)) } : d));
+    if (id === summary.emailId || id === target?.id) onPatch(threadId, { category: c });
+  };
+  const categoryError = (text: string) => setNotice({ ok: false, text });
   return (
     <Card className="overflow-hidden" data-testid="thread-view">
       <div className={cn("h-1.5 w-full", st.bar)} aria-hidden />
@@ -172,7 +188,11 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           <div className="min-w-0 flex-1">
             <h2 className="break-words text-base font-semibold leading-snug sm:text-lg" data-testid="thread-subject">{detail?.subject || summary.subject || "(bez předmětu)"}</h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <CategoryPill category={target?.category ?? summary.category} />
+              {asking
+                ? <AskingCategoryPill />
+                : target
+                  ? <CategoryPicker emailId={target.id} category={target.category} direction={target.direction} onChange={(c) => setMessageCategory(target.id, c)} onError={categoryError} />
+                  : <CategoryPill category={summary.category} />}
               {(target?.customer ?? summary.customer) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-500/10 dark:text-green-300">
                   <Building2 className="h-3 w-3" /> {target?.customer ?? summary.customer}
@@ -276,30 +296,39 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
                 onToggle={() => setExpanded((s) => { const n = new Set(s); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })}
                 onReply={() => compose("reply", m)}
                 onForward={() => compose("forward", m)}
+                onCategory={(c) => setMessageCategory(m.id, c)}
+                onCategoryError={categoryError}
               />
             ))}
           </ol>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed bg-muted/30 p-3">
-          {jobId ? (
-            <Button asChild variant="success" size="sm">
-              <Link href={`/orders/${jobId}`}><FolderOpen className="h-4 w-4" /> Otevřít zakázku {jobNumber ?? ""}</Link>
-            </Button>
-          ) : (
-            <Button variant="success" size="sm" onClick={createJob} disabled={busy !== null || !lastIn}>
-              {busy === "job" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderPlus className="h-4 w-4" />} Založit zakázku
-            </Button>
-          )}
+        <div className="space-y-2 rounded-xl border border-dashed bg-muted/30 p-3">
+          <JobLinkBar
+            threadId={threadId}
+            jobId={jobId}
+            jobNumber={jobNumber}
+            jobTitle={detail?.jobTitle ?? summary.jobTitle}
+            linkSource={[...messages].reverse().find((m) => m.jobId)?.jobLinkSource ?? summary.jobLinkSource}
+            linkActor={[...messages].reverse().find((m) => m.jobId)?.jobLinkActor ?? summary.jobLinkActor}
+            suggestion={detail ? detail.suggestion ?? null : summary.suggestion ?? null}
+            canCreate
+            createDisabled={!lastIn}
+            creating={busy === "job"}
+            onCreate={() => void createJob()}
+            onError={(text) => setNotice({ ok: false, text })}
+            onChanged={(c) => {
+              setNotice({ ok: true, text: c.text });
+              onPatch(threadId, c.jobId ? { jobId: c.jobId, jobNumber: c.jobNumber, suggestionDone: true } : { jobCleared: true, suggestionDone: c.suggestionDone });
+              void openThreadAction(threadId, { markRead: false }).then(setDetail);
+            }}
+          />
           {lastIn && (
             <CategoryEditor
               emailId={lastIn.id}
               category={lastIn.category}
               canAi={canAi}
-              onSaved={(c) => {
-                setDetail((d) => (d?.messages ? { ...d, messages: d.messages.map((m) => (m.id === lastIn.id ? { ...m, category: c } : m)) } : d));
-                onPatch(threadId, { category: c });
-              }}
+              onSaved={(c) => setMessageCategory(lastIn.id, c)}
             />
           )}
         </div>
@@ -319,8 +348,12 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
   );
 }
 
-function MessageItem({ m, open, onToggle, onReply, onForward }: { m: ThreadMessage; open: boolean; onToggle: () => void; onReply: () => void; onForward: () => void }) {
+function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCategoryError }: {
+  m: ThreadMessage; open: boolean; onToggle: () => void; onReply: () => void; onForward: () => void;
+  onCategory: (c: EmailCategory) => void; onCategoryError: (text: string) => void;
+}) {
   const out = m.direction === "out";
+  const [asSent, setAsSent] = React.useState(false);
   const who = out ? (m.senderName || m.fromName || m.fromEmail || "Já") : (m.fromName || m.fromEmail || "—");
   return (
     <li className={cn("rounded-xl border", out ? "border-cyan-200 bg-cyan-50/40 dark:border-cyan-500/20 dark:bg-cyan-500/5" : "bg-card")} data-testid="thread-message" data-direction={m.direction}>
@@ -344,10 +377,28 @@ function MessageItem({ m, open, onToggle, onReply, onForward }: { m: ThreadMessa
       </button>
       {open && (
         <div className="space-y-2 px-3 pb-3">
-          {out && m.bccEmail && <p className="text-xs text-muted-foreground">Skrytá kopie: {m.bccEmail}</p>}
-          <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-3 text-sm leading-relaxed scrollbar-thin" data-testid="message-body">
-            {m.body.trim() || "(prázdný e-mail)"}
+          <div className="flex flex-wrap items-center gap-2" data-testid="message-meta">
+            <CategoryPicker emailId={m.id} category={m.category} direction={m.direction} onChange={onCategory} onError={onCategoryError} />
+            {out && m.signedHtml && (
+              <button
+                type="button"
+                onClick={() => setAsSent((v) => !v)}
+                aria-pressed={asSent}
+                className="inline-flex min-h-7 items-center gap-1 rounded-full border px-2 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                data-testid="message-as-sent"
+              >
+                <PenLine className="h-3 w-3" /> {asSent ? "Zobrazit text" : "Jak odešla (s podpisem)"}
+              </button>
+            )}
           </div>
+          {out && m.bccEmail && <p className="text-xs text-muted-foreground">Skrytá kopie: {m.bccEmail}</p>}
+          {asSent && m.signedHtml ? (
+            <SentHtmlFrame html={m.signedHtml} />
+          ) : (
+            <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-3 text-sm leading-relaxed scrollbar-thin" data-testid="message-body">
+              {m.body.trim() || "(prázdný e-mail)"}
+            </div>
+          )}
           {m.attachments.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {m.attachments.map((a) => (
@@ -368,5 +419,28 @@ function MessageItem({ m, open, onToggle, onReply, onForward }: { m: ThreadMessa
         </div>
       )}
     </li>
+  );
+}
+
+/** Odeslaná zpráva tak, jak odešla (HTML s grafickým podpisem) — izolovaný rám bez skriptů, výška podle obsahu. */
+function SentHtmlFrame({ html }: { html: string }) {
+  const ref = React.useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = React.useState(260);
+  const measure = () => {
+    const d = ref.current?.contentDocument;
+    if (d?.documentElement) setHeight(Math.min(900, Math.max(120, Math.ceil(d.documentElement.scrollHeight) + 4)));
+  };
+  return (
+    <div className="overflow-hidden rounded-lg border bg-white" data-testid="message-sent-html">
+      <iframe
+        ref={ref}
+        title="Zpráva, jak odešla"
+        sandbox="allow-same-origin"
+        srcDoc={html}
+        onLoad={measure}
+        className="block w-full border-0 bg-white"
+        style={{ height }}
+      />
+    </div>
   );
 }

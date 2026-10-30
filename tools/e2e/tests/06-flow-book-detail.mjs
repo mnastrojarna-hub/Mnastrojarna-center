@@ -122,6 +122,7 @@ await T("výroba: zapsat dodání 1 ze 2 položek → „Částečně dodáno 1/
   await card.getByRole("button", { name: "Zapsat dodání" }).click();
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("button", { name: "Vše — Deska A" }).click();
+  await dlg.getByLabel("Dodávám teď — Deska B").fill(""); // předvyplněný zbytek → dílčí dodávka jen Desky A
   await dlg.getByRole("button", { name: "Zapsat dodání" }).click();
   await eventually(() => expect(Number(J(DEL).items_delivered) === 1, "DB: 1 položka dodaná"));
   expect(J(DEL).status === "ve_vyrobe", "stav se při částečném dodání neposunul");

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { SYSTEM_ACTOR, type ActorContext } from "@/lib/supabase/actor-headers";
@@ -235,8 +236,11 @@ export const RUN_PATH = "/api/cron/drawing-anonymize/run";
  * Adresa požadavku jen jako záloha pro lokální vývoj (localhost / 127.0.0.1).
  */
 export function appOrigin(reqUrl?: string | null): string | null {
-  const env = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  if (env) return env.replace(/\/+$/, "");
+  for (const c of originCandidates()) {
+    // na Vercelu nemá adresa localhost smysl (zkopírované .env.example) → další kandidát
+    if (process.env.VERCEL && isLocalOrigin(c)) continue;
+    return c;
+  }
   if (reqUrl) {
     try {
       const u = new URL(reqUrl);
@@ -244,6 +248,26 @@ export function appOrigin(reqUrl?: string | null): string | null {
     } catch { /* dál */ }
   }
   return null;
+}
+
+/**
+ * Kandidáti adresy v pořadí: APP_URL → NEXT_PUBLIC_APP_URL → produkční doména Vercelu (jen v produkci —
+ * doménu nechrání Deployment Protection) → VERCEL_URL (adresa nasazení, bývá chráněná → 401).
+ */
+function originCandidates(): string[] {
+  const vercelProd = process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "";
+  return [process.env.APP_URL, process.env.NEXT_PUBLIC_APP_URL, vercelProd, process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ""]
+    .map((v) => (v ?? "").trim().replace(/\/+$/, ""))
+    .filter((v) => /^https?:\/\/[^/]+/i.test(v));
+}
+
+function isLocalOrigin(o: string): boolean {
+  try {
+    const h = new URL(o).hostname;
+    return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0";
+  } catch {
+    return false;
+  }
 }
 
 export interface KickOptions {
@@ -282,51 +306,212 @@ export function internalRunAuth(authorization: string | null | undefined): 200 |
   return a.length === b.length && timingSafeEqual(a, b) ? 200 : 401;
 }
 
-/** Pro Nastavení: běží zpracování na pozadí? (bez CRON_SECRET jen šťouchnutím, bez plánovače). */
-export function anonRunnerStatus(): { cronSecret: boolean; internalKick: boolean; origin: string | null; warning: string | null } {
+export interface RunnerStatus {
+  cronSecret: boolean;
+  internalKick: boolean;
+  origin: string | null;
+  /** Varování pro Nastavení (null = vše v pořádku). */
+  warning: string | null;
+  /** Adresa z konfigurace ukazuje na localhost, ale běžíme na Vercelu (zkopírované .env.example). */
+  localOriginIgnored?: boolean;
+}
+
+/**
+ * Pro Nastavení: konfigurace zpracování na pozadí. Zpracování samo NEZÁVISÍ na CRON_SECRET ani na adrese
+ * aplikace — první soubor zpracuje přímo požadavek, který ho nahrál (after()), další se zpracují při otevření
+ * zakázky. Adresa + tajemství slouží jen k rozvětvení (souběh) a záchrannému plánovači.
+ */
+export function anonRunnerStatus(): RunnerStatus {
   const cronSecret = Boolean((process.env.CRON_SECRET ?? "").trim());
   const internalKick = Boolean(internalRunSecret());
   const origin = appOrigin(null);
-  const warning = !internalKick
-    ? "Chybí SUPABASE_SECRET_KEY — anonymizace na pozadí neběží."
-    : !cronSecret
-      ? "Chybí CRON_SECRET — anonymizace běží jen po nahrání / ručně, bez záchranného plánovače (soubory po chybě zůstanou ve frontě)."
-      : !origin ? "Chybí APP_URL — automatické šťouchnutí do fronty nezná adresu aplikace." : null;
-  return { cronSecret, internalKick, origin, warning };
+  const localOriginIgnored = Boolean(process.env.VERCEL) && originCandidates().some(isLocalOrigin);
+  const parts: string[] = [];
+  if (!(process.env.SUPABASE_SECRET_KEY ?? "").trim()) {
+    parts.push("Chybí SUPABASE_SECRET_KEY — anonymizace výkresů vůbec neběží (doplň servisní klíč v Nastavení → Integrace).");
+  } else {
+    if (localOriginIgnored) parts.push("NEXT_PUBLIC_APP_URL / APP_URL ukazuje na localhost — na Vercelu nastav APP_URL na veřejnou adresu aplikace.");
+    else if (!origin) parts.push("Chybí APP_URL — souběžné zpracování více výkresů je vypnuté (zpracují se postupně).");
+    if (!cronSecret) parts.push("Chybí CRON_SECRET — bez záchranného plánovače: výkresy se zpracují hned po nahrání a při otevření zakázky / Poptávek, staré výkresy jen ručně.");
+  }
+  const warning = parts.length ? parts.join(" ") : null;
+  return { cronSecret, internalKick, origin, warning, localOriginIgnored };
+}
+
+export interface KickResult {
+  /** Požadavky, které cílová funkce přijala (2xx nebo běží déle než waitMs). */
+  kicked: number;
+  ids: string[];
+  /** Požadavky, které selhaly (401 chráněné nasazení, 404, nedostupná adresa…). */
+  failed?: number;
+  reason?: string;
+}
+
+/** Proč interní běh nepřijal požadavek (česky, pro log a Nastavení). */
+export function describeKickFailure(status: number, body: string, origin: string): string {
+  const json = /^\s*[{[]/.test(body);
+  if ((status === 401 || status === 403) && !json) {
+    return `Adresa ${origin} je chráněná (Vercel Deployment Protection, HTTP ${status}) — nastav APP_URL na veřejnou doménu nebo zapni „Protection Bypass for Automation".`;
+  }
+  if (status === 401) return `Adresa ${origin} odmítla tajemství interního běhu (HTTP 401) — APP_URL nejspíš ukazuje na jiné nasazení.`;
+  if (status === 404) return `Na adrese ${origin} není interní běh anonymizace (HTTP 404) — zkontroluj APP_URL.`;
+  if (status === 503) return `Interní běh na ${origin} hlásí chybějící konfiguraci (HTTP 503) — zkontroluj SUPABASE_SECRET_KEY / CRON_SECRET.`;
+  return `Interní běh na ${origin} vrátil HTTP ${status}.`;
+}
+
+/** Poslední selhání rozvětvení v této instanci (Nastavení). */
+let lastKickProblem: { at: number; message: string } | null = null;
+
+export function lastKickFailure(): { at: number; message: string } | null {
+  return lastKickProblem;
 }
 
 /**
  * Vybere ≤ 5 kandidátů (pending podle priority) a pro každý pošle samostatný požadavek na run
- * (internalRunSecret + x-vercel-protection-bypass); čeká jen ≤ 2 s. Bez tajemství / originu vrátí 0
- * (route pak zpracuje sám v after(); server action nikdy nevykresluje).
+ * (internalRunSecret + x-vercel-protection-bypass); čeká jen ≤ 2 s. Počítá POCTIVĚ: 401 (chráněné
+ * nasazení), 404, 5xx nebo nedostupná adresa = selhání (failed), ne „rozběhnuto". Je to jen rozvětvení —
+ * zpracování nesmí na kick spoléhat (routy zpracují první soubor samy v after(), viz runner.ts).
  */
-export async function kick(opts: KickOptions): Promise<{ kicked: number; ids: string[]; reason?: string }> {
+export async function kick(opts: KickOptions): Promise<KickResult> {
   const secret = internalRunSecret();
   if (!secret) return { kicked: 0, ids: [], reason: "Chybí CRON_SECRET i SUPABASE_SECRET_KEY" };
   if (!opts.origin) return { kicked: 0, ids: [], reason: "Neznámá adresa aplikace" };
   const table = opts.table ?? "job_files";
   let ids = (opts.ids ?? []).slice(0, opts.limit ?? KICK_CONCURRENCY);
   if (!ids.length && opts.db) {
-    const nowIso = new Date().toISOString();
-    const { data } = await opts.db.from(table).select("id, anon_status, anon_lock_until")
-      .or(`and(anon_status.eq.pending,anon_lock_until.is.null),and(anon_status.eq.pending,anon_lock_until.lt.${nowIso}),and(anon_status.eq.processing,anon_lock_until.lt.${nowIso})`)
-      .order("anon_priority", { ascending: true }).order("created_at", { ascending: false })
-      .limit(opts.limit ?? KICK_CONCURRENCY);
-    ids = ((data ?? []) as { id: string }[]).map((r) => r.id);
+    ids = await runnableIds(opts.db, table, { includeBackfill: true, limit: opts.limit ?? KICK_CONCURRENCY });
   }
   if (!ids.length) return { kicked: 0, ids: [] };
   const f = opts.fetchImpl ?? fetch;
   const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${secret}` };
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (bypass) headers["x-vercel-protection-bypass"] = bypass;
-  await Promise.all(ids.map(async (id) => {
+  const origin = opts.origin;
+  const problems: string[] = [];
+  const outcomes = await Promise.all(ids.map(async (id): Promise<boolean> => {
     try {
-      await f(`${opts.origin}${RUN_PATH}`, { method: "POST", headers, body: JSON.stringify({ table, ids: [id], ...(opts.manualBy ? { manualBy: opts.manualBy } : {}) }), signal: AbortSignal.timeout(opts.waitMs ?? 2_000) });
-    } catch {
+      const res = await f(`${origin}${RUN_PATH}`, { method: "POST", headers, body: JSON.stringify({ table, ids: [id], ...(opts.manualBy ? { manualBy: opts.manualBy } : {}) }), signal: AbortSignal.timeout(opts.waitMs ?? 2_000) });
+      if (res.ok) return true;
+      problems.push(describeKickFailure(res.status, await res.text().catch(() => ""), origin));
+      return false;
+    } catch (err) {
       // timeout po 2 s je v pořádku — cílová funkce běží dál
+      const name = (err as { name?: string } | null)?.name;
+      if (name === "TimeoutError" || name === "AbortError") return true;
+      problems.push(`Adresa ${origin} je nedostupná (${err instanceof Error ? err.message.slice(0, 120) : "chyba spojení"}) — zkontroluj APP_URL.`);
+      return false;
     }
   }));
-  return { kicked: ids.length, ids };
+  const kicked = outcomes.filter(Boolean).length;
+  const failed = ids.length - kicked;
+  if (failed) {
+    lastKickProblem = { at: Date.now(), message: problems[0] };
+    console.warn(`[anonymize] Rozvětvení selhalo (${failed}/${ids.length}): ${problems[0]}`);
+  } else if (kicked) lastKickProblem = null;
+  return { kicked, ids, ...(failed ? { failed, reason: problems[0] } : {}) };
+}
+
+/**
+ * Šťouchnutí do fronty z kódu bez rendereru (server action, knihovny pošty): kick až po odpovědi
+ * (after()), mimo požadavek Next.js hned. Jen pomocník — soubory zpracuje i otevření zakázky.
+ */
+export function kickInBackground(opts: Omit<KickOptions, "origin"> & { origin?: string | null }): void {
+  const task = async () => {
+    try {
+      await kick({ ...opts, origin: opts.origin ?? appOrigin(null) });
+    } catch (err) {
+      console.warn(`[anonymize] Šťouchnutí do fronty selhalo: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  try {
+    after(task);
+  } catch {
+    void task();
+  }
+}
+
+/** Ověření interního běhu pro Nastavení (GET run s tajemstvím, ≤ 2,5 s; výsledek 5 min v paměti). */
+let probeCache: { at: number; key: string; result: { ok: boolean; message: string | null } } | null = null;
+
+export async function probeRunner(opts: { fetchImpl?: typeof fetch; force?: boolean } = {}): Promise<{ ok: boolean; message: string | null }> {
+  const secret = internalRunSecret();
+  const origin = appOrigin(null);
+  if (!secret || !origin) return { ok: false, message: null };
+  const key = `${origin}|${secret.slice(0, 8)}`;
+  if (!opts.force && probeCache && probeCache.key === key && Date.now() - probeCache.at < 5 * 60_000) return probeCache.result;
+  const headers: Record<string, string> = { authorization: `Bearer ${secret}` };
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  let result: { ok: boolean; message: string | null };
+  try {
+    const res = await (opts.fetchImpl ?? fetch)(`${origin}${RUN_PATH}`, { method: "GET", headers, signal: AbortSignal.timeout(2_500), cache: "no-store" });
+    result = res.ok ? { ok: true, message: null } : { ok: false, message: describeKickFailure(res.status, await res.text().catch(() => ""), origin) };
+  } catch (err) {
+    result = { ok: false, message: `Adresa ${origin} je nedostupná (${err instanceof Error ? err.message.slice(0, 120) : "chyba spojení"}) — zkontroluj APP_URL.` };
+  }
+  probeCache = { at: Date.now(), key, result };
+  return result;
+}
+
+/** Jak dlouho smí výkres čekat, než ho Nastavení ohlásí jako zaseknutý. */
+export const STUCK_AFTER_MS = 15 * 60_000;
+
+/**
+ * Stav zpracování na pozadí pro Nastavení: konfigurace + ověření interního běhu (probe) + poslední selhání
+ * rozvětvení + počet zaseknutých výkresů (pending déle než 15 min, přerušený běh). warning = co je špatně
+ * (česky, s radou), ok = krátké potvrzení, když je vše v pořádku.
+ */
+export async function anonRunnerHealth(db: AnonDb, opts: { fetchImpl?: typeof fetch } = {}): Promise<{ warning: string | null; ok: string | null; stuck: number; probeOk: boolean | null }> {
+  const st = anonRunnerStatus();
+  const parts: string[] = st.warning ? [st.warning] : [];
+  let probeOk: boolean | null = null;
+  if (st.internalKick && st.origin && (process.env.SUPABASE_SECRET_KEY ?? "").trim()) {
+    const p = await probeRunner(opts);
+    probeOk = p.ok;
+    if (!p.ok && p.message) parts.push(`Souběžné zpracování nefunguje: ${p.message} Výkresy se přesto zpracují postupně (hned po nahrání a při otevření zakázky).`);
+  }
+  const last = lastKickFailure();
+  if (last && probeOk !== false && Date.now() - last.at < 60 * 60_000) parts.push(`Poslední rozvětvení selhalo: ${last.message}`);
+  let stuck = 0;
+  try {
+    const now = new Date().toISOString();
+    const cut = new Date(Date.now() - STUCK_AFTER_MS).toISOString();
+    const { count } = await db.from("job_files").select("id", { count: "exact", head: true }).eq("archived", false).lt("anon_priority", BACKFILL_PRIORITY)
+      .or(`and(anon_status.eq.pending,created_at.lt.${cut},anon_lock_until.is.null),and(anon_status.eq.processing,anon_lock_until.lt.${now})`);
+    stuck = count ?? 0;
+  } catch {
+    // jen informace
+  }
+  if (stuck) parts.push(`${stuck} ${stuck === 1 ? "výkres čeká" : stuck < 5 ? "výkresy čekají" : "výkresů čeká"} na anonymizaci déle než 15 min — otevři zakázku, nebo v Poptávkách „Anonymizovat vše, co čeká".`);
+  const ok = parts.length ? null
+    : `Zpracování na pozadí běží: výkres se anonymizuje hned po nahrání${probeOk ? `, souběh přes ${st.origin} ověřen` : ""}${st.cronSecret ? ", záchranný plánovač nastaven" : ""}.`;
+  return { warning: parts.length ? parts.join(" ") : null, ok, stuck, probeOk };
+}
+
+/**
+ * Soubory připravené ke zpracování (pending bez zámku / s prošlým zámkem, processing s prošlým zámkem =
+ * přerušený běh), nejnovější první v rámci priority. Bez includeBackfill bez starých výkresů (priorita ≥ 9).
+ */
+export async function runnableIds(db: AnonDb, table: AnonTable, opts: {
+  ids?: string[] | null; jobIds?: string[] | null; includeBackfill?: boolean; exclude?: string[]; limit?: number;
+} = {}): Promise<string[]> {
+  if (opts.ids && !opts.ids.length) return [];
+  if (opts.jobIds && !opts.jobIds.length) return [];
+  const nowIso = new Date().toISOString();
+  let q = db.from(table).select("id")
+    .or(`and(anon_status.eq.pending,anon_lock_until.is.null),and(anon_status.eq.pending,anon_lock_until.lt.${nowIso}),and(anon_status.eq.processing,anon_lock_until.lt.${nowIso})`);
+  if (!opts.includeBackfill) q = q.lt("anon_priority", BACKFILL_PRIORITY);
+  if (opts.ids?.length) q = q.in("id", opts.ids.slice(0, 200));
+  if (table === "job_files") {
+    q = q.eq("archived", false);
+    if (opts.jobIds?.length) q = q.in("job_id", opts.jobIds.slice(0, 100));
+  }
+  if (opts.exclude?.length) q = q.not("id", "in", `(${opts.exclude.slice(0, 100).join(",")})`);
+  const { data, error } = await q.order("anon_priority", { ascending: true }).order("created_at", { ascending: false }).limit(Math.max(1, Math.min(opts.limit ?? KICK_CONCURRENCY, 50)));
+  if (error) {
+    console.error(`[anonymize] Fronta (výběr): ${error.message}`);
+    return [];
+  }
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
 }
 
 

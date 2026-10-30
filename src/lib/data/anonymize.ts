@@ -3,7 +3,7 @@ import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/serve
 import { getAccess } from "@/lib/auth/session";
 import type { FlowScope } from "@/lib/auth/flow-scope";
 import { chunks, countAnonReview, getAnonSummary, listAnonReview, type AnonReviewItem, type JobAnonBadge } from "@/lib/anonymize/queries";
-import { BACKFILL_PRIORITY, type AnonDb } from "@/lib/anonymize/queue";
+import { anonRunnerHealth, BACKFILL_PRIORITY, type AnonDb } from "@/lib/anonymize/queue";
 
 /**
  * Data anonymizace výkresů pro stránky (Poptávky, Dashboard, Archiv výkresů) — jen čtení, podle
@@ -110,6 +110,8 @@ export interface AnonSettingsPanelData {
   settings: import("@/lib/anonymize/settings").AnonSettings;
   mode: "full" | "approval";
   runnerWarning: string | null;
+  /** Všechno v pořádku: krátký popis, jak zpracování běží. */
+  runnerOk: string | null;
   spentTodayUsd: number;
   /** Staré výkresy čekající na zpracování v rámci denního limitu (backfill, priorita 9). */
   legacyCount: number;
@@ -124,7 +126,6 @@ export async function getAnonSettingsPanel(): Promise<AnonSettingsPanelData | nu
   if (!c) return null;
   try {
     const { settingsFromRow, configHash } = await import("@/lib/anonymize/settings");
-    const { anonRunnerStatus } = await import("@/lib/anonymize/queue");
     const { spentToday } = await import("@/lib/anonymize/budget");
     const [{ data: row }, { data: mode }, { data: glob }] = await Promise.all([
       c.from("drawing_anon_settings").select("*").eq("id", 1).maybeSingle(),
@@ -134,16 +135,18 @@ export async function getAnonSettingsPanel(): Promise<AnonSettingsPanelData | nu
     const settings = settingsFromRow(row as Record<string, unknown> | null);
     const hash = await configHash(settings);
     const m = mode as { mode: "full" | "approval"; enabled: boolean } | null;
-    const [legacy, changed, review, spent] = await Promise.all([
+    const [legacy, changed, review, spent, health] = await Promise.all([
       c.from("job_files").select("id", { count: "exact", head: true }).eq("anon_status", "pending").gte("anon_priority", 9).eq("archived", false),
       c.from("job_files").select("id", { count: "exact", head: true }).in("anon_status", ["done", "review"]).neq("anon_config_hash", hash).eq("archived", false),
       countAnonReview(c, null),
       spentToday(c),
+      anonRunnerHealth(c),
     ]);
     return {
       settings,
       mode: m && m.enabled === false ? "approval" : m?.mode ?? ((glob as { mode: "full" | "approval" } | null)?.mode ?? "approval"),
-      runnerWarning: anonRunnerStatus().warning,
+      runnerWarning: health.warning,
+      runnerOk: health.ok,
       spentTodayUsd: spent,
       legacyCount: legacy.count ?? 0,
       changedCount: changed.count ?? 0,

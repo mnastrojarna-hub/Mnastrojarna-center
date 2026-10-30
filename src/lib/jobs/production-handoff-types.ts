@@ -136,6 +136,12 @@ export interface WhoSuggestion {
   badges: SuggestionBadge[];
   /** Česky, proč tento návrh („Nejlevnější nabídka", „Naposledy dělal výkres…"). */
   reason: string;
+  /**
+   * Objednávka, kterou by návrh vystavil (stejné pravidlo jako server — purchaseItemsForStep): počet
+   * položek, kolik jich je bez ceny a součet (null bez práva na marže / bez ceny). Náhled tak nikdy
+   * neukáže částku, kterou objednávka mít nebude. Chybí = neznámo (návrh bez nabídky).
+   */
+  order?: { itemCount: number; unpriced: number; total: number | null } | null;
 }
 
 export interface StepPlan extends HandoffStepInput {
@@ -175,6 +181,88 @@ export interface HandoffPlan {
   automation: { mode: AutomationMode; sendDefault: boolean; senderEmail: string | null; reason: string | null };
   pendingCapturedQuotes: number;
   issues: HandoffIssue[];
+  /** Podklady pro dialog (WP3): adresář, díly, kontrola naživo, návrhy pro přidaný krok. Jen čtení. */
+  client?: HandoffPlanClient;
+}
+
+/** „Nabídka telefonem" zapsaná v dialogu předání (uloží se jako nabídka dodavatele, zdroj „telefon"). */
+export interface PhoneQuoteInput {
+  /** Dodavatel z adresáře; jinak supplierName (dohledá se ≥ 80, jinak se založí do adresáře). */
+  supplierId?: string | null;
+  supplierName?: string | null;
+  /** Cena za díly kroku bez DPH (jen obchodník / admin — ostatním se ignoruje). Jen u kroku s jedním dílem. */
+  price?: number | null;
+  /**
+   * Cena za kus u každého dílu (id položky zakázky → Kč/MJ bez DPH) — krok s víc díly. Objednávka
+   * potřebuje cenu položek (celková cena za víc dílů by se do objednávky nepropsala).
+   */
+  itemPrices?: Record<string, number> | null;
+  leadTimeDays?: number | null;
+  deliveryDate?: string | null;
+  note?: string | null;
+  /** Na co je nabídka (druh kroku) a pro které díly (null = všechny). */
+  kind: OperationKind;
+  orderItemIds?: string[] | null;
+}
+
+/** Návrh kdo pro krok, který uživatel v dialogu přidá („+ Přidat další krok"). */
+export interface KindSuggestion {
+  /** Díly kroku (kalírna / povrch jen díly s úpravou na výkresu); null = všechny. */
+  orderItemIds: string[] | null;
+  primary: WhoSuggestion | null;
+  alternatives: WhoSuggestion[];
+  /**
+   * Návrhy pro DALŠÍ výrobu (díly už dělá dřívější krok obrábění / kompletní dodávky — coveringStep): bez nabídek
+   * na kompletní dodávku, předvyplní se jen nabídka na tuto operaci. Chybí u druhů mimo obrábění (platí výchozí).
+   */
+  covered?: { primary: WhoSuggestion | null; alternatives: WhoSuggestion[] } | null;
+}
+
+/** Nabídka dodavatele k zakázce — co kryje (varování „nabídka firmy už kryje díly jiného kroku"). Bez cen. */
+export interface QuoteCover {
+  id: string;
+  number: string | null;
+  supplierId: string | null;
+  supplierName: string;
+  /** Nabídka na kompletní dodávku. */
+  complete: boolean;
+  /** Díly zakázky, které nabídka kryje (null = všechny / nejde určit). */
+  itemIds: string[] | null;
+  /** Nabídku už spotřeboval krok / objednávka zakázky („krok 1 (Výroba 1)" / „objednávka OV-…"). */
+  usedBy: string | null;
+  /** Krok, který ji spotřeboval (v dialogu se pak bere jeho aktuální stav). */
+  usedByOpId: string | null;
+}
+
+export interface HandoffPlanClient {
+  today: string;
+  /** Adresář dodavatelů (výběr „Kdo to dělá"; e-mail k „Rovnou odeslat"; obvyklá lhůta k termínu). */
+  suppliers: { id: string; name: string; email: string | null; leadDays: number | null }[];
+  /** Díly zakázky (výběr dílů kroku, kontrola dílů bez kroku). */
+  items: {
+    id: string; drawingNumber: string | null; name: string | null; quantity: number; unit: string; heatTreatment: string | null; surfaceTreatment: string | null;
+    /** Poznámka pro dodavatele (Technologie) — do objednávky u položky; v dialogu jde upravit. */
+    supplierNote?: string | null;
+  }[];
+  /** Kontext kontroly mimo dialog (ostatní kroky, otevřené objednávky, běžící krok před dialogem). */
+  otherSteps: { kind: OperationKind; status: OperationStatus; orderItemIds?: string[] | null }[];
+  openPurchaseOrders: { id: string; number: string; supplierId: string | null; supplierName: string; linked: boolean }[];
+  previousEnd: { date: string; label: string } | null;
+  /** Návrhy kdo pro přidaný krok podle druhu. */
+  kindSuggestions: Partial<Record<OperationKind, KindSuggestion>>;
+  /** Co AI přidala podle výkresu („+ Tepelné zpracování (výkres: kalit 58–60 HRC)"). */
+  routeChips: string[];
+  /** Čekající kroky za aktuálním (ukončení: přeskočí se; jejich objednávky). */
+  remaining: { id: string; label: string; location: string; purchaseOrder: { id: string; number: string; status: PurchaseOrderStatus } | null }[];
+  /** Poslední nevrácené předání (Vrátit předání do výroby). */
+  undoHandoffId: string | null;
+  /**
+   * Stav před předáním do výroby (objednávka / potvrzeno / pozastaveno / reklamace …) — kam „Vrátit předání"
+   * i „Jen přesunout stav" zakázku vrátí: z předání (stage_from), jinak z posledního přesunu do výroby v historii.
+   */
+  undoStage?: JobStage | null;
+  /** Nabídky dodavatelů a co kryjí (varování u kroku). */
+  quotes?: QuoteCover[];
 }
 
 export interface HandoffResult {

@@ -29,6 +29,7 @@ export function DeliveryNoteDocument({ data }: { data: DeliveryNoteData }) {
         <MetaStrip
           items={[
             { label: "Vystaveno", value: d(data.issueDate) },
+            { label: "Dodávka", value: data.deliveryLabel, accent: true },
             { label: "Naše zakázka", value: data.jobNumber },
             { label: "Vaše objednávka", value: data.customerOrderNumber },
             { label: "K objednávce", value: data.customerOrderNumber ? undefined : data.orderNumber },
@@ -72,6 +73,7 @@ export function DeliveryNoteDocument({ data }: { data: DeliveryNoteData }) {
             />
           ) : null}
           {data.weightKg ? <SummaryPill label="Hmotnost" value={`${czNumber(data.weightKg)} kg`} /> : null}
+          {data.remainingText ? <SummaryPill label="Zbývá dodat" value={data.remainingText} /> : null}
         </View>
 
         {data.note ? <NoteBox title="Poznámka">{data.note}</NoteBox> : null}

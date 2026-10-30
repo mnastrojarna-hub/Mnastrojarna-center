@@ -7,7 +7,9 @@ import type {
 export type UserRole = "super_admin" | "obchodnik" | "zamestnanec";
 export type EmailCategory =
   | "poptavka" | "objednavka" | "nabidka_dodavatele" | "potvrzeni_objednavky"
-  | "faktura" | "upominka" | "reklamace" | "technicka_dokumentace" | "spam" | "ostatni";
+  | "faktura" | "upominka" | "reklamace" | "technicka_dokumentace" | "spam" | "ostatni"
+  // komunikace k běžící zakázce / poptávce (migrace 20261029145000)
+  | "k_zakazce";
 export type PriorityLevel = "nizka" | "stredni" | "vysoka";
 export type QuoteStatus = "navrh_ai" | "ke_schvaleni" | "odeslano" | "prijato" | "zamitnuto";
 /** Stav zakázky v Knize zakázek (migrace 0019 — nahrazuje původní order_status). */
@@ -526,6 +528,11 @@ export interface OrderItem {
   heat_steps: Record<string, unknown>[] | null;
   surface_steps: Record<string, unknown>[] | null;
   spec_sources: Record<string, "ai" | "rucne">;
+  // Technologie položky (migrace 20261029140000)
+  tech_procedure?: string | null;
+  tech_complete?: boolean;
+  tech_complete_by?: string | null;
+  supplier_note?: string | null;
 }
 
 /** Dokument zakázky (výkres, model, nabídka, objednávka, DL, faktura…) s verzemi. */
@@ -943,7 +950,7 @@ export interface SupplierQuoteRow {
   selected: boolean;
   note: string | null;
   file_id: string | null;
-  source: "manual" | "foto" | "email" | "ai";
+  source: "manual" | "foto" | "email" | "ai" | "telefon";
   created_by: string | null;
   created_at: string;
   updated_at: string;

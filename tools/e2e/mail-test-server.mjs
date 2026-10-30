@@ -30,11 +30,16 @@ export const ACCOUNTS = [
   { user: "cert@jinycert.test", pass: "Cert-Heslo-1", imap: true, pop3: true },
   // E2E 18 (Pošta A): vlastní schránka v Můj účet, stažení celé schránky, odpovědi, Odeslané
   { user: "posta@nastrojarstvi.test", pass: "Posta-Heslo-1", imap: true, pop3: true },
+  // E2E 20 (Pošta B): komunikace k zakázce
+  { user: "zakazky@nastrojarstvi.test", pass: "Zakazky-Heslo-1", imap: true, pop3: true },
   // E2E 22: obchodník a zaměstnanec si schránku připojí sami (Můj účet), oprava zastaralého SMTP hesla
   { user: "obchod22@nastrojarstvi.test", pass: "Obchod22-Heslo-1", imap: true, pop3: true },
   { user: "dilna22@nastrojarstvi.test", pass: "Dilna22-Heslo-1", imap: true, pop3: true },
   // src/lib/email/smtp-heal.integration.test.ts: zastaralé vlastní SMTP heslo (535) → heslo schránky
   { user: "smtpheal@nastrojarstvi.test", pass: "Smtpheal-Heslo-1", imap: true, pop3: true },
+  // Pošta D: podpis s logem (src/lib/email/mail-d.integration.test.ts) a E2E 25 (kategorie, podpis, mobil)
+  { user: "podpis@nastrojarstvi.test", pass: "Podpis-Heslo-1", imap: true, pop3: true },
+  { user: "podpis25@nastrojarstvi.test", pass: "Podpis25-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {
@@ -688,7 +693,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const body = url.pathname === "/events"
       ? srv.events
       : url.pathname === "/sent"
-        ? srv.sent.map(({ from, to, raw }) => ({ from, to, raw: raw.slice(0, 4000) }))
+        // ?full=1 = celý zdroj zprávy (E2E 25: HTML podpis a vložené logo)
+        ? srv.sent.map(({ from, to, raw }) => ({ from, to, raw: url.searchParams.get("full") === "1" ? raw : raw.slice(0, 4000) }))
         : url.pathname === "/folder"
           ? srv.folder(user, url.searchParams.get("name") ?? "Sent").map((m) => ({ uid: m.uid, subject: m.subject, messageId: m.messageId, raw: m.raw.toString("utf8").slice(0, 6000) }))
           : null;

@@ -229,22 +229,28 @@ export async function confirmOrderByPhoto(db: JobsDb, jobId: string): Promise<{ 
  */
 export async function recordPhotoDelivery(
   db: JobsDb, userId: string, jobId: string, docItems: ExtractedItem[], opts: { documentNumber?: string | null; extra?: Row } = {},
-): Promise<{ recorded: number; lines: string[]; unmatched: string[]; complete: boolean; partial: boolean }> {
+): Promise<{
+  recorded: number; lines: string[]; unmatched: string[]; complete: boolean; partial: boolean;
+  /** Dodané kusy z fotky po položkách (řádky vyfoceného DL do delivery_notes). */
+  shipped: { itemId: string; description: string; quantity: number; unit: string }[];
+}> {
   const { data } = await db.from("order_items").select("id, drawing_number, name, quantity, delivered_quantity, delivery_closed, unit").eq("order_id", jobId).order("position");
   const items: DeliveryItem[] = ((data ?? []) as Row[]).map((r) => ({
     id: String(r.id), drawingNumber: (r.drawing_number as string | null) ?? null, name: (r.name as string | null) ?? null,
     quantity: num(r.quantity), deliveredQuantity: num(r.delivered_quantity), deliveryClosed: Boolean(r.delivery_closed), unit: (r.unit as string | null) ?? null,
   }));
-  const empty = { recorded: 0, lines: [], unmatched: [], complete: false, partial: false };
+  const empty = { recorded: 0, lines: [], unmatched: [], complete: false, partial: false, shipped: [] };
   if (!items.length || !docItems.length) return empty;
   const { updates, unmatched } = deliveryUpdates(docItems, items);
   const note = `podle vyfoceného dodacího listu${opts.documentNumber ? ` ${opts.documentNumber}` : ""}`;
   const lines: string[] = [];
+  const shipped: { itemId: string; description: string; quantity: number; unit: string }[] = [];
   for (const u of updates) {
     const upd = db.from("order_items").update({ delivered_quantity: u.delivered } as never).eq("id", u.itemId).eq("order_id", jobId);
     const { error } = await withChangeNote(upd, note);
     if (error) continue;
     const it = items.find((x) => x.id === u.itemId)!;
+    if (u.delivered > u.before) shipped.push({ itemId: u.itemId, description: u.label, quantity: u.delivered - u.before, unit: u.unit });
     it.deliveredQuantity = u.delivered;
     lines.push(`${u.label} ${new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 3 }).format(u.delivered)}/${new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 3 }).format(it.quantity)} ${u.unit}`);
   }
@@ -258,7 +264,7 @@ export async function recordPhotoDelivery(
       actorId: userId, entity: "delivery",
     });
   }
-  return { recorded: lines.length, lines, unmatched, complete: done === items.length, partial: any && done < items.length };
+  return { recorded: lines.length, lines, unmatched, complete: done === items.length, partial: any && done < items.length, shipped };
 }
 
 // ── Převzetí od dodavatele z DL dodavatele ──────────────────
@@ -401,14 +407,16 @@ export async function captureProductionHandoff(
       who = ctxPo.supplierName;
       due = end;
     }
-  } else if (consent === "review" && doc?.supplier && doc.supplier.name.trim() && date) {
-    // 4: nic nesedí — jen se souhlasem člověka (AI objednávku nevystavuje)
+  } else if (consent === "review" && doc?.supplier && doc.supplier.name.trim() && date && !firstWaiting) {
+    // 4: nic nesedí — jen se souhlasem člověka (AI objednávku nevystavuje). Čekající krok, který nejde
+    // spustit (bez objednávky / kdo / termínu), by zůstal před novým krokem a zakázka by byla „Ve výrobě"
+    // bez běžícího kroku → 5 (předá člověk dialogem „Předat do výroby…").
     const cands = [...ctx.suppliers.values()].map((s) => ({ id: s.id, name: s.name, ico: s.ico, dic: null, email: s.email, contactEmails: [], customerNumber: null, supplierNumberAtCustomer: null }));
     const hit = cands.length ? matchParty(doc.supplier, cands) : null;
     const sup = hit && hit.score >= 80 ? ctx.suppliers.get(hit.id) ?? null : null;
     steps = [{
       kind: "vyroba", who: sup ? { type: "supplier", id: sup.id, name: sup.name } : { type: "free", name: doc.supplier.name.trim().slice(0, 300) },
-      plannedEnd: date, endsAtCustomerDate: false, deadlineAgreed: false, deadlineSource: "potvrzeni_dodavatele", whoSource: "ai", start: !firstWaiting,
+      plannedEnd: date, endsAtCustomerDate: false, deadlineAgreed: false, deadlineSource: "potvrzeni_dodavatele", whoSource: "ai", start: true,
       po: { mode: "neobjednavat", noneReason: `Objednáno mimo systém — potvrzení dodavatele${doc.documentNumber ? ` ${doc.documentNumber}` : ""}`.slice(0, 500) },
     }];
     who = sup?.name ?? doc.supplier.name.trim();

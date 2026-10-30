@@ -3,8 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Inbox, MessageSquareQuote, Camera, Menu } from "lucide-react";
+import { ClipboardList, Inbox, MessageSquareQuote, Camera, Menu, Moon, Sun, LogOut, Loader2 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { AutomationModeToggle } from "@/components/automation-mode-toggle";
+import { signOutEverywhere } from "@/components/layout/sign-out";
 import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
 import type { BadgeCounts } from "@/lib/data/types";
@@ -34,8 +37,14 @@ function CountBadge({ n, className }: { n: number; className?: string }) {
 /**
  * Spodní lišta na mobilu: Zakázky, Poptávky, VYFOTIT doklad (hlavní akce),
  * Pošta a Menu se všemi sekcemi, na které má uživatel právo (s počty jako v postranním menu).
+ * Na konci Menu účet: kdo je přihlášen, motiv, režim AI (super admin) a Odhlásit — horní lišta
+ * je na telefonu jen hledání (R072).
  */
-export function MobileNav({ features, counts }: { features: Feature[]; counts?: Partial<BadgeCounts> | null }) {
+export function MobileNav({ features, counts, user }: {
+  features: Feature[];
+  counts?: Partial<BadgeCounts> | null;
+  user?: { fullName: string; roleLabel: string } | null;
+}) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const sections = navForFeatures(features);
@@ -142,9 +151,56 @@ export function MobileNav({ features, counts }: { features: Feature[]; counts?: 
                 </div>
               </div>
             ))}
+            <MenuAccount user={user ?? null} automation={features.includes("dashboard")} />
           </div>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** Konec mobilního Menu: přihlášený uživatel, motiv, režim AI (super admin), Odhlásit. */
+function MenuAccount({ user, automation }: { user: { fullName: string; roleLabel: string } | null; automation: boolean }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const [leaving, start] = React.useTransition();
+  const dark = mounted && resolvedTheme === "dark";
+  return (
+    <div className="space-y-2 border-t pt-3" data-testid="mobile-menu-account">
+      <div className="pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">Účet</div>
+      {user && (
+        <p className="truncate text-sm">
+          <span className="font-medium">{user.fullName}</span> <span className="text-muted-foreground">· {user.roleLabel}</span>
+        </p>
+      )}
+      {automation && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm text-muted-foreground">Režim AI</span>
+          <AutomationModeToggle />
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setTheme(dark ? "light" : "dark")}
+          className="flex min-h-11 items-center gap-2 rounded-lg border p-2.5 text-sm font-medium hover:bg-accent"
+          data-testid="mobile-menu-theme"
+        >
+          {dark ? <Sun className="h-4 w-4 shrink-0 text-amber-500" /> : <Moon className="h-4 w-4 shrink-0 text-indigo-500" />}
+          <span className="truncate">{dark ? "Světlý motiv" : "Tmavý motiv"}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => start(signOutEverywhere)}
+          disabled={leaving}
+          className="flex min-h-11 items-center gap-2 rounded-lg border border-destructive/30 p-2.5 text-sm font-medium text-destructive hover:bg-destructive/5 disabled:opacity-60"
+          data-testid="mobile-menu-signout"
+        >
+          {leaving ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <LogOut className="h-4 w-4 shrink-0" />}
+          <span className="truncate">Odhlásit se</span>
+        </button>
+      </div>
+    </div>
   );
 }

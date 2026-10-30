@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import {
   Mail, RefreshCw, Upload, Search, Loader2, Inbox as InboxIcon, UserRound, AlertCircle, CheckCircle2, X, PenSquare,
-  Send, Flag, Layers, Ban, Share2, SlidersHorizontal, MailOpen,
+  Send, Flag, Layers, Ban, Share2, SlidersHorizontal, MailOpen, FolderKanban, FolderOpen, Wand2, Settings,
 } from "lucide-react";
+import { MailSettingsPanel } from "@/components/mail/mail-settings-panel";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,8 @@ import { useMailSync } from "@/components/mail/use-mail-sync";
 import { useMailLive } from "@/components/mail/mail-live-provider";
 import { PRIORITY_STYLE, type PriorityValue } from "@/components/priority";
 import { listThreadsAction, setThreadFlagAction, setThreadPriorityAction } from "@/app/actions/mail-inbox";
-import { CATEGORY_STYLE, INBOX_CATEGORIES, NO_MAILBOX, type MailboxOption } from "@/lib/email/visibility";
+import { backfillMailJobsAction, confirmJobSuggestionAction, rejectJobSuggestionAction } from "@/app/actions/mail-jobs";
+import { CATEGORY_STYLE, INBOX_CATEGORIES, NO_MAILBOX, categoryCodeFromLabel, type MailboxOption } from "@/lib/email/visibility";
 import {
   EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, progressText, threadCountLabel, type FolderCounts, type MailFolder, type MailSort, type ThreadPage,
   type ThreadSummary,
@@ -57,6 +59,7 @@ function useIsDesktop(): boolean {
 }
 const FOLDERS: { id: MailFolder; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "inbox", icon: InboxIcon },
+  { id: "jobs", icon: FolderKanban },
   { id: "sent", icon: Send },
   { id: "flagged", icon: Flag },
   { id: "shared", icon: Share2 },
@@ -65,10 +68,14 @@ const FOLDERS: { id: MailFolder; icon: React.ComponentType<{ className?: string 
 ];
 
 function folderCount(f: MailFolder, c: FolderCounts): number {
-  return f === "inbox" ? c.inboxUnread : f === "flagged" ? c.flagged : f === "shared" ? c.sharedUnread : f === "spam" ? c.spam : 0;
+  return f === "inbox" ? c.inboxUnread : f === "jobs" ? (c.jobsUnread ?? 0) + (c.jobSuggestions ?? 0) : f === "flagged" ? c.flagged : f === "shared" ? c.sharedUnread : f === "spam" ? c.spam : 0;
 }
 
-/** Přijatá pošta: složky, vlákna, vlaječka + priorita, odpověď / přeposlání / nová zpráva, předání kolegovi. */
+/**
+ * Pošta (jedna položka menu): složky (Přijaté, K zakázkám, Odeslané …), vlákna, vlaječka + priorita,
+ * kategorie (štítek, čipy filtru, oprava ťuknutím), odpověď / přeposlání / nová zpráva, předání kolegovi,
+ * ozubené kolo „Nastavení pošty" (podpis).
+ */
 export function InboxView({ initial, counts: initialCounts, mailboxes, scope, mailboxId: initialMailbox, folder: initialFolder }: InboxViewProps) {
   const { can } = useAccess();
   const canAi = can("dashboard"); // AI třídění, návrhy odpovědí a korekce — jen AI přehled
@@ -207,6 +214,8 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         ...(p.unreadCount !== undefined ? { unreadCount: p.unreadCount } : {}),
         ...(p.category ? { category: p.category } : {}),
         ...(p.jobId ? { jobId: p.jobId, jobNumber: p.jobNumber } : {}),
+        ...(p.jobCleared ? { jobId: undefined, jobNumber: undefined, jobTitle: undefined, jobLinkSource: undefined, jobLinkActor: undefined } : {}),
+        ...(p.suggestionDone ? { suggestion: undefined } : {}),
         ...(p.shareUnread === false && t.share ? { share: { ...t.share, unread: false } } : {}),
       } : t)),
     }));
@@ -228,6 +237,41 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
       patch(t.threadId, { priority: t.priority, priorityManual: t.priorityManual });
       setSyncMsg({ ok: false, text: r.error ?? "Prioritu se nepodařilo uložit." });
     } else if (v === null) void reload({ keep: page.items.length });
+  };
+
+  // Pošta B: návrh „Patří k Z-…?" přímo v seznamu (jedno ťuknutí)
+  const [suggBusy, setSuggBusy] = React.useState<string | null>(null);
+  const answerSuggestion = async (t: ThreadSummary, accept: boolean) => {
+    if (!t.suggestion) return;
+    setSuggBusy(t.threadId);
+    const r = accept ? await confirmJobSuggestionAction(t.suggestion.id) : await rejectJobSuggestionAction(t.suggestion.id);
+    setSuggBusy(null);
+    if (!r.ok) return setSyncMsg({ ok: false, text: r.error ?? "Nepodařilo se." });
+    const jobNumber = t.suggestion.jobNumber;
+    patch(t.threadId, accept ? { jobId: t.suggestion.jobId, jobNumber, suggestionDone: true } : { suggestionDone: true });
+    setSyncMsg({ ok: true, text: accept ? `Přiřazeno k ${jobNumber}.` : `Dobře, nepatří k ${jobNumber}.` });
+    setCounts((c) => ({ ...c, jobSuggestions: Math.max(0, (c.jobSuggestions ?? 0) - 1) }));
+    setThreadVersion((v) => v + 1);
+  };
+  const [backfilling, setBackfilling] = React.useState(false);
+  const backfill = async () => {
+    setBackfilling(true);
+    try {
+      let total = { processed: 0, linked: 0, suggested: 0 };
+      for (let round = 0; round < 10; round++) {
+        const r = await backfillMailJobsAction();
+        if (!r.ok) {
+          setSyncMsg({ ok: false, text: r.error ?? "Přiřazení staré pošty selhalo." });
+          return;
+        }
+        total = { processed: total.processed + (r.processed ?? 0), linked: total.linked + (r.linked ?? 0), suggested: total.suggested + (r.suggested ?? 0) };
+        if (!r.remaining || !r.processed) break;
+      }
+      setSyncMsg({ ok: true, text: `Stará pošta prošla (${total.processed}): přiřazeno ${total.linked}, návrhů ${total.suggested}.` });
+      await reload({ keep: page.items.length });
+    } finally {
+      setBackfilling(false);
+    }
   };
 
   const items = page.items;
@@ -264,15 +308,34 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   };
 
   const description = scope === "all"
-    ? "Pošta všech schránek ve vláknech. Vlaječka a priorita jedním ťuknutím, odpověď a přeposlání přímo odsud."
-    : "Tvoje pošta ve vláknech — odpovídej, přeposílej a piš přímo odsud, vlaječka a priorita jedním ťuknutím.";
+    ? "Pošta všech schránek ve vláknech. Vlaječka, priorita i kategorie jedním ťuknutím, odpověď a přeposlání přímo odsud."
+    : "Tvoje pošta ve vláknech — odpovídej, přeposílej a piš přímo odsud, vlaječka, priorita i kategorie jedním ťuknutím.";
 
-  const filtersOn = priorityMax !== null || unreadOnly || sort !== "date" || category !== null;
+  const filtersOn = priorityMax !== null || unreadOnly || sort !== "date";
+  // čipy kategorií v každé složce (ve Spamu ne; v „K zakázkám" bez „K zakázce" — to je složka sama)
+  const chipCategories = folder === "spam" ? [] : INBOX_CATEGORIES.filter((c) => c !== "Spam" && !(folder === "jobs" && c === "K zakázce"));
+  React.useEffect(() => {
+    if (category && !chipCategories.includes(category)) setCategory(null);
+  }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Nastavení pošty (podpis): ozubené kolo v hlavičce, odkaz z Můj účet (/inbox?nastaveni=podpis)
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  React.useEffect(() => {
+    const u = new URL(window.location.href);
+    if (!u.searchParams.has("nastaveni")) return;
+    setSettingsOpen(true);
+    u.searchParams.delete("nastaveni");
+    window.history.replaceState(window.history.state, "", u.toString());
+  }, []);
+  const selectedMailboxEmail = mailboxId ? mailboxes.find((m) => m.id === mailboxId)?.email ?? null : null;
+
+  const recategorize = (t: ThreadSummary, c: EmailCategory) => patch(t.threadId, { category: c });
 
   return (
-    <div className="space-y-4">
+    // mobil: menší mezery — seznam vláken má začít co nejvýš (čipy kategorií přibyly)
+    <div className="space-y-3 sm:space-y-4">
       <PageHeader
-        title="Přijatá pošta"
+        title="Pošta"
         description={description}
         // mobil: bez popisu — seznam vláken má začít co nejvýš
         className="[&>div>p]:hidden sm:[&>div>p]:block"
@@ -287,6 +350,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             </Button>
             <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose">
               <PenSquare className="h-4 w-4" /> Nová zpráva
+            </Button>
+            <Button
+              size="sm" variant="outline" onClick={() => setSettingsOpen(true)}
+              aria-label="Nastavení pošty" title="Nastavení pošty (podpis)" data-testid="btn-mail-settings"
+              className="px-2.5"
+            >
+              <Settings className="h-4 w-4" /><span className="hidden xl:inline">Nastavení pošty</span>
             </Button>
           </div>
         }
@@ -426,16 +496,35 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                   <MailOpen className="h-3.5 w-3.5" /> Jen nepřečtené
                 </button>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="w-16 text-xs text-muted-foreground">Kategorie</span>
-                <button type="button" onClick={() => setCategory(null)} className={cn("min-h-7 rounded-full border px-2 text-[11px] font-medium", category === null ? "border-foreground bg-foreground text-background" : "hover:bg-accent")}>Vše</button>
-                {INBOX_CATEGORIES.filter((c) => c !== "Spam").map((c) => (
-                  <button key={c} type="button" onClick={() => setCategory(c)} className={cn("min-h-7 rounded-full border px-2 text-[11px] font-medium", category === c ? CATEGORY_STYLE[c].active : CATEGORY_STYLE[c].chip)}>{c}</button>
-                ))}
-              </div>
             </div>
           )}
-          <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+          {chipCategories.length > 0 && (
+            // kategorie vždy na očích: jeden řádek čipů (na mobilu se posouvá do strany)
+            <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin" role="group" aria-label="Filtr kategorie" data-testid="category-chips">
+              {/* mobil: řádek s počtem vláken není (seznam začne výš) — načítání ukáže kolečko tady */}
+              {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground sm:hidden" aria-label="Načítám" />}
+              <button
+                type="button" onClick={() => setCategory(null)} aria-pressed={category === null}
+                className={cn("min-h-8 shrink-0 rounded-full border px-2.5 text-xs font-medium", category === null ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-accent")}
+                data-testid="category-chip-all"
+              >
+                Všechny
+              </button>
+              {chipCategories.map((c) => {
+                const Icon = CATEGORY_STYLE[c].icon;
+                return (
+                  <button
+                    key={c} type="button" onClick={() => setCategory(category === c ? null : c)} aria-pressed={category === c}
+                    className={cn("inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", category === c ? CATEGORY_STYLE[c].active : CATEGORY_STYLE[c].chip)}
+                    data-testid={`category-chip-${categoryCodeFromLabel(c)}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" /> {c}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className={cn("items-center justify-between px-1 text-xs text-muted-foreground", chipCategories.length ? "hidden sm:flex" : "flex")}>
             <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           </div>
@@ -444,21 +533,37 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
               Starší odeslané z fronty schvalování: <Link href="/sent?archiv=1" className="text-primary underline-offset-4 hover:underline">archiv odeslané pošty</Link>
             </p>
           )}
+          {folder === "jobs" && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-xs text-fuchsia-900 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-200" data-testid="jobs-folder-hint">
+              <FolderKanban className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1">Pošta k běžícím zakázkám a poptávkám — přiřazuje se sama. Nejisté má otázku „Patří k…?“.</span>
+              <Button size="sm" variant="outline" className="h-7 bg-background text-xs" onClick={() => void backfill()} disabled={backfilling} data-testid="jobs-backfill">
+                {backfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} Přiřadit starou poštu
+              </Button>
+            </div>
+          )}
           {items.length === 0 ? (
-            <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn} />
+            <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} />
           ) : (
             <div className="space-y-2" data-testid="thread-list">
-              {items.map((t) => (
-                <ThreadRow
-                  key={t.threadId}
-                  t={t}
-                  active={t.threadId === selected?.threadId}
-                  canAi={canAi}
-                  showMailbox={scope === "all" && !mailboxId}
-                  onOpen={() => open(t)}
-                  onFlag={() => void toggleFlag(t)}
-                  onPriority={(v) => void changePriority(t, v)}
-                />
+              {items.map((t, i) => (
+                <React.Fragment key={t.threadId}>
+                  {folder === "jobs" && (i === 0 || groupKey(items[i - 1]) !== groupKey(t)) && <JobGroupHeader t={t} />}
+                  <ThreadRow
+                    t={t}
+                    active={t.threadId === selected?.threadId}
+                    canAi={canAi}
+                    showMailbox={scope === "all" && !mailboxId}
+                    hideJob={folder === "jobs"}
+                    onOpen={() => open(t)}
+                    onFlag={() => void toggleFlag(t)}
+                    onPriority={(v) => void changePriority(t, v)}
+                    onSuggestion={(accept) => void answerSuggestion(t, accept)}
+                    suggestionBusy={suggBusy === t.threadId}
+                    onCategory={(c) => recategorize(t, c)}
+                    onError={(text) => setSyncMsg({ ok: false, text })}
+                  />
+                </React.Fragment>
               ))}
               <div ref={sentinel} />
               {page.hasMore && (
@@ -512,6 +617,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           live.pokeNow();
         }}
       />
+      <MailSettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} initialMailbox={selectedMailboxEmail} />
     </div>
   );
 }
@@ -636,5 +742,32 @@ function EmptyList({ scope, noMailbox, folder, filtered }: { scope: "all" | "own
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Skupina ve složce „K zakázkám": zakázka vlákna, jinak „Bez zakázky" (návrh / K zakázce bez přiřazení). */
+function groupKey(t: ThreadSummary): string {
+  return t.jobId ?? `t:${t.threadId}`;
+}
+
+function JobGroupHeader({ t }: { t: ThreadSummary }) {
+  if (!t.jobId) {
+    return (
+      <p className="flex items-center gap-1.5 px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground" data-testid="job-group">
+        <FolderKanban className="h-3.5 w-3.5" /> {t.suggestion ? "Návrh přiřazení" : "Bez zakázky"}
+      </p>
+    );
+  }
+  return (
+    <Link
+      href={`/orders/${t.jobId}?tab=komunikace`}
+      className="flex items-center gap-1.5 rounded-lg px-1 pt-2 text-sm font-semibold text-primary hover:underline"
+      data-testid="job-group"
+      data-job={t.jobNumber}
+    >
+      <FolderOpen className="h-4 w-4 shrink-0" />
+      <span className="tabular-nums">{t.jobNumber}</span>
+      {t.jobTitle && <span className="min-w-0 truncate font-normal text-foreground/80">{t.jobTitle}</span>}
+    </Link>
   );
 }

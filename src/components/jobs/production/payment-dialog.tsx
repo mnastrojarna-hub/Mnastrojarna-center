@@ -97,6 +97,19 @@ export function PaymentDialog({
               </div>
             )}
           </div>
+          {margins && remaining !== null && remaining > 0 && (
+            // „Zaplaceno" = rychlá volba: doplatek celé zbývající částky (zálohy zůstanou v seznamu úhrad)
+            <button
+              type="button"
+              onClick={() => {
+                setAmount(String(remaining).replace(".", ","));
+                setSettles(true);
+              }}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-emerald-100 px-3 text-xs font-medium text-emerald-800 hover:brightness-95 dark:bg-emerald-500/15 dark:text-emerald-300"
+            >
+              <Banknote className="h-3.5 w-3.5" /> Doplatit zbytek {formatMoney(remaining, currency)}
+            </button>
+          )}
           {margins ? (
             <label htmlFor={ids.s} className="flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm">
               <span>

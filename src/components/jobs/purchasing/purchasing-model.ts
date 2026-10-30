@@ -3,7 +3,7 @@ import type {
   JobCommissionView, JobPurchasingTotals, PurchaseItem, PurchaseItemInput, PurchaseOrderDraftInput, PurchaseOrderView,
   PurchaseReceiptInput, SupplierQuoteInput, SupplierQuoteView,
 } from "@/lib/jobs/purchasing-types";
-import { purchaseExtraStates } from "@/lib/jobs/purchasing";
+import { purchaseExtraStates, supplierNoteSegment } from "@/lib/jobs/purchasing";
 import { dayDiff, type ChangeStamp, type Progress, type PurchaseExtraState } from "@/lib/jobs/flow-status";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import { parseDecimal, isInvalidDecimal, decimalInput, formatMoney, formatPercent } from "@/components/jobs/detail/detail-helpers";
@@ -50,9 +50,13 @@ export function purchaseDraftFrom(it: Partial<PurchaseItem> | PurchaseItemInput)
   };
 }
 
-/** Položky zakázky → koncepty nabídky dodavatele (bez cen — doplní se z nabídky). */
+/**
+ * Položky zakázky → koncepty (bez cen — doplní se z nabídky). `supplierNotes` = objednávka dodavateli:
+ * poznámka pro dodavatele z Technologie jde k položce jako „Pozor: …" (vytiskne se v PDF).
+ */
 export function draftsFromJobItems(
-  items: Pick<JobItem, "drawingNumber" | "name" | "description" | "material" | "quantity" | "unit">[],
+  items: (Pick<JobItem, "drawingNumber" | "name" | "description" | "material" | "quantity" | "unit"> & Partial<Pick<JobItem, "tech">>)[],
+  opts: { supplierNotes?: boolean } = {},
 ): PurchaseItemDraft[] {
   return items.map((it) => purchaseDraftFrom({
     drawingNumber: it.drawingNumber ?? undefined,
@@ -61,6 +65,7 @@ export function draftsFromJobItems(
     quantity: it.quantity,
     unit: it.unit,
     unitPrice: null,
+    ...(opts.supplierNotes ? { note: supplierNoteSegment(it.tech?.supplierNote) ?? undefined } : {}),
   }));
 }
 
@@ -137,12 +142,16 @@ export interface SupplierQuoteFormState {
   total: string;
   note: string;
   items: PurchaseItemDraft[];
+  /** Na co je nabídka (druhy kroků výroby) — porovnání nabídek ke stejnému kroku při předání do výroby. */
+  operationKinds?: string[];
+  /** Druhy předvyplnila AI (nabídka z focení / e-mailu) — ✦ u výběru, dokud je člověk nezmění. */
+  operationKindsAi?: boolean;
 }
 
 export function supplierQuoteFormNew(job: Pick<JobDetail, "items">, today: string): SupplierQuoteFormState {
   return {
     supplierId: null, supplierName: "", number: "", quoteDate: today, validUntil: "", leadTimeDays: "", deliveryDate: "",
-    total: "", note: "", items: draftsFromJobItems(job.items),
+    total: "", note: "", items: draftsFromJobItems(job.items), operationKinds: [], operationKindsAi: false,
   };
 }
 
@@ -162,6 +171,8 @@ export function supplierQuoteFormFrom(q: SupplierQuoteView): SupplierQuoteFormSt
     total: explicit ? decimalInput(q.total) : "",
     note: q.note ?? "",
     items,
+    operationKinds: q.operationKinds ?? [],
+    operationKindsAi: q.source !== "manual" && q.source !== "telefon" && Boolean(q.operationKinds?.length),
   };
 }
 
@@ -193,6 +204,7 @@ export function supplierQuoteFormToInput(f: SupplierQuoteFormState): SupplierQuo
     note: f.note.trim(),
     items: purchaseDraftsToInput(f.items),
     total: parseDecimal(f.total),
+    ...(f.operationKinds !== undefined ? { operationKinds: f.operationKinds.length ? f.operationKinds : null } : {}),
   };
 }
 

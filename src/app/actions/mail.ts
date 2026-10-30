@@ -1,16 +1,19 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { userActor } from "@/lib/supabase/actor-headers";
+import { copyEmailAttachmentsToJob, extractAndApply, linkThread, type MailJobActor } from "@/lib/email/job-link-store";
+import { cleanMailText, itemHintsFromMail } from "@/lib/email/job-instructions";
 import { checkFeature } from "@/lib/auth/session";
 import { getVisibleEmailRow } from "@/lib/data/mail";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
-import { guessFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
-import { jobFilePath, translateDbError } from "@/lib/jobs/mapping";
+import { translateDbError } from "@/lib/jobs/mapping";
 import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
 import {
-  attachmentIssuer, buildJobFromEmail, isUuidLike, isDbEmailCategory, jobPeopleFromEmail, type EmailForJob,
+  buildJobFromEmail, isUuidLike, isDbEmailCategory, jobPeopleFromEmail, type EmailForJob,
 } from "@/lib/email/visibility";
 import { emailCategoryLabel } from "@/lib/data/labels";
 import type { EmailCategory } from "@/lib/supabase/database.types";
@@ -21,8 +24,6 @@ import type { EmailCategory } from "@/lib/supabase/database.types";
  */
 
 const NOT_FOUND = "E-mail nenalezen (nebo k němu nemáš přístup).";
-const SOURCE_BUCKET = "documents"; // přílohy e-mailů
-const JOB_BUCKET = "job-files";
 
 function fail(err: unknown): { ok: false; error: string } {
   if (typeof err === "string") return { ok: false, error: translateDbError(err) };
@@ -64,30 +65,44 @@ export async function setEmailCategory(
   try {
     const found = await getVisibleEmailRow<{
       id: string; category: EmailCategory | null; ai_confidence: number | null; subject: string | null; from_email: string | null;
-    }>(emailId, "id, category, ai_confidence, subject, from_email");
+      to_email: string | null; direction: string | null;
+    }>(emailId, "id, category, ai_confidence, subject, from_email, to_email, direction");
     if (!found) return fail(NOT_FOUND);
     const prev = found.row.category;
     if (prev === category && !note?.trim()) return { ok: true };
+    const out = found.row.direction === "out";
+    if (out && category === "spam") return fail("Odeslaná zpráva nemůže být spam.");
     const db = await createOperatorClient();
-    const { error } = await db
+    // ručně zvolená kategorie: kdo a kdy (Pošta D); AI ji pak už nepřetřídí (ai_pending pryč)
+    const patch = { category, is_spam: category === "spam", ai_pending: false };
+    let { error } = await db
       .from("emails")
-      .update({ category, is_spam: category === "spam" } as never)
+      .update({ ...patch, category_set_by: access.user.id, category_set_at: new Date().toISOString() } as never)
       .eq("id", emailId);
+    if (error && /category_set_(by|at)/.test(error.message)) {
+      // DB bez migrace 20261030110000 — uložit aspoň kategorii
+      ({ error } = await db.from("emails").update(patch as never).eq("id", emailId));
+    }
     if (error) return fail(error.message);
 
-    // AI se učí z ruční opravy (jen když kategorii předtím určila AI, nebo je k ní pravidlo)
-    if ((found.row.ai_confidence !== null && prev !== category) || note?.trim()) {
+    // Učení: každá ruční oprava (přijaté i odeslané) jde do korekcí AI třídění pošty — AI je dostává
+    // v promptu jako „naučené korekce" (lib/ai/corrections) a stejnou chybu příště neudělá
+    if (prev !== category || note?.trim()) {
       await db.from("ai_corrections").insert({
         agent_key: "email",
         field: "category",
-        context: `Předmět: ${(found.row.subject ?? "").slice(0, 300)} (od ${found.row.from_email ?? "?"})`,
+        context: `${out ? "Odeslaný" : "Přijatý"} e-mail — Předmět: ${(found.row.subject ?? "").slice(0, 300)} (${out ? `komu ${found.row.to_email ?? "?"}` : `od ${found.row.from_email ?? "?"}`})`,
         ai_value: prev ? emailCategoryLabel[prev] : null,
         corrected_value: emailCategoryLabel[category],
         note: note?.trim().slice(0, 1000) || null,
         created_by: access.user.id,
       } as never);
     }
-    await logAudit({ action: "email_category_set", entity: "emails", entityId: emailId, diff: { from: prev, to: category } });
+    await logAudit({
+      action: "email_category_set", entity: "emails", entityId: emailId,
+      diff: { from: prev, to: category, direction: out ? "out" : "in", ...(found.row.ai_confidence !== null ? { ai: true } : {}) },
+      actor: userActor(access.user),
+    });
     revalidatePath("/inbox");
     return { ok: true };
   } catch (err) {
@@ -139,74 +154,18 @@ export async function getEmailBody(emailId: string): Promise<EmailBody> {
   }
 }
 
-interface AttachmentRow {
-  id: string;
-  filename: string | null;
-  mime_type: string | null;
-  size_bytes: number | null;
-  storage_path: string | null;
+/** Autor zápisů Pošty B (přiřazení vlákna, změny z e-mailu, přílohy) = přihlášený uživatel. */
+async function mailActor(user: { id: string }): Promise<MailJobActor> {
+  const ctx = userActor(user);
+  return { db: (await createOperatorClient({ actor: ctx })) as unknown as SupabaseClient, actorId: user.id, kind: "user", ctx };
 }
 
-/** Přílohy e-mailu → dokumenty zakázky (bucket documents → job-files). Best-effort. */
-async function copyAttachments(db: JobsDb, emailId: string, jobId: string, actorId: string): Promise<number> {
-  let copied = 0;
-  try {
-    const [{ data }, { data: em }] = await Promise.all([
-      db.from("email_attachments")
-        .select("id, filename, mime_type, size_bytes, storage_path")
-        .eq("email_id", emailId)
-        .not("storage_path", "is", null),
-      db.from("emails").select("category, supplier_id, customer_id").eq("id", emailId).maybeSingle(),
-    ]);
-    // #25: vystavitel příloh podle e-mailu — dodavatel (nákupní doklad, zaměstnanec ho uvidí zamčený),
-    // zákazník (podklad), jinak neznámý
-    const mailRow = em as { category: EmailCategory | null; supplier_id: string | null; customer_id: string | null } | null;
-    const issuer = mailRow
-      ? attachmentIssuer({ category: mailRow.category, supplierId: mailRow.supplier_id, customerId: mailRow.customer_id })
-      : null;
-    for (const a of (data ?? []) as AttachmentRow[]) {
-      try {
-        // jen soubor této přílohy (bez „..", absolutní cesty a cizích bucketů)
-        if (!a.storage_path || a.storage_path.includes("..") || a.storage_path.startsWith("/") || a.storage_path.includes("://")) continue;
-        if (a.size_bytes && a.size_bytes > JOB_FILE_MAX_BYTES) continue;
-        const filename = (a.filename ?? "").trim() || a.storage_path.split("/").pop() || "priloha";
-        // Storage kopíruje jen v rámci jednoho bucketu → stáhnout a nahrát
-        const { data: blob, error: dlErr } = await db.storage.from(SOURCE_BUCKET).download(a.storage_path);
-        if (dlErr || !blob) continue;
-        const bytes = Buffer.from(await (blob as Blob).arrayBuffer());
-        if (bytes.length > JOB_FILE_MAX_BYTES) continue;
-        const path = jobFilePath(jobId, crypto.randomUUID(), filename);
-        const mime = a.mime_type || (blob as Blob).type || "application/octet-stream";
-        const { error: upErr } = await db.storage.from(JOB_BUCKET).upload(path, bytes, { contentType: mime, upsert: false });
-        if (upErr) continue;
-        const { error: insErr } = await db.from("job_files").insert({
-          job_id: jobId,
-          kind: guessFileKind(filename, mime),
-          title: filename.slice(0, 300),
-          filename: filename.slice(0, 255),
-          mime_type: mime,
-          size_bytes: bytes.length,
-          storage_path: path,
-          version: 1,
-          archived: false,
-          note: "Příloha e-mailu",
-          uploaded_by: actorId,
-          origin: "email",
-          ...(issuer ? { issuer } : {}),
-        } as never);
-        if (insErr) {
-          await db.storage.from(JOB_BUCKET).remove([path]);
-          continue;
-        }
-        copied++;
-      } catch {
-        // jedna příloha nesmí shodit ostatní
-      }
-    }
-  } catch {
-    // přílohy jsou best-effort
-  }
-  return copied;
+/**
+ * Přílohy e-mailu → dokumenty zakázky (Pošta B: jednou, bez duplicit podle obsahu, nový výkres stejného
+ * čísla = nová revize; obsah i ze serveru IMAP). Vystavitel podle e-mailu (#25 §4.2).
+ */
+async function copyAttachments(a: MailJobActor, emailId: string, jobId: string): Promise<number> {
+  return (await copyEmailAttachmentsToJob(a, emailId, jobId)).copied;
 }
 
 /**
@@ -227,22 +186,17 @@ export async function linkEmailToJob(emailId: string, jobId: string): Promise<{ 
     const db = await createOperatorClient();
     const { data: job } = await db.from("orders").select("id, number").eq("id", jobId).maybeSingle();
     if (!job) return fail("Zakázka nenalezena.");
-    const { data: linked, error } = await db.from("emails").update({ order_id: jobId } as never)
-      .eq("id", emailId).is("order_id", null).select("id");
-    if (error) return fail(error.message);
-    if (!linked || !(linked as unknown[]).length) return fail("E-mail mezitím přiřadil někdo jiný — obnov stránku.");
-    const subject = (found.row.subject ?? "").trim() || "(bez předmětu)";
-    await logJobEvent(db, {
-      jobId, type: "email", message: `Přiřazen e-mail „${subject.slice(0, 200)}“`,
-      data: { emailId, action: "linked" }, actorId: user.id,
-    });
-    const files = await copyAttachments(db, emailId, jobId, user.id);
-    if (files > 0) {
-      await logJobEvent(db, {
-        jobId, type: "file", message: files === 1 ? "Přiložena příloha e-mailu" : `Přiloženo ${files} příloh e-mailu`,
-        data: { emailId, count: files }, actorId: user.id,
-      });
-    }
+    // Pošta B: přiřazení platí pro celé vlákno (e-mail i ostatní nepřiřazené zprávy vlákna) — s autorem,
+    // zdrojem „ručně" a JEDNÍM řádkem v historii; technické změny z textu, přílohy jednou
+    const a = await mailActor(user);
+    const { data: em } = await a.db.from("emails").select("id, thread_id, subject, direction, category, supplier_id, customer_id, from_name, from_email").eq("id", emailId).maybeSingle();
+    if (!em) return fail(NOT_FOUND);
+    const linked = await linkThread(a, { email: em as never, jobId, source: "manual", confidence: null, strong: true });
+    if (!linked.ok) return fail(linked.error ?? "E-mail se nepodařilo přiřadit.");
+    const { data: now } = await db.from("emails").select("order_id").eq("id", emailId).maybeSingle();
+    if ((now as { order_id: string | null } | null)?.order_id !== jobId) return fail("E-mail mezitím přiřadil někdo jiný — obnov stránku.");
+    await extractAndApply(a, emailId, jobId, { force: true });
+    await copyAttachments(a, emailId, jobId);
     await logAudit({ action: "email_linked_to_job", entity: "emails", entityId: emailId, diff: { jobId } });
     for (const p of ["/orders", "/inbox", "/inquiries", "/confirmations"]) revalidatePath(p);
     revalidatePath(`/orders/${jobId}`);
@@ -286,9 +240,9 @@ export async function createJobFromEmail(
   const { user } = access;
 
   try {
-    const found = await getVisibleEmailRow<EmailForJob & { order_id: string | null; owner_id: string | null; mailbox_id: string | null }>(
+    const found = await getVisibleEmailRow<EmailForJob & { order_id: string | null; owner_id: string | null; mailbox_id: string | null; body_text: string | null }>(
       emailId,
-      "id, subject, from_name, from_email, customer_id, category, received_at, ai_summary, snippet, order_id, owner_id, mailbox_id",
+      "id, subject, from_name, from_email, customer_id, category, received_at, ai_summary, snippet, order_id, owner_id, mailbox_id, body_text",
     );
     if (!found) return fail(NOT_FOUND);
     const email = found.row;
@@ -349,16 +303,41 @@ export async function createJobFromEmail(
       actorId: user.id,
     });
 
-    const files = await copyAttachments(db, emailId, job.id, user.id);
-    if (files > 0) {
+    // poznámka zakázky (shrnutí / začátek e-mailu) i v historii — majitel: „měly by tam být i poznámky"
+    const note = typeof (row as { note?: unknown }).note === "string" ? ((row as { note: string }).note) : null;
+    if (note) {
       await logJobEvent(db, {
-        jobId: job.id,
-        type: "file",
-        message: files === 1 ? "Přiložena příloha e-mailu" : `Přiloženo ${files} příloh e-mailu`,
-        data: { emailId, count: files },
+        jobId: job.id, type: "field", message: `Interní poznámka: ${note.slice(0, 300)}`,
+        data: { changes: [{ field: "note", label: "Interní poznámka", from: null, to: note, fromText: "—", toText: note }], note: true },
         actorId: user.id,
       });
     }
+
+    // Pošta B (B4): položky z textu e-mailu (výkres + počet) a pokyn zákazníka z e-mailu je NADŘAZENÝ
+    // výkresu — „prosím kalit" se propíše do položky (s odznakem a možností vrátit), ne jen do poznámky
+    const a = await mailActor(user);
+    const { data: attRows } = await a.db.from("email_attachments").select("filename").eq("email_id", emailId);
+    const names = ((attRows ?? []) as { filename: string | null }[]).map((r) => r.filename ?? "").filter(Boolean);
+    const hints = itemHintsFromMail(email.body_text, names);
+    if (hints.length) {
+      const { error: itemErr } = await a.db.from("order_items").insert(hints.map((h, i) => ({
+        order_id: job.id, position: i, drawing_number: h.drawingNumber.slice(0, 120), name: h.name, quantity: h.quantity ?? 1, unit: "ks",
+        note: h.quantity ? null : "Počet doplň — v e-mailu není",
+      })));
+      if (itemErr) console.error(`[mail] Položky z e-mailu se nepodařilo uložit: ${itemErr.message}`);
+      else {
+        await logJobEvent(db, {
+          jobId: job.id, type: "field", message: `Položky z e-mailu: ${hints.map((h) => `${h.drawingNumber}${h.quantity ? ` · ${h.quantity} ks` : ""}`).join(", ").slice(0, 300)}`,
+          data: { items: hints.length, emailId }, actorId: user.id,
+        });
+      }
+    }
+    await a.db.from("emails").update({ job_link_source: "created", job_link_actor: "user", job_linked_at: new Date().toISOString(), job_linked_by: user.id, job_match_at: new Date().toISOString() }).eq("id", emailId);
+    const { data: em } = await a.db.from("emails").select("id, thread_id, subject, direction, category, supplier_id, customer_id, from_name, from_email").eq("id", emailId).maybeSingle();
+    if (em) await linkThread(a, { email: em as never, jobId: job.id, source: "created", confidence: null, strong: true });
+    // zakázka založená z tohoto e-mailu: odesílatel je její zákazník a text je zadání (i u starší pošty)
+    if (cleanMailText(email.body_text)) await extractAndApply(a, emailId, job.id, { mode: "full", party: "customer", allowOld: true, force: true });
+    await copyAttachments(a, emailId, job.id);
 
     await logAudit({ action: "job_created_from_email", entity: "orders", entityId: job.id, diff: { emailId, number: job.number } });
     for (const p of ["/orders", "/inbox", "/inquiries", "/confirmations", "/"]) revalidatePath(p);

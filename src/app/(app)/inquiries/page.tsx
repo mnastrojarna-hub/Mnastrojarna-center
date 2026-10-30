@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calculator, EyeOff, FilePlus, Inbox, MessageSquareQuote, Mail } from "lucide-react";
+import { Calculator, EyeOff, FilePlus, Inbox, MessageSquareQuote, Mail, MessagesSquare } from "lucide-react";
 import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
 import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
@@ -27,6 +27,7 @@ import { CLOSED_JOB_KEYS, STATE_PARAM, actionPalette, parseStateParam } from "@/
 import { getAnonPending, getAnonReviewList, getJobAnonBadges } from "@/lib/data/anonymize";
 import { AnonymizeToolButton } from "@/components/anonymize/anonymize-tool-dialog";
 import { JobAnonBadge } from "@/components/anonymize/anon-badge";
+import { AnonQueueNudge } from "@/components/anonymize/anon-queue-nudge";
 import { AnonReviewChip, AnonReviewList, type AnonReviewRowView } from "@/components/anonymize/anon-review-section";
 import type { AnonUiStatus } from "@/components/anonymize/anon-status";
 
@@ -86,6 +87,8 @@ export default async function InquiriesPage({
       count={reviewRows.length}
     >
       <AnonReviewList items={reviewRows} pendingFileIds={anonPending.fileIds} pendingCount={anonPending.count} />
+      {/* čekající výkresy se zpracují i bez plánovače — stačí, že je někdo vidí */}
+      <AnonQueueNudge ids={anonPending.fileIds} />
     </FlowSection>
   ) : null;
   const chips = chipsForTab("inquiries", counts);
@@ -94,6 +97,9 @@ export default async function InquiriesPage({
   const today = todayPrague();
   const inbox = toFlowEmails(emails, ["Poptávka"]);
   const waiting = inbox.filter((e) => !e.jobId).length;
+  // Pošta B: komunikace k rozpracovaným poptávkám (přiřazená pošta „K zakázce")
+  const inquiryIds = new Set(jobs.map((j) => j.id));
+  const talk = toFlowEmails(emails.filter((e) => e.jobId && inquiryIds.has(e.jobId)), ["K zakázce"], 20);
 
   return (
     <div className="space-y-5">
@@ -195,6 +201,18 @@ export default async function InquiriesPage({
       </ToastProvider>
 
       {reviewRows.length === 0 && anonSection}
+
+      {mail && talk.length > 0 && (
+        <FlowSection
+          icon={MessagesSquare}
+          iconClass="bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300"
+          title="Komunikace k poptávkám"
+          description="Doplnění a změny k rozpracovaným poptávkám — AI je přiřadila samy, technické změny jsou v historii a v záložce Komunikace."
+          count={talk.length}
+        >
+          <FlowMailList emails={talk} />
+        </FlowSection>
+      )}
 
       {mail && (
         <FlowSection

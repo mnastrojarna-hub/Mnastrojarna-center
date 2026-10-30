@@ -267,7 +267,8 @@ await T("učení AI: korekce z dokladu nese autora (ai_corrections.created_by)",
 
 await T("historie: zápis dokladu = jedna událost (bez duplicitního „Nahrán dokument“)", async () => {
   const id = [...cleanup.jobs][0];
-  const ev = sqlJson(`select json_agg(e) from (select type, message from job_events where job_id = ${q(id)} and type in ('ai','file')) e`) ?? [];
+  // anonymizace vyfoceného výkresu běží hned po uložení a má vlastní událost (data.anonStatus) — sem nepatří
+  const ev = sqlJson(`select json_agg(e) from (select type, message from job_events where job_id = ${q(id)} and type in ('ai','file') and coalesce(data->>'anonStatus', '') = '') e`) ?? [];
   try {
     expect(ev.length === 1, `jedna událost dokladu v historii (je ${ev.length}: ${ev.map((e) => e.message.slice(0, 50)).join(" | ")})`);
   } finally {

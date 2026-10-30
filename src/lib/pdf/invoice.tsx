@@ -6,7 +6,8 @@ import {
   type Fact,
 } from "./components";
 import { buildSpdString, spdVariableSymbol } from "./qr";
-import { computeTotals, czk, czDate, type InvoiceData } from "./types";
+import { czk, czDate, type InvoiceData } from "./types";
+import { invoiceBalance, invoicePaymentLabel } from "./invoice-payments";
 
 function PayRow({ k, v, strong, w = 76 }: { k: string; v?: string; strong?: boolean; w?: number }) {
   if (!v) return null;
@@ -18,22 +19,38 @@ function PayRow({ k, v, strong, w = 76 }: { k: string; v?: string; strong?: bool
   );
 }
 
+/** Faktura má odečtené úhrady (zálohy / platby) nebo je zakázka vyrovnaná. */
+function hasPayments(data: InvoiceData): boolean {
+  return Boolean(data.payments?.length) || data.settled === true;
+}
+
+/**
+ * Řetězec QR Platby faktury — na částku, která ZBÝVÁ uhradit (po zálohách). Jen se skutečným
+ * platným IBANem, v CZK a když něco zbývá; jinak null (QR se nekreslí).
+ */
+export function invoiceSpd(data: InvoiceData): string | null {
+  const cur = data.currency || "CZK";
+  if (!data.bank?.iban || cur.toUpperCase() !== "CZK") return null;
+  const { due } = invoiceBalance(data.items, data.payments, data.settled);
+  if (!(due > 0)) return null;
+  return buildSpdString({
+    iban: data.bank.iban,
+    bic: data.bank.swift,
+    amount: due,
+    currency: cur,
+    variableSymbol: data.variableSymbol,
+    dueDate: data.dueDate,
+    message: `Faktura ${data.number}`,
+  });
+}
+
 /** Platební údaje + QR Platba (jen se skutečným IBANem a v CZK). */
-function PaymentBox({ data, total }: { data: InvoiceData; total: number }) {
+function PaymentBox({ data }: { data: InvoiceData }) {
   const cur = data.currency || "CZK";
   const vs = spdVariableSymbol(data.variableSymbol) ?? data.variableSymbol;
-  const spd =
-    data.bank?.iban && cur.toUpperCase() === "CZK"
-      ? buildSpdString({
-          iban: data.bank.iban,
-          bic: data.bank.swift,
-          amount: total,
-          currency: cur,
-          variableSymbol: data.variableSymbol,
-          dueDate: data.dueDate,
-          message: `Faktura ${data.number}`,
-        })
-      : null;
+  const { due } = invoiceBalance(data.items, data.payments, data.settled);
+  const paidUp = hasPayments(data) && due <= 0;
+  const spd = invoiceSpd(data);
   return (
     <View
       style={{
@@ -50,10 +67,15 @@ function PaymentBox({ data, total }: { data: InvoiceData; total: number }) {
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 6 }}>
           <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>Platební údaje</Text>
           <Text>
-            <Text style={{ fontSize: 7.5, color: C.grey }}>K úhradě  </Text>
-            <Text style={{ fontSize: 14, fontWeight: "bold", color: C.red }}>{czk(total, cur)}</Text>
+            <Text style={{ fontSize: 7.5, color: C.grey }}>{hasPayments(data) ? "Zbývá uhradit  " : "K úhradě  "}</Text>
+            <Text style={{ fontSize: 14, fontWeight: "bold", color: C.red }}>{czk(due, cur)}</Text>
           </Text>
         </View>
+        {paidUp ? (
+          <Text style={{ fontSize: 8.4, fontWeight: "bold", color: C.ink, marginBottom: 4 }}>
+            Faktura je uhrazena — neplaťte prosím znovu.
+          </Text>
+        ) : null}
         <View style={{ flexDirection: "row", borderTopWidth: 0.6, borderColor: C.hair, paddingTop: 5 }}>
           <View style={{ flex: 1.2, paddingRight: 12 }}>
             <PayRow w={56} k="Číslo účtu" v={data.bank?.accountNumber} strong />
@@ -91,7 +113,13 @@ function PaymentBox({ data, total }: { data: InvoiceData; total: number }) {
 
 export function InvoiceDocument({ data }: { data: InvoiceData }) {
   const cur = data.currency || "CZK";
-  const { total } = computeTotals(data.items);
+  const paid = hasPayments(data);
+  const { due } = invoiceBalance(data.items, data.payments, data.settled);
+  const deductions = (data.payments ?? []).map((p) => ({
+    label: invoicePaymentLabel(p),
+    amount: p.amount,
+    sub: p.net !== null ? `${czk(p.net, cur)} bez DPH` : undefined,
+  }));
   const refs: Fact[] = [
     { k: "Č. zákazníka", v: data.customerNumber },
     { k: "Č. dodavatele", v: data.supplierNumberAtCustomer },
@@ -129,10 +157,14 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
           <View style={{ flex: 1, paddingRight: 24 }}>
             <VatRecap items={data.items} currency={cur} />
           </View>
-          <TotalsCard items={data.items} currency={cur} grandLabel="K úhradě" />
+          {paid ? (
+            <TotalsCard items={data.items} currency={cur} deductions={deductions} due={{ label: "Zbývá uhradit", amount: due }} />
+          ) : (
+            <TotalsCard items={data.items} currency={cur} grandLabel="K úhradě" />
+          )}
         </View>
 
-        <PaymentBox data={data} total={total} />
+        <PaymentBox data={data} />
 
         {data.note ? <NoteBox>{data.note}</NoteBox> : null}
 
@@ -143,7 +175,12 @@ export function InvoiceDocument({ data }: { data: InvoiceData }) {
             {data.customerOrderNumber
               ? ` Plnění dle Vaší objednávky č. ${data.customerOrderNumber}${data.customerOrderDate ? ` ze dne ${czDate(data.customerOrderDate)}` : ""}.`
               : ""}
-            {data.deliveryNoteNumber ? ` Dodáno dodacím listem č. ${data.deliveryNoteNumber}.` : ""}
+            {data.deliveryNoteNumber
+              ? ` Dodáno ${data.deliveryNoteNumber.includes(",") ? "dodacími listy" : "dodacím listem"} č. ${data.deliveryNoteNumber}.`
+              : ""}
+            {paid
+              ? " Přijaté úhrady snižují jen částku k úhradě; rekapitulace DPH platí pro celé zdanitelné plnění."
+              : ""}
           </Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 8 }}>
             <Text style={{ fontSize: 9, lineHeight: 1.3, color: C.ink }}>Děkujeme za Vaši objednávku a těšíme se na další spolupráci.</Text>

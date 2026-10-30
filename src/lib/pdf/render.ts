@@ -12,20 +12,21 @@ import { addDaysIso, todayIso, type InvoiceData, type QuoteData, type DeliveryNo
 
 type DocEl = ReactElement<DocumentProps>;
 
+// ensureFonts() se MUSÍ awaitovat — opravuje sdílenou mezipaměť glyfů písma (mizející písmena).
 export async function renderInvoicePdf(data: InvoiceData): Promise<Buffer> {
-  ensureFonts();
+  await ensureFonts();
   return renderToBuffer(createElement(InvoiceDocument, { data }) as unknown as DocEl);
 }
 export async function renderQuotePdf(data: QuoteData): Promise<Buffer> {
-  ensureFonts();
+  await ensureFonts();
   return renderToBuffer(createElement(QuoteDocument, { data }) as unknown as DocEl);
 }
 export async function renderDeliveryNotePdf(data: DeliveryNoteData): Promise<Buffer> {
-  ensureFonts();
+  await ensureFonts();
   return renderToBuffer(createElement(DeliveryNoteDocument, { data }) as unknown as DocEl);
 }
 export async function renderConfirmationPdf(data: ConfirmationData): Promise<Buffer> {
-  ensureFonts();
+  await ensureFonts();
   return renderToBuffer(createElement(ConfirmationDocument, { data }) as unknown as DocEl);
 }
 

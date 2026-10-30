@@ -148,7 +148,7 @@ export async function skipDrawingAnon(fileId: string, reason?: string | null, ta
 }
 
 /** Přepočet po změně pravidel: soubory s jiným anon_config_hash → pending (priorita 5). Jen super admin. */
-export async function requeueChangedConfig(): Promise<Result<{ queued: number }>> {
+export async function requeueChangedConfig(): Promise<Result<{ queued: number; ids?: string[] }>> {
   const c = await begin("settings");
   if ("error" in c) return { ok: false, error: c.error as string };
   if (c.user.role !== "super_admin") return { ok: false, error: "Přepočet spouští jen super admin." };
@@ -160,7 +160,8 @@ export async function requeueChangedConfig(): Promise<Result<{ queued: number }>
   const ids = ((data ?? []) as { id: string }[]).map((r) => r.id);
   if (ids.length) await kick({ origin: await origin(), table: "job_files", ids: ids.slice(0, 5) }).catch(() => undefined);
   await logAudit({ action: "drawing_anon_requeue", entity: "drawing_anon_settings", entityId: "1", diff: { count: ids.length }, actor: c.actor });
-  return { ok: true, queued: ids.length };
+  // ids → prohlížeč hned šťouchne do /api/drawings/anonymize/process (akce nevykresluje)
+  return { ok: true, queued: ids.length, ids: ids.slice(0, 50) };
 }
 
 /**
@@ -227,7 +228,7 @@ export async function setAnonMode(mode: "full" | "approval"): Promise<Result> {
 }
 
 /** „Zpracovat staré výkresy (n)": backfill (priorita 9) → priorita 5 a šťouchnout; běží v rámci denního limitu. Jen super admin. */
-export async function queueLegacyDrawings(): Promise<Result<{ queued: number }>> {
+export async function queueLegacyDrawings(): Promise<Result<{ queued: number; ids?: string[] }>> {
   const c = await begin("settings");
   if ("error" in c) return { ok: false, error: c.error as string };
   if (c.user.role !== "super_admin") return { ok: false, error: "Zpracování starých výkresů spouští jen super admin." };
@@ -237,5 +238,5 @@ export async function queueLegacyDrawings(): Promise<Result<{ queued: number }>>
   await kick({ origin: await origin(), table: "job_files", ids: ids.slice(0, 5) }).catch(() => undefined);
   await logAudit({ action: "drawing_anon_backfill", entity: "drawing_anon_settings", entityId: "1", diff: { count: ids.length }, actor: c.actor });
   revalidatePath("/settings");
-  return { ok: true, queued: ids.length };
+  return { ok: true, queued: ids.length, ids: ids.slice(0, 50) };
 }

@@ -1,6 +1,6 @@
 import {
   MessageSquareQuote, ShoppingCart, Handshake, BadgeCheck, ReceiptText, BellRing, AlertTriangle,
-  PencilRuler, Ban, Mail, FileText, Factory, Bot, Send, type LucideIcon,
+  PencilRuler, Ban, Mail, FileText, Factory, Bot, Send, FolderKanban, type LucideIcon,
 } from "lucide-react";
 import type {
   ApprovalType, EmailCategory as DbEmailCategory, JobStage, PriorityLevel,
@@ -206,6 +206,11 @@ export const CATEGORY_STYLE: Record<EmailCategory, CategoryStyle> = {
     chip: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300",
     active: "border-blue-500 bg-blue-500 text-white", dot: "bg-blue-500", bar: "bg-blue-500", text: "text-blue-600 dark:text-blue-400",
   },
+  "K zakázce": {
+    label: "K zakázce", icon: FolderKanban,
+    chip: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-300",
+    active: "border-fuchsia-600 bg-fuchsia-600 text-white", dot: "bg-fuchsia-500", bar: "bg-fuchsia-500", text: "text-fuchsia-600 dark:text-fuchsia-400",
+  },
   "Ostatní": {
     label: "Ostatní", icon: Mail,
     chip: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300",
@@ -220,12 +225,24 @@ export const CATEGORY_STYLE: Record<EmailCategory, CategoryStyle> = {
 
 /** Pořadí chipů v Inboxu. */
 export const INBOX_CATEGORIES: EmailCategory[] = [
-  "Poptávka", "Objednávka", "Potvrzení objednávky", "Nabídka dodavatele", "Faktura", "Upomínka",
+  "K zakázce", "Poptávka", "Objednávka", "Potvrzení objednávky", "Nabídka dodavatele", "Faktura", "Upomínka",
   "Reklamace", "Technická dokumentace", "Ostatní", "Spam",
 ];
 
 export function categoryStyle(label: string | null | undefined): CategoryStyle {
   return (label && CATEGORY_STYLE[label as EmailCategory]) || CATEGORY_STYLE["Ostatní"];
+}
+
+/** Kategorie z pravidel, které odpověď ve vlákně zakázky po přiřazení (Ano i Ne) změní na „K zakázce". */
+const NEUTRAL_WHILE_ASKING: readonly string[] = ["Nabídka dodavatele", "Ostatní", "Technická dokumentace", "K zakázce"];
+
+/**
+ * Pošta B: zpráva čeká na otázku „Patří k Z-…?" (odpověď ve vlákně zakázky jmenuje jinou zakázku) —
+ * kategorie z pravidel (např. „Nabídka dodavatele" z předmětu „Re: Nabídka …") by klamala; do rozhodnutí
+ * se ukáže neutrální „K zakázce?". Objednávka, faktura, reklamace, poptávka… zůstávají.
+ */
+export function neutralWhileAsking(label: string | null | undefined, asking: boolean): boolean {
+  return asking && NEUTRAL_WHILE_ASKING.includes(label ?? "Ostatní");
 }
 
 /** Počty e-mailů po kategoriích (pro chipy filtru). */
@@ -592,7 +609,7 @@ export function jobPeopleFromEmail(input: {
 const SUPPLIER_MAIL_CATEGORIES: readonly DbEmailCategory[] = ["nabidka_dodavatele", "faktura"];
 /** Kategorie, jejichž přílohy od ZÁKAZNÍKA jsou podklady (poptávka, objednávka, reklamace, výkresy). */
 const CUSTOMER_MAIL_CATEGORIES: readonly DbEmailCategory[] = [
-  "poptavka", "objednavka", "potvrzeni_objednavky", "reklamace", "technicka_dokumentace",
+  "poptavka", "objednavka", "potvrzeni_objednavky", "reklamace", "technicka_dokumentace", "k_zakazce",
 ];
 
 /**

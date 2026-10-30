@@ -480,3 +480,17 @@ describe("neschválená nabídka (#25)", () => {
     expect(pickPricedItems(ok)[0]).toMatchObject({ unitPrice: 1180 });
   });
 });
+
+// A2: dlouhé číslo výkresu se nesmí přelít do popisu ani useknout („VYK-…" → „YK-…")
+describe("fitFontSize — kód na jeden řádek sloupce", async () => {
+  const { fitFontSize } = await import("./components");
+  it("krátký kód zůstává, dlouhý se zmenší, aby se vešel; text s mezerami se nemění", () => {
+    expect(fitFontSize("KR-1", 78, 8.8)).toBe(8.8);
+    const s = fitFontSize("VYK-MVUAOT9F-A", 78, 8.8);
+    expect(s).toBeLessThan(8.8);
+    expect(14 * 0.66 * s).toBeLessThanOrEqual(78);
+    expect(fitFontSize("Upínací deska dlouhý popis", 20, 8.8)).toBe(8.8);
+    expect(fitFontSize("A".repeat(60), 78, 8.8)).toBe(5.4); // minimum
+    expect(fitFontSize(null, 78, 8.8)).toBe(8.8);
+  });
+});

@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, ExternalLink, Loader2, Paperclip, RotateCcw, Send } from "lucide-react";
+import { AlertTriangle, Eye, ExternalLink, Loader2, Paperclip, RotateCcw, Save, Send } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import {
-  draftJobDocumentEmail, generateJobDocument, sendJobDocument, type JobDocumentKind,
+  draftInvoiceEmail, draftJobDocumentEmail, generateJobDocument, sendJobDocument, type JobDocumentKind,
 } from "@/app/actions/job-documents";
-import { parseEmailList } from "@/lib/jobs/document-emails";
+import { INVOICE_NUMBER_PLACEHOLDER, fillInvoicePlaceholders, parseEmailList } from "@/lib/jobs/document-emails";
 
 export interface MailDraft {
   to: string;
@@ -87,6 +87,9 @@ type Step = "preparing" | "unpriced" | "form" | "sending";
  * Odeslání dokladu zákazníkovi: (1) vytvoří PDF (uloží se do Dokumentů zakázky),
  * (2) předvyplní e-mail, (3) po kontrole odešle z mé schránky s PDF v příloze.
  * Položky bez ceny u nabídky / potvrzení / faktury → varování a „Přesto odeslat / vystavit".
+ * issueOnSend (faktura): otevření ani „Zrušit" nic nevystaví — nejdřív návrh e-mailu a náhled bez
+ * uložení, doklad (číslo, PDF, posun stavu) vznikne až tlačítkem „Vystavit a odeslat" / „Vystavit,
+ * neposílat". Vystavená faktura (fileId / server ji najde) se jen pošle znovu.
  */
 export function DocumentSendDialog({
   open,
@@ -97,7 +100,11 @@ export function DocumentSendDialog({
   fileId: givenFileId,
   filename: givenFilename,
   title,
+  subtitle,
   onSent,
+  onPrepared,
+  saveOnly,
+  issueOnSend,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -108,22 +115,67 @@ export function DocumentSendDialog({
   fileId?: string;
   filename?: string;
   title: string;
+  /** Podnadpis místo výchozího „Zkontroluj adresu a text…". */
+  subtitle?: string;
   onSent?: (info: { to: string }) => void;
+  /** PDF je hotové (vystavené / znovu použité) — číslo dokladu pro zpětnou vazbu (faktura posune stav). */
+  onPrepared?: (info: { fileId: string; filename: string; number: string | null; existing: boolean }) => void;
+  /** Volba „Jen uložit, neposílat" (doklad zůstane v Dokumentech zakázky, e-mail neodejde). */
+  saveOnly?: { label?: string; onSaved: (info: { fileId: string; filename: string }) => void };
+  /** Faktura: vystavit až tlačítkem (ne při otevření). */
+  issueOnSend?: boolean;
 }) {
+  const deferred = Boolean(issueOnSend) && kind === "faktura" && !givenFileId;
   const [step, setStep] = React.useState<Step>("preparing");
   const [error, setError] = React.useState<string | null>(null);
   const [warning, setWarning] = React.useState<string | null>(null);
+  /** Faktura před vystavením: chybí bankovní spojení v Nastavení (bez QR / čísla účtu). */
+  const [bankWarning, setBankWarning] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
+  /** Doklad vznikne až odesláním (název přílohy předem) — jen issueOnSend. */
+  const [pending, setPending] = React.useState<{ filename: string; force: boolean } | null>(null);
   const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const run = React.useRef(0);
+  const onPreparedRef = React.useRef(onPrepared);
+  onPreparedRef.current = onPrepared;
 
   const prepare = React.useCallback(async (force = false) => {
     const token = ++run.current;
     setStep("preparing");
     setError(null);
     try {
+      if (deferred) {
+        // jen návrh e-mailu + kontrola, že fakturu jde vystavit — nic se nevystaví
+        const d = await draftInvoiceEmail(jobId);
+        if (token !== run.current) return;
+        if (!d.ok) {
+          setBlocked(d.code === "rights" || d.code === "delivery" || d.code === "invoiced");
+          setError(d.error ?? "Fakturu teď nejde vystavit.");
+          setStep("form");
+          return;
+        }
+        if (d.existing) {
+          // mezitím vystavená (jiná záložka, kolega) → jen poslat znovu, nic nového nevzniká
+          setFile({ id: d.existing.fileId, filename: d.existing.filename });
+          onPreparedRef.current?.({ fileId: d.existing.fileId, filename: d.existing.filename, number: d.existing.number, existing: true });
+        } else {
+          if ((d.unpriced ?? 0) > 0 && !force) {
+            setWarning(`${d.unpriced} ${d.unpriced === 1 ? "položka nemá" : d.unpriced! < 5 ? "položky nemají" : "položek nemá"} cenu — doplň ceny v kartě zakázky (záložka Položky), nebo fakturu přesto vystav.`);
+            setStep("unpriced");
+            return;
+          }
+          setPending({ filename: d.filename ?? "Faktura.pdf", force });
+          // chybí bankovní účet / IBAN v Nastavení → upozornit ještě před vystavením (faktura bez QR)
+          setBankWarning(d.bankWarning ?? null);
+        }
+        setMail((m) => ({ to: d.to || m.to, cc: m.cc, subject: d.subject ?? m.subject, body: d.body ?? m.body }));
+        setStep("form");
+        return;
+      }
       let f = givenFileId ? { id: givenFileId, filename: givenFilename ?? "doklad.pdf" } : null;
+      let number: string | null = null;
+      let existing = Boolean(givenFileId);
       if (!f) {
         const gen = await generateJobDocument(jobId, kind, { ...(quoteId ? { quoteId } : {}), ...(force ? { force: true } : {}), reuse: true });
         if (token !== run.current) return;
@@ -133,15 +185,18 @@ export function DocumentSendDialog({
             setStep("unpriced");
             return;
           }
-          // #25: neschválená nabídka — znovu to zkoušet nemá smysl, jen vysvětlit
-          setBlocked(gen.code === "approval");
+          // #25: neschválená nabídka / bez práva / DL bez dodání — znovu to zkoušet nemá smysl, jen vysvětlit
+          setBlocked(gen.code === "approval" || gen.code === "rights" || gen.code === "delivery" || gen.code === "invoiced");
           setError(gen.error ?? "PDF se nepodařilo vytvořit.");
           setStep("form");
           return;
         }
         f = { id: gen.fileId, filename: gen.filename ?? "doklad.pdf" };
+        number = gen.number ?? null;
+        existing = Boolean(gen.existing);
       }
       setFile(f);
+      onPreparedRef.current?.({ fileId: f.id, filename: f.filename, number, existing });
       const draft = await draftJobDocumentEmail(jobId, f.id);
       if (token !== run.current) return;
       if (draft.ok) {
@@ -155,14 +210,16 @@ export function DocumentSendDialog({
       setError("Spojení se nepovedlo — zkus to znovu.");
       setStep("form");
     }
-  }, [jobId, kind, quoteId, givenFileId, givenFilename]);
+  }, [jobId, kind, quoteId, givenFileId, givenFilename, deferred]);
 
   const [wasOpen, setWasOpen] = React.useState(false);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
       setFile(null);
+      setPending(null);
       setWarning(null);
+      setBankWarning(null);
       setError(null);
       setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
@@ -184,23 +241,55 @@ export function DocumentSendDialog({
     void prepareRef.current();
   }, [open]);
 
+  /** issueOnSend: vystaví doklad teď (číslo, PDF, stav) → soubor + e-mail s přiděleným číslem. */
+  async function issueNow(draft: MailDraft): Promise<{ file: { id: string; filename: string }; mail: MailDraft } | null> {
+    const gen = await generateJobDocument(jobId, kind, { ...(pending?.force ? { force: true } : {}), reuse: true });
+    if (!gen.ok || !gen.fileId) {
+      if (gen.code === "delivery" || gen.code === "invoiced" || gen.code === "rights") setBlocked(true);
+      setError(gen.error ?? "Fakturu se nepodařilo vystavit.");
+      return null;
+    }
+    const f = { id: gen.fileId, filename: gen.filename ?? "doklad.pdf" };
+    const filled: MailDraft = {
+      ...draft,
+      subject: fillInvoicePlaceholders(draft.subject, gen.number),
+      body: fillInvoicePlaceholders(draft.body, gen.number),
+    };
+    setFile(f);
+    setPending(null);
+    setMail(filled);
+    onPreparedRef.current?.({ fileId: f.id, filename: f.filename, number: gen.number ?? null, existing: Boolean(gen.existing) });
+    return { file: f, mail: filled };
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
-    if (!file || step !== "form") return;
+    if ((!file && !pending) || step !== "form") return;
     const bad = mailDraftError(mail);
     if (bad) return setError(bad);
     setStep("sending");
     setError(null);
     try {
-      const res = await sendJobDocument(jobId, file.id, {
-        to: mail.to.trim(), cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body,
+      let target = file;
+      let out = mail;
+      if (!target) {
+        const issued = await issueNow(mail);
+        if (!issued) {
+          setStep("form");
+          return;
+        }
+        target = issued.file;
+        out = issued.mail;
+      }
+      const res = await sendJobDocument(jobId, target.id, {
+        to: out.to.trim(), cc: out.cc.trim() || undefined, subject: out.subject.trim(), body: out.body,
       });
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
         setStep("form");
         return;
       }
-      onSent?.({ to: mail.to.trim() });
+      onSent?.({ to: out.to.trim() });
       onOpenChange(false);
     } catch {
       setError("Spojení se nepovedlo — zkus to znovu.");
@@ -208,7 +297,31 @@ export function DocumentSendDialog({
     }
   }
 
+  async function saveOnlyNow() {
+    if (!saveOnly || step !== "form") return;
+    let target = file;
+    if (!target) {
+      setStep("sending");
+      setError(null);
+      try {
+        const issued = await issueNow(mail);
+        if (!issued) {
+          setStep("form");
+          return;
+        }
+        target = issued.file;
+      } catch {
+        setError("Spojení se nepovedlo — zkus to znovu.");
+        setStep("form");
+        return;
+      }
+    }
+    saveOnly.onSaved({ fileId: target.id, filename: target.filename });
+    onOpenChange(false);
+  }
+
   const text = KIND_TEXT[kind];
+  const hasPlaceholder = pending !== null && (mail.subject.includes(INVOICE_NUMBER_PLACEHOLDER) || mail.body.includes(INVOICE_NUMBER_PLACEHOLDER));
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
@@ -217,14 +330,14 @@ export function DocumentSendDialog({
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
           title={title}
-          subtitle="Zkontroluj adresu a text — e-mail odejde z tvé schránky s PDF v příloze."
+          subtitle={subtitle ?? "Zkontroluj adresu a text — e-mail odejde z tvé schránky s PDF v příloze."}
         />
         <form onSubmit={send} className="space-y-4 p-4 sm:p-5" noValidate>
           <ErrorBox error={error} />
           {step === "preparing" && (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
-              {text.preparing}
+              {deferred ? "Připravuji návrh e-mailu…" : text.preparing}
             </div>
           )}
           {step === "unpriced" && (
@@ -245,21 +358,62 @@ export function DocumentSendDialog({
           )}
           {(step === "form" || step === "sending") && (
             <>
+              {pending && bankWarning && !blocked ? (
+                <p
+                  className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+                  data-testid="invoice-bank-warning"
+                  role="status"
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /> {bankWarning}
+                </p>
+              ) : null}
               {file ? (
                 <AttachmentChip fileId={file.id} filename={file.filename} />
+              ) : pending ? (
+                // doklad ještě neexistuje: příloha vznikne při vystavení, náhled bez uložení
+                <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-dashed bg-violet-50/60 px-3 py-2 text-sm dark:bg-violet-500/5" data-testid="send-pending-attachment">
+                  <Paperclip className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{bankWarning ? "PDF faktury" : "PDF faktury s QR platbou"}</span>
+                    <span className="block text-xs text-muted-foreground">vznikne a přiloží se při vystavení — číslo přidělí řada faktur</span>
+                  </span>
+                  <a
+                    href={`/api/pdf/job/${jobId}?type=faktura`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-violet-700 hover:underline dark:text-violet-300"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Náhled bez uložení
+                  </a>
+                </div>
               ) : blocked ? null : (
                 <Button type="button" variant="outline" onClick={() => void prepare()}>
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
               )}
               {!blocked && <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} />}
+              {hasPlaceholder && (
+                <p className="text-[11px] text-muted-foreground">„{INVOICE_NUMBER_PLACEHOLDER}“ se při vystavení nahradí přiděleným číslem faktury.</p>
+              )}
             </>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
-            <Button type="submit" variant="send" disabled={step !== "form" || !file}>
+            <Button type="button" variant="ghost" className="h-11 sm:h-10" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
+            {/* faktura: „Vystavit, neposílat" jen před vystavením (vystavenou zavře i Zrušit) */}
+            {saveOnly && (pending || (file && !deferred)) && !blocked && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 sm:h-10"
+                disabled={step !== "form"}
+                onClick={() => void saveOnlyNow()}
+              >
+                <Save className="h-4 w-4" /> {saveOnly.label ?? "Jen uložit, neposílat"}
+              </Button>
+            )}
+            <Button type="submit" variant="send" className="h-11 sm:h-10" disabled={step !== "form" || (!file && !pending) || blocked}>
               {step === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Odeslat {text.what}
+              {deferred && !file ? "Vystavit a odeslat" : `Odeslat ${text.what}`}
             </Button>
           </div>
         </form>

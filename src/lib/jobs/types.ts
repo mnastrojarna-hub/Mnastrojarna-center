@@ -134,6 +134,19 @@ export interface JobItem {
   deliveryClosedReason?: string | null;
   /** Materiál, hmotnost, TZ / PÚ z výkresu (štítky v Položkách); null = výkres nic neuvádí. */
   spec?: DrawingSpecView | null;
+  /** Technologie (záložka Technologie): postup technologa, kompletní dodávka, poznámka pro dodavatele. */
+  tech?: JobItemTech;
+}
+
+/** Technologie položky (migrace 20261029140000). */
+export interface JobItemTech {
+  /** Technologický postup (volný text technologa); nepovinný při kompletní dodávce. */
+  procedure: string | null;
+  /** „Bez technologie — kompletně zadáno {firma}". */
+  complete: boolean;
+  completeBy: string | null;
+  /** Poznámka pro dodavatele — tiskne se do objednávky u položky a do e-mailu. */
+  supplierNote: string | null;
 }
 
 export interface JobQuoteItem {
@@ -258,6 +271,10 @@ export interface JobFileAnon {
   /** Vyřazené stránky (dopis, faktura ve smíšeném PDF). */
   excludedPages: number[];
   method: string | null;
+  /** Starý výkres z doby před anonymizací (backfill) — čeká na „Zpracovat staré výkresy", nic neběží. */
+  backfill?: boolean;
+  /** Zámek běhu (processing) — po termínu je běh přerušený a převezme ho další běh. */
+  lockUntil?: string | null;
 }
 
 export type FileLock = "price" | "unapproved" | "stale" | null;
@@ -333,9 +350,17 @@ export interface JobDetail extends JobListItem {
   quotes: JobQuote[];
   files: JobFile[];
   events: JobEvent[];
+  /**
+   * Kolik z položky (id) pokrývají vystavené dodací listy — dodané zboží bez DL dostane „DL na dodané
+   * zboží". null = nejde poznat (starší DL bez vazby na položky); chybí = nenačteno.
+   */
+  deliveryDocumented?: Record<string, number> | null;
+  /** Vystavené dodací listy (číslo z delivery_notes, id PDF v Dokumentech) — nejnovější první; chybí = nenačteno. */
+  deliveryNotes?: { id: string | null; number: string; createdAt: string }[];
 }
 
-export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date";
+/** „krok" = krok výroby po termínu nebo ohrožený konečný termín (zákazník). */
+export type JobDeadlineFilter = "overdue" | "week" | "month" | "no_date" | "krok";
 /**
  * Platba faktury (podrobný stav paymentKey): čeká na úhradu / částečně zaplaceno / po splatnosti /
  * zaplaceno; „nezaplaceno" = vše kromě zaplaceno (vč. po splatnosti).

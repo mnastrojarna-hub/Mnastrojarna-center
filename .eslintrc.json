@@ -50,6 +50,10 @@
                   "**/lib/anonymize/photo-pipeline.*",
                   "**/lib/anonymize/service",
                   "**/lib/anonymize/service.*",
+                  "@/lib/anonymize/runner",
+                  "@/lib/anonymize/runner.*",
+                  "**/lib/anonymize/runner",
+                  "**/lib/anonymize/runner.*",
                   "sharp",
                   "pdfjs-dist",
                   "pdfjs-dist/*",
@@ -80,7 +84,7 @@
             "message": "Servisní klíč patří jen na server — v klientské komponentě (\"use client\") server.ts neimportuj."
           },
           {
-            "selector": "ImportExpression[source.value=/lib.anonymize.(pdf-|image|vision|photo-pipeline|service)|^sharp$|^pdfjs-dist|^@napi-rs.canvas/]",
+            "selector": "ImportExpression[source.value=/lib.anonymize.(pdf-|image|vision|photo-pipeline|service|runner)|^sharp$|^pdfjs-dist|^@napi-rs.canvas/]",
             "message": "Server action nikdy nevykresluje — ani dynamický import() rendereru anonymizace (pdf.js, canvas, sharp). Použij @/lib/anonymize/queue."
           }
         ]

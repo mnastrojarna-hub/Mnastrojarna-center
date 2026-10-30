@@ -26,7 +26,12 @@ type SendTarget = { id: string; number: string; supplierName: string | null; fil
  * nebo ze zakázky) → PDF → e-mail dodavateli, a přehled objednávek dodavatelům.
  * Jen pro role s právem „margins". Marži i provizi počítá DB.
  */
-export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasing }) {
+export function PurchasingTab({ job, data, stepOf }: {
+  job: JobDetail;
+  data: JobPurchasing;
+  /** Objednávka → krok výroby („Krok 2: Tepelné zpracování"). */
+  stepOf?: Record<string, string>;
+}) {
   const { notify, refresh } = useJobDetail();
   const today = isoToday();
   const [quoteDialog, setQuoteDialog] = React.useState<{ open: boolean; quote: SupplierQuoteView | null }>({ open: false, quote: null });
@@ -131,7 +136,7 @@ export function PurchasingTab({ job, data }: { job: JobDetail; data: JobPurchasi
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {orders.map((po) => (
-              <PurchaseOrderCard key={po.id} order={po} today={today} notify={notify} onChanged={refresh} onEdit={() => setEditOrder(po)} />
+              <PurchaseOrderCard key={po.id} order={po} today={today} notify={notify} onChanged={refresh} onEdit={() => setEditOrder(po)} stepLabel={stepOf?.[po.id] ?? null} />
             ))}
           </div>
         )}

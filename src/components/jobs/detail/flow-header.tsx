@@ -46,10 +46,12 @@ function sameStamp(a: ChangeStamp | null | undefined, b: ChangeStamp | null | un
  * Klíčový dílčí stav pod hlavním stavem (jako v Knize): „Aktualizovaná (rev 2)", „Částečně dodáno 1/2",
  * „Potvrzeno bez dokladu" — vidět i na mobilu bez posouvání řádku průběhu. Návrh má vlastní řádek.
  */
-export function FlowStageChip({ className, hidePendingQuote }: {
+export function FlowStageChip({ className, hidePendingQuote, deliveryNote }: {
   className?: string;
   /** #25: chip „Neschválená · NAB-…“ vynechat — hlavička pod ním ukazuje výrazný štítek schválení. */
   hidePendingQuote?: boolean;
+  /** Poslední dodací list — chip dodání („Dodáno", „Částečně dodáno") na něj odkazuje. */
+  deliveryNote?: { id: string; number: string } | null;
 }) {
   const flow = useFlowActions();
   if (!flow?.facts || !flow.snapshot) return null;
@@ -59,7 +61,21 @@ export function FlowStageChip({ className, hidePendingQuote }: {
   const stamp = chip.stamp && !sameStamp(chip.stamp, flow.stamps?.stage) ? chip.stamp : null;
   return (
     <div className={cn("flex min-w-0 max-w-full flex-col items-start gap-0.5 lg:items-end", className)}>
-      <FlowStatusChip chip={chip} />
+      {deliveryNote && chip.phase === "delivery" && chip.key !== "k_expedici" ? (
+        <a
+          href={`/api/jobs/files/${deliveryNote.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-full hover:opacity-90"
+          title={`Dodací list ${deliveryNote.number} (PDF)`}
+          data-testid="delivery-chip-link"
+        >
+          <FlowStatusChip chip={chip} />
+          <span className="whitespace-nowrap font-mono text-[11px] font-medium text-green-700 underline-offset-2 hover:underline dark:text-green-400">{deliveryNote.number}</span>
+        </a>
+      ) : (
+        <FlowStatusChip chip={chip} />
+      )}
       {stamp && <ActorStamp stamp={stamp} className="max-w-[18rem]" />}
     </div>
   );

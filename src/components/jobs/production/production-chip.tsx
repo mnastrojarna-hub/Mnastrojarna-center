@@ -9,8 +9,10 @@ import type { JobListItem } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { ProductionMiniBar } from "./production-mini";
+import { useFlowActions } from "@/components/jobs/detail/flow-actions";
+import { isProductionClosed } from "./production-helpers";
 
-/** Stavy, ve kterých má smysl nabídnout „Naplánovat výrobu". */
+/** Stavy, ve kterých má smysl nabídnout „Předat do výroby…". */
 const PLAN_STAGES: JobStage[] = ["objednavka", "potvrzeno", "ve_vyrobe"];
 
 /**
@@ -50,21 +52,33 @@ function ChipLink({ className, title, children }: { className: string; title: st
  * problém ve výrobě a faktura po splatnosti. Klik → záložka Výroba.
  */
 export function ProductionHeaderBadges({ job, className }: { job: JobListItem; className?: string }) {
+  const flow = useFlowActions();
   const step = job.productionStep ?? null;
   const total = job.productionTotal ?? 0;
   const done = job.productionDone ?? 0;
   const problem = Boolean(job.productionProblem);
   const overdue = paymentStateOf(job, todayInPrague()) === "po_splatnosti";
-  const kind = isOperationKind(step) ? OPERATION_KINDS[step] : null;
-  const plan = !step && !total && PLAN_STAGES.includes(job.stage);
+  // dodaná / vyfakturovaná / dokončená zakázka s neukončeným krokem: výroba uzavřená, ne „Teď: …"
+  const closed = isProductionClosed(job.stage) && isOperationKind(step);
+  const kind = isOperationKind(step) && !closed ? OPERATION_KINDS[step] : null;
+  // před výrobou (i s připraveným postupem) a ve výrobě bez kroku: předání do výroby (kdo + termín)
+  // hlavní tlačítko karty už je „Předat do výroby… / Doplnit kdo a termín…" → druhý stejný chip by se opakoval
+  const plan = PLAN_STAGES.includes(job.stage) && (job.stage !== "ve_vyrobe" ? true : !step && !total)
+    && flow?.next?.key !== "production.handoff";
   if (!step && !problem && !overdue && !plan) return null;
   const label = productionLabel(step, job.productionLocation ?? null);
+  const planLabel = job.stage === "ve_vyrobe" ? "Doplnit kdo a termín…" : "Předat do výroby…";
 
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)}>
       {step === "hotovo" && (
         <ChipLink title={`Výroba hotová (${done}/${total})`} className="bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300">
           <CircleCheckBig className="h-3.5 w-3.5 shrink-0" /> Výroba hotová
+        </ChipLink>
+      )}
+      {closed && (
+        <ChipLink title={`Výroba uzavřena dodáním — hotovo ${done} z ${total}, ostatní kroky neukončené`} className="bg-muted text-muted-foreground">
+          <CircleCheckBig className="h-3.5 w-3.5 shrink-0" /> Výroba uzavřena
         </ChipLink>
       )}
       {kind && (
@@ -79,11 +93,21 @@ export function ProductionHeaderBadges({ job, className }: { job: JobListItem; c
           )}
         </ChipLink>
       )}
-      {plan && (
-        <ChipLink title="Zakázka zatím nemá postup výroby" className="border border-dashed border-muted-foreground/40 bg-transparent font-medium text-muted-foreground">
-          <Factory className="h-3.5 w-3.5 shrink-0" /> <Plus className="-ml-1 h-3 w-3" /> Naplánovat výrobu
+      {plan && (flow ? (
+        <button
+          type="button"
+          onClick={() => flow.run("production.handoff")}
+          title="Komu to zadáváš a do kdy — objednávka dodavateli se vystaví sama"
+          className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-dashed border-rose-400 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+          data-testid="chip-handoff"
+        >
+          <Factory className="h-3.5 w-3.5 shrink-0" /> {planLabel}
+        </button>
+      ) : (
+        <ChipLink title="Zakázka čeká na předání do výroby" className="border border-dashed border-muted-foreground/40 bg-transparent font-medium text-muted-foreground">
+          <Factory className="h-3.5 w-3.5 shrink-0" /> <Plus className="-ml-1 h-3 w-3" /> {planLabel}
         </ChipLink>
-      )}
+      ))}
       {problem && (
         <ChipLink title="Některá operace hlásí problém — otevřít výrobu" className="bg-red-600 text-white">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Problém ve výrobě

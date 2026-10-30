@@ -17,7 +17,8 @@ export const DEFAULT_RULES: Record<string, AgentRules> = {
       "Odpovídej vždy česky, zdvořile a věcně",
       "Poptávky a reklamace označ vysokou prioritou",
       "Spam vždy rozpoznej a odfiltruj",
-      "U firemních zpráv se vždy podepiš jako „Mnástrojárna s.r.o.“",
+      // podpis s logem vkládá aplikace (Pošta → Nastavení pošty) — AI by přidala druhý
+      "Nepodepisuj se a nepiš závěrečný pozdrav — pozdrav a podpis odesílatele (s logem) doplní aplikace",
     ],
     never_rules: [
       "Nikdy neodesílej nabídku s vymyšlenou cenou — cenu doplní člověk",
@@ -74,7 +75,7 @@ export const DEFAULT_RULES: Record<string, AgentRules> = {
     always_rules: [
       "Vždy potvrď, co konkrétně přijímáš (číslo poptávky/objednávky/nabídky)",
       "Vždy uveď další krok a předpokládaný termín",
-      "Vždy se podepiš jako MNástrojárna s.r.o.",
+      "Nepodepisuj se a nepiš závěrečný pozdrav — pozdrav a podpis odesílatele (s logem) doplní aplikace",
     ],
     never_rules: [
       "Nikdy nepotvrzuj objednávku, která neodpovídá odsouhlasené nabídce",

@@ -40,7 +40,7 @@ export interface EmailAnalysis {
 
 const CATEGORY_ENUM: EmailCategory[] = [
   "poptavka", "objednavka", "nabidka_dodavatele", "potvrzeni_objednavky",
-  "faktura", "upominka", "reklamace", "technicka_dokumentace", "spam", "ostatni",
+  "faktura", "upominka", "reklamace", "technicka_dokumentace", "spam", "ostatni", "k_zakazce",
 ];
 
 export async function categorizeEmail(input: {
@@ -88,7 +88,10 @@ export async function categorizeEmail(input: {
       "Jsi asistent nástrojárny Mnástrojárna. Klasifikuj příchozí e-mail do jedné z kategorií " +
       "a urči prioritu, důležitost (0–100), zda jde o spam, krátké shrnutí česky a confidence (0–1). " +
       "Kategorie: poptavka, objednavka, nabidka_dodavatele, potvrzeni_objednavky, faktura, upominka, " +
-      "reklamace, technicka_dokumentace, spam, ostatni." +
+      "reklamace, technicka_dokumentace, spam, ostatni, k_zakazce. " +
+      "k_zakazce = komunikace k již běžící zakázce nebo poptávce (doplnění, upřesnění, změna počtu, " +
+      "materiálu, úpravy, termínu, dotaz k rozpracované věci, odpověď na naši nabídku či objednávku) — " +
+      "NE nová poptávka ani nová objednávka (ty zůstávají poptavka / objednavka)." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
@@ -113,7 +116,8 @@ export async function draftReply(input: {
 }): Promise<string> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
-    return "Dobrý den,\n\nděkujeme za Vaši zprávu. (Návrh vygeneruje AI po doplnění Claude API klíče v Nastavení.)\n\nS pozdravem,\nMNástrojárna s.r.o.";
+    // bez pozdravu a podpisu — podpis odesílatele s logem doplní aplikace při odeslání
+    return "Dobrý den,\n\nděkujeme za Vaši zprávu. (Návrh vygeneruje AI po doplnění Claude API klíče v Nastavení.)";
   }
 
   const message = await new Anthropic({ apiKey }).messages.create({
@@ -123,7 +127,8 @@ export async function draftReply(input: {
     system:
       "Jsi obchodní asistent firmy Mnástrojárna s.r.o. (nástrojárna). Napiš zdvořilou, věcnou " +
       "odpověď v češtině na příchozí e-mail. Bez vymýšlení cen a termínů — pokud chybí, napiš, že " +
-      "je doplníme. Podpis: 'S pozdravem, Mnástrojárna s.r.o.'. Vrať pouze tělo e-mailu." +
+      "je doplníme. Nepodepisuj se a nepiš závěrečný pozdrav — pozdrav a podpis odesílatele doplní aplikace. " +
+      "Vrať pouze tělo e-mailu." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
@@ -393,7 +398,8 @@ export async function generateQuote(input: {
     output_config: { effort: "medium", format: { type: "json_schema", schema } },
     system:
       "Jsi obchodník nástrojárny Mnástrojárna. Z poptávky a kalkulace technologa sestav cenovou nabídku " +
-      "(položky s cenami, dodací lhůta, platnost) a průvodní e-mail v češtině. Sazba DPH 21 %." +
+      "(položky s cenami, dodací lhůta, platnost) a průvodní e-mail v češtině. Sazba DPH 21 %. " +
+      "Průvodní e-mail bez závěrečného pozdravu a podpisu — pozdrav a podpis odesílatele doplní aplikace." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
@@ -420,7 +426,7 @@ export async function generateConfirmation(input: {
 }): Promise<string> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
-    return `Dobrý den,\n\npotvrzujeme přijetí (${input.reference}). (Plný text vygeneruje AI po doplnění klíče.)\n\nS pozdravem,\nMNástrojárna s.r.o.`;
+    return `Dobrý den,\n\npotvrzujeme přijetí (${input.reference}). (Plný text vygeneruje AI po doplnění klíče.)`;
   }
 
   const message = await new Anthropic({ apiKey }).messages.create({
@@ -429,7 +435,7 @@ export async function generateConfirmation(input: {
     output_config: { effort: "low" },
     system:
       "Jsi asistent nástrojárny Mnástrojárna. Napiš krátké zdvořilé potvrzení v češtině. " +
-      "Podpis: 'S pozdravem, MNástrojárna s.r.o.'. Vrať pouze tělo e-mailu." +
+      "Nepodepisuj se a nepiš závěrečný pozdrav — pozdrav a podpis odesílatele doplní aplikace. Vrať pouze tělo e-mailu." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {

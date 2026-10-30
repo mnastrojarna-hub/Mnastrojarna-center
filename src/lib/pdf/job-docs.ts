@@ -5,6 +5,8 @@ import type { JobDetail, JobQuote, JobItem, JobQuoteItem } from "@/lib/jobs/type
 import { quoteApprovalBlock } from "@/lib/jobs/flow-status";
 import { supplierParty } from "./components";
 import { spdVariableSymbol } from "./qr";
+import { invoicePaymentsFromRows, type PaymentRowLike } from "./invoice-payments";
+import type { JobsDb } from "@/lib/jobs/events";
 import {
   UNAPPROVED_WATERMARK, addDaysIso, leadTimeLabel, todayIso,
   type ConfirmationData, type DeliveryItem, type DeliveryNoteData, type DocItem, type DocRefs,
@@ -306,6 +308,46 @@ export async function buildDeliveryNoteDoc(
   };
 }
 
+/**
+ * Dodací list jedné dodávky („Zapsat dodání"): jen položky a množství, které odešly teď
+ * (u dílčí dodávky „z 10 ks"), bez cen. Řádky bez položky zakázky (fallback ze záznamu
+ * delivery_note_items) nesou jen popis, množství a jednotku.
+ */
+export async function buildDeliveryDoc(
+  job: JobDetail,
+  opts: {
+    number: string;
+    lines: { itemId?: string | null; quantity: number; ordered?: number; deliveredTotal?: number; description?: string; unit?: string }[];
+    issueDate?: string;
+    deliveryLabel?: string;
+    remainingText?: string;
+    preparedBy?: string;
+    note?: string;
+  },
+): Promise<DeliveryNoteData> {
+  await refreshCompanyFromSettings();
+  const refs = jobRefs(job);
+  const items: DeliveryItem[] = opts.lines.map((l) => {
+    const it = l.itemId ? job.items.find((i) => i.id === l.itemId) : undefined;
+    if (!it) return { description: u(l.description) ?? "Položka", quantity: l.quantity, unit: u(l.unit) ?? "ks", ordered: l.ordered };
+    const { description, unit, drawingNumber, revision, material, note } = jobItemToDoc(it);
+    return { description, unit, drawingNumber, revision, material, note, quantity: l.quantity, ordered: l.ordered ?? it.quantity, deliveredTotal: l.deliveredTotal };
+  });
+  return {
+    ...refs,
+    number: opts.number,
+    issueDate: opts.issueDate ?? todayIso(),
+    supplier: supplierParty(),
+    customer: jobCustomerParty(job),
+    items,
+    transport: u(job.deliveryMethod),
+    note: u(opts.note),
+    preparedBy: u(opts.preparedBy) ?? refs.contactPerson,
+    deliveryLabel: u(opts.deliveryLabel),
+    remainingText: u(opts.remainingText),
+  };
+}
+
 export async function buildInvoiceDoc(
   job: JobDetail,
   opts: {
@@ -316,6 +358,8 @@ export async function buildInvoiceDoc(
     preparedBy?: string;
     note?: string;
     constantSymbol?: string;
+    /** Úhrady zakázky (job_payments, bez DPH) — zálohy a platby se na faktuře odečtou. */
+    payments?: readonly PaymentRowLike[] | null;
   },
 ): Promise<InvoiceData> {
   await refreshCompanyFromSettings();
@@ -323,6 +367,8 @@ export async function buildInvoiceDoc(
   const issueDate = opts.issueDate ?? todayIso();
   const taxableDate = opts.taxableDate ?? dateOnly(job.deliveredAt ?? job.shippedAt) ?? issueDate;
   const dueDays = opts.dueDays ?? job.customerDetail?.paymentTermsDays ?? 14;
+  const items = pickPricedItems(job);
+  const { payments, settled } = invoicePaymentsFromRows(opts.payments, items, issueDate);
   return {
     ...refs,
     number: opts.number,
@@ -341,10 +387,24 @@ export async function buildInvoiceDoc(
       swift: u(COMPANY.bank.swift),
       bankName: u(COMPANY.bank.bankName),
     },
-    items: pickPricedItems(job),
+    items,
     deliveryNoteNumber: u(job.deliveryNoteNumber),
     constantSymbol: u(opts.constantSymbol),
     note: u(opts.note),
     preparedBy: u(opts.preparedBy) ?? u(job.owner?.name) ?? refs.contactPerson,
+    ...(payments.length || settled ? { payments, settled } : {}),
   };
+}
+
+/**
+ * Úhrady zakázky pro fakturu (zálohy, dílčí platby, vyrovnání). Čte je role s právem na faktury
+ * (RLS job_payments = obchodník / admin); chyba čtení = faktura bez odečtů (zaloguje se).
+ */
+export async function jobPaymentRows(db: JobsDb, jobId: string): Promise<PaymentRowLike[]> {
+  const { data, error } = await db.from("job_payments").select("paid_on, amount, settles").eq("job_id", jobId).order("paid_on");
+  if (error) {
+    console.error(`[job-docs] Úhrady zakázky se nepodařilo načíst: ${error.message}`);
+    return [];
+  }
+  return (data ?? []) as PaymentRowLike[];
 }

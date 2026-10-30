@@ -38,7 +38,8 @@ const obchodId = sql(`select id from profiles where email = '${USERS.obchod.emai
 const ctl = async (p, opts) => (await fetch(`${CTL}${p}`, opts)).json();
 const addMany = (count, prefix = `Archiv ${TAG}`) => ctl(`/add?user=${encodeURIComponent(BOX)}&count=${count}&prefix=${encodeURIComponent(prefix)}`, { method: "POST" });
 const addMsg = (m) => ctl(`/message?user=${encodeURIComponent(BOX)}`, { method: "POST", body: JSON.stringify(m) });
-const sentRaw = async () => (await ctl("/sent")).map((s) => s.raw);
+// celý zdroj (podpis s vloženým logem posune přílohy za prvních 4000 znaků)
+const sentRaw = async () => (await ctl("/sent?full=1")).map((s) => s.raw);
 const sentFolder = async () => ctl(`/folder?user=${encodeURIComponent(BOX)}&name=Sent`);
 
 console.log(`18 · pošta (testovací server IMAP ${SRV.ports.imaps}, SMTP ${SRV.ports.smtps}, ovládání ${SRV.ports.control})`);
@@ -263,7 +264,7 @@ await T("předat kolegovi: poznámka → kolega ji vidí ve své poště s odzna
   expect(main.includes(`Prosím ověř cenu ${TAG}`) && /Od Super Admin/.test(main), "kolega vidí poznámku");
   expect(!main.includes("Posta: Objednávka 4500123") && !main.includes(`Archiv ${TAG}`), "kolega nevidí jinou poštu schránky");
   const nav = await p2.locator("aside").innerText().catch(() => "");
-  expect(/Přijatá pošta\s*\n?\s*\d+/.test(nav), `odznak nepřečtených v menu: ${nav.slice(0, 200)}`);
+  expect(/Pošta\s*\n?\s*\d+/.test(nav), `odznak nepřečtených v menu: ${nav.slice(0, 200)}`);
   // cizí vlákno ani schránku přes API nedostane
   const sync = await p2.request.post(`${BASE}/api/emails/sync`, { data: { mailboxId: boxId() } });
   expect(((await sync.json()).fetched ?? 0) === 0, "cizí schránku nestáhne");

@@ -16,6 +16,8 @@ import { formatPercent, longDate, parseTags, tagTone } from "./detail-helpers";
 import { openProductionTab } from "@/components/jobs/production/production-chip";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ChangeStamp } from "@/lib/jobs/flow-status";
+import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
+import { ownInvoiceFile } from "@/components/jobs/production/invoice-dialog";
 
 /** „změna · J. Novák · před 2 dny" pod klíčovým polem (M12). */
 function FieldStamp({ stamps, column }: { stamps?: Record<string, ChangeStamp>; column: string }) {
@@ -53,6 +55,45 @@ function ReadOnly({ label, icon: Icon, iconClass, children }: { label: string; i
       </div>
       <div className="text-sm">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Čísla dodacích listů a faktury — jen ke čtení (A2): DL vzniká se zápisem dodání, faktura tlačítkem
+ * „Vystavit fakturu" (nebo „Faktura vystavená mimo systém…" v ⋯). Odkaz otevře PDF.
+ */
+function DocNumbers({ job }: { job: JobDetail }) {
+  const { perms } = useJobDetail();
+  // čísla DL z delivery_notes (jediný zdroj čísla DL); starší data bez řádku → ze souborů
+  const notes: { id: string | null; number: string }[] = (job.deliveryNotes?.length
+    ? job.deliveryNotes
+    : currentDeliveryNotes(job.files ?? [])).slice().reverse();
+  const legacyDl = (job.deliveryNoteNumber ?? "").trim();
+  const invoiceFile = ownInvoiceFile(job.files ?? []);
+  const invoice = (job.invoiceNumber ?? "").trim();
+  return (
+    <>
+      <ReadOnly label={notes.length > 1 ? "Dodací listy" : "Číslo dodacího listu"} icon={Truck} iconClass="text-green-600">
+        {notes.length ? (
+          <span className="flex flex-wrap gap-x-2 gap-y-0.5" data-field="delivery-notes">
+            {notes.map((n) => n.id ? (
+              <a key={n.id} href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400">
+                {n.number} <ExternalLink className="h-3 w-3" aria-hidden />
+              </a>
+            ) : <span key={n.number} className="font-mono">{n.number}</span>)}
+          </span>
+        ) : legacyDl ? <span className="font-mono">{legacyDl}</span> : <span className="text-muted-foreground">—</span>}
+      </ReadOnly>
+      <ReadOnly label="Číslo faktury" icon={ReceiptText} iconClass="text-emerald-600">
+        {invoice ? (
+          invoiceFile && perms.margins ? (
+            <a href={`/api/jobs/files/${invoiceFile.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400" data-field="invoice-pdf">
+              {invoice} <ExternalLink className="h-3 w-3" aria-hidden />
+            </a>
+          ) : <span className="font-mono">{invoice}</span>
+        ) : <span className="text-muted-foreground">—</span>}
+      </ReadOnly>
+    </>
   );
 }
 
@@ -249,8 +290,7 @@ export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?
           <JobField field="customerOrderNumber" label="Č. objednávky zákazníka" value={job.customerOrderNumber} icon={ShoppingCart} iconClass="text-orange-500" display={(v) => <span className="font-mono">{v}</span>} />
           <JobField field="orderDate" kind="date" label="Datum objednávky" value={job.orderDate} icon={CalendarDays} iconClass="text-orange-500" />
           <JobField field="supplierOrderNumber" label="Naše obj. u dodavatele" value={job.supplierOrderNumber} icon={Hash} iconClass="text-yellow-600" display={(v) => <span className="font-mono">{v}</span>} />
-          <JobField field="deliveryNoteNumber" label="Číslo dodacího listu" value={job.deliveryNoteNumber} icon={Truck} iconClass="text-green-600" display={(v) => <span className="font-mono">{v}</span>} />
-          <JobField field="invoiceNumber" label="Číslo faktury" value={job.invoiceNumber} icon={ReceiptText} iconClass="text-emerald-600" display={(v) => <span className="font-mono">{v}</span>} />
+          <DocNumbers job={job} />
         </div>
       </InfoCard>
 
@@ -344,7 +384,7 @@ export function OverviewTab({ job, fieldStamps }: { job: JobDetail; fieldStamps?
         )}
       </InfoCard>
 
-      <InfoCard icon={Wrench} tone="bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300" title="Výroba" subtitle="Jak a kde se díly dělají">
+      <InfoCard icon={Wrench} tone="bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300" title="Technologie" subtitle="Jak a kde se díly dělají — kroky a postup v záložce Technologie">
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
           <JobField field="technology" label="Technologie" value={job.technology} icon={Wrench} iconClass="text-yellow-600" placeholder="např. frézování, kalení" />
           <JobField field="manufacturingLocation" label="Místo výroby" value={job.manufacturingLocation} icon={MapPin} iconClass="text-yellow-600" placeholder="u nás / u dodavatele" />

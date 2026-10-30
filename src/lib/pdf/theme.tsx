@@ -3,21 +3,90 @@ import { Font, StyleSheet } from "@react-pdf/renderer";
 import { COMPANY } from "@/lib/company";
 
 // Roboto (brandové písmo) s podporou českých znaků — registrace z public/fonts.
+const ROBOTO_VARIANTS = [
+  { file: "Roboto-Light.ttf", fontWeight: 300, fontStyle: "normal" },
+  { file: "Roboto-Regular.ttf", fontWeight: 400, fontStyle: "normal" },
+  { file: "Roboto-Italic.ttf", fontWeight: 400, fontStyle: "italic" },
+  { file: "Roboto-Bold.ttf", fontWeight: 700, fontStyle: "normal" },
+] as const;
+
 let registered = false;
-export function ensureFonts() {
-  if (registered) return;
-  const dir = path.join(process.cwd(), "public", "fonts");
-  Font.register({
-    family: "Roboto",
-    fonts: [
-      { src: path.join(dir, "Roboto-Light.ttf"), fontWeight: 300 },
-      { src: path.join(dir, "Roboto-Regular.ttf"), fontWeight: "normal" },
-      { src: path.join(dir, "Roboto-Italic.ttf"), fontStyle: "italic" },
-      { src: path.join(dir, "Roboto-Bold.ttf"), fontWeight: "bold" },
-    ],
-  });
-  Font.registerHyphenationCallback(splitLongWord);
-  registered = true;
+let ready: Promise<void> | null = null;
+
+/**
+ * Zaregistruje a NAČTE písma a opraví sdílenou mezipaměť glyfů (viz `fixGlyphCodePoints`).
+ * Volat (await) před každým renderem dokladu — první volání v procesu písma načte, další jsou zdarma.
+ */
+export function ensureFonts(): Promise<void> {
+  if (!registered) {
+    const dir = path.join(process.cwd(), "public", "fonts");
+    Font.register({
+      family: "Roboto",
+      fonts: ROBOTO_VARIANTS.map((v) => ({ src: path.join(dir, v.file), fontWeight: v.fontWeight, fontStyle: v.fontStyle })),
+    });
+    Font.registerHyphenationCallback(splitLongWord);
+    registered = true;
+  }
+  if (!ready) {
+    ready = Promise.all(
+      ROBOTO_VARIANTS.map(async (v) => {
+        const source = Font.getFont({ fontFamily: "Roboto", fontWeight: v.fontWeight, fontStyle: v.fontStyle });
+        await source.load();
+        fixGlyphCodePoints(source.data as unknown as GlyphFont | null);
+      }),
+    ).then(
+      () => undefined,
+      (err: unknown) => {
+        ready = null; // příště zkusit znovu (např. dočasně nedostupný soubor)
+        throw err;
+      },
+    );
+  }
+  return ready;
+}
+
+interface GlyphLike {
+  id: number;
+  codePoints: number[];
+}
+interface GlyphFont {
+  getGlyph: (id: number, codePoints?: number[]) => GlyphLike | null;
+  [GLYPH_FIX]?: true;
+}
+const GLYPH_FIX = Symbol.for("mnastrojarna.pdf.glyphCodePoints");
+
+/**
+ * Oprava „mizejících písmen" (C, Z, Y, R … po dokladu s Č, Ž, Ý, Ř …).
+ *
+ * fontkit drží pro každé písmo JEDEN objekt glyfu na id (`font._glyphs`) a do něj při prvním
+ * vytvoření uloží `codePoints` — znaky, které glyf v textu představuje. Písmo (FontSource.data)
+ * je sdílené všemi doklady v procesu. Složené písmeno „Č" je v Robotu glyf ze složek „C" + háček;
+ * když doklad obsahuje tučné „Č", ale ne tučné „C", vytvoří podmnožina písma (TTFSubset._addGlyph →
+ * font.getGlyph(id) bez znaků) glyf „C" s `codePoints = []`. V dalším dokladu fontkit při sazbě
+ * „C" vrátí tento uložený glyf a textkit (@react-pdf) podle `codePoints.length` páruje glyfy se
+ * znaky textu — glyf s nula znaky při dělení do řádků vypadne a chybí i v ToUnicode (kopírování).
+ *
+ * Oprava: `getGlyph` tohoto písma vrací pro sazbu glyf se znaky, které volající skutečně předal —
+ * pokud se uložené `codePoints` liší, dostane volající lehký pohled (Object.create) se správnými
+ * znaky; data glyfu (obrys, metriky) zůstávají sdílená. Bez znaků (podmnožina, obrysy) beze změny.
+ */
+export function fixGlyphCodePoints(font: GlyphFont | null | undefined): void {
+  if (!font || typeof font.getGlyph !== "function" || font[GLYPH_FIX]) return;
+  const original = font.getGlyph.bind(font);
+  font.getGlyph = (id: number, codePoints: number[] = []) => {
+    const glyph = original(id, codePoints);
+    if (!glyph || codePoints.length === 0 || sameCodePoints(glyph.codePoints, codePoints)) return glyph;
+    const view = Object.create(glyph) as GlyphLike;
+    view.codePoints = codePoints;
+    return view;
+  };
+  font[GLYPH_FIX] = true;
+}
+
+function sameCodePoints(a: readonly number[] | undefined, b: readonly number[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 /**

@@ -205,6 +205,32 @@ describe("dialogy — korekce s náhledem dopadu, dodání po položkách", () =
     expect(html).toContain("Změnit na Objednávka");
   });
 
+  it("korekce do / z / přes výrobu otevře předání (kdo + termín) — nikdy nezablokuje", () => {
+    // potvrzeno → Ve výrobě: dialog předání (načítá předvyplněné kroky)
+    const into = render(
+      <StageCorrectionDialog open onOpenChange={() => {}} jobId="j1" from="potvrzeno" to="ve_vyrobe" flow={facts({ stage: "potvrzeno" })} quotes={[]} />,
+    );
+    expect(into).toContain("Předat do výroby");
+    expect(into).toContain("Načítám předvyplněné kroky…");
+    expect(into).not.toContain("Změnit na Ve výrobě");
+    // ve výrobě → Dodáno k nám s otevřeným krokem: ukončení výroby
+    const out = render(
+      <StageCorrectionDialog open onOpenChange={() => {}} jobId="j1" from="ve_vyrobe" to="dodano_k_nam" flow={facts({ stage: "ve_vyrobe", productionTotal: 2, productionDone: 1 })} quotes={[]} />,
+    );
+    expect(out).toContain("Ukončit výrobu");
+    // ve výrobě → Potvrzeno: vrácení předání
+    const back = render(
+      <StageCorrectionDialog open onOpenChange={() => {}} jobId="j1" from="ve_vyrobe" to="potvrzeno" flow={facts({ stage: "ve_vyrobe", productionTotal: 1 })} quotes={[]} />,
+    );
+    expect(back).toContain("Vrátit předání do výroby");
+    // poptávka → Ve výrobě: zákazník neobjednal — ale „Přesunout i tak (bez předání)" (hlídání je zatím vypnuté)
+    const early = render(
+      <StageCorrectionDialog open onOpenChange={() => {}} jobId="j1" from="poptavka" to="ve_vyrobe" flow={facts({ stage: "poptavka", orderStatus: null, orderRevision: 0 })} quotes={[]} />,
+    );
+    expect(early).toContain("Zákazník ještě neobjednal — nejdřív zapiš objednávku zákazníka.");
+    expect(early).toContain("Přesunout i tak (bez předání)");
+  });
+
   it("dodání: „1/2 položek“ po položkách, u každé dodáno / objednáno", () => {
     const items = [
       { id: "a", drawingNumber: "PR-1", name: "Příruba", description: null, quantity: 200, unit: "ks", deliveredQuantity: 200, deliveryClosed: false },

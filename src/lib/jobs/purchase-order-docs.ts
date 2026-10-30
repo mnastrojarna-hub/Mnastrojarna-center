@@ -3,13 +3,13 @@ import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import { getSetting } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
-import { sendMail, type SmtpPreference } from "@/lib/email/send";
+import { sendMail, senderSignatureText, type SmtpPreference } from "@/lib/email/send";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { cleanText, isUuid, jobFilePath, one, personRef, type PersonEmbed } from "@/lib/jobs/mapping";
 import {
   ourDeliveryAddressOf, parseEmailList, purchaseOrderCancelEmail, purchaseOrderChangeEmail, purchaseOrderEmail,
-  purchaseOrderFileName, purchaseOrderHoldEmail,
+  purchaseOrderFileName, purchaseOrderHoldEmail, supplierNotesOfItems,
 } from "@/lib/jobs/purchasing";
 import type { PurchaseItem, PurchaseOrderMail, PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import type { PurchaseItemRowInput } from "@/lib/jobs/purchasing";
@@ -210,13 +210,21 @@ export type PoMailKind = "issue" | "change" | "cancel" | "hold";
 /** Návrh e-mailu dodavateli s podpisem skutečného odesílatele (jméno, telefon, e-mail z profilu). */
 export async function purchaseOrderMailFor(
   db: JobsDb,
-  po: Pick<PurchaseOrderView, "number" | "supplierQuote" | "requiredDate" | "confirmedDate" | "supplier"> & { revision?: number | null },
+  po: Pick<PurchaseOrderView, "number" | "supplierQuote" | "requiredDate" | "confirmedDate" | "supplier"> & {
+    revision?: number | null;
+    /** Položky (poznámky pro dodavatele → souhrn v e-mailu). */
+    items?: Pick<PurchaseOrderView["items"][number], "drawingNumber" | "name" | "note">[];
+  },
   signerId: string | null,
   kind: PoMailKind = "issue",
   extra: { previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null } = {},
 ): Promise<PurchaseOrderMail & { attachmentName: string }> {
   await refreshCompanyFromSettings();
-  const me = signerId ? await fetchProfileContact(db, signerId) : { name: null, email: null, phone: null };
+  const [me, signatureText] = await Promise.all([
+    signerId ? fetchProfileContact(db, signerId) : Promise.resolve({ name: null, email: null, phone: null }),
+    // podpis podepisujícího z Nastavení pošty (při odeslání z jeho schránky → grafický s logem)
+    senderSignatureText(signerId, { ownerId: signerId ?? "" }),
+  ]);
   const sender = {
     number: po.number,
     companyName: COMPANY.name,
@@ -224,6 +232,7 @@ export async function purchaseOrderMailFor(
     senderEmail: me.email ?? extra.fallbackEmail ?? null,
     senderPhone: me.phone ?? COMPANY.phone,
     companyWeb: COMPANY.web,
+    signatureText,
   };
   const mail = kind === "change"
     ? purchaseOrderChangeEmail({ ...sender, revision: Math.max(2, po.revision ?? 2), requiredDate: po.requiredDate, previousRequiredDate: extra.previousRequiredDate, reason: extra.reason })
@@ -231,7 +240,10 @@ export async function purchaseOrderMailFor(
       ? purchaseOrderCancelEmail({ ...sender, reason: extra.reason })
       : kind === "hold"
         ? purchaseOrderHoldEmail({ ...sender, reason: extra.reason })
-        : purchaseOrderEmail({ ...sender, supplierQuoteNumber: po.supplierQuote?.number, requiredDate: po.confirmedDate ?? po.requiredDate, drawingsSeparately: !po.supplierQuote });
+        : purchaseOrderEmail({
+          ...sender, supplierQuoteNumber: po.supplierQuote?.number, requiredDate: po.confirmedDate ?? po.requiredDate, drawingsSeparately: !po.supplierQuote,
+          itemNotes: supplierNotesOfItems(po.items ?? []),
+        });
   return { to: po.supplier?.email ?? "", ...mail, attachmentName: purchaseOrderFileName(po.number) };
 }
 
@@ -312,6 +324,9 @@ export async function sendPurchaseOrderCore(
     from: opts.from,
     jobId: po.jobId,
     senderId: sender.id,
+    // podpis vlastníka schránky (podepisující návrhu) je v textu → grafický s logem; systém bez podpisu
+    signature: "ownerId" in opts.from && opts.from.ownerId ? { userId: opts.from.ownerId, mode: "inline" } : null,
+    category: "objednavka",
   });
   if (!res.sent) return { ok: false, error: res.reason ?? "E-mail se nepodařilo odeslat." };
 

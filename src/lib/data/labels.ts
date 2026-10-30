@@ -16,6 +16,7 @@ export const emailCategoryLabel: Record<EmailCategory, string> = {
   technicka_dokumentace: "Technická dokumentace",
   spam: "Spam",
   ostatni: "Ostatní",
+  k_zakazce: "K zakázce",
 };
 
 export const priorityLabel: Record<PriorityLevel, string> = {

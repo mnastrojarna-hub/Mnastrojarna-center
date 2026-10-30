@@ -3,6 +3,10 @@ import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { isForward, isJobStage } from "@/lib/jobs/stages";
 import { cleanDate, cleanText, isUuid, stageEventMessage, todayIso } from "@/lib/jobs/mapping";
 import { czDay, dueDateFor } from "@/lib/jobs/production";
+import { invoiceDeliveryOf } from "@/lib/jobs/flow-status";
+import { INVOICE_NEEDS_DELIVERY } from "@/lib/jobs/invoice-file";
+import { COMPANY, DEFAULT_VAT_RATE } from "@/lib/company";
+import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { JobStage } from "@/lib/supabase/database.types";
 
 /**
@@ -71,6 +75,60 @@ export async function confirmDeliveryNoteCore(
 }
 
 /**
+ * Evidence faktur (invoices) podle údajů faktury na zakázce: faktura vystavená mimo systém (ručně, jiný
+ * účetní program, vyfocená naše faktura) dostane řádek bez PDF, aby ji viděly Faktury vydané a hlídání
+ * splatnosti; existující řádek (i faktura z PDF) převezme datum a splatnost („Upravit splatnost").
+ * Číslo cizí zakázky se nepřepisuje. Best-effort — chyba evidence nezastaví zápis na zakázce.
+ */
+export async function syncInvoiceRowCore(
+  db: JobsDb,
+  jobId: string,
+  prevNumber: string | null,
+  a: { invoice_number: string | null; invoice_date: string | null; invoice_due_date: string | null },
+): Promise<void> {
+  const number = cleanText(a.invoice_number, 120);
+  if (!number) return;
+  const issue = cleanDate(a.invoice_date) ?? todayIso();
+  const due = cleanDate(a.invoice_due_date) ?? issue;
+  try {
+    const { data: cur } = await db.from("invoices").select("id, order_id").eq("number", number).maybeSingle();
+    const row = cur as { id: string; order_id: string | null } | null;
+    if (row) {
+      if (row.order_id && row.order_id !== jobId) {
+        console.error(`[production] Faktura ${number} patří jiné zakázce — evidence se nezměnila.`);
+        return;
+      }
+      const { error } = await db.from("invoices").update({ issue_date: issue, due_date: due, order_id: jobId } as never).eq("id", row.id);
+      if (error) console.error(`[production] Evidence faktury se nezměnila: ${error.message}`);
+      return;
+    }
+    // přejmenovaná faktura mimo systém (bez PDF) → stejný řádek s novým číslem
+    if (prevNumber && prevNumber !== number) {
+      const { data: renamed } = await db.from("invoices").update({ number, issue_date: issue, due_date: due } as never)
+        .eq("number", prevNumber).eq("order_id", jobId).is("storage_path", null).select("id");
+      if ((renamed ?? []).length) return;
+    }
+    const job = await loadJob(db, jobId, "id, customer_id, currency, owner_id, value");
+    if (!job) return;
+    // částky faktury mimo systém neznáme → odhad z hodnoty zakázky (bez DPH) + výchozí sazba DPH firmy
+    await refreshCompanyFromSettings().catch(() => undefined);
+    const raw = job.value === null || job.value === undefined ? 0 : Number(job.value);
+    const subtotal = Number.isFinite(raw) ? Math.round(raw * 100) / 100 : 0;
+    const rate = COMPANY.vatPayer ? DEFAULT_VAT_RATE : 0;
+    const vat = Math.round(subtotal * rate) / 100;
+    const { error } = await db.from("invoices").insert({
+      number, order_id: jobId, customer_id: job.customer_id ?? null, issue_date: issue, taxable_date: issue, due_date: due,
+      currency: (job.currency as string | null) || "CZK", subtotal, vat_rate: rate, vat_amount: vat,
+      total: Math.round((subtotal + vat) * 100) / 100, status: "vystavena", storage_path: null, owner_id: job.owner_id ?? null,
+      note: "Faktura vystavená mimo systém (bez PDF) — částky odhadnuté z hodnoty zakázky a výchozí sazby DPH.",
+    } as never);
+    if (error) console.error(`[production] Zápis faktury do evidence selhal: ${error.message}`);
+  } catch (err) {
+    console.error(`[production] Evidence faktury selhala: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/**
  * Naše faktura: číslo, datum, splatnost. Bez zadané splatnosti = datum faktury + splatnost
  * zákazníka (jinak 14 dní). S číslem / datem faktury → Vyfakturováno (už zaplacená zakázka rovnou
  * Dokončeno), jen dopředu a jen se stage ≠ false.
@@ -91,7 +149,7 @@ export async function setInvoiceInfoCore(
   if (typeof input.invoiceNumber === "string" && input.invoiceNumber.trim().length > 120) return { ok: false, error: "Číslo faktury je příliš dlouhé." };
   const job = await loadJob(
     db, jobId,
-    "id, status, invoice_number, invoice_date, invoice_due_date, paid_at, customer:customers!customer_id(payment_terms_days)",
+    "id, status, invoice_number, invoice_date, invoice_due_date, paid_at, items_count, items_delivered, items_partial, partial_delivery_at, customer:customers!customer_id(payment_terms_days)",
   );
   if (!job) return { ok: false, error: NOT_FOUND };
   const from = isJobStage(job.status) ? job.status : null;
@@ -118,8 +176,27 @@ export async function setInvoiceInfoCore(
   if (invoiceDate && due && due < invoiceDate) return { ok: false, error: "Splatnost je před datem faktury." };
 
   const number = cleanText("invoice_number" in patch ? patch.invoice_number : job.invoice_number, 120);
+  // jedno číslo = jedna zakázka: číslo faktury jiné zakázky se nepřevezme (ani z evidence faktur)
+  const prevNo = cleanText(job.invoice_number, 120);
+  if (number && number !== prevNo) {
+    const [{ data: inv }, { data: ord }] = await Promise.all([
+      db.from("invoices").select("order_id").eq("number", number).not("order_id", "is", null).neq("order_id", jobId).limit(1),
+      db.from("orders").select("number").eq("invoice_number", number).neq("id", jobId).limit(1),
+    ]);
+    const otherId = ((inv ?? []) as { order_id: string }[])[0]?.order_id ?? null;
+    let other = ((ord ?? []) as { number: string | null }[])[0]?.number ?? null;
+    if (!other && otherId) other = ((await loadJob(db, otherId, "id, number"))?.number as string | null) ?? null;
+    if (other) return { ok: false, error: `Faktura ${number} už patří zakázce ${other}.` };
+    if (otherId) return { ok: false, error: `Faktura ${number} už patří jiné zakázce.` };
+  }
+  // stav: Vyfakturováno jen po dodání všeho; nová faktura bez jakéhokoli dodání se nezapíše (ruční krok)
+  const delivery = invoiceDeliveryOf({
+    stage: from ?? "poptavka", itemsCount: Number(job.items_count) || 0, itemsDelivered: Number(job.items_delivered) || 0,
+    itemsPartial: Number(job.items_partial) || 0, partialDeliveryAt: (job.partial_delivery_at as string | null) ?? null,
+  });
+  if (opts.stage !== false && number && !prevNo && delivery === "none") return { ok: false, error: INVOICE_NEEDS_DELIVERY };
   const target: JobStage = job.paid_at ? "dokonceno" : "fakturovano";
-  const toStage = opts.stage !== false && (number || invoiceDate) && from && isForward(from, target) ? target : null;
+  const toStage = opts.stage !== false && delivery === "complete" && (number || invoiceDate) && from && isForward(from, target) ? target : null;
   if (toStage) patch.status = toStage;
 
   const changedCols = (["invoice_number", "invoice_date", "invoice_due_date"] as const).filter((k) =>
@@ -154,6 +231,8 @@ export async function setInvoiceInfoCore(
     });
   }
   if (a.status !== from && isJobStage(a.status)) await logStage(db, userId, jobId, from, a.status, "faktura vystavena");
+  // jedna evidence faktur: i faktura mimo systém / z fotky má řádek (Faktury vydané, splatnost)
+  await syncInvoiceRowCore(db, jobId, cleanText(job.invoice_number, 120), a);
   return { ok: true, invoiceDate: cleanDate(a.invoice_date), invoiceDueDate: cleanDate(a.invoice_due_date), stage: a.status, changed: true };
 }
 

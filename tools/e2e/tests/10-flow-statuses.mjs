@@ -44,6 +44,7 @@ async function cleanup() {
     sql(`delete from purchase_order_items where purchase_order_id in (select id from purchase_orders where job_id in (${inList}))`);
     sql(`delete from purchase_orders where job_id in (${inList})`);
     sql(`delete from documents where order_id in (${inList})`);
+    sql(`delete from delivery_notes where order_id in (${inList})`); // DL dodávek (order_id on delete set null)
     sql(`delete from invoices where order_id in (${inList})`);
     sql(`delete from emails where order_id in (${inList}) and direction = 'out'`);
     sql(`update emails set order_id = null where order_id in (${inList})`);
@@ -121,6 +122,19 @@ async function openJob(page, job, query = "") {
 const nextBtn = (page, label) => header(page).getByRole("button", { name: label, exact: true });
 /** Razítko „kdo · kdy" (text viditelný na všech šířkách, ťuknutím detail). */
 const stamp = (scope, re) => scope.getByRole("button", { name: re });
+/** Dodání během výroby s otevřeným krokem: dialog „Ukončit výrobu" → „Zapsat dodání bez ukončení kroků" (postaru). */
+async function skipFinish(dlg) {
+  const plain = dlg.locator('[data-testid="handoff-plain-move"]');
+  const delivery = dlg.getByRole("button", { name: /^Vše — / }).first();
+  await Promise.race([plain.waitFor({ timeout: 25_000 }), delivery.waitFor({ timeout: 25_000 })]).catch(() => {});
+  if (await plain.isVisible().catch(() => false)) {
+    expect(norm(await dlg.innerText()).includes("Výroba ještě běží"), "upozornění: výroba ještě běží");
+    expect(norm(await plain.innerText()) === "Zapsat dodání bez ukončení kroků", "druhotná akce dodání bez ukončení");
+    await plain.click();
+    await delivery.waitFor({ timeout: 15_000 });
+  }
+}
+
 async function stateMenu(page, item) {
   await header(page).getByRole("button", { name: "Akce se stavem" }).click();
   await page.getByRole("menuitem", { name: item }).click();
@@ -368,23 +382,30 @@ await T("objednávka: Potvrdit → Zákazník změnil (Aktualizovaná rev 2) →
   expect(flowRow(J).confirmation_key === "bez_dokladu", "potvrzení rev 2 zatím neodešlo (bez dokladu)");
 });
 
-await T("korekce stavu: náhled dopadu + poznámka → Ve výrobě; událost s poznámkou a autorem (ruční)", async (context) => {
+await T("korekce stavu na Ve výrobě = předání do výroby (kdo + termín) + poznámka; událost s poznámkou a autorem (ruční)", async (context) => {
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await openJob(page, J);
   const before = row(J).stage_changed_at;
   await header(page).getByRole("button", { name: /^Stav zakázky: / }).click();
   await page.getByRole("menuitem", { name: /^Ve výrobě/ }).click();
-  const dlg = page.getByRole("dialog");
-  await dlg.getByRole("heading", { name: "Korekce stavu: Potvrzená objednávka → Ve výrobě" }).waitFor({ timeout: 10_000 });
-  expect(norm(await dlg.innerText()).length > 60, "dialog vysvětluje dopad");
-  await dlg.getByRole("textbox").fill(`Výroba začala ${TAG}`);
-  await dlg.getByRole("button", { name: "Změnit na Ve výrobě" }).click();
+  // přesun do výroby se ptá, komu to zadávám a do kdy (WP3) — „U nás", ať další kroky testu nemají objednávku navíc
+  const dlg = page.locator('[data-testid="handoff-dialog"]');
+  await dlg.locator('[data-testid="handoff-submit"]').waitFor({ timeout: 20_000 });
+  expect(norm(await dlg.innerText()).includes("komu to zadáváš a do kdy"), "dialog předání do výroby");
+  await dlg.getByRole("button", { name: "U nás" }).first().click();
+  await dlg.locator('input[type="date"]').first().fill(sql(`select (current_date + 7)::text`));
+  await dlg.getByLabel("Poznámka k předání (nepovinné)").fill(`Výroba začala ${TAG}`);
+  await dlg.locator('[data-testid="handoff-submit"]').click();
   await eventually(() => {
     const o = row(J);
     expect(o.status === "ve_vyrobe" && o.stage_changed_by === ID.obchod && o.stage_changed_via === "rucne" && o.stage_changed_at !== before, `DB: Ve výrobě, ručně, obchodník (${o.status}, ${o.stage_changed_via})`);
-  });
-  expectEvent(lastEvent(J, "type = 'stage'"), { actor: "obchod", startsWith: `Stav: Potvrzená objednávka → Ve výrobě — Výroba začala ${TAG}`, via: "rucne" });
+  }, { timeout: 25_000 });
+  const ev = lastEvent(J, "type = 'stage'");
+  expectEvent(ev, { actor: "obchod", startsWith: "Stav: Potvrzená objednávka → Ve výrobě", via: "rucne" });
+  expect(ev.message.includes(`Výroba začala ${TAG}`), `poznámka předání ve změně stavu (${ev.message})`);
+  // kdo + termín: souhrn předání („Předáno do výroby: 1) Výroba · U nás · do …") se stejným autorem
+  expectEvent(lastEvent(J, "message like 'Předáno do výroby:%'"), { actor: "obchod", includes: "U nás" });
 });
 
 // ═════════════════════════ 5. DODÁNÍ ═════════════════════════
@@ -395,7 +416,10 @@ await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → 
   const card = page.getByRole("region", { name: "Dodání zákazníkovi" });
   await card.getByRole("button", { name: "Zapsat dodání" }).click();
   let dlg = page.getByRole("dialog");
+  // výroba ještě běží (krok U nás) → nejdřív „Ukončit výrobu"; tady dodání postaru (částečné dodání během výroby)
+  await skipFinish(dlg);
   await dlg.getByRole("button", { name: `Vše — Deska A ${TAG}` }).click();
+  await dlg.getByLabel(`Dodávám teď — Čep B ${TAG}`).fill(""); // předvyplněný zbytek → dílčí dodávka jen Desky A
   await dlg.getByRole("button", { name: "Zapsat dodání" }).click();
   await eventually(() => {
     const o = row(J);
@@ -413,8 +437,10 @@ await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → 
   expect(bt.includes("Částečně dodáno") && bt.includes("1/2 položek"), `Kniha: Částečně dodáno 1/2 položek (${bt.slice(0, 200)})`);
   // zbytek
   await openJob(page, J, "?tab=vyroba");
-  await page.getByRole("region", { name: "Dodání zákazníkovi" }).getByRole("button", { name: /^(Dodat zbytek|Zapsat dodání)$/ }).first().click();
+  // A2 (sk. 2): hlavička ukazuje „Dodat zbytek" → karta Dodání stejné tlačítko podruhé nenabízí (jen odkáže nahoru)
+  await nextBtn(page, "Dodat zbytek").click();
   dlg = page.getByRole("dialog");
+  await skipFinish(dlg);
   await dlg.getByRole("button", { name: `Vše — Čep B ${TAG}` }).click();
   await dlg.getByRole("button", { name: "Zapsat dodání" }).click();
   await eventually(() => {
@@ -430,9 +456,16 @@ await T("faktura → Vyfakturováno · autor; úhrada částečná (bez posunu, 
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await openJob(page, J);
-  await page.getByRole("button", { name: "Doklady (PDF)" }).click();
-  await page.getByRole("menuitem", { name: /^Faktura/ }).click();
-  await waitToast(page, /Faktura FV-\S+ je hotov/, 30_000);
+  // A2 (sk. 1): faktura = hlavní tlačítko „Vystavit fakturu" hned po dodání (potvrzený DL není podmínka)
+  // → PDF + dialog odeslání jako u nabídky; tady „Vystavit, neposílat" (odeslání testuje E2E 23)
+  await nextBtn(page, "Vystavit fakturu").click();
+  const inv = page.getByRole("dialog");
+  const force = inv.getByRole("button", { name: "Přesto vystavit" });
+  const save = inv.getByRole("button", { name: "Vystavit, neposílat" });
+  await Promise.race([force.waitFor({ timeout: 30_000 }), save.waitFor({ timeout: 30_000 })]).catch(() => {});
+  if (await force.isVisible().catch(() => false)) await force.click();
+  await save.click({ timeout: 30_000 });
+  await waitToast(page, /Faktura FV-\S+ je vystaven/, 30_000);
   await eventually(() => {
     const o = row(J);
     expect(o.status === "fakturovano" && o.invoiced_by === ID.obchod, `DB: Vyfakturováno, fakturoval obchodník (${o.status}, ${o.invoiced_by})`);

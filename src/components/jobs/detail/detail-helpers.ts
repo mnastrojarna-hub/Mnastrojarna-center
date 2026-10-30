@@ -470,20 +470,33 @@ export function autoLabel(e: Pick<JobEvent, "data">): string | null {
 }
 
 /** Fáze historie (filtr): podle entity / typu / dat události. */
-export type HistoryPhase = "stavy" | "poptavka" | "nabidky" | "objednavka" | "vyroba" | "dodani" | "platby" | "dokumenty" | "komunikace" | "zmeny";
+export type HistoryPhase = "stavy" | "poptavka" | "nabidky" | "objednavka" | "vyroba" | "dodani" | "platby" | "dokumenty" | "komunikace" | "poznamky" | "zmeny";
 
 export const HISTORY_PHASES: { key: HistoryPhase; label: string }[] = [
   { key: "stavy", label: "Stav zakázky" },
   { key: "poptavka", label: "Poptávka" },
   { key: "nabidky", label: "Nabídky" },
   { key: "objednavka", label: "Objednávka" },
-  { key: "vyroba", label: "Výroba" },
+  { key: "vyroba", label: "Technologie & výroba" },
   { key: "dodani", label: "Dodání" },
   { key: "platby", label: "Faktura & platby" },
   { key: "dokumenty", label: "Dokumenty" },
   { key: "komunikace", label: "Komentáře & e-maily" },
+  { key: "poznamky", label: "Poznámky & štítky" },
   { key: "zmeny", label: "Změny polí" },
 ];
+
+/** Sloupce poznámek (zakázka, položka) a štítků — v historii jako poznámka s celým textem. */
+export const NOTE_FIELDS = ["note", "item_note", "tags", "customer_note"];
+
+/** Událost mění poznámku / štítky (Pošta B: „měly by tam být i poznámky"). */
+export function isNoteEvent(e: Pick<JobEvent, "type" | "data">): boolean {
+  if (e.type !== "field") return false;
+  const d = e.data ?? {};
+  if (d.note === true) return true;
+  const ch = Array.isArray(d.changes) ? (d.changes as { field?: unknown }[]) : [];
+  return ch.length > 0 && ch.every((c) => typeof c?.field === "string" && NOTE_FIELDS.includes(c.field));
+}
 
 export function eventPhase(e: Pick<JobEvent, "type" | "data"> & Partial<Pick<JobEvent, "entity">>): HistoryPhase {
   const d = e.data ?? {};
@@ -499,6 +512,7 @@ export function eventPhase(e: Pick<JobEvent, "type" | "data"> & Partial<Pick<Job
   if (e.type === "status") return entity === "proposal" ? "stavy" : "objednavka";
   if (e.type === "file") return "dokumenty";
   if (e.type === "comment" || e.type === "email") return "komunikace";
+  if (isNoteEvent(e)) return "poznamky";
   return "zmeny";
 }
 
@@ -850,8 +864,8 @@ export function tagTone(tag: string): string {
 }
 
 // ── Záložky ─────────────────────────────────────────────────
-export type DetailTab = "prehled" | "vyroba" | "polozky" | "nabidky" | "nakup" | "dokumenty" | "historie";
-export const DETAIL_TABS: DetailTab[] = ["prehled", "vyroba", "polozky", "nabidky", "nakup", "dokumenty", "historie"];
+export type DetailTab = "prehled" | "vyroba" | "polozky" | "nabidky" | "nakup" | "dokumenty" | "komunikace" | "historie";
+export const DETAIL_TABS: DetailTab[] = ["prehled", "vyroba", "polozky", "nabidky", "nakup", "dokumenty", "komunikace", "historie"];
 
 export function isDetailTab(v: unknown): v is DetailTab {
   return typeof v === "string" && (DETAIL_TABS as string[]).includes(v);
@@ -863,7 +877,7 @@ export const DETAIL_TABS_ID = "zalozky-zakazky";
 /** Anglické aliasy záložek (odkazy akcí toku: ?tab=items / quotes / production / purchasing). */
 const TAB_ALIASES: Record<string, DetailTab> = {
   overview: "prehled", items: "polozky", quotes: "nabidky", production: "vyroba", purchasing: "nakup",
-  documents: "dokumenty", history: "historie",
+  documents: "dokumenty", history: "historie", communication: "komunikace", posta: "komunikace", mail: "komunikace",
 };
 
 export function detailTabOf(v: unknown): DetailTab | null {

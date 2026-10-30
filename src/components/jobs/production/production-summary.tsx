@@ -1,16 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, ArrowRight, Check, CircleCheckBig, Clock, Loader2, Play } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CircleCheckBig, Clock, Loader2, Play, Truck } from "lucide-react";
+import { useFlowActions } from "@/components/jobs/detail/flow-actions";
 import { Button } from "@/components/ui/button";
 import { OPERATION_KINDS } from "@/lib/jobs/operations";
-import { operationDisplayName, summarizeOperations } from "@/lib/jobs/production";
+import { operationDisplayName, stepLabel, summarizeOperations } from "@/lib/jobs/production";
+import { DeadlineChip } from "./handoff/deadline-chip";
 import type { JobOperation } from "@/lib/jobs/production-types";
 import { cn } from "@/lib/utils";
 import { useProduction } from "./production-context";
 import {
-  currentOperation, dayLabel, lastNoteLine, operationStatusStamp, overdueOperations, plannedState, primaryAction,
-  problemOperations, progressSegments, upcomingOperation, type ChangedByFields, type ProgressSegment,
+  closedProductionView, currentOperation, dayLabel, isProductionClosed, lastNoteLine, operationStatusStamp, overdueOperations, plannedState,
+  primaryAction, problemOperations, progressSegments, stepAction, stepCounterOf, upcomingOperation, type ChangedByFields, type ProgressSegment,
 } from "./production-helpers";
 import { useOperationActions } from "./use-operation-actions";
 
@@ -61,10 +63,24 @@ export function ProgressBar({ segments, labels = true }: { segments: ProgressSeg
   );
 }
 
-function CurrentAction({ op }: { op: JobOperation }) {
+function CurrentAction({ op, label }: { op: JobOperation; label: string }) {
+  const { ops, stage, open } = useProduction();
   const { advance, advancing, busy } = useOperationActions(op);
   const pa = primaryAction(op.status);
-  if (!pa) return null;
+  const action = stage ? stepAction(op, ops, stage) : pa ? { mode: "advance" as const, ...pa } : null;
+  if (!action) return null;
+  if (action.mode === "handoff") {
+    return (
+      <Button
+        type="button"
+        onClick={() => open({ type: "handoff", kind: action.kind, operationId: action.operationId })}
+        className="h-12 w-full gap-2 bg-rose-600 text-base font-semibold text-white shadow-md hover:bg-rose-700 sm:h-11 sm:w-auto sm:px-6"
+        data-testid="summary-handoff"
+      >
+        <ArrowRight /> {action.label}
+      </Button>
+    );
+  }
   return (
     <Button
       type="button"
@@ -72,12 +88,45 @@ function CurrentAction({ op }: { op: JobOperation }) {
       disabled={busy}
       className={cn(
         "h-12 w-full gap-2 text-base font-semibold shadow-md sm:h-11 sm:w-auto sm:px-6",
-        pa.next === "probiha" ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-success text-success-foreground hover:bg-success/90",
+        action.next === "probiha" ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-success text-success-foreground hover:bg-success/90",
       )}
     >
-      {advancing ? <Loader2 className="animate-spin" /> : pa.next === "probiha" ? <Play className="fill-current" /> : <Check strokeWidth={3} />}
-      {pa.next === "probiha" ? `Začít: ${op.label}` : `Hotovo: ${op.label}`}
+      {advancing ? <Loader2 className="animate-spin" /> : action.next === "probiha" ? <Play className="fill-current" /> : <Check strokeWidth={3} />}
+      {action.next === "probiha" ? `Začít: ${label}` : `Hotovo: ${label}`}
     </Button>
+  );
+}
+
+/**
+ * Dodání během výroby (dílčí dodávka, výroba končí u dodavatele): jediné tlačítko „Zapsat dodání a dodací
+ * list" je v kartě „Dodání zákazníkovi" (a v ⋯) — souhrn nahoře na něj jen odkáže (na mobilu je karta níž).
+ */
+export function summaryOffersDelivery(flow: ReturnType<typeof useFlowActions>): boolean {
+  const f = flow?.facts;
+  if (!flow || !f || !flow.ctx.can("workflow") || f.itemsCount <= 0) return false;
+  const delivery = flow.snapshot?.delivery ?? null;
+  if (flow.next?.key === "delivery.record" || delivery === "dodano" || delivery === "dl_potvrzen") return false;
+  const total = f.productionTotal ?? 0;
+  return total > 0 && (f.productionDone ?? 0) < total && f.productionStep !== "hotovo";
+}
+
+function DeliveryShortcut() {
+  const flow = useFlowActions();
+  if (!flow || !summaryOffersDelivery(flow)) return null;
+  return (
+    <a
+      href="#dodani-zakaznikovi"
+      onClick={(e) => {
+        const card = document.getElementById("dodani-zakaznikovi");
+        if (!card) return;
+        e.preventDefault();
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }}
+      className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-green-700 hover:underline dark:text-green-400"
+      data-testid="summary-delivery"
+    >
+      <Truck className="h-3.5 w-3.5" /> Hotové kusy dodáš i během výroby — Dodání zákazníkovi ↓
+    </a>
   );
 }
 
@@ -85,15 +134,18 @@ function CurrentAction({ op }: { op: JobOperation }) {
  * Souhrn nahoře: kde se zakázka právě nachází, kolik je hotovo, velký pruh
  * průběhu, hlavní tlačítko pro aktuální operaci, problémy a zpoždění.
  */
-export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
-  const { today, events } = useProduction();
+export function ProductionSummary({ ops: allOps }: { ops: JobOperation[] }) {
+  const { today, events, finalDate, stage } = useProduction();
+  // dodaná / vyfakturovaná / dokončená zakázka: neukončené kroky jsou uzavřené (žádné „probíhá" ani „Hotovo")
+  const { ops, closedOpen } = closedProductionView(allOps, stage);
+  const delivered = isProductionClosed(stage);
   const summary = summarizeOperations(ops);
   const segments = progressSegments(ops);
   const current = currentOperation(ops);
   const upcoming = upcomingOperation(ops);
   const problems = problemOperations(ops);
   const late = overdueOperations(ops, today).filter((o) => o.status !== "problem");
-  const finished = summary.step === "hotovo";
+  const finished = summary.step === "hotovo" || closedOpen > 0;
   const meta = current ? OPERATION_KINDS[current.kind] : null;
   const Icon = meta?.icon ?? CircleCheckBig;
   const running = current && (current.status === "probiha" || current.status === "problem");
@@ -127,17 +179,31 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
               {finished ? "Výroba" : running ? "Teď" : "Na řadě"}
             </p>
             {finished ? (
-              <p className="text-lg font-bold leading-tight text-green-700 dark:text-green-400 sm:text-xl">Výroba hotová ✓</p>
+              <p className="text-lg font-bold leading-tight text-green-700 dark:text-green-400 sm:text-xl" data-testid="production-finished">
+                {closedOpen > 0 ? "Výroba uzavřena ✓" : "Výroba hotová ✓"}
+              </p>
             ) : current ? (
-              <p className="break-words text-lg font-bold leading-tight sm:text-xl">
-                {current.label}
+              <p className="break-words text-lg font-bold leading-tight sm:text-xl" data-testid="production-now">
+                {stepCounterOf(current, ops) && <span className="font-semibold text-muted-foreground">{stepCounterOf(current, ops)} · </span>}
+                {stepLabel(current, ops)}
                 {current.location !== "—" && <span className="font-semibold text-muted-foreground"> · {current.location}</span>}
               </p>
             ) : (
               <p className="text-lg font-bold">Bez postupu</p>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              {finished && <span>Všechny operace jsou hotové — dodej zákazníkovi a nahraj potvrzený dodací list.</span>}
+              {finished && closedOpen > 0 && (
+                <span data-testid="production-closed-note">
+                  Zakázka je dodaná — neukončené kroky ({closedOpen}) jsou uzavřené jako přeskočené (dodání zapsané bez ukončení kroků).
+                </span>
+              )}
+              {finished && closedOpen === 0 && (
+                <span>
+                  {delivered
+                    ? "Všechny operace jsou hotové — zakázka je dodaná zákazníkovi."
+                    : "Všechny operace jsou hotové — dodej zákazníkovi: „Zapsat dodání a dodací list“, pak faktura."}
+                </span>
+              )}
               {!finished && current?.status === "ceka" && <span>čeká na začátek</span>}
               {!finished && running && (since || stamp) && (
                 <span>
@@ -147,7 +213,18 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
                   ].filter(Boolean).join(" · ")}
                 </span>
               )}
-              {!finished && planned && (
+              {!finished && current?.plannedEnd ? (
+                <DeadlineChip
+                  compact
+                  op={{
+                    plannedEnd: current.plannedEnd, endsAtCustomerDate: current.endsAtCustomerDate, deadlineState: current.deadlineState ?? null,
+                    deadlineSource: current.deadlineSource ?? null, inHouse: current.inHouse, location: current.location, status: current.status,
+                    purchaseOrder: current.purchaseOrder ? { number: current.purchaseOrder.number, status: current.purchaseOrder.status, confirmedDate: current.purchaseOrder.confirmedDate } : null,
+                  }}
+                  finalDate={finalDate ?? null}
+                  today={today}
+                />
+              ) : !finished && planned && (
                 <span className={cn("inline-flex items-center gap-1 font-medium", planned.tone === "overdue" && "text-red-600 dark:text-red-400", (planned.tone === "today" || planned.tone === "soon") && "text-amber-700 dark:text-amber-400")}>
                   <Clock className="h-3 w-3" /> {planned.text}
                 </span>
@@ -157,9 +234,11 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
           <div className="shrink-0 text-right">
             <p className="text-2xl font-bold leading-none tabular-nums sm:text-3xl">
               {summary.done}
-              <span className="text-base font-semibold text-muted-foreground sm:text-lg">/{summary.total}</span>
+              <span className="text-base font-semibold text-muted-foreground sm:text-lg">/{summary.total + closedOpen}</span>
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">hotovo · {summary.percent} %</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {closedOpen > 0 ? `hotovo · ${closedOpen} uzavřeno` : `hotovo · ${summary.percent} %`}
+            </p>
           </div>
         </div>
 
@@ -190,8 +269,11 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
         )}
 
         {!finished && current && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CurrentAction op={current} />
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <CurrentAction op={current} label={stepLabel(current, ops)} />
+              <DeliveryShortcut />
+            </div>
             {upcoming && upcoming.id !== current.id && (
               <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                 <ArrowRight className="h-3.5 w-3.5 shrink-0" /> Pak:

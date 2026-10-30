@@ -2,10 +2,11 @@ import { Document, View, Text } from "@react-pdf/renderer";
 import { COMPANY } from "@/lib/company";
 import { styles, C } from "./theme";
 import {
-  DocPage, BrandHeader, MetaStrip, PartyBlock, TotalsCard, Terms, addressLines, d,
+  DocPage, BrandHeader, MetaStrip, PartyBlock, TotalsCard, Terms, addressLines, d, fitFontSize,
 } from "./components";
 import { czDate, czk, czNumber, czWeekday, countryName, isPlaceholder, lineTotal, plural, type DocItem } from "./types";
 import type { PurchaseOrderData } from "./purchase-types";
+import { splitItemNote } from "@/lib/jobs/purchasing";
 
 /**
  * PDF „Objednávka" — naše objednávka vydaná dodavateli. Stejný vzhled jako
@@ -118,14 +119,24 @@ function PurchaseItemsTable({ items, currency }: { items: DocItem[]; currency: s
           <Text style={[styles.cellNum, { width: W.num }]}>{i + 1}</Text>
           {hasDrawing ? (
             <View style={{ width: W.drawing, paddingRight: 6 }}>
-              <Text style={it.drawingNumber ? styles.cellDrawing : { color: C.muted }}>{it.drawingNumber || "—"}</Text>
+              {/* celé číslo výkresu na jednom řádku (dlouhé menším písmem — nepřeteče do popisu) */}
+              <Text style={it.drawingNumber ? [styles.cellDrawing, { fontSize: fitFontSize(it.drawingNumber, W.drawing - 6, 8.8) }] : { color: C.muted }}>{it.drawingNumber || "—"}</Text>
               {it.revision ? <Text style={styles.cellRev}>rev. {it.revision}</Text> : null}
             </View>
           ) : null}
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.cellDesc}>{it.description}</Text>
             {it.material ? <Text style={styles.cellSub}>Materiál: {it.material}</Text> : null}
-            {it.note ? <Text style={styles.cellNote}>{it.note}</Text> : null}
+            {(() => {
+              // poznámka pro dodavatele (Technologie → „Pozor: popsat na čele") zvýrazněná, zbytek poznámky pod ní
+              const n = splitItemNote(it.note);
+              return (
+                <>
+                  {n.warning ? <Text style={{ fontSize: 8.2, lineHeight: 1.35, fontWeight: "bold", color: C.red, marginTop: 1.5 }}>Pozor: {n.warning}</Text> : null}
+                  {n.rest ? <Text style={styles.cellNote}>{n.rest}</Text> : null}
+                </>
+              );
+            })()}
           </View>
           <Text style={[styles.cellRight, { width: W.qty }]}>
             {czNumber(it.quantity)} <Text style={styles.cellUnit}>{it.unit}</Text>

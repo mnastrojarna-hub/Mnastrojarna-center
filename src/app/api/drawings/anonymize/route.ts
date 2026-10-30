@@ -1,6 +1,7 @@
-import { after } from "next/server";
+import { routeDeadline } from "@/lib/ai/ai-call";
 import { anonGuard, idList, json, readBody, tableParam } from "@/lib/anonymize/route-helpers";
-import { appOrigin, defaultDeadline, enqueue, kick, runClaimed } from "@/lib/anonymize/service";
+import { appOrigin, enqueue } from "@/lib/anonymize/service";
+import { processInBackground } from "@/lib/anonymize/runner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,10 +9,11 @@ export const maxDuration = 300;
 
 /**
  * Ruční / hromadná anonymizace: POST { fileIds?, jobIds?, force?, table? } → zařadí do fronty
- * (force = i done/review/skipped, priorita 0) a spustí zpracování (rozvětvení po souborech přes
- * interní run; bez CRON_SECRET zpracuje sám po odpovědi v after()). Vrací { queued, statuses, skipped }.
+ * (force = i done/review/skipped, priorita 0) a zpracuje je sama po odpovědi (after(), runner.ts);
+ * interní rozvětvení (kick) jen přidá souběh. Vrací { queued, statuses, skipped }.
  */
 export async function POST(req: Request) {
+  const start = Date.now();
   const body = await readBody(req);
   if (body instanceof Response) return body;
   const table = tableParam(body.table);
@@ -44,16 +46,12 @@ export async function POST(req: Request) {
   const backfill = new Set(res.backfill ?? []);
   const queuedIds = Object.entries(res.statuses).filter(([id, s]) => s === "pending" && !backfill.has(id)).map(([id]) => id);
   if (queuedIds.length) {
-    const origin = appOrigin(req.url);
-    const k = await kick({ origin, table, ids: queuedIds.slice(0, 5), manualBy: guard.user.id });
-    if (!k.kicked) {
-      // bez interního spouštění: zpracovat po odpovědi tady (route, ne server action)
-      const db = guard.db;
-      const actor = guard.actor;
-      after(async () => {
-        await runClaimed(db, table, queuedIds.slice(0, 3), { actor, deadline: defaultDeadline(), manual: true }, 3);
-      });
-    }
+    // zpracuje TATO funkce po odpovědi (první soubor hned, bez HTTP volání sama sebe); zbytek se rozvětví
+    // kickem na souběžné běhy — když rozvětvení nefunguje (chráněná adresa, 401…), dojede to tady postupně
+    processInBackground({
+      table, ids: queuedIds, actor: guard.actor, manual: true, deadline: routeDeadline(start), maxFiles: 20,
+      origin: appOrigin(req.url), label: "ruční zařazení",
+    });
   }
   return json({ ok: true, ...res });
 }

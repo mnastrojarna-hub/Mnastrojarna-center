@@ -133,14 +133,18 @@ describe("Kniha zakázek — vykreslení", () => {
     const heat = job({
       id: "j3", stage: "ve_vyrobe", productionStep: "tepelne_zpracovani", productionLocation: "TepKal s.r.o.",
       productionDone: 1, productionTotal: 4, productionProblem: true, customerNote: "Balit po 10 ks do VCI.",
+      productionStepNo: 2, productionDue: "2026-11-12", productionDueState: "odhad", productionPoStatus: "vystavena",
     });
     const late = job({ id: "j4", number: "Z-2026-110", stage: "fakturovano", invoiceNumber: "FV-9", invoiceDueDate: "2026-10-15" });
     const soon = job({ id: "j5", number: "Z-2026-111", stage: "fakturovano", invoiceDueDate: "2026-11-21" });
     const paid = job({ id: "j6", number: "Z-2026-112", stage: "dokonceno", paidAt: "2026-10-03", productionStep: "hotovo", productionDone: 2, productionTotal: 2 });
     const html = render(<JobRows jobs={[heat, late, soon, paid]} today="2026-10-22" />);
     expect(html).toContain('href="/orders/j3?tab=vyroba"');
-    expect(html).toContain("Tepelné zpracování · TepKal s.r.o."); // mobil: celý název
-    expect(html).toContain("Kalení · TepKal s.r.o."); // desktop: krátký
+    // „Krok 2/4 · Tepelné zpracování · TepKal · do 12. 11." + stav termínu + tečka „Objednávka neodeslána"
+    expect(html).toContain("Krok 2/4 · Tepelné zpracování · TepKal s.r.o. · do 12. 11.");
+    expect(html).toContain('aria-label="Objednávka neodeslána"');
+    expect(html).toContain(">odhad<");
+    expect(html).toContain("krok do 12. 11.");
     expect(html).toContain("1/4");
     expect(html).toContain("problém");
     expect(html).toContain('aria-label="Domluvy se zákazníkem"');
@@ -150,7 +154,9 @@ describe("Kniha zakázek — vykreslení", () => {
     expect(html).toContain("zaplaceno");
     expect(html).toContain("Výroba hotová");
     const board = render(<JobBoard jobs={[heat]} stages={["ve_vyrobe"]} today="2026-10-22" />);
-    expect(board).toContain("Kalení · TepKal s.r.o.");
+    expect(board).toContain("Krok 2/4 · Tepelné zpracování · TepKal s.r.o. · do 12. 11.");
+    // sloupec „Ve výrobě": mezititulek podle aktuálního kroku
+    expect(board).toContain("Tepelné zpracování (1)");
     expect(board).toContain('aria-label="Domluvy se zákazníkem"');
   });
 

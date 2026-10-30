@@ -117,6 +117,7 @@ describe.skipIf(!ENABLED)("Kniha a karta zakázky — podrobné stavy ↔ lokál
     if (!svc || !jobs.length) return;
     await svc.from("job_operations").delete().in("job_id", jobs);
     await svc.from("job_payments").delete().in("job_id", jobs);
+    await svc.from("invoices").delete().in("order_id", jobs); // A2: faktura zapsaná ručně = řádek v evidenci
     await svc.from("quotes").delete().in("job_id", jobs);
     await svc.from("orders").delete().in("id", jobs);
     await svc.from("audit_log").delete().in("entity_id", jobs);

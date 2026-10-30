@@ -64,6 +64,10 @@ type ThreadRow = {
   has_draft: boolean; message_count: number; unread_count: number; flagged: boolean; priority_rank: number; manual_priority: boolean;
   has_attachments: boolean; ai_pending: boolean; last_at: string; share_note: string | null; share_by_name: string | null;
   share_unread: boolean | null; total_count: number;
+  // Pošta B (migrace 20261029145000)
+  job_title?: string | null; job_link_source?: string | null; job_link_actor?: string | null;
+  sugg_id?: string | null; sugg_job_id?: string | null; sugg_job_number?: string | null; sugg_job_title?: string | null; sugg_score?: number | null;
+  sugg_email_id?: string | null;
 };
 
 export function toThreadSummary(r: ThreadRow): ThreadSummary {
@@ -96,6 +100,16 @@ export function toThreadSummary(r: ThreadRow): ThreadSummary {
     aiPending: Boolean(r.ai_pending),
     ...(r.share_note !== null || r.share_by_name !== null || r.share_unread !== null && r.share_unread !== false
       ? { share: { note: r.share_note, by: r.share_by_name, unread: Boolean(r.share_unread) } }
+      : {}),
+    ...(r.order_id && r.job_title ? { jobTitle: clean(r.job_title) } : {}),
+    ...(r.order_id && r.job_link_source ? { jobLinkSource: r.job_link_source } : {}),
+    ...(r.order_id && r.job_link_actor ? { jobLinkActor: r.job_link_actor } : {}),
+    // návrh vlákna bez zakázky, nebo otázka k jedné zprávě vlákna jiné zakázky („Patří k Z-…?")
+    ...(r.sugg_id && r.sugg_job_id && r.sugg_job_id !== r.order_id
+      ? { suggestion: {
+        id: r.sugg_id, jobId: r.sugg_job_id, jobNumber: r.sugg_job_number ?? "", jobTitle: clean(r.sugg_job_title) || undefined, score: Number(r.sugg_score) || 0,
+        ...(r.order_id ? { forMessage: true, ...(r.sugg_email_id ? { emailId: r.sugg_email_id } : {}) } : {}),
+      } }
       : {}),
   };
 }
@@ -146,6 +160,7 @@ export async function getFolderCounts(mailboxId?: string | null): Promise<Folder
   return {
     inboxUnread: Number(r.inbox_unread) || 0, flagged: Number(r.flagged) || 0, spam: Number(r.spam) || 0,
     shared: Number(r.shared) || 0, sharedUnread: Number(r.shared_unread) || 0, aiPending: Number(r.ai_pending) || 0,
+    jobsUnread: Number(r.jobs_unread) || 0, jobSuggestions: Number(r.job_suggestions) || 0,
   };
 }
 
@@ -203,8 +218,8 @@ export async function visibleThreadEmails(threadId: string): Promise<{
 const MSG_SELECT = [
   "id, thread_id, mailbox_id, owner_id, direction, message_id, message_refs, from_name, from_email, to_email, cc_email, bcc_email",
   "subject, body_text, snippet, received_at, is_read, flagged, flagged_by, manual_priority, priority_rank, priority_set_by, category",
-  "ai_confidence, ai_summary, ai_pending, has_draft, order_id, sent_copy, sent_copy_error",
-  "customer:customers!customer_id(name)", "job:orders!order_id(id, number)", "mailbox:mailboxes!mailbox_id(email)",
+  "ai_confidence, ai_summary, ai_pending, has_draft, order_id, sent_copy, sent_copy_error, job_link_source, job_link_actor, body_html",
+  "customer:customers!customer_id(name)", "job:orders!order_id(id, number, title)", "mailbox:mailboxes!mailbox_id(email)",
   "flagger:profiles!flagged_by(full_name)", "setter:profiles!priority_set_by(full_name)", "sender:profiles!owner_id(full_name)",
 ].join(", ");
 
@@ -215,7 +230,8 @@ type MsgRow = {
   flagged: boolean; flagged_by: string | null; manual_priority: number | null; priority_rank: number | null; priority_set_by: string | null;
   category: DbEmailCategory | null; ai_confidence: number | null; ai_summary: string | null; ai_pending: boolean; has_draft: boolean;
   order_id: string | null; sent_copy: "ok" | "failed" | "skipped" | null; sent_copy_error: string | null;
-  customer?: { name: string | null } | null; job?: { id: string; number: string | null } | null; mailbox?: { email: string | null } | null;
+  job_link_source?: string | null; job_link_actor?: string | null; body_html?: string | null;
+  customer?: { name: string | null } | null; job?: { id: string; number: string | null; title?: string | null } | null; mailbox?: { email: string | null } | null;
   flagger?: { full_name: string | null } | null; setter?: { full_name: string | null } | null; sender?: { full_name: string | null } | null;
 };
 
@@ -274,6 +290,8 @@ export async function getThread(threadId: string): Promise<ThreadDetail> {
     hasDraft: Boolean(r.has_draft),
     jobId: one(r.job)?.id ?? r.order_id ?? undefined,
     jobNumber: one(r.job)?.number ?? undefined,
+    jobLinkSource: r.order_id ? r.job_link_source ?? null : null,
+    jobLinkActor: r.order_id ? r.job_link_actor ?? null : null,
     customer: one(r.customer)?.name ?? undefined,
     messageId: r.message_id,
     references: r.message_refs ?? [],
@@ -281,6 +299,9 @@ export async function getThread(threadId: string): Promise<ThreadDetail> {
     sentCopy: r.sent_copy,
     sentCopyError: r.sent_copy_error,
     senderName: r.direction === "out" ? one(r.sender)?.full_name ?? null : null,
+    // odeslaná zpráva s grafickým podpisem z aplikace (HTML jsme sestavili sami, vše escapované)
+    ...(r.direction === "out" && r.body_html && r.body_html.includes('data-mn-signature="1"') && r.body_html.length <= 200_000
+      ? { signedHtml: r.body_html } : {}),
   })));
   const person = (p: unknown) => {
     const x = one(p as { full_name: string | null; email: string | null } | null);
@@ -292,6 +313,22 @@ export async function getThread(threadId: string): Promise<ThreadDetail> {
   const { data: boxes } = await db.from("mailboxes").select("email").eq("owner_id", scope.userId);
   const myAddresses = ((boxes ?? []) as { email: string }[]).map((b) => b.email.toLowerCase());
   const last = messages[messages.length - 1];
+  const jobMsg = [...rows].sort((a, b) => Date.parse(b.received_at) - Date.parse(a.received_at)).find((r) => r.order_id);
+  // Pošta B: návrh „Patří k Z-…?" (vlákno bez zakázky) / otázka k jedné zprávě vlákna jiné zakázky
+  // (odpověď jmenuje jinou zakázku — ta zpráva zůstala nepřiřazená)
+  let suggestion: ThreadDetail["suggestion"] = null;
+  {
+    let sq = db.from("email_job_suggestions").select("id, job_id, score, email_id, job:orders!job_id(number, title)")
+      .eq("thread_id", threadId).eq("status", "pending");
+    if (jobMsg) sq = sq.not("thread_job_id", "is", null).neq("job_id", jobMsg.order_id as string);
+    const { data: sg } = await sq.order("score", { ascending: false }).limit(1).maybeSingle();
+    const s = sg as { id: string; job_id: string; score: number; email_id: string | null; job: unknown } | null;
+    const sj = one(s?.job as { number: string | null; title: string | null } | null);
+    const unlinked = !jobMsg || Boolean(s?.email_id && rows.some((r) => r.id === s.email_id && !r.order_id));
+    if (s && sj && unlinked) {
+      suggestion = { id: s.id, jobId: s.job_id, jobNumber: sj.number ?? "", jobTitle: clean(sj.title) || undefined, score: Number(s.score) || 0, ...(jobMsg ? { forMessage: true, ...(s.email_id ? { emailId: s.email_id } : {}) } : {}) };
+    }
+  }
   return {
     ok: true,
     threadId,
@@ -299,6 +336,9 @@ export async function getThread(threadId: string): Promise<ThreadDetail> {
     messages,
     shares: visibleShares,
     myAddresses,
-    jobId: [...messages].reverse().find((m) => m.jobId)?.jobId ?? last?.jobId ?? null,
+    jobId: jobMsg?.order_id ?? [...messages].reverse().find((m) => m.jobId)?.jobId ?? last?.jobId ?? null,
+    jobNumber: jobMsg ? one(jobMsg.job)?.number ?? null : null,
+    jobTitle: jobMsg ? clean(one(jobMsg.job)?.title) || null : null,
+    suggestion,
   };
 }

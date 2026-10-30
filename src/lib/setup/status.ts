@@ -67,6 +67,8 @@ export const COMPANY_SETTING_KEYS = [
   "company_bank_name",
   "company_registration",
   "company_delivery_address",
+  "company_correspondence_address",
+  "company_certifications",
 ] as const;
 
 /** Ověří existenci tabulek přes admin klienta (vyžaduje servisní klíč). */

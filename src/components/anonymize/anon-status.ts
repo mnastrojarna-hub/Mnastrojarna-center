@@ -79,13 +79,22 @@ export function displayReason(status: string | null | undefined, reason: string 
 }
 
 /** Stav jednoho souboru → štítek. total = počet smazaných oblastí (když je znám). */
-export function fileAnonLabel(a: { status: AnonUiStatus; reviewed?: boolean; reason?: string | null; total?: number | null }): { label: string; tone: AnonTone; hint: string } {
+export function fileAnonLabel(a: {
+  status: AnonUiStatus; reviewed?: boolean; reason?: string | null; total?: number | null;
+  /** Starý výkres (backfill) — nic neběží, čeká na „Zpracovat staré výkresy". */
+  backfill?: boolean;
+  /** Čeká déle než obvykle (UI přestalo čekat) — místo spinneru „Zkusit znovu". */
+  stalled?: boolean;
+}): { label: string; tone: AnonTone; hint: string } {
   switch (a.status) {
     case "uploading":
       return { label: "Nahrávám…", tone: "busy", hint: "Soubor se nahrává." };
     case "pending":
     case "processing":
       if (isBudgetWait(a.status, a.reason)) return { label: "Čeká (denní limit)", tone: "muted", hint: a.reason ?? "" };
+      if (a.backfill && a.status === "pending") return { label: "Starší výkres", tone: "muted", hint: "Výkres z doby před anonymizací — spusť „Anonymizovat“ v menu, nebo hromadně v Nastavení." };
+      if (a.stalled) return { label: "Čeká déle než obvykle", tone: "warn", hint: "Anonymizace se nerozběhla — zkus to znovu." };
+      if (a.status === "pending" && a.reason) return { label: "Zkouší se znovu…", tone: "busy", hint: displayReason("failed", a.reason) ?? "Předchozí pokus selhal — zkouší se znovu." };
       return { label: "Anonymizuje se…", tone: "busy", hint: "AI maže firmu, jména, logo a cesty — za chvíli bude hotovo." };
     case "done":
       if (a.total === 0) {
@@ -129,6 +138,8 @@ export interface JobBadgeInput {
   sendWaiting: number;
   /** Čeká na denní limit AI. */
   waitingBudget?: number;
+  /** Staré výkresy (backfill) — sám se nespouští. */
+  waitingLegacy?: number;
 }
 
 export interface JobBadgeView {
@@ -156,7 +167,9 @@ export function jobAnonBadge(b: JobBadgeInput | null | undefined): JobBadgeView 
   if (b.review) parts.push({ text: `${b.review} ke kontrole`, tone: "warn" });
   if (b.pending) {
     const budget = b.waitingBudget ?? 0;
-    parts.push(budget >= b.pending ? { text: "Čeká (limit)", tone: "muted" } : { text: "Čeká…", tone: "busy" });
+    const legacy = b.waitingLegacy ?? 0;
+    parts.push(budget + legacy < b.pending ? { text: "Čeká…", tone: "busy" }
+      : budget >= legacy ? { text: "Čeká (limit)", tone: "muted" } : { text: "Starší výkresy", tone: "muted" });
   }
   if (anonymizable > 0) {
     const all = b.done === anonymizable;

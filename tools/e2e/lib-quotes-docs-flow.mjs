@@ -145,10 +145,11 @@ export function createJob(f) {
     created_by: lit(f.ownerId ?? null),
     customer_order_number: lit(f.cpo ?? null),
     customer_inquiry_number: lit(f.cinq ?? null),
-    due_date: f.dueDays === undefined ? "null" : `current_date + ${Number(f.dueDays)}`,
-    customer_required_date: f.reqDays === undefined ? "null" : `current_date + ${Number(f.reqDays)}`,
-    order_date: f.status && !["poptavka", "naceneni", "nabidka"].includes(f.status) ? "current_date - 2" : "null",
-    inquiry_date: "current_date - 5",
+    // data i očekávání v jednom pásmu: pražský den (app_today), ne UTC current_date — jinak 23:00–24:00 UTC posun o den
+    due_date: f.dueDays === undefined ? "null" : `app_today() + ${Number(f.dueDays)}`,
+    customer_required_date: f.reqDays === undefined ? "null" : `app_today() + ${Number(f.reqDays)}`,
+    order_date: f.status && !["poptavka", "naceneni", "nabidka"].includes(f.status) ? "app_today() - 2" : "null",
+    inquiry_date: "app_today() - 5",
     value: f.value === undefined ? "null" : String(f.value),
     purchase_cost: f.purchaseCost === undefined ? "null" : String(f.purchaseCost),
     priority: `${lit(f.priority ?? "stredni")}::priority_level`,
@@ -171,7 +172,7 @@ export function createQuote(job, { number, status = "ke_schvaleni", approvedBy =
   const total = items.reduce((s, it) => (it.price === null || it.price === undefined ? s : s + it.price * (it.qty ?? 1)), 0) || null;
   // approvalRequested: autor požádal o schválení → podrobný stav „Čeká na schválení“
   const id = sql(`insert into quotes (number, job_id, customer_id, status, total, currency, valid_until, revision, created_by, owner_id, approved_by, approved_at, lead_time_days, archived, sent_at, title, approval_requested_at, approval_requested_by)
-    values (${lit(number)}, ${lit(job.id)}, ${lit(customerId)}, ${lit(status)}::quote_status, ${total ?? "null"}, 'CZK', current_date + ${validDays}, 1, ${lit(createdBy)}, ${lit(createdBy)},
+    values (${lit(number)}, ${lit(job.id)}, ${lit(customerId)}, ${lit(status)}::quote_status, ${total ?? "null"}, 'CZK', app_today() + ${validDays}, 1, ${lit(createdBy)}, ${lit(createdBy)},
       ${lit(approvedBy)}, ${approvedBy ? "now()" : "null"}, 14, false, ${sent ? "now()" : "null"}, ${lit(job.title)},
       ${approvalRequested ? "now()" : "null"}, ${approvalRequested ? lit(createdBy) : "null"})
     returning id`).split("\n")[0];
@@ -218,6 +219,7 @@ export async function cleanupOwnData() {
     const paths = sql(`select storage_path from job_files where job_id in (${inList}) and storage_path is not null`).split("\n").filter(Boolean);
     await removeStorageFiles(paths);
     sql(`delete from documents where order_id in (${inList})`);
+    sql(`delete from delivery_notes where order_id in (${inList})`); // DL dodávek (order_id on delete set null)
     sql(`delete from invoices where order_id in (${inList})`);
     sql(`delete from emails where order_id in (${inList}) and direction = 'out'`);
     sql(`update emails set order_id = null where order_id in (${inList})`);

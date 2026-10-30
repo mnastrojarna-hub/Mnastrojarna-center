@@ -14,6 +14,7 @@ import {
 } from "@/components/jobs/book/job-cells";
 import { groupByStage, moveJobStage } from "@/components/jobs/book/book-params";
 import { nextStage, stageMeta } from "@/lib/jobs/stages";
+import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
 import type { FlowActionKey } from "@/lib/jobs/flow-status";
 import type { JobStage } from "@/lib/supabase/database.types";
 import type { JobListItem } from "@/lib/jobs/types";
@@ -35,6 +36,24 @@ const STEP_ACTION: Partial<Record<JobStage, FlowActionKey>> = {
   dodano_zakaznikovi: "delivery.record",
   fakturovano: "payment.invoice",
 };
+
+/** Sloupec „Ve výrobě": karty pod mezititulky podle aktuálního kroku („Tepelné zpracování (3)"), řazené podle termínu kroku. */
+export function productionGroups(jobs: JobListItem[]): { label: string | null; jobs: JobListItem[] }[] {
+  const map = new Map<string, JobListItem[]>();
+  for (const j of jobs) {
+    const step = j.productionStep ?? null;
+    const label = (j.productionStepTitle ?? "").trim()
+      || (step === "hotovo" ? "Výroba hotová" : isOperationKind(step) ? OPERATION_KINDS[step].label : "Chybí kdo a termín");
+    const list = map.get(label) ?? [];
+    list.push(j);
+    map.set(label, list);
+  }
+  const groups = [...map.entries()].map(([label, list]) => ({
+    label,
+    jobs: [...list].sort((a, b) => (a.productionDue ?? "9999").localeCompare(b.productionDue ?? "9999")),
+  }));
+  return groups.sort((a, b) => (a.jobs[0].productionDue ?? "9999").localeCompare(b.jobs[0].productionDue ?? "9999"));
+}
 
 export function JobBoard({
   jobs, stages, today, access,
@@ -120,7 +139,13 @@ export function JobBoard({
               <div className={cn("h-1 w-full", m.bar)} aria-hidden />
 
               <ul role="list" className="flex min-h-[8rem] flex-1 flex-col gap-2 p-2">
-                {shown.map((job) => (
+                {(col.stage === "ve_vyrobe" ? productionGroups(shown) : [{ label: null, jobs: shown }]).flatMap((g) => [
+                  ...(g.label ? [(
+                    <li key={`g:${g.label}`} className="px-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" data-testid="board-step-group">
+                      {g.label} ({g.jobs.length})
+                    </li>
+                  )] : []),
+                  ...g.jobs.map((job) => (
                   <BoardCard
                     key={job.id}
                     job={job}
@@ -139,7 +164,8 @@ export function JobBoard({
                     onStageChanged={(s) => setLocal((cur) => moveJobStage(cur, job.id, s))}
                     access={access ?? null}
                   />
-                ))}
+                  )),
+                ])}
                 {col.jobs.length > shown.length && (
                   <li className="px-2 py-1 text-center text-xs text-muted-foreground">
                     + {col.jobs.length - shown.length} dalších — zpřesni hledání
@@ -242,7 +268,7 @@ function BoardCard({
       <p className="truncate text-xs text-muted-foreground">{job.title || "Bez názvu"}</p>
       <CustomerDocNumber job={job} className="mt-1.5" />
       <RowStateChip job={job} view={view} shortFlag className="relative z-10 mt-1.5" />
-      <ProductionLine job={job} compact className="mt-2" />
+      <ProductionLine job={job} compact today={today} className="mt-2" />
       <div className="mt-2 flex items-end justify-between gap-2">
         <DeadlineBlock job={job} today={today} compact />
         <div className="flex flex-col items-end gap-0.5">

@@ -20,6 +20,7 @@ import {
 } from "@/lib/jobs/mapping";
 import type { FlowScope } from "@/lib/auth/flow-scope";
 import { fileLocks } from "@/lib/jobs/job-file-access";
+import { documentedQuantities, issuedNoteRefs } from "@/lib/jobs/delivery-notes-db";
 
 /**
  * Datová vrstva Knihy zakázek — čte servisním klíčem (obchází RLS),
@@ -231,7 +232,19 @@ export async function getJob(id: string): Promise<JobDetail | null> {
       },
       s.view,
     );
-    return { ...detail, files: await withLocks(s.db, detail.files, s.access) };
+    // dodané zboží bez dodacího listu (Doklady → „DL na dodané zboží") — jen u zakázky s dodávkou
+    const delivered = detail.items.some((i) => Number(i.deliveredQuantity ?? 0) > 0);
+    const [documented, notes] = await Promise.all([
+      delivered ? documentedQuantities(s.db, detail.id).catch(() => null) : Promise.resolve(new Map<string, number>()),
+      // čísla DL z delivery_notes (jediný zdroj čísla DL) — čip v hlavičce, přehled
+      issuedNoteRefs(s.db, detail.id).catch(() => undefined),
+    ]);
+    return {
+      ...detail,
+      files: await withLocks(s.db, detail.files, s.access),
+      deliveryDocumented: documented ? Object.fromEntries(documented) : null,
+      ...(notes ? { deliveryNotes: notes } : {}),
+    };
   } catch (err) {
     console.error(`[data:jobs:detail] ${err instanceof Error ? err.message : String(err)}`);
     return null;

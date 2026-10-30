@@ -284,7 +284,8 @@ await T("desktop — plná dávka: objednávka, výkres PNG, STEP, nabídka doda
   await page.goto(`${BASE}/orders/${jobId}`);
   await page.getByRole("tab", { name: /^Historie/ }).click();
   const hist = page.locator("main [role=tabpanel][data-state=active]");
-  await hist.getByText(USERS.admin.name).first().waitFor({ timeout: 15_000 });
+  // viditelný záznam (filtr „Kdo" má jméno i ve skryté <option> — s událostmi AI anonymizace je filtr vidět)
+  await hist.getByText(USERS.admin.name).locator("visible=true").first().waitFor({ timeout: 15_000 });
   expect((await hist.innerText()).includes(USERS.admin.name), "Historie ukazuje jméno účtu");
   await shot(page, "capture-multi/1-history");
   await page.close();

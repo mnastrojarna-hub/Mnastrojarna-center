@@ -4,7 +4,7 @@ import type { CommissionStatus, JobStage, PurchaseOrderStatus } from "@/lib/supa
 import type { PersonRef } from "@/lib/jobs/types";
 import type { ChangeStamp } from "@/lib/jobs/flow-status";
 
-export type SupplierQuoteSource = "manual" | "foto" | "email" | "ai";
+export type SupplierQuoteSource = "manual" | "foto" | "email" | "ai" | "telefon";
 
 /** Položka nabídky dodavatele i objednávky vydané (stejné sloupce v DB). */
 export interface PurchaseItem {
@@ -70,6 +70,8 @@ export interface SupplierQuoteView {
   items: PurchaseItem[];
   /** Kdo nabídku vybral jako vítěznou (selected_by/at plní DB trigger). */
   selectedStamp?: ChangeStamp | null;
+  /** Na co je nabídka (druhy kroků výroby; u focení / e-mailu předvyplní AI). */
+  operationKinds?: string[] | null;
 }
 
 /** Objednávka vydaná dodavateli (OV-2026-004). */
@@ -256,6 +258,8 @@ export interface SupplierQuoteInput {
   /** Celkem bez DPH; undefined/null = Σ množství × cena. */
   total?: number | null;
   source?: SupplierQuoteSource;
+  /** Na co je nabídka (druhy kroků výroby); undefined = beze změny, [] / null = neurčeno. */
+  operationKinds?: string[] | null;
 }
 
 /** Objednávka připravená k vystavení (to, co uživatel v dialogu potvrdí). */

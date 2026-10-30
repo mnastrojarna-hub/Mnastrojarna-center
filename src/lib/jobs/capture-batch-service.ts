@@ -53,6 +53,7 @@ import {
   selectWinningQuoteCore,
 } from "@/lib/jobs/purchasing-store";
 import { confirmDeliveryNoteCore, markJobPaidCore, setInvoiceInfoCore } from "@/lib/jobs/production-store";
+import { recordCapturedDeliveryNote } from "@/lib/jobs/delivery-notes-db";
 import { SPEC_ROW_SELECT, applySpecToDrawing, upsertDrawingFromCapture } from "@/lib/jobs/drawings-store";
 import { captureUuid, emptyDrawing } from "@/lib/jobs/capture-batch";
 import {
@@ -1697,6 +1698,14 @@ async function applyDoc(
         // dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi"; částečně = stav zůstává)
         const dl = await recordPhotoDelivery(db, user.id, jobId, doc.items, { documentNumber: number, extra: { captureId: session.captureId, docId: draft.id } });
         if (dl.recorded) summary.push(dl.complete ? "dodáno vše" : `dodáno částečně (${dl.lines.join("; ")})`);
+        // vyfocený náš DL → delivery_notes (jediný zdroj čísla DL; dodávka má svůj DL)
+        if (dl.shipped.length && fileIds[0]) {
+          const { data: fr } = await db.from("job_files").select("storage_path").eq("id", fileIds[0]).maybeSingle();
+          await recordCapturedDeliveryNote(db, jobId, {
+            number, storagePath: (fr as { storage_path: string | null } | null)?.storage_path ?? null,
+            issueDate: st.documentDate || doc.documentDate || null, lines: dl.shipped,
+          });
+        }
         if (dl.unmatched.length) warnings.push(`Na dodacím listu jsou položky, které zakázka nemá: ${dl.unmatched.slice(0, 5).join(", ")}.`);
         if (st.confirmDelivered) {
           const r = await confirmDeliveryNoteCore(db, user.id, jobId, { date: st.documentDate || undefined, fileId: fileIds[0], stage: false, extra: { captureId: session.captureId, docId: draft.id } });

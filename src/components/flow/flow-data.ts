@@ -1,7 +1,7 @@
 import type { EmailItem } from "@/lib/data/types";
 import type { JobDetail, JobFile, JobListItem, JobQuote } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
-import { quoteDisplayState, type QuoteFacts } from "@/lib/jobs/flow-status";
+import { canIssueInvoice, quoteDisplayState, type QuoteFacts } from "@/lib/jobs/flow-status";
 import { quoteStateFromStatus } from "@/lib/data/labels";
 import type { FileFlowInfo, FlowJobState, FlowQuoteInfo } from "./flow-state";
 import type { FlowEmail } from "./flow-mail-list";
@@ -202,13 +202,18 @@ export function toConfirmJob(j: JobDetail): ConfirmJob {
   };
 }
 
-export function toIssueJob(j: JobListItem): IssueJob {
+export function toIssueJob(j: JobListItem, invoicePdfJobs?: ReadonlySet<string>): IssueJob {
   return {
+    // vystavená faktura bez PDF (zapsaná mimo systém) → panel neslibuje „otevřeš nebo pošleš znovu"
+    ...(invoicePdfJobs ? { invoiceHasPdf: invoicePdfJobs.has(j.id) } : {}),
     id: j.id,
     number: j.number,
     title: j.title,
     customerName: j.customer?.name ?? null,
     stage: j.stage,
     hasQuote: j.quoteCount > 0,
+    // faktura: vystavená (poslat znovu v kartě) / jde vystavit (dodáno vše) — stejné pravidlo jako karta
+    invoiceNumber: (j.invoiceNumber ?? "").trim() || null,
+    invoiceable: j.flow ? canIssueInvoice({ ...j.flow, stage: j.stage }) : false,
   };
 }

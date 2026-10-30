@@ -1,6 +1,7 @@
 import { createJobFileUpload, registerJobFile } from "@/app/actions/job-files";
 import { createClient } from "@/lib/supabase/client";
 import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
+import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import type { JobFileKind } from "@/lib/supabase/database.types";
 import type { JobFile } from "@/lib/jobs/types";
 
@@ -141,6 +142,10 @@ export async function uploadJobFile(file: File, opts: UploadJobFileOptions): Pro
       replaceFileId: opts.replaceFileId,
     });
     if (!reg.ok || !reg.file) return { ok: false, error: reg.error ?? "Dokument se nepodařilo uložit." };
+    // výkres čeká na anonymizaci → hned spustit zpracování na serveru (route, ne server action; bez čekání)
+    if (reg.file.anon?.status === "pending" || reg.file.anon?.status === "processing") {
+      void nudgeAnonymize({ jobId: opts.jobId, fileIds: [reg.file.id] });
+    }
     return { ok: true, file: reg.file };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Nahrání selhalo." };

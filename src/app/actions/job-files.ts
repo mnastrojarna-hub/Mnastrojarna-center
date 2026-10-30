@@ -16,6 +16,7 @@ import {
 import type { DocIssuerKey, JobFileKind, JobFileOrigin } from "@/lib/supabase/database.types";
 import type { ActionResult, JobFile } from "@/lib/jobs/types";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
+import { kickInBackground } from "@/lib/anonymize/queue";
 
 /**
  * Dokumenty zakázky. Soubor jde z prohlížeče PŘÍMO do Supabase Storage
@@ -140,13 +141,17 @@ export async function registerJobFile(input: {
     return lock === "price" ? FILE_PRICE_VIEW : null;
   };
   // jádro (lib/jobs/job-files-store) — nové volby (vazba položky, relace focení) jen pro serverový kód
-  return registerJobFileCore(c.db, c.user.id, {
+  const res = await registerJobFileCore(c.db, c.user.id, {
     replaceBlock, dupOnlyOwn: true,
     jobId: input.jobId, path: input.path, filename: input.filename, mimeType: input.mimeType, size: input.size,
     kind: input.kind, title: input.title, quoteId: input.quoteId, note: input.note, replaceFileId: input.replaceFileId,
     aiExtracted: input.aiExtracted, aiConfidence: input.aiConfidence, silent: input.silent, noAutoVersion: input.noAutoVersion,
     origin: input.origin ?? null, issuer: input.issuer ?? null, orderRevision: input.orderRevision ?? null,
   });
+  // výkres čeká na anonymizaci: akce nevykresluje — prohlížeč hned volá /api/drawings/anonymize/process
+  // (upload-client), tohle je jen druhá šance (šťouchnutí po odpovědi), kdyby se prohlížeč zavřel
+  if (res.ok && res.file?.anon?.status === "pending") kickInBackground({ table: "job_files", ids: [res.file.id] });
+  return res;
 }
 
 export async function setJobFileArchived(fileId: string, archived: boolean): Promise<ActionResult> {

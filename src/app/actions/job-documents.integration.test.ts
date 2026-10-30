@@ -226,7 +226,13 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     const api = loadEnv().LOCAL_MAIL_API ?? "http://127.0.0.1:54324";
     const msg = await (await fetch(`${api}/messages/latest?to=${encodeURIComponent(MAIL_TO)}&wait=3000`)).json();
     expect(msg.subject).toBe(draft.subject);
-    expect(msg.attachments).toEqual([expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Potvrzeni_objednavky_POT-/) })]);
+    // PDF + logo grafického podpisu (Pošta D: podpis z návrhu → HTML s vloženým logem, jednou)
+    expect(msg.attachments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Potvrzeni_objednavky_POT-/) }),
+      expect.objectContaining({ contentType: "image/png", filename: "mnastrojarna-logo.png" }),
+    ]));
+    expect(msg.attachments).toHaveLength(2);
+    expect(String(msg.html).split('data-mn-signature="1"')).toHaveLength(2);
 
     const jj = await job();
     expect(jj.status).toBe("potvrzeno");
@@ -272,17 +278,28 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     expect((await d.generateJobDocument(jobId, "nabidka", { quoteId: "00000000-0000-0000-0000-000000000000" })).error).toBe("Nabídka k této zakázce nepatří.");
   }, 60_000);
 
-  it("dodací list: číslo z řady uložené k zakázce, opakované vystavení = stejné číslo, nová verze", async () => {
+  // A2 (sk. 2): DL bez dodávky už nevzniká — jediná cesta je „Zapsat dodání a dodací list" (delivery-notes /
+  // closing-flow integrační testy); dřív Doklady vystavily DL „na celou zakázku" s vlastním číslem
+  it("dodací list bez dodávky: odmítnuto s návodem, číslo z řady se nespotřebuje", async () => {
     const a = await d.generateJobDocument(jobId, "dodaci_list");
-    expect(a.ok, a.error).toBe(true);
-    expect(a.number).toMatch(/^DL-\d{4}-\d{3,}$/);
-    expect((await job()).delivery_note_number).toBe(a.number);
-    const b = await d.generateJobDocument(jobId, "dodaci_list");
-    expect(b.number).toBe(a.number);
-    expect(b.version).toBe(2);
+    expect(a.ok).toBe(false);
+    expect(a.code).toBe("delivery");
+    expect(a.error).toMatch(/Zapsat dodání a dodací list/);
+    expect((await job()).delivery_note_number).toBeNull();
+    const { data: files } = await db.from("job_files").select("id").eq("job_id", jobId).eq("kind", "dodaci_list");
+    expect(files ?? []).toHaveLength(0);
   }, 60_000);
 
   it("faktura: číslo FV, evidence faktur s DPH, archiv dokladů, stav Vyfakturováno, e-mail se splatností", async () => {
+    // review A2 #2: bez dodání faktura nevznikne (dřív Potvrzeno → Vyfakturováno bez jediného dodaného kusu)
+    const early = await d.generateJobDocument(jobId, "faktura");
+    expect(early).toMatchObject({ ok: false, code: "delivery" });
+    expect((await job()).invoice_number).toBeNull();
+    const { data: its } = await db.from("order_items").select("id, quantity").eq("order_id", jobId);
+    for (const it of (its ?? []) as { id: string; quantity: number }[]) {
+      const { error } = await db.from("order_items").update({ delivered_quantity: it.quantity }).eq("id", it.id);
+      expect(error).toBeNull();
+    }
     const res = await d.generateJobDocument(jobId, "faktura");
     expect(res.ok, res.error).toBe(true);
     expect(res.number).toMatch(/^FV-\d{4}-\d{3,}$/);
