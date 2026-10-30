@@ -70,7 +70,7 @@ const PRESET_LABEL: Record<PresetId, string> = {
   other: "Jiný poskytovatel (IMAP / POP3)",
 };
 
-type TlsChoice = "" | "tls" | "starttls";
+type TlsChoice = "" | "tls" | "starttls" | "none";
 
 export interface FormState {
   preset: PresetId;
@@ -164,7 +164,7 @@ function formToConfig(f: FormState): MailboxConfig {
     incoming_protocol: f.incoming_protocol,
     imap_host: f.imap_host,
     imap_port: port(f.imap_port),
-    imap_tls: f.imap_tls || undefined,
+    imap_tls: f.imap_tls === "none" ? undefined : f.imap_tls || undefined, // příchozí vždy šifrovaně
     imap_user: f.imap_user || f.email,
     imap_skip_name_check: f.imap_skip_name_check || undefined,
     smtp_host: f.smtp_host,
@@ -177,15 +177,21 @@ function formToConfig(f: FormState): MailboxConfig {
   };
 }
 
-function formSecrets(f: FormState, isNew: boolean) {
+/**
+ * Hesla k uložení / testu. „SMTP má jiné heslo než schránka":
+ *  - odškrtnuté → uložené vlastní SMTP heslo se smaže (SMTP použije heslo schránky),
+ *  - zaškrtnuté bez zadání → uložené SMTP heslo zůstane i při změně hesla schránky.
+ */
+export function formSecrets(f: FormState, isNew: boolean) {
   return {
     imap_password: (isNew || f.changePassword) && f.password ? f.password : undefined,
     smtp_password: f.separateSmtpPassword && f.smtpPassword ? f.smtpPassword : undefined,
     ms_graph_client_secret: (isNew || f.changeGraphSecret) && f.graphSecret ? f.graphSecret : undefined,
+    ...(f.separateSmtpPassword ? { keep_smtp_password: true } : { clear_smtp_password: true }),
   };
 }
 
-function mailboxToForm(m: Mailbox): FormState {
+export function mailboxToForm(m: Mailbox): FormState {
   const c = m.config ?? {};
   const preset = presetOf(m.provider, c);
   return {
@@ -206,6 +212,8 @@ function mailboxToForm(m: Mailbox): FormState {
     smtp_skip_name_check: c.smtp_skip_name_check === true,
     ms_graph_client_id: String(c.ms_graph_client_id ?? ""),
     ms_graph_tenant_id: String(c.ms_graph_tenant_id ?? ""),
+    // uložené vlastní SMTP heslo musí být vidět (dřív zaškrtávátko vždy prázdné → zastaralé heslo nešlo smazat)
+    separateSmtpPassword: m.secrets_set?.smtp_separate === true,
     changePassword: false,
     changeGraphSecret: false,
   };
@@ -263,6 +271,7 @@ function DiagView({ title, result }: { title: string; result: DiagResult }) {
         ))}
       </ol>
       {!result.ok && result.error && <p className="break-words text-sm text-destructive" data-testid="diag-error">{result.error}</p>}
+      {result.note && <p className="break-words text-xs text-amber-700 dark:text-amber-400" data-testid="diag-note">{result.note}</p>}
     </div>
   );
 }
@@ -411,6 +420,7 @@ function MailboxForm({
         protocol: advanced ? form.incoming_protocol : undefined,
         smtpHost: advanced ? form.smtp_host : undefined,
         smtpPort: advanced && form.smtp_port ? Number(form.smtp_port) : undefined,
+        smtpTls: advanced && form.smtp_tls ? form.smtp_tls : undefined,
         preset: form.preset,
         allowNameMismatch,
       });
@@ -656,18 +666,30 @@ function MailboxForm({
                       <option value="">podle portu</option>
                       <option value="tls">{TLS_LABEL.tls}</option>
                       <option value="starttls">{TLS_LABEL.starttls}</option>
+                      <option value="none">Žádné (jako Outlook)</option>
                     </select>
                   </Field>
                   <Field label="Uživatel (výchozí = jako příchozí)" className="sm:col-span-6">
                     <Input value={form.smtp_user} onChange={set("smtp_user")} placeholder={form.imap_user || form.email || "jmeno@nastrojarstvi.com"} aria-label="Uživatel odchozího serveru" />
                   </Field>
                 </div>
+                {form.smtp_tls === "none" && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="smtp-tls-none-note">
+                    Bez SSL jako v Outlooku („Žádné“): šifrování STARTTLS se použije, jen když ho server nabídne. Bezpečnější je {HOSTING90_SMTP_HOST} port 465 (SSL/TLS).
+                  </p>
+                )}
                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input type="checkbox" checked={form.separateSmtpPassword} onChange={set("separateSmtpPassword")} />
+                  <input type="checkbox" checked={form.separateSmtpPassword} onChange={set("separateSmtpPassword")} data-testid="smtp-separate" />
                   SMTP má jiné heslo než schránka
+                  {stored?.smtp_separate && <Badge variant="muted" data-testid="smtp-password-stored"><KeyRound className="h-3 w-3" /> vlastní SMTP heslo uloženo</Badge>}
                 </label>
                 {form.separateSmtpPassword && (
-                  <Input type="password" value={form.smtpPassword} onChange={set("smtpPassword")} placeholder="Heslo pro SMTP" aria-label="Heslo SMTP" autoComplete="new-password" />
+                  <Input type="password" value={form.smtpPassword} onChange={set("smtpPassword")} placeholder={stored?.smtp_separate ? "Heslo pro SMTP (prázdné = ponechat uložené)" : "Heslo pro SMTP"} aria-label="Heslo SMTP" autoComplete="new-password" />
+                )}
+                {!form.separateSmtpPassword && stored?.smtp_separate && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="smtp-password-clear-note">
+                    Po uložení se uložené vlastní SMTP heslo smaže — odesílání použije heslo schránky.
+                  </p>
                 )}
                 {form.smtp_skip_name_check && (
                   <label className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">

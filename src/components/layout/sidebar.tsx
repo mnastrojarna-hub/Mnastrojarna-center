@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { activeNavHref, matchesNavPath, navForFeatures } from "@/lib/nav";
 import type { Feature } from "@/lib/auth/permissions";
@@ -89,11 +90,21 @@ export function Sidebar({
       </nav>
 
       {userName && (
-        <div className="border-t p-3">
-          <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs">
-            <div className="truncate font-medium text-foreground">{userName}</div>
-            {roleLabel && <div className="text-muted-foreground">{roleLabel}</div>}
-          </div>
+        // pb-11: na desktopu přes spodek obrazovky leží lišta Debug (fixed, ~36 px) — jinak by odkaz zakryla
+        <div className="border-t px-3 pb-11 pt-3">
+          {/* Můj účet (heslo, schránka) — klik na jméno, ne jen menu pod avatarem */}
+          <Link
+            href="/account"
+            title="Můj účet — heslo, e-mailová schránka, podpis"
+            data-testid="sidebar-account"
+            className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-xs transition-colors hover:bg-accent"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium text-foreground">{userName}</span>
+              {roleLabel && <span className="block text-muted-foreground">{roleLabel}</span>}
+            </span>
+            <Settings className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
         </div>
       )}
     </aside>

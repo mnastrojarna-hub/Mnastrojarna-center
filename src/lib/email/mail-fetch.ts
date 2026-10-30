@@ -2,7 +2,7 @@ import "server-only";
 import type { ImapFlow, MailboxObject } from "imapflow";
 import { parseEmailFile } from "@/lib/email/parse";
 import { connectWithFallback, imapLogin, pop3Login, type Credentials, type NetOptions } from "@/lib/email/mail-connect";
-import type { MailEndpoint, ResolvedEndpoint } from "@/lib/email/mail-config";
+import type { IncomingEndpoint, MailEndpoint, ResolvedEndpoint } from "@/lib/email/mail-config";
 import type { Pop3Client } from "@/lib/email/pop3";
 import type { RawEmail } from "@/lib/email/ingest";
 import { attachmentsFromStructure, listAttachments, readHeaders, type BodyStructureNode } from "@/lib/email/mime-parts";
@@ -57,7 +57,7 @@ export interface FetchBatch {
 
 export interface FetchSummary {
   state: MailSyncState;
-  endpoint: MailEndpoint;
+  endpoint: IncomingEndpoint;
   /** Uložený server nefungoval, pomohl ověřený server poskytovatele → uložit do schránky. */
   healed: boolean;
   /** Zpráv na serveru (INBOX + Odeslané). */
@@ -420,7 +420,7 @@ export async function fetchIncoming(
   state: MailSyncState,
   limit: number,
   opts: NetOptions & { budgetMs?: number } = {},
-): Promise<FetchBatch & { endpoint: MailEndpoint; healed: boolean }> {
+): Promise<FetchBatch & { endpoint: IncomingEndpoint; healed: boolean }> {
   const connect = async (ep: MailEndpoint, auth: Credentials) => {
     if (ep.protocol === "pop3") {
       const { client } = await pop3Login(ep, auth, { ...opts, keepOpen: true });

@@ -37,6 +37,10 @@ describe("#25 navigace podle role", () => {
     expect(worker).not.toContain("/commissions");
   });
 
+  it("Můj účet (heslo, vlastní schránka) mají v menu všichni — i obchodník a zaměstnanec", () => {
+    for (const role of ["super_admin", "obchodnik", "zamestnanec"] as const) expect(hrefsOf(role)).toContain("/account");
+  });
+
   it("neaktivní účet nevidí nic", () => {
     expect(navForFeatures(allowedFeatures({ role: "super_admin", aiAccess: true, active: false }, ctx))).toEqual([]);
   });

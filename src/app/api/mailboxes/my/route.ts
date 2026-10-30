@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 /**
  * Moje e-mailová schránka (každý uživatel s poštou, jen svou vlastní — owner_id = já):
  *   GET → moje schránky (bez hesel)
- *   POST { action: "detect", email, password?, mailboxId?, preset?, host?, smtpHost? } → najít nastavení (IMAP/POP3 + SMTP)
+ *   POST { action: "detect", email, password?, mailboxId?, preset?, host?, smtpHost?, smtpPort?, smtpTls? } → najít nastavení (IMAP/POP3 + SMTP)
  *   POST { action: "save", mailboxId?, email, displayName?, password?, smtpPassword?, config } → uložit
  *   POST { action: "test", mailboxId } → test příjmu i odesílání (spojení + přihlášení)
  *   POST { action: "testSend", mailboxId } → zkušební e-mail na vlastní adresu (+ kopie do Odeslaných)
@@ -43,7 +43,8 @@ export async function POST(req: Request) {
       case "detect": {
         const r = await detectMine(uid, {
           mailboxId, email: str("email") ?? "", password: str("password"), preset: str("preset"), host: str("host"),
-          smtpHost: str("smtpHost"), user: str("user"), allowNameMismatch: body.allowNameMismatch === true,
+          smtpHost: str("smtpHost"), smtpPort: Number(body.smtpPort) || undefined, smtpTls: str("smtpTls"),
+          user: str("user"), allowNameMismatch: body.allowNameMismatch === true,
         });
         await logAudit({
           action: "mailbox_detect", entity: "mailboxes", entityId: mailboxId ?? undefined,
