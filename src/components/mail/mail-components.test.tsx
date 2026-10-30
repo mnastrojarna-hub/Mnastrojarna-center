@@ -19,7 +19,6 @@ import { ThreadRow } from "./thread-row";
 import { ThreadView } from "./thread-view";
 import { initialBody } from "./compose-dialog";
 import { MyMailboxCard } from "./my-mailbox-card";
-import { SignatureForm } from "./signature-form";
 import { RecipientField } from "./recipient-field";
 import { shouldContinue } from "./use-mail-sync";
 import type { ThreadMessage, ThreadSummary } from "@/lib/email/mail-types";
@@ -52,6 +51,17 @@ describe("řádek vlákna", () => {
     expect(h).toContain('aria-label="Odeslané"');
     expect(h).toContain('aria-label="Označit vlaječkou"');
     expect(h).toContain('data-unread="0"');
+  });
+  it("kategorie: štítek u přijaté i odeslané; s onCategory jde opravit ťuknutím (tlačítko mimo tlačítko řádku)", () => {
+    const plain = html(<ThreadRow t={t} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} />);
+    expect(plain).toContain('data-testid="category-pill"');
+    expect(plain).toContain("Poptávka");
+    const out = html(<ThreadRow t={{ ...t, direction: "out", category: "Objednávka" }} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} onCategory={() => {}} />);
+    expect(out).toContain('data-testid="category-picker"');
+    expect(out).toContain('aria-label="Kategorie: Objednávka. Změnit"');
+    // štítek není uvnitř tlačítka, které otevírá vlákno (vnořené tlačítko = neplatné HTML)
+    const openButton = /<button[^>]*aria-current[^>]*>[\s\S]*?<\/button>|<button type="button" class="block w-full[\s\S]*?<\/button>/.exec(out)?.[0] ?? "";
+    expect(openButton).not.toContain("category-picker");
   });
 });
 
@@ -114,9 +124,6 @@ describe("Moje e-mailová schránka", () => {
     expect(h).not.toMatch(/password|heslo:/i);
     const noSmtp = html(<MyMailboxCard initial={[{ ...box, smtp: null, canSend: false }]} isAdmin={false} />);
     expect(noSmtp).toContain("Odesílání: nenastaveno — doplň v Upravit");
-  });
-  it("podpis", () => {
-    expect(html(<SignatureForm initial="Jan" />)).toContain("Uložit podpis");
   });
 });
 

@@ -7,7 +7,7 @@ import { replyHeaders, replySubject } from "@/lib/email/threading";
 import { recordCorrection } from "@/app/actions/corrections";
 import { logAudit } from "@/lib/audit";
 import { OUTBOUND_APPROVAL_TYPES } from "@/lib/data/types";
-import type { ApprovalType } from "@/lib/supabase/database.types";
+import type { ApprovalType, EmailCategory } from "@/lib/supabase/database.types";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { approveJobQuote } from "@/app/actions/jobs";
@@ -111,12 +111,15 @@ export async function resolveApproval(
         // Stejná cesta jako odpověď z Přijaté pošty (pickSmtpMailbox): vlastní schránka schvalujícího
         // (u odpovědi přednostně ta, kam e-mail přišel) → firemní schránka, kam e-mail přišel → firemní
         // → globální SMTP; nikdy osobní schránka kolegy. Odpověď nese In-Reply-To / References (vlákno).
-        type ReplySource = { mailbox_id: string | null; message_id: string | null; message_refs: string[] | null; subject: string | null; order_id: string | null; customer_id: string | null; supplier_id: string | null; thread_id: string | null };
+        type ReplySource = {
+          mailbox_id: string | null; message_id: string | null; message_refs: string[] | null; subject: string | null; order_id: string | null;
+          customer_id: string | null; supplier_id: string | null; thread_id: string | null; category: EmailCategory | null;
+        };
         let reply: ReplySource | null = null;
         if (row.email_id) {
           const { data: em } = await supabase
             .from("emails")
-            .select("mailbox_id, message_id, message_refs, subject, order_id, customer_id, supplier_id, thread_id" as "*")
+            .select("mailbox_id, message_id, message_refs, subject, order_id, customer_id, supplier_id, thread_id, category" as "*")
             .eq("id", row.email_id)
             .maybeSingle();
           reply = (em as unknown as ReplySource | null) ?? null;
@@ -133,6 +136,9 @@ export async function resolveApproval(
           jobId: reply?.order_id ?? row.order_id ?? undefined,
           customerId: reply?.customer_id ?? null,
           supplierId: reply?.supplier_id ?? null,
+          // text připravila AI bez podpisu → podpis schvalujícího s logem (pozdrav z AI pryč, jen jednou)
+          signature: { userId: auth.user.id, mode: "append" },
+          category: reply?.category && reply.category !== "spam" && reply.category !== "ostatni" ? reply.category : undefined,
         });
         if (!res.sent) {
           return { ok: false, error: res.reason ?? "Odeslání selhalo." };

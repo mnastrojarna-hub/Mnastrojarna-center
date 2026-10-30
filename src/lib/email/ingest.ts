@@ -17,7 +17,7 @@ import {
 import {
   isAiSwitchOn, filterMailboxesForSync, allowGlobalFallback, isDbEmailCategory, isPriorityLevel,
 } from "@/lib/email/visibility";
-import { ruleCategorize } from "@/lib/email/mail-rules";
+import { outgoingCategory, ruleCategorize } from "@/lib/email/mail-rules";
 import { decodePart, mimeLeaves, isAttachmentLeaf, type AttachmentMeta } from "@/lib/email/mime-parts";
 import { replyHeaders, replySubject } from "@/lib/email/threading";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -403,7 +403,10 @@ export async function ingestEmailsProgress(
       }
     }
     const rule = direction === "in" && !analysis ? ruleCategorize({ fromEmail: e.fromEmail, fromName: e.fromName, subject: e.subject, body: e.body, headers: e.headers }) : null;
-    const category = analysis && isDbEmailCategory(analysis.category) ? analysis.category : rule?.category ?? "ostatni";
+    // odeslaná pošta ze serveru (složka Odeslané): kategorie podle předmětu, jako u odeslání z aplikace
+    const category = analysis && isDbEmailCategory(analysis.category)
+      ? analysis.category
+      : rule?.category ?? (direction === "out" ? outgoingCategory({ subject: e.subject }) : "ostatni");
     const isSpam = direction === "in" && Boolean(analysis ? analysis.is_spam || category === "spam" : rule?.isSpam);
     const party = direction === "out" ? (e.toEmail ?? "").split(",")[0]?.trim() ?? "" : e.fromEmail;
     const customerId = matchPartyByEmail(party, customers);
@@ -485,6 +488,9 @@ export async function ingestEmailsProgress(
           references: h.references,
           customerId: customerId ?? null,
           supplierId: supplierId ?? null,
+          // návrh AI je bez podpisu → podpis vlastníka schránky s logem (firemní schránka bez vlastníka: jen text)
+          signature: opts.ownerId ? { userId: opts.ownerId, mode: "append" } : null,
+          category: isSpam ? undefined : category,
         });
         sentAuto = res.sent;
       }

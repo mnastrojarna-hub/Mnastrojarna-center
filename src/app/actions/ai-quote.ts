@@ -155,6 +155,9 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
         text: input.coverEmail,
         from: { ownerId: auth.user.id }, // ze schránky obchodníka, který nabídku vytvořil
         senderId: auth.user.id,
+        // průvodní text napsala AI bez podpisu → podpis obchodníka s logem
+        signature: { userId: auth.user.id, mode: "append" },
+        category: "poptavka",
       });
       sent = res.sent;
       sentReason = res.reason;

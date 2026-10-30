@@ -65,30 +65,44 @@ export async function setEmailCategory(
   try {
     const found = await getVisibleEmailRow<{
       id: string; category: EmailCategory | null; ai_confidence: number | null; subject: string | null; from_email: string | null;
-    }>(emailId, "id, category, ai_confidence, subject, from_email");
+      to_email: string | null; direction: string | null;
+    }>(emailId, "id, category, ai_confidence, subject, from_email, to_email, direction");
     if (!found) return fail(NOT_FOUND);
     const prev = found.row.category;
     if (prev === category && !note?.trim()) return { ok: true };
+    const out = found.row.direction === "out";
+    if (out && category === "spam") return fail("Odeslaná zpráva nemůže být spam.");
     const db = await createOperatorClient();
-    const { error } = await db
+    // ručně zvolená kategorie: kdo a kdy (Pošta D); AI ji pak už nepřetřídí (ai_pending pryč)
+    const patch = { category, is_spam: category === "spam", ai_pending: false };
+    let { error } = await db
       .from("emails")
-      .update({ category, is_spam: category === "spam" } as never)
+      .update({ ...patch, category_set_by: access.user.id, category_set_at: new Date().toISOString() } as never)
       .eq("id", emailId);
+    if (error && /category_set_(by|at)/.test(error.message)) {
+      // DB bez migrace 20261030110000 — uložit aspoň kategorii
+      ({ error } = await db.from("emails").update(patch as never).eq("id", emailId));
+    }
     if (error) return fail(error.message);
 
-    // AI se učí z ruční opravy (jen když kategorii předtím určila AI, nebo je k ní pravidlo)
-    if ((found.row.ai_confidence !== null && prev !== category) || note?.trim()) {
+    // Učení: každá ruční oprava (přijaté i odeslané) jde do korekcí AI třídění pošty — AI je dostává
+    // v promptu jako „naučené korekce" (lib/ai/corrections) a stejnou chybu příště neudělá
+    if (prev !== category || note?.trim()) {
       await db.from("ai_corrections").insert({
         agent_key: "email",
         field: "category",
-        context: `Předmět: ${(found.row.subject ?? "").slice(0, 300)} (od ${found.row.from_email ?? "?"})`,
+        context: `${out ? "Odeslaný" : "Přijatý"} e-mail — Předmět: ${(found.row.subject ?? "").slice(0, 300)} (${out ? `komu ${found.row.to_email ?? "?"}` : `od ${found.row.from_email ?? "?"}`})`,
         ai_value: prev ? emailCategoryLabel[prev] : null,
         corrected_value: emailCategoryLabel[category],
         note: note?.trim().slice(0, 1000) || null,
         created_by: access.user.id,
       } as never);
     }
-    await logAudit({ action: "email_category_set", entity: "emails", entityId: emailId, diff: { from: prev, to: category } });
+    await logAudit({
+      action: "email_category_set", entity: "emails", entityId: emailId,
+      diff: { from: prev, to: category, direction: out ? "out" : "in", ...(found.row.ai_confidence !== null ? { ai: true } : {}) },
+      actor: userActor(access.user),
+    });
     revalidatePath("/inbox");
     return { ok: true };
   } catch (err) {

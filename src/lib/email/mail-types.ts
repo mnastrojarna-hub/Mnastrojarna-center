@@ -161,6 +161,8 @@ export interface ThreadMessage {
   sentCopy?: "ok" | "failed" | "skipped" | null;
   sentCopyError?: string | null;
   senderName?: string | null;
+  /** Odeslaná zpráva s grafickým podpisem: HTML, jak odešla (náhled v izolovaném rámu). */
+  signedHtml?: string;
 }
 
 export interface ThreadShare {

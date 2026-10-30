@@ -275,7 +275,13 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     const api = loadEnv().LOCAL_MAIL_API ?? "http://127.0.0.1:54324";
     const msg = await (await fetch(`${api}/messages/latest?to=${encodeURIComponent(MAIL_TO)}&wait=3000`)).json();
     expect(msg.subject).toBe(m.subject);
-    expect(msg.attachments).toEqual([expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Objednavka_OV-/) })]);
+    // PDF + logo grafického podpisu (Pošta D: podpis z návrhu → HTML s vloženým logem, jednou)
+    expect(msg.attachments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Objednavka_OV-/) }),
+      expect.objectContaining({ contentType: "image/png", filename: "mnastrojarna-logo.png" }),
+    ]));
+    expect(msg.attachments).toHaveLength(2);
+    expect(String(msg.html).split('data-mn-signature="1"')).toHaveLength(2);
 
     const { data: po } = await db.from("purchase_orders").select("status, sent_at").eq("id", poId).single();
     expect(po!.status).toBe("odeslana");

@@ -8,10 +8,11 @@ import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import { getVisibleEmailRow } from "@/lib/data/mail";
 import { describeSender, sendMail, type OutgoingAttachment } from "@/lib/email/send";
+import { outgoingSignature } from "@/lib/email/signature-server";
 import { loadEmailAttachment, MAX_ATTACHMENT_BYTES } from "@/lib/email/attachments";
 import { replyHeaders, splitAddresses } from "@/lib/email/threading";
 import { sentCopyLabel } from "@/lib/email/mail-folders";
-import { isUuidLike } from "@/lib/email/visibility";
+import { isDbEmailCategory, isUuidLike } from "@/lib/email/visibility";
 import { assertJobFileAccess, fileLocks } from "@/lib/jobs/job-file-access";
 import type { JobsDb } from "@/lib/jobs/events";
 
@@ -90,16 +91,18 @@ export async function composeContextAction(input: { sourceEmailId?: string | nul
       jobId = jobId ?? found.row.order_id;
     }
   }
-  const [sender, profile] = await Promise.all([
-    describeSender({ ownerId: access.user.id, replyMailboxId }),
-    c.from("profiles").select("mail_signature").eq("id", access.user.id).maybeSingle(),
-  ]);
+  const sender = await describeSender({ ownerId: access.user.id, replyMailboxId });
+  // podpis schránky, ze které zpráva odejde (Pošta → Nastavení pošty); při odeslání se z textu
+  // stane grafický podpis s logem (sendMail signature inline) — v okně psaní jde upravit i smazat
+  const signature = await outgoingSignature({ userId: access.user.id, mailboxEmail: sender.ok ? sender.from : null })
+    .then((s) => s.text.trim())
+    .catch(() => "");
   const jobFiles = jobId ? await jobFilesFor(c, jobId) : [];
   return {
     ok: true,
     from: sender.ok ? sender.from : undefined,
     fromError: sender.ok ? undefined : sender.reason,
-    signature: ((profile.data as { mail_signature: string | null } | null)?.mail_signature ?? "").trim(),
+    signature,
     jobId,
     jobFiles,
   };
@@ -209,11 +212,11 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
   // původní zpráva (odpověď / přeposlání) — jen viditelná
   type Source = {
     id: string; mailbox_id: string | null; message_id: string | null; message_refs: string[] | null; subject: string | null;
-    order_id: string | null; customer_id: string | null; supplier_id: string | null; thread_id: string | null;
+    order_id: string | null; customer_id: string | null; supplier_id: string | null; thread_id: string | null; category: string | null;
   };
   let source: Source | null = null;
   if (input.mode !== "new" && input.sourceEmailId) {
-    const found = await getVisibleEmailRow<Source>(input.sourceEmailId, "id, message_id, message_refs, subject, order_id, customer_id, supplier_id, thread_id");
+    const found = await getVisibleEmailRow<Source>(input.sourceEmailId, "id, message_id, message_refs, subject, order_id, customer_id, supplier_id, thread_id, category");
     if (!found) return { ok: false, error: "Původní e-mail nenalezen (nebo k němu nemáš přístup)." };
     source = found.row;
   }
@@ -277,6 +280,11 @@ export async function sendComposedAction(input: SendComposedInput): Promise<Send
     jobId: jobId ?? undefined,
     customerId: source?.customer_id ?? null,
     supplierId: source?.supplier_id ?? null,
+    // podpis vložilo okno psaní (uživatel ho mohl upravit / smazat) → jen převést na grafický, nepřidávat
+    signature: { userId: access.user.id, mode: "inline" },
+    // odpověď / přeposlání: kategorie zprávy, na kterou odpovídám (jinak podle předmětu)
+    category: source && input.mode !== "forward" && isDbEmailCategory(source.category) && source.category !== "spam" && source.category !== "ostatni"
+      ? source.category : undefined,
   });
   if (!res.sent) return { ok: false, error: res.reason ?? "Odeslání selhalo." };
 

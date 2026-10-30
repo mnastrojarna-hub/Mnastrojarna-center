@@ -172,6 +172,8 @@ async function defaultSender(): Promise<Sender> {
   return async (a) => sendMail({
     to: a.to, cc: a.cc, subject: a.subject, text: a.text, html: a.html, attachments: a.attachments,
     from: a.ownerId ? { ownerId: a.ownerId } : { system: true }, jobId: a.jobId ?? undefined, senderId: a.ownerId ?? undefined,
+    // text z dialogu (objednávka / výkresy) nese podpis autora → grafický s logem
+    signature: a.ownerId ? { userId: a.ownerId, mode: "inline" } : null,
   });
 }
 

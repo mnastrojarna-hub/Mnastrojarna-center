@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Inbox,
-  Send,
   Users,
   Factory,
   FileBox,
@@ -60,6 +59,8 @@ export const navSections: NavSection[] = [
         description: "Všechny zakázky na jednom místě — stav, termíny, doklady",
         color: "text-primary", primary: true,
       },
+      // jedna položka Pošta (beta 29. 10.): Přijaté / Odeslané / K zakázkám … jsou složky uvnitř; /sent → složka Odeslané
+      { title: "Pošta", href: "/inbox", icon: Inbox, feature: "mail", badgeKey: "inbox", description: "Přijatá i odeslaná pošta ve vláknech", color: "text-blue-500" },
     ],
   },
   {
@@ -76,13 +77,6 @@ export const navSections: NavSection[] = [
       { title: "Faktury dodavatelů", href: "/supplier-invoices", icon: Receipt, feature: "supplier_invoices", color: "text-emerald-600", description: "Přijaté faktury, rozdělení na zakázky, zaplaceno" },
       { title: "Nahrát fakturu", href: "/supplier-invoices/upload", icon: FileUp, feature: "supplier_invoices_upload", hideWith: "supplier_invoices", color: "text-emerald-600", description: "Vyfoť nebo nahraj fakturu od dodavatele" },
       { title: "Dokumenty", href: "/documents", icon: ReceiptText, feature: "documents", description: "Faktury, nabídky, dodací listy, výkresy", color: "text-emerald-500" },
-    ],
-  },
-  {
-    label: "Pošta",
-    items: [
-      { title: "Přijatá pošta", href: "/inbox", icon: Inbox, feature: "mail", badgeKey: "inbox", description: "Tvoje schránka", color: "text-blue-500" },
-      { title: "Odeslaná pošta", href: "/sent", icon: Send, feature: "mail", description: "Co odešlo ven", color: "text-cyan-500" },
     ],
   },
   {
@@ -129,11 +123,16 @@ export function matchesNavPath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/** Stránky bez vlastní položky menu → položka, pod kterou patří (archiv /sent = Pošta). */
+const NAV_ALIASES: Record<string, string> = { "/sent": "/inbox" };
+
 /** Aktivní položka = nejdelší shoda (na /settings/audit svítí Audit, ne Nastavení). */
 export function activeNavHref(pathname: string, hrefs: readonly string[]): string | null {
+  const alias = Object.entries(NAV_ALIASES).find(([from]) => matchesNavPath(pathname, from))?.[1];
+  const path = alias && hrefs.includes(alias) ? alias : pathname;
   let best: string | null = null;
   for (const href of hrefs) {
-    if (matchesNavPath(pathname, href) && (!best || href.length > best.length)) best = href;
+    if (matchesNavPath(path, href) && (!best || href.length > best.length)) best = href;
   }
   return best;
 }

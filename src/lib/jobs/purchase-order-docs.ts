@@ -3,7 +3,7 @@ import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import { getSetting } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
-import { sendMail, type SmtpPreference } from "@/lib/email/send";
+import { sendMail, senderSignatureText, type SmtpPreference } from "@/lib/email/send";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { cleanText, isUuid, jobFilePath, one, personRef, type PersonEmbed } from "@/lib/jobs/mapping";
@@ -220,7 +220,11 @@ export async function purchaseOrderMailFor(
   extra: { previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null } = {},
 ): Promise<PurchaseOrderMail & { attachmentName: string }> {
   await refreshCompanyFromSettings();
-  const me = signerId ? await fetchProfileContact(db, signerId) : { name: null, email: null, phone: null };
+  const [me, signatureText] = await Promise.all([
+    signerId ? fetchProfileContact(db, signerId) : Promise.resolve({ name: null, email: null, phone: null }),
+    // podpis podepisujícího z Nastavení pošty (při odeslání z jeho schránky → grafický s logem)
+    senderSignatureText(signerId, { ownerId: signerId ?? "" }),
+  ]);
   const sender = {
     number: po.number,
     companyName: COMPANY.name,
@@ -228,6 +232,7 @@ export async function purchaseOrderMailFor(
     senderEmail: me.email ?? extra.fallbackEmail ?? null,
     senderPhone: me.phone ?? COMPANY.phone,
     companyWeb: COMPANY.web,
+    signatureText,
   };
   const mail = kind === "change"
     ? purchaseOrderChangeEmail({ ...sender, revision: Math.max(2, po.revision ?? 2), requiredDate: po.requiredDate, previousRequiredDate: extra.previousRequiredDate, reason: extra.reason })
@@ -319,6 +324,9 @@ export async function sendPurchaseOrderCore(
     from: opts.from,
     jobId: po.jobId,
     senderId: sender.id,
+    // podpis vlastníka schránky (podepisující návrhu) je v textu → grafický s logem; systém bez podpisu
+    signature: "ownerId" in opts.from && opts.from.ownerId ? { userId: opts.from.ownerId, mode: "inline" } : null,
+    category: "objednavka",
   });
   if (!res.sent) return { ok: false, error: res.reason ?? "E-mail se nepodařilo odeslat." };
 

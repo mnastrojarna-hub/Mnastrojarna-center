@@ -90,6 +90,11 @@ export interface DocumentEmailInput {
   filename?: string | null;
   sender: { name?: string | null; position?: string | null; phone?: string | null; email?: string | null };
   company: { name: string; web?: string | null; phone?: string | null; email?: string | null };
+  /**
+   * Text podpisu odesílatele (Pošta → Nastavení pošty, včetně pozdravu) — při odeslání se z něj stane
+   * grafický podpis s logem. Prázdný / bez zadání = jednoduchý textový podpis z `sender` a `company`.
+   */
+  signatureText?: string | null;
 }
 
 function t(v?: string | null): string {
@@ -229,7 +234,7 @@ export function documentEmailBody(d: DocumentEmailInput): string {
     "",
     outro,
     "",
-    documentEmailSignature(d),
+    t(d.signatureText) || documentEmailSignature(d),
   ].join("\n");
 }
 

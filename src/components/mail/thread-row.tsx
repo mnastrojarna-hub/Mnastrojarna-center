@@ -3,7 +3,8 @@
 import * as React from "react";
 import { Flag, Paperclip, FolderOpen, Building2, MessageSquareText, Sparkles, Send, Check, X, HelpCircle } from "lucide-react";
 import { PrioritySelect, type PriorityValue } from "@/components/priority";
-import { CategoryPill } from "@/components/mail/category-editor";
+import { CategoryPicker, CategoryPill } from "@/components/mail/category-editor";
+import type { EmailCategory } from "@/lib/data/types";
 import { AiConfidence } from "@/components/ai-confidence";
 import { categoryStyle, neutralWhileAsking } from "@/lib/email/visibility";
 import { LINK_SOURCE_LABEL } from "@/lib/email/job-match";
@@ -25,8 +26,11 @@ export function AskingCategoryPill({ className }: { className?: string }) {
   );
 }
 
-/** Řádek vlákna: vlaječka a priorita jedním ťuknutím, odesílatel, předmět, náhled, poznámka kolegy. */
-export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPriority, hideJob, onSuggestion, suggestionBusy }: {
+/**
+ * Řádek vlákna: vlaječka a priorita jedním ťuknutím, odesílatel, předmět, náhled, poznámka kolegy,
+ * štítek kategorie (s `onCategory` jde opravit ťuknutím — přijatá i odeslaná zpráva řádku).
+ */
+export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPriority, hideJob, onSuggestion, suggestionBusy, onCategory, onError }: {
   t: ThreadSummary;
   active: boolean;
   canAi: boolean;
@@ -39,6 +43,9 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
   /** Pošta B: odpověď na návrh „Patří k Z-…?" jedním ťuknutím. */
   onSuggestion?: (accept: boolean) => void;
   suggestionBusy?: boolean;
+  /** Oprava kategorie zprávy řádku (t.emailId) — nová kategorie hned, při chybě zpět. */
+  onCategory?: (c: EmailCategory) => void;
+  onError?: (text: string) => void;
 }) {
   // zpráva řádku čeká na otázku „Patří k …?" → do rozhodnutí neutrální „K zakázce?" (ne kategorie z pravidel)
   const asking = neutralWhileAsking(t.category, Boolean(t.suggestion?.forMessage && (!t.suggestion.emailId || t.suggestion.emailId === t.emailId)));
@@ -58,33 +65,40 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
       data-priority={t.priority}
     >
       <span className={cn("absolute inset-y-0 left-0 w-1", t.priority <= 1 ? "bg-red-600" : t.priority === 2 ? "bg-orange-500" : st.bar)} aria-hidden />
-      <button type="button" onClick={onOpen} className="min-w-0 flex-1 p-3 pl-4 text-left" aria-current={active ? "true" : undefined}>
-        <div className="flex items-center gap-2">
-          {unread && <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background", st.dot)} aria-label="Nepřečtené" />}
-          {t.direction === "out" && <Send className="h-3.5 w-3.5 shrink-0 text-cyan-600" aria-label="Odeslané" />}
-          <span className={cn("truncate text-sm", unread ? "font-bold" : "font-medium text-foreground/80")}>{t.from}</span>
-          {t.messageCount > 1 && <span className="shrink-0 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground" aria-label={`${t.messageCount} zpráv`}>{t.messageCount}</span>}
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground" suppressHydrationWarning>{relativeTime(t.lastAt)}</span>
-        </div>
-        <p className={cn("mt-1 truncate text-sm", unread ? "font-semibold" : "text-foreground/80")}>{t.subject || "(bez předmětu)"}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.preview}</p>
-        {t.suggestion && (!t.jobNumber || t.suggestion.forMessage) && (
-          <p className="mt-1 flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" data-testid="row-suggestion">
-            <HelpCircle className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">
-              {t.suggestion.forMessage ? `Zpráva jmenuje ${t.suggestion.jobNumber} — patří k ní?` : `Patří k ${t.suggestion.jobNumber}?`}
-              {t.suggestion.jobTitle ? ` ${t.suggestion.jobTitle}` : ""}
-            </span>
-          </p>
-        )}
-        {t.share && (
-          <p className="mt-1 flex items-start gap-1 rounded-md bg-violet-50 px-2 py-1 text-xs text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" data-testid="row-share">
-            <MessageSquareText className="mt-0.5 h-3 w-3 shrink-0" />
-            <span className="min-w-0 truncate"><b>Od {t.share.by ?? "kolegy"}</b>{t.share.note ? `: ${t.share.note}` : ""}</span>
-          </p>
-        )}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {asking ? <AskingCategoryPill /> : <CategoryPill category={t.category} />}
+      <div className="min-w-0 flex-1">
+        <button type="button" onClick={onOpen} className="block w-full min-w-0 p-3 pb-2 pl-4 text-left" aria-current={active ? "true" : undefined}>
+          <div className="flex items-center gap-2">
+            {unread && <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background", st.dot)} aria-label="Nepřečtené" />}
+            {t.direction === "out" && <Send className="h-3.5 w-3.5 shrink-0 text-cyan-600" aria-label="Odeslané" />}
+            <span className={cn("truncate text-sm", unread ? "font-bold" : "font-medium text-foreground/80")}>{t.from}</span>
+            {t.messageCount > 1 && <span className="shrink-0 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground" aria-label={`${t.messageCount} zpráv`}>{t.messageCount}</span>}
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground" suppressHydrationWarning>{relativeTime(t.lastAt)}</span>
+          </div>
+          <p className={cn("mt-1 truncate text-sm", unread ? "font-semibold" : "text-foreground/80")}>{t.subject || "(bez předmětu)"}</p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.preview}</p>
+          {t.suggestion && (!t.jobNumber || t.suggestion.forMessage) && (
+            <p className="mt-1 flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" data-testid="row-suggestion">
+              <HelpCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                {t.suggestion.forMessage ? `Zpráva jmenuje ${t.suggestion.jobNumber} — patří k ní?` : `Patří k ${t.suggestion.jobNumber}?`}
+                {t.suggestion.jobTitle ? ` ${t.suggestion.jobTitle}` : ""}
+              </span>
+            </p>
+          )}
+          {t.share && (
+            <p className="mt-1 flex items-start gap-1 rounded-md bg-violet-50 px-2 py-1 text-xs text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" data-testid="row-share">
+              <MessageSquareText className="mt-0.5 h-3 w-3 shrink-0" />
+              <span className="min-w-0 truncate"><b>Od {t.share.by ?? "kolegy"}</b>{t.share.note ? `: ${t.share.note}` : ""}</span>
+            </p>
+          )}
+        </button>
+        {/* štítky mimo tlačítko řádku (štítek kategorie je samostatné tlačítko — oprava jedním ťuknutím) */}
+        <div className="flex flex-wrap items-center gap-1.5 px-3 pb-3 pl-4" data-testid="row-chips">
+          {asking
+            ? <AskingCategoryPill />
+            : onCategory
+              ? <CategoryPicker emailId={t.emailId} category={t.category} direction={t.direction} onChange={onCategory} onError={onError} />
+              : <CategoryPill category={t.category} />}
           {t.customer && (
             <span className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-800 dark:bg-green-500/10 dark:text-green-300">
               <Building2 className="h-3 w-3 shrink-0" /> <span className="truncate">{t.customer}</span>
@@ -107,7 +121,7 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
           )}
           {canAi && t.aiConfidence > 0 && <AiConfidence value={t.aiConfidence} className="ml-auto" />}
         </div>
-      </button>
+      </div>
       {t.suggestion && (!t.jobNumber || t.suggestion.forMessage) && onSuggestion && (
         <div className="flex shrink-0 flex-col justify-center gap-1 py-2">
           <button

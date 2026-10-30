@@ -218,7 +218,7 @@ export async function visibleThreadEmails(threadId: string): Promise<{
 const MSG_SELECT = [
   "id, thread_id, mailbox_id, owner_id, direction, message_id, message_refs, from_name, from_email, to_email, cc_email, bcc_email",
   "subject, body_text, snippet, received_at, is_read, flagged, flagged_by, manual_priority, priority_rank, priority_set_by, category",
-  "ai_confidence, ai_summary, ai_pending, has_draft, order_id, sent_copy, sent_copy_error, job_link_source, job_link_actor",
+  "ai_confidence, ai_summary, ai_pending, has_draft, order_id, sent_copy, sent_copy_error, job_link_source, job_link_actor, body_html",
   "customer:customers!customer_id(name)", "job:orders!order_id(id, number, title)", "mailbox:mailboxes!mailbox_id(email)",
   "flagger:profiles!flagged_by(full_name)", "setter:profiles!priority_set_by(full_name)", "sender:profiles!owner_id(full_name)",
 ].join(", ");
@@ -230,7 +230,7 @@ type MsgRow = {
   flagged: boolean; flagged_by: string | null; manual_priority: number | null; priority_rank: number | null; priority_set_by: string | null;
   category: DbEmailCategory | null; ai_confidence: number | null; ai_summary: string | null; ai_pending: boolean; has_draft: boolean;
   order_id: string | null; sent_copy: "ok" | "failed" | "skipped" | null; sent_copy_error: string | null;
-  job_link_source?: string | null; job_link_actor?: string | null;
+  job_link_source?: string | null; job_link_actor?: string | null; body_html?: string | null;
   customer?: { name: string | null } | null; job?: { id: string; number: string | null; title?: string | null } | null; mailbox?: { email: string | null } | null;
   flagger?: { full_name: string | null } | null; setter?: { full_name: string | null } | null; sender?: { full_name: string | null } | null;
 };
@@ -299,6 +299,9 @@ export async function getThread(threadId: string): Promise<ThreadDetail> {
     sentCopy: r.sent_copy,
     sentCopyError: r.sent_copy_error,
     senderName: r.direction === "out" ? one(r.sender)?.full_name ?? null : null,
+    // odeslaná zpráva s grafickým podpisem z aplikace (HTML jsme sestavili sami, vše escapované)
+    ...(r.direction === "out" && r.body_html && r.body_html.includes('data-mn-signature="1"') && r.body_html.length <= 200_000
+      ? { signedHtml: r.body_html } : {}),
   })));
   const person = (p: unknown) => {
     const x = one(p as { full_name: string | null; email: string | null } | null);

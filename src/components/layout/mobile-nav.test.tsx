@@ -15,6 +15,10 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
 }));
 
+vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light", setTheme: vi.fn() }) }));
+vi.mock("@/components/automation-mode-toggle", () => ({ AutomationModeToggle: () => <span data-automation>Auto | Schvál.</span> }));
+vi.mock("@/components/layout/sign-out", () => ({ signOutEverywhere: vi.fn() }));
+
 import { MobileNav, mobileMenuCount } from "./mobile-nav";
 import type { Feature } from "@/lib/auth/permissions";
 
@@ -50,6 +54,24 @@ describe("mobilní lišta — odznaky", () => {
     const admin = html(<MobileNav features={ADMIN} counts={COUNTS} />);
     expect(admin).toContain('href="/pricing"');
     expect(admin).toMatch(/AI přehled<\/span><span[^>]*>5<\/span>/);
+    dialogOpen.value = false;
+  });
+
+  it("R072: Menu nese účet — Můj účet, motiv, Odhlásit (všichni), režim AI jen super admin; jedna položka Pošta", () => {
+    dialogOpen.value = true;
+    const user = { fullName: "Jan Novák", roleLabel: "Obchodník" };
+    const sales = html(<MobileNav features={SALES} counts={COUNTS} user={user} />);
+    expect(sales).toContain('href="/account"');
+    expect(sales).toContain("Jan Novák");
+    expect(sales).toContain('data-testid="mobile-menu-theme"');
+    expect(sales).toContain("Tmavý motiv");
+    expect(sales).toContain("Odhlásit se");
+    expect(sales).not.toContain("data-automation");
+    expect(sales).not.toContain('href="/sent"');
+    expect(sales).not.toContain("Odeslaná pošta");
+    expect(sales).toMatch(/>Pošta<\/span>/);
+    const admin = html(<MobileNav features={ADMIN} counts={COUNTS} user={user} />);
+    expect(admin).toContain("data-automation");
     dialogOpen.value = false;
   });
 });

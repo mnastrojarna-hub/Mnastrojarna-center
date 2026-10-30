@@ -57,7 +57,8 @@ cleanup();
 const adminId = sql(`select id from profiles where email = '${USERS.admin.email}'`);
 const ctl = async (p, opts) => (await fetch(`${CTL}${p}`, opts)).json();
 const addMsg = (m) => ctl(`/message?user=${encodeURIComponent(BOX)}`, { method: "POST", body: JSON.stringify(m) });
-const sentRaw = async () => (await ctl("/sent")).map((s) => s.raw);
+// celý zdroj (podpis s vloženým logem posune přílohy za prvních 4000 znaků)
+const sentRaw = async () => (await ctl("/sent?full=1")).map((s) => s.raw);
 // režimy Pošty B = plná automatika (výchozí z migrace; nezávisle na ručních změnách v lokální DB)
 sql(`insert into automation_settings (module, mode, enabled) values ('mail_job_link', 'full', true), ('mail_job_changes', 'full', true) on conflict (module) do update set mode = 'full', enabled = true`);
 

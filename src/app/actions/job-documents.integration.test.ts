@@ -226,7 +226,13 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     const api = loadEnv().LOCAL_MAIL_API ?? "http://127.0.0.1:54324";
     const msg = await (await fetch(`${api}/messages/latest?to=${encodeURIComponent(MAIL_TO)}&wait=3000`)).json();
     expect(msg.subject).toBe(draft.subject);
-    expect(msg.attachments).toEqual([expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Potvrzeni_objednavky_POT-/) })]);
+    // PDF + logo grafického podpisu (Pošta D: podpis z návrhu → HTML s vloženým logem, jednou)
+    expect(msg.attachments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Potvrzeni_objednavky_POT-/) }),
+      expect.objectContaining({ contentType: "image/png", filename: "mnastrojarna-logo.png" }),
+    ]));
+    expect(msg.attachments).toHaveLength(2);
+    expect(String(msg.html).split('data-mn-signature="1"')).toHaveLength(2);
 
     const jj = await job();
     expect(jj.status).toBe("potvrzeno");

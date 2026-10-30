@@ -16,6 +16,10 @@ import { describeSmtpFailure, sendWithSmtpRecovery, type SmtpTry } from "@/lib/e
 import { healSmtpPassword } from "@/lib/email/smtp-heal";
 import { appendToSent, type SentCopyState } from "@/lib/email/mail-append";
 import { bracketId } from "@/lib/email/threading";
+import { outgoingCategory } from "@/lib/email/mail-rules";
+import { signatureHtmlForApp } from "@/lib/email/signature";
+import { applySignature, outgoingSignature, type InlineImage } from "@/lib/email/signature-server";
+import type { EmailCategory as DbEmailCategory } from "@/lib/supabase/database.types";
 
 /**
  * Odesílání pošty z aplikace (SMTP schránky, Microsoft Graph u schránek M365, globální SMTP).
@@ -242,6 +246,21 @@ export async function describeSender(pref: SmtpPreference): Promise<{ ok: boolea
   return from ? { ok: true, from, mailboxId: s.cfg.mailboxId ?? null } : { ok: false, reason: "Chybí e-mail odesílatele." };
 }
 
+/**
+ * Text podpisu uživatele pro schránku, ze které by zpráva odešla (návrh e-mailu v dialogu dokladu /
+ * objednávky: podpis je v textu vidět a jde upravit; sendMail({ signature: { mode: "inline" } }) ho při
+ * odeslání převede na grafický). Prázdný = bez podpisu (vypnutý, chyba) → volající použije svůj text.
+ */
+export async function senderSignatureText(userId: string | null | undefined, pref: SmtpPreference): Promise<string> {
+  if (!userId || !isSupabaseConfigured() || !hasServiceKey()) return "";
+  try {
+    const sender = await describeSender(pref);
+    return (await outgoingSignature({ userId, mailboxEmail: sender.ok ? sender.from : null })).text;
+  } catch {
+    return "";
+  }
+}
+
 export interface OutgoingAttachment {
   filename: string;
   content: Buffer;
@@ -278,6 +297,15 @@ export interface SendMailInput {
   /** Vazby záznamu v odeslané poště. */
   customerId?: string | null;
   supplierId?: string | null;
+  /**
+   * Grafický podpis uživatele `userId` pro schránku, ze které zpráva odchází (Pošta → Nastavení pošty):
+   * „inline" = podpis už je v textu (okno psaní, dialog dokladu) → převést na grafický s logem,
+   * „append" (výchozí) = e-mail ve jménu uživatele (schválená odpověď, AI nabídka) → připojit jednou.
+   * Bez podpisu v textu / vypnutý podpis = jen text. Logo jde jako vložená příloha (cid).
+   */
+  signature?: { userId: string; mode?: "inline" | "append" } | null;
+  /** Kategorie v odeslané poště (výchozí podle předmětu, viz outgoingCategory). */
+  category?: DbEmailCategory | null;
 }
 
 /** Hlavička From: „Jméno" <adresa> (uvozovky a konce řádků z jména pryč). */
@@ -301,7 +329,9 @@ async function senderName(box: BoxRow | null | undefined, explicit?: string): Pr
 }
 
 /** Odeslání přes Microsoft Graph (/users/{schránka}/sendMail, kopie do Odeslané pošty dělá Microsoft). */
-async function sendViaGraph(cfg: SmtpConfig, msg: { to: string[]; cc: string[]; bcc: string[]; subject: string; text: string; html?: string; attachments?: OutgoingAttachment[] }) {
+async function sendViaGraph(cfg: SmtpConfig, msg: {
+  to: string[]; cc: string[]; bcc: string[]; subject: string; text: string; html?: string; attachments?: OutgoingAttachment[]; inline?: InlineImage[];
+}) {
   const token = await graphToken(cfg.graph!);
   const rcpt = (list: string[]) => list.map((address) => ({ emailAddress: { address } }));
   const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(cfg.from!)}/sendMail`, {
@@ -314,10 +344,17 @@ async function sendViaGraph(cfg: SmtpConfig, msg: { to: string[]; cc: string[]; 
         toRecipients: rcpt(msg.to),
         ccRecipients: rcpt(msg.cc),
         bccRecipients: rcpt(msg.bcc),
-        attachments: (msg.attachments ?? []).map((a) => ({
-          "@odata.type": "#microsoft.graph.fileAttachment", name: a.filename, contentType: a.contentType || "application/octet-stream",
-          contentBytes: a.content.toString("base64"),
-        })),
+        attachments: [
+          ...(msg.attachments ?? []).map((a) => ({
+            "@odata.type": "#microsoft.graph.fileAttachment", name: a.filename, contentType: a.contentType || "application/octet-stream",
+            contentBytes: a.content.toString("base64"),
+          })),
+          // logo podpisu: vložená příloha (src="cid:…" v HTML)
+          ...(msg.inline ?? []).map((a) => ({
+            "@odata.type": "#microsoft.graph.fileAttachment", name: a.filename, contentType: a.contentType,
+            contentBytes: a.content.toString("base64"), isInline: true, contentId: a.cid,
+          })),
+        ],
       },
       saveToSentItems: true,
     }),
@@ -376,6 +413,29 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
   const references = (input.references ?? []).map((r) => bracketId(r)).filter((r): r is string => Boolean(r));
   const name = await senderName(s.box, input.fromName);
 
+  // Grafický podpis odesílatele pro schránku, ze které zpráva skutečně odchází (best-effort —
+  // chyba podpisu odeslání nezastaví, zpráva pak odejde jen s textem)
+  let text = input.text;
+  let html = input.html;
+  let inline: InlineImage[] = [];
+  if (input.signature?.userId && isSupabaseConfigured() && hasServiceKey()) {
+    try {
+      const sig = await outgoingSignature({ userId: input.signature.userId, mailboxEmail: s.box?.email ?? fromAddress });
+      const applied = applySignature(input.text, sig, input.signature.mode ?? "append");
+      text = applied.text;
+      if (applied.html) {
+        html = applied.html;
+        inline = applied.inline;
+      }
+    } catch (err) {
+      console.error(`[mail:send] Podpis se nepodařilo připojit: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  const attachments = [
+    ...(input.attachments ?? []),
+    ...inline.map((i) => ({ filename: i.filename, content: i.content, contentType: i.contentType, cid: i.cid, contentDisposition: "inline" as const })),
+  ];
+
   // Zpráva se sestaví jednou (raw) — stejná jde přes SMTP i do složky Odeslané na serveru
   const node = new MailComposer({
     from: formatFrom(name, fromAddress),
@@ -383,9 +443,9 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
     cc: cc.length ? cc.join(", ") : undefined,
     bcc: bcc.length ? bcc.join(", ") : undefined,
     subject: input.subject,
-    text: input.text,
-    html: input.html,
-    attachments: input.attachments,
+    text,
+    html,
+    attachments: attachments.length ? attachments : undefined,
     messageId,
     inReplyTo,
     references: references.length ? references : undefined,
@@ -409,7 +469,7 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
   };
   if (s.graph) {
     try {
-      await sendViaGraph(s, { to, cc, bcc, subject: input.subject, text: input.text, html: input.html, attachments: input.attachments });
+      await sendViaGraph(s, { to, cc, bcc, subject: input.subject, text, html, attachments: input.attachments, inline });
     } catch (err) {
       return { sent: false, reason: `Odeslání selhalo — ${err instanceof Error ? err.message : "Microsoft Graph chyba"}` };
     }
@@ -470,14 +530,16 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
           cc_email: cc.length ? cc.join(", ") : null,
           bcc_email: bcc.length ? bcc.join(", ") : null,
           subject: input.subject,
-          body_text: input.text,
-          body_html: input.html ?? null,
-          snippet: input.text.replace(/\s+/g, " ").trim().slice(0, 200),
+          body_text: text,
+          // v aplikaci logo z webu (cid: znamená jen „příloha této zprávy")
+          body_html: html ? signatureHtmlForApp(html) : null,
+          // náhled v seznamu bez podpisu (oddělovač „-- ")
+          snippet: (text.split(/\r?\n-- \r?\n/)[0] || text).replace(/\s+/g, " ").trim().slice(0, 200),
           owner_id: input.senderId ?? s.ownerId ?? null,
           order_id: input.jobId ?? null,
           customer_id: input.customerId ?? null,
           supplier_id: input.supplierId ?? null,
-          category: "ostatni",
+          category: input.category ?? outgoingCategory({ subject: input.subject, jobId: input.jobId ?? null }),
           is_read: true,
           has_draft: false,
           has_attachments: Boolean(input.attachments?.length),

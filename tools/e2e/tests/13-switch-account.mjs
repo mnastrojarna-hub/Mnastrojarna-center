@@ -18,8 +18,14 @@ function resetVit() {
 async function switchAccount(page, label) {
   await login(page, USERS.admin);
   await page.goto(`${BASE}/orders`);
-  await page.getByRole("button", { name: "Uživatelské menu" }).click();
-  await page.getByRole("menuitem", { name: /Odhlásit se/ }).click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    // telefon (R072): Odhlásit je v mobilním Menu (horní lišta je jen hledání)
+    await page.getByRole("button", { name: /^Menu/ }).click();
+    await page.getByTestId("mobile-menu-signout").click();
+  } else {
+    await page.getByRole("button", { name: "Uživatelské menu" }).click();
+    await page.getByRole("menuitem", { name: /Odhlásit se/ }).click();
+  }
   await page.waitForURL(/\/login/, { timeout: 15_000 });
   await shot(page, `13-${label}-login`);
   const prefilled = await page.locator("#email").inputValue();

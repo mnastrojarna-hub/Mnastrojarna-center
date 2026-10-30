@@ -865,6 +865,8 @@ export function purchaseOrderEmail(input: {
   drawingsSeparately?: boolean;
   /** Poznámky pro dodavatele u položek („pozor popsat na čele") — souhrn v e-mailu (v PDF jsou u položky). */
   itemNotes?: SupplierItemNote[];
+  /** Podpis odesílatele z Nastavení pošty (text s pozdravem → při odeslání grafický s logem). */
+  signatureText?: string | null;
 }): { subject: string; body: string } {
   const days = input.confirmWithinDays ?? CONFIRM_WITHIN_WORKING_DAYS;
   const quote = (input.supplierQuoteNumber ?? "").trim();
@@ -888,20 +890,10 @@ export function purchaseOrderEmail(input: {
     "",
     "Děkujeme za spolupráci.",
     "",
-    "S pozdravem",
-    "",
   );
-  const signature = [
-    input.senderName,
-    input.companyName,
-    [input.senderPhone ? `tel. ${input.senderPhone}` : "", input.senderEmail ?? ""].filter(Boolean).join(" · "),
-    input.companyWeb,
-  ]
-    .map((s) => (s ?? "").trim())
-    .filter(Boolean);
   return {
     subject: `Objednávka ${input.number} — ${input.companyName}`,
-    body: [...lines, ...signature].join("\n"),
+    body: [...lines, ...supplierClosing(input)].join("\n"),
   };
 }
 
@@ -913,6 +905,8 @@ export interface SupplierMailSender {
   senderEmail?: string | null;
   senderPhone?: string | null;
   companyWeb?: string | null;
+  /** Podpis odesílatele z Nastavení pošty (text s pozdravem → při odeslání grafický s logem). */
+  signatureText?: string | null;
 }
 
 function supplierSignature(input: SupplierMailSender): string[] {
@@ -924,6 +918,12 @@ function supplierSignature(input: SupplierMailSender): string[] {
   ]
     .map((s) => (s ?? "").trim())
     .filter(Boolean);
+}
+
+/** Závěr e-mailu dodavateli: podpis z Nastavení pošty (i s pozdravem), jinak „S pozdravem" + jméno, firma, kontakt. */
+function supplierClosing(input: SupplierMailSender): string[] {
+  const own = (input.signatureText ?? "").trim();
+  return own ? [own] : ["S pozdravem", "", ...supplierSignature(input)];
 }
 
 /** Změna odeslané objednávky (nový termín / položky) — PDF změny v příloze. */
@@ -950,12 +950,10 @@ export function purchaseOrderChangeEmail(input: SupplierMailSender & {
     "",
     "Děkujeme za pochopení.",
     "",
-    "S pozdravem",
-    "",
   );
   return {
     subject: `Změna objednávky ${input.number} (změna ${input.revision}) — ${input.companyName}`,
-    body: [...lines, ...supplierSignature(input)].join("\n"),
+    body: [...lines, ...supplierClosing(input)].join("\n"),
   };
 }
 
@@ -970,12 +968,10 @@ export function purchaseOrderCancelEmail(input: SupplierMailSender & { reason?: 
     "",
     "Děkujeme a omlouváme se za komplikace.",
     "",
-    "S pozdravem",
-    "",
   ];
   return {
     subject: `Storno objednávky ${input.number} — ${input.companyName}`,
-    body: [...lines, ...supplierSignature(input)].join("\n"),
+    body: [...lines, ...supplierClosing(input)].join("\n"),
   };
 }
 
@@ -990,12 +986,10 @@ export function purchaseOrderHoldEmail(input: SupplierMailSender & { reason?: st
     "",
     "Děkujeme za pochopení.",
     "",
-    "S pozdravem",
-    "",
   ];
   return {
     subject: `Pozastavení objednávky ${input.number} — ${input.companyName}`,
-    body: [...lines, ...supplierSignature(input)].join("\n"),
+    body: [...lines, ...supplierClosing(input)].join("\n"),
   };
 }
 

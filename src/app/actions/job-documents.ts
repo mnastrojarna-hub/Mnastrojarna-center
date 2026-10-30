@@ -26,7 +26,7 @@ import { invoiceBalance, invoicePaymentsFromRows } from "@/lib/pdf/invoice-payme
 import { renderConfirmationPdf, renderInvoicePdf, renderQuotePdf } from "@/lib/pdf/render";
 import { addDaysIso, computeTotals, plural, todayIso, type DocItem } from "@/lib/pdf/types";
 import { invoiceBankWarning, spdVariableSymbol } from "@/lib/pdf/qr";
-import { sendMail } from "@/lib/email/send";
+import { sendMail, senderSignatureText } from "@/lib/email/send";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
@@ -735,6 +735,9 @@ export async function sendJobDocument(
       from: { ownerId: user.id },
       jobId,
       senderId: user.id,
+      // podpis je v textu z návrhu (dialog ho ukázal k úpravě) → grafický s logem místo firemní šablony;
+      // bez podpisu v textu zůstane HTML výše (starý / vypnutý podpis)
+      signature: { userId: user.id, mode: "inline" },
     });
     if (!res.sent) return fail(res.reason ?? "E-mail se nepodařilo odeslat.");
 
@@ -897,7 +900,11 @@ async function composeDocumentEmail(
   invoicePending?: { invoiceNumber: string; variableSymbol: string },
 ): Promise<ActionResult<{ to: string; subject: string; body: string; filename: string; kind: DocumentEmailKind }>> {
   await refreshCompanyFromSettings();
-  const { data: me } = await db.from("profiles").select("phone, position, email").eq("id", user.id).maybeSingle();
+  const [{ data: me }, signatureText] = await Promise.all([
+    db.from("profiles").select("phone, position, email").eq("id", user.id).maybeSingle(),
+    // můj podpis pro schránku, ze které doklad odejde (stejná volba jako sendJobDocument)
+    senderSignatureText(user.id, { ownerId: user.id }),
+  ]);
   const profile = (me ?? {}) as { phone?: string | null; position?: string | null; email?: string | null };
 
   const input: DocumentEmailInput = {
@@ -911,6 +918,7 @@ async function composeDocumentEmail(
     filename: file.filename,
     sender: { name: myName(user), position: profile.position, phone: profile.phone, email: profile.email ?? user.email },
     company: { name: COMPANY.name, web: COMPANY.web, phone: COMPANY.phone, email: COMPANY.email },
+    signatureText,
   };
 
   if (kind === "nabidka") {

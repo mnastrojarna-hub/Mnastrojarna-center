@@ -15,8 +15,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { endSession } from "@/app/auth/actions";
-import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import { signOutEverywhere } from "@/components/layout/sign-out";
 import type { CurrentUser } from "@/lib/data/current-user";
 import type { Feature } from "@/lib/auth/permissions";
 
@@ -35,7 +34,8 @@ export function Topbar({ user, features }: { user: CurrentUser | null; features:
         <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] font-medium sm:inline">⌘K</kbd>
       </button>
 
-      <div className="ml-auto flex items-center gap-2">
+      {/* telefon: režim AI, motiv, Můj účet a Odhlásit jsou v mobilním Menu (lišta by na 390 px přetekla) */}
+      <div className="ml-auto hidden items-center gap-2 md:flex" data-testid="topbar-account">
         {/* Režim automatizace řídí AI — vidí jen super admin */}
         {has("dashboard") && <AutomationModeToggle />}
         <ThemeToggle />
@@ -85,11 +85,7 @@ function SignOutItem() {
       disabled={pending}
       onSelect={(e) => {
         e.preventDefault();
-        start(async () => {
-          // relace v prohlížeči i na serveru (cookies), pak jedno čisté přesměrování na /login
-          await Promise.allSettled([createBrowserClient().auth.signOut(), endSession()]);
-          window.location.assign("/login");
-        });
+        start(signOutEverywhere);
       }}
     >
       {pending && <Loader2 className="h-4 w-4 animate-spin" />}

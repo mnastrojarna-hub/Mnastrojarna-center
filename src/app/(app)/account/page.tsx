@@ -1,11 +1,12 @@
+import Link from "next/link";
 import { MyMailboxCard } from "@/components/mail/my-mailbox-card";
-import { SignatureForm } from "@/components/mail/signature-form";
 import { listMyMailboxes } from "@/lib/email/my-mailbox";
 import {
-  Crown, Briefcase, Wrench, Mail, KeyRound, UserRound, ShieldCheck, Sparkles, Inbox, Check, Eye,
+  Crown, Briefcase, Wrench, Mail, KeyRound, UserRound, ShieldCheck, Sparkles, Inbox, Check, Eye, Settings,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { requireUser, getAccess } from "@/lib/auth/session";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, FEATURE_LABELS, can, type Feature } from "@/lib/auth/permissions";
 import { loadAccountData } from "@/components/account/data";
@@ -200,10 +201,15 @@ export default async function AccountPage() {
               </CardHeader>
               <CardContent className="space-y-5">
                 <MyMailboxCard initial={myBoxes} isAdmin={access.features.includes("mail_all")} />
-                <div className="space-y-1.5 border-t pt-4">
-                  <div className="flex items-center gap-2 text-sm font-medium"><Mail className="h-4 w-4 text-muted-foreground" /> Podpis e-mailu</div>
-                  <p className="text-xs text-muted-foreground">Vloží se pod každou novou zprávu, odpověď i přeposlání.</p>
-                  <SignatureForm initial={data.mailSignature ?? ""} />
+                {/* podpis má jedno místo: Pošta → ozubené kolo „Nastavení pošty" (grafický, s logem, po schránkách) */}
+                <div className="flex flex-wrap items-center gap-3 border-t pt-4" data-testid="account-signature-link">
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-2 text-sm font-medium"><Mail className="h-4 w-4 text-muted-foreground" /> Podpis e-mailu</div>
+                    <p className="text-xs text-muted-foreground">Grafický podpis s logem — vloží se pod každou novou zprávu, odpověď i doklad. Nastavíš ho v Poště.</p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/inbox?nastaveni=podpis"><Settings className="h-4 w-4" /> Nastavení pošty</Link>
+                  </Button>
                 </div>
               </CardContent>
             </Card>

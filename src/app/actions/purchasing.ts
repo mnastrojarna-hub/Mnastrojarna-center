@@ -7,6 +7,7 @@ import type { CurrentUser } from "@/lib/data/current-user";
 import { logAudit } from "@/lib/audit";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
+import { senderSignatureText } from "@/lib/email/send";
 import { getJob } from "@/lib/data/jobs";
 import {
   fetchProfileContact, fetchPurchaseOrder, fetchSupplierQuote, fetchSupplierQuotes, fetchSupplierRef,
@@ -874,6 +875,10 @@ export async function draftPurchaseOrderEmail(
     if (!po) return fail(PO_NOT_FOUND);
     await refreshCompanyFromSettings();
     const me = await fetchProfileContact(c.db, c.user.id);
+    // podpis toho, z čí schránky objednávka odejde (stejná volba jako sendPurchaseOrder)
+    const { data: jobRow } = await c.db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
+    const sender = await purchaseOrderSender(c.db, { id: c.user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+    const signatureText = await senderSignatureText(sender.signerId, sender.from);
     const mail = purchaseOrderEmail({
       number: po.number,
       companyName: COMPANY.name,
@@ -884,6 +889,7 @@ export async function draftPurchaseOrderEmail(
       senderEmail: me.email ?? c.user.email,
       senderPhone: me.phone ?? COMPANY.phone,
       companyWeb: COMPANY.web,
+      signatureText,
     });
     return { ok: true, to: po.supplier?.email ?? "", ...mail, attachmentName: purchaseOrderFileName(po.number) };
   } catch (err) {
