@@ -5,6 +5,7 @@ import { AlertTriangle, Camera, Download, EyeOff, FileText, Loader2, Pencil, Ref
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn, relativeTime } from "@/lib/utils";
+import { isUnsupportedExt, unsupportedHowTo } from "@/lib/anonymize/candidate";
 import { anonApi, downloadUrl, previewUrl, type AdhocItemDto } from "./anon-api";
 import { FileAnonBadge } from "./anon-badge";
 import { describeCounts, displayReason, NOTHING_REMOVED, type AnonUiStatus } from "./anon-status";
@@ -18,15 +19,15 @@ import { regionsBox, type NBox } from "./editor-geometry";
  * Náhled Před / Po je výřez kolem smazaných míst (razítko) se zvýrazněnými oblastmi; klepnutí otevře editor.
  */
 
-const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.tif,.tiff,.heic,.heif,.dxf,.stp,.step,application/pdf,image/*";
-const SUPPORTED = /\.(pdf|jpe?g|png|webp|tiff?|heic|heif|dxf|stp|step)$/i;
+const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.heic,.heif,.dxf,.stp,.step,.stl,.igs,.iges,application/pdf,image/*";
+const SUPPORTED = /\.(pdf|jpe?g|png|webp|gif|tiff?|heic|heif|dxf|stp|step|stl|igs|iges)$/i;
 const MAX_BYTES = 50 * 1024 * 1024;
 const BUSY = new Set(["uploading", "pending", "processing"]);
 const POLL_MS = 2500;
 
 /** Nepodporovaný soubor odmítne už v prohlížeči (accept nezastaví přetažení ani výběr na mobilu). */
 export function toolRejectReason(f: { name: string; size: number }): string | null {
-  if (!SUPPORTED.test(f.name)) return "Nelze anonymizovat — tento formát (např. DWG, SolidWorks) neumíme. Pošli PDF, fotku, DXF nebo STEP.";
+  if (!SUPPORTED.test(f.name)) return isUnsupportedExt(f.name) ? unsupportedHowTo(f.name) : "Nelze anonymizovat automaticky — tento formát neumíme. Pošli PDF, fotku, DXF, STEP nebo STL.";
   if (f.size > MAX_BYTES) return "Soubor je větší než 50 MB — pošli menší nebo ho rozděl.";
   return null;
 }
@@ -158,7 +159,7 @@ export function AnonymizeToolDialog({ open, onOpenChange }: { open: boolean; onO
                 <Camera className="h-4 w-4" /> Vyfotit nebo vybrat výkres
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">PDF, fotka (JPEG, PNG, HEIC), TIFF, DXF nebo STEP · do 50 MB · i bez zakázky · na počítači sem soubor přetáhni</p>
+            <p className="text-xs text-muted-foreground">PDF, fotka (JPEG, PNG, HEIC), TIFF, DXF, STEP, STL nebo IGES · do 50 MB · i bez zakázky · na počítači sem soubor přetáhni</p>
             <input
               ref={input}
               type="file"

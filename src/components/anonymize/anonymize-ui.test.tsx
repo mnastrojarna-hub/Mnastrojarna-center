@@ -29,11 +29,11 @@ describe("stavy anonymizace — texty", () => {
   it("odznak zakázky: čipy podle naléhavosti, každý s vlastní barvou, nejvýš 2 + „+N“", () => {
     expect(jobAnonBadge(badge({ total: 3, done: 3 }))!.parts.map((p) => p.text)).toEqual(["Výkresy 3/3 ✓"]);
     const b = jobAnonBadge(badge({ total: 6, done: 1, review: 1, failed: 1, pending: 1, unsupported: 1, skipped: 1, sendWaiting: 1 }))!;
-    expect(b.parts.map((p) => p.text)).toEqual(["Odeslání čeká", "1 selhal", "1 ke kontrole", "Čeká…", "Výkresy 1/4", "1 nejde (DWG)"]);
+    expect(b.parts.map((p) => p.text)).toEqual(["Odeslání čeká", "1 selhal", "1 ke kontrole", "Čeká…", "Výkresy 1/4", "1 nelze automaticky"]);
     expect(b.parts.map((p) => p.tone)).toEqual(["warn", "error", "warn", "busy", "muted", "muted"]);
     expect(b.visible.map((p) => p.text)).toEqual(["Odeslání čeká", "1 selhal"]);
     expect(b.more).toBe(4);
-    expect(b.title).toContain("1 nejde (DWG)");
+    expect(b.title).toContain("1 nelze automaticky");
     expect(b.tone).toBe("error");
     expect(jobAnonBadge(badge({ total: 2, skipped: 2 }))).toBeNull();
     expect(jobAnonBadge(badge({ total: 2, pending: 2, waitingBudget: 2 }))!.parts[0].text).toBe("Čeká (limit)");
@@ -155,7 +155,9 @@ describe("render komponent anonymizace", () => {
     expect(html(<AnonSummaryLine file={file()} />)).toContain("Pro dodavatele smazáno: firma, cesta na disk · vyřazené strany 1");
     expect(canAnonymize(file({ origin: "generated" }))).toBe(false);
     expect(canAnonymize(file({ issuer: "my" }))).toBe(false);
-    expect(canAnonymize(file({ filename: "x.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }))).toBe(false);
+    // Word zákazníka je kandidát (stav „Nelze anonymizovat automaticky" + návod), text ne
+    expect(canAnonymize(file({ filename: "x.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }))).toBe(true);
+    expect(canAnonymize(file({ filename: "x.txt", mimeType: "text/plain" }))).toBe(false);
     expect(canAnonymize(file())).toBe(true);
     // stejné pravidlo jako server (isAnonCandidate): faktura / nabídka bez vystavitele ani zamčený soubor ne
     expect(canAnonymize(file({ kind: "faktura", issuer: null }))).toBe(false);

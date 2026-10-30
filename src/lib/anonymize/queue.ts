@@ -4,7 +4,7 @@ import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { SYSTEM_ACTOR, type ActorContext } from "@/lib/supabase/actor-headers";
-import { isAnonCandidate, isUnsupportedExt } from "./candidate";
+import { isAnonCandidate, isUnsupportedExt, unsupportedHowTo } from "./candidate";
 import { settingsFromRow, type AnonSettings } from "./settings";
 import type { AnonPages, AnonRegion, AnonStatus } from "./types";
 
@@ -191,7 +191,7 @@ export async function enqueue(db: AnonDb, input: {
     }
     const { error } = await db.from(table).update({
       anon_status: unsupported ? "unsupported" : "pending", anon_priority: input.priority ?? 0, anon_attempts: 0, anon_lock_until: null,
-      anon_reason: unsupported ? "Formát nelze anonymizovat — pošli dodavateli PDF, DXF nebo STEP." : null,
+      anon_reason: unsupported ? unsupportedHowTo(s.filename) : null,
       anon_via: input.via ?? "rucne",
     }).eq("id", r.id);
     if (error) { out.skipped.push({ id: r.id, reason: error.message }); continue; }

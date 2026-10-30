@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ fileId: 
   const bucket = table === "drawings" ? "documents" : "job-files";
   const { data: blob, error } = await guard.db.storage.from(bucket).download(path);
   if (error || !blob) return json({ error: "Soubor se nepodařilo načíst." }, 404);
-  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bytes: Uint8Array = new Uint8Array(await blob.arrayBuffer());
   const srcPage = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
   // „Po" obsahuje jen zahrnuté stránky → strana originálu n = strana výstupu (pořadí v included) + 1
   let page = srcPage;
@@ -50,8 +50,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ fileId: 
   try {
     const sharp = (await import("sharp")).default;
     const { sourceFormat } = await import("@/lib/anonymize/candidate");
-    const fmt = sourceFormat(path, null, bytes.subarray(0, 16));
+    let fmt = sourceFormat(path, null, bytes.subarray(0, 16));
     let png: Buffer;
+    // originál HEIC z iPhonu (sharp HEVC neumí) → JPEG přes libheif
+    if (fmt === "heic") {
+      const { heicToJpeg } = await import("@/lib/anonymize/image");
+      bytes = await heicToJpeg(bytes);
+      fmt = "image";
+    }
     if (fmt === "pdf") {
       const { openPdf } = await import("@/lib/anonymize/pdf-node");
       const { renderPageRaster, rawSharp } = await import("@/lib/anonymize/pdf-raster");

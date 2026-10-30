@@ -108,9 +108,11 @@ export const anonApi = {
   skip(id: string, reason?: string, table?: AnonTableParam) {
     return call<{ ok: boolean }>(`/api/drawings/anonymize/${id}/skip`, { method: "POST", body: JSON.stringify({ table, reason }) });
   },
-  supplierPack(jobId: string, files: string[], reviewed: string[] = []) {
+  supplierPack(jobId: string, files: string[], reviewed: string[] = [], original: string[] = []) {
     const p = new URLSearchParams({ files: files.join(",") });
     if (reviewed.length) p.set("reviewed", reviewed.join(","));
+    // originál bez anonymizace — jen super admin (server ověří roli)
+    if (original.length) p.set("original", original.join(","));
     return call<{ url: string | null; included: number; missing: { id: string; filename: string; reason: string }[] }>(`/api/jobs/${jobId}/supplier-pack?${p}`);
   },
   adhocList() {

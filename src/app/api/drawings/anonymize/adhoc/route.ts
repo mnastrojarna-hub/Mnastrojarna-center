@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const MAX_BYTES = 50 * 1024 * 1024;
-const EXT_RE = /\.(pdf|jpe?g|png|webp|tiff?|heic|heif|dxf|stp|step)$/i;
+const EXT_RE = /\.(pdf|jpe?g|png|webp|gif|tiff?|heic|heif|dxf|stp|step|stl|igs|iges)$/i;
 
 /**
  * Samostatný nástroj „Anonymizovat výkres" (Poptávky, i bez zakázky), asynchronně:
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   const filename = cleanNamePart(typeof body.filename === "string" ? body.filename : "").slice(0, 120);
   const size = Number(body.size);
   const mime = typeof body.mimeType === "string" ? body.mimeType.slice(0, 100) : null;
-  if (!filename || !EXT_RE.test(filename)) return json({ error: "Podporované soubory: PDF, fotky (JPEG, PNG, WebP, TIFF), DXF a STEP." }, 400);
+  if (!filename || !EXT_RE.test(filename)) return json({ error: "Podporované soubory: PDF, fotky (JPEG, PNG, WebP, HEIC, TIFF), DXF, STEP, STL a IGES." }, 400);
   if (!Number.isFinite(size) || size <= 0 || size > MAX_BYTES) return json({ error: "Soubor je větší než 50 MB." }, 400);
   const path = `capture/${user.id}/anon/${crypto.randomUUID()}-${filename.replace(/[^A-Za-z0-9._-]/g, "_")}`;
   const { data: signed, error: signErr } = await db.storage.from("job-files").createSignedUploadUrl(path);

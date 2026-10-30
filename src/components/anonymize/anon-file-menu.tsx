@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { cancelQueuedSend, sendQueuedWithoutPending } from "@/app/actions/drawing-anon";
 import { isAnonCandidate } from "@/lib/anonymize/candidate";
+import { useAccess } from "@/components/access-provider";
 import type { JobFile } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { anonApi, downloadUrl, previewUrl, type SendQueueDto } from "./anon-api";
@@ -198,6 +199,9 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   const [open, setOpen] = React.useState(false);
   const [sel, setSel] = React.useState<Set<string>>(new Set());
   const [reviewed, setReviewed] = React.useState<Set<string>>(new Set());
+  /** Super admin výslovně potvrdil originál bez anonymizace (formát, který anonymizovat nejde). */
+  const [originals, setOriginals] = React.useState<Set<string>>(new Set());
+  const superAdmin = useAccess().role === "super_admin";
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<{ url: string | null; included: number; missing: { filename: string; reason: string }[] } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -206,6 +210,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   function openDialog() {
     setSel(new Set(candidates.filter((f) => f.anon?.status === "done").map((f) => f.id)));
     setReviewed(new Set());
+    setOriginals(new Set());
     setResult(null);
     setError(null);
     setOpen(true);
@@ -214,7 +219,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   async function build() {
     setBusy(true);
     setError(null);
-    const r = await anonApi.supplierPack(jobId, [...sel], [...reviewed].filter((id) => sel.has(id)));
+    const r = await anonApi.supplierPack(jobId, [...sel], [...reviewed].filter((id) => sel.has(id)), [...originals].filter((id) => sel.has(id)));
     setBusy(false);
     if (!r.ok) {
       const d = r.data as { missing?: { filename: string; reason: string }[] } | undefined;
@@ -239,7 +244,8 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
               <ul className="divide-y rounded-lg border">
                 {candidates.map((f) => {
                   const st = f.anon!.status;
-                  const usable = st === "done" || st === "review";
+                  const unsupported = st === "unsupported";
+                  const usable = st === "done" || st === "review" || (unsupported && superAdmin && originals.has(f.id));
                   return (
                     <li key={f.id} className="flex flex-col gap-1 px-3 py-2">
                       <label className={cn("flex min-h-11 items-center gap-2 text-sm", !usable && "opacity-60")}>
@@ -256,6 +262,22 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
                         </span>
                         <FileAnonBadge status={st} reviewed={f.anon?.reviewed} reason={f.anon?.reason} total={usable ? f.anon?.total : null} />
                       </label>
+                      {unsupported && (
+                        <div className="ml-7 space-y-1">
+                          {f.anon?.reason && <p className="text-[11px] text-muted-foreground">{f.anon.reason}</p>}
+                          {superAdmin && (
+                            <label className="flex min-h-9 items-center gap-2 text-xs text-red-800 dark:text-red-300" data-testid="supplier-pack-original">
+                              <input type="checkbox" className="h-4 w-4" checked={originals.has(f.id)}
+                                onChange={(e) => {
+                                  const on = e.target.checked;
+                                  setOriginals((s) => { const n = new Set(s); if (on) n.add(f.id); else n.delete(f.id); return n; });
+                                  setSel((s) => { const n = new Set(s); if (on) n.add(f.id); else n.delete(f.id); return n; });
+                                }} />
+                              Poslat ORIGINÁL bez anonymizace (zákazník bude vidět) — potvrzuji jako super admin
+                            </label>
+                          )}
+                        </div>
+                      )}
                       {st === "review" && sel.has(f.id) && (
                         <div className="ml-7 flex flex-wrap items-center gap-x-3 gap-y-1">
                           {onEdit && EDITABLE.test(f.filename) && (

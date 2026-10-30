@@ -69,7 +69,7 @@ export function dedupeNames(names: readonly string[]): string[] {
 }
 
 /** Přípona výstupu podle metody (PDF zůstane PDF, fotka JPEG/PNG, CAD stejně). */
-export function outputExt(method: "raster_pdf" | "image" | "image_pdf" | "dxf" | "step", srcExt: string): string {
+export function outputExt(method: "raster_pdf" | "image" | "image_pdf" | "dxf" | "step" | "stl" | "iges", srcExt: string): string {
   switch (method) {
     case "raster_pdf":
     case "image_pdf":
@@ -78,6 +78,10 @@ export function outputExt(method: "raster_pdf" | "image" | "image_pdf" | "dxf" |
       return "dxf";
     case "step":
       return /^stp$/i.test(srcExt) ? "stp" : "step";
+    case "stl":
+      return "stl";
+    case "iges":
+      return /^igs$/i.test(srcExt) ? "igs" : "iges";
     default:
       return /^png$/i.test(srcExt) ? "png" : "jpg";
   }

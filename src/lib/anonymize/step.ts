@@ -269,7 +269,7 @@ export function anonymizeStep(bytes: Uint8Array, ctx: RuleContext): StepResult {
     if (!v.trim()) continue;
     const isProductId = sec === "DATA" && types[0] === "PRODUCT" && arg === 0;
     if (!isProductId && (containsTerm(v, ctx.terms) || ruleLine(v, "title_block", ctx).hits.length)) res.problems.push("zbyl citlivý literál");
-    if (isSuspiciousLiteral(v)) res.suspicious = true;
+    if (isSuspiciousLiteral(v, ctx.keepTerms)) res.suspicious = true;
   }
   res.ok = true;
   return res;

@@ -45,8 +45,10 @@ describe("DXF", () => {
     const r = anonymizeDxf(enc(SAMPLE), ctx());
     expect(r.ok).toBe(true);
     const out = dec(r.bytes);
-    // název hladiny se v1 nepřejmenovává (odkazy) — jinde termín nesmí zůstat
-    expect(out.replace("LOGO_STROJMETAL", "")).not.toMatch(/strojmetal/i);
+    // název hladiny s termínem se přejmenuje jednotně (i odkazy) — termín nesmí zůstat nikde
+    expect(out).not.toMatch(/strojmetal/i);
+    // „LOGO" už v souboru je (hladina obrázku) → bez kolize „LOGO_2"
+    expect(out).toMatch(/^\s*2\nLOGO_2$/m);
     expect(out).not.toContain("Novák");
     expect(out).not.toContain("novak");
     expect(out).not.toContain("C:\\");
@@ -56,8 +58,8 @@ describe("DXF", () => {
     expect(out).toContain("100.0");
     expect(out).not.toMatch(/^\s*0\nIMAGE$/m);
     expect(r.removedImages).toBe(1);
-    // název hladiny s termínem se nepřejmenuje (v1) → review
-    expect(r.warnings.some((w) => w.code === "dxf_layer_term")).toBe(true);
+    // název hladiny přejmenovaný → žádné varování o názvu; DXF v1 stejně ke kontrole (grafika)
+    expect(r.warnings.some((w) => w.code === "dxf_layer_term")).toBe(false);
     expect(r.warnings.some((w) => w.code === "dxf_graphics")).toBe(true);
     expect(r.verified).toBe(true);
     expect(parseDxfPairs(out)).not.toBeNull();

@@ -2,7 +2,7 @@ import "server-only";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { addUsage } from "@/lib/ai/ai-call";
 import type { AiCallConfig } from "./detect-ai";
-import { checkImageOutput, decodeImage, encodeImageOutput, imagePages, maybeGray, rasterToJpeg } from "./image";
+import { checkImageOutput, decodeImage, encodeImageOutput, heicToJpeg, imagePages, maybeGray, rasterToJpeg } from "./image";
 import { buildRasterPdf, type OutPage } from "./pdf-raster";
 import { keepValuesOf, reburn } from "./pdf-pipeline";
 import { applyManual, burnable, normalizeRegion, sortRegions } from "./regions";
@@ -57,34 +57,50 @@ export interface PhotoAnonResult {
   cache: { v: 1; pages: Record<number, VisionAiCache> } | null;
   unsupported: string | null;
   pages: number;
+  /** Zdroj je v plném rozlišení (master, originál z e-mailu, PNG / TIFF, HEIC). */
+  hasMaster: boolean;
 }
 
 export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonResult> {
   const res: PhotoAnonResult = {
     method: "image", bytes: null, mime: "image/jpeg", ext: "jpg", regions: [], texts: [], warnings: [], isDrawing: null, aiUsed: false,
     fallback: false, confidence: 1, usage: null, calls: 0, verifyClean: null, verifyKeepPresent: null, pxPerMm: null, titleBlockFound: false,
-    customerStandard: false, termInKeep: false, outputProblems: [], keepValues: {}, cache: null, unsupported: null, pages: 1,
+    customerStandard: false, termInKeep: false, outputProblems: [], keepValues: {}, cache: null, unsupported: null, pages: 1, hasMaster: input.hasMaster,
   };
-  let meta: { pages: number; format: string; compression?: string };
+  let meta: { pages: number; format: string; compression?: string; width?: number; height?: number };
+  let bytes = input.bytes;
+  let hasMaster = input.hasMaster;
+  const isHeif = (b: Uint8Array) => b.length >= 12 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70;
   try {
-    meta = await imagePages(input.bytes);
+    meta = await imagePages(bytes);
   } catch {
-    res.unsupported = "Obrázek nelze přečíst (HEIC z prohlížeče bez převodu, poškozený soubor) — pošli JPEG nebo PDF.";
-    return res;
+    if (!isHeif(bytes)) {
+      res.unsupported = "Obrázek nelze přečíst (poškozený soubor) — pošli JPEG, PNG nebo PDF.";
+      return res;
+    }
+    meta = { pages: 1, format: "heif", compression: "hevc" };
   }
-  if (meta.format === "heif") {
-    res.unsupported = "Fotka HEIC nejde na serveru přečíst — vyfoť znovu (JPEG) nebo nahraj PDF.";
-    return res;
+  // HEIC z iPhonu (HEVC): sharp ho nedekóduje → libheif (WebAssembly) → JPEG bez metadat
+  if (meta.format === "heif" && meta.compression !== "av1") {
+    try {
+      bytes = await heicToJpeg(bytes);
+      meta = await imagePages(bytes);
+      // celý originál z telefonu (žádné zmenšení v prohlížeči) = master
+      hasMaster = true;
+    } catch {
+      res.unsupported = "Nelze anonymizovat automaticky (fotka HEIC se nepodařila přečíst) — vyfoť znovu jako JPEG (iPhone: Nastavení → Fotoaparát → Formáty → Nejkompatibilnější) nebo nahraj PDF.";
+      return res;
+    }
   }
-  if (meta.format === "tiff" && /ccitt|fax|group ?4/i.test(meta.compression ?? "")) {
-    res.unsupported = "TIFF s faxovou kompresí (G4) nelze přečíst — pošli PDF.";
-    return res;
-  }
+  // Prohlížeč zmenšuje jen velké fotky do JPEG ≤ 2400 px (a master ukládá zvlášť). Soubor, který takhle
+  // zmenšený být nemůže (PNG / TIFF / WebP / větší než 2400 px), je originál = master.
+  if (!hasMaster && (meta.format !== "jpeg" || Math.max(meta.width ?? 0, meta.height ?? 0) > 2400)) hasMaster = true;
   const pageCount = meta.format === "tiff" ? Math.max(1, meta.pages) : 1;
   res.pages = pageCount;
   const asPdf = input.asPdf || pageCount > 1;
   const png = meta.format === "png";
-  if (!input.hasMaster) res.warnings.push({ code: "no_master", message: "Fotka v nízkém rozlišení — zkontroluj (příště vyfoť v plném rozlišení)." });
+  res.hasMaster = hasMaster;
+  if (!hasMaster) res.warnings.push({ code: "no_master", message: "Fotka v nízkém rozlišení — zkontroluj (příště vyfoť v plném rozlišení)." });
   const cache = input.cache ?? { v: 1 as const, pages: {} };
   const outPages: OutPage[] = [];
   let single: Uint8Array | null = null;
@@ -102,7 +118,7 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
   for (let p = 1; p <= Math.min(pageCount, MAX_TIFF_PAGES); p++) {
     let raster;
     try {
-      raster = await decodeImage(input.bytes, pageCount > 1 ? p - 1 : undefined);
+      raster = await decodeImage(bytes, pageCount > 1 ? p - 1 : undefined);
     } catch (err) {
       res.unsupported = `Obrázek nelze přečíst: ${err instanceof Error ? err.message.slice(0, 120) : "chyba"}`;
       return res;

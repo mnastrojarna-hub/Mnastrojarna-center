@@ -29,6 +29,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const reviewed = new Set((url.searchParams.get("reviewed") ?? "").split(",").filter(isUuid));
   /** Potvrzeno „není to podklad zákazníka" (externí soubor bez anonymizace). */
   const confirmed = new Set((url.searchParams.get("confirmed") ?? "").split(",").filter(isUuid));
+  /** Originál bez anonymizace (formát, který nejde — DWG, Word…): jen super admin, vždy s auditem. */
+  const superAdmin = guard.user.role === "super_admin";
+  const sendOriginal = new Set((url.searchParams.get("original") ?? "").split(",").filter(isUuid));
+  if (sendOriginal.size && !superAdmin) return json({ error: "Originál bez anonymizace smí dodavateli poslat jen super admin." }, 403);
   const originals: string[] = [];
   if (!files.length) return json({ error: "Vyber soubory." }, 400);
   const { data: job } = await guard.db.from("orders").select("id, number").eq("id", jobId).maybeSingle();
@@ -46,13 +50,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!row) { missing.push({ id, filename: "?", reason: "Soubor nepatří k zakázce." }); continue; }
     const chk = await assertJobFileAccess(guard.db as never, id, guard.access, "send");
     if (!chk.ok) { missing.push({ id, filename: row.filename, reason: chk.error }); continue; }
-    const d = pickShareFile(row, { reviewedByCaller: reviewed.has(id), confirmNotCustomerMaterial: confirmed.has(id), priceDocument: price.has(id.toLowerCase()) });
+    const d = pickShareFile(row, {
+      reviewedByCaller: reviewed.has(id), confirmNotCustomerMaterial: confirmed.has(id), priceDocument: price.has(id.toLowerCase()),
+      // výslovně potvrzený originál jen u souboru, který anonymizovat nejde (hotovou kopii nikdy neobchází)
+      ...(sendOriginal.has(id) && row.anon_status === "unsupported" ? { original: true, isSuperAdmin: superAdmin } : {}),
+    });
     if (!d.ok) { missing.push({ id, filename: d.reason === "pending" ? "(anonymizuje se)" : row.anon_filename ?? "výkres", reason: d.message }); continue; }
     try {
       const bytes = await verifyShareBytes(guard.db as never, d, row);
       total += bytes.length;
       if (total > MAX_BYTES) { missing.push({ id, filename: d.filename, reason: "Balíček by byl větší než 100 MB." }); continue; }
-      entries.push({ name: d.filename, bytes });
+      // originál (super admin) bez původního názvu — ten často nese jméno zákazníka
+      const ext = /\.[A-Za-z0-9]{1,8}$/.exec(d.filename)?.[0]?.toLowerCase() ?? "";
+      entries.push({ name: d.source === "original" && sendOriginal.has(id) ? `original-${entries.length + 1}${ext}` : d.filename, bytes });
       if (d.audit) originals.push(id);
     } catch (err) {
       missing.push({ id, filename: d.filename, reason: err instanceof Error ? err.message : "Chyba" });
