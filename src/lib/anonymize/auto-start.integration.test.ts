@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -371,7 +371,7 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace se spustí sama hned po nahrání (
     expect(finished((await status(b)).anon_status)).toBe(true);
   }, 120_000);
 
-  it("selhání zpracování: pending s českým důvodem (opakování), 3. pokus → failed; UI dostane českou větu", async () => {
+  it("smazaný originál: hned failed s pravdivým českým důvodem (opakování nepomůže)", async () => {
     const job = await newJob();
     const id = await insertFile(job, "rozbity.pdf");
     // rozbitý zdroj: soubor v úložišti chybí
@@ -381,9 +381,50 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace se spustí sama hned po nahrání (
     for (let i = 0; i < 3; i++) await processQueue({ ids: [id], fanOut: false, deadline: Date.now() + 200_000 });
     const st = await status(id);
     expect(st.anon_status).toBe("failed");
-    expect(st.anon_attempts).toBe(3);
-    expect(st.anon_reason).toBeTruthy();
+    expect(st.anon_attempts).toBe(1);
+    expect(st.anon_reason).toBe("Originál souboru v úložišti chybí — nahraj ho znovu.");
     expect(st.anon_reason).not.toMatch(/^[A-Za-z ]+error/i);
+  }, 120_000);
+
+  it("po nasazení: soubory s dřívější nepravdivou hláškou „poškozené nebo zaheslované“ vrátí migrace do fronty a doběhnou samy", async () => {
+    const job = await newJob();
+    const a = await insertFile(job, "stary-poskozene.pdf");
+    const b = await insertFile(job, "stary-technicka.pdf");
+    const c = await insertFile(job, "stary-cas.pdf");
+    localSql(`update job_files set anon_status = 'failed', anon_attempts = 3, anon_reason = 'PDF je poškozené nebo zaheslované — nejde otevřít. Požádej o nový soubor.' where id = '${a}'`);
+    localSql(`update job_files set anon_status = 'failed', anon_attempts = 3, anon_reason = 'Anonymizace se nepovedla (technická chyba) — zkus Anonymizovat znovu.' where id = '${b}'`);
+    localSql(`update job_files set anon_status = 'failed', anon_attempts = 3, anon_reason = 'Opakovaně překročen čas zpracování.' where id = '${c}'`);
+    const mig = readFileSync(path.join(process.cwd(), "supabase/migrations/20261030180000_anonymizace_pdf_znovu.sql"), "utf8");
+    for (let i = 0; i < 2; i++) localSql(mig); // idempotentní
+    for (const id of [a, b]) expect(await status(id)).toEqual({ anon_status: "pending", anon_reason: null, anon_attempts: 0 });
+    expect((await status(c)).anon_status).toBe("failed"); // jiný důvod se nemění
+    // zpracuje je běžná fronta (otevření zakázky / plánovač) — bez ručního klikání
+    const { processQueue } = await import("./runner");
+    await processQueue({ jobIds: [job], fanOut: false, deadline: Date.now() + 200_000 });
+    for (const id of [a, b]) {
+      const st = await status(id);
+      expect(finished(st.anon_status), `${st.anon_status}: ${st.anon_reason}`).toBe(true);
+    }
+  }, 180_000);
+
+  it("chyba prostředí („Path2D is not defined“ jako na Vercelu) → pending „zkusí se znovu automaticky“, další běh soubor dokončí; nikdy „poškozené“", async () => {
+    const job = await newJob();
+    const id = await insertFile(job, "vykres-porucha.pdf");
+    const { sha256Hex } = await import("./text");
+    const fault = path.join(process.env.AI_FAKE_ANON!, `${await sha256Hex(pdf)}.fault.json`);
+    writeFileSync(fault, JSON.stringify({ message: "Path2D is not defined" }));
+    const { processQueue } = await import("./runner");
+    await processQueue({ ids: [id], fanOut: false, deadline: Date.now() + 200_000 });
+    const st1 = await status(id);
+    expect(existsSync(fault)).toBe(false);
+    expect(st1.anon_status).toBe("pending");
+    expect(st1.anon_attempts).toBe(1);
+    expect(st1.anon_reason).toBe("Anonymizace se nepovedla kvůli technické chybě při zpracování — zkusí se znovu automaticky.");
+    await processQueue({ ids: [id], fanOut: false, deadline: Date.now() + 200_000 });
+    const st2 = await status(id);
+    expect(finished(st2.anon_status), `${st2.anon_status}: ${st2.anon_reason}`).toBe(true);
+    expect(st2.anon_attempts).toBe(2);
+    expect(String(st2.anon_reason ?? "")).not.toMatch(/poškozené|zaheslované/);
   }, 120_000);
 
   it("Nastavení: nedosažitelná adresa a zaseknutý výkres → jasné varování", async () => {

@@ -6,9 +6,9 @@ import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { logUsage, spentToday } from "./budget";
 import { isAnonCandidate, isUnsupportedExt, sourceFormat, unsupportedHowTo, UNSUPPORTED_PREFIX } from "./candidate";
 import { accToDecide, decideAnonStatus, mergeBatch, type DecideInput } from "./decide";
-import { isFakeAnon, termsPrompt, usageUsd, type AiCallConfig } from "./detect-ai";
+import { consumeFakeFault, isFakeAnon, termsPrompt, usageUsd, type AiCallConfig } from "./detect-ai";
 import { anonFilename, outputExt, rebaseTwinFilename } from "./filename";
-import { userFacingFailure } from "./failure-text";
+import { classifyFailure, retryPlan, userFacingFailure } from "./failure-text";
 import { describeSummary, summarize } from "./regions";
 import {
   ANON_COLS, SUBJECT_SELECT, afterSettled, claim, event, label, loadSettings, priceDocIds, subjectOf,
@@ -186,7 +186,8 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
       pageFrom, deadline: opts.deadline, manual: opts.manual, cache: (opts.cache as never) ?? null,
     });
     if (r.failure && !r.pages.length) {
-      if (/heslem|XFA|víc než|není platné|příliš velký/i.test(r.failure)) return { unsupported: r.failure };
+      // vada souboru (heslo k otevření, nečitelné PDF, XFA, moc stran, obří sken) → „nelze"; jinak opakovat
+      if (r.unsupported) return { unsupported: r.failure };
       throw new Error(r.failure);
     }
     const included = [...(pageFrom > 1 ? prevPages?.included ?? [] : []), ...r.pages.filter((p) => p.included).map((p) => p.page)];
@@ -406,6 +407,9 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       return { id: s.id, table, status: "unsupported", reason: r.reason, spawned: r.spawned };
     }
     const sha = await sha256Hex(bytes);
+    // jen testy (AI_FAKE_ANON): jednorázová porucha prostředí → musí se opakovat, nikdy „poškozené"
+    const fault = consumeFakeFault(sha);
+    if (fault) throw new Error(fault);
     const gathered = await gatherTerms(db, { jobId: s.jobId, settings, extracted: s.extracted });
     const ruleCtx: RuleContext = { terms: gathered.terms, keepTerms: gathered.keep, redact: settings.redact };
     const cfgHash = await configHash(settings);
@@ -561,7 +565,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       return { id: s.id, table, status: "skipped", reason: "Není výkres" };
     }
     if (status === "failed" || status === "pending" || !out.bytes) {
-      const r = userFacingFailure(reason ?? "Výstup se nepodařilo vytvořit.", fmt);
+      const r = userFacingFailure(reason ?? "Výstup se nepodařilo vytvořit.");
       const retry: AnonStatus = status === "pending" ? "pending" : "failed";
       // nový pokus začne od první strany (části předchozích dávek pryč)
       await finish(db, s, { anon_status: retry, anon_reason: r, anon_at: new Date().toISOString(), anon_usage: usage, ...(out.method === "raster_pdf" ? { anon_pages: null } : {}) });
@@ -602,11 +606,17 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     const raw = err instanceof Error ? err.message.slice(0, 300) : "Neočekávaná chyba.";
     // surová (anglická) chyba jen do logu serveru, uživatel dostane českou větu s radou
     console.error(`[anonymize] ${table}/${row.id}: ${raw}`);
-    const message = userFacingFailure(raw, sourceFormat(s.filename, s.mime));
-    const attempts = row.anon_attempts ?? 1;
-    const status: AnonStatus = attempts < 3 && failure !== "auth" && failure !== "spend_limit" ? "pending" : "failed";
+    // poctivě: vada souboru → hned „nelze/selhalo" s důvodem; chyba prostředí / běhu → opakuje se sama
+    const aiRefused = failure === "auth" || failure === "spend_limit";
+    const info = aiRefused
+      ? { kind: "internal" as const, text: "AI požadavek odmítla (klíč nebo limit útraty) — zkontroluj Nastavení → Integrace a klikni Anonymizovat znovu.", transient: false }
+      : classifyFailure(raw);
+    const plan = retryPlan(row.anon_attempts ?? 1, info);
+    const status: AnonStatus = plan.status;
+    const message = plan.text;
+    const lockUntil = plan.status === "pending" && plan.delayMs > 0 ? new Date(Date.now() + plan.delayMs).toISOString() : null;
     try {
-      await db.from(s.table).update({ anon_status: status, anon_reason: message, anon_lock_until: null, ...(status === "failed" ? { anon_at: new Date().toISOString() } : {}) }).eq("id", s.id);
+      await db.from(s.table).update({ anon_status: status, anon_reason: message, anon_lock_until: lockUntil, ...(status === "failed" ? { anon_at: new Date().toISOString() } : {}) }).eq("id", s.id);
       if (status === "failed") {
         await event(db, s, SYSTEM_ACTOR, `Anonymizace výkresu ${label(s)} selhala — ${message}`, { anonStatus: "failed" });
         await afterSettled(db, s);

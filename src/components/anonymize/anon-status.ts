@@ -75,7 +75,7 @@ export function isBudgetWait(status: string | null | undefined, reason: string |
 /** Důvod pro uživatele: technickou (anglickou) chybu u selhání nahradí českou větou. */
 export function displayReason(status: string | null | undefined, reason: string | null | undefined): string | null {
   if (!reason) return null;
-  return status === "failed" ? userFacingFailure(reason, null) : reason;
+  return status === "failed" ? userFacingFailure(reason) : reason;
 }
 
 /** Stav jednoho souboru → štítek. total = počet smazaných oblastí (když je znám). */

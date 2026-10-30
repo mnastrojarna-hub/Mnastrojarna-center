@@ -1,5 +1,5 @@
 import "server-only";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { callStructured, type AiEffort } from "@/lib/ai/ai-call";
@@ -255,6 +255,25 @@ function neutralFake(call: AnonCall, images: Omit<AiImageSpec, "jpeg">[], pages:
       return { tiles: images.map((im) => ({ img: im.index, lines: [], graphics: [] })), confidence: 0.95 };
     case "verify":
       return { tiles: images.map((im) => ({ img: im.index, lines: [], graphics: [] })) };
+  }
+}
+
+/**
+ * Jen testy (AI_FAKE_ANON, nikdy produkce): jednorázová porucha běhu pro soubor s daným obsahem —
+ * `<sha>.fault.json` = { "message": "…" } se při zpracování spotřebuje (smaže) a běh vyhodí chybu
+ * (simulace výpadku prostředí, např. „Path2D is not defined"). Další pokus už proběhne normálně.
+ */
+export function consumeFakeFault(sha: string): string | null {
+  const dir = isFakeAnon() && process.env.AI_FAKE_ANON ? path.resolve(process.env.AI_FAKE_ANON) : null;
+  if (!dir || !existsSync(dir) || !/^[0-9a-f]{64}$/.test(sha)) return null;
+  const f = path.join(dir, `${sha}.fault.json`);
+  if (!existsSync(f)) return null;
+  try {
+    const msg = String((JSON.parse(readFileSync(f, "utf8")) as { message?: unknown }).message ?? "Simulovaná porucha");
+    unlinkSync(f);
+    return msg;
+  } catch {
+    return null;
   }
 }
 
