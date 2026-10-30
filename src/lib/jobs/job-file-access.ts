@@ -22,6 +22,7 @@ export type { FileLock };
 export const FILE_PRICE_VIEW = "Nákupní doklad vidí obchodník a super admin.";
 export const FILE_PRICE_SEND = "Nákupní doklad posílá obchodník nebo super admin.";
 export const FILE_PRICE_KIND = "Druh nákupního dokladu mění obchodník nebo super admin.";
+export const FILE_INVOICE_VIEW = "Fakturu vidí a posílá obchodník nebo super admin.";
 export const FILE_UNAPPROVED_VIEW = "Nabídka čeká na schválení super admina — stáhni náhled s vodoznakem (‚PDF náhled‘).";
 export const FILE_STALE_VIEW = "Toto PDF nabídky vzniklo před posledním schválením — vystav nové.";
 /** = text odeslání v job-documents (25-A). */
@@ -85,6 +86,11 @@ interface QuoteApprovalRow {
   sent_at: string | null;
 }
 
+/** Naše faktura zákazníkovi (ne faktura dodavatele). */
+function isOurInvoice(f: Pick<FileLockInput, "kind" | "issuer">): boolean {
+  return f.kind === "faktura" && f.issuer !== "dodavatel";
+}
+
 /** Zámky obsahu pro seznam dokumentů (jeden dávkový dotaz na nákupní doklady a schválení nabídek). */
 export async function fileLocks(db: JobsDb, files: FileLockInput[], access: Pick<Access, "user" | "can">): Promise<Map<string, FileLock>> {
   const out = new Map<string, FileLock>();
@@ -98,6 +104,8 @@ export async function fileLocks(db: JobsDb, files: FileLockInput[], access: Pick
     for (const f of list) {
       // chyba DB → zamknout (i to, co by podle TS pravidla nákupní nebylo)
       if (!price || price.has(f.id.toLowerCase()) || isPriceDocument({ ...f, issuer: f.issuer ?? null }, new Set())) out.set(f.id, "price");
+      // A2: i NAŠE faktura (ceny, částka k úhradě) je jen pro finance — „Faktury asi ne" pro ostatní
+      else if (isOurInvoice(f)) out.set(f.id, "price");
     }
   }
 
@@ -156,6 +164,7 @@ export async function assertJobFileAccess(
     id: file.id, kind: file.kind, issuer: file.issuer, origin: file.origin, quoteId: file.quote_id, createdAt: file.created_at,
   }, access);
   if (lock === "price") {
+    if (isOurInvoice(file)) return { ok: false, status: 403, lock, error: FILE_INVOICE_VIEW };
     return { ok: false, status: 403, lock, error: intent === "send" ? FILE_PRICE_SEND : FILE_PRICE_VIEW };
   }
   if (intent !== "edit" && lock === "unapproved") {

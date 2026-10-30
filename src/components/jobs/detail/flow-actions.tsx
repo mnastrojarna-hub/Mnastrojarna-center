@@ -14,6 +14,7 @@ import { StagePickerDialog } from "@/components/jobs/stage-select";
 import { ConfirmOrderDialog, MismatchList } from "@/components/flow/confirm-order-dialog";
 import { DeliveryDialog } from "@/components/jobs/production/delivery-dialog";
 import { PaymentDialog } from "@/components/jobs/production/payment-dialog";
+import { InvoiceDialog, InvoiceInfoDialog, ownInvoiceFile } from "@/components/jobs/production/invoice-dialog";
 import { ProductionHandoffDialog } from "@/components/jobs/production/handoff/handoff-dialog";
 import { DeliveryAfterFinish } from "@/components/jobs/production/handoff/delivery-finish";
 import { productionLabel } from "@/lib/jobs/operations";
@@ -104,7 +105,6 @@ const TAB_OF: Partial<Record<FlowActionKey, DetailTab>> = {
   "production.plan": "vyroba",
   "production.sendPo": "vyroba",
   "delivery.confirmNote": "vyroba",
-  "payment.invoice": "vyroba",
 };
 
 const DIRECT_OK: Partial<Record<FlowActionKey, string>> = {
@@ -234,7 +234,15 @@ export function FlowActionsProvider({
       if (!features.length) opened.current = false;
       return;
     }
-    run(key);
+    // faktura a platby z odkazu jen tehdy, když je karta teď nabízí (hlavní tlačítko nebo ⋯) — starý odkaz /
+    // tabule nesmí otevřít fakturu bez dodání; dodání z odkazu (/documents → DL) dál i z Potvrzeno
+    // vystavená faktura: odkaz „Poslat fakturu znovu" (/documents) otevře tentýž dialog jen k odeslání
+    const resend = key === "payment.invoice" && Boolean((job.invoiceNumber ?? "").trim()) && Boolean(ownInvoiceFile(job.files ?? []));
+    if (key.startsWith("payment.") && key !== next?.key && !menu.includes(key) && !resend) {
+      notify("info", `„${FLOW_ACTIONS[key].label.replace(/…$/, "")}“ teď u této zakázky není k dispozici.`);
+    } else {
+      run(key);
+    }
     try {
       const url = new URL(window.location.href);
       url.searchParams.delete("akce");
@@ -245,7 +253,7 @@ export function FlowActionsProvider({
     } catch {
       // adresa je jen pohodlí
     }
-  }, [initialAction, ctx, features.length, run]);
+  }, [initialAction, ctx, features.length, run, next?.key, menu, notify, job.invoiceNumber, job.files]);
 
   const approveToast = approvedToastOf(job.quotes.find((q) => q.id === activeQuoteId) ?? null);
   const value = React.useMemo<FlowActionsValue>(() => ({
@@ -335,6 +343,10 @@ function FlowDialog({
 }) {
   const jobId = job.id;
   const key = state.key;
+  // dodání ve výrobě: větev („nejdřív ukončit výrobu" → dodání) se určí jednou při otevření — po zápisu
+  // dodání se stav zakázky změní a dialog nesmí přeskočit na jinou větev (ztratil by výsledek s DL)
+  const [deliveryAfterFinish] = React.useState(() => key === "delivery.record" && job.stage === "ve_vyrobe"
+    && (facts.productionTotal ?? 0) > (facts.productionDone ?? 0) && Boolean(facts.productionStep) && facts.productionStep !== "hotovo");
   const qid = quote?.id ?? null;
   const qLabel = quote ? `${quote.number}${quote.revision > 1 && !/-R?\d+$/i.test(quote.number) ? ` r${quote.revision}` : ""}` : "nabídka";
   const others = quotes.filter((q) => q.id !== qid && !q.archived && (q.status === "navrh_ai" || q.status === "ke_schvaleni" || q.status === "odeslano"));
@@ -536,13 +548,12 @@ function FlowDialog({
     case "delivery.closeShort":
     case "delivery.partialNote":
       // ve výrobě s otevřenými kroky: nejdřív „Ukončit výrobu" (kroky, neodeslané objednávky), pak dodání (C.3)
-      if (key === "delivery.record" && job.stage === "ve_vyrobe" && (facts.productionTotal ?? 0) > (facts.productionDone ?? 0)
-        && facts.productionStep && facts.productionStep !== "hotovo") {
+      if (deliveryAfterFinish) {
         return (
           <DeliveryAfterFinish
             jobId={jobId}
             items={job.items}
-            stepLabel={productionLabel(facts.productionStep, facts.productionLocation ?? null)}
+            stepLabel={productionLabel(facts.productionStep ?? null, facts.productionLocation ?? null)}
             onClose={onClose}
             onDone={onDone}
             onSplitItems={() => setTab("polozky")}
@@ -558,6 +569,31 @@ function FlowDialog({
           mode={key === "delivery.closeShort" ? "closeShort" : key === "delivery.partialNote" ? "partialNote" : "record"}
           onDone={onDone}
           onSplitItems={() => setTab("polozky")}
+        />
+      );
+    case "payment.invoice": {
+      // jediná cesta k faktuře: dialog odeslání jako u nabídky; vystaví se až tlačítkem (i „Vystavit,
+      // neposílat"); vystavená faktura se jen pošle znovu (žádné nové PDF ani datum)
+      const pdf = (job.invoiceNumber ?? "").trim() ? ownInvoiceFile(job.files ?? []) : null;
+      return (
+        <InvoiceDialog
+          open
+          onOpenChange={onClose}
+          jobId={jobId}
+          existing={pdf ? { fileId: pdf.id, filename: pdf.filename, number: job.invoiceNumber ?? null } : null}
+          onDone={onDone}
+        />
+      );
+    }
+    case "payment.invoiceExternal":
+      return (
+        <InvoiceInfoDialog
+          open
+          onOpenChange={onClose}
+          jobId={jobId}
+          mode="external"
+          terms={job.customerDetail?.paymentTermsDays ?? null}
+          onDone={onDone}
         />
       );
     case "payment.record":

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   currentDeliveryNotes, deliveryCompletes, deliveryLabel, deliveryLines, deliveryNoteNumberOf, deliveryNoteTitle,
   deliveredRows, isDeliveryNoteFile, isOwnDeliveryNote, itemDelivered, qtyInput, remainingQty, remainingRows,
+  undocumentedRows, hadUndocumentedBefore, CATCH_UP_LABEL,
 } from "./delivery-notes";
 
 const items = [
@@ -95,5 +96,36 @@ describe("označení a číslo dodacího listu", () => {
     expect(qtyInput(12.5)).toBe("12,5");
     expect(qtyInput(4)).toBe("4");
     expect(qtyInput(0.1 + 0.2)).toBe("0,3");
+  });
+});
+
+// ── A2: dodávka bez DL u zakázky, která jiné DL už má ──
+describe("dodané zboží bez dodacího listu", () => {
+  const items = [
+    { id: "a", quantity: 10, deliveredQuantity: 10 },
+    { id: "b", quantity: 4, deliveredQuantity: 1 },
+    { id: "c", quantity: 2, deliveredQuantity: 0 },
+  ];
+
+  it("undocumentedRows: jen to, co žádný DL nepokrývá (od zdokumentovaného do dodaného)", () => {
+    expect(undocumentedRows(items, new Map([["a", 6], ["b", 1]]))).toEqual([{ itemId: "a", from: 6, to: 10 }]);
+    expect(undocumentedRows(items, new Map([["a", 10], ["b", 1]]))).toEqual([]);
+    expect(undocumentedRows(items, new Map())).toEqual([{ itemId: "a", from: 0, to: 10 }, { itemId: "b", from: 0, to: 1 }]);
+    // starší DL bez vazby na položky → nejde poznat, nic se nenabízí
+    expect(undocumentedRows(items, null)).toEqual([]);
+  });
+
+  it("hadUndocumentedBefore: dodávka bez DL před touto se počítá do pořadí", () => {
+    // dřív dodáno 6 ks bez DL, teď 6 → 10 s DL
+    expect(hadUndocumentedBefore([{ id: "a", quantity: 10, deliveredQuantity: 6 }], [{ itemId: "a", from: 6, to: 10 }], new Map())).toBe(true);
+    // první dodávka vůbec
+    expect(hadUndocumentedBefore([{ id: "a", quantity: 10, deliveredQuantity: 0 }], [{ itemId: "a", from: 0, to: 4 }], new Map())).toBe(false);
+    // předchozí dodávka má DL
+    expect(hadUndocumentedBefore([{ id: "a", quantity: 10, deliveredQuantity: 6 }], [{ itemId: "a", from: 6, to: 10 }], new Map([["a", 6]]))).toBe(false);
+    expect(hadUndocumentedBefore([{ id: "a", quantity: 10, deliveredQuantity: 6 }], [{ itemId: "a", from: 6, to: 10 }], null)).toBe(false);
+  });
+
+  it("DL na dříve dodané zboží je dodací list dodávky (Doklady, karta, čip)", () => {
+    expect(isDeliveryNoteFile({ kind: "dodaci_list", title: `Dodací list DL-2026-090 · ${CATCH_UP_LABEL}` })).toBe(true);
   });
 });

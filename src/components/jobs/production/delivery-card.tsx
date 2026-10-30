@@ -34,9 +34,12 @@ export function DeliveryCard({ job, className }: { job: JobDetail; className?: s
   const allDone = summary ? summary.done === summary.total : rank >= 9;
   const can = flow.ctx.can("workflow");
   const notes = currentDeliveryNotes(job.files ?? []);
+  // hlavní tlačítko v hlavičce je právě zápis dodání → druhé stejné tlačítko v kartě se neukazuje;
+  // ve výrobě (hlavička = posun výroby) je karta nejviditelnější cesta k dodání a DL — zůstává
+  const sameAsHeader = flow.next?.key === "delivery.record" || flow.next?.key === "delivery.partialNote";
 
   return (
-    <section aria-label="Dodání zákazníkovi" className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", className)}>
+    <section id="dodani-zakaznikovi" aria-label="Dodání zákazníkovi" className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", className)}>
       <header className="flex items-center gap-2.5 border-b px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300">
           <Truck className="h-4 w-4" />
@@ -71,9 +74,15 @@ export function DeliveryCard({ job, className }: { job: JobDetail; className?: s
         )}
         {can && !allDone && (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="success" className="h-11 sm:h-9" onClick={() => flow.run(items.length ? "delivery.record" : "delivery.partialNote")}>
-              <Truck /> {key === "castecne" ? "Dodat zbytek" : items.length ? "Zapsat dodání a dodací list" : "Zapsat dodání"}
-            </Button>
+            {sameAsHeader ? (
+              <p className="w-full text-xs text-muted-foreground">
+                Dodání zapíšeš tlačítkem <strong className="font-semibold text-foreground">{flow.next?.label}</strong> nahoře — vystaví dodací list s dodanými kusy.
+              </p>
+            ) : (
+              <Button type="button" variant="success" className="h-11 sm:h-9" onClick={() => flow.run(items.length ? "delivery.record" : "delivery.partialNote")}>
+                <Truck /> {key === "castecne" ? "Dodat zbytek" : items.length ? "Zapsat dodání a dodací list" : "Zapsat dodání"}
+              </Button>
+            )}
             {key === "castecne" && items.length > 0 && (
               <Button type="button" variant="outline" className="h-11 sm:h-9" onClick={() => flow.run("delivery.closeShort")}>
                 <PackageCheck className="text-green-600" /> Uzavřít s menším množstvím

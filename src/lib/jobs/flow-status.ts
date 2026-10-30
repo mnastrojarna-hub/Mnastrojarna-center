@@ -4,7 +4,7 @@ import {
   ShoppingCart, GitCompare, BadgeCheck, RefreshCw, Ban, PackageCheck, CircleDotDashed, Factory, FilePlus, FileCheck,
   MailCheck, FileX, ClipboardCheck, Truck, Package, Banknote, AlarmClock, Sparkles, Hand, Camera, Mail, Cog, Upload,
   Clock, Globe, Database, CircleSlash, Pencil, Undo, CalendarPlus, ThumbsUp, Handshake, ReceiptText, Wrench,
-  ArrowRightCircle, Flag, CalendarClock, CalendarX2, UserRoundX,
+  ArrowRightCircle, Flag, CalendarClock, CalendarX2, UserRoundX, FileSignature,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -914,6 +914,25 @@ export function confirmationKey(f: FlowFacts): ConfirmationState | null {
   return null;
 }
 
+/**
+ * Dodání pro fakturu (bez ohledu na doklad objednávky): complete = dodáno vše (i uzavřeno s menším
+ * množstvím, i starší zakázka ručně posunutá na Dodáno a dál), partial = dílčí dodávka, none = nic.
+ * Faktura z aplikace jen při complete (dílčí faktura na dodané kusy zatím není) — sdílí karta i server.
+ */
+export function invoiceDeliveryOf(
+  f: Pick<FlowFacts, "stage" | "itemsCount" | "itemsDelivered" | "itemsPartial" | "partialDeliveryAt">,
+): "none" | "partial" | "complete" {
+  const facts = f as FlowFacts;
+  if (deliveredAll(facts) || (flowRank(f.stage) >= 9 && !deliveredPartial(facts))) return "complete";
+  return deliveredPartial(facts) ? "partial" : "none";
+}
+
+/** Fakturu z aplikace jde vystavit: dodáno vše, zakázka ještě fakturu nemá, Ve výrobě…Vyfakturováno. */
+export function canIssueInvoice(f: FlowFacts): boolean {
+  const rank = flowRank(f.stage);
+  return !(f.invoiceNumber ?? "").trim() && rank >= 5 && rank <= 10 && invoiceDeliveryOf(f) === "complete";
+}
+
 export function deliveryKey(f: FlowFacts): DeliveryState | null {
   if (!f.orderStatus || CLOSED_FOR_ORDER.includes(f.stage)) return null;
   const rank = flowRank(f.stage);
@@ -1597,8 +1616,8 @@ export type FlowActionKey =
   | "order.sendConfirmation" | "order.cancel" | "order.propose" | "order.reopen" | "production.plan" | "production.handoff"
   | "production.advance" | "production.finish" | "production.replan" | "production.sendPo" | "production.undo"
   | "purchasing.notifySuppliers" | "delivery.record"
-  | "delivery.closeShort" | "delivery.partialNote" | "delivery.confirmNote" | "payment.invoice" | "payment.record"
-  | "payment.settle" | "job.correct";
+  | "delivery.closeShort" | "delivery.partialNote" | "delivery.confirmNote" | "payment.invoice" | "payment.invoiceExternal"
+  | "payment.record" | "payment.settle" | "job.correct";
 
 export interface FlowActionMeta {
   key: FlowActionKey;
@@ -1674,7 +1693,10 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "delivery.closeShort": act({ key: "delivery.closeShort", label: "Uzavřít s menším množstvím…", icon: PackageCheck, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "delivery.partialNote": act({ key: "delivery.partialNote", label: "Částečná dodávka…", icon: CircleDotDashed, intent: "secondary", feature: "workflow", kind: "dialog" }),
   "delivery.confirmNote": act({ key: "delivery.confirmNote", label: "Potvrdit DL", icon: ClipboardCheck, intent: "primary", feature: "orders", kind: "dialog" }),
+  // jediná cesta k faktuře: PDF s QR (řada FV) + evidence faktur + dialog odeslání jako u nabídky
   "payment.invoice": act({ key: "payment.invoice", label: "Vystavit fakturu", icon: ReceiptText, intent: "primary", feature: "margins", kind: "dialog" }),
+  // faktura z jiného systému / ručně psaná: číslo, datum, splatnost (řádek v evidenci faktur bez PDF)
+  "payment.invoiceExternal": act({ key: "payment.invoiceExternal", label: "Faktura vystavená mimo systém…", icon: FileSignature, intent: "secondary", feature: "margins", kind: "dialog" }),
   "payment.record": act({ key: "payment.record", label: "Zadat platbu", icon: Banknote, intent: "primary", feature: "margins", kind: "dialog" }),
   "payment.settle": act({ key: "payment.settle", label: "Zaplaceno", icon: CircleCheckBig, intent: "secondary", feature: "margins", kind: "dialog" }),
   "job.correct": act({ key: "job.correct", label: "Korekce stavu…", icon: Cog, intent: "secondary", feature: "orders", kind: "dialog" }),
@@ -1926,9 +1948,14 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     return allowed(ctx, "purchasing.notifySuppliers", "Stornovat u dodavatelů…");
   }
   if (f.stage === "dodano_zakaznikovi") {
-    if (s.delivery === "dodano") return allowed(ctx, "delivery.confirmNote");
-    if (s.delivery === "dl_potvrzen") return allowed(ctx, "payment.invoice");
-    return null;
+    // faktura hned po dodání / vystavení DL — potvrzený DL není podmínka (volitelný krok v ⋯ a v kartě);
+    // bez práva na faktury (zaměstnanec) zůstává hlavním krokem „Potvrdit DL"
+    if (s.delivery === "castecne") return allowed(ctx, "delivery.record", "Dodat zbytek");
+    const worker = s.delivery === "dodano" ? allowed(ctx, "delivery.confirmNote") : null;
+    // faktura už je (mimo systém při dílčí dodávce, starší data) → další je platba, ne druhá faktura
+    if ((f.invoiceNumber ?? "").trim()) return allowed(ctx, "payment.record") ?? worker;
+    if (canIssueInvoice(f)) return allowed(ctx, "payment.invoice") ?? worker;
+    return worker;
   }
   if (f.stage === "fakturovano") return allowed(ctx, "payment.record");
   // pozastavená zakázka: jediný krok je rozhodnout, kde pokračovat (Korekce stavu s náhledem)
@@ -2009,8 +2036,14 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
     else add("delivery.partialNote");
   }
   if (s.delivery === "dodano") add("delivery.confirmNote");
-  if (s.delivery === "dl_potvrzen" && !f.invoiceNumber) add("payment.invoice");
+  // faktura po dodání všeho (i bez potvrzeného DL) — tentýž dialog jako hlavní tlačítko; jen jednou
+  // (vystavenou fakturu Doklady ▾ otevřou / pošlou znovu), dílčí faktura na část dodávky zatím není
+  if (canIssueInvoice(f)) add("payment.invoice");
+  // faktura vystavená jinde (účetní program, ručně) — číslo, datum, splatnost do evidence; jen po dodání
+  if (rank >= 5 && rank <= 10 && !(f.invoiceNumber ?? "").trim() && invoiceDeliveryOf(f) !== "none") add("payment.invoiceExternal");
   if (s.payment && s.payment !== "zaplaceno") { add("payment.record"); add("payment.settle"); }
+  // záloha / dílčí platba ještě před fakturou (od potvrzené objednávky po dodání) — tentýž dialog
+  if (!s.payment && rank >= 4 && rank <= 9) add("payment.record");
 
   const allowedKeys = keys.filter((k) => ctx.can(FLOW_ACTIONS[k].feature));
   const safe = allowedKeys.filter((k) => FLOW_ACTIONS[k].intent !== "danger");

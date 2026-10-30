@@ -88,7 +88,7 @@ export default async function DocumentsPage(props: {
         title="Vystavit doklad ze zakázky"
         description="Nabídka, potvrzení, dodací list nebo faktura — údaje se vezmou ze zakázky, PDF se uloží k ní a můžeš ho rovnou poslat."
       >
-        <IssueDocumentPanel jobs={issueJobs} />
+        <IssueDocumentPanel jobs={issueJobs} canInvoice={can("margins")} />
       </FlowSection>
 
       <details className="group rounded-2xl border bg-card shadow-sm">

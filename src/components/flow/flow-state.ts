@@ -317,15 +317,18 @@ export function flowActionHref(key: FlowActionKey, jobId: string, opts: { canPri
     case "purchasing.notifySuppliers":
       // předání do výroby: dialog otevře karta zakázky (Kniha ho otevírá rovnou na řádku)
       return `/orders/${jobId}?akce=${key}`;
-    case "production.plan":
-    case "production.sendPo":
     case "delivery.record":
     case "delivery.closeShort":
     case "delivery.partialNote":
     case "delivery.confirmNote":
     case "payment.invoice":
+    case "payment.invoiceExternal":
     case "payment.record":
     case "payment.settle":
+      // dodání, faktura, platba: karta zakázky otevře rovnou tentýž dialog jako hlavní tlačítko
+      return `/orders/${jobId}?akce=${key}`;
+    case "production.plan":
+    case "production.sendPo":
       return `/orders/${jobId}?tab=vyroba`;
     case "job.correct":
       return `/orders/${jobId}?akce=job.correct`;

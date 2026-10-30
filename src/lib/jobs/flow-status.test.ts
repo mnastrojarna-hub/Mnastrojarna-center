@@ -12,7 +12,7 @@ import {
   stampText, stampTitle, transitionFeature, approvalReasons, quoteLabel, flowFactsFromRow, quoteFactsFromRow,
   QUOTE_ACCEPT_BLOCKED, QUOTE_ARCHIVED_SEND, QUOTE_AWAITS_APPROVAL, QUOTE_SEND_NO_RIGHT, approvedStampText,
   quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent,
-  UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META,
+  UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META, canIssueInvoice, invoiceDeliveryOf,
   type ActionCtx, type ChangeStamp, type FlowFacts, type FlowStateMeta, type JobStamps, type QuoteFacts,
 } from "./flow-status";
 import { STAGES, STAGE_ORDER, stageRank } from "./stages";
@@ -406,7 +406,9 @@ describe("nextAction (tabulka 1.12)", () => {
     expect(next(o({ stage: "ve_vyrobe", orderStatus: "potvrzena", orderConfirmedRevision: 1 }))?.key).toBe("production.handoff");
     expect(menuActions(noDoc, deriveFlow(noDoc, [], TODAY), SALES)).toContain("order.sendConfirmation");
     const dz = o({ stage: "dodano_zakaznikovi", orderStatus: "potvrzena", orderConfirmedRevision: 1, confirmationSentRevision: 1 });
-    expect(next(dz)?.key).toBe("delivery.confirmNote");
+    // faktura hned po dodání — potvrzený DL není podmínka (A2, acceptance 8); zaměstnanec bez faktur → Potvrdit DL
+    expect(next(dz)?.key).toBe("payment.invoice");
+    expect(next(dz, [], WORKER)?.key).toBe("delivery.confirmNote");
     expect(next({ ...dz, deliveryNoteConfirmedAt: "2026-10-20" })?.key).toBe("payment.invoice");
     expect(next(o({ stage: "fakturovano", orderStatus: "potvrzena" }))?.key).toBe("payment.record");
     for (const s of ["dokonceno", "reklamace", "nerealizovano", "zruseno"] as JobStage[]) expect(next(o({ stage: s }))).toBeNull();
@@ -920,5 +922,122 @@ describe("předání do výroby — další krok, menu a chipy", () => {
       pos: [{ status: "vystavena" }, { status: "dodana" }, { status: "zrusena" }],
     });
     expect(f).toMatchObject({ productionStep: "tepelne_zpracovani", productionStepNo: 2, productionPoStatus: "vystavena", openPurchaseOrders: 1, deliveredPurchaseOrders: 1, dueDate: "2026-11-20" });
+  });
+});
+
+// ── A2 (beta 29. 10.): konec toku — dodací list → faktura → platba, jedna cesta každé akce ──
+describe("konec toku: faktura po DL bez potvrzení, DL z Ve výrobě, jedna cesta platby", () => {
+  const o = (p: Partial<FlowFacts>) => facts({ inquiryStatus: "zpracovana", orderStatus: "potvrzena", orderRevision: 1, orderConfirmedRevision: 1, confirmationSentRevision: 1, ...p });
+  const s = (f: FlowFacts) => deriveFlow(f, [], TODAY);
+  const nx = (f: FlowFacts, c: ActionCtx = SALES) => nextAction(f, s(f), c);
+  const menu = (f: FlowFacts, c: ActionCtx = SALES) => menuActions(f, s(f), c);
+
+  it("Dodáno zákazníkovi (DL vystaven, nepotvrzen) → hlavní „Vystavit fakturu“; potvrzení DL jen v menu", () => {
+    const dz = o({ stage: "dodano_zakaznikovi", itemsCount: 2, itemsDelivered: 2, lastDeliveryAt: "2026-10-22T10:00:00Z" });
+    expect(s(dz).delivery).toBe("dodano");
+    expect(nx(dz)).toEqual({ key: "payment.invoice", label: "Vystavit fakturu" });
+    expect(menu(dz)).toContain("delivery.confirmNote");
+    // review A2 #8: záloha / platba před fakturou jde zapsat (tentýž dialog), „Zaplaceno" až po faktuře
+    expect(menu(dz)).toContain("payment.record");
+    expect(menu(dz)).not.toContain("payment.settle");
+    // potvrzený DL: stejné hlavní tlačítko
+    expect(nx({ ...dz, deliveryNoteConfirmedAt: "2026-10-23" })?.key).toBe("payment.invoice");
+  });
+
+  it("zaměstnanec (bez marží) fakturu nevystaví: hlavní „Potvrdit DL“, v menu žádná faktura ani platba", () => {
+    const dz = o({ stage: "dodano_zakaznikovi", itemsCount: 1, itemsDelivered: 1, lastDeliveryAt: "2026-10-22T10:00:00Z" });
+    expect(nx(dz, WORKER)?.key).toBe("delivery.confirmNote");
+    const m = menu(dz, WORKER);
+    for (const k of ["payment.invoice", "payment.invoiceExternal", "payment.record", "payment.settle"] as const) expect(m).not.toContain(k);
+    expect(FLOW_ACTIONS["payment.invoiceExternal"].feature).toBe("margins");
+  });
+
+  // review A2 #4: „dílčí" faktura účtovala celou objednávku → faktura z aplikace až po dodání všeho
+  it("dílčí dodávka (i ve výrobě): hlavní „Dodat zbytek“, faktura z aplikace až po dodání všeho (mimo systém jde)", () => {
+    const vv = o({ stage: "ve_vyrobe", itemsCount: 2, itemsDelivered: 1, productionTotal: 2, productionDone: 1, productionStep: "vyroba", productionLocation: "U nás", productionDue: "2026-11-01" });
+    expect(s(vv).delivery).toBe("castecne");
+    expect(nx(vv)).toEqual({ key: "delivery.record", label: "Dodat zbytek" });
+    expect(menu(vv)).not.toContain("payment.invoice");
+    expect(menu(vv)).toContain("payment.invoiceExternal");
+    expect(invoiceDeliveryOf(vv)).toBe("partial");
+    expect(canIssueInvoice(vv)).toBe(false);
+    // Dodáno zákazníkovi s dílčím dodáním (položka uzavřena později): stejné
+    const dzPart = o({ stage: "dodano_zakaznikovi", itemsCount: 2, itemsDelivered: 1, itemsPartial: 0 });
+    expect(nx(dzPart)).toEqual({ key: "delivery.record", label: "Dodat zbytek" });
+  });
+
+  it("Ve výrobě s běžícím krokem: hlavní posun výroby, „Zapsat dodání a dodací list“ v menu; hotová výroba → hlavní dodání", () => {
+    const run = o({ stage: "ve_vyrobe", itemsCount: 2, productionTotal: 2, productionDone: 0, productionStep: "vyroba", productionLocation: "U nás", productionDue: "2026-11-01" });
+    expect(nx(run)?.key).toBe("production.advance");
+    expect(menu(run)).toContain("delivery.record");
+    expect(menu(run, WORKER)).toContain("delivery.record");
+    const done = { ...run, productionDone: 2, productionStep: "hotovo" };
+    expect(nx(done)).toEqual({ key: "delivery.record", label: "Zapsat dodání a dodací list" });
+    // Dodáno k nám / Na skladě (bez kroků výroby) → hlavní dodání
+    expect(nx(o({ stage: "dodano_k_nam", itemsCount: 1 }))?.key).toBe("delivery.record");
+    expect(nx(o({ stage: "na_sklade", itemsCount: 1 }))?.key).toBe("delivery.record");
+  });
+
+  // review A2 #2: mimo systém ve výrobě bez dodání posunulo zakázku na Vyfakturováno → jen po (i dílčím) dodání
+  it("faktura mimo systém: v menu po dodání (i dílčím), jen bez čísla faktury; bez dodání ne", () => {
+    const vv = o({ stage: "ve_vyrobe", itemsCount: 2, itemsDelivered: 1, productionTotal: 1, productionDone: 0, productionStep: "vyroba", productionLocation: "U nás", productionDue: "2026-11-01" });
+    expect(menu(vv)).toContain("payment.invoiceExternal");
+    expect(menu({ ...vv, itemsDelivered: 0 })).not.toContain("payment.invoiceExternal");
+    expect(menu({ ...vv, invoiceNumber: "FV-2026-001" })).not.toContain("payment.invoiceExternal");
+    expect(menu(o({ stage: "potvrzeno" }))).not.toContain("payment.invoiceExternal");
+    expect(menu(o({ stage: "fakturovano", invoiceNumber: "FV-1" }))).not.toContain("payment.invoiceExternal");
+  });
+
+  it("platba: hlavní „Zadat platbu“ (dialog), „Zaplaceno“ = tentýž dialog v menu; po zaplacení nic", () => {
+    const fv = o({ stage: "fakturovano", invoiceNumber: "FV-1", invoiceDueDate: "2026-11-30" });
+    expect(nx(fv)).toEqual({ key: "payment.record", label: "Zadat platbu" });
+    expect(menu(fv)).toContain("payment.settle");
+    expect(FLOW_ACTIONS["payment.record"].kind).toBe("dialog");
+    expect(FLOW_ACTIONS["payment.settle"].kind).toBe("dialog");
+    const paid = { ...fv, stage: "dokonceno" as JobStage, paidAt: "2026-11-02" };
+    expect(nx(paid)).toBeNull();
+    expect(menu(paid)).not.toContain("payment.record");
+  });
+
+  // review A2 #2: faktura nikdy bez dodání — ani v menu, ani hlavní tlačítko (Ve výrobě, Potvrzeno, Poptávka)
+  it("bez dodání se faktura nenabízí v žádném stavu", () => {
+    for (const st of ["poptavka", "nabidka", "potvrzeno", "ve_vyrobe", "dodano_k_nam"] as const) {
+      const f = o({ stage: st, itemsCount: 2, itemsDelivered: 0, productionTotal: 1, productionDone: 0, productionStep: "vyroba", productionLocation: "U nás", productionDue: "2026-11-01" });
+      expect(menu(f)).not.toContain("payment.invoice");
+      expect(nx(f)?.key).not.toBe("payment.invoice");
+      expect(canIssueInvoice(f)).toBe(false);
+    }
+  });
+
+  // review A2 #1: vystavená faktura se znovu nevystavuje (nové datum by smazalo „po splatnosti")
+  it("faktura už je: žádné druhé „Vystavit fakturu“, v Dodáno je další krok platba", () => {
+    const dz = o({ stage: "dodano_zakaznikovi", itemsCount: 2, itemsDelivered: 2, invoiceNumber: "FV-2026-169", invoiceDueDate: "2026-11-30" });
+    expect(nx(dz)).toEqual({ key: "payment.record", label: "Zadat platbu" });
+    expect(menu(dz)).not.toContain("payment.invoice");
+    expect(canIssueInvoice(dz)).toBe(false);
+    const fv = o({ stage: "fakturovano", itemsCount: 2, itemsDelivered: 2, invoiceNumber: "FV-1" });
+    expect(menu(fv)).not.toContain("payment.invoice");
+    // starší zakázka ručně na Vyfakturováno bez čísla → fakturu jde dovystavit (v menu)
+    expect(menu(o({ stage: "fakturovano", itemsCount: 2, itemsDelivered: 2 }))).toContain("payment.invoice");
+    // dokončená zakázka bez faktury už ne
+    expect(menu(o({ stage: "dokonceno", itemsCount: 2, itemsDelivered: 2, paidAt: "2026-10-01" }))).not.toContain("payment.invoice");
+  });
+
+  // review A2 #8: záloha před fakturou — „Zadat platbu“ v menu od Potvrzeno po Dodáno
+  it("záloha před fakturou: „Zadat platbu“ v menu od potvrzené objednávky (jen s maržemi)", () => {
+    for (const st of ["potvrzeno", "ve_vyrobe", "dodano_k_nam", "dodano_zakaznikovi"] as const) {
+      const f = o({ stage: st, itemsCount: 2, itemsDelivered: st === "dodano_zakaznikovi" ? 2 : 0, productionTotal: 1, productionDone: 0, productionStep: "vyroba", productionLocation: "U nás", productionDue: "2026-11-01" });
+      expect(s(f).payment).toBeNull();
+      expect([nx(f)?.key, ...menu(f)]).toContain("payment.record");
+      expect(menu(f, WORKER)).not.toContain("payment.record");
+    }
+    expect(menu(o({ stage: "nabidka" }))).not.toContain("payment.record");
+  });
+
+  it("dílčí faktura (číslo, splatnost) při dílčí dodávce: platba se hlídá, po splatnosti se ukáže", () => {
+    const part = o({ stage: "ve_vyrobe", itemsCount: 2, itemsDelivered: 1, invoiceNumber: "FV-2", invoiceDueDate: "2026-10-01" });
+    expect(s(part).payment).toBe("po_splatnosti");
+    expect(menu(part)).toContain("payment.record");
+    expect(menu(part)).not.toContain("payment.invoice");
   });
 });

@@ -307,3 +307,18 @@ export function parseEmailList(text: string | null | undefined): { valid: string
   }
   return { valid, invalid };
 }
+
+// ── Faktura před vystavením (A2: „Zrušit" nic nevystaví) ─────
+/** Číslo faktury se přidělí až při vystavení — v návrhu e-mailu je místo něj tato značka. */
+export const INVOICE_NUMBER_PLACEHOLDER = "[číslo faktury]";
+/** Variabilní symbol (číslice čísla faktury) — doplní se spolu s číslem. */
+export const INVOICE_VS_PLACEHOLDER = "[variabilní symbol]";
+
+/** Doplní přidělené číslo faktury (a variabilní symbol z jeho číslic) místo značek v návrhu e-mailu. */
+export function fillInvoicePlaceholders(text: string, number: string | null | undefined): string {
+  const n = (number ?? "").trim();
+  if (!n) return text;
+  const digits = n.replace(/\D/g, "");
+  const vs = digits.length > 10 ? digits.slice(-10) : digits;
+  return text.split(INVOICE_NUMBER_PLACEHOLDER).join(n).split(INVOICE_VS_PLACEHOLDER).join(vs || n);
+}

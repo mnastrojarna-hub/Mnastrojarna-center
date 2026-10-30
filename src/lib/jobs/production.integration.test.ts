@@ -140,6 +140,8 @@ describe.skipIf(!ENABLED)("akce výroby ↔ lokální Supabase (E2E)", () => {
     await db.from("job_operations").delete().eq("job_id", JOB).gte("created_at", startedAt);
     if (fileIds.length) await db.from("job_files").delete().in("id", fileIds);
     await db.from("job_events").delete().eq("job_id", JOB).gte("created_at", startedAt);
+    // A2: faktura zapsaná ručně má řádek v evidenci faktur (bez PDF) — test po sobě uklidí jen ten svůj
+    await db.from("invoices").delete().eq("order_id", JOB).eq("number", "FV-E2E-104").is("storage_path", null);
     await db.from("audit_log").delete().gte("created_at", startedAt).eq("entity", "job_operations");
     const restore: Record<string, unknown> = {};
     for (const k of [

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   documentEmailBody, documentEmailHtml, documentEmailSubject, draftDocumentEmail, escapeHtml, firstEmail,
   isDocumentEmailKind, issuedEventMessage, parseEmailList, sentEventMessage, type DocumentEmailInput,
+  INVOICE_NUMBER_PLACEHOLDER, INVOICE_VS_PLACEHOLDER, fillInvoicePlaceholders,
 } from "./document-emails";
 
 const base: Omit<DocumentEmailInput, "kind"> = {
@@ -154,5 +155,15 @@ describe("historie", () => {
   it("isDocumentEmailKind", () => {
     expect(isDocumentEmailKind("faktura")).toBe(true);
     expect(isDocumentEmailKind("vykres")).toBe(false);
+  });
+});
+
+// A2 (review #5): faktura se vystaví až tlačítkem — návrh e-mailu nese značky čísla a VS
+describe("fillInvoicePlaceholders", () => {
+  it("doplní přidělené číslo a variabilní symbol (číslice, max. 10)", () => {
+    const text = `Faktura ${INVOICE_NUMBER_PLACEHOLDER} · VS ${INVOICE_VS_PLACEHOLDER} · ${INVOICE_NUMBER_PLACEHOLDER}`;
+    expect(fillInvoicePlaceholders(text, "FV-2026-197")).toBe("Faktura FV-2026-197 · VS 2026197 · FV-2026-197");
+    expect(fillInvoicePlaceholders(text, "  ")).toBe(text);
+    expect(fillInvoicePlaceholders(`VS ${INVOICE_VS_PLACEHOLDER}`, "FV-20261234-56789")).toBe("VS 6123456789");
   });
 });

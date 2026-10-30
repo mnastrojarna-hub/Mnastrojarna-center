@@ -224,8 +224,9 @@ describe("Záložka Výroba — render", () => {
     expect(html).toContain("FV-2026-042");
     expect(html).toContain("21 dní po splatnosti");
     expect(html).toContain("Balit po 10 ks.");
-    expect(html).toContain("Přišlo dne"); // platba je na řadě
-    expect(html).toContain("Částka bez DPH");
+    // A2: platba = jeden dialog „Zadat platbu" (žádný druhý formulář v kartě)
+    expect(html).toContain("Zadat platbu"); // platba je na řadě
+    expect(html).not.toContain("Označit zaplaceno");
   });
 
   it("zaplaceno → zakázka dokončena; bez marží bez částky a bez rušení", () => {
@@ -237,7 +238,8 @@ describe("Záložka Výroba — render", () => {
     expect(admin).toContain("Zakázka dokončena ✓");
     expect(admin).toContain("Zaplaceno 3. 11. 2026");
     expect(admin).toMatch(/47\s000\sKč/);
-    expect(admin).toContain("Zrušit úhradu");
+    // A2: hromadné „Zrušit úhradu" (mazalo i zálohy) nahradilo „Odebrat" u jednotlivé úhrady
+    expect(admin).not.toContain("Zrušit úhradu");
     const worker = render(job({ stage: "dokonceno" }), data([], { ...c, paidAmount: null }), WORKER);
     expect(worker).toContain("Zakázka dokončena ✓");
     expect(worker).not.toContain("Zrušit úhradu");

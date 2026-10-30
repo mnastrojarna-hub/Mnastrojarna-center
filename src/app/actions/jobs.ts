@@ -316,6 +316,10 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     const row = jobInputToRow(rest);
     delete row.status;
     if (!margins) delete row.purchase_cost;
+    // čísla dokladů jen z jejich jediné cesty: faktura = „Vystavit fakturu" / „Faktura vystavená mimo
+    // systém" (právo na marže), DL = zápis dodání — obecná úprava zakázky je nepřepíše (A2)
+    delete row.invoice_number;
+    delete row.delivery_note_number;
 
     // #25: obchodníka zakázky mění jen super admin („Zpracovává" smí každý) — kontrola PŘED založením
     // zákazníka níže (jinak by po odmítnutí zůstal založený zákazník)

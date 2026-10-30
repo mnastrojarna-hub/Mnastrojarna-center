@@ -21,9 +21,11 @@ import { isSupplierSideDoc, matchCustomer, matchJob, matchParty } from "@/lib/jo
 import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
-  cleanNumber, cleanText, computeItemTotals, isUuid, jobFilePath, jobInputToRow, jobItemToRow, stageEventMessage,
-  translateDbError, validateItems, validateJobInput,
+  cleanDate, cleanNumber, cleanText, computeItemTotals, isUuid, jobFilePath, jobInputToRow, jobItemToRow, stageEventMessage,
+  todayIso, translateDbError, validateItems, validateJobInput,
 } from "@/lib/jobs/mapping";
+import { recordCapturedDeliveryNote } from "@/lib/jobs/delivery-notes-db";
+import { setInvoiceInfoCore } from "@/lib/jobs/production-store";
 import { isJobStage } from "@/lib/jobs/stages";
 import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { docNumbersEqual } from "@/lib/jobs/matching";
@@ -823,6 +825,8 @@ export async function applyBusinessDoc(
   let orderRevision: OrderChange[] | null = null;
   /** Co focení udělalo s podrobnými stavy (zobrazí se po uložení). */
   const flowNotes: string[] = [];
+  /** Vyfocený náš DL: dodané kusy z fotky (→ řádek delivery_notes, až bude fotka u zakázky). */
+  let photoDl: Awaited<ReturnType<typeof recordPhotoDelivery>> | null = null;
 
   if (target.mode === "new" && captureKey) {
     // dávka: zakázka bez položek, hned klíč relace, položky s klíčem (opakování je nezdvojí)
@@ -963,7 +967,7 @@ export async function applyBusinessDoc(
 
     // náš dodací list → dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi")
     if (opts.stage !== false && state.chip === "dodaci_list_my" && doc.items.length) {
-      const d = await recordPhotoDelivery(db, user.id, jobId, doc.items, { documentNumber: documentNumberFor(state, doc.documentNumber) });
+      const d = (photoDl = await recordPhotoDelivery(db, user.id, jobId, doc.items, { documentNumber: documentNumberFor(state, doc.documentNumber) }));
       if (d.recorded) flowNotes.push(d.complete ? "Dodáno vše" : `Dodáno částečně: ${d.lines.join("; ")}`);
     }
     // DL dodavatele k naší objednávce → převzetí po položkách (2.7)
@@ -1055,6 +1059,20 @@ export async function applyBusinessDoc(
     if (f.sortPath) {
       try { await bucket(db).remove([f.sortPath]); } catch { /* náhled roztřídění vyprší sám */ }
     }
+  }
+
+  // vyfocený náš DL → delivery_notes (jediný zdroj čísla DL; dodávka má svůj DL, žádný druhý „na dodané zboží")
+  if (photoDl?.shipped.length && fileIds[0]) {
+    const { data: fr } = await db.from("job_files").select("storage_path").eq("id", fileIds[0]).maybeSingle();
+    await recordCapturedDeliveryNote(db, jobId, {
+      number: docNumber, storagePath: (fr as { storage_path: string | null } | null)?.storage_path ?? null,
+      issueDate: cleanDate(doc.documentDate), lines: photoDl.shipped,
+    });
+  }
+  // vyfocená naše faktura (číslo zapsané výše) → datum, splatnost a evidence faktur (jako „mimo systém")
+  if (opts.stage !== false && state.chip === "faktura_my" && written.includes("invoiceNumber")) {
+    const r = await setInvoiceInfoCore(db, user.id, jobId, { invoiceDate: cleanDate(doc.documentDate) ?? todayIso() }, { stage: false });
+    if (!r.ok) warnings.push(r.error);
   }
 
   // podrobné stavy podle dokladu (2.8) — jen u jednoho dokladu; dávka to dělá per doklad

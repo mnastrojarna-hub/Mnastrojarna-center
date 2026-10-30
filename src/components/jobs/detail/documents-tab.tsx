@@ -386,7 +386,7 @@ function LockedFileRow({ file }: { file: JobFile }) {
           <span className="rounded bg-muted px-1.5 py-px text-[10px] font-semibold text-muted-foreground">v{file.version}</span>
         </div>
         <p className="mt-0.5 flex items-start gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
-          <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden /> <span className="min-w-0">{fileLockText(file.locked)}</span>
+          <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden /> <span className="min-w-0">{fileLockText(file.locked, file)}</span>
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground" title={formatTimestamp(file.createdAt) ?? undefined} suppressHydrationWarning>
           {file.uploadedBy?.name ?? "systém"} · {relativeTime(file.createdAt)}

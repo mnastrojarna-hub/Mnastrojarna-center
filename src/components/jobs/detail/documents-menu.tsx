@@ -8,10 +8,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { generateJobDocument, type JobDocumentKind } from "@/app/actions/job-documents";
 import type { JobFile, JobItem, JobQuote } from "@/lib/jobs/types";
-import { currentDeliveryNotes, isDeliveryNoteFile, remainingQty } from "@/lib/jobs/delivery-notes";
+import { currentDeliveryNotes, isDeliveryNoteFile, remainingQty, undocumentedRows } from "@/lib/jobs/delivery-notes";
 import { DeliveryDialog } from "@/components/jobs/production/delivery-dialog";
+import { InvoiceDialog, ownInvoiceFile } from "@/components/jobs/production/invoice-dialog";
 import { useFlowActions } from "./flow-actions";
-import { quoteApprovalBlock } from "@/lib/jobs/flow-status";
+import { flowRank, quoteApprovalBlock } from "@/lib/jobs/flow-status";
 import { cn } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
 import { primaryQuote } from "./detail-helpers";
@@ -27,17 +28,23 @@ const DOCS: { kind: JobDocumentKind; label: string; hint: string; icon: LucideIc
 type DeliveryItem = Pick<JobItem, "id" | "drawingNumber" | "name" | "description" | "quantity" | "unit" | "deliveredQuantity" | "deliveryClosed" | "deliveryClosedReason">;
 
 /**
- * „Doklady ▾" — vygeneruje PDF doklad ze zakázky a uloží ho do Dokumentů. Dodací list: zakázka
- * bez dodávek → DL na všechny položky (jako dřív); dodáno bez DL → „DL na dodané zboží"; s DL
- * dodávek → stáhnout je a „DL na zbývající položky" (zapíše dodání zbytku a vystaví další DL —
- * nikdy nové číslo pro stejný DL).
+ * „Doklady ▾" — vygeneruje PDF doklad ze zakázky a uloží ho do Dokumentů. Dodací list vzniká jen se
+ * zápisem dodání: bez dodávky → tentýž dialog „Zapsat dodání a dodací list"; dodáno bez DL → „DL na
+ * dodané zboží" (i u zakázky, která jiné DL už má); s DL dodávek → stáhnout je a „DL na zbývající
+ * položky" (zapíše dodání zbytku a vystaví další DL — nikdy nové číslo pro stejný DL).
+ * Faktura: tentýž dialog jako hlavní „Vystavit fakturu" (PDF + odeslání) — jen když ji karta nabízí
+ * (dodáno vše); vystavená → otevřít / poslat znovu; mimo systém → jen číslo; jen finance (marže).
  */
 export function DocumentsMenu({
-  quotes, acceptedQuoteId, variant = "outline", size, className, compact, items, files,
+  quotes, acceptedQuoteId, variant = "outline", size, className, compact, items, files, documented, invoiceNumber,
 }: {
   /** Položky a dokumenty zakázky (dodací listy dodávek, zbývá dodat). */
   items?: DeliveryItem[];
   files?: JobFile[];
+  /** Kolik z položky pokrývají vystavené DL (getJob) — dodané zboží bez DL. */
+  documented?: Record<string, number> | null;
+  /** Číslo faktury zakázky (i vystavené mimo systém). */
+  invoiceNumber?: string | null;
   quotes: (Pick<JobQuote, "id" | "number" | "archived" | "createdAt" | "revision" | "status">
     & Partial<Pick<JobQuote, "state" | "adminApprovalRequired" | "approvalRequired" | "approvedBy" | "sentAt">>)[];
   acceptedQuoteId: string | null;
@@ -51,10 +58,24 @@ export function DocumentsMenu({
   const flow = useFlowActions();
   const [busy, setBusy] = React.useState<JobDocumentKind | null>(null);
   const [remainder, setRemainder] = React.useState(false);
+  const [invoiceSend, setInvoiceSend] = React.useState(false);
   const deliveryNotes = currentDeliveryNotes((files ?? []).filter(isDeliveryNoteFile));
   const anyDelivered = (items ?? []).some((i) => (i.deliveredQuantity ?? 0) > 0);
   const canDeliver = flow ? flow.ctx.can("workflow") : true;
   const hasRemainder = canDeliver && (deliveryNotes.length > 0 || anyDelivered) && (items ?? []).some((i) => remainingQty(i) > 0);
+  // dodáno bez DL: bez DL vůbec, nebo víc, než pokrývají vystavené DL (nenačteno → jen „bez DL vůbec")
+  const undocumented = deliveryNotes.length === 0
+    ? anyDelivered
+    : documented ? undocumentedRows((items ?? []).map((i) => ({ ...i })), new Map(Object.entries(documented))).length > 0 : false;
+  const stage = flow?.facts?.stage ?? null;
+  // doklady k objednávce (DL, faktura) až od objednávky — v poptávce / nabídce nedávají smysl
+  const ordered = stage === null || flowRank(stage) >= 3 || stage === "pozastaveno" || stage === "reklamace";
+  const margins = Boolean(flow?.ctx.can("margins"));
+  const invoiceNo = (invoiceNumber ?? "").trim() || null;
+  const invoiceFile = invoiceNo ? ownInvoiceFile(files ?? []) : null;
+  // nová faktura jen když ji karta nabízí (dodáno vše, faktura ještě není) — tentýž dialog jako hlavní tlačítko
+  const invoiceOffered = flow?.next?.key === "payment.invoice" || Boolean(flow?.menu.includes("payment.invoice"));
+  const canInvoice = margins && ordered && (invoiceOffered || Boolean(invoiceNo));
   // potvrzení / faktura s neoceněnými položkami → „Přesto vystavit"
   const [unpriced, setUnpriced] = React.useState<{ kind: JobDocumentKind; message: string } | null>(null);
   const quote = primaryQuote(quotes, acceptedQuoteId);
@@ -123,6 +144,70 @@ export function DocumentsMenu({
         <DropdownMenuSeparator />
         {DOCS.map((d) => {
           const Icon = d.icon;
+          const tile = (
+            <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", d.tone)}>
+              <Icon className="!size-4 !text-current" />
+            </span>
+          );
+          if (d.kind === "faktura") {
+            if (!canInvoice) return null;
+            if (invoiceFile) {
+              return (
+                <React.Fragment key={d.kind}>
+                  <DropdownMenuItem asChild className="items-center gap-2.5 py-2">
+                    <a href={`/api/jobs/files/${invoiceFile.id}`} target="_blank" rel="noopener noreferrer">
+                      {tile}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium leading-tight">Faktura {invoiceNo ?? ""}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">otevřít PDF</span>
+                      </span>
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setInvoiceSend(true)} className="items-center gap-2.5 py-2">
+                    {tile}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium leading-tight">Poslat fakturu znovu</span>
+                      <span className="block truncate text-[11px] text-muted-foreground">stejné PDF e-mailem zákazníkovi</span>
+                    </span>
+                  </DropdownMenuItem>
+                </React.Fragment>
+              );
+            }
+            if (invoiceNo) {
+              // faktura vystavená mimo systém (bez PDF z aplikace) — druhá faktura nevznikne
+              return (
+                <DropdownMenuItem key={d.kind} disabled className="items-center gap-2.5 py-2">
+                  {tile}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium leading-tight">Faktura {invoiceNo}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">vystavená mimo systém — bez PDF z aplikace</span>
+                  </span>
+                </DropdownMenuItem>
+              );
+            }
+            return (
+              <DropdownMenuItem key={d.kind} onSelect={() => flow?.run("payment.invoice")} className="items-center gap-2.5 py-2">
+                {tile}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium leading-tight">Faktura</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">vystavit s QR platbou a poslat</span>
+                </span>
+              </DropdownMenuItem>
+            );
+          }
+          if (d.kind === "dodaci_list" && deliveryNotes.length === 0 && !anyDelivered) {
+            // DL vzniká se zápisem dodání — tentýž dialog jako hlavní „Zapsat dodání a dodací list"
+            if (!canDeliver || !ordered || !(items ?? []).length || !flow) return null;
+            return (
+              <DropdownMenuItem key={d.kind} onSelect={() => flow.run("delivery.record")} className="items-center gap-2.5 py-2">
+                {tile}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium leading-tight">Dodací list</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">zapíše dodání a vystaví DL</span>
+                </span>
+              </DropdownMenuItem>
+            );
+          }
           if (d.kind === "dodaci_list" && (deliveryNotes.length > 0 || anyDelivered)) {
             return (
               <React.Fragment key={d.kind}>
@@ -139,7 +224,7 @@ export function DocumentsMenu({
                     </a>
                   </DropdownMenuItem>
                 ))}
-                {deliveryNotes.length === 0 && (
+                {undocumented && (
                   <DropdownMenuItem onSelect={() => void generate(d.kind)} className="items-center gap-2.5 py-2">
                     <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", d.tone)}>
                       <Icon className="!size-4 !text-current" />
@@ -192,6 +277,15 @@ export function DocumentsMenu({
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+    {invoiceFile && (
+      <InvoiceDialog
+        open={invoiceSend}
+        onOpenChange={setInvoiceSend}
+        jobId={jobId}
+        existing={{ fileId: invoiceFile.id, filename: invoiceFile.filename, number: invoiceNo }}
+        onDone={(message) => { notify("success", message); refresh(); }}
+      />
+    )}
     {items && items.length > 0 && (
       <DeliveryDialog
         open={remainder}

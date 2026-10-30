@@ -2,36 +2,38 @@
 
 import * as React from "react";
 import {
-  Banknote, Camera, Check, CircleCheckBig, ExternalLink, FileCheck2, FileUp, Loader2, PartyPopper, Pencil, ReceiptText,
+  Banknote, Camera, Check, CircleCheckBig, ExternalLink, FileCheck2, FileText, FileUp, Loader2, PartyPopper, Pencil, ReceiptText,
   Truck, Undo2, UserRound, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  confirmDeliveryNote, markJobPaid, setInvoiceInfo, unconfirmDeliveryNote, unmarkJobPaid,
-} from "@/app/actions/production";
+import { confirmDeliveryNote, unconfirmDeliveryNote } from "@/app/actions/production";
 import { uploadJobFile, type UploadPhase } from "@/lib/jobs/upload-client";
-import { czDay, dueDateFor, dueText, DEFAULT_PAYMENT_TERMS } from "@/lib/jobs/production";
+import { czDay, dueText } from "@/lib/jobs/production";
 import type { JobClosingInfo } from "@/lib/jobs/production-types";
 import type { JobDetail } from "@/lib/jobs/types";
 import { UPLOAD_PHASE_LABELS, useJobDetail } from "@/components/jobs/detail/detail-context";
-import { formatMoney, parseDecimal } from "@/components/jobs/detail/detail-helpers";
+import { useFlowActions } from "@/components/jobs/detail/flow-actions";
+import { formatMoney } from "@/components/jobs/detail/detail-helpers";
 import { todayInPrague } from "@/components/jobs/book/book-params";
 import { cn } from "@/lib/utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { ProgressPill } from "@/components/flow-status/progress-pill";
 import { deleteJobPayment } from "@/app/actions/flow-status";
-import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";
+import { flowRank, type ChangeStamp, type JobStamps } from "@/lib/jobs/flow-status";
 import type { JobPayment } from "@/lib/data/flow-status";
+import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 import { useRunner } from "./production-context";
 import { PaymentDialog } from "./payment-dialog";
+import { InvoiceInfoDialog, ownInvoiceFile } from "./invoice-dialog";
 import {
-  CONFIRMED_DL_TITLE, INVOICE_TONE, closingProgress, closingStamp, confirmedDeliveryFile, invoiceTone, stampLabel,
+  CONFIRMED_DL_TITLE, INVOICE_TONE, closingStamp, confirmedDeliveryFile, invoiceTone, stampLabel,
 } from "./production-helpers";
 
 /**
- * Konec toku zakázky jako tři velké kroky: potvrzený dodací list → naše faktura
- * (splatnost) → zaplaceno. Po zaplacení je zakázka dokončená.
+ * Konec toku zakázky jako tři kroky: dodací list (dodání; potvrzený DL od zákazníka je NEPOVINNÝ)
+ * → naše faktura (PDF + odeslání = hlavní tlačítko „Vystavit fakturu") → zaplaceno („Zadat platbu",
+ * jeden dialog pro zálohy, dílčí úhrady i doplatek). Po zaplacení je zakázka dokončená.
  */
 
 type StepState = "done" | "current" | "todo";
@@ -41,7 +43,7 @@ function Step({
 }: {
   n: number;
   icon: LucideIcon;
-  title: string;
+  title: React.ReactNode;
   state: StepState;
   last?: boolean;
   children: React.ReactNode;
@@ -111,9 +113,14 @@ function UndoButton({ onClick, busy, label = "Zrušit" }: { onClick: () => void;
   );
 }
 
-// ── 1) Potvrzený dodací list ────────────────────────────────
-function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing: JobClosingInfo; state: StepState; stamp?: ChangeStamp | null }) {
+// ── 1) Dodací list (+ nepovinně potvrzený DL) ───────────────
+function DeliveryStep({
+  job, closing, state, delivered, stamp, invoiced,
+}: { job: JobDetail; closing: JobClosingInfo; state: StepState; delivered: "all" | "part" | null; stamp?: ChangeStamp | null; invoiced: boolean }) {
   const { notify } = useJobDetail();
+  // po faktuře (Vyfakturováno, Dokončeno) je nepovinný potvrzený DL jen malý odkaz — rozbalí se na klik
+  const [expanded, setExpanded] = React.useState(false);
+  const collapsed = !expanded && (invoiced || flowRank(closing.stage) >= 10);
   const { run, isBusy } = useRunner();
   const [date, setDate] = React.useState(() => todayInPrague());
   const [phase, setPhase] = React.useState<UploadPhase | null>(null);
@@ -125,6 +132,7 @@ function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing:
   const file = confirmedDeliveryFile(job.files);
   const confirmed = closing.deliveryNoteConfirmedAt;
   const busy = phase !== null || isBusy("dl");
+  const notes = currentDeliveryNotes(job.files ?? []);
 
   async function upload(f: File | undefined) {
     if (!f) return;
@@ -152,10 +160,24 @@ function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing:
     <Step
       n={1}
       icon={Truck}
-      title="Potvrzený dodací list"
+      title="Dodací list"
       state={state}
-      aside={confirmed ? <UndoButton busy={isBusy("dl-undo")} onClick={() => void run("dl-undo", () => unconfirmDeliveryNote(job.id), { success: "Potvrzení dodacího listu zrušeno." })} /> : null}
+      aside={confirmed ? <UndoButton busy={isBusy("dl-undo")} label="Zrušit potvrzení" onClick={() => void run("dl-undo", () => unconfirmDeliveryNote(job.id), { success: "Potvrzení dodacího listu zrušeno." })} /> : null}
     >
+      {notes.length > 0 ? (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" data-testid="closing-delivery-notes">
+          <span>{delivered === "all" ? "Dodáno —" : delivered === "part" ? "Dodáno částečně —" : "Vystaveno —"}</span>
+          {notes.map((n) => (
+            <a key={n.id} href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono font-medium text-foreground underline-offset-2 hover:underline">
+              <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden /> {n.number}
+            </a>
+          ))}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {delivered ? "Dodáno." : "Po dodání: „Zapsat dodání a dodací list“ — vystaví DL s dodanými kusy."}
+        </p>
+      )}
       {confirmed ? (
         <DoneBox>
           <p className="font-semibold">Zákazník potvrdil převzetí {czDay(confirmed)}</p>
@@ -176,9 +198,21 @@ function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing:
             </p>
           )}
         </DoneBox>
+      ) : collapsed ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+          data-testid="confirmed-dl-optional-link"
+        >
+          <FileUp className="h-3.5 w-3.5" /> Nahrát potvrzený DL (nepovinné)
+        </button>
       ) : (
-        <>
-          <p className="text-xs text-muted-foreground">Po dodání vyfoť nebo nahraj dodací list podepsaný zákazníkem.</p>
+        // potvrzený DL od zákazníka je nepovinný — fakturu jde vystavit hned po dodání
+        <div className="space-y-2 rounded-lg border border-dashed p-2.5" data-testid="confirmed-dl-optional">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Potvrzený DL od zákazníka</span> · nepovinné — vyfoť nebo nahraj podepsaný dodací list.
+          </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[9.5rem] flex-1 sm:flex-none">
               <label htmlFor={dateId} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Převzato dne</label>
@@ -187,9 +221,9 @@ function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing:
           </div>
           <div className="grid gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
             {/* <label for> — výběr/fotoaparát otevře prohlížeč nativně (spolehlivé i na iOS a ve vestavěných prohlížečích) */}
-            <Button asChild variant="success" className={cn("h-11 cursor-pointer sm:hidden", busy && "pointer-events-none opacity-50")}>
+            <Button asChild variant="outline" className={cn("h-11 cursor-pointer sm:hidden", busy && "pointer-events-none opacity-50")}>
               <label htmlFor={photoId} aria-disabled={busy || undefined}>
-                {phase ? <Loader2 className="animate-spin" /> : <Camera />} Vyfotit DL
+                {phase ? <Loader2 className="animate-spin" /> : <Camera className="text-emerald-600" />} Vyfotit DL
               </label>
             </Button>
             <Button asChild variant="outline" className={cn("h-11 cursor-pointer sm:hidden", busy && "pointer-events-none opacity-50")}>
@@ -197,9 +231,9 @@ function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing:
                 <FileUp className="text-emerald-600" /> Ze souboru
               </label>
             </Button>
-            <Button asChild variant="success" className={cn("hidden h-10 cursor-pointer sm:inline-flex", busy && "pointer-events-none opacity-50")}>
+            <Button asChild variant="outline" className={cn("hidden h-10 cursor-pointer sm:inline-flex", busy && "pointer-events-none opacity-50")}>
               <label htmlFor={fileId} aria-disabled={busy || undefined}>
-                {phase ? <Loader2 className="animate-spin" /> : <FileUp />} Nahrát potvrzený DL
+                {phase ? <Loader2 className="animate-spin" /> : <FileUp className="text-emerald-600" />} Nahrát potvrzený DL
               </label>
             </Button>
           </div>
@@ -208,71 +242,37 @@ function DeliveryStep({ job, closing, state, stamp }: { job: JobDetail; closing:
             type="button"
             onClick={() => void run("dl", () => confirmDeliveryNote(job.id, { date }), { success: `Dodací list potvrzen (${czDay(date)}).` })}
             disabled={busy || !date}
-            className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline disabled:opacity-50 dark:text-sky-400"
+            className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-sky-700 hover:underline disabled:opacity-50 dark:text-sky-400"
           >
             {isBusy("dl") && !phase ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Potvrdit bez souboru
           </button>
           <input ref={photoRef} id={photoId} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden disabled={busy} onChange={pickHandler} />
           <input ref={fileRef} id={fileId} type="file" accept="image/*,application/pdf" className="sr-only" tabIndex={-1} aria-hidden disabled={busy} onChange={pickHandler} />
-        </>
+        </div>
       )}
     </Step>
   );
 }
 
-// ── 2) Faktura a splatnost ──────────────────────────────────
+// ── 2) Faktura a splatnost (přehled; vystavení = „Vystavit fakturu") ─────
 function InvoiceStep({
-  job, closing, state, invoiced, margins, stamp,
-}: { job: JobDetail; closing: JobClosingInfo; state: StepState; invoiced: boolean; margins: boolean; stamp?: ChangeStamp | null }) {
-  const { run, isBusy } = useRunner();
-  const terms = closing.paymentTermsDays ?? job.customerDetail?.paymentTermsDays ?? null;
+  job, closing, state, invoiced, margins, stamp, delivered,
+}: {
+  job: JobDetail; closing: JobClosingInfo; state: StepState; invoiced: boolean; margins: boolean; stamp?: ChangeStamp | null;
+  delivered: "all" | "part" | null;
+}) {
+  const flow = useFlowActions();
+  const { notify, refresh } = useJobDetail();
   const [editing, setEditing] = React.useState(false);
-  const [number, setNumber] = React.useState(closing.invoiceNumber ?? "");
-  const [date, setDate] = React.useState(closing.invoiceDate ?? todayInPrague());
-  const [due, setDue] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const ids = { n: React.useId(), d: React.useId(), due: React.useId() };
-  const busy = isBusy("inv");
-  const autoDue = date
-    ? closing.invoiceDueDate && date === closing.invoiceDate ? closing.invoiceDueDate : dueDateFor(date, terms)
-    : "";
-  const shownDue = due ?? autoDue;
+  const terms = closing.paymentTermsDays ?? job.customerDetail?.paymentTermsDays ?? null;
   const tone = invoiceTone(closing);
   const text = dueText(closing);
-  // fakturu a úhrady zapisuje obchodník nebo admin (finance); zaměstnanec vidí jen stav
-  const showForm = margins && (editing || (!invoiced && state === "current"));
-
-  function startEdit() {
-    setNumber(closing.invoiceNumber ?? "");
-    setDate(closing.invoiceDate ?? todayInPrague());
-    setDue(null);
-    setError(null);
-    setEditing(true);
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!number.trim() && !date) {
-      setError("Zadej číslo nebo datum faktury.");
-      return;
-    }
-    if (date && shownDue && shownDue < date) {
-      setError("Splatnost je před datem faktury.");
-      return;
-    }
-    setError(null);
-    const res = await run("inv", () => setInvoiceInfo(job.id, {
-      invoiceNumber: number.trim() || null,
-      invoiceDate: date || null,
-      ...(due !== null ? { invoiceDueDate: due || null } : {}),
-    }), {
-      success: (r) => `Faktura uložena${r.invoiceDueDate ? ` — splatná ${czDay(r.invoiceDueDate)}` : ""}.`,
-    });
-    if (res) {
-      setEditing(false);
-      setDue(null);
-    }
-  }
+  // PDF naší faktury jen pro finance (zaměstnanec fakturu neotevře — stejně jako Přehled a Dokumenty)
+  const pdf = margins ? ownInvoiceFile(job.files ?? []) : null;
+  // hlavní tlačítko v hlavičce už je „Vystavit fakturu" → v kartě jen odkaz na něj (žádné druhé tlačítko vedle)
+  const headerHasInvoice = flow?.next?.key === "payment.invoice";
+  // vystavit jde, jen když to karta nabízí (dodáno vše, faktura ještě není) — tentýž dialog
+  const offered = Boolean(flow) && margins && Boolean(flow?.menu.includes("payment.invoice"));
 
   return (
     <Step
@@ -280,19 +280,26 @@ function InvoiceStep({
       icon={ReceiptText}
       title="Naše faktura"
       state={state}
-      aside={invoiced && !editing && margins ? (
-        <button type="button" onClick={startEdit} className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
-          <Pencil className="h-3 w-3" /> Upravit
+      aside={invoiced && margins ? (
+        <button type="button" onClick={() => setEditing(true)} className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Pencil className="h-3 w-3" /> Upravit splatnost
         </button>
       ) : null}
     >
-      {invoiced && !editing && (
+      {invoiced && (
         <div className={cn(
           "rounded-lg border px-3 py-2 text-sm",
           tone === "overdue" ? "border-red-300 bg-red-50 dark:border-red-500/40 dark:bg-red-500/10" : "bg-background",
         )}>
-          <p className="font-semibold">
-            Faktura {closing.invoiceNumber ? <span className="font-mono">{closing.invoiceNumber}</span> : <span className="font-normal text-muted-foreground">(bez čísla)</span>}
+          <p className="flex flex-wrap items-center gap-x-2 font-semibold">
+            <span>Faktura {closing.invoiceNumber ? <span className="font-mono">{closing.invoiceNumber}</span> : <span className="font-normal text-muted-foreground">(bez čísla)</span>}</span>
+            {pdf ? (
+              <a href={`/api/jobs/files/${pdf.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-400">
+                PDF <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : margins && !ownInvoiceFile(job.files ?? []) ? (
+              <span className="text-xs font-normal text-muted-foreground">vystavená mimo systém</span>
+            ) : null}
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             {closing.invoiceDate && <span>vystavena {czDay(closing.invoiceDate)}</span>}
@@ -308,50 +315,37 @@ function InvoiceStep({
           </div>
         </div>
       )}
-      {!invoiced && !showForm && margins && (
-        <Button type="button" variant="outline" size="sm" onClick={startEdit}>
-          <ReceiptText className="text-sky-600" /> Zapsat fakturu
-        </Button>
+      {!invoiced && margins && (
+        headerHasInvoice ? (
+          <p className="text-xs text-muted-foreground">Fakturu vystavíš tlačítkem <strong className="font-semibold text-foreground">Vystavit fakturu</strong> nahoře — PDF s QR platbou a rovnou e-mail zákazníkovi.</p>
+        ) : offered ? (
+          <Button type="button" variant="outline" className="h-11 sm:h-9" onClick={() => flow!.run("payment.invoice")}>
+            <ReceiptText className="text-emerald-600" /> Vystavit fakturu
+          </Button>
+        ) : delivered === "part" ? (
+          <p className="text-xs text-muted-foreground">Fakturu vystavíš, až bude dodáno vše (dílčí faktura na část dodávky zatím nejde) — potvrzený DL není podmínka.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Fakturu vystavíš hned po dodání (dodací list) — potvrzený DL není podmínka.</p>
+        )
       )}
       {!invoiced && !margins && <FinanceNote />}
-      {showForm && (
-        <form onSubmit={submit} className="space-y-2 rounded-lg border bg-background p-3">
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className="min-w-0">
-              <label htmlFor={ids.n} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Číslo faktury</label>
-              <Input id={ids.n} value={number} maxLength={120} onChange={(e) => setNumber(e.target.value)} placeholder="FV-2026-…" className="h-10 font-mono" />
-            </div>
-            <div className="min-w-0">
-              <label htmlFor={ids.d} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Vystavena</label>
-              <Input id={ids.d} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10" />
-            </div>
-            <div className="min-w-0">
-              <label htmlFor={ids.due} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Splatná</label>
-              <Input id={ids.due} type="date" value={shownDue} onChange={(e) => setDue(e.target.value)} className="h-10" />
-            </div>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            {due === null
-              ? `Splatnost se dopočítá: ${terms ?? DEFAULT_PAYMENT_TERMS} dní${terms !== null ? " dle zákazníka" : " (výchozí)"}.`
-              : "Splatnost zadaná ručně."}
-          </p>
-          {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="success" disabled={busy} className="h-10">
-              {busy ? <Loader2 className="animate-spin" /> : <Check />} Uložit fakturu
-            </Button>
-            {(editing || invoiced) && (
-              <Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={busy} className="h-10">Zpět</Button>
-            )}
-          </div>
-        </form>
+      {invoiced && margins && (
+        <InvoiceInfoDialog
+          open={editing}
+          onOpenChange={setEditing}
+          jobId={job.id}
+          mode="due"
+          current={{ number: closing.invoiceNumber, date: closing.invoiceDate, due: closing.invoiceDueDate }}
+          terms={terms}
+          onDone={(m) => { notify("success", m); refresh(); }}
+        />
       )}
     </Step>
   );
 }
 
 // ── 3) Zaplaceno ────────────────────────────────────────────
-/** Seznam úhrad s autory (částky jen s právem na marže; v historii částky nejsou). */
+/** Seznam úhrad s autory (částky jen s právem na marže; v historii částky nejsou). „Odebrat" = jedna úhrada. */
 function PaymentList({ payments, margins, currency }: { payments: JobPayment[]; margins: boolean; currency: string }) {
   const { run, isBusy } = useRunner();
   if (!payments.length) return null;
@@ -370,7 +364,7 @@ function PaymentList({ payments, margins, currency }: { payments: JobPayment[]; 
               type="button"
               onClick={() => void run(`del-${p.id}`, () => deleteJobPayment(p.id), { success: "Úhrada odebrána." })}
               disabled={isBusy(`del-${p.id}`)}
-              className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+              className="ml-auto min-h-8 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
               aria-label={`Odebrat úhradu ze dne ${czDay(p.paidOn)}`}
             >
               {isBusy(`del-${p.id}`) ? <Loader2 className="h-3 w-3 animate-spin" /> : "Odebrat"}
@@ -385,46 +379,17 @@ function PaymentList({ payments, margins, currency }: { payments: JobPayment[]; 
 function PaidStep({
   job, closing, state, margins, invoiced, payments, stamp,
 }: { job: JobDetail; closing: JobClosingInfo; state: StepState; margins: boolean; invoiced: boolean; payments: JobPayment[]; stamp?: ChangeStamp | null }) {
-  const { run, isBusy } = useRunner();
   const { notify, refresh } = useJobDetail();
-  const [partial, setPartial] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
   const paidSoFar = job.flow?.paidSoFar ?? 0;
   const value = job.value;
   const pct = value && value > 0 && paidSoFar > 0 ? Math.min(100, Math.round((paidSoFar / value) * 100)) : null;
-  const [date, setDate] = React.useState(() => todayInPrague());
-  const [amount, setAmount] = React.useState("");
-  const [open, setOpen] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const ids = { d: React.useId(), a: React.useId() };
-  const busy = isBusy("paid");
   const paidAt = closing.paidAt;
-  const showForm = margins && (open || state === "current");
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const n = amount.trim() ? parseDecimal(amount) : null;
-    if (amount.trim() && (n === null || n < 0)) {
-      setError("Zadej částku číslem (např. 48 000).");
-      return;
-    }
-    setError(null);
-    const res = await run("paid", () => markJobPaid(job.id, { date, ...(margins && n !== null ? { amount: n } : {}) }), {
-      success: (r) => (r.stage === "dokonceno" ? "Zaplaceno ✓ — zakázka je dokončená." : `Zaplaceno ${czDay(date)}.`),
-    });
-    if (res) setOpen(false);
-  }
+  const rank = flowRank(closing.stage);
+  const deposits = rank >= 4;
 
   return (
-    <Step
-      n={3}
-      icon={Banknote}
-      title="Zaplaceno"
-      state={state}
-      last
-      aside={paidAt && margins ? (
-        <UndoButton busy={isBusy("unpaid")} label="Zrušit úhradu" onClick={() => void run("unpaid", () => unmarkJobPaid(job.id), { success: "Úhrada zrušena." })} />
-      ) : null}
-    >
+    <Step n={3} icon={Banknote} title="Zaplaceno" state={state} last>
       {paidAt ? (
         <DoneBox>
           <p className="font-semibold">Zaplaceno {czDay(paidAt)}</p>
@@ -434,13 +399,36 @@ function PaidStep({
             </p>
           )}
           <ByLine job={job} kind="paid" prefix="Zaplaceno" stamp={stamp} />
+          {/* oprava omylu = „Odebrat" u konkrétní úhrady (nikdy hromadné zrušení — zálohy zůstanou) */}
           <div className="mt-2"><PaymentList payments={payments} margins={margins} currency={job.currency} /></div>
         </DoneBox>
-      ) : showForm ? (
+      ) : margins ? (
         <>
+          {pct !== null && (
+            <ProgressPill
+              progress={{ done: paidSoFar, total: value ?? 0, pct, label: `${formatMoney(paidSoFar, job.currency)} z ${formatMoney(value, job.currency)}` }}
+              hue="emerald"
+              className="text-xs font-medium"
+            />
+          )}
+          <PaymentList payments={payments} margins={margins} currency={job.currency} />
+          {!invoiced && (state === "current" || payments.length > 0) && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">Faktura zatím není vystavená — zálohu zapíšeš, zakázka se dokončí po faktuře.</p>
+          )}
+          {/* záloha / dílčí platba i před fakturou — od potvrzené objednávky (tentýž dialog „Zadat platbu") */}
+          {(state === "current" || invoiced || payments.length > 0 || paidSoFar > 0 || deposits) && (
+            <Button type="button" variant={state === "current" ? "success" : "outline"} className="h-11 w-full sm:h-10 sm:w-auto" onClick={() => setOpen(true)}>
+              <Banknote /> Zadat platbu
+            </Button>
+          )}
+          {state !== "current" && !invoiced && payments.length === 0 && paidSoFar === 0 && (
+            <p className="text-xs text-muted-foreground">
+              {deposits ? "Zálohu nebo dílčí úhradu zapíšeš i před fakturou." : "Po potvrzení objednávky tu zapíšeš zálohu, po faktuře platbu."}
+            </p>
+          )}
           <PaymentDialog
-            open={partial}
-            onOpenChange={setPartial}
+            open={open}
+            onOpenChange={setOpen}
             jobId={job.id}
             margins={margins}
             value={value}
@@ -448,50 +436,7 @@ function PaidStep({
             currency={job.currency}
             onDone={(m) => { notify("success", m); refresh(); }}
           />
-          <form onSubmit={submit} className="space-y-2">
-            {pct !== null && (
-              <ProgressPill
-                progress={{ done: paidSoFar, total: value ?? 0, pct, label: margins ? `${formatMoney(paidSoFar, job.currency)} z ${formatMoney(value, job.currency)}` : `${pct} %` }}
-                hue="emerald"
-                className="text-xs font-medium"
-              />
-            )}
-            <PaymentList payments={payments} margins={margins} currency={job.currency} />
-            {!invoiced && <p className="text-xs text-amber-700 dark:text-amber-400">Faktura zatím není zapsaná — zakázka se dokončí, až ji doplníš.</p>}
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[9.5rem] flex-1 sm:flex-none">
-                <label htmlFor={ids.d} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Přišlo dne</label>
-                <Input id={ids.d} type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10" />
-              </div>
-              {margins && (
-                <div className="min-w-[8rem] flex-1">
-                  <label htmlFor={ids.a} className="mb-0.5 block text-[11px] font-medium text-muted-foreground">Částka bez DPH</label>
-                  <Input
-                    id={ids.a}
-                    inputMode="decimal"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder={job.value !== null ? formatMoney(job.value, job.currency) : "hodnota zakázky"}
-                    className="h-10 text-right tabular-nums"
-                  />
-                </div>
-              )}
-            </div>
-            {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button type="submit" variant="success" disabled={busy || !date} className="h-11 w-full text-base font-semibold sm:w-auto sm:px-6">
-                {busy ? <Loader2 className="animate-spin" /> : <Banknote />} Zaplaceno
-              </Button>
-              <Button type="button" variant="outline" className="h-11 sm:h-11" onClick={() => setPartial(true)}>
-                <Banknote className="text-emerald-600" /> Zadat částečnou platbu / zálohu
-              </Button>
-            </div>
-          </form>
         </>
-      ) : margins ? (
-        <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-          <Banknote className="text-green-600" /> Označit zaplaceno
-        </Button>
       ) : (
         <FinanceNote />
       )}
@@ -504,15 +449,28 @@ function FinanceNote() {
   return <p className="text-xs text-muted-foreground">Fakturu a úhrady zapisuje obchodník nebo admin.</p>;
 }
 
+/** Dodáno vše / částečně / nic — z podrobného stavu dodání (karta), jinak podle hlavního stavu. */
+function deliveredOf(job: JobDetail, closing: JobClosingInfo, delivery: string | null | undefined): "all" | "part" | null {
+  if (delivery === "dodano" || delivery === "dl_potvrzen") return "all";
+  if (delivery === "castecne") return "part";
+  if (flowRank(closing.stage) >= 9 || closing.deliveryNoteConfirmedAt) return "all";
+  return job.items.some((i) => Number(i.deliveredQuantity ?? 0) > 0) ? "part" : null;
+}
+
 export function ClosingCard({
   job, closing, margins, payments = [], stamps = null,
 }: { job: JobDetail; closing: JobClosingInfo; margins: boolean; payments?: JobPayment[]; stamps?: JobStamps | null }) {
-  const p = closingProgress(closing);
+  const flow = useFlowActions();
   const finished = closing.stage === "dokonceno";
-  // na řadě je první nehotový krok a každý, jehož předchozí krok je hotový
-  const done = [p.delivery, p.invoice, p.paid];
-  const firstOpen = done.findIndex((d) => !d);
-  const fixed: StepState[] = done.map((d, i) => (d ? "done" : i === firstOpen || done[i - 1] ? "current" : "todo"));
+  const delivered = deliveredOf(job, closing, flow?.snapshot?.delivery);
+  const invoiced = Boolean((closing.invoiceNumber ?? "").trim() || closing.invoiceDate);
+  const paid = Boolean(closing.paidAt);
+  // na řadě: po dodání faktura — potvrzený DL není podmínka; po faktuře platba
+  const s1: StepState = delivered === "all" ? "done" : delivered === "part" ? "current" : "todo";
+  // faktura je na řadě po dodání všeho (dílčí faktura na část dodávky zatím není)
+  const s2: StepState = invoiced ? "done" : delivered === "all" ? "current" : "todo";
+  const s3: StepState = paid ? "done" : invoiced ? "current" : "todo";
+  const done = [delivered === "all", invoiced, paid].filter(Boolean).length;
 
   return (
     <section id="konec-toku" aria-label="Dodání, faktura a platba" className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", finished && "border-green-300 dark:border-green-500/40")}>
@@ -522,9 +480,9 @@ export function ClosingCard({
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold leading-tight">Dodání, faktura a platba</h3>
-          <p className="text-xs text-muted-foreground">dodáme → potvrzený DL → faktura → zaplaceno</p>
+          <p className="text-xs text-muted-foreground">dodací list → faktura → zaplaceno</p>
         </div>
-        <span className="shrink-0 text-sm font-bold tabular-nums">{p.done}<span className="text-muted-foreground">/3</span></span>
+        <span className="shrink-0 text-sm font-bold tabular-nums">{done}<span className="text-muted-foreground">/3</span></span>
       </header>
       {finished && (
         <div className="flex items-center gap-3 bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 text-white">
@@ -537,9 +495,9 @@ export function ClosingCard({
         </div>
       )}
       <ol className="p-4">
-        <DeliveryStep job={job} closing={closing} state={fixed[0]} stamp={stamps?.deliveryNote} />
-        <InvoiceStep job={job} closing={closing} state={fixed[1]} invoiced={p.invoice} margins={margins} stamp={stamps?.invoiced} />
-        <PaidStep job={job} closing={closing} state={fixed[2]} margins={margins} invoiced={p.invoice} payments={payments} stamp={stamps?.paid} />
+        <DeliveryStep job={job} closing={closing} state={s1} delivered={delivered} stamp={stamps?.deliveryNote} invoiced={invoiced} />
+        <InvoiceStep job={job} closing={closing} state={s2} invoiced={invoiced} margins={margins} stamp={stamps?.invoiced} delivered={delivered} />
+        <PaidStep job={job} closing={closing} state={s3} margins={margins} invoiced={invoiced} payments={payments} stamp={stamps?.paid} />
       </ol>
     </section>
   );

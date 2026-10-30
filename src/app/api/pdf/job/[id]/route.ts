@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiRequire } from "@/lib/auth/session";
+import { apiRequire, getAccess } from "@/lib/auth/session";
 import { getJob } from "@/lib/data/jobs";
 import { isUuid } from "@/lib/jobs/mapping";
 import {
@@ -49,6 +49,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const rawType = (sp.get("type") ?? "nabidka").trim().toLowerCase();
   const kind = Object.hasOwn(TYPES, rawType) ? TYPES[rawType] : undefined;
   if (!kind) return json("Neznámý typ dokladu (nabidka, potvrzeni, dodaci-list, faktura).", 400);
+  // A2: faktura (i náhled) jen pro finance — stejně jako vystavení a odeslání
+  if (kind === "faktura" && !(await getAccess()).can("margins")) return json("Fakturu vystavuje obchodník nebo super admin.", 403);
   const quoteId = sp.get("quoteId")?.trim() || null;
   if (quoteId && !isUuid(quoteId)) return json("Nabídka nenalezena.", 404);
   const download = sp.get("download") === "1";

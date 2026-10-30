@@ -87,6 +87,30 @@ export function deliveredRows(items: DeliveryItemFacts[]): DeliveryRowInput[] {
     .map((i) => ({ itemId: i.id, from: 0, to: round3(Number(i.deliveredQuantity ?? 0)) }));
 }
 
+/**
+ * Dodané zboží, které ještě nemá dodací list: u každé položky dodáno celkem − množství na vystavených
+ * DL (documented, podle řádků DL navázaných na položku). Řádky „od zdokumentovaného do dodaného".
+ * documented = null (starší DL bez vazby na položky) → nic (nejde poznat, co DL už pokrývá).
+ */
+export function undocumentedRows(items: DeliveryItemFacts[], documented: ReadonlyMap<string, number> | null): DeliveryRowInput[] {
+  if (!documented) return [];
+  return items
+    .map((i) => ({ itemId: i.id, from: round3(documented.get(i.id) ?? 0), to: round3(Number(i.deliveredQuantity ?? 0)) }))
+    .filter((r) => r.to > r.from);
+}
+
+/** Dodávka bez DL před touto (dodáno dříve víc, než pokrývají vystavené DL) — pořadí dodávky +1. */
+export function hadUndocumentedBefore(
+  items: DeliveryItemFacts[], rows: DeliveryRowInput[], documented: ReadonlyMap<string, number> | null,
+): boolean {
+  if (!documented) return false;
+  const from = new Map(rows.map((r) => [r.itemId, Number(r.from)]));
+  return items.some((i) => round3(from.get(i.id) ?? Number(i.deliveredQuantity ?? 0)) > round3(documented.get(i.id) ?? 0));
+}
+
+/** Označení DL na dříve dodané zboží (dodávka zapsaná bez DL, zakázka už jiné DL má). */
+export const CATCH_UP_LABEL = "dříve dodané zboží";
+
 /** Množství do pole formuláře s desetinnou čárkou („12,5"), jako zbytek českého UI. */
 export function qtyInput(n: number): string {
   return String(round3(n)).replace(".", ",");
@@ -114,7 +138,7 @@ export function deliveryNoteTitle(number: string, label?: string): string {
   return `Dodací list ${number} · ${label ?? "dodávka"}`;
 }
 
-const DELIVERY_TITLE_RE = / · (\d+\. (dílčí dodávka|dodávka — konečná)|dodávka)$/;
+const DELIVERY_TITLE_RE = / · (\d+\. (dílčí dodávka|dodávka — konečná)|dodávka|dříve dodané zboží)$/;
 
 /** Dokument zakázky je dodací list k dodávce (vystavený při „Zapsat dodání"), ne DL celé zakázky. */
 export function isDeliveryNoteFile(f: { kind: string; title?: string | null; archived?: boolean }): boolean {

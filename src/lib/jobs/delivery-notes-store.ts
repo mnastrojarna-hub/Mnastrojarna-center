@@ -9,8 +9,9 @@ import { buildDeliveryDoc, dateOnly, pdfFileName } from "@/lib/pdf/job-docs";
 import { renderDeliveryNotePdf } from "@/lib/pdf/render";
 import { todayIso } from "@/lib/pdf/types";
 import { czPlural } from "@/lib/jobs/flow-status";
+import { documentedQuantities } from "@/lib/jobs/delivery-notes-db";
 import {
-  deliveryCompletes, deliveryLabel, deliveryLines, deliveryNoteTitle, remainingQty, round3,
+  CATCH_UP_LABEL, deliveryCompletes, deliveryLabel, deliveryLines, deliveryNoteTitle, hadUndocumentedBefore, remainingQty, round3,
   type DeliveryLine, type DeliveryRowInput,
 } from "@/lib/jobs/delivery-notes";
 
@@ -87,8 +88,9 @@ export class DeliveryNoteBlocked extends Error {}
  * Řádek dodacího listu pro tuto dodávku, zabraný jen pro tento požadavek (storage_path = pending):
  *  - retryId = „Vystavit dodací list znovu" po chybě: zabere řádek jedním podmíněným UPDATE (jen
  *    když nemá PDF, nebo jeho zámek zestárl) — vystavený DL ani rozpracovaný jiným požadavkem nepřevezme;
- *  - jinak vždy NOVÝ řádek: první dodávka převezme číslo DL zakázky z Dokladů
- *    (orders.delivery_note_number), jinak další číslo z řady (kolize jedinečnosti → další číslo).
+ *  - jinak číslo, jehož vystavení dřív selhalo a nikdo ho neopakoval (řada bez mezer), jinak NOVÝ řádek:
+ *    první dodávka převezme číslo DL zakázky z Dokladů (orders.delivery_note_number), jinak další číslo
+ *    z řady (kolize jedinečnosti → další číslo).
  */
 async function reserveNote(
   db: JobsDb, job: JobDetail, opts: { retryId?: string | null; note: string | null },
@@ -122,6 +124,30 @@ async function reserveNote(
     }
     if (!row) throw new DeliveryNoteBlocked(`Dodací list ${prev.number} se právě vystavuje (jiné okno nebo kolega) — obnov stránku.`);
     return row;
+  }
+
+  // číslo DL, jehož vystavení dřív selhalo a nikdo ho neopakoval (zavřená obrazovka chyby) → použít ho
+  // pro tento DL (řada DL bez mezer); zábor stejně podmíněně jako „Vystavit znovu"
+  {
+    const stale = `${PENDING}${String(Date.now() - PENDING_STALE_MS).padStart(13, "0")}`;
+    const [failed, dead] = await Promise.all([
+      db.from("delivery_notes").select("id, storage_path, created_at").eq("order_id", job.id).is("storage_path", null)
+        .order("created_at", { ascending: true }).limit(3),
+      db.from("delivery_notes").select("id, storage_path, created_at").eq("order_id", job.id)
+        .like("storage_path", `${PENDING}%`).lt("storage_path", stale).order("created_at", { ascending: true }).limit(3),
+    ]);
+    const orphans = [...((failed.data ?? []) as { id: string; storage_path: string | null; created_at: string }[]),
+      ...((dead.data ?? []) as { id: string; storage_path: string | null; created_at: string }[])]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    for (const o of orphans) {
+      // nová dodávka = nové pořadí (created_at), číslo zůstává
+      let q = db.from("delivery_notes").update({ ...patch, created_at: new Date().toISOString() } as never).eq("id", o.id).eq("order_id", job.id);
+      q = o.storage_path === null ? q.is("storage_path", null) : q.eq("storage_path", o.storage_path);
+      const { data: got, error } = await q.select(NOTE_COLS);
+      if (error) throw new Error(error.message);
+      const row = ((got ?? []) as DeliveryNoteRow[])[0];
+      if (row) return row;
+    }
   }
 
   // první dodávka zakázky: číslo DL z Dokladů (vystavený DL na celou zakázku) — jedno číslo pro jedno zboží
@@ -161,12 +187,6 @@ export class DeliveryNoteError extends Error {
 }
 
 /**
- * Vystaví (nebo znovu vystaví — stejné číslo) PDF dodacího listu dodávky a uloží ho do Dokumentů
- * zakázky (kind dodaci_list; každý DL vlastní dokument, opakování = nová verze téhož DL) a do
- * delivery_notes(+items). Dodané množství NEZAPISUJE — to udělá volající až po úspěchu.
- * Chyba → DeliveryNoteError s rezervovaným číslem (opakování ho použije).
- */
-/**
  * Zabere číslo dodacího listu pro dodávku (řádek delivery_notes se zámkem pending) — volající
  * ho může hned uvést v historii dodání; PDF pak vystaví issueDeliveryNote({ reserved }).
  */
@@ -181,12 +201,19 @@ export async function reserveDeliveryNote(
   }
 }
 
+/**
+ * Vystaví (nebo znovu vystaví — stejné číslo) PDF dodacího listu dodávky a uloží ho do Dokumentů
+ * zakázky (kind dodaci_list; každý DL vlastní dokument, opakování = nová verze téhož DL) a do
+ * delivery_notes(+items, řádek navázaný na položku). Dodané množství NEZAPISUJE — to udělá volající
+ * až po úspěchu. catchUp = DL na zboží dodané dřív bez DL (zakázka už jiné DL má) → vlastní označení.
+ * Chyba → DeliveryNoteError s rezervovaným číslem (opakování ho použije).
+ */
 export async function issueDeliveryNote(
   db: JobsDb,
   userId: string,
   job: JobDetail,
   rows: DeliveryRowInput[],
-  opts: { note: string | null; preparedBy?: string; retryId?: string | null; reserved?: DeliveryNoteRow },
+  opts: { note: string | null; preparedBy?: string; retryId?: string | null; reserved?: DeliveryNoteRow; catchUp?: boolean },
 ): Promise<IssueNoteResult & { lines: DeliveryLine[] }> {
   const lines = deliveryLines(job.items.map((i) => ({ ...i })), rows);
   if (!lines.length) throw new DeliveryNoteError("Na dodací list není co dát — zadej, kolik se dodává teď.", null);
@@ -199,8 +226,10 @@ export async function issueDeliveryNote(
     const issued = (await issuedDeliveryNotes(db, job.id)).filter((n) => n.id !== row.id && n.created_at <= row.created_at);
     const items = job.items.map((i) => ({ ...i }));
     const final = deliveryCompletes(items, rows);
-    const seq = issued.length + 1;
-    const label = deliveryLabel(seq, final);
+    // dodávka zapsaná dřív bez DL se počítá do pořadí („2. dodávka", i když je to první DL zakázky)
+    const documented = await documentedQuantities(db, job.id, { exclude: row.id }).catch(() => null);
+    const seq = issued.length + 1 + (!opts.catchUp && hadUndocumentedBefore(items, rows, documented) ? 1 : 0);
+    const label = opts.catchUp && issued.length ? CATCH_UP_LABEL : deliveryLabel(seq, final);
     const after = new Map(rows.map((r) => [r.itemId, r.to]));
     const left = items.filter((i) => remainingQty({ ...i, deliveredQuantity: after.get(i.id) ?? i.deliveredQuantity }) > 0).length;
     const remainingText = final || !left ? undefined : `${left} ${czPlural(left, "položka", "položky", "položek")}`;
@@ -217,6 +246,7 @@ export async function issueDeliveryNote(
         quantity: l.quantity,
         unit: (it.unit || "ks").slice(0, 20),
         position: idx,
+        order_item_id: it.id,
       };
     });
     const { error: insErr } = await db.from("delivery_note_items").insert(snapshot as never);

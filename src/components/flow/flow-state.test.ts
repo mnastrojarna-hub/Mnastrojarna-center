@@ -205,8 +205,11 @@ describe("odkazy akcí a menu stránky", () => {
     expect(flowActionHref("quote.create", "j1")).toBe("/orders/j1?tab=nabidky&nova=1");
     expect(flowActionHref("pricing.supplierPrice", "j1")).toBe("/orders/j1?tab=nakup");
     expect(flowActionHref("quote.edit", "j1")).toBe("/orders/j1?tab=nabidky");
-    expect(flowActionHref("delivery.record", "j1")).toBe("/orders/j1?tab=vyroba");
-    expect(flowActionHref("payment.invoice", "j1")).toBe("/orders/j1?tab=vyroba");
+    // dodání / faktura / platba: odkaz otevře v kartě tentýž dialog (?akce=), ne jen záložku (plán sk. 1–3)
+    expect(flowActionHref("delivery.record", "j1")).toBe("/orders/j1?akce=delivery.record");
+    expect(flowActionHref("payment.invoice", "j1")).toBe("/orders/j1?akce=payment.invoice");
+    expect(flowActionHref("payment.record", "j1")).toBe("/orders/j1?akce=payment.record");
+    expect(flowActionHref("production.sendPo", "j1")).toBe("/orders/j1?tab=vyroba");
     expect(flowActionHref("order.confirm", "j1")).toBeNull();
     expect(flowActionHref("inquiry.take", "j1")).toBeNull();
   });

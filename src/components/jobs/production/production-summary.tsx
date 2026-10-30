@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, ArrowRight, Check, CircleCheckBig, Clock, Loader2, Play } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CircleCheckBig, Clock, Loader2, Play, Truck } from "lucide-react";
+import { useFlowActions } from "@/components/jobs/detail/flow-actions";
 import { Button } from "@/components/ui/button";
 import { OPERATION_KINDS } from "@/lib/jobs/operations";
 import { operationDisplayName, stepLabel, summarizeOperations } from "@/lib/jobs/production";
@@ -97,6 +98,39 @@ function CurrentAction({ op, label }: { op: JobOperation; label: string }) {
 }
 
 /**
+ * Dodání během výroby (dílčí dodávka, výroba končí u dodavatele): jediné tlačítko „Zapsat dodání a dodací
+ * list" je v kartě „Dodání zákazníkovi" (a v ⋯) — souhrn nahoře na něj jen odkáže (na mobilu je karta níž).
+ */
+export function summaryOffersDelivery(flow: ReturnType<typeof useFlowActions>): boolean {
+  const f = flow?.facts;
+  if (!flow || !f || !flow.ctx.can("workflow") || f.itemsCount <= 0) return false;
+  const delivery = flow.snapshot?.delivery ?? null;
+  if (flow.next?.key === "delivery.record" || delivery === "dodano" || delivery === "dl_potvrzen") return false;
+  const total = f.productionTotal ?? 0;
+  return total > 0 && (f.productionDone ?? 0) < total && f.productionStep !== "hotovo";
+}
+
+function DeliveryShortcut() {
+  const flow = useFlowActions();
+  if (!flow || !summaryOffersDelivery(flow)) return null;
+  return (
+    <a
+      href="#dodani-zakaznikovi"
+      onClick={(e) => {
+        const card = document.getElementById("dodani-zakaznikovi");
+        if (!card) return;
+        e.preventDefault();
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }}
+      className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-green-700 hover:underline dark:text-green-400"
+      data-testid="summary-delivery"
+    >
+      <Truck className="h-3.5 w-3.5" /> Hotové kusy dodáš i během výroby — Dodání zákazníkovi ↓
+    </a>
+  );
+}
+
+/**
  * Souhrn nahoře: kde se zakázka právě nachází, kolik je hotovo, velký pruh
  * průběhu, hlavní tlačítko pro aktuální operaci, problémy a zpoždění.
  */
@@ -153,7 +187,7 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
               <p className="text-lg font-bold">Bez postupu</p>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              {finished && <span>Všechny operace jsou hotové — dodej zákazníkovi a nahraj potvrzený dodací list.</span>}
+              {finished && <span>Všechny operace jsou hotové — dodej zákazníkovi: „Zapsat dodání a dodací list“, pak faktura.</span>}
               {!finished && current?.status === "ceka" && <span>čeká na začátek</span>}
               {!finished && running && (since || stamp) && (
                 <span>
@@ -217,8 +251,11 @@ export function ProductionSummary({ ops }: { ops: JobOperation[] }) {
         )}
 
         {!finished && current && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CurrentAction op={current} label={stepLabel(current, ops)} />
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <CurrentAction op={current} label={stepLabel(current, ops)} />
+              <DeliveryShortcut />
+            </div>
             {upcoming && upcoming.id !== current.id && (
               <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                 <ArrowRight className="h-3.5 w-3.5 shrink-0" /> Pak:

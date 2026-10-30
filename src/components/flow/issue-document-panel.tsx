@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Eye, FileOutput, Loader2, Send, ExternalLink } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, FileOutput, Loader2, ReceiptText, Send, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { generateJobDocument, type JobDocumentKind } from "@/app/actions/job-documents";
@@ -23,13 +23,19 @@ export interface IssueJob {
   customerName: string | null;
   stage: JobStage;
   hasQuote: boolean;
+  /** Číslo faktury zakázky (vystavená → v kartě jen poslat znovu). */
+  invoiceNumber?: string | null;
+  /** Fakturu jde vystavit (dodáno vše, faktura ještě není) — stejné pravidlo jako karta. */
+  invoiceable?: boolean;
 }
 
 /** Jaký doklad se k zakázce v daném stavu nejspíš hodí. */
-export function suggestedKind(stage: JobStage): JobDocumentKind {
+export function suggestedKind(stage: JobStage, job?: Pick<IssueJob, "invoiceNumber" | "invoiceable">): JobDocumentKind {
+  // faktura jen tam, kde jde vystavit nebo už je (jinak by panel nabízel fakturu poptávce)
+  if (job && (job.invoiceable || job.invoiceNumber)) return "faktura";
   if (stage === "poptavka" || stage === "naceneni" || stage === "nabidka") return "nabidka";
   if (stage === "objednavka" || stage === "potvrzeno") return "potvrzeni";
-  if (stage === "dodano_zakaznikovi" || stage === "fakturovano" || stage === "dokonceno") return "faktura";
+  if (!job && (stage === "dodano_zakaznikovi" || stage === "fakturovano" || stage === "dokonceno")) return "faktura";
   return "dodaci_list";
 }
 
@@ -48,13 +54,22 @@ const SELECTED: Record<JobDocumentKind, string> = {
  * „Vystavit doklad ze zakázky": vyber zakázku a druh → PDF se uloží do Dokumentů
  * zakázky (nová verze, stará do archivu) a jde rovnou poslat zákazníkovi.
  */
-export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
+export function IssueDocumentPanel({ jobs, canInvoice = true }: { jobs: IssueJob[]; canInvoice?: boolean }) {
   const router = useRouter();
   const [text, setText] = React.useState("");
   const [jobId, setJobId] = React.useState<string | null>(null);
-  const [kind, setKind] = React.useState<JobDocumentKind>("faktura");
+  // faktura jen pro finance (marže) — ostatní ji tu ani nevidí (server ji stejně odmítne)
+  const kinds = canInvoice ? ISSUABLE_KINDS : ISSUABLE_KINDS.filter((k) => k.kind !== "faktura");
+  const suggest = (picked: IssueJob): JobDocumentKind => {
+    const k = suggestedKind(picked.stage, picked);
+    return k === "faktura" && !canInvoice ? "dodaci_list" : k;
+  };
+  // výchozí druh před výběrem zakázky (po výběru se navrhne podle stavu); faktura se vystavuje v kartě
+  const [kind, setKind] = React.useState<JobDocumentKind>("potvrzeni");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  /** DL bez dodávky: chyba vede do karty na „Zapsat dodání a dodací list". */
+  const [needsDelivery, setNeedsDelivery] = React.useState(false);
   const [warning, setWarning] = React.useState<string | null>(null);
   const [done, setDone] = React.useState<{ fileId: string; filename: string; number: string; version: number; kind: JobDocumentKind; jobId: string; sentTo?: string } | null>(null);
   const [sending, setSending] = React.useState(false);
@@ -93,14 +108,18 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
     setError(null);
     setWarning(null);
     setDone(null);
+    setNeedsDelivery(false);
     try {
       const res = await generateJobDocument(job.id, kind, force ? { force: true } : undefined);
       if (!res.ok || !res.fileId) {
         if (res.unpriced) setWarning(res.error ?? "Některé položky nemají cenu.");
         else setError(res.error ?? "Doklad se nepodařilo vystavit.");
+        setNeedsDelivery(res.code === "delivery");
         return;
       }
       setDone({ fileId: res.fileId, filename: res.filename ?? "doklad.pdf", number: res.number ?? "", version: res.version ?? 1, kind, jobId: job.id });
+      // nový DL (dodané zboží bez DL) → seznam DL zakázky načíst znovu
+      if (kind === "dodaci_list") setNotes(null);
       router.refresh();
     } catch {
       setError("Spojení se nepovedlo — zkus to znovu.");
@@ -125,8 +144,9 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
             setDone(null);
             setWarning(null);
             setError(null);
+            setNeedsDelivery(false);
             const picked = id ? jobs.find((j) => j.id === id) : null;
-            if (picked) setKind(suggestedKind(picked.stage));
+            if (picked) setKind(suggest(picked));
           }}
           placeholder="Hledej číslo zakázky, název nebo zákazníka…"
           max={10}
@@ -135,8 +155,8 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
 
       <div className="space-y-1">
         <span className="text-xs font-medium text-muted-foreground">2. Druh dokladu</span>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {ISSUABLE_KINDS.map((k) => {
+        <div className={cn("grid grid-cols-2 gap-2", kinds.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+          {kinds.map((k) => {
             const m = FILE_KINDS[k.kind];
             const Icon = m.icon;
             const on = kind === k.kind;
@@ -151,6 +171,7 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
                   setDone(null);
                   setWarning(null);
                   setError(null);
+                  setNeedsDelivery(false);
                 }}
                 className={cn(
                   "flex items-start gap-2 rounded-xl border bg-background p-2.5 text-left transition hover:bg-accent/50",
@@ -199,6 +220,23 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
         </div>
       )}
       <ErrorBox error={error} />
+      {needsDelivery && job && (
+        <p className="text-sm">
+          <Link href={`/orders/${job.id}?tab=vyroba&akce=delivery.record`} className="font-medium underline underline-offset-2">Otevřít kartu zakázky → Zapsat dodání a dodací list</Link>
+        </p>
+      )}
+      {kind === "faktura" && job && (
+        // A2: faktura má jednu cestu — karta zakázky „Vystavit fakturu" (PDF + odeslání jako u nabídky)
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm dark:border-emerald-500/30 dark:bg-emerald-500/10" data-testid="issue-invoice-link">
+          <p className="text-emerald-900 dark:text-emerald-100">
+            {job.invoiceNumber
+              ? `Zakázka už má fakturu ${job.invoiceNumber} — v kartě zakázky ji otevřeš nebo pošleš znovu (druhá faktura nevznikne).`
+              : job.invoiceable
+                ? "Fakturu vystavíš v kartě zakázky — vznikne PDF s QR platbou a rovnou ji pošleš zákazníkovi."
+                : "Fakturu vystavíš po dodání všeho zboží (Zapsat dodání a dodací list) — v kartě zakázky."}
+          </p>
+        </div>
+      )}
       {warning && (
         <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
           <p className="flex items-start gap-2 font-medium">
@@ -243,10 +281,33 @@ export function IssueDocumentPanel({ jobs }: { jobs: IssueJob[] }) {
             </a>
           </Button>
         )}
-        <Button type="button" onClick={() => void issue()} disabled={!job || busy} className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-600/90">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileOutput className="h-4 w-4" />}
-          Vystavit PDF
-        </Button>
+        {kind === "faktura" ? (
+          <Button asChild={Boolean(job)} type="button" disabled={!job} className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-600/90">
+            {job ? (
+              job.invoiceNumber ? (
+                // vystavená → tentýž dialog jen k odeslání (stejné PDF, nic nového nevzniká)
+                <Link href={`/orders/${job.id}?akce=payment.invoice`}>
+                  <ReceiptText className="h-4 w-4" /> Poslat fakturu znovu v kartě zakázky
+                </Link>
+              ) : !job.invoiceable ? (
+                <Link href={`/orders/${job.id}?tab=vyroba`}>
+                  <ReceiptText className="h-4 w-4" /> Otevřít kartu zakázky
+                </Link>
+              ) : (
+                <Link href={`/orders/${job.id}?akce=payment.invoice`}>
+                  <ReceiptText className="h-4 w-4" /> Vystavit fakturu v kartě zakázky
+                </Link>
+              )
+            ) : (
+              <span><ReceiptText className="h-4 w-4" /> Vystavit fakturu v kartě zakázky</span>
+            )}
+          </Button>
+        ) : (
+          <Button type="button" onClick={() => void issue()} disabled={!job || busy} className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-600/90">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileOutput className="h-4 w-4" />}
+            Vystavit PDF
+          </Button>
+        )}
       </div>
 
       {done && (

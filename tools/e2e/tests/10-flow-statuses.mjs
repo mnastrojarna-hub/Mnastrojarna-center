@@ -437,7 +437,8 @@ await T("dodání: 1/2 položek → Částečně dodáno (stav se neposune) → 
   expect(bt.includes("Částečně dodáno") && bt.includes("1/2 položek"), `Kniha: Částečně dodáno 1/2 položek (${bt.slice(0, 200)})`);
   // zbytek
   await openJob(page, J, "?tab=vyroba");
-  await page.getByRole("region", { name: "Dodání zákazníkovi" }).getByRole("button", { name: /^(Dodat zbytek|Zapsat dodání)$/ }).first().click();
+  // A2 (sk. 2): hlavička ukazuje „Dodat zbytek" → karta Dodání stejné tlačítko podruhé nenabízí (jen odkáže nahoru)
+  await nextBtn(page, "Dodat zbytek").click();
   dlg = page.getByRole("dialog");
   await skipFinish(dlg);
   await dlg.getByRole("button", { name: `Vše — Čep B ${TAG}` }).click();
@@ -455,9 +456,16 @@ await T("faktura → Vyfakturováno · autor; úhrada částečná (bez posunu, 
   const page = await context.newPage();
   await login(page, USERS.obchod);
   await openJob(page, J);
-  await page.getByRole("button", { name: "Doklady (PDF)" }).click();
-  await page.getByRole("menuitem", { name: /^Faktura/ }).click();
-  await waitToast(page, /Faktura FV-\S+ je hotov/, 30_000);
+  // A2 (sk. 1): faktura = hlavní tlačítko „Vystavit fakturu" hned po dodání (potvrzený DL není podmínka)
+  // → PDF + dialog odeslání jako u nabídky; tady „Vystavit, neposílat" (odeslání testuje E2E 23)
+  await nextBtn(page, "Vystavit fakturu").click();
+  const inv = page.getByRole("dialog");
+  const force = inv.getByRole("button", { name: "Přesto vystavit" });
+  const save = inv.getByRole("button", { name: "Vystavit, neposílat" });
+  await Promise.race([force.waitFor({ timeout: 30_000 }), save.waitFor({ timeout: 30_000 })]).catch(() => {});
+  if (await force.isVisible().catch(() => false)) await force.click();
+  await save.click({ timeout: 30_000 });
+  await waitToast(page, /Faktura FV-\S+ je vystaven/, 30_000);
   await eventually(() => {
     const o = row(J);
     expect(o.status === "fakturovano" && o.invoiced_by === ID.obchod, `DB: Vyfakturováno, fakturoval obchodník (${o.status}, ${o.invoiced_by})`);

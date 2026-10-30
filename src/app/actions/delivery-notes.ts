@@ -216,9 +216,11 @@ export async function recordDelivery(
 
     if (noteErr) {
       const nr = noteErr.note ? ` ${noteErr.note.number}` : "";
+      // věta chyby vždy končí tečkou, ať další věta („Zkus…") nenavazuje bez oddělení
+      const why = noteErr.message.trim().replace(/\s+$/, "");
       return {
         ok: false,
-        error: `Dodání je zapsané, dodací list${nr} se nepodařilo vystavit: ${noteErr.message}`
+        error: `Dodání je zapsané, dodací list${nr} se nepodařilo vystavit: ${/[.!?…]$/.test(why) ? why : `${why}.`}`
           + (noteErr.blocked ? "" : ` Zkus „Vystavit dodací list znovu“${noteErr.note ? " — číslo zůstane" : ""}.`),
         recorded: true,
         stage,

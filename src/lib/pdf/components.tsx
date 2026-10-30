@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Page, View, Text, Svg, Rect, Line, Path, G, Defs, ClipPath, Polygon } from "@react-pdf/renderer";
 import { COMPANY } from "@/lib/company";
-import { styles, C } from "./theme";
+import { styles, C, PAGE } from "./theme";
 import { qrMatrix, qrRuns } from "./qr";
 import {
   computeTotals, czk, czNumber, czDate, countryName, isPlaceholder, lineTotal,
@@ -156,19 +156,41 @@ export interface MetaItem {
   accent?: boolean;
 }
 
+/** Šířka obsahu A4 mezi okraji (pt). */
+const CONTENT_W = 595 - 2 * PAGE.side;
+
+/**
+ * Písmo, aby se kód bez mezer (číslo výkresu, zakázky, objednávky) vešel na JEDEN řádek sloupce —
+ * dlouhý kód se dřív přelil do vedlejšího sloupce / usekl první znaky („VYK-…" → „YK-…"). Odhad šířky
+ * tučného Roboto 0,66 em na znak (velká písmena, číslice, pomlčky) s rezervou. Pod `min` se už
+ * nezmenšuje (extrémně dlouhý kód pak zalomí splitLongWord).
+ */
+export function fitFontSize(text: string | null | undefined, width: number, base: number, min = 5.4): number {
+  const t = String(text ?? "").trim();
+  if (!t || /\s/.test(t)) return base;
+  const len = [...t].length;
+  if (len * 0.66 * base <= width) return base;
+  return Math.max(min, Math.floor((width / (len * 0.66)) * 10) / 10);
+}
+
 export function MetaStrip({ items }: { items: MetaItem[] }) {
   const shown = items.filter((i) => i.value && String(i.value).trim());
   if (!shown.length) return null;
   const cols = shown.length <= 6 ? shown.length : Math.ceil(shown.length / 2);
   const width = `${100 / cols}%`;
+  // obsah buňky: šířka pruhu bez vnitřního okraje pruhu a buňky
+  const cellW = (CONTENT_W - 16) / cols - 12;
   return (
     <View style={styles.meta} wrap={false}>
-      {shown.map((m, i) => (
-        <View key={i} style={[styles.metaCell, { width }]}>
-          <Text style={styles.metaLabel}>{m.label}</Text>
-          <Text style={m.accent ? [styles.metaValue, { color: C.red }] : styles.metaValue}>{m.value}</Text>
-        </View>
-      ))}
+      {shown.map((m, i) => {
+        const size = fitFontSize(m.value, cellW, 9.2);
+        return (
+          <View key={i} style={[styles.metaCell, { width }]}>
+            <Text style={styles.metaLabel}>{m.label}</Text>
+            <Text style={[styles.metaValue, ...(size !== 9.2 ? [{ fontSize: size }] : []), ...(m.accent ? [{ color: C.red }] : [])]}>{m.value}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -301,7 +323,8 @@ export function Parties({
 
 // ── Tabulka položek ─────────────────────────────────────────
 
-const W = { num: 18, drawing: 72, qty: 52, price: 64, vat: 30, total: 76, check: 52 };
+// výkres 84 pt: číslo výkresu „VYK-12345-A" se vejde celé (dřív 72 pt → přetékalo do popisu)
+const W = { num: 18, drawing: 84, qty: 52, price: 64, vat: 30, total: 76, check: 52 };
 
 function ItemText({ it }: { it: DocItem | DeliveryItem }) {
   return (
@@ -314,9 +337,11 @@ function ItemText({ it }: { it: DocItem | DeliveryItem }) {
 }
 
 function DrawingCell({ it, width }: { it: DocItem | DeliveryItem; width: number }) {
+  // celé číslo výkresu na jednom řádku (zákazník podle něj páruje díl) — dlouhé menším písmem
+  const size = fitFontSize(it.drawingNumber, width - 6, 8.8);
   return (
     <View style={{ width, paddingRight: 6 }}>
-      <Text style={it.drawingNumber ? styles.cellDrawing : { color: C.muted }}>{it.drawingNumber || "—"}</Text>
+      <Text style={it.drawingNumber ? [styles.cellDrawing, ...(size !== 8.8 ? [{ fontSize: size }] : [])] : { color: C.muted }}>{it.drawingNumber || "—"}</Text>
       {it.revision ? <Text style={styles.cellRev}>rev. {it.revision}</Text> : null}
     </View>
   );

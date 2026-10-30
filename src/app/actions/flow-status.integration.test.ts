@@ -164,6 +164,7 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
     else await svc.from("integration_settings").delete().eq("key", "quote_approval_limit");
     if (jobs.length) {
       await svc.from("job_files").delete().in("job_id", jobs);
+      await svc.from("invoices").delete().in("order_id", jobs);
       await svc.from("quotes").delete().in("job_id", jobs);
       await svc.from("orders").delete().in("id", jobs);
       await svc.from("audit_log").delete().in("entity_id", jobs);
@@ -466,10 +467,19 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
     const paid = await p.markJobPaid(jobId, { date: "2026-10-22", amount: 90_000 });
     expect(paid).toMatchObject({ ok: true, stage: "dokonceno" });
     expect(await job(jobId)).toMatchObject({ paid_at: "2026-10-22", paid_amount: 90000 });
-    const { data: mirrored } = await svc.from("job_payments").select("amount, settles").eq("job_id", jobId);
-    expect(mirrored).toEqual([{ amount: 90000, settles: true }]);
+    // A2 (ochrana záloh, migrace 20261029170000): ruční úhrada 30 000 zůstala, zrcadlo zapsalo jen doplatek do 90 000
+    // (dřív zápis orders.paid_* smazal všechny úhrady a vložil jednu 90 000)
+    const { data: mirrored } = await svc.from("job_payments").select("amount, settles, via").eq("job_id", jobId).order("paid_on");
+    expect(mirrored).toEqual([
+      { amount: 30000, settles: false, via: expect.not.stringMatching(/^automaticky$/) },
+      { amount: 60000, settles: true, via: "automaticky" },
+    ]);
     expect(await p.unmarkJobPaid(jobId)).toMatchObject({ ok: true, stage: "fakturovano" });
-    expect((await svc.from("job_payments").select("id").eq("job_id", jobId)).data).toEqual([]);
+    // zrušení úhrady smaže jen automatický doplatek; ruční záloha zůstane (oprava = „Odebrat“ u úhrady)
+    const left = ((await svc.from("job_payments").select("id, amount, settles").eq("job_id", jobId)).data ?? []) as { id: string; amount: number; settles: boolean }[];
+    expect(left.map((x) => [x.amount, x.settles])).toEqual([[30000, false]]);
+    expect(await job(jobId)).toMatchObject({ paid_at: null, paid_so_far: 30000 });
+    expect(await a.deleteJobPayment(left[0].id)).toMatchObject({ ok: true });
 
     // korekce → Dokončeno při 30 % a další dílčí platba zakázku nevrátí (M6b)
     await a.recordJobPayment(jobId, { date: "2026-10-10", amount: 30_000 });

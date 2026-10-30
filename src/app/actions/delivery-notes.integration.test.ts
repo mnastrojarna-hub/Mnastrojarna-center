@@ -11,8 +11,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * i v Dokumentech zakázky; druhá dílčí dodávka → druhý DL; chyba PDF → dodání zůstane zapsané,
  * číslo zůstane a „Vystavit znovu" ho použije; souběh dvou uživatelů → jedna dodávka, jeden DL;
  * dodáno bez DL → Doklady vystaví DL na dodané zboží; náhled DL; zbytek → konečný DL a Dodáno zákazníkovi; Doklady → Dodací
- * list stáhne vystavený DL bez nového čísla; zakázka bez dodávek dostane DL jako dřív a první dodávka
- * jeho číslo převezme; zaměstnanec DL vystaví i vidí; e-mail nese číslo konkrétního DL.
+ * list stáhne vystavený DL bez nového čísla; zakázka bez dodávek DL bez dodání nedostane (vede na
+ * zápis dodání); zaměstnanec DL vystaví i vidí; e-mail nese číslo konkrétního DL.
  *   LOCAL_SUPABASE=1 npx vitest run src/app/actions/delivery-notes.integration.test.ts
  * Vlastní data (zákazník, zakázky „E2E-21I-"), na konci se uklidí; číselné řady se nevrací (sdílená DB).
  */
@@ -367,19 +367,23 @@ describe.skipIf(!ENABLED)("dodací list při zápisu dodání ↔ lokální Supa
     expect(draft.body).toContain(numbers[1]);
   });
 
-  it("zakázka bez dodávek: Doklady → DL na všechny položky jako dřív; první dodávka převezme jeho číslo", async () => {
+  // A2 (sk. 2): DL „na celou zakázku" bez dodávky už nevzniká — jedna cesta = „Zapsat dodání a dodací list"
+  // (dřív: Doklady → DL na všechny položky, číslo v orders a první dodávka ho převzala)
+  it("zakázka bez dodávek: Doklady → Dodací list nic nevystaví (vede na zápis dodání); dodání pak dostane DL", async () => {
     const j = await newJob("B");
-    const all = await d.generateJobDocument(j.id, "dodaci_list");
-    expect(all.ok, all.error).toBe(true);
-    expect((await order(j.id)).delivery_note_number).toBe(all.number);
-    expect(await notesOf(j.id)).toHaveLength(0);
     const counter0 = await dlCounter();
+    const all = await d.generateJobDocument(j.id, "dodaci_list");
+    expect(all.ok).toBe(false);
+    expect(all.code).toBe("delivery");
+    expect(all.error).toMatch(/Dodací list vzniká se zápisem dodání/);
+    expect((await order(j.id)).delivery_note_number).toBeNull();
+    expect(await dlCounter()).toBe(counter0); // číslo se nespotřebovalo
     const res = await a.recordDelivery(j.id, [{ itemId: j.a, from: 0, to: 10 }, { itemId: j.b, from: 0, to: 4 }], { issueNote: true });
     expect(res.ok, res.error).toBe(true);
-    expect(res.deliveryNote!.number).toBe(all.number);
     expect(res.deliveryNote!.label).toBeNull(); // jediná kompletní dodávka
-    expect(res.deliveryNote!.version).toBe(2); // stejný DL — nová verze, ne nové číslo
-    expect(await dlCounter()).toBe(counter0);
+    expect(res.deliveryNote!.version).toBe(1);
+    expect((await order(j.id)).delivery_note_number).toBe(res.deliveryNote!.number);
+    expect(await dlCounter()).toBe(counter0 + 1);
   }, 60_000);
 
   it("dodáno bez DL (starší dodání): Doklady → DL na dodané zboží (6 ks, ne 10 + 4), příště stejný DL bez nového čísla", async () => {
