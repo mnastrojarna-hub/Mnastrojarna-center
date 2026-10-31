@@ -11,6 +11,7 @@ on:
       - claude/cnc-sales-os-ai-cbR2f
     paths:
       - "supabase/**"
+      - ".github/workflows/supabase-deploy.yml"
   workflow_dispatch:
 
 jobs:
@@ -44,9 +45,12 @@ jobs:
         if: steps.guard.outputs.ready == 'true'
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
+      # --include-all: použije i migraci s dřívějším časem, než má poslední nasazená (souběžné PR se mergují
+      # v jiném pořadí, než je časové razítko — jinak by push skončil chybou a nenasadila by se žádná další).
+      # Všechny migrace jsou idempotentní (if not exists / create or replace / ochranné značky).
       - name: Push DB migrací
         if: steps.guard.outputs.ready == 'true'
-        run: supabase db push
+        run: supabase db push --linked --include-all
 
       - name: Deploy Edge Functions
         if: steps.guard.outputs.ready == 'true'
