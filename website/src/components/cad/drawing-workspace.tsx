@@ -268,8 +268,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
+      if (prompt) {
+        if (e.key === "Escape") setPrompt(null);
+        return; // při otevřeném formuláři poznámky nepřepínat nástroje
+      }
       if (e.key === "Escape") {
-        if (prompt) return setPrompt(null);
         if (annTool) {
           setAnnTool(null);
           setAnnPts([]);
@@ -721,7 +724,7 @@ function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number;
   const field = (k: string, label: string, placeholder = "") => (
     <label className="block">
       <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wider text-ink-700/50">{label}</span>
-      <input ref={k === "text" || k === "ra" || (kind === "gdt" && k === "value") ? first : undefined} value={v[k] ?? ""} placeholder={placeholder} onChange={(e) => setV({ ...v, [k]: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onCancel(); }} className={inputCls} />
+      <input ref={k === "text" || k === "ra" || (kind === "gdt" && k === "value") ? first : undefined} autoFocus={k === "text" || k === "ra" || (kind === "gdt" && k === "value")} value={v[k] ?? ""} placeholder={placeholder} onChange={(e) => setV({ ...v, [k]: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") onCancel(); }} className={inputCls} />
     </label>
   );
   return (
