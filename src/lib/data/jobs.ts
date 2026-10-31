@@ -23,6 +23,7 @@ import {
 import type { FlowScope } from "@/lib/auth/flow-scope";
 import { fileLocks } from "@/lib/jobs/job-file-access";
 import { documentedQuantities, issuedNoteRefs } from "@/lib/jobs/delivery-notes-db";
+import { loadDrawingChanges } from "@/lib/data/flow-exceptions";
 
 /**
  * Datová vrstva Knihy zakázek — čte servisním klíčem (obchází RLS),
@@ -33,6 +34,11 @@ import { documentedQuantities, issuedNoteRefs } from "@/lib/jobs/delivery-notes-
 export type { JobStageCounts } from "@/lib/jobs/mapping";
 
 const MAX_ROWS = 2000;
+
+/** Měla zakázka někdy změnu revize výkresu? (historie — i potvrzené změny se ukážou u položek) */
+function hasDrawingEvent(events: unknown): boolean {
+  return Array.isArray(events) && events.some((e) => (e as { data?: { exception?: unknown } | null })?.data?.exception === "drawing_revision");
+}
 
 function warn(scope: string, error: { message: string } | null | undefined) {
   if (error) console.error(`[data:jobs:${scope}] Supabase chyba: ${error.message}`);
@@ -183,6 +189,7 @@ function lightEligible(filters: JobFilters, narrowed: FlowScope | null): boolean
   return !narrowed && limit > 0 && limit <= LIGHT_MAX && LIGHT_SORTS.has(filters.sort ?? "created")
     && !(filters.q ?? "").trim() && !(filters.step ?? "").trim() && !(filters.location ?? "").trim() && !filters.payment
     && !(filters.inquiry ?? []).length && !(filters.order ?? []).length && !(filters.delivery ?? []).length
+    && !filters.exception && !filters.lostReason
     // dodáno zákazníkovi potřebuje items_count / items_delivered (lehké řádky je nemají)
     && typeof filters.deliveredToCustomer !== "boolean"
     && filters.deadline !== "krok";
@@ -224,6 +231,7 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
     const filtered = filterJobs(items, {
       q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
       inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery, deliveredToCustomer: filters.deliveredToCustomer,
+      exception: filters.exception, lostReason: filters.lostReason,
     });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
@@ -309,16 +317,21 @@ export async function getJob(id: string): Promise<JobDetail | null> {
     );
     // dodané zboží bez dodacího listu (Doklady → „DL na dodané zboží") — jen u zakázky s dodávkou
     const delivered = detail.items.some((i) => Number(i.deliveredQuantity ?? 0) > 0);
-    const [documented, notes] = await Promise.all([
+    const [documented, notes, drawings] = await Promise.all([
       delivered ? documentedQuantities(s.db, detail.id).catch(() => null) : Promise.resolve(new Map<string, number>()),
       // čísla DL z delivery_notes (jediný zdroj čísla DL) — čip v hlavičce, přehled
       issuedNoteRefs(s.db, detail.id).catch(() => undefined),
+      // změny revize výkresu (banner „Nová revize výkresu") — jen zakázka, která nějakou měla
+      (jobRes.data as { drawing_changes_open?: number | null }).drawing_changes_open || hasDrawingEvent(eventsRes.data)
+        ? loadDrawingChanges(s.db, detail.id, { margins: s.view.margins }).catch(() => null)
+        : Promise.resolve(null),
     ]);
     return {
       ...detail,
       files: await withLocks(s.db, detail.files, s.access),
       deliveryDocumented: documented ? Object.fromEntries(documented) : null,
       ...(notes ? { deliveryNotes: notes } : {}),
+      ...(drawings ? { drawingChanges: drawings.changes, drawingAffects: drawings.affects } : {}),
     };
   } catch (err) {
     console.error(`[data:jobs:detail] ${err instanceof Error ? err.message : String(err)}`);
@@ -576,6 +589,7 @@ interface MatchJobRow {
   customer_contact_email: string | null;
   supplier_id?: string | null;
   supplier_order_number?: string | null;
+  awaiting_customer_po?: boolean | null;
   customer?: {
     id: string; name: string; ico: string | null; dic: string | null; email: string | null;
     contacts?: { email: string | null }[] | null;
@@ -616,7 +630,7 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
     const since = new Date();
     since.setFullYear(since.getFullYear() - 2);
     const [jobsRes, customersRes] = await Promise.all([
-      fetchPaged<MatchJobRow>((from, to) => s.db.from("orders").select(`${MATCH_JOB_SELECT}, supplier_id, supplier_order_number`)
+      fetchPaged<MatchJobRow>((from, to) => s.db.from("orders").select(`${MATCH_JOB_SELECT}, supplier_id, supplier_order_number, awaiting_customer_po`)
         .neq("status", "zruseno")
         .is("merged_into_id", null)
         .gte("created_at", since.toISOString())
@@ -646,6 +660,7 @@ export async function getMatchingCandidates(): Promise<{ jobs: JobMatchCandidate
         customerInquiryNumber: r.customer_inquiry_number ?? null,
         supplierId: r.supplier_id ?? null,
         supplierOrderNumber: r.supplier_order_number ?? null,
+        awaitingCustomerPo: r.awaiting_customer_po === true,
         quoteNumbers: uniqueStrings([
           ...(r.quotes ?? []).map((q) => q.number),
           ...(r.quote_docs ?? []).filter((f) => f.kind === "nabidka").map((f) => f.doc_no),

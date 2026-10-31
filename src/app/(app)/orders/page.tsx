@@ -10,6 +10,8 @@ import { BookToolbar } from "@/components/jobs/book/book-toolbar";
 import { JobRows, JobRowsHeader } from "@/components/jobs/book/job-rows";
 import { JobBoard } from "@/components/jobs/book/job-board";
 import { FlowFilterChips } from "@/components/jobs/book/flow-filter-chips";
+import { ExceptionChips } from "@/components/jobs/book/exception-chips";
+import { getFlowExceptionCounts } from "@/lib/data/flow-exceptions";
 import type { BookAccess } from "@/components/jobs/book/book-flow";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { BookEmpty } from "@/components/jobs/book/book-empty";
@@ -63,7 +65,7 @@ export default async function OrdersPage({
   // „Hodnota v běhu" (jen s právem na marže) = VŠECHNY objednávky v běhu (bez DL na vše) — stejné filtry jako
   // záložka Objednávky bez dalších filtrů, ne jen zobrazené řádky; dotaz do DB sdílí se seznamem (React cache).
   // „Po splatnosti" = vlastní dotaz přes celou knihu (vyfakturované jsou v Dokončených).
-  const [jobs, counts, options, running, overdueInvoices, production, flowCounts, quoteApprovers] = await Promise.all([
+  const [jobs, counts, options, running, overdueInvoices, production, flowCounts, quoteApprovers, exceptionCounts] = await Promise.all([
     listJobs(bookParamsToFilters(params)),
     getJobStageCounts(),
     getJobFormOptions(),
@@ -73,6 +75,8 @@ export default async function OrdersPage({
     chipSegment ? getFlowCounts() : Promise.resolve({} as Record<string, number>),
     // 31. 10.: schvalovatelé (štítek „čeká na schválení (V. Volný nebo super admin)“)
     listQuoteApprovers(),
+    // výjimky v toku (Bez objednávky, Reklamace, Pozastaveno, Nová revize výkresu, důvody prohry)
+    getFlowExceptionCounts(),
   ]);
   const access: BookAccess = {
     features, userId: user.id, role: user.role, quoteNeedsApproval: user.quoteNeedsApproval !== false, quoteApprovers,
@@ -111,6 +115,7 @@ export default async function OrdersPage({
           <SegmentTabs counts={segmentCounts(counts.byStage, counts.deliveredByStage)} />
           <StageChips byStage={segmentStageCounts(counts.byStage, counts.deliveredByStage, params.segment)} />
           {chipSegment && <FlowFilterChips counts={flowCounts} />}
+          <ExceptionChips counts={exceptionCounts} />
           <BookToolbar options={options} production={production} />
         </section>
 

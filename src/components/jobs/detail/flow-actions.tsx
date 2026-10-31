@@ -30,7 +30,7 @@ import {
   type ActionCtx, type FlowActionKey, type FlowFacts, type FlowSnapshot, type JobStamps, type LostReason, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import type { Feature } from "@/lib/auth/permissions";
-import type { JobDetail, JobQuote } from "@/lib/jobs/types";
+import type { DrawingChangeView, JobDetail, JobQuote } from "@/lib/jobs/types";
 import type { OrderMismatchKind, UserRole } from "@/lib/supabase/database.types";
 import type { OrderRevision } from "@/lib/data/flow-status";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,7 @@ import { QuoteApproveSendDialog } from "@/components/flow/quote-approve-send-dia
 import { approvedToast } from "@/components/flow/quote-approval-copy";
 import { DETAIL_TABS_ID, addDaysIso, type DetailTab } from "./detail-helpers";
 import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
+import { EXCEPTION_DIALOG_KEYS, FlowExceptionDialog } from "./flow-exception-dialogs";
 
 /**
  * Akce podrobných stavů na kartě zakázky: jeden poskytovatel drží fakta toku (deriveFlow),
@@ -67,8 +68,8 @@ interface FlowActionsValue {
   next: Next;
   menu: FlowActionKey[];
   stamps: JobStamps | null;
-  /** Spustí akci: přímá se provede (s oznámením), jinak se otevře její dialog / záložka. */
-  run: (key: FlowActionKey, opts?: { quoteId?: string }) => void;
+  /** Spustí akci: přímá se provede (s oznámením), jinak se otevře její dialog / záložka. itemId = předvybraná položka (Aktualizace výkresu). */
+  run: (key: FlowActionKey, opts?: { quoteId?: string; itemId?: string }) => void;
   /** Přímá akce s výsledkem (tlačítko dalšího kroku s „Vrátit"). */
   runDirect: (key: FlowActionKey, opts?: { quoteId?: string }) => Promise<DirectResult | null>;
   undo: ((key: FlowActionKey) => Promise<DirectResult>) | null;
@@ -83,6 +84,8 @@ interface FlowActionsValue {
   newQuoteSeen?: { current: number };
   /** Toast po „Schválit“ aktivní nabídky (§13: „Nabídka {č.} schválena — {autor} ji teď může odeslat.“). */
   approveToast: string;
+  /** Změny revize výkresu (štítek „rev. změněna" u položek). */
+  drawingChanges?: DrawingChangeView[];
 }
 
 const FlowActionsContext = React.createContext<FlowActionsValue | null>(null);
@@ -91,7 +94,7 @@ export function useFlowActions(): FlowActionsValue | null {
   return React.useContext(FlowActionsContext);
 }
 
-type DialogState = { key: FlowActionKey; quoteId?: string } | null;
+type DialogState = { key: FlowActionKey; quoteId?: string; itemId?: string } | null;
 
 const MISMATCH_KINDS: { kind: OrderMismatchKind; label: string }[] = [
   { kind: "cena", label: "Cena" },
@@ -206,7 +209,7 @@ export function FlowActionsProvider({
     return res;
   }, [directCtx, settle]);
 
-  const run = React.useCallback((key: FlowActionKey, opts: { quoteId?: string } = {}) => {
+  const run = React.useCallback((key: FlowActionKey, opts: { quoteId?: string; itemId?: string } = {}) => {
     const tab = TAB_OF[key];
     if (tab) {
       setTab(tab === "nakup" && !perms.margins ? "polozky" : tab);
@@ -225,7 +228,7 @@ export function FlowActionsProvider({
       }).catch(() => notify("error", "Spojení se nepovedlo — zkus to znovu."));
       return;
     }
-    setDialog({ key, quoteId: opts.quoteId });
+    setDialog({ key, quoteId: opts.quoteId, itemId: opts.itemId });
   }, [setTab, perms.margins, runDirect, notify, job.quotes, activeQuoteId]);
 
   const undo = React.useCallback(async (key: FlowActionKey) => {
@@ -266,10 +269,11 @@ export function FlowActionsProvider({
   }, [initialAction, ctx, features.length, run, next?.key, menu, notify, job.invoiceNumber, job.files]);
 
   const approveToast = approvedToastOf(job.quotes.find((q) => q.id === activeQuoteId) ?? null);
+  const drawingChanges = job.drawingChanges;
   const value = React.useMemo<FlowActionsValue>(() => ({
     facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal, newQuoteSeen,
-    approveToast,
-  }), [facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal, approveToast]);
+    approveToast, drawingChanges,
+  }), [facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal, approveToast, drawingChanges]);
 
   const close = (o: boolean) => !o && setDialog(null);
   const quoteOf = (id?: string | null): JobQuote | null => job.quotes.find((q) => q.id === (id ?? activeQuoteId)) ?? null;
@@ -339,7 +343,7 @@ interface ReasonConfig {
 function FlowDialog({
   state, job, facts, quotes, revisions, quote, margins, purchaseOrders, onClose, onDone, onSwitch, setTab,
 }: {
-  state: { key: FlowActionKey; quoteId?: string };
+  state: { key: FlowActionKey; quoteId?: string; itemId?: string };
   job: JobDetail;
   facts: FlowFacts;
   quotes: QuoteFacts[];
@@ -455,6 +459,24 @@ function FlowDialog({
       success: "Návrh odeslán — rozhodne obchodník.",
     },
   };
+
+  // výjimky v toku („Co se stalo?") — vlastní dialogy, navazující krok přes onSwitch
+  if (EXCEPTION_DIALOG_KEYS.includes(key)) {
+    return (
+      <FlowExceptionDialog
+        actionKey={key}
+        job={job}
+        facts={facts}
+        quotes={quotes}
+        margins={margins}
+        itemId={state.itemId ?? null}
+        onClose={onClose}
+        onDone={onDone}
+        onProgress={onDone}
+        onSwitch={onSwitch}
+      />
+    );
+  }
 
   const cfg = reason[key];
   if (cfg) {

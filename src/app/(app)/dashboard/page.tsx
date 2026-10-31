@@ -22,6 +22,8 @@ import { FlowStateTiles, MoversPanel } from "@/components/dashboard/flow-overvie
 import { getJobStageCounts, listJobs } from "@/lib/data/jobs";
 import { getSetupChecklist } from "@/lib/setup/status";
 import { getAnonReviewCount } from "@/lib/data/anonymize";
+import { getFlowExceptionCounts } from "@/lib/data/flow-exceptions";
+import { FlowExceptionTiles } from "@/components/dashboard/flow-exception-tiles";
 import { EyeOff } from "lucide-react";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
 
@@ -33,7 +35,7 @@ import { cn, formatCZK, relativeTime } from "@/lib/utils";
 export default async function DashboardPage() {
   await requireFeature("dashboard");
   const { can } = await getAccess();
-  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved, anonReview] = await Promise.all([
+  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved, anonReview, exceptions] = await Promise.all([
     getEmails(),
     getApprovalQueue(),
     getJobStageCounts(),
@@ -46,6 +48,8 @@ export default async function DashboardPage() {
     getResolvedApprovals(5),
     // dřív až po všem ostatním (o round-trip později)
     getAnonReviewCount(),
+    // výjimky v toku (31. 10.): chybí objednávka zákazníka, reklamace, nová revize výkresu…
+    getFlowExceptionCounts(),
   ]);
   // #25: dlaždice = fronta AI + ruční nabídky kolegů (oba panely níže je vypíšou)
   const waitingApproval = approvals.length + quotes.length;
@@ -161,6 +165,9 @@ export default async function DashboardPage() {
 
       {/* Podrobné stavy toku — co čeká na koho */}
       <FlowStateTiles tiles={FLOW_TILES} counts={flowCounts} />
+
+      {/* Výjimky v toku — co vybočilo z běžného postupu (stejné filtry jako chipy v Knize) */}
+      <FlowExceptionTiles counts={exceptions} />
 
       {/* Kde jsou zakázky */}
       <section className="rounded-2xl border bg-card p-4 shadow-sm">

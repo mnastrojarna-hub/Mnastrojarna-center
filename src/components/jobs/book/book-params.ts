@@ -5,8 +5,10 @@ import {
 } from "@/lib/jobs/stages";
 import { isOperationKind } from "@/lib/jobs/operations";
 import {
-  DELIVERY_STATES, INQUIRY_ORDER, ORDER_TAB_CHIPS, isInquiryStatus, type DeliveryState, type InquiryStatus,
+  DELIVERY_STATES, INQUIRY_ORDER, ORDER_TAB_CHIPS, isInquiryStatus, isLostReason, type DeliveryState, type InquiryStatus,
 } from "@/lib/jobs/flow-status";
+import { isExceptionFilter, type ExceptionFilterKey } from "@/lib/jobs/flow-exceptions";
+import type { LostReason } from "@/lib/supabase/database.types";
 
 /**
  * Kniha zakázek — parametry URL ↔ filtry, segmenty (záložky), řazení,
@@ -192,6 +194,10 @@ export interface BookParams {
   delivery: DeliveryState[];
   /** Kdo naposledy posunul stav (uuid, URL zmenil=) nebo "". */
   changedBy: string;
+  /** Výjimka v toku (URL vyjimka=): Bez objednávky, Reklamace, Pozastaveno, Nová revize výkresu, Opraveno. */
+  exception?: ExceptionFilterKey | null;
+  /** Důvod prohry / storna (URL duvod=) — záložka Nerealizované & zrušené. */
+  reason?: LostReason | null;
   sort: JobSort;
   dir: SortDir;
   view: BookView;
@@ -242,6 +248,8 @@ export const DEFAULT_PARAMS: BookParams = {
   order: [],
   delivery: [],
   changedBy: "",
+  exception: null,
+  reason: null,
   sort: DEFAULT_SORT,
   dir: defaultDirFor(DEFAULT_SORT),
   view: "radky",
@@ -274,6 +282,8 @@ export function parseBookParams(sp: RawSearchParams): BookParams {
     order: keyList(firstParam(sp, "objednavka"), ORDER_FILTER_KEYS),
     delivery: keyList(firstParam(sp, "dodani"), deliveryFiltersFor(segment)),
     changedBy: cleanId(firstParam(sp, "zmenil")),
+    exception: isExceptionFilter(firstParam(sp, "vyjimka")) ? (firstParam(sp, "vyjimka") as ExceptionFilterKey) : null,
+    reason: isLostReason(firstParam(sp, "duvod")) ? (firstParam(sp, "duvod") as LostReason) : null,
     sort,
     dir,
     view: firstParam(sp, "view") === "tabule" ? "tabule" : "radky",
@@ -303,6 +313,8 @@ export function bookQuery(p: BookParams): string {
   const delivery = deliveryFor(p.delivery, p.segment);
   if (delivery.length) out.set("dodani", delivery.join(","));
   if (cleanId(p.changedBy)) out.set("zmenil", cleanId(p.changedBy));
+  if (p.exception && isExceptionFilter(p.exception)) out.set("vyjimka", p.exception);
+  if (p.reason && isLostReason(p.reason)) out.set("duvod", p.reason);
   const sort = isSort(p.sort) ? p.sort : DEFAULT_SORT;
   if (sort !== DEFAULT_SORT) out.set("sort", sort);
   if (p.dir !== defaultDirFor(sort)) out.set("dir", p.dir);
@@ -334,6 +346,7 @@ export function applyBookPatch(p: BookParams, patch: BookPatch): BookParams {
     if (patch.stages === undefined) next.stages = [];
     if (patch.inquiry === undefined) next.inquiry = [];
     if (patch.order === undefined) next.order = [];
+    if (patch.reason === undefined) next.reason = null;
   }
   if (patch.sort !== undefined && patch.dir === undefined && patch.sort !== p.sort) next.dir = defaultDirFor(patch.sort);
   next.stages = normalizeStages(next.stages, next.segment);
@@ -351,7 +364,7 @@ export function toggleStagePatch(p: BookParams, stage: JobStage): BookPatch {
 /** „Zrušit filtry" — záložka, řazení a pohled zůstávají. */
 export const RESET_FILTERS: BookPatch = {
   stages: [], q: "", owner: "", assignee: "", customer: "", deadline: null, step: "", location: "", payment: null,
-  inquiry: [], order: [], delivery: [], changedBy: "",
+  inquiry: [], order: [], delivery: [], changedBy: "", exception: null, reason: null,
 };
 
 export function activeFilterCount(p: BookParams): number {
@@ -359,6 +372,7 @@ export function activeFilterCount(p: BookParams): number {
     p.stages.length > 0, p.q.trim() !== "", p.owner !== "", p.assignee !== "", p.customer !== "", p.deadline !== null,
     Boolean(p.step), Boolean((p.location ?? "").trim()), Boolean(p.payment),
     (p.inquiry ?? []).length > 0, (p.order ?? []).length > 0, (p.delivery ?? []).length > 0, Boolean(p.changedBy),
+    Boolean(p.exception), Boolean(p.reason),
   ].filter(Boolean).length;
 }
 
@@ -399,6 +413,8 @@ export function bookParamsToFilters(p: BookParams): JobFilters {
   if (p.order?.length) filters.order = p.order;
   if (p.delivery?.length) filters.delivery = p.delivery;
   if (p.changedBy) filters.changedBy = p.changedBy;
+  if (p.exception) filters.exception = p.exception;
+  if (p.reason) filters.lostReason = p.reason;
   return filters;
 }
 

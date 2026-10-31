@@ -3,6 +3,7 @@ import { StageSelect } from "@/components/jobs/stage-select";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { FlowStatusChip } from "@/components/flow-status/state-chip";
+import { RowExceptionFlags } from "@/components/flow-status/exception-flag-chip";
 import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
 import { RowNextAction, RowProposal } from "@/components/jobs/book/row-flow";
 import { rowFlowView, type BookAccess, type RowFlowView } from "@/components/jobs/book/book-flow";
@@ -162,16 +163,19 @@ function JobRow({ job, today, access }: { job: JobListItem; today: string; acces
           </div>
           <CustomerDocNumber job={job} className="mt-1.5 lg:hidden" />
           <RowStateChip job={job} view={view} className="relative z-10 mt-1.5 lg:hidden" />
+          {/* výjimky v toku: nová revize výkresu, bez objednávky, reklamace, opraveno */}
+          <RowExceptionFlags flow={job.flow} stage={job.stage} today={today} className="relative z-10 mt-1.5 lg:hidden" />
           <ProductionLine job={job} today={today} className="mt-2 lg:hidden" />
         </div>
 
         {/* stav */}
         <div className="relative z-10 order-2 flex shrink-0 flex-col items-end gap-0.5 lg:order-none lg:min-w-0 lg:max-w-full lg:justify-self-end [grid-area:stage] xl:items-start xl:justify-self-start">
-          <StageSelect jobId={job.id} stage={job.stage} size="sm" flow={job.flow} quotes={job.flowQuotes} />
+          <StageSelect jobId={job.id} stage={job.stage} size="sm" flow={job.flow} quotes={job.flowQuotes} exceptions />
           {/* kdo stav naposledy posunul — text na všech šířkách, ťuknutím detail */}
           <ActorStamp stamp={view.stamp} short className="max-w-[10.5rem] xl:max-w-[11rem]" />
           {/* dlouhý chip („Ohrožen konečný termín (o 8 dní)“) se zkrátí ve sloupci, nepřeteče do Termínu */}
           <RowStateChip job={job} view={view} shortFlag className="max-w-[10.5rem] xl:max-w-[11rem] hidden lg:inline-flex" />
+          <RowExceptionFlags flow={job.flow} stage={job.stage} today={today} short className="hidden max-w-[10.5rem] lg:flex xl:max-w-[11rem]" />
           <ProductionLine job={job} compact today={today} className="hidden w-full max-w-[11rem] lg:flex" />
         </div>
 
