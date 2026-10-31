@@ -2233,6 +2233,16 @@ function FloatPanel({ title, icon, onClose, children, className, pos = "left-3 t
 }
 
 function Modal({ title, icon, onClose, children }: { title: string; icon: CadIconName; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", esc, true);
+    return () => window.removeEventListener("keydown", esc, true);
+  }, [onClose]);
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-[#0b1220]/40 p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-lg border border-[#cfd6de] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>

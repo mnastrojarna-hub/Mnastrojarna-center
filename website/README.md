@@ -14,7 +14,7 @@ Nový web Mnástrojárny s.r.o. — **„Váš partner ve strojírenství“**. 
   - **sestava:** komponenty, vazby Kontakt/Zarovnat/Vystředit, podsestavy, gizmo, úprava dílu v kontextu, rozložený pohled, kontrola kolizí, kusovník (plochý/strukturovaný) + CSV, generátor rámu vstřikovací formy,
   - **knihovna normálií (Ctrl+L):** 46 rodin – šrouby, matice, podložky, kolíky, pera, pojistné kroužky, ložiska, evolventní ozubená kola, řetězová kola ISO 606, řemenice, IPE/HEA/HEB/UPN/L/jäkly/trubky/tyče, O-kroužky, pružiny, normálie forem – stačí napsat „M8x30“, „ložisko 6205“, „kolo m2 z24“, „IPE 200 L=1500“,
   - **formy:** barevná analýza úkosů, smrštění, návrh dělicí roviny, vyhazovačů a chladicích kanálů,
-  - **výkresy:** listy A4–A0, ISO E/A, řez A–A se šrafováním, osy, kóty, razítko, kusovník ISO 7573 → **PDF** (vektorové, čeština), **DXF**, **DWG R2000–R2018**, SVG,
+  - **výkresy:** listy A4–A0, ISO E/A, řez A–A se šrafováním, osy, automatické kóty, razítko, kusovník ISO 7573; uživatelské asociativní kóty, poznámky s odkazem, drsnosti ISO 1302, geometrické tolerance ISO 1101, základny a texty uložené v dokumentu → **PDF** (vektorové, čeština), **DXF**, **DWG R2000–R2018**, SVG,
   - **formáty:** import STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML, DWG; nativní formáty (SLDPRT, IPT, Z3, CATPart…) → návod na STEP,
   - **nástroje:** výběrový filtr entit, inspektor, měření mezi entitami, řez, hmotnostní vlastnosti, paleta příkazů (Ctrl+K), nastavení (jednotky, myš, zkratky, výkres), úvodní obrazovka s nedávnými soubory, projekt `.mncad`,
   - „Poptat výrobu“ uloží model jako STEP a otevře e-mail obchodníkovi (Vít Volný) – soubor stačí přiložit.

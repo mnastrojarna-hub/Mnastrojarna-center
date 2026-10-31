@@ -119,6 +119,10 @@ Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · �
 - [ ] Snímky všech nástrojů CAD + tabulka počtu příkazů (náš CAD vs. ZW3D Standard) do zprávy zadavateli.
 - [ ] Vyžádat od zadavatele: texty k 10 zakázkám, fotky týmu, potvrzení claimu/klientů/konsignace.
 
+## Rozsah (listopad 2026, poctivé srovnání)
+- **201 unikátních příkazů/voleb** v UI (pás karet, nabídky, kontextová menu, skicář, výkres), **32 typů prvků** v jádře, **46 rodin normálií**, 6 formátů výkresů/exportu 2D, 8 formátů 3D exportu, 11 importních formátů.
+- ZW3D Standard/Professional má řádově **600–900 příkazů** (včetně ploch, plechů, CAM, PMI, pokročilých sestav). Náš CAD pokrývá jádro práce nástrojárny (díly, sestavy, výkresy, formy, normálie); chybí především plošné modelování, plech, CAM, trvalé vazby sestav a pokročilé výkresové pohledy – viz etapy níže.
+
 ## Známá omezení (říkat zákazníkovi na rovinu)
 - Nativní formáty SolidWorks/Inventor/ZW3D/CATIA/NX/Creo nelze číst (uzavřené formáty) – návod na STEP.
 - DWG se nezapisuje (DXF ano).

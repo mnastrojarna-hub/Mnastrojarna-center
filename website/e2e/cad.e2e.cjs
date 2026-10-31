@@ -66,7 +66,7 @@ const dl = async (page, trigger) => { const [d] = await Promise.all([page.waitFo
   ok(await page.getByText(/ISO 4762/).first().isVisible(), 'knihovna rozpoznala ISO 4762 M8×30');
   await page.getByRole('button', { name: /Vložit jako nový díl|Otevřít jako nový díl/ }).click();
   await page.waitForTimeout(3000);
-  ok(/Šroub/.test(await page.locator('header').innerText()), 'šroub otevřen jako nový díl');
+  ok(/Šroub/.test(await page.locator('header input').first().inputValue()), 'šroub otevřen jako nový díl');
 
   // výkres: PDF, DXF, DWG, SVG
   await page.getByRole('button', { name: 'Výkres', exact: true }).click();
@@ -95,6 +95,7 @@ const dl = async (page, trigger) => { const [d] = await Promise.all([page.waitFo
   await page.waitForTimeout(800);
   ok((await page.locator('table tbody tr').count()) >= 8, 'kusovník má řádky');
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Data', exact: true }).click();
   await page.getByRole('button', { name: /^Export/ }).first().click();
   d = await dl(page, () => page.getByRole('button', { name: /STEP AP214/ }).click());
