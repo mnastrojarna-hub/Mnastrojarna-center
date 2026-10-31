@@ -492,9 +492,17 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   }, [selected]);
 
   // velikost
+  // změna velikosti (např. otevření panelu vlastností) nesmí kresbu posunout: drží se levý horní roh
+  const prevSize = useRef<{ w: number; h: number } | null>(null);
   useEffect(() => {
     const el = svgRef.current!;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    const ro = new ResizeObserver(() => {
+      const n = { w: el.clientWidth, h: el.clientHeight };
+      const p = prevSize.current;
+      prevSize.current = n;
+      setSize(n);
+      if (p && fitted.current && (p.w !== n.w || p.h !== n.h)) setView((v) => ({ ...v, cx: v.cx + (n.w - p.w) / 2 / v.scale, cy: v.cy - (n.h - p.h) / 2 / v.scale }));
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -607,7 +615,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
 
   const addEntities = (es: SketchEntity[], extraCons: SketchConstraint[] = []) => {
     commitEdit([...entities, ...es], [...constraints, ...extraCons], dims);
-    if (es.length) setSelection([es[es.length - 1].id]);
+    // řetězové nástroje nevybírají (panel by se otevíral při každém segmentu)
+    if (es.length && !["line", "centerline", "polyline", "spline"].includes(tool)) setSelection([es[es.length - 1].id]);
   };
 
   // ---------- uchopování ----------
@@ -717,7 +726,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // ---------- zásahy ----------
   const hitEntity = (p: Vec2, exclude?: Set<string>): string | null => {
     let best: string | null = null;
-    let bd = 7 / view.scale;
+    let bd = 9 / view.scale;
     for (const e of entities) {
       if (exclude?.has(e.id)) continue;
       const d = distToEntity(e, p).d;
@@ -738,9 +747,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     return annHits.current.find((a) => x >= a.x && x <= a.x + a.w && y >= a.y && y <= a.y + a.h) ?? null;
   };
 
+  /** výběr pro kóty/vazby: bod jen u koncových bodů, středů a průsečíků; jinak celá entita */
+  const POINT_PICK = new Set<Snap["kind"]>(["end", "center", "origin"]);
   const pickAt = (raw: Vec2): Pick | null => {
     const s = computeSnap(raw);
-    if (s.ref && s.kind !== "near" && s.kind !== "perp" && s.kind !== "tan") return { kind: "point", ref: s.ref, p: s.p };
+    if (s.ref && POINT_PICK.has(s.kind)) return { kind: "point", ref: s.ref, p: s.p };
     const id = hitEntity(raw);
     if (!id) return null;
     return pickOfEntity(entities.find((e) => e.id === id)!, raw);
@@ -1055,8 +1066,19 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           onOk: (v) => {
             lastVal.current[tool] = v;
             const r = tool === "fillet" ? filletLines(entities, id1, e.id, v) : chamferLines(entities, id1, e.id, v);
-            if (r) commitEdit(r);
-            else note("Roh nelze upravit (hodnota je příliš velká nebo úsečky jsou rovnoběžné).");
+            if (!r) return note("Roh nelze upravit (hodnota je příliš velká nebo úsečky jsou rovnoběžné).");
+            // vazby rohu nahradit: totožnost konců s novou entitou (+ tečnost u zaoblení)
+            const added = r.find((x) => !entities.some((o) => o.id === x.id))!;
+            const l1 = r.find((x) => x.id === id1) as Extract<SketchEntity, { type: "line" }>;
+            const l2 = r.find((x) => x.id === e.id) as Extract<SketchEntity, { type: "line" }>;
+            const ends = added.type === "arc" ? [added.a, added.c] : added.type === "line" ? [added.a, added.b] : [];
+            const keyNear = (l: Extract<SketchEntity, { type: "line" }>, p: Vec2) => (dist(l.a, p) < dist(l.b, p) ? "a" : "b");
+            const nk = added.type === "arc" ? ["a", "c"] : ["a", "b"];
+            const cons = constraints.filter((c) => !(c.type === "coincident" && c.refs.every((rf) => rf.e === id1 || rf.e === e.id)));
+            cons.push({ id: uid(), type: "coincident", refs: [{ e: id1, k: keyNear(l1, ends[0]) }, { e: added.id, k: nk[0] }] });
+            cons.push({ id: uid(), type: "coincident", refs: [{ e: e.id, k: keyNear(l2, ends[1]) }, { e: added.id, k: nk[1] }] });
+            if (added.type === "arc") cons.push({ id: uid(), type: "tangent", refs: [{ e: id1, k: "self" }, { e: added.id, k: "self" }] }, { id: uid(), type: "tangent", refs: [{ e: e.id, k: "self" }, { e: added.id, k: "self" }] });
+            commitEdit(r, snaps.auto ? cons : constraints.filter((c) => !(c.type === "coincident" && c.refs.every((rf) => rf.e === id1 || rf.e === e.id))));
           },
         });
         setPicks([]);
@@ -1161,61 +1183,59 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
   };
 
+  /** Kóta z vybraných entit/bodů a polohy popisku (pro umístění i náhled). */
+  const dimFromPicks = (ps: Pick[], at: Vec2): { type: SketchDim["type"]; refs: SketchRef[]; anchor: Vec2 } | null => {
+    const m = new Map(entities.map((x) => [x.id, x]));
+    const [a, b] = ps;
+    if (ps.length === 1) {
+      if (a.kind === "circle") {
+        const c = refCircle(m, a.ref);
+        return c ? { type: m.get(a.ref.e)?.type === "arc" ? "radius" : "diameter", refs: [a.ref], anchor: c.c } : null;
+      }
+      if (a.kind === "line") {
+        const l = refLine(m, a.ref);
+        return l ? { type: "length", refs: [a.ref], anchor: [(l[0][0] + l[1][0]) / 2, (l[0][1] + l[1][1]) / 2] } : null;
+      }
+      return null;
+    }
+    if (a.kind === "line" && b.kind === "line") {
+      const la = refLine(m, a.ref);
+      const lb = refLine(m, b.ref);
+      if (!la || !lb) return null;
+      const ang = angleBetween(la[0], la[1], lb[0], lb[1]);
+      return { type: ang < 0.01 || ang > 179.99 ? "distance" : "angle", refs: [a.ref, b.ref], anchor: la[0] };
+    }
+    if (a.kind === "point" && b.kind === "point") {
+      const [pa, pb] = [a.p, b.p];
+      const [minx, maxx, miny, maxy] = [Math.min(pa[0], pb[0]), Math.max(pa[0], pb[0]), Math.min(pa[1], pb[1]), Math.max(pa[1], pb[1])];
+      const type: SketchDim["type"] = at[0] > minx && at[0] < maxx && (at[1] > maxy || at[1] < miny) ? "horizontal" : at[1] > miny && at[1] < maxy && (at[0] > maxx || at[0] < minx) ? "vertical" : "distance";
+      return { type, refs: [a.ref, b.ref], anchor: [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2] };
+    }
+    const pt = a.kind === "point" ? a : b.kind === "point" ? b : null;
+    const ln = a.kind === "line" ? a : b.kind === "line" ? b : null;
+    if (pt?.kind === "point" && ln) return { type: "distance", refs: [pt.ref, ln.ref], anchor: pt.p };
+    return null;
+  };
+
   const dimClick = (raw: Vec2) => {
-    const pk = picks.length ? null : pickAt(raw);
     if (!picks.length) {
-      if (!pk) return;
-      if (pk.kind === "circle") {
-        const e = entities.find((x) => x.id === pk.ref.e)!;
-        const c = refCircle(new Map(entities.map((x) => [x.id, x])), pk.ref)!;
-        placeDim(e.type === "arc" ? "radius" : "diameter", [pk.ref], raw, c.c);
-        setPicks([]);
+      const pk = pickAt(raw);
+      if (pk && pk.kind !== "entity") setPicks([pk]);
+      return;
+    }
+    // druhý výběr (jiná entita / bod), nebo umístění kóty
+    if (picks.length === 1 && picks[0].kind !== "circle") {
+      const pk = pickAt(raw);
+      if (pk && pk.kind !== "entity" && pk.kind !== "circle" && !(pk.ref.e === picks[0].ref.e && pk.ref.k === picks[0].ref.k)) {
+        setPicks([picks[0], pk]);
         return;
       }
-      setPicks([pk]);
-      return;
+      if (picks[0].kind === "point") return note("Vyberte druhý bod nebo úsečku.");
     }
-    const first = picks[0];
-    const s = computeSnap(raw);
-    const id = hitEntity(raw);
-    const second: Pick | null = s.ref && s.kind !== "near" && s.kind !== "perp" && s.kind !== "tan" ? { kind: "point", ref: s.ref, p: s.p } : id ? pickOfEntity(entities.find((x) => x.id === id)!, raw) : null;
-    const m = new Map(entities.map((x) => [x.id, x]));
-    if (picks.length === 1 && second && !(second.ref.e === first.ref.e && second.ref.k === first.ref.k)) {
-      setPicks([first, second]);
-      return;
-    }
-    // umístění kóty
-    if (picks.length === 1 && first.kind === "line") {
-      const l = refLine(m, first.ref)!;
-      placeDim("length", [first.ref], raw, [(l[0][0] + l[1][0]) / 2, (l[0][1] + l[1][1]) / 2]);
-      setPicks([]);
-      return;
-    }
-    if (picks.length === 2) {
-      const [a, b] = picks;
-      if (a.kind === "line" && b.kind === "line") {
-        const la = refLine(m, a.ref)!;
-        const lb = refLine(m, b.ref)!;
-        const ang = angleBetween(la[0], la[1], lb[0], lb[1]);
-        const parallel = ang < 0.01 || ang > 179.99;
-        placeDim(parallel ? "distance" : "angle", [a.ref, b.ref], raw, la[0]);
-      } else if (a.kind === "point" && b.kind === "point") {
-        const pa = a.p;
-        const pb = b.p;
-        const minx = Math.min(pa[0], pb[0]);
-        const maxx = Math.max(pa[0], pb[0]);
-        const miny = Math.min(pa[1], pb[1]);
-        const maxy = Math.max(pa[1], pb[1]);
-        const type: SketchDim["type"] = raw[0] > minx && raw[0] < maxx && (raw[1] > maxy || raw[1] < miny) ? "horizontal" : raw[1] > miny && raw[1] < maxy && (raw[0] > maxx || raw[0] < minx) ? "vertical" : "distance";
-        placeDim(type, [a.ref, b.ref], raw, [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2]);
-      } else {
-        const pt = a.kind === "point" ? a : b;
-        const ln = a.kind === "line" ? a : b.kind === "line" ? b : null;
-        if (pt.kind === "point" && ln) placeDim("distance", [pt.ref, ln.ref], raw, pt.p);
-        else note("Tuto kombinaci nelze okótovat.");
-      }
-      setPicks([]);
-    }
+    const d = dimFromPicks(picks, raw);
+    if (d) placeDim(d.type, d.refs, raw, d.anchor);
+    else note("Tuto kombinaci nelze okótovat.");
+    setPicks([]);
   };
 
   const measureClick = (raw: Vec2) => {
@@ -1472,10 +1492,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
     } else {
       entries.push({ divider: true, label: "Uchopování" });
-      for (const k of SNAP_ORDER) entries.push({ id: `s-${k}`, label: SNAP_LABEL[k], icon: "magnet", active: snaps[k], onClick: () => setSnap(k, !snaps[k]) });
-      entries.push({ id: "s-infer", label: "Zarovnání (vodítka)", icon: "magnet", active: snaps.infer, onClick: () => setSnap("infer", !snaps.infer) });
-      entries.push({ id: "s-auto", label: "Automatické vazby", icon: "cCoincident", active: snaps.auto, onClick: () => setSnap("auto", !snaps.auto) });
-      if (setSnapGrid) entries.push({ id: "grid", label: "Přichytit k mřížce", icon: "grid", kbd: "G", active: snapGrid, onClick: () => setSnapGrid(!snapGrid) });
+      const on = (v: boolean, l: string) => `${v ? "✓" : "○"}  ${l}`;
+      for (const k of SNAP_ORDER) entries.push({ id: `s-${k}`, label: on(snaps[k], SNAP_LABEL[k]), icon: "magnet", onClick: () => setSnap(k, !snaps[k]) });
+      entries.push({ id: "s-infer", label: on(snaps.infer, "Zarovnání (vodítka)"), icon: "magnet", onClick: () => setSnap("infer", !snaps.infer) });
+      entries.push({ id: "s-auto", label: on(snaps.auto, "Automatické vazby"), icon: "cCoincident", onClick: () => setSnap("auto", !snaps.auto) });
+      if (setSnapGrid) entries.push({ id: "grid", label: on(snapGrid, "Přichytit k mřížce"), icon: "grid", kbd: "G", onClick: () => setSnapGrid(!snapGrid) });
       entries.push({ divider: true });
       entries.push({ id: "fit", label: "Zobrazit vše", icon: "fit", kbd: "F", onClick: fit });
       entries.push({ id: "all", label: "Vybrat vše", icon: "select", kbd: "Ctrl+A", onClick: () => setSelection(entities.map((e) => e.id)) });
@@ -1656,6 +1677,15 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       const d = distToEntity(src, c).d * offsetSide(src, c);
       const o2 = offsetEntity(src, d);
       return o2 ? <g>{ghost([o2])}{label(c, `${fmt(Math.abs(d))} mm`)}</g> : null;
+    }
+    if (tool === "dimension" && picks.length && !(picks.length === 1 && picks[0].kind === "point")) {
+      const d = dimFromPicks(picks, c);
+      if (d) {
+        const tmp: SketchDim = { id: "_preview", type: d.type, refs: d.refs, value: 0, driving: false, offset: sub(c, d.anchor) };
+        const node = renderDim(tmp, emap, toPx, view.scale, true, false);
+        if (node) return <g opacity={0.75}>{node.el}</g>;
+      }
+      return null;
     }
     if (tool === "measure" && measureRes?.line) {
       const [a, b] = measureRes.line;

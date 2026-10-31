@@ -67,6 +67,8 @@ type Props = {
   measure?: MeasureGfx | null;
   assembly?: AsmView[];
   faceColors?: Record<number, string>;
+  /** barvy vrcholů (RGB po trojicích, délka = vertices.length) – např. analýza úkosů; přebije barvy ploch */
+  vertexColors?: Float32Array | null;
   bodyOpacity?: number;
   bodyHidden?: boolean;
   gizmo?: Gizmo;
@@ -820,7 +822,16 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       }
       const gi = s.partGeo;
       const colors = [...new Set(Object.values(props.faceColors ?? {}))];
-      const mesh = new THREE.Mesh(gi.geo, materials(colors));
+      const vc = props.vertexColors && props.vertexColors.length === m.vertices.length ? props.vertexColors : null;
+      if (vc) gi.geo.setAttribute("color", new THREE.BufferAttribute(vc, 3));
+      else if (gi.geo.getAttribute("color")) gi.geo.deleteAttribute("color");
+      const mats = vc
+        ? (() => {
+            const vm = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xffffff, metalness: 0.08, roughness: 0.62, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, clippingPlanes: props.section ? [s.clip] : [] });
+            return new Array(3 + colors.length).fill(vm) as THREE.Material[];
+          })()
+        : materials(colors);
+      const mesh = new THREE.Mesh(gi.geo, mats);
       mesh.userData.colorIdx = new Map(colors.map((c, i) => [c, i + 3]));
       mesh.visible = !props.bodyHidden;
       s.model.add(mesh);
@@ -853,7 +864,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     paint();
     drawHilite();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.mesh, props.display, props.bodyColor, !!props.section, fcKey, props.bodyOpacity, props.bodyHidden]);
+  }, [props.mesh, props.display, props.bodyColor, !!props.section, fcKey, props.bodyOpacity, props.bodyHidden, props.vertexColors]);
 
   useEffect(() => {
     applyClip();

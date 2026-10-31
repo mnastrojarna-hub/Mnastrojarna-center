@@ -33,7 +33,7 @@ export const moldGuidePillar: Family = {
   standards: ["HASCO Z00", "Meusburger E1000", "DIN 9825"],
   keywords: ["vodici sloupek", "sloupek", "guide pillar", "leader pin", "z00", "e1000"],
   params: [dEnum(PILLAR_D, 24), lParam(120)],
-  parse: (q) => (has(q, "oper", "support") ? null : parseDL(q, ["vodici sloupek", "sloupek", "guide pillar", "leader pin", "z00"], PILLAR_D)),
+  parse: (q) => (has(q, "oper", "support") ? null : parseDL(q, ["vodici sloupek", "sloupek", "guide pillar", "leader pin"], PILLAR_D)),
   describe: (v) => `Vodicí sloupek Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => guidePillar(num(v.d, 24), num(v.l, 120)),
 };
@@ -46,7 +46,7 @@ export const moldGuideBush: Family = {
   standards: ["HASCO Z10", "Meusburger E1100", "DIN 9831"],
   keywords: ["vodici pouzdro", "pouzdro", "guide bush", "z10", "e1100"],
   params: [dEnum(PILLAR_D, 24), lParam(56)],
-  parse: (q) => parseDL(q, ["vodici pouzdro", "pouzdro", "guide bush", "z10"], PILLAR_D),
+  parse: (q) => parseDL(q, ["vodici pouzdro", "pouzdro", "guide bush"], PILLAR_D),
   describe: (v) => `Vodicí pouzdro Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => guideBush(num(v.d, 24), num(v.l, 56)),
 };
@@ -59,7 +59,7 @@ export const moldEjector: Family = {
   standards: ["ISO 8694", "DIN 1530 A", "HASCO Z40"],
   keywords: ["vyhazovac", "vyhazovaci kolik", "ejector pin", "z40", "din 1530"],
   params: [dEnum(EJ_D, 6), lParam(160, 50, 800)],
-  parse: (q) => (has(q, "vratn", "return") ? null : parseDL(q, ["vyhazovac", "ejector", "z40", "1530"], EJ_D)),
+  parse: (q) => (has(q, "vratn", "return") ? null : parseDL(q, ["vyhazovac", "ejector"], EJ_D)),
   describe: (v) => `Vyhazovač Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => ejectorPin(num(v.d, 6), num(v.l, 160)),
 };
@@ -72,7 +72,7 @@ export const moldReturnPin: Family = {
   standards: ["HASCO Z41", "DIN 1530 A"],
   keywords: ["vratny kolik", "vratny", "return pin", "z41"],
   params: [dEnum([10, 12, 16, 20, 25], 16), lParam(200, 50, 800)],
-  parse: (q) => parseDL(q, ["vratn", "return pin", "z41"], [10, 12, 16, 20, 25]),
+  parse: (q) => parseDL(q, ["vratn", "return pin"], [10, 12, 16, 20, 25]),
   describe: (v) => `Vratný kolík Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => {
     const d = num(v.d, 16);
@@ -90,7 +90,7 @@ export const moldLocatingRing: Family = {
   keywords: ["stredici krouzek", "centrovaci krouzek", "locating ring", "k100"],
   params: [dEnum([90, 100, 110, 125, 160], 100), { key: "h", label: "Výška", kind: "number", min: 6, max: 30, step: 1, unit: "mm", default: 10 }],
   parse: (q) => {
-    const hit = parseDL(q, ["stredici", "centrovaci", "locating ring", "k100"], [90, 100, 110, 125, 160]);
+    const hit = parseDL(q, ["stredici", "centrovaci", "locating ring"], [90, 100, 110, 125, 160]);
     return hit && { values: { d: hit.values.d, ...(hit.values.l ? { h: hit.values.l } : {}) }, score: hit.score };
   },
   describe: (v) => `Středicí kroužek Ø${v.d}×${fmt(num(v.h))}`,
@@ -110,7 +110,7 @@ export const moldSprueBush: Family = {
     { key: "d2", label: "Vstupní průměr vtoku", kind: "enum", options: [2.5, 3, 3.5, 4, 4.5, 5, 6].map((x) => ({ v: String(x), l: `${x} mm` })), default: "3.5" },
     { key: "R", label: "Rádius dosedací plochy", kind: "enum", options: [{ v: "15.5", l: "R 15,5 (SR 15,5)" }, { v: "20", l: "R 20" }, { v: "40", l: "R 40" }], default: "15.5" },
   ],
-  parse: (q) => parseDL(q, ["vtok", "sprue", "z51"], [12, 16, 20, 25]),
+  parse: (q) => parseDL(q, ["vtok", "sprue"], [12, 16, 20, 25]),
   describe: (v) => `Vtoková vložka Ø${v.d}×${fmt(num(v.l))} – vtok Ø${v.d2} – R${v.R}`,
   make: (v) => {
     const d = num(v.d, 16);
@@ -138,7 +138,7 @@ export const moldSupportPillar: Family = {
   standards: ["HASCO Z57", "Meusburger E1500"],
   keywords: ["operny sloupek", "oper", "support pillar", "z57"],
   params: [dEnum([20, 25, 30, 40, 50, 60], 30), lParam(96, 20, 400), { key: "thread", label: "Závit", kind: "enum", options: ["M6", "M8", "M10", "M12", "M16"].map((m) => ({ v: m, l: m })), default: "M10" }],
-  parse: (q) => parseDL(q, ["operny", "oper", "support pillar", "z57"], [20, 25, 30, 40, 50, 60]),
+  parse: (q) => parseDL(q, ["operny", "oper", "support pillar"], [20, 25, 30, 40, 50, 60]),
   describe: (v) => `Opěrný sloupek Ø${v.d}×${fmt(num(v.l))} – ${v.thread}`,
   make: (v) => {
     const d = num(v.d, 30);
@@ -157,7 +157,7 @@ export const moldStopButton: Family = {
   keywords: ["dosedka", "operna podlozka", "stop button", "stop disc", "z55"],
   params: [dEnum([16, 20, 25, 32, 40], 25), { key: "h", label: "Výška", kind: "number", min: 3, max: 20, step: 0.5, unit: "mm", default: 6 }],
   parse: (q) => {
-    const hit = parseDL(q, ["dosedk", "stop button", "stop disc", "z55"], [16, 20, 25, 32, 40]);
+    const hit = parseDL(q, ["dosedk", "stop button", "stop disc"], [16, 20, 25, 32, 40]);
     return hit && { values: { d: hit.values.d, ...(hit.values.l ? { h: hit.values.l } : {}) }, score: hit.score };
   },
   describe: (v) => `Dosedka Ø${v.d}×${fmt(num(v.h))}`,

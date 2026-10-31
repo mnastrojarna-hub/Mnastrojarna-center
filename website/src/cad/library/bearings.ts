@@ -26,7 +26,7 @@ export const deepGrooveBearing: Family = {
   sizes: { key: "code", columns: [{ key: "d", label: "d" }, { key: "D", label: "D" }, { key: "B", label: "B" }], rows: Object.entries(BEARINGS).map(([k, v]) => ({ code: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "lozisk", "bearing", "skf", "zkl", "fag");
-    const code = (q.match(/\b(6[0-3]\d{2}|6[02][4-8])\b/) ?? [])[1];
+    const code = (q.match(/\b(6[0-3]\d{2}|6[02][4-8])(?!\d)/) ?? [])[1];
     if (!kw && !code) return null;
     if (code && !BEARINGS[code]) return kw ? { values: {}, score: 0.5 } : null;
     const seal = /2rs|rs/.test(q) ? "2RS" : /2z|zz/.test(q) ? "2Z" : /otev|open/.test(q) ? "" : undefined;

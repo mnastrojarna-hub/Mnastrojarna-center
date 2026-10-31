@@ -431,6 +431,11 @@ function corner(l1: Extract<SketchEntity, { type: "line" }>, l2: Extract<SketchE
   return { x, far1, far2, u1: mul(u1, 1 / L1), u2: mul(u2, 1 / L2), L1, L2 };
 }
 
+/** Zkrátí úsečku: vzdálený konec zůstane na svém klíči (a/b), druhý konec se přesune do p. */
+function trimEnd(l: Extract<SketchEntity, { type: "line" }>, far: Vec2, p: Vec2): SketchEntity {
+  return d2(l.a, far) <= d2(l.b, far) ? { ...l, a: R(far), b: R(p) } : { ...l, a: R(p), b: R(far) };
+}
+
 /** Zaoblení rohu dvou úseček poloměrem r: zkrátí úsečky a vloží tečný oblouk. */
 export function filletLines(entities: SketchEntity[], id1: string, id2: string, r: number): SketchEntity[] | null {
   const l1 = entities.find((e) => e.id === id1);
@@ -450,7 +455,7 @@ export function filletLines(entities: SketchEntity[], id1: string, id2: string, 
   const center = add(c.x, mul(bis, r / Math.sin(theta / 2) / bl));
   const mid = add(center, mul(sub(c.x, center), r / d2(c.x, center)));
   const arc: SketchEntity = { id: uid(), type: "arc", a: R(p1), b: R(mid), c: R(p2), construction: l1.construction };
-  return entities.flatMap((e) => (e.id === id1 ? [{ ...l1, a: R(c.far1), b: R(p1) }] : e.id === id2 ? [{ ...l2, a: R(p2), b: R(c.far2) }, arc] : [e]));
+  return entities.flatMap((e) => (e.id === id1 ? [trimEnd(l1, c.far1, p1)] : e.id === id2 ? [trimEnd(l2, c.far2, p2), arc] : [e]));
 }
 
 /** Sražení rohu dvou úseček vzdáleností d (na obou ramenech). */
@@ -463,7 +468,7 @@ export function chamferLines(entities: SketchEntity[], id1: string, id2: string,
   const p1 = add(c.x, mul(c.u1, d));
   const p2 = add(c.x, mul(c.u2, d2v));
   const ch: SketchEntity = { id: uid(), type: "line", a: R(p1), b: R(p2), construction: l1.construction };
-  return entities.flatMap((e) => (e.id === id1 ? [{ ...l1, a: R(c.far1), b: R(p1) }] : e.id === id2 ? [{ ...l2, a: R(p2), b: R(c.far2) }, ch] : [e]));
+  return entities.flatMap((e) => (e.id === id1 ? [trimEnd(l1, c.far1, p1)] : e.id === id2 ? [trimEnd(l2, c.far2, p2), ch] : [e]));
 }
 
 // ---------------- měření ----------------

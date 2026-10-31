@@ -57,6 +57,16 @@ export function withParams(e: SketchEntity, x: number[]): SketchEntity {
   }
 }
 
+/** Index parametru „úhel“ (ve stupních) u parametrických tvarů. */
+function angleIndex(e: SketchEntity): number {
+  return e.type === "rect" || e.type === "slot" || e.type === "ellipse" ? 4 : e.type === "polygon" ? 3 : -1;
+}
+/** Kolik mm odpovídá 1° natočení entity (obvodový posun nejvzdálenějšího bodu). */
+function angleScale(e: SketchEntity): number {
+  const r = e.type === "rect" ? Math.hypot(e.w, e.h) / 2 : e.type === "slot" ? e.length / 2 : e.type === "ellipse" ? Math.max(e.rx, e.ry) : e.type === "polygon" ? e.r : 1;
+  return Math.max(1, r) * (Math.PI / 180) * 3;
+}
+
 /** Počet stupňů volnosti entity (oblouk třemi body má o 1 parametr víc než DOF). */
 const dofOf = (e: SketchEntity) => paramsOf(e).length - (e.type === "arc" ? 1 : 0);
 
@@ -376,7 +386,12 @@ export function solveSketch(entities: SketchEntity[], constraints: SketchConstra
     });
     return { out, owner };
   };
-  const wts = vars.flatMap((e) => paramsOf(e).map(() => (opts.weights?.[e.id] ?? W_REG)));
+  const wts = vars.flatMap((e) => {
+    const w = opts.weights?.[e.id] ?? W_REG;
+    const ai = angleIndex(e);
+    // úhel (°) převést na ekvivalentní posun (mm) podle velikosti entity – jinak by řešič raději otáčel
+    return paramsOf(e).map((_, i) => (i === ai ? w * angleScale(e) : w));
+  });
   let anchor = [...x0];
   const F = (x: number[]) => {
     const m = build(x);

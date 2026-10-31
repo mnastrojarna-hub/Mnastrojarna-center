@@ -209,16 +209,22 @@ export const compressionSpring: Family = {
     const kw = has(q, "pruzin", "spring", "2095");
     if (!kw || has(q, "podloz", "kolik", "pin")) return null;
     const values: Record<string, number> = {};
-    const d = tagged(q, "d");
-    const D = q.match(/(?:^|[^a-z])de?\s?=?\s?(\d+(?:\.\d+)?)/) ? Number(q.match(/(?:^|[^a-z])de?\s?=?\s?(\d+(?:\.\d+)?)/)![1]) : null;
-    const L = tagged(q, "l") ?? tagged(q, "l0");
-    const n = tagged(q, "n");
+    // „d1.6 D12“ – po normalizaci jsou obě malá: menší = drát, větší = vnější průměr
+    const ds = [...q.matchAll(/(?:^|[^a-z])de?\s?=?\s?(\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]));
     const dm = dims(q);
-    if (d) values.d = d;
-    if (D && D !== d) values.D = D;
-    if (!d && dm[0]) values.d = dm[0];
-    if (!D && dm[1]) values.D = dm[1];
-    if (!L && dm[2]) values.L = dm[2];
+    if (ds.length >= 2) {
+      values.d = Math.min(...ds);
+      values.D = Math.max(...ds);
+    } else if (ds.length === 1) {
+      if (ds[0] < 4) values.d = ds[0];
+      else values.D = ds[0];
+    } else if (dm.length >= 2) {
+      values.d = dm[0];
+      values.D = dm[1];
+      if (dm[2]) values.L = dm[2];
+    }
+    const L = tagged(q, "l0") ?? tagged(q, "l");
+    const n = tagged(q, "n");
     if (L) values.L = L;
     if (n) values.n = n;
     return { values, score: score(kw, Math.min(0.4, Object.keys(values).length * 0.1)) };

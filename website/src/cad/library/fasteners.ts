@@ -40,7 +40,7 @@ export const socketCap: Family = {
   params: [sizeParam(Object.keys(ISO4762)), lenParam(30), gradeParam(["8.8", "10.9", "12.9", "A2-70", "A4-80"], "12.9")],
   sizes: { key: "size", columns: [{ key: "d", label: "d" }, { key: "p", label: "P" }, { key: "dk", label: "dk" }, { key: "k", label: "k" }, { key: "s", label: "s" }], rows: Object.entries(ISO4762).map(([k, v]) => ({ size: k, d: METRIC[k].d, p: METRIC[k].p, ...v })) },
   parse: (q) => {
-    if (has(q, "sestihran", "hex", "6hr", "pulkulat", "button", "zapust", "countersunk", "stavec", "cerv", "matice", "nut", "podloz", "washer", "tyc", "rod", "kolik", "pin")) return null;
+    if (has(q, "sestihran", "hex", "6hr", "pulkulat", "button", "zapust", "countersunk", "stavec", "cerv", "matice", "nut", "podloz", "washer", "tyc", "rod", "kolik", "pin", "kolo", "ozub", "gear", "lozisk", "pruzin", "retez", "pero", "sloupek", "vyhazov", "931", "933", "4014", "4017", "din 9")) return null;
     return parseScrew(q, ["imbus", "inbus", "valcov", "912", "4762", "socket", "sroub", "screw", "bolt"], 0.45);
   },
   describe: (v) => `ISO 4762 – ${v.size}×${fmt(num(v.l))} – ${v.grade}`,
@@ -69,10 +69,12 @@ const hexBolt = (id: string, std: string, full: boolean): Family => ({
   params: [sizeParam(), lenParam(40), gradeParam(["5.6", "8.8", "10.9", "A2-70", "A4-70"], "8.8")],
   sizes: { key: "size", columns: [{ key: "d", label: "d" }, { key: "p", label: "P" }, { key: "s", label: "s" }, { key: "k", label: "k" }], rows: METRIC_SIZES.map((k) => ({ size: k, ...METRIC[k] })) },
   parse: (q) => {
-    const kw = has(q, "sestihran", "hex", "6hr", full ? "933" : "931", std.toLowerCase().replace("iso ", ""));
-    if (!kw) return null;
-    if (!full && !has(q, "castecn", "931", "4014", "partial")) return parseScrew(q, ["sestihran", "hex", "6hr"]) && { ...parseScrew(q, ["sestihran", "hex", "6hr"])!, score: 0.5 };
-    return parseScrew(q, ["sestihran", "hex", "6hr", full ? "933" : "931"]);
+    const words = ["sestihran", "hex", "6hr", full ? "933" : "931", std.toLowerCase().replace("iso ", "")];
+    if (!has(q, ...words) || has(q, "matice", "nut", "tyc", "bar", "podloz")) return null;
+    const hit = parseScrew(q, words);
+    if (!hit) return null;
+    const wantsPartial = !!has(q, "castecn", "931", "4014", "partial");
+    return { ...hit, score: hit.score * (wantsPartial === !full ? 1 : 0.85) };
   },
   describe: (v) => `${std} – ${v.size}×${fmt(num(v.l))} – ${v.grade}`,
   make: (v) => {
@@ -107,15 +109,12 @@ export const buttonHead: Family = {
     const g = ISO7380[size] ?? ISO7380.M8;
     const d = METRIC[size].d;
     const l = num(v.l, 20);
-    const R = (g.dk * g.dk) / 4 / (2 * g.k) + g.k / 2; // poloměr kulového vrchlíku
-    const prof: Vec2[] = [[0, 0], [g.dk / 2, 0]];
+    const R = ((g.dk * g.dk) / 4 + g.k * g.k) / (2 * g.k); // poloměr kulového vrchlíku (sedí na z=0, vrchol v z=k)
+    const cap: Vec2[] = [[0, 0], [g.dk / 2, 0]];
     for (let i = 1; i <= 8; i++) {
-      const t = i / 8;
-      const x = (g.dk / 2) * (1 - t);
-      prof.push([x, R - Math.sqrt(Math.max(0, R * R - x * x)) - (R - g.k) + 0]);
+      const x = (g.dk / 2) * (1 - i / 8);
+      cap.push([x, g.k - (R - Math.sqrt(Math.max(0, R * R - x * x)))]);
     }
-    // oprava: vrchlík sedí na z=0 a vrchol je v z=k
-    const cap = prof.map(([x, y], i) => (i < 2 ? ([x, y] as Vec2) : ([x, g.k - (R - Math.sqrt(Math.max(0, R * R - x * x)))] as Vec2)));
     return part(`Šroub ${size}×${fmt(l)} ISO 7380`, materialOf(str(v.grade)), [
       cyl("Dřík", d, l, -l, "new"),
       ...revolveProfile("Hlava", cap, "add"),

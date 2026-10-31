@@ -17,30 +17,32 @@ export function involuteGearProfile(m: number, z: number, alphaDeg = 20, x = 0, 
   const rf = m * (z / 2 - 1.25 + x);
   const psiP = (Math.PI / 2 + 2 * x * Math.tan(a)) / z; // poloviční úhlová tloušťka zubu na roztečné kružnici
   const half = (r: number) => psiP + inv(a) - inv(Math.acos(Math.min(1, rb / r)));
+  // špičatý zub (velká korekce / málo zubů): hlavovou kružnici snížit, aby zůstala hlava zubu
+  let raEff = ra;
+  while (half(raEff) < 0.004 && raEff > rp) raEff -= 0.02 * m;
   const pts: Vec2[] = [];
   const rStart = Math.max(rb, rf);
   const n = z > 100 ? Math.max(4, samples - 3) : samples;
   const polar = (r: number, th: number): Vec2 => [rnd(r * Math.cos(th), 5), rnd(r * Math.sin(th), 5)];
+  const foot = half(rStart) + (rf < rb ? 0.012 : 0); // úhel paty zubu na rf
+  const step = (2 * Math.PI) / z;
   for (let i = 0; i < z; i++) {
-    const th0 = (2 * Math.PI * i) / z;
-    const thPrevTip = th0 - Math.PI / z; // střed mezery před zubem
-    // dno mezery (oblouk na rf) – od středu mezery k patě levého boku
-    const footL = th0 - half(rStart) - (rf < rb ? 0.015 : 0);
-    for (let k = 0; k <= 2; k++) pts.push(polar(rf, thPrevTip + ((footL - thPrevTip) * k) / 2));
+    const th0 = step * i;
+    // dno mezery na rf: od paty předchozího zubu k patě tohoto
+    const a0 = th0 - step + foot;
+    const a1 = th0 - foot;
+    for (let k = 1; k <= 3; k++) pts.push(polar(rf, a0 + ((a1 - a0) * k) / 3));
     if (rf < rb) pts.push(polar(rb, th0 - half(rb)));
-    // levý bok nahoru
     for (let k = 1; k <= n; k++) {
-      const r = rStart + ((ra - rStart) * k) / n;
+      const r = rStart + ((raEff - rStart) * k) / n;
       pts.push(polar(r, th0 - half(r)));
     }
-    // hlava
-    pts.push(polar(ra, th0));
-    // pravý bok dolů
-    for (let k = n - 1; k >= 0; k--) {
-      const r = rStart + ((ra - rStart) * k) / n;
+    pts.push(polar(raEff, th0));
+    for (let k = n; k >= 0; k--) {
+      const r = rStart + ((raEff - rStart) * k) / n;
       pts.push(polar(r, th0 + half(r)));
     }
-    if (rf < rb) pts.push(polar(rf, th0 + half(rb) + 0.015));
+    if (rf < rb) pts.push(polar(rf, th0 + foot));
   }
   return pts;
 }
@@ -54,9 +56,8 @@ export function rackProfile(m: number, n: number, h: number, alphaDeg = 20): Vec
   const pts: Vec2[] = [[0, -h], [0, 0]];
   for (let i = 0; i < n; i++) {
     const x0 = i * p;
-    // mezera: od x0 do x0+p/2 (na roztečné přímce), zub od p/2 do p
-    pts.push([x0 + p / 4 - hf * dx, -hf], [x0 + p / 4 + hf * dx, -hf]);
-    pts.push([x0 + p / 2 + ha * dx * 0 + (p / 4 - ha * dx), ha], [x0 + (3 * p) / 4 + ha * dx, ha]);
+    // mezera od x0 do x0+p/2 (na roztečné přímce), zub od x0+p/2 do x0+p
+    pts.push([x0 + hf * dx, -hf], [x0 + p / 2 - hf * dx, -hf], [x0 + p / 2 + ha * dx, ha], [x0 + p - ha * dx, ha]);
   }
   pts.push([n * p, 0], [n * p, -h]);
   return pts;
@@ -237,9 +238,9 @@ export const sprocket: Family = {
   sizes: { key: "chain", columns: [{ key: "p", label: "p" }, { key: "d1", label: "d1 váleček" }, { key: "b1", label: "b1" }], rows: Object.entries(CHAINS).map(([k, v]) => ({ chain: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "retez", "sprocket", "chain");
-    const chain = (q.match(/\b(0?5b|06b|08b|10b|12b|16b|20b|24b|35|40|50|60|80)(?:-(\d))?\b/) ?? [])[1];
+    const chain = (q.match(/\b(0?5b|06b|08b|10b|12b|16b|20b|24b)(?:-\d)?\b/) ?? [])[1] ?? (kw ? (q.match(/\b(35|40|50|60|80)\b/) ?? [])[1] : undefined);
     if (!kw && !chain) return null;
-    const rows = (q.match(/\b(?:0?5b|06b|08b|10b|12b|16b|20b|24b)-(\d)\b/) ?? [])[1];
+    const rows = (q.match(/\b(?:0?5b|06b|08b|10b|12b|16b|20b|24b|35|40|50|60|80)-(\d)\b/) ?? [])[1];
     const z = tagged(q, "z") ?? (chain ? nums(q.replace(chain, "")).find((n) => n >= 7 && n <= 150 && Number.isInteger(n)) : undefined);
     const values: Record<string, string | number> = {};
     if (chain) values.chain = chain.toUpperCase().replace(/^5B$/, "05B");
@@ -293,7 +294,7 @@ export const htdPulley: Family = {
     const prof = (q.match(/\b(3m|5m|8m|14m)\b/) ?? [])[1];
     if (!kw && !prof) return null;
     if (!prof && !has(q, "htd", "ozubena remenic", "timing")) return null;
-    const z = tagged(q, "z") ?? nums(q).find((n) => n >= 10 && n <= 200 && Number.isInteger(n) && !/\b(3|5|8|14)m\b/.test(q.slice(Math.max(0, q.indexOf(String(n)) - 1), q.indexOf(String(n)) + 3)));
+    const z = tagged(q, "z") ?? nums(q.replace(/\b\d+m\b/g, "")).find((n) => n >= 10 && n <= 200 && Number.isInteger(n));
     const values: Record<string, string | number> = {};
     if (prof) values.profile = prof.toUpperCase();
     if (z) values.z = z;
@@ -344,7 +345,7 @@ export const vPulley: Family = {
     const prof = (q.match(/\b(spz|spa|spb|spc)\b/) ?? [])[1];
     if (!kw || (has(q, "htd", "ozuben", "timing") && !prof)) return null;
     const dp = tagged(q, "dp") ?? tagged(q, "d") ?? nums(q).find((n) => n >= 50);
-    const g = tagged(q, "x") ?? (q.match(/(\d)\s*draz/) ?? [])[1];
+    const g = (q.match(/(\d)\s*(?:draz|groov)/) ?? [])[1];
     const values: Record<string, string | number> = {};
     if (prof) values.profile = prof.toUpperCase();
     if (dp) values.dp = dp;

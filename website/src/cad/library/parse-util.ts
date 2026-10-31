@@ -8,7 +8,6 @@ export function norm(q: string): string {
     .replace(/[̀-ͯ]/g, "")
     .replace(/[×*]/g, "x")
     .replace(/(\d),(\d)/g, "$1.$2")
-    .replace(/\bo\s*(\d)/g, "o$1")
     .replace(/[ø⌀]/g, "d")
     .replace(/\s+/g, " ")
     .trim();
@@ -34,7 +33,7 @@ export function metric(q: string): string | null {
 
 /** Délka: „l=1500“, „l 1500“, „délka 30“, nebo číslo za metrickým označením („m8x30“, „m8 30“). */
 export function length(q: string): number | null {
-  const m = q.match(/\b(?:l|delka|length|dl)\s*[=:]?\s*(\d+(?:\.\d+)?)/);
+  const m = q.match(/\b(?:l|delka|length|dl)\s*[=:]?\s*(\d+(?:\.\d+)?)(?!\d)(?!\s*x)/);
   if (m) return Number(m[1]);
   return null;
 }
