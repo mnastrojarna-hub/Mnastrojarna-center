@@ -21,7 +21,8 @@ export default async function CustomersPage() {
       />
       <p className="flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:bg-rose-500/10 dark:text-rose-300">
         <Camera className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Tip: nového zákazníka nemusíš zakládat ručně — vyfoť jeho objednávku v Knize zakázek a AI ho založí i s IČO a adresou.
+        Tip: v okně Nový zákazník stačí vyfotit e-mail, objednávku, fakturu nebo vizitku (nebo jen napsat IČO) — AI a ARES
+        vyplní název, adresu, DIČ i kontakty. Založí se jen zákazník, žádná zakázka.
       </p>
       <CustomersBrowser customers={customers} owners={owners} userId={user.id} />
     </div>

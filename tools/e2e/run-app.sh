@@ -21,6 +21,8 @@ export NEXT_PUBLIC_APP_URL="http://localhost:$PORT"
 export CRON_SECRET="${CRON_SECRET:-e2e-cron-secret}"
 # AI bez klíče: čtení dokladu vrátí fixture (viz src/lib/ai/document-reader.ts)
 export AI_FAKE_CAPTURE="${AI_FAKE_CAPTURE:-$ROOT/src/lib/jobs/__fixtures__/capture/objednavka-strojmetal.json}"
+# ARES bez sítě: firmy z fixtures (src/lib/ares/__fixtures__/subjekt-<ičo>.json, vyhledat.json)
+export ARES_FAKE_DIR="${ARES_FAKE_DIR:-$ROOT/src/lib/ares/__fixtures__}"
 export NEXT_TELEMETRY_DISABLED=1
 
 "$ROOT/tools/e2e/stop-app.sh" >/dev/null 2>&1 || true
