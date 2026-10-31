@@ -1076,6 +1076,8 @@ export class SectionReader {
     this.expect(T.ASM_FileStructureTessellation);
     this.base(false);
     const n = this.count(50_000_000);
+    // anotace (TESS_Markup) se nepočítají — „deklarované" jsou jen tessellace geometrie
+    let markups = 0;
     try {
       for (let i = 0; i < n; i++) {
         const type = r.readUInt();
@@ -1089,6 +1091,7 @@ export class SectionReader {
           case T.TESS_Markup:
             this.skipMarkupTess();
             out.push(null);
+            markups++;
             break;
           case T.TESS_3D_Compressed: {
             const res = decodeCompressedTess(this.r);
@@ -1103,9 +1106,9 @@ export class SectionReader {
       }
     } catch (e) {
       if (!(e instanceof PrcFormatError)) throw e;
-      return { tess: out, declared: n, error: e.message };
+      return { tess: out, declared: n - markups, error: e.message };
     }
-    return { tess: out, declared: n, error: null };
+    return { tess: out, declared: n - markups, error: null };
   }
 }
 

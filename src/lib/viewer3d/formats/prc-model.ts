@@ -145,7 +145,7 @@ export interface PrcFileStructure {
   globals: PrcGlobals;
   tree: PrcTree | null;
   tess: (Tess | null)[];
-  /** Kolik tessellací bylo v sekci deklarováno (i když se nepřečetly). */
+  /** Kolik tessellací geometrie (bez anotací) bylo v sekci deklarováno (i když se nepřečetly). */
   tessDeclared: number;
   /** Počet těles v přesné geometrii (B-rep) — pro hlášku, když chybí tessellace. */
   hasExactGeometry: boolean;

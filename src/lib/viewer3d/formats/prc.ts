@@ -362,6 +362,9 @@ function buildModel(
         `${ERR_PREFIX}: model obsahuje jen přesnou geometrii (B-rep) bez tessellace, kterou prohlížeč zatím neumí zobrazit.`,
       );
     }
+    if (declared > 0) {
+      throw new ModelImportError(`${ERR_PREFIX}: trojúhelníkovou síť (tessellaci) modelu se nepodařilo rozbalit.`);
+    }
     if (warnings.length) throw new ModelImportError(`${ERR_PREFIX}: ${warnings[0]}`);
     throw new ModelImportError(`${ERR_PREFIX}: model neobsahuje žádnou zobrazitelnou geometrii.`);
   }

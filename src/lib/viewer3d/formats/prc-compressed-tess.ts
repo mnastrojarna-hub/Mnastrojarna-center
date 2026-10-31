@@ -51,13 +51,14 @@ interface CompressedData {
  */
 export function decodeCompressedTess(r: BitReader): CompressedResult {
   const d = readCompressed(r);
-  try {
-    return { mesh: rebuild(d), warning: null };
-  } catch (e) {
-    if (!(e instanceof PrcFormatError)) throw e;
-    return { mesh: null, warning: "Část komprimované tessellace (PRC) se nepodařilo rozbalit.", detail: e.message };
-  }
+  const res = rebuild(d);
+  if (res.mesh && !res.partial) return { mesh: res.mesh, warning: null };
+  if (res.mesh) return { mesh: res.mesh, warning: WARN_PARTIAL, detail: res.detail };
+  return { mesh: null, warning: WARN_FAILED, detail: res.detail };
 }
+
+const WARN_PARTIAL = "Část komprimované tessellace (PRC) se nepodařilo rozbalit celou — některé díly jsou zobrazeny jen částečně.";
+const WARN_FAILED = "Část komprimované tessellace (PRC) se nepodařilo rozbalit — některé díly se nezobrazí.";
 
 function readBits(r: BitReader, n: number): Uint8Array {
   if (n > r.remaining) throw new PrcFormatError("neplatná délka bitového pole");
@@ -263,27 +264,110 @@ const enum Orient {
   Normals,
 }
 
-interface RebuildResult {
-  mesh: MeshTess | null;
-  /** Všechna pole spotřebována přesně — silný důkaz správného průchodu. */
+/** Výsledek jednoho průchodu sítí (trojúhelníky v pořadí průchodu). */
+interface Traversal {
+  /** Počet úplně sestavených trojúhelníků. */
+  done: number;
+  /** Všechna pole spotřebována přesně (průchod se nerozešel s daty). */
   exact: boolean;
+  verts: Float64Array;
+  tris: Uint32Array;
+  triNormal: Float32Array | null;
+  triStyle: Int32Array;
+  /**
+   * 1 = trojúhelník nesouhlasí s normálami převzatými z dřívějška (normála vrcholu míří
+   * jinam než plocha trojúhelníku) — typická známka, že se rekonstrukce rozjela. Bez normál
+   * v souboru null.
+   */
+  bad: Uint8Array | null;
+  detail: string;
+}
+
+/** Trojúhelník je „špatný", když převzatá normála svírá s jeho plochou úhel nad ~60°. */
+const BAD_DOT = 0.5;
+/** Rozjetí = aspoň BAD_LIMIT špatných trojúhelníků v okně BAD_WINDOW po sobě jdoucích. */
+const BAD_WINDOW = 32;
+const BAD_LIMIT = 4;
+/** Částečnou síť (jen spolehlivý začátek průchodu) zobrazíme, je-li dost velká. */
+const MIN_PARTIAL_TRIS = 48;
+const MIN_PARTIAL_SHARE = 0.2;
+
+/**
+ * Délka spolehlivého začátku průchodu: trojúhelníky před prvním místem, kde se nahromadí
+ * nesouhlasy s normálami. (Kódování je ztrátové a dlouhé úzké trojúhelníky v CAD sítích
+ * zesilují i drobné odchylky — od určitého místa se pak síť „rozletí" do střepů.)
+ */
+function cleanPrefix(t: Traversal): number {
+  const bad = t.bad;
+  if (!bad) return t.exact ? t.done : 0;
+  const n = t.done;
+  let count = 0;
+  for (let i = 0; i < Math.min(BAD_WINDOW, n); i++) count += bad[i];
+  for (let k = 0; k < n; k++) {
+    if (bad[k] && count >= BAD_LIMIT) return k;
+    count -= bad[k];
+    if (k + BAD_WINDOW < n) count += bad[k + BAD_WINDOW];
+  }
+  return n;
 }
 
 /**
- * Průchod sítí se ověřuje přesnou spotřebou všech polí (body, odkazy, příznaky, bity a úhly
- * normál). Orientace trojúhelníků v souborech z CAD (HOOPS/Tetra4D) se nejspolehlivěji
- * určí podle normály dekódované přímo v daném trojúhelníku; když tam žádná nová není
- * (všechny vrcholy už normálu mají), převezme se od souseda. Pro jistotu zkusíme i varianty.
+ * Orientace trojúhelníků v souborech z CAD (HOOPS/Tetra4D) se nejspolehlivěji určí podle
+ * normály dekódované přímo v daném trojúhelníku; když tam žádná nová není, převezme se od
+ * souseda. Zkoušíme i varianty a bereme tu, jejíž spolehlivý začátek je nejdelší. Úplná síť
+ * se přijme jen tehdy, když průchod přesně spotřebuje všechna data a nikde se nerozjede.
  */
-function rebuild(d: CompressedData): MeshTess | null {
+function rebuild(d: CompressedData): { mesh: MeshTess | null; partial: boolean; detail?: string } {
   const numTri = d.triFace.length;
-  if (numTri === 0 || d.points.length < 9) return null;
+  if (numTri === 0 || d.points.length < 9) return { mesh: null, partial: false };
   const order = d.mustRecalc ? [Orient.Normals] : [Orient.Fresh, Orient.Topo, Orient.Normals];
+  let best: Traversal | null = null;
+  let bestCut = -1;
   for (const o of order) {
-    const res = rebuildOnce(d, o);
-    if (res.mesh && res.exact) return res.mesh;
+    const t = rebuildOnce(d, o);
+    const cut = cleanPrefix(t);
+    if (t.exact && cut === numTri) return { mesh: toMesh(d, t, numTri), partial: false };
+    if (cut > bestCut) {
+      best = t;
+      bestCut = cut;
+    }
   }
-  throw new PrcFormatError("komprimovanou síť se nepodařilo jednoznačně rekonstruovat");
+  const detail = best ? `${best.detail}; spolehlivých ${bestCut}/${numTri} trojúhelníků` : "";
+  const minKeep = Math.max(MIN_PARTIAL_TRIS, Math.ceil(numTri * MIN_PARTIAL_SHARE));
+  if (best && bestCut >= minKeep) return { mesh: toMesh(d, best, bestCut), partial: true, detail };
+  return { mesh: null, partial: true, detail };
+}
+
+/** Prvních `count` trojúhelníků průchodu → MeshTess seskupená po plochách. */
+function toMesh(d: CompressedData, t: Traversal, count: number): MeshTess {
+  const faceCount = d.hasFaces ? Math.max(1, d.faceCount) : 1;
+  const counts = new Uint32Array(faceCount + 1);
+  for (let k = 0; k < count; k++) counts[(d.hasFaces ? d.triFace[k] : 0) + 1]++;
+  for (let f = 0; f < faceCount; f++) counts[f + 1] += counts[f];
+  const faceStart = counts.slice();
+  const fill = counts.slice(0, faceCount);
+  const tri = new Uint32Array(count * 3);
+  const src = t.triNormal;
+  const cn = src ? new Float32Array(count * 9) : null;
+  const faceStyle = new Int32Array(faceCount).fill(-1);
+  for (let k = 0; k < count; k++) {
+    const f = d.hasFaces ? d.triFace[k] : 0;
+    const dst = fill[f]++;
+    if (dst === faceStart[f]) faceStyle[f] = t.triStyle[k];
+    tri[dst * 3] = t.tris[k * 3];
+    tri[dst * 3 + 1] = t.tris[k * 3 + 1];
+    tri[dst * 3 + 2] = t.tris[k * 3 + 2];
+    if (cn && src) cn.set(src.subarray(k * 9, k * 9 + 9), dst * 9);
+  }
+  return {
+    kind: "mesh",
+    pos: t.verts,
+    tri,
+    cornerNormals: cn,
+    faceStart,
+    faceStyle,
+    creaseAngle: ((d.creaseDeg > 0 && d.creaseDeg <= 180 ? d.creaseDeg : 25) * Math.PI) / 180,
+  };
 }
 
 // pracovní vektory (bez alokací v hlavní smyčce)
@@ -305,10 +389,9 @@ const nn = v3(),
   m1 = v3(),
   m2 = v3();
 
-function rebuildOnce(d: CompressedData, orient: Orient): RebuildResult {
+function rebuildOnce(d: CompressedData, orient: Orient): Traversal {
   const numTri = d.triFace.length;
   const numPts = Math.floor(d.points.length / 3);
-  if (d.edgeStatus.length < numTri - 1) return { mesh: null, exact: false };
   const tol = d.tolerance;
   const [ox, oy, oz] = d.origin;
   const P = d.points;
@@ -317,6 +400,18 @@ function rebuildOnce(d: CompressedData, orient: Orient): RebuildResult {
   const withNormals = !d.mustRecalc;
   const triNormal = withNormals ? new Float32Array(numTri * 9) : null;
   const triStyle = new Int32Array(numTri).fill(-1);
+  const bad = withNormals ? new Uint8Array(numTri) : null;
+  const fail = (detail: string, done: number): Traversal => ({
+    done,
+    exact: false,
+    verts,
+    tris,
+    triNormal,
+    triStyle,
+    bad,
+    detail,
+  });
+  if (d.edgeStatus.length < numTri - 1) return fail("chybí příznaky hran", 0);
 
   let normals = new Float64Array(withNormals ? Math.max(16, numTri * 3 * 3) : 0);
   let nNormals = 0;
@@ -644,6 +739,14 @@ function rebuildOnce(d: CompressedData, orient: Orient): RebuildResult {
     let rev = dd < 0;
     if (hint >= 0 && (orient === Orient.Topo || (orient === Orient.Fresh && fresh < 0))) rev = hint === 1;
     reversed = rev;
+    // souhlasí převzaté normály s plochou trojúhelníku? (td = normála uloženého pořadí bez otočení)
+    const gl = Math.hypot(td[0], td[1], td[2]);
+    if (gl > 0) {
+      const sc = (reversed ? -1 : 1) / gl;
+      const off = (n: number) =>
+        n < nStart && sc * (td[0] * normals[n * 3] + td[1] * normals[n * 3 + 1] + td[2] * normals[n * 3 + 2]) < BAD_DOT;
+      if (off(n0) || off(n1) || off(n2)) bad![k] = 1;
+    }
     const o = k * 9;
     const nrm = triNormal!;
     const put = (slot: number, n: number) => {
@@ -813,7 +916,7 @@ function rebuildOnce(d: CompressedData, orient: Orient): RebuildResult {
       storeTriangle();
     }
   } catch (e) {
-    if (e instanceof Conflict) return { mesh: null, exact: false };
+    if (e instanceof Conflict) return fail(`rozpor v trojúhelníku ${k}`, k);
     throw e;
   }
 
@@ -822,35 +925,7 @@ function rebuildOnce(d: CompressedData, orient: Orient): RebuildResult {
     refIdx === d.refs.length &&
     refFlagIdx === d.isRef.length &&
     (!withNormals || (bitPos === d.normalBits.length && anglePos === d.angles.length));
-  if (!exact) return { mesh: null, exact: false };
-
-  // seskupení trojúhelníků po plochách (stabilně, v pořadí průchodu)
-  const faceCount = d.hasFaces ? Math.max(1, d.faceCount) : 1;
-  const counts = new Uint32Array(faceCount + 1);
-  for (let t = 0; t < numTri; t++) counts[(d.hasFaces ? d.triFace[t] : 0) + 1]++;
-  for (let f = 0; f < faceCount; f++) counts[f + 1] += counts[f];
-  const faceStart = counts.slice();
-  const fill = counts.slice(0, faceCount);
-  const tri = new Uint32Array(numTri * 3);
-  const cn = triNormal ? new Float32Array(numTri * 9) : null;
-  const faceStyle = new Int32Array(faceCount).fill(-1);
-  for (let t = 0; t < numTri; t++) {
-    const f = d.hasFaces ? d.triFace[t] : 0;
-    const dst = fill[f]++;
-    if (dst === faceStart[f]) faceStyle[f] = triStyle[t];
-    tri[dst * 3] = tris[t * 3];
-    tri[dst * 3 + 1] = tris[t * 3 + 1];
-    tri[dst * 3 + 2] = tris[t * 3 + 2];
-    if (cn && triNormal) cn.set(triNormal.subarray(t * 9, t * 9 + 9), dst * 9);
-  }
-  const mesh: MeshTess = {
-    kind: "mesh",
-    pos: verts,
-    tri,
-    cornerNormals: cn,
-    faceStart,
-    faceStyle,
-    creaseAngle: ((d.creaseDeg > 0 && d.creaseDeg <= 180 ? d.creaseDeg : 25) * Math.PI) / 180,
-  };
-  return { mesh, exact: true };
+  if (!exact) return fail("data nespotřebována přesně", numTri);
+  return { done: numTri, exact: true, verts, tris, triNormal, triStyle, bad, detail: "" };
 }
+
