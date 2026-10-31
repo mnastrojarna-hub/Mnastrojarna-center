@@ -31,6 +31,11 @@ doklady a učí se z ručních oprav.
 - **Zákazníci** (`/customers`) a **Dodavatelé** (`/suppliers`) — pro všechny: číslo zákazníka
   (ZK0001, přiděluje DB), IČO/DIČ, adresy, kontaktní osoby, splatnost, naše číslo dodavatele
   u zákazníka; dodavatelé s technologiemi, materiály, certifikacemi, lhůtou a hodnocením.
+  **Vyplnit z dokladu** v okně Nový zákazník / Nový dodavatel: vyfoť nebo nahraj cokoli (screenshot
+  e-mailu, objednávku, fakturu, vizitku, PDF, `.eml` / `.msg`) nebo vlož text či screenshot (Ctrl+V) →
+  AI vytáhne **jen firmu** (kontakty, e-maily podle účelu, u dodavatele i technologie) a IČO ověří
+  v **ARES** (název, DIČ, sídlo z registru; bez IČO hledá podle názvu). Nezakládá se žádná zakázka —
+  formulář se jen předvyplní a uloží až uživatel. Stačí i jen napsat IČO — tlačítko **ARES** doplní zbytek.
 - **Provize** — obchodník vidí jen svoje, super admin všechny (smlouvy, pásma, vyúčtování).
 - **Super admin navíc**: AI přehled (fronta schvalování, AI pošta, rozložení zakázek), AI asistent,
   znalostní DB (historie cen), archiv výkresů, ladění AI (pravidla, korekce, automatika),
@@ -48,7 +53,9 @@ doklady a učí se z ručních oprav.
   **výběrový filtr** (lišta i pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed
   křivosti, střed hrany), **řez** rovinou XY / XZ / YZ nebo plochou (posuvník, otočení, šrafovaná
   plocha řezu, měření na řezu), měření vzdálenosti s uchopením (roh, střed díry, střed hrany, hrana,
-  plocha; rovnoběžné plochy, rozteč os), průměr / poloměr, úhel, rozměry / objem / hmotnost dílu. Kód: `src/components/viewer3d`,
+  plocha; rovnoběžné plochy, rozteč os), průměr / poloměr, úhel, rozměry / objem dílu, **hmotnost dílu a polotovaru** podle materiálu
+  z Nacenění (přířez / kulatina s přídavky jako v kalkulaci, polotovar nakreslený v 3D), barvy dílů
+  a ploch. Kód: `src/components/viewer3d`,
   `src/components/file-viewer`, `src/lib/viewer3d` (OpenCascade se kopíruje do `public/vendor`
   skriptem `tools/vendor-occt.mjs` při instalaci a buildu).
 
@@ -180,6 +187,8 @@ tools/e2e/stop-app.sh
 ```
 
 E2E běží s `AI_FAKE_CAPTURE` (fixture místo volání Claude), takže nepotřebují API klíč.
+ARES (`ares.gov.cz`, veřejné API bez klíče) v E2E čte fixtures z `ARES_FAKE_DIR`
+(`src/lib/ares/__fixtures__`); `ARES_API_URL` přepíše adresu API.
 
 ## Struktura
 

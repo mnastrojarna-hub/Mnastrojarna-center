@@ -17,6 +17,14 @@ import { PartyBookEditor } from "@/components/contacts/party-book-editor";
 import { usePartyBookDraft } from "@/components/contacts/use-party-book";
 import { createCustomer, updateCustomer } from "@/app/actions/crm";
 import {
+  AresButton, AresNoteText, DuplicateNotice, PartyAutofill, filledClass, useAresLookup,
+} from "@/components/contacts/party-autofill";
+import {
+  CUSTOMER_FIELD_LABELS, applyAresToCustomerForm, applyToCustomerForm, filledSummary, mergeContactsIntoDraft, type FilledFrom,
+} from "@/lib/parties/autofill";
+import { icoDigits, isValidIco, type AresCompany } from "@/lib/ares/ares";
+import type { PartyAutofillData, PartyDuplicate } from "@/lib/parties/autofill-types";
+import {
   EMPTY_CUSTOMER_FORM, customerFormFromView, validateCustomerForm,
   type CustomerField, type CustomerFormValues, type CustomerView,
 } from "@/components/customers/model";
@@ -79,6 +87,15 @@ export function CustomerDialog({
   // nový zákazník uložený, ale kontakty ne → další „Uložit" už jen upraví (žádný druhý zákazník)
   const [createdId, setCreatedId] = React.useState<string | null>(null);
   const book = usePartyBookDraft("customer", customer?.id ?? null, open);
+  // „Vyplnit z dokladu" / ARES: která pole vyplnila AI / registr (zvýraznění do první ruční úpravy)
+  const [filled, setFilled] = React.useState<Partial<Record<CustomerField, FilledFrom>>>({});
+  const [found, setFound] = React.useState<PartyDuplicate | null>(null);
+  // async výsledky (AI čte i desítky sekund) se slučují do aktuálního stavu, ne do stavu z doby spuštění
+  const valuesRef = React.useRef(values);
+  valuesRef.current = values;
+  const draftRef = React.useRef(book.draft);
+  draftRef.current = book.draft;
+  const autoIco = React.useRef<string | null>(null);
 
   const errors = touched ? validateCustomerForm(values) : {};
   const dirty = JSON.stringify(values) !== JSON.stringify(initial) || book.dirty;
@@ -89,13 +106,63 @@ export function CustomerDialog({
     setError(null);
     setDuplicateId(null);
     setCreatedId(null);
+    setFilled({});
+    setFound(null);
+    autoIco.current = null;
+    ares.reset();
   }
 
   function set<K extends CustomerField>(key: K, v: CustomerFormValues[K]) {
     setValues((cur) => ({ ...cur, [key]: v }));
     setError(null);
     setDuplicateId(null);
+    setFilled((f) => (f[key] ? { ...f, [key]: undefined } : f));
   }
+
+  function mark(next: Partial<Record<CustomerField, FilledFrom>>): string[] {
+    setFilled((f) => ({ ...f, ...next }));
+    return (Object.keys(next) as CustomerField[]).map((k) => CUSTOMER_FIELD_LABELS[k] ?? k);
+  }
+
+  function applyAres(company: AresCompany, duplicate: PartyDuplicate | null): string {
+    const res = applyAresToCustomerForm(valuesRef.current, company);
+    valuesRef.current = res.values;
+    setValues(res.values);
+    setFound(duplicate);
+    setError(null);
+    setDuplicateId(null);
+    return filledSummary(mark(res.filled), 0, 0);
+  }
+
+  function applyDoc(data: PartyAutofillData): string {
+    const res = applyToCustomerForm(valuesRef.current, data, editing ? "edit" : "new");
+    valuesRef.current = res.values;
+    setValues(res.values);
+    let added = { contacts: 0, roles: 0 };
+    if (draftRef.current) {
+      const merged = mergeContactsIntoDraft(draftRef.current, data.contacts, data.roleEmails);
+      draftRef.current = merged.draft;
+      book.setDraft(merged.draft);
+      added = { contacts: merged.addedContacts, roles: merged.addedRoles };
+    }
+    setFound(data.duplicate);
+    setError(null);
+    setDuplicateId(null);
+    autoIco.current = icoDigits(res.values.ico);
+    return filledSummary(mark(res.filled), added.contacts, added.roles);
+  }
+
+  const ares = useAresLookup("customer", customer?.id ?? createdId, applyAres);
+  const aresLookup = ares.lookup;
+
+  // nový zákazník: po napsání platného IČO (a bez názvu) se ARES zeptá sám
+  React.useEffect(() => {
+    if (!open || editing) return;
+    const digits = values.ico.replace(/\D/g, "");
+    if (digits.length !== 8 || !isValidIco(digits) || values.name.trim() || autoIco.current === digits) return;
+    autoIco.current = digits;
+    void aresLookup(digits);
+  }, [open, editing, values.ico, values.name, aresLookup]);
 
   function requestClose() {
     if (busy) return;
@@ -143,7 +210,8 @@ export function CustomerDialog({
       onChange={(e) => set(k, e.target.value)}
       aria-invalid={Boolean(errors[k])}
       aria-describedby={errors[k] ? `${fid(k)}-error` : undefined}
-      className={cn(HINT, errors[k] && "border-destructive focus-visible:ring-destructive")}
+      className={cn(HINT, filledClass(filled[k]), errors[k] && "border-destructive focus-visible:ring-destructive")}
+      data-filled={filled[k]}
       {...props}
     />
   );
@@ -191,19 +259,31 @@ export function CustomerDialog({
             <p className="text-xs text-muted-foreground">
               {editing
                 ? "Změny se hned projeví na nových dokladech (nabídky, potvrzení, dodací listy, faktury)."
-                : "Stačí název — zbytek doplníš kdykoli. Zákazníka umí založit i AI z vyfocené objednávky."}
+                : "Vyfoť nebo nahraj cokoli od zákazníka — AI vyplní údaje a IČO ověří v ARES. Zakládá se jen zákazník, žádná zakázka."}
             </p>
           </div>
         </div>
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
           <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-4 py-4 scrollbar-thin sm:px-6">
+            <div className="space-y-3">
+              <PartyAutofill kind="customer" exceptId={customer?.id ?? createdId} compact={editing} onApply={applyDoc} onApplyAres={applyAres} />
+              <DuplicateNotice kind="customer" duplicate={found} onOpen={() => setOpen(false)} />
+            </div>
             <FormSection icon={<Building2 />} tone="bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300" title="Firma">
               <Field id={fid("name")} label="Název firmy" required error={errors.name} className="sm:col-span-2">
                 {input("name", { placeholder: "název firmy", autoFocus: !editing, autoComplete: "organization" })}
               </Field>
-              <Field id={fid("ico")} label="IČO" error={errors.ico} hint="8 číslic, podle něj AI pozná zákazníka na dokladech.">
-                {input("ico", { inputMode: "numeric", placeholder: "8 číslic" })}
+              <Field
+                id={fid("ico")}
+                label="IČO"
+                error={errors.ico}
+                hint={<AresNoteText note={ares.note} fallback="Napiš IČO — ARES doplní název, DIČ a adresu." />}
+              >
+                <div className="flex gap-2 [&>input]:min-w-0 [&>input]:flex-1">
+                  {input("ico", { inputMode: "numeric", placeholder: "8 číslic" })}
+                  <AresButton busy={ares.busy} disabled={!icoDigits(values.ico)} onClick={() => void ares.lookup(values.ico)} testId="cust-ares" />
+                </div>
               </Field>
               <Field id={fid("dic")} label="DIČ" error={errors.dic}>
                 {input("dic", { placeholder: "CZ + číslo" })}
@@ -243,7 +323,7 @@ export function CustomerDialog({
                   onChange={(v) => set("email", v)}
                   context={customer ? { customerId: customer.id } : null}
                   placeholder="obecný e-mail firmy"
-                  className={cn(errors.email && "border-destructive focus-visible:ring-destructive")}
+                  className={cn(filledClass(filled.email), errors.email && "border-destructive focus-visible:ring-destructive")}
                 />
               </Field>
               <Field id={fid("phone")} label="Telefon firmy">
@@ -287,7 +367,7 @@ export function CustomerDialog({
                   value={values.deliveryAddress}
                   onChange={(e) => set("deliveryAddress", e.target.value)}
                   placeholder="adresa skladu, jen když se liší od sídla"
-                  className={cn(HINT, "min-h-[60px]")}
+                  className={cn(HINT, filledClass(filled.deliveryAddress), "min-h-[60px]")}
                 />
               </Field>
             </FormSection>

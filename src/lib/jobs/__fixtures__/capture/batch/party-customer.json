@@ -1,0 +1,30 @@
+{
+  "name": "STROJMETAL ALUMINIUM FORGING a.s.",
+  "ico": "25037684",
+  "dic": "",
+  "street": "Ringhofferova 66",
+  "city": "Kamenice",
+  "zip": "251 68",
+  "country": "CZ",
+  "email": "info@strojmetal-e2e.test",
+  "phone": "+420 323 600 100",
+  "website": "https://www.strojmetal-e2e.test",
+  "contacts": [
+    { "name": "Jana Nákupčí", "position": "nákupčí", "email": "jana.nakupci@strojmetal-e2e.test", "phone": "+420 777 360 001" },
+    { "name": "Petr Obchod", "position": "obchod", "email": "petr@mnastrojarna.cz", "phone": "" }
+  ],
+  "roleEmails": [
+    { "role": "fakturace", "email": "faktury@strojmetal-e2e.test" },
+    { "role": "nakup", "email": "jana.nakupci@strojmetal-e2e.test" }
+  ],
+  "paymentTermsDays": 45,
+  "supplierNumberAtCustomer": "D-4711",
+  "deliveryAddress": "",
+  "technologies": [],
+  "materials": [],
+  "certifications": [],
+  "documentKind": "objednávka",
+  "confidence": 0.93,
+  "summary": "Objednávka od Strojmetal Aluminium Forging, podepsaná nákupčí Janou.",
+  "needsClarification": []
+}

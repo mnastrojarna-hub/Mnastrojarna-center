@@ -54,6 +54,18 @@ async function pdfWithU3D() {
   return Buffer.from(await doc.save());
 }
 
+/** Sestava ze dvou kostek 20 mm vedle sebe (OBJ, dva objekty = dva díly). */
+function twoCubesObj() {
+  const cube = (name, ox, base) => {
+    const v = [];
+    for (const [x, y, z] of [[0, 0, 0], [20, 0, 0], [20, 20, 0], [0, 20, 0], [0, 0, 20], [20, 0, 20], [20, 20, 20], [0, 20, 20]]) v.push(`v ${x + ox} ${y} ${z}`);
+    const f = [[1, 3, 2], [1, 4, 3], [5, 6, 7], [5, 7, 8], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 4, 8], [3, 8, 7], [4, 1, 5], [4, 5, 8]]
+      .map((t) => `f ${t.map((i) => i + base).join(" ")}`);
+    return [`o ${name}`, ...v, ...f].join("\n");
+  };
+  return `${cube("KostkaA", 0, 0)}\n${cube("KostkaB", 20, 8)}\n`;
+}
+
 async function setup() {
   cleanup();
   const adminId = sql(`select id from profiles where email = 'admin@local.test'`);
@@ -65,6 +77,7 @@ async function setup() {
   files.cone = await upload(job, "kuzel.STP", fs.readFileSync(path.join(FIX, "conical-surface.step")), "application/octet-stream", "model_3d");
   files.stl = await upload(job, "kostka.stl", fs.readFileSync(path.join(FIX, "cube-10mm.stl")), "model/stl", "model_3d");
   files.pdf = await upload(job, "vykres-E2E.pdf", await minimalPdf(), "application/pdf", "vykres");
+  files.pair = await upload(job, "dve-kostky.obj", Buffer.from(twoCubesObj()), "text/plain", "model_3d");
   files.pdf3d = await upload(job, "plocha-3D.pdf", await pdfWithU3D(), "application/pdf", "model_3d");
   if (EXTRA && fs.existsSync(EXTRA)) files.asm = await upload(job, "SESTAVA.stp", fs.readFileSync(EXTRA), "application/octet-stream", "model_3d");
   return { job, files };
@@ -365,6 +378,145 @@ await test("desktop: výběrový filtr (plocha, hrana), řez rovinou i z plochy,
   });
 });
 
+await test("desktop: barvy dílu a plochy (pravé tlačítko bez nabídky prohlížeče), zpět vrátí barvu", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.step}`)}&name=KOSTKA.step`);
+    await waitModel(page);
+    const box = await canvasBox(page);
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    // pravé tlačítko na díl → naše nabídka; nativní nabídka (contextmenu) je potlačená i nad ní
+    await page.mouse.click(cx, cy, { button: "right" });
+    await page.getByTestId("viewer3d-context").waitFor();
+    const prevented = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      const ev = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y });
+      el.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    }, [cx + 5, cy + 5]);
+    expect(prevented, "nativní nabídka prohlížeče se nad prohlížečem 3D neotevře");
+    await page.getByTestId("context-colors").getByRole("button", { name: "Barva #c0504d" }).first().click();
+    await page.getByTestId("viewer3d-context").waitFor({ state: "detached" });
+    // barva dílu: karta dílu ukáže vybranou barvu, Ctrl+Z ji vrátí
+    await page.mouse.click(cx, cy);
+    await page.getByTestId("viewer3d-part").waitFor();
+    const ring = async (hex) => /ring-2/.test((await page.getByTestId("part-colors").getByRole("button", { name: `Barva ${hex}` }).getAttribute("class")) ?? "");
+    expect(await ring("#c0504d"), "díl má zvolenou barvu");
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-color-part.png") });
+    await page.getByTestId("part-colors").getByRole("button", { name: "Barva #9bbb59" }).click();
+    expect(await ring("#9bbb59"), "nová barva z karty dílu");
+    await page.keyboard.press("Control+z");
+    expect(await ring("#c0504d"), "Ctrl+Z vrátí předchozí barvu");
+    // odlišit plochy barevně
+    await page.getByTestId("viewer3d-part").getByRole("button", { name: /Odlišit plochy/ }).click();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-color-faces.png") });
+    // barva jedné plochy (filtr Plocha → karta plochy)
+    await page.getByTestId("tool-filter").click();
+    await page.getByTestId("filter-items").getByRole("radio", { name: /Plocha/ }).click();
+    await page.mouse.click(cx, cy);
+    await page.getByTestId("face-colors").waitFor();
+    await page.getByTestId("face-colors").getByRole("button", { name: "Barva #f2c314" }).click();
+    // pozadí
+    await page.getByTestId("tool-display").click();
+    await page.getByRole("button", { name: "Pozadí Tmavé" }).click();
+    expect(/from-\[#3b4250\]/.test((await page.getByTestId("viewer3d-root").getAttribute("class")) ?? ""), "tmavé pozadí");
+    await page.getByRole("button", { name: /Původní barvy/ }).click();
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-color-reset.png") });
+  });
+});
+
+await test("desktop: materiál → hmotnost dílu a polotovaru (kulatina u rotačního dílu), přídavek, polotovar v 3D", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.cone}`)}&name=kuzel.STP`);
+    await waitModel(page);
+    await page.getByTestId("tool-mass").click();
+    const panel = page.getByTestId("mass-panel");
+    await panel.waitFor();
+    // rotační díl → kulatina
+    const label = await page.getByTestId("mass-stock-label").innerText();
+    expect(/^Kulatina ⌀\d+ × \d+ mm$/.test(label), `polotovar rotačního dílu: ${label}`);
+    // ocel C45 → hliník: hmotnost klesne zhruba na třetinu
+    await page.getByTestId("mass-material").selectOption("12050");
+    const steel = await page.getByTestId("mass-part").innerText();
+    await page.getByTestId("mass-material").selectOption("alu_6082");
+    const alu = await page.getByTestId("mass-part").innerText();
+    const kg = (t) => Number(t.replace(/[^\d,]/g, "").replace(",", "."));
+    expect(kg(steel) > 0 && Math.abs(kg(alu) / kg(steel) - 2.7 / 7.85) < 0.05, `hliník vs ocel: ${alu} / ${steel}`);
+    const stockAlu = kg(await page.getByTestId("mass-stock").innerText());
+    expect(stockAlu > kg(alu), "polotovar je těžší než hotový díl");
+    // vlastní přídavek změní rozměr polotovaru
+    await page.getByTestId("mass-allowance").fill("20");
+    const label2 = await page.getByTestId("mass-stock-label").innerText();
+    expect(label2 !== label, `přídavek 20 mm: ${label} → ${label2}`);
+    // přířez místo kulatiny
+    await panel.getByRole("radio", { name: "Přířez" }).click();
+    expect(/^Přířez /.test(await page.getByTestId("mass-stock-label").innerText()), "přířez");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-mass.png") });
+    await page.getByTestId("mass-allowance").fill("");
+    await panel.getByRole("radio", { name: "Auto" }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-mass-round.png") });
+  });
+});
+
+await test("desktop: rozebrání sestavy — Ctrl + tažení dílu, rozložení posuvníkem, zpět, složit", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.pair}`)}&name=dve-kostky.obj`);
+    await waitModel(page);
+    const status = () => page.getByTestId("viewer3d-status").innerText();
+    const size0 = (await status()).split("mm")[0];
+    expect(/40,00 × 20,00 × 20,00/.test(size0) || /20,00 × 40,00/.test(size0) || /40,00/.test(size0), `sestava 40 × 20 × 20: ${size0}`);
+    await page.keyboard.press("5"); // shora
+    await page.waitForTimeout(500);
+    const b = await canvasBox(page);
+    // Ctrl + tažení levé kostky doleva
+    const sx = b.x + b.width / 2 - 60;
+    const sy = b.y + b.height / 2;
+    await page.keyboard.down("Control");
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.mouse.move(sx - 80, sy, { steps: 6 });
+    await page.mouse.move(sx - 160, sy, { steps: 6 });
+    await page.mouse.up();
+    await page.keyboard.up("Control");
+    await page.waitForTimeout(200);
+    const size1 = (await status()).split("mm")[0];
+    expect(size1 !== size0, `po přesunu dílu je sestava větší (${size0} → ${size1})`);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-move-part.png") });
+    // Ctrl+Z vrátí
+    await page.keyboard.press("Control+z");
+    await page.waitForTimeout(150);
+    expect((await status()).split("mm")[0] === size0, "Ctrl+Z vrátí díl");
+    // rozložení posuvníkem
+    await page.getByTestId("tool-explode").click();
+    await page.getByTestId("explode-panel").waitFor();
+    const slider = page.getByTestId("explode-slider");
+    await slider.focus();
+    for (let i = 0; i < 60; i++) await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+    const size2 = (await status()).split("mm")[0];
+    expect(size2 !== size0, `rozložená sestava (${size0} → ${size2})`);
+    await page.keyboard.press("0");
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-explode.png") });
+    // táhnutí bez Ctrl v režimu Táhnout díly
+    await page.getByTestId("explode-move-tool").click();
+    expect(/zapnuto/.test(await page.getByTestId("explode-move-tool").innerText()), "režim táhnutí");
+    await page.getByTestId("explode-reset").click();
+    await page.waitForTimeout(150);
+    expect((await status()).split("mm")[0] === size0, "Složit zpět");
+  });
+});
+
 if (files.asm) {
   await test("desktop: sestava — strom dílů, izolace, skrytí v stromu", async () => {
     await withContext(browser, errors, async (ctx) => {
@@ -381,6 +533,17 @@ if (files.asm) {
       await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-assembly.png") });
       await page.getByTestId("tool-showall").click();
       await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+      // výchozí klik vybere jen jeden díl (ne celou podsestavu)
+      {
+        const bb = await canvasBox(page);
+        let card = "";
+        for (let dx = -60; dx <= 60 && !card; dx += 20) {
+          await page.mouse.click(bb.x + bb.width / 2 + dx, bb.y + bb.height / 2);
+          card = await page.getByTestId("viewer3d-part").innerText({ timeout: 400 }).catch(() => "");
+        }
+        expect(card && !/Vybráno dílů/.test(card) && /Rozměr/.test(card), `klik = jeden díl: ${card.slice(0, 60)}`);
+        await page.keyboard.press("Escape");
+      }
       // filtr Sestava: klik na díl vybere celou podsestavu, Delete ji smaže, Ctrl+Z vrátí
       await page.getByTestId("tool-filter").click();
       await page.getByTestId("filter-items").getByRole("radio", { name: /Sestava/ }).click();

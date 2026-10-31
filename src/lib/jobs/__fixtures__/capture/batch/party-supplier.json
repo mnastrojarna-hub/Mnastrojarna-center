@@ -1,0 +1,28 @@
+{
+  "name": "Strojmetal",
+  "ico": "",
+  "dic": "",
+  "street": "",
+  "city": "",
+  "zip": "",
+  "country": "CZ",
+  "email": "kooperace@strojmetal-e2e.test",
+  "phone": "",
+  "website": "",
+  "contacts": [
+    { "name": "Karel Kalič", "position": "vedoucí kalírny", "email": "karel@strojmetal-e2e.test", "phone": "+420 777 360 002" }
+  ],
+  "roleEmails": [
+    { "role": "nabidky", "email": "kooperace@strojmetal-e2e.test" }
+  ],
+  "paymentTermsDays": 0,
+  "supplierNumberAtCustomer": "",
+  "deliveryAddress": "",
+  "technologies": ["kalení", "kování"],
+  "materials": ["hliník"],
+  "certifications": ["ISO 9001"],
+  "documentKind": "podpis e-mailu",
+  "confidence": 0.7,
+  "summary": "E-mail od kalírny Strojmetal, bez IČO.",
+  "needsClarification": ["Na podkladu chybí IČO."]
+}

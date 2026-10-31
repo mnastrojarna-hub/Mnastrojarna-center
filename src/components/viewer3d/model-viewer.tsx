@@ -3,15 +3,20 @@
 import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
-  ListTree, Loader2, Maximize2, MousePointer2, Redo2, Ruler, ScanEye, Scissors, Trash2, TriangleRight, Undo2, X, ZoomIn, ZoomOut,
+  ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
+  Undo2, Weight, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import type { ModelNode } from "@/lib/viewer3d/types";
 import type { LoadStage } from "@/lib/viewer3d/worker-protocol";
-import { fmtMm, steelMassKg, type Measurement } from "@/lib/viewer3d/measure";
+import { fmtMm, type Measurement } from "@/lib/viewer3d/measure";
+import { fmtKg, massKg, stockFor, type StockMode, type StockResult } from "@/lib/viewer3d/stock";
+import {
+  DEFAULT_VIEWER_MATERIALS, GROUP_LABEL, guessMaterialKey, lastMaterialKey, loadViewerMaterials, rememberMaterialKey, type ViewerMaterial,
+} from "./materials-client";
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import { cn } from "@/lib/utils";
 import {
-  PICK_FILTERS, ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
+  COLOR_PALETTE, PICK_FILTERS, ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
 } from "./engine";
 import { loadModel } from "./load-model";
 
@@ -50,11 +55,29 @@ const DISPLAYS: { key: DisplayMode; label: string }[] = [
   { key: "xray", label: "Průhledný (rentgen)" },
 ];
 
-const TOOL_HINT: Record<Exclude<Tool, "select">, [string, string]> = {
+const TOOL_HINT: Record<Exclude<Tool, "select" | "move">, [string, string]> = {
   distance: ["Klikni na 1. místo — roh, střed díry, střed hrany, hranu nebo plochu.", "Klikni na 2. místo."],
   diameter: ["Klikni na kružnici, oblouk nebo válcovou plochu (díra, čep).", ""],
   angle: ["Klikni na 1. hranu nebo rovinnou plochu.", "Klikni na 2. hranu nebo plochu."],
 };
+
+type Background = "light" | "dark" | "white" | "black";
+
+const BACKGROUNDS: { key: Background; label: string; className: string }[] = [
+  { key: "light", label: "Světlé (CAD)", className: "bg-gradient-to-b from-[#d6dee8] to-[#f6f8fa] dark:from-[#2b3139] dark:to-[#121417]" },
+  { key: "dark", label: "Tmavé", className: "bg-gradient-to-b from-[#3b4250] to-[#14171c]" },
+  { key: "white", label: "Bílé", className: "bg-white" },
+  { key: "black", label: "Černé", className: "bg-black" },
+];
+
+function loadBackground(): Background {
+  try {
+    const v = window.localStorage.getItem("viewer3d.bg");
+    return BACKGROUNDS.some((b) => b.key === v) ? (v as Background) : "light";
+  } catch {
+    return "light";
+  }
+}
 
 function fmt1(v: number): string {
   return v.toFixed(v >= 100 ? 1 : 2).replace(".", ",");
@@ -92,6 +115,19 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const [menu, setMenu] = React.useState<ContextRequest | null>(null);
   const [panel, setPanel] = React.useState<"tree" | "views" | "display" | "filter" | null>(null);
   const [sectionOpen, setSectionOpen] = React.useState(false);
+  const [massOpen, setMassOpen] = React.useState(false);
+  const [explodeOpen, setExplodeOpen] = React.useState(false);
+  const materials = useViewerMaterials();
+  const [bg, setBg] = React.useState<Background>("light");
+  React.useEffect(() => setBg(loadBackground()), []);
+  const pickBg = (b: Background) => {
+    setBg(b);
+    try {
+      window.localStorage.setItem("viewer3d.bg", b);
+    } catch {
+      /* soukromé okno — jen pro tuto chvíli */
+    }
+  };
   const [help, setHelp] = React.useState(false);
   const [isWide, setIsWide] = React.useState(true);
 
@@ -176,6 +212,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const section = eng?.getSection() ?? null;
   const sectionPicking = eng?.isSectionPicking() ?? false;
   const entityMode = ["face", "edge", "vertex", "center", "midpoint"].includes(filter);
+  const measuring = tool === "distance" || tool === "diameter" || tool === "angle";
   const openSection = () => {
     setSectionOpen(true);
     if (!isWide) setPanel(null);
@@ -187,7 +224,12 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   };
 
   return (
-    <div className={cn("relative h-full w-full select-none overflow-hidden bg-gradient-to-b from-[#d6dee8] to-[#f6f8fa] dark:from-[#2b3139] dark:to-[#121417]", className)}>
+    <div
+      className={cn("relative h-full w-full select-none overflow-hidden", BACKGROUNDS.find((b) => b.key === bg)?.className, className)}
+      // pravé tlačítko patří prohlížeči 3D — nabídka prohlížeče (Chrome na Windows ji otevírá až po puštění tlačítka) ne
+      onContextMenu={(e) => e.preventDefault()}
+      data-testid="viewer3d-root"
+    >
       <div ref={hostRef} className="absolute inset-0" data-testid="viewer3d-canvas" />
 
       {/* načítání / chyba */}
@@ -230,6 +272,16 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             filterActive={filter !== "auto"}
             sectionActive={!!section || sectionOpen}
             onSection={() => (sectionOpen ? setSectionOpen(false) : openSection())}
+            massActive={massOpen}
+            onMass={() => setMassOpen((o) => !o)}
+            explodeActive={explodeOpen || tool === "move"}
+            onExplode={() => {
+              setExplodeOpen((o) => !o);
+              if (!isWide) {
+                setSectionOpen(false);
+                setPanel(null);
+              }
+            }}
             onUndo={() => eng!.undo()}
             onRedo={() => eng!.redo()}
             onDelete={() => eng!.deleteSelected()}
@@ -254,6 +306,27 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               {DISPLAYS.map((d) => (
                 <MenuItem key={d.key} active={display === d.key} onClick={() => { eng!.setDisplay(d.key); setPanel(null); }}>{d.label}</MenuItem>
               ))}
+              <div className="my-1 border-t" />
+              <p className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Barvy</p>
+              <MenuItem onClick={() => { eng!.colorPartsDistinct(selection); setPanel(null); }}><Palette className="h-4 w-4" /> {selection.length ? "Odlišit vybrané díly" : "Odlišit díly barevně"}</MenuItem>
+              <MenuItem onClick={() => { eng!.colorFacesDistinct(selection); setPanel(null); }}><PaintBucket className="h-4 w-4" /> {selection.length ? "Odlišit plochy vybraných dílů" : "Odlišit plochy barevně"}</MenuItem>
+              {eng!.hasColorChanges() && (
+                <MenuItem onClick={() => { eng!.resetColors(); setPanel(null); }}><RotateCcw className="h-4 w-4" /> Původní barvy</MenuItem>
+              )}
+              <div className="my-1 border-t" />
+              <p className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pozadí</p>
+              <div className="grid grid-cols-4 gap-1 px-1.5 pb-1">
+                {BACKGROUNDS.map((b) => (
+                  <button
+                    key={b.key}
+                    type="button"
+                    onClick={() => pickBg(b.key)}
+                    title={b.label}
+                    aria-label={`Pozadí ${b.label}`}
+                    className={cn("h-9 rounded-md border-2", b.className, bg === b.key ? "border-primary" : "border-border")}
+                  />
+                ))}
+              </div>
             </Popover>
           )}
           {panel === "filter" && (
@@ -263,13 +336,24 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           )}
 
           {/* levý sloupec (telefon: dole nad lištou): řez + strom dílů */}
-          {(sectionOpen || panel === "tree") && (
+          {(sectionOpen || panel === "tree" || explodeOpen) && (
             <div
               className={cn(
                 "pointer-events-none absolute z-30 flex flex-col gap-2",
                 isWide ? "bottom-10 left-2 top-14 w-72" : "inset-x-2 bottom-[4.25rem] max-h-[62%] justify-end",
               )}
             >
+              {explodeOpen && (
+                <ExplodePanel
+                  engine={eng!}
+                  moveTool={tool === "move"}
+                  onMoveTool={(on) => eng!.setTool(on ? "move" : "select")}
+                  onClose={() => {
+                    setExplodeOpen(false);
+                    if (eng!.getTool() === "move") eng!.setTool("select");
+                  }}
+                />
+              )}
               {sectionOpen && (
                 <SectionPanel engine={eng!} picking={sectionPicking} onClose={() => { eng!.cancelSectionPick(); setSectionOpen(false); }} />
               )}
@@ -284,9 +368,12 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               isWide ? "bottom-10 right-2 top-[7.25rem] w-72" : "left-2 right-[7rem] top-2 max-h-[46%]",
             )}
           >
-            {tool === "select" && selection.length > 0 && <PartCard engine={eng!} selection={selection} />}
+            {massOpen && <MassPanel engine={eng!} materials={materials} selection={selection} onClose={() => setMassOpen(false)} />}
+            {!massOpen && (tool === "select" || tool === "move") && selection.length > 0 && (
+              <PartCard engine={eng!} selection={selection} materials={materials} onMass={() => setMassOpen(true)} />
+            )}
             {tool === "select" && entity && <EntityCard engine={eng!} onSection={openSection} />}
-            {(tool !== "select" || (measures.length > 0 && (isWide || (selection.length === 0 && !entity)))) && (
+            {(measuring || (measures.length > 0 && !massOpen && (isWide || (selection.length === 0 && !entity)))) && (
               <MeasurePanel
                 wide={isWide}
                 tool={tool}
@@ -300,7 +387,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           </div>
 
           {/* uchopení při měření */}
-          {(tool !== "select" || entityMode || sectionPicking) && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
+          {(measuring || (tool === "select" && entityMode) || sectionPicking) && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
 
           {/* aktivní filtr / výběr plochy pro řez — připomínka nahoře */}
           {(filter !== "auto" || sectionPicking) && (
@@ -379,6 +466,10 @@ function Toolbar(p: {
   filterActive: boolean;
   sectionActive: boolean;
   onSection: () => void;
+  massActive: boolean;
+  onMass: () => void;
+  explodeActive: boolean;
+  onExplode: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDelete: () => void;
@@ -407,6 +498,8 @@ function Toolbar(p: {
       <Sep />
       <ToolButton icon={Filter} label={p.filterActive ? p.filterLabel : "Filtr"} active={p.panel === "filter" || p.filterActive} onClick={() => p.onPanel("filter")} testId="tool-filter" />
       <ToolButton icon={Scissors} label="Řez" active={p.sectionActive} onClick={p.onSection} testId="tool-section" />
+      <ToolButton icon={Weight} label="Hmotnost" active={p.massActive} onClick={p.onMass} testId="tool-mass" />
+      <ToolButton icon={Move3d} label="Rozebrat" active={p.explodeActive} onClick={p.onExplode} testId="tool-explode" />
       <Sep />
       <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
       <ToolButton icon={Focus} label="Izolovat" kbd="I" disabled={!p.hasSelection} onClick={p.onIsolate} testId="tool-isolate" />
@@ -563,7 +656,7 @@ function MeasurePanel({
   onClear: () => void;
   onDone: () => void;
 }) {
-  const hint = tool !== "select" ? TOOL_HINT[tool][pending ? 1 : 0] || TOOL_HINT[tool][0] : null;
+  const hint = tool !== "select" && tool !== "move" ? TOOL_HINT[tool][pending ? 1 : 0] || TOOL_HINT[tool][0] : null;
   const list = [...measures].reverse();
   const [collapsed, setCollapsed] = React.useState(false);
   return (
@@ -583,7 +676,7 @@ function MeasurePanel({
             {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 rotate-90" />}
           </button>
         )}
-        {tool !== "select" && (
+        {tool !== "select" && tool !== "move" && (
           <button type="button" onClick={onDone} className="rounded p-1 hover:bg-accent" aria-label="Ukončit měření"><X className="h-4 w-4" /></button>
         )}
       </div>
@@ -653,6 +746,63 @@ function FilterItems({ current, onPick }: { current: PickFilter; onPick: (f: Pic
 
 function fmtPos(v: number): string {
   return v.toFixed(2).replace(".", ",");
+}
+
+/** Rozebrání sestavy: rozložený pohled posuvníkem, tažení dílů (Ctrl / režim Táhnout), složení zpět. */
+function ExplodePanel({ engine, moveTool, onMoveTool, onClose }: { engine: ViewerEngine; moveTool: boolean; onMoveTool: (on: boolean) => void; onClose: () => void }) {
+  const value = engine.getExplode();
+  const end = () => engine.endExplode();
+  return (
+    <div className="pointer-events-auto shrink-0 rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur" onPointerDown={(e) => e.stopPropagation()} data-testid="explode-panel">
+      <div className="flex items-center gap-2">
+        <Move3d className="h-4 w-4 text-primary" />
+        <span className="flex-1 font-semibold">Rozebrání sestavy</span>
+        <button type="button" onClick={onClose} aria-label="Zavřít panel rozebrání" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-2 space-y-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Rozložit díly od středu</span>
+          <span className="tabular-nums">{Math.round(value * 100)} %</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={2}
+          step={0.01}
+          value={value}
+          onPointerDown={() => engine.beginExplode()}
+          onChange={(e) => engine.setExplode(Number(e.target.value))}
+          onPointerUp={end}
+          onKeyUp={end}
+          onBlur={end}
+          className="w-full accent-[#E03930]"
+          aria-label="Rozložení sestavy"
+          data-testid="explode-slider"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => onMoveTool(!moveTool)}
+        aria-pressed={moveTool}
+        className={cn("mt-2 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium", moveTool ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent")}
+        data-testid="explode-move-tool"
+      >
+        <Move3d className="h-4 w-4" /> {moveTool ? "Táhnutí dílů zapnuto" : "Táhnout díly myší / prstem"}
+      </button>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Kdykoli: <strong>Ctrl + táhni díl</strong> = přesun (vybraný díl, nebo celá podsestava s filtrem Sestava). <strong>Shift</strong> při tažení = jen po ose X / Y / Z. Ctrl+Z vrátí.
+      </p>
+      <button
+        type="button"
+        disabled={!engine.hasOffsets()}
+        onClick={() => engine.resetOffsets()}
+        className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent disabled:opacity-40"
+        data-testid="explode-reset"
+      >
+        <RotateCcw className="h-3.5 w-3.5" /> Složit zpět
+      </button>
+    </div>
+  );
 }
 
 function SectionPanel({ engine, picking, onClose }: { engine: ViewerEngine; picking: boolean; onClose: () => void }) {
@@ -765,6 +915,12 @@ function EntityCard({ engine, onSection }: { engine: ViewerEngine; onSection: ()
         </div>
         <button type="button" onClick={() => engine.setEntity(null)} aria-label="Zrušit výběr" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
       </div>
+      {e.face !== undefined && (
+        <div className="mt-2 space-y-1.5 border-t pt-2">
+          <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><PaintBucket className="h-3.5 w-3.5" /> Barva plochy</p>
+          <ColorSwatches onPick={(c) => engine.setFaceColor(e.part, e.face!, c)} resetLabel="Jako díl" testId="face-colors" />
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5">
         {e.plane && (
           <button type="button" onClick={() => { engine.sectionFromPlane(e.plane!.normal, e.plane!.point, e.part); onSection(); }} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="entity-section"><Scissors className="h-3.5 w-3.5" /> Řez touto plochou</button>
@@ -772,6 +928,261 @@ function EntityCard({ engine, onSection }: { engine: ViewerEngine; onSection: ()
         <button type="button" onClick={() => engine.measureFromEntity()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Ruler className="h-3.5 w-3.5" /> Měřit odsud</button>
         <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat díl</button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- materiál, hmotnost, polotovar
+
+function useViewerMaterials(): ViewerMaterial[] {
+  const [list, setList] = React.useState<ViewerMaterial[]>(DEFAULT_VIEWER_MATERIALS);
+  React.useEffect(() => {
+    let alive = true;
+    void loadViewerMaterials().then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return list;
+}
+
+/** Materiál dílu: zvolený, podle názvu dílu, naposledy použitý, jinak ocel C45. */
+function materialOf(engine: ViewerEngine, part: number, list: ViewerMaterial[]): ViewerMaterial {
+  const key = engine.getPartMaterial(part) ?? guessMaterialKey(engine.partName(part), list) ?? lastMaterialKey() ?? "12050";
+  return list.find((m) => m.key === key) ?? list.find((m) => m.key === "12050") ?? list[0];
+}
+
+function shortMaterial(label: string): string {
+  return label.length > 34 ? `${label.slice(0, 32)}…` : label;
+}
+
+const STOCK_MODES: { key: StockMode; label: string }[] = [
+  { key: "auto", label: "Auto" },
+  { key: "prirez", label: "Přířez" },
+  { key: "kulatina", label: "Kulatina" },
+];
+
+/**
+ * Hmotnost dílu a polotovaru přímo v 3D: materiál ze seznamu (hustota přednastavená v Nacenění),
+ * objem z modelu, polotovar s přídavky — průhledně nakreslený kolem dílu.
+ */
+function MassPanel({ engine, materials, selection, onClose }: { engine: ViewerEngine; materials: ViewerMaterial[]; selection: number[]; onClose: () => void }) {
+  const scope = selection.length ? selection : engine.visibleParts();
+  const [allowanceText, setAllowanceText] = React.useState("");
+  const [show3D, setShow3D] = React.useState(true);
+  const allowanceMm = allowanceText.trim() === "" ? null : Number(allowanceText.replace(",", "."));
+  const validAllowance = allowanceMm === null || (Number.isFinite(allowanceMm) && allowanceMm >= 0) ? allowanceMm : null;
+
+  const rows = scope.map((i) => {
+    const mat = materialOf(engine, i, materials);
+    const geom = engine.stockGeometry(i);
+    const res = geom ? stockFor(geom, mat.density, engine.getStockMode(i), validAllowance) : null;
+    return { i, mat, geom, res };
+  }).filter((r): r is { i: number; mat: ViewerMaterial; geom: NonNullable<typeof r.geom>; res: StockResult } => !!r.res && !!r.geom);
+  const keys = new Set(rows.map((r) => r.mat.key));
+  const currentKey = keys.size === 1 ? [...keys][0] : "";
+  const modes = new Set(scope.map((i) => engine.getStockMode(i)));
+  const currentMode = modes.size === 1 ? [...modes][0] : null;
+  const totalPart = rows.reduce((s, r) => s + r.res.partMassKg, 0);
+  const totalStock = rows.reduce((s, r) => s + r.res.massKg, 0);
+  const anyOpen = rows.some((r) => r.geom.open);
+  const one = rows.length === 1 ? rows[0] : null;
+
+  // polotovar v 3D (průhledně kolem dílu)
+  const previewKey = show3D ? rows.map((r) => `${r.i}:${r.res.label}`).join("|") : "";
+  React.useEffect(() => {
+    engine.setStockPreview(previewKey ? rows.slice(0, 400).map((r) => ({ part: r.i, result: r.res })) : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, previewKey]);
+  React.useEffect(() => () => engine.setStockPreview(null), [engine]);
+
+  const groups = React.useMemo(() => {
+    const m = new Map<string, ViewerMaterial[]>();
+    for (const x of materials) {
+      const g = GROUP_LABEL[x.group] ?? x.group;
+      m.set(g, [...(m.get(g) ?? []), x]);
+    }
+    return [...m.entries()];
+  }, [materials]);
+
+  const title = selection.length === 1 ? engine.partName(selection[0]) : selection.length ? `Vybráno dílů: ${selection.length}` : `Celý model (${scope.length} ${scope.length === 1 ? "díl" : scope.length < 5 ? "díly" : "dílů"})`;
+  const fmtCm3 = (mm3: number) => `${(mm3 / 1000).toFixed(2).replace(".", ",")} cm³`;
+
+  return (
+    <div className="pointer-events-auto flex min-h-0 shrink flex-col overflow-hidden rounded-xl border border-[#1f6feb]/40 bg-card/95 text-sm shadow-xl backdrop-blur" onPointerDown={(e) => e.stopPropagation()} data-testid="mass-panel">
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <Weight className="h-4 w-4 text-[#1f6feb]" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-tight">Hmotnost a polotovar</p>
+          <p className="truncate text-[11px] text-muted-foreground" title={title}>{title}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Zavřít" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2.5 overflow-auto p-3 scrollbar-thin">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-muted-foreground">Materiál</span>
+          <select
+            value={currentKey}
+            onChange={(e) => {
+              engine.setPartMaterial(scope, e.target.value);
+              rememberMaterialKey(e.target.value);
+            }}
+            className="h-10 w-full rounded-md border bg-background px-2 text-sm md:h-9"
+            data-testid="mass-material"
+          >
+            {!currentKey && <option value="">Různé materiály…</option>}
+            {groups.map(([g, list]) => (
+              <optgroup key={g} label={g}>
+                {list.map((m) => (
+                  <option key={m.key} value={m.key}>{m.label} · {m.density.toString().replace(".", ",")} kg/dm³</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-muted/50 p-2">
+            <p className="text-[11px] text-muted-foreground">Hotový díl</p>
+            <p className="text-base font-bold tabular-nums" data-testid="mass-part">{fmtKg(totalPart)}</p>
+            {one && <p className="text-[11px] text-muted-foreground">objem {fmtCm3(one.geom.volumeMm3)}</p>}
+          </div>
+          <div className="rounded-lg bg-[#1f6feb]/10 p-2">
+            <p className="text-[11px] text-muted-foreground">Polotovar</p>
+            <p className="text-base font-bold tabular-nums text-[#1f6feb]" data-testid="mass-stock">{fmtKg(totalStock)}</p>
+            {one && <p className="text-[11px] text-muted-foreground">využití {one.res.utilization} %</p>}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted-foreground">Polotovar</span>
+          <div className="grid grid-cols-3 gap-1 rounded-lg border p-0.5" role="radiogroup" aria-label="Druh polotovaru">
+            {STOCK_MODES.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                role="radio"
+                aria-checked={currentMode === m.key}
+                onClick={() => engine.setStockMode(scope, m.key)}
+                className={cn("h-8 rounded-md text-xs font-medium", currentMode === m.key ? "bg-foreground text-background" : "hover:bg-accent")}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {one && <p className="text-sm font-medium tabular-nums" data-testid="mass-stock-label">{one.res.label}</p>}
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Přídavek</span>
+            <input
+              value={allowanceText}
+              onChange={(e) => setAllowanceText(e.target.value)}
+              placeholder="standard"
+              inputMode="decimal"
+              className="h-8 w-24 rounded-md border bg-background px-2 text-right tabular-nums"
+              aria-label="Přídavek na rozměr v mm"
+              data-testid="mass-allowance"
+            />
+            <span className="text-muted-foreground">mm na rozměr</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground">Standard jako v nacenění: 3–8 mm podle velikosti, délka kulatiny 4–10 mm, kulatina na běžný průměr tyče.</p>
+        </div>
+
+        {one && (
+          <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
+            <dt className="text-muted-foreground">Rozměr dílu</dt>
+            <dd className="text-right">{one.geom.size.map(fmt1).join(" × ")} mm</dd>
+            <dt className="text-muted-foreground">Objem polotovaru</dt>
+            <dd className="text-right">{fmtCm3(one.res.volumeMm3)}</dd>
+            <dt className="text-muted-foreground">Odpad (třísky)</dt>
+            <dd className="text-right">{fmtKg(one.res.wasteKg)}</dd>
+            <dt className="text-muted-foreground">Hustota</dt>
+            <dd className="text-right">{one.mat.density.toString().replace(".", ",")} kg/dm³</dd>
+          </dl>
+        )}
+
+        {rows.length > 1 && (
+          <div className="overflow-hidden rounded-lg border">
+            <table className="w-full text-[11px] tabular-nums">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr><th className="px-2 py-1 text-left font-medium">Díl</th><th className="px-2 py-1 text-right font-medium">Díl</th><th className="px-2 py-1 text-right font-medium">Polotovar</th></tr>
+              </thead>
+              <tbody className="divide-y">
+                {rows.slice(0, 200).map((r) => (
+                  <tr key={r.i} className="cursor-pointer hover:bg-accent/60" onClick={() => engine.select([r.i])} title={`${r.res.label} · ${r.mat.label}`}>
+                    <td className="max-w-[7rem] truncate px-2 py-1">{engine.partName(r.i)}</td>
+                    <td className="px-2 py-1 text-right">{fmtKg(r.res.partMassKg)}</td>
+                    <td className="px-2 py-1 text-right">{fmtKg(r.res.massKg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <label className="flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={show3D} onChange={(e) => setShow3D(e.target.checked)} className="h-4 w-4 accent-[#1f6feb]" data-testid="mass-show3d" />
+          Ukázat polotovar v 3D (modře)
+        </label>
+        {anyOpen && (
+          <p className="flex items-start gap-1 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> Síť modelu není uzavřená (např. z 3D PDF / STL) — objem a hmotnost jsou jen orientační.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Vlastní barva: použije se až po potvrzení v systémovém výběru barvy (nativní „change"),
+ * ne při každém pohybu — jinak by vznikly desítky kroků „zpět".
+ */
+function CustomColorInput({ initial, onPick }: { initial: string; onPick: (hex: number) => void }) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const pick = React.useRef(onPick);
+  pick.current = onPick;
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const h = () => pick.current(parseInt(el.value.slice(1), 16));
+    el.addEventListener("change", h);
+    return () => el.removeEventListener("change", h);
+  }, []);
+  return <input ref={ref} type="color" defaultValue={initial} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Vlastní barva" />;
+}
+
+/** Vzorník barev: paleta, vlastní barva a „původní". */
+function ColorSwatches({
+  value, onPick, compact = false, resetLabel = "Původní", testId,
+}: {
+  value?: number | null;
+  onPick: (hex: number | null) => void;
+  compact?: boolean;
+  resetLabel?: string;
+  testId?: string;
+}) {
+  const colors = compact ? COLOR_PALETTE.slice(0, 10) : COLOR_PALETTE;
+  const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
+  return (
+    <div className="flex flex-wrap items-center gap-1" data-testid={testId}>
+      {colors.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onPick(c)}
+          title={hex(c)}
+          aria-label={`Barva ${hex(c)}`}
+          className={cn("h-6 w-6 rounded-full border border-black/15 shadow-sm transition hover:scale-110 md:h-5 md:w-5", value === c && "ring-2 ring-primary ring-offset-1")}
+          style={{ backgroundColor: hex(c) }}
+        />
+      ))}
+      <label className="relative inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-dashed border-muted-foreground/60 text-muted-foreground hover:bg-accent md:h-5 md:w-5" title="Vlastní barva">
+        <Palette className="h-3 w-3" />
+        <CustomColorInput initial={value != null ? hex(value) : "#b8c0ca"} onPick={onPick} />
+      </label>
+      <button type="button" onClick={() => onPick(null)} className="inline-flex h-6 items-center gap-0.5 rounded-md px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground md:h-5" title={resetLabel}>
+        <RotateCcw className="h-3 w-3" /> {resetLabel}
+      </button>
     </div>
   );
 }
@@ -801,8 +1212,9 @@ function SnapMarker({ kind, x, y, text }: { kind: string; x: number; y: number; 
 
 // ---------------------------------------------------------------- díl, stav, nabídka, nápověda
 
-function PartCard({ engine, selection }: { engine: ViewerEngine; selection: number[] }) {
+function PartCard({ engine, selection, materials, onMass }: { engine: ViewerEngine; selection: number[]; materials: ViewerMaterial[]; onMass: () => void }) {
   const one = selection.length === 1 ? engine.partInfo(selection[0]) : null;
+  const mat = one ? materialOf(engine, one.index, materials) : null;
   return (
     <div
       className="pointer-events-auto shrink-0 overflow-auto rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur"
@@ -820,8 +1232,13 @@ function PartCard({ engine, selection }: { engine: ViewerEngine; selection: numb
                 <>
                   <dt className="text-muted-foreground">Objem</dt>
                   <dd className="text-right">{(one.volume / 1000).toFixed(2).replace(".", ",")} cm³</dd>
-                  <dt className="text-muted-foreground">Hmotnost (ocel)</dt>
-                  <dd className="text-right">{steelMassKg(one.volume).toFixed(3).replace(".", ",")} kg</dd>
+                  <dt className="text-muted-foreground">Hmotnost</dt>
+                  <dd className="text-right">
+                    <button type="button" onClick={onMass} className="font-semibold text-[#1f6feb] underline-offset-2 hover:underline" title="Materiál a polotovar">
+                      {mat ? fmtKg(massKg(one.volume, mat.density)) : "—"}
+                    </button>
+                    {mat && <span className="block text-[10px] text-muted-foreground">{shortMaterial(mat.label)}</span>}
+                  </dd>
                 </>
               )}
               <dt className="text-muted-foreground">Povrch</dt>
@@ -836,6 +1253,14 @@ function PartCard({ engine, selection }: { engine: ViewerEngine; selection: numb
           )}
         </div>
         <button type="button" onClick={() => engine.clearSelection()} aria-label="Zrušit výběr" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-2 space-y-1.5 border-t pt-2">
+        <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva {selection.length > 1 ? "dílů" : "dílu"}</p>
+        <ColorSwatches value={engine.partColorHex(selection[0])} onPick={(c) => engine.setPartColor(selection, c)} testId="part-colors" />
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => engine.colorFacesDistinct(selection)} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><PaintBucket className="h-3.5 w-3.5" /> Odlišit plochy barevně</button>
+          <button type="button" onClick={onMass} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="part-mass"><Weight className="h-3.5 w-3.5" /> Materiál a polotovar</button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
@@ -902,11 +1327,24 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
           <MenuItem onClick={act(() => engine.hideParts(engine.assemblyGroup(part)))}><Trash2 className="h-4 w-4" /> Smazat celou podsestavu</MenuItem>
           <MenuItem onClick={act(() => engine.isolate(sel.length ? sel : engine.partGroup(part)))} kbd="I"><Focus className="h-4 w-4" /> Izolovat</MenuItem>
           <MenuItem onClick={act(() => engine.fit(true))} kbd="F"><Maximize2 className="h-4 w-4" /> Přiblížit na díl</MenuItem>
+          {engine.partMoved(part) && (
+            <MenuItem onClick={act(() => engine.resetOffsets(sel.length ? sel : engine.partGroup(part)))}><RotateCcw className="h-4 w-4" /> Vrátit díl na místo</MenuItem>
+          )}
           {req.facePlane && (
             <MenuItem onClick={act(() => { engine.sectionFromPlane(req.facePlane!.normal, req.facePlane!.point, req.facePlane!.part); onSection(); })}>
               <Scissors className="h-4 w-4" /> Řez touto plochou
             </MenuItem>
           )}
+          <div className="space-y-1 px-2.5 py-1.5" data-testid="context-colors">
+            <p className="flex items-center gap-1 text-xs text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva dílu</p>
+            <ColorSwatches compact value={engine.partColorHex(part)} onPick={(c) => { engine.setPartColor(sel.length ? sel : engine.partGroup(part), c); onClose(); }} />
+            {req.face && (
+              <>
+                <p className="flex items-center gap-1 pt-1 text-xs text-muted-foreground"><PaintBucket className="h-3.5 w-3.5" /> Barva plochy</p>
+                <ColorSwatches compact resetLabel="Jako díl" onPick={(c) => { engine.setFaceColor(req.face!.part, req.face!.index, c); onClose(); }} />
+              </>
+            )}
+          </div>
           <div className="my-1 border-t" />
         </>
       )}
@@ -919,6 +1357,7 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
       ))}
       <div className="my-1 border-t" />
       <MenuItem onClick={act(() => engine.showAll())}><Eye className="h-4 w-4" /> Ukázat vše</MenuItem>
+      {engine.hasOffsets() && <MenuItem onClick={act(() => engine.resetOffsets())}><RotateCcw className="h-4 w-4" /> Složit sestavu zpět</MenuItem>}
       <MenuItem onClick={act(() => engine.fit())} kbd="Ctrl+F"><Maximize2 className="h-4 w-4" /> Celý model</MenuItem>
       <MenuItem onClick={act(() => engine.setView("iso"))} kbd="0"><Box className="h-4 w-4" /> Izometrie</MenuItem>
       <MenuItem onClick={act(() => engine.undo())} kbd="Ctrl+Z"><Undo2 className="h-4 w-4" /> Zpět</MenuItem>
@@ -933,8 +1372,10 @@ const HELP: [string, string][] = [
   ["Přiblížení", "kolečko myši (ke kurzoru) · roztažení 2 prstů"],
   ["Celý model", "F nebo Ctrl+F · dvojklik do prázdna"],
   ["Výběr dílu", "klik · Ctrl / Shift + klik = více dílů"],
+  ["Rozebrat sestavu", "Ctrl + táhni díl = přesun (Shift = jen po ose X/Y/Z) · tlačítko Rozebrat: posuvník rozložení, táhnutí bez Ctrl (telefon), Složit zpět"],
   ["Smazat díl", "klik na díl + Del (nebo H) · Izolovat = I · pravé tlačítko = smazat díl / celou podsestavu"],
   ["Výběrový filtr", "tlačítko Filtr nebo pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed křivosti, střed hrany"],
+  ["Hmotnost", "tlačítko Hmotnost: vyber materiál (hustota z Nacenění) → hmotnost dílu, polotovar (přířez / kulatina s přídavkem) a jeho hmotnost, polotovar modře v 3D; bez výběru celý model"],
   ["Řez", "tlačítko Řez: rovina XY / XZ / YZ nebo „z plochy“ (klik na plochu), posuvník polohy, otočit stranu; pravé tlačítko na ploše = řez touto plochou"],
   ["Zpět / vpřed", "Ctrl+Z / Ctrl+Y"],
   ["Pohledy", "0 izometrie · 1 zepředu · 2 zezadu · 3 zleva · 4 zprava · 5 shora · 6 zespodu · klik na kostku"],

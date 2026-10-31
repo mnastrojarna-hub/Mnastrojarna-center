@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Award, Factory, Loader2, Pencil, Plus, Save, Wrench } from "lucide-react";
+import Link from "next/link";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,14 @@ import { usePartyBookDraft } from "@/components/contacts/use-party-book";
 import { Field, FormSection } from "@/components/customers/form-bits";
 import { StarRatingInput, TagInput } from "@/components/suppliers/tag-input";
 import { createSupplier, updateSupplier } from "@/app/actions/crm";
+import {
+  AresButton, AresNoteText, DuplicateNotice, PartyAutofill, filledClass, useAresLookup,
+} from "@/components/contacts/party-autofill";
+import {
+  SUPPLIER_FIELD_LABELS, applyAresToSupplierForm, applyToSupplierForm, filledSummary, mergeContactsIntoDraft, type FilledFrom,
+} from "@/lib/parties/autofill";
+import { icoDigits, isValidIco, type AresCompany } from "@/lib/ares/ares";
+import type { PartyAutofillData, PartyDuplicate } from "@/lib/parties/autofill-types";
 import {
   EMPTY_SUPPLIER_FORM, supplierFormFromView, validateSupplierForm,
   type SupplierField, type SupplierFormValues, type SupplierView,
@@ -62,9 +71,18 @@ export function SupplierDialog({
   const [touched, setTouched] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [duplicateId, setDuplicateId] = React.useState<string | null>(null);
   // nový dodavatel uložený, ale kontakty ne → další „Uložit" už jen upraví
   const [createdId, setCreatedId] = React.useState<string | null>(null);
   const book = usePartyBookDraft("supplier", supplier?.id ?? null, open);
+  // „Vyplnit z dokladu" / ARES: která pole vyplnila AI / registr (zvýraznění do první ruční úpravy)
+  const [filled, setFilled] = React.useState<Partial<Record<SupplierField, FilledFrom>>>({});
+  const [found, setFound] = React.useState<PartyDuplicate | null>(null);
+  const valuesRef = React.useRef(values);
+  valuesRef.current = values;
+  const draftRef = React.useRef(book.draft);
+  draftRef.current = book.draft;
+  const autoIco = React.useRef<string | null>(null);
 
   const errors = touched ? validateSupplierForm(values) : {};
   const dirty = JSON.stringify(values) !== JSON.stringify(initial) || book.dirty;
@@ -72,7 +90,53 @@ export function SupplierDialog({
   function set<K extends SupplierField>(key: K, v: SupplierFormValues[K]) {
     setValues((cur) => ({ ...cur, [key]: v }));
     setError(null);
+    setDuplicateId(null);
+    setFilled((f) => (f[key] ? { ...f, [key]: undefined } : f));
   }
+
+  function mark(next: Partial<Record<SupplierField, FilledFrom>>): string[] {
+    setFilled((f) => ({ ...f, ...next }));
+    return (Object.keys(next) as SupplierField[]).map((k) => SUPPLIER_FIELD_LABELS[k] ?? k);
+  }
+
+  function applyAres(company: AresCompany, duplicate: PartyDuplicate | null): string {
+    const res = applyAresToSupplierForm(valuesRef.current, company);
+    valuesRef.current = res.values;
+    setValues(res.values);
+    setFound(duplicate);
+    setError(null);
+    return filledSummary(mark(res.filled), 0, 0);
+  }
+
+  function applyDoc(data: PartyAutofillData): string {
+    const res = applyToSupplierForm(valuesRef.current, data, editing ? "edit" : "new");
+    valuesRef.current = res.values;
+    setValues(res.values);
+    let added = { contacts: 0, roles: 0 };
+    if (draftRef.current) {
+      const merged = mergeContactsIntoDraft(draftRef.current, data.contacts, data.roleEmails);
+      draftRef.current = merged.draft;
+      book.setDraft(merged.draft);
+      added = { contacts: merged.addedContacts, roles: merged.addedRoles };
+    }
+    setFound(data.duplicate);
+    setError(null);
+    autoIco.current = icoDigits(res.values.ico);
+    return filledSummary(mark(res.filled), added.contacts, added.roles);
+  }
+
+  const ares = useAresLookup("supplier", supplier?.id ?? createdId, applyAres);
+  const aresLookup = ares.lookup;
+  const aresReset = ares.reset;
+
+  // nový dodavatel: po napsání platného IČO (a bez názvu) se ARES zeptá sám
+  React.useEffect(() => {
+    if (!open || editing) return;
+    const digits = values.ico.replace(/\D/g, "");
+    if (digits.length !== 8 || !isValidIco(digits) || values.name.trim() || autoIco.current === digits) return;
+    autoIco.current = digits;
+    void aresLookup(digits);
+  }, [open, editing, values.ico, values.name, aresLookup]);
 
   function requestClose() {
     if (busy) return;
@@ -101,6 +165,7 @@ export function SupplierDialog({
     setBusy(false);
     if (!res.ok) {
       setError(res.error ?? "Uložení se nepovedlo.");
+      setDuplicateId((res as { duplicateId?: string }).duplicateId ?? null);
       const newId = !supplier ? (res as { id?: string }).id ?? null : null;
       if (newId && res.partySaved) setCreatedId(newId);
       return;
@@ -117,7 +182,8 @@ export function SupplierDialog({
       onChange={(e) => set(k, e.target.value)}
       aria-invalid={Boolean(errors[k])}
       aria-describedby={errors[k] ? `${fid(k)}-error` : undefined}
-      className={cn(HINT, errors[k] && "border-destructive focus-visible:ring-destructive")}
+      className={cn(HINT, filledClass(filled[k]), errors[k] && "border-destructive focus-visible:ring-destructive")}
+      data-filled={filled[k]}
       {...props}
     />
   );
@@ -130,7 +196,12 @@ export function SupplierDialog({
           setValues(initial);
           setTouched(false);
           setError(null);
+          setDuplicateId(null);
           setCreatedId(null);
+          setFilled({});
+          setFound(null);
+          autoIco.current = null;
+          aresReset();
           setOpen(true);
         } else requestClose();
       }}
@@ -157,6 +228,7 @@ export function SupplierDialog({
           "top-0 flex h-[100dvh] max-w-3xl flex-col overflow-hidden rounded-none",
           "sm:top-[4vh] sm:h-auto sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
         )}
+        data-testid="supplier-dialog"
       >
         <div className="flex items-start gap-3 border-b px-4 py-3 pr-12 sm:px-6">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-600 text-white">
@@ -165,19 +237,33 @@ export function SupplierDialog({
           <div className="min-w-0">
             <DialogTitle>{editing ? "Upravit dodavatele" : "Nový dodavatel"}</DialogTitle>
             <p className="text-xs text-muted-foreground">
-              Technologie a materiály piš jako štítky — podle nich se pak hledá, kdo co umí.
+              {editing
+                ? "Technologie a materiály piš jako štítky — podle nich se pak hledá, kdo co umí."
+                : "Vyfoť nebo nahraj cokoli od dodavatele — AI vyplní údaje a IČO ověří v ARES. Zakládá se jen dodavatel, žádná zakázka."}
             </p>
           </div>
         </div>
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
           <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-4 py-4 scrollbar-thin sm:px-6">
+            <div className="space-y-3">
+              <PartyAutofill kind="supplier" exceptId={supplier?.id ?? createdId} compact={editing} onApply={applyDoc} onApplyAres={applyAres} />
+              <DuplicateNotice kind="supplier" duplicate={found} onOpen={() => setOpen(false)} />
+            </div>
             <FormSection icon={<Factory />} tone="bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title="Firma">
               <Field id={fid("name")} label="Název" required error={errors.name} className="sm:col-span-2">
                 {text("name", { placeholder: "název firmy", autoFocus: !editing, autoComplete: "organization" })}
               </Field>
-              <Field id={fid("ico")} label="IČO" error={errors.ico}>
-                {text("ico", { inputMode: "numeric", placeholder: "8 číslic" })}
+              <Field
+                id={fid("ico")}
+                label="IČO"
+                error={errors.ico}
+                hint={<AresNoteText note={ares.note} fallback="Napiš IČO — ARES doplní název, DIČ a adresu." />}
+              >
+                <div className="flex gap-2 [&>input]:min-w-0 [&>input]:flex-1">
+                  {text("ico", { inputMode: "numeric", placeholder: "8 číslic" })}
+                  <AresButton busy={ares.busy} disabled={!icoDigits(values.ico)} onClick={() => void aresLookup(values.ico)} testId="sup-ares" />
+                </div>
               </Field>
               <Field id={fid("dic")} label="DIČ">
                 {text("dic", { placeholder: "CZ + číslo" })}
@@ -198,7 +284,7 @@ export function SupplierDialog({
                   onChange={(v) => set("email", v)}
                   context={supplier ? { supplierId: supplier.id } : null}
                   placeholder="obecný e-mail firmy"
-                  className={cn(errors.email && "border-destructive focus-visible:ring-destructive")}
+                  className={cn(filledClass(filled.email), errors.email && "border-destructive focus-visible:ring-destructive")}
                 />
               </Field>
               <Field id={fid("phone")} label="Telefon firmy">
@@ -270,7 +356,16 @@ export function SupplierDialog({
           </div>
 
           <div className="border-t bg-background/95 px-4 py-3 sm:px-6">
-            {error && <p className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert" data-testid="supplier-dialog-error">{error}</p>}
+            {error && (
+              <p className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert" data-testid="supplier-dialog-error">
+                {error}{" "}
+                {duplicateId && (
+                  <Link href={`/suppliers?q=${encodeURIComponent(values.ico.trim() || values.name.trim())}`} className="font-semibold underline" onClick={() => setOpen(false)}>
+                    Ukázat existujícího dodavatele
+                  </Link>
+                )}
+              </p>
+            )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" onClick={requestClose} disabled={busy}>Zrušit</Button>
               <Button type="submit" variant="success" disabled={busy || book.loading}>

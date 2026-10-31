@@ -3,6 +3,8 @@ import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-
 import type { ModelNode, ParsedModel } from "@/lib/viewer3d/types";
 import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
 import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
+import { buildAssemblyGroups, type AssemblyGroups } from "@/lib/viewer3d/assembly-groups";
+import type { StockGeometry, StockMode, StockResult } from "@/lib/viewer3d/stock";
 import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
   type MeasureMode, type Measurement, type SnapGeometry, type SnapKind, type SnapPoint,
@@ -21,10 +23,11 @@ THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 export type DisplayMode = "shaded-edges" | "shaded" | "wireframe" | "xray";
-export type Tool = "select" | MeasureMode;
+export type Tool = "select" | "move" | MeasureMode;
 export type StdView = "front" | "back" | "left" | "right" | "top" | "bottom" | "iso";
 export type ChangeKind =
-  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity";
+  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity" | "colors"
+  | "material" | "move";
 
 /** Výběrový filtr jako v ZW3D — co se vybírá / na co se uchopuje. */
 export type PickFilter = "auto" | "shape" | "part" | "assembly" | "face" | "edge" | "vertex" | "center" | "midpoint";
@@ -51,6 +54,8 @@ export interface EntityInfo {
   part: number;
   /** Rovinná plocha → jde z ní udělat řez. */
   plane?: { normal: Vec3; point: Vec3 };
+  /** Index plochy (barva plochy). */
+  face?: number;
 }
 
 /** Stav řezu pro panel. */
@@ -80,6 +85,8 @@ export interface ContextRequest {
   clientY: number;
   /** Rovinná plocha pod kurzorem (nabídka „Řez touto plochou"). */
   facePlane?: { normal: Vec3; point: Vec3; part: number } | null;
+  /** Plocha pod kurzorem (barva plochy). */
+  face?: { part: number; index: number } | null;
 }
 
 export interface SnapState {
@@ -102,12 +109,41 @@ interface PartView {
   sphere: THREE.Sphere;
   faceTris?: { start: Uint32Array; tris: Uint32Array };
   info?: PartInfo;
+  /** Barva ze souboru (lineární) a barvy ploch ze souboru (barvy vrcholů) — pro „Původní barvy". */
+  origColor: THREE.Color | null;
+  origVC: Float32Array | null;
+  opacity: number;
+  /** Uživatelská barva dílu (sRGB hex) a barvy ploch (plocha → hex). */
+  colorOverride: number | null;
+  faceColors: Map<number, number>;
+  /** Geometrie pro polotovar (počítá se líně). */
+  stockGeom?: PartStockGeometry;
+  /** Posunutí dílu (rozebrání sestavy) a obalový kvádr bez posunu; box / sphere jsou světové. */
+  offset: THREE.Vector3;
+  localBox: THREE.Box3;
+}
+
+/** Geometrie dílu pro výpočet polotovaru + kde ho nakreslit. */
+export interface PartStockGeometry extends StockGeometry {
+  center: Vec3;
+  /** Osa rotačního dílu (0 = X, 1 = Y, 2 = Z), jinak nejdelší rozměr. */
+  axis: 0 | 1 | 2;
+  /** Síť není uzavřená → objem jen orientačně. */
+  open: boolean;
 }
 
 interface Snapshot {
   hidden: Uint8Array;
   measures: Measurement[];
+  offsets: Float32Array;
+  colors: { over: (number | null)[]; faces: [number, [number, number][]][] };
 }
+
+/** Paleta pro barvy dílů / ploch (sRGB) — dobře rozlišitelné odstíny jako v CAD. */
+export const COLOR_PALETTE = [
+  0x4f81bd, 0xc0504d, 0x9bbb59, 0xf79646, 0x8064a2, 0x4bacc6, 0xf2c314, 0x2e8b57,
+  0xd16ba5, 0x8c564b, 0x17becf, 0xbcbd22, 0xa9c4e8, 0xe03930, 0x7f7f7f, 0x272425,
+];
 
 const DEFAULT_COLOR = new THREE.Color(0.72, 0.75, 0.79);
 const SELECT_COLOR = 0xff9f1a;
@@ -164,6 +200,7 @@ export class ViewerEngine {
     polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
   private hoverMaterials = new Map<THREE.Material, THREE.Material>();
+  private selMaterials = new Map<THREE.Material, THREE.Material>();
   private raycaster = new THREE.Raycaster();
 
   private display: DisplayMode = "shaded-edges";
@@ -191,11 +228,8 @@ export class ViewerEngine {
   private filter: PickFilter = "auto";
   private entity: SnapPoint | null = null;
   private entityObj: THREE.Object3D | null = null;
-  // strom sestavy: díl → uzel, uzel → rodič
-  private nodeParts: number[][] = [];
-  private nodeAll: number[][] = [];
-  private nodeParent: number[] = [];
-  private partNode: number[] = [];
+  // strom sestavy: díl a podsestava k tělesu
+  private groups: AssemblyGroups | null = null;
 
   // řez
   private clipPlane: THREE.Plane | null = null;
@@ -205,6 +239,15 @@ export class ViewerEngine {
   private sectionTimer: number | null = null;
   private sectionPick = false;
   private capMaterials = new Map<string, THREE.Material>();
+  // materiál a polotovar
+  private partMaterial = new Map<number, string>();
+  private partStockMode = new Map<number, StockMode>();
+  private stockObj: THREE.Object3D | null = null;
+  // rozebrání sestavy
+  private moveArm: { part: number } | null = null;
+  private moveCtx: { parts: number[]; start: THREE.Vector3[]; from: THREE.Vector3; before: Snapshot; moved: boolean } | null = null;
+  private explodeCtx: { before: Snapshot; base: THREE.Vector3[]; dirs: THREE.Vector3[]; parts: number[] } | null = null;
+  private explodeValue = 0;
   private hatch: THREE.Texture | null = null;
   private stencilBack = new THREE.MeshBasicMaterial({
     side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
@@ -267,6 +310,10 @@ export class ViewerEngine {
       hover: (x, y, info) => this.queueHover(x, y, info.alt),
       leave: () => this.clearHover(),
       contextMenu: (x, y, cx, cy) => this.openContext(x, y, cx, cy),
+      canMove: (x, y, info) => this.canMove(x, y, info),
+      moveStart: (x, y) => this.moveStart(x, y),
+      moveTo: (x, y, info) => this.moveTo(x, y, info),
+      moveEnd: () => this.moveEnd(),
     });
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(container);
@@ -284,6 +331,7 @@ export class ViewerEngine {
     this.cube.dispose();
     for (const m of this.materials.values()) m.dispose();
     for (const m of this.hoverMaterials.values()) m.dispose();
+    for (const m of this.selMaterials.values()) m.dispose();
     this.selMaterial.dispose();
     this.edgeMaterial.dispose();
     this.edgeSelMaterial.dispose();
@@ -311,6 +359,11 @@ export class ViewerEngine {
     this.clearMeasureObjects();
     this.clearSectionObjects();
     this.setEntityObj(null);
+    if (this.stockObj) {
+      this.overlayGroup.remove(this.stockObj);
+      disposeObject(this.stockObj);
+      this.stockObj = null;
+    }
   }
 
   // ------------------------------------------------------------------ model
@@ -348,7 +401,10 @@ export class ViewerEngine {
     this.entity = null;
     this.section = null;
     this.clipPlane = null;
-    this.indexTree(model.root, model.parts.length);
+    this.partMaterial.clear();
+    this.partStockMode.clear();
+    this.setStockPreview(null);
+    this.groups = buildAssemblyGroups(model.root, model.parts.map((p) => p.name));
 
     model.parts.forEach((part, index) => {
       const g = new THREE.BufferGeometry();
@@ -360,6 +416,7 @@ export class ViewerEngine {
 
       // barvy ploch (STEP s barevnými plochami) → barvy vrcholů
       let vertexColors = false;
+      let origVC: Float32Array | null = null;
       const base = part.color ? new THREE.Color(part.color[0], part.color[1], part.color[2]) : null;
       const faceColors = part.faces?.filter((f) => f.color) ?? [];
       if (faceColors.length && part.indices) {
@@ -392,6 +449,7 @@ export class ViewerEngine {
             col[i * 3 + 2] = tmp.b;
           }
           g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+          origVC = col.slice();
           vertexColors = true;
         }
       }
@@ -429,6 +487,8 @@ export class ViewerEngine {
         index, name: part.name, mesh, edges, wires,
         topo: topo ?? { edgeSegments: new Float32Array(0), curves: [], segCurve: new Uint32Array(0), corners: new Float32Array(0), triFace: new Uint32Array(0), faces: [] },
         baseMaterial: mat, hidden: false, box, sphere: box.getBoundingSphere(new THREE.Sphere()),
+        origColor: baseColor, origVC, opacity: part.opacity ?? 1, colorOverride: null, faceColors: new Map(),
+        offset: new THREE.Vector3(), localBox: box.clone(),
       });
     });
 
@@ -450,38 +510,14 @@ export class ViewerEngine {
     this.onChange("section");
   }
 
-  /** Strom sestavy → rychlé dotazy „díl tohoto tělesa" a „podsestava". */
-  private indexTree(root: ModelNode, partCount: number) {
-    this.nodeParts = [];
-    this.nodeAll = [];
-    this.nodeParent = [];
-    this.partNode = new Array(partCount).fill(-1);
-    const visit = (n: ModelNode, parent: number): number[] => {
-      const id = this.nodeParts.length;
-      this.nodeParts.push(n.parts);
-      this.nodeAll.push([]);
-      this.nodeParent.push(parent);
-      for (const p of n.parts) if (p >= 0 && p < partCount && this.partNode[p] < 0) this.partNode[p] = id;
-      const all = [...n.parts];
-      for (const c of n.children) all.push(...visit(c, id));
-      this.nodeAll[id] = all;
-      return all;
-    };
-    visit(root, -1);
-  }
-
-  /** Všechna tělesa dílu, do kterého patří těleso i. */
+  /** Tělesa dílu, do kterého patří těleso i (většinou jen ono samo). */
   partGroup(i: number): number[] {
-    const n = this.partNode[i];
-    return n >= 0 && this.nodeParts[n].length ? [...this.nodeParts[n]] : [i];
+    return this.groups ? this.groups.partGroup(i) : [i];
   }
 
-  /** Všechna tělesa podsestavy, do které patří díl tělesa i. */
+  /** Tělesa nejbližší podsestavy, do které díl tělesa i patří. */
   assemblyGroup(i: number): number[] {
-    const n = this.partNode[i];
-    if (n < 0) return [i];
-    const parent = this.nodeParent[n];
-    return parent >= 0 ? [...this.nodeAll[parent]] : [...this.nodeAll[n]];
+    return this.groups ? this.groups.assemblyGroup(i) : [i];
   }
 
   private triCount(i: number): number {
@@ -545,6 +581,282 @@ export class ViewerEngine {
     let n = 0;
     for (const p of this.parts) n += this.triCount(p.index);
     return n;
+  }
+
+  // ------------------------------------------------------------------ rozebrání sestavy (posun dílů)
+
+  private shiftCache = new WeakMap<SectionTopology, { key: string; t: SectionTopology }>();
+
+  /** Posunutá topologie s cache (nepřepočítávat při každém pohybu myši). */
+  private shifted(t: SectionTopology, o: THREE.Vector3): SectionTopology {
+    const key = `${o.x},${o.y},${o.z}`;
+    const c = this.shiftCache.get(t);
+    if (c?.key === key) return c.t;
+    const r = shiftTopology(t, o);
+    this.shiftCache.set(t, { key, t: r });
+    return r;
+  }
+
+  private setOffset(p: PartView, v: THREE.Vector3) {
+    p.offset.copy(v);
+    p.box = p.localBox.clone().translate(v);
+    p.sphere = p.box.getBoundingSphere(new THREE.Sphere());
+    for (const o of [p.mesh, p.edges, p.wires]) {
+      if (!o) continue;
+      o.position.copy(v);
+      o.updateMatrix();
+    }
+  }
+
+  /** Koule modelu (ořez hloubky kamery) po rozebrání — model může narůst. */
+  private updateModelSphere() {
+    const all = new THREE.Box3();
+    for (const p of this.parts) all.union(p.box);
+    if (all.isEmpty()) return;
+    all.getBoundingSphere(this.modelSphere);
+    this.camDist = Math.max(this.camDist, this.modelSphere.radius * 6 + 10);
+    this.placeCamera();
+  }
+
+  hasOffsets(): boolean {
+    return this.parts.some((p) => p.offset.lengthSq() > 0);
+  }
+
+  partMoved(i: number): boolean {
+    return (this.parts[i]?.offset.lengthSq() ?? 0) > 0;
+  }
+
+  /** Co se táhne: díl / těleso / podsestava podle filtru. */
+  private moveGroup(part: number): number[] {
+    return this.filter === "shape" ? [part] : this.filter === "assembly" ? this.assemblyGroup(part) : this.partGroup(part);
+  }
+
+  /** Volá ovládání při stisku: Ctrl + díl (výběr) nebo nástroj Přesun → tažení posouvá díl. */
+  canMove(x: number, y: number, info: { button: number; ctrl: boolean }): boolean {
+    this.moveArm = null;
+    if (this.sectionPick || info.button !== 0) return false;
+    const want = this.tool === "move" || (this.tool === "select" && info.ctrl && !ENTITY_FILTERS.includes(this.filter));
+    if (!want) return false;
+    const hit = this.raycastParts(x, y);
+    if (!hit) return false;
+    this.moveArm = { part: hit.part };
+    return true;
+  }
+
+  moveStart(x: number, y: number) {
+    const arm = this.moveArm;
+    if (!arm) return;
+    const parts = this.selection.has(arm.part) ? [...this.selection] : this.moveGroup(arm.part);
+    if (!this.selection.has(arm.part)) this.select(parts);
+    this.moveCtx = {
+      parts, start: parts.map((i) => this.parts[i].offset.clone()), from: this.viewPlanePoint(x, y), before: this.snapshot(), moved: false,
+    };
+    this.anim = null;
+  }
+
+  moveTo(x: number, y: number, info: { axisLock: boolean }) {
+    const ctx = this.moveCtx;
+    if (!ctx) return;
+    const d = this.viewPlanePoint(x, y).sub(ctx.from);
+    if (info.axisLock) {
+      // Shift: jen po ose X / Y / Z, která je pohybu nejblíž
+      const ax = Math.abs(d.x), ay = Math.abs(d.y), az = Math.abs(d.z);
+      if (ax >= ay && ax >= az) d.set(d.x, 0, 0);
+      else if (ay >= az) d.set(0, d.y, 0);
+      else d.set(0, 0, d.z);
+    }
+    ctx.parts.forEach((i, k) => this.setOffset(this.parts[i], ctx.start[k].clone().add(d)));
+    ctx.moved = d.lengthSq() > 0;
+    this.requestRender();
+  }
+
+  moveEnd() {
+    const ctx = this.moveCtx;
+    this.moveCtx = null;
+    this.moveArm = null;
+    if (!ctx?.moved) return;
+    this.commit(ctx.before);
+    this.updateModelSphere();
+    if (this.section) this.rebuildSection(true);
+    this.requestRender();
+    this.onChange("move");
+    this.onChange("visibility");
+  }
+
+  /** Vrátit díly na původní místo (bez parametru celou sestavu). */
+  resetOffsets(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.map((p) => p.index);
+    const before = this.snapshot();
+    let changed = false;
+    for (const i of list) {
+      const p = this.parts[i];
+      if (!p || p.offset.lengthSq() === 0) continue;
+      this.setOffset(p, new THREE.Vector3());
+      changed = true;
+    }
+    if (!changed) return;
+    if (!this.hasOffsets()) this.explodeValue = 0;
+    this.commit(before);
+    this.updateModelSphere();
+    if (this.section) this.rebuildSection(true);
+    this.requestRender();
+    this.onChange("move");
+    this.onChange("visibility");
+  }
+
+  getExplode(): number {
+    return this.explodeValue;
+  }
+
+  /** Začátek tažení posuvníku rozložení (jeden krok zpět za celé tažení). */
+  beginExplode() {
+    const parts = this.parts.filter((p) => !p.hidden && this.triCount(p.index) > 0).map((p) => p.index);
+    // směr od středu sestavy ke středu dílu (bez aktuálního rozložení)
+    const factor = this.explodeValue;
+    const centers = parts.map((i) => this.parts[i].localBox.getCenter(new THREE.Vector3()));
+    const all = new THREE.Box3();
+    for (const i of parts) all.union(this.parts[i].localBox);
+    const c = all.getCenter(new THREE.Vector3());
+    const size = all.getSize(new THREE.Vector3());
+    const longest = size.x >= size.y && size.x >= size.z ? new THREE.Vector3(1, 0, 0) : size.y >= size.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    const eps = Math.max(size.length() * 1e-4, 1e-6);
+    const dirs = centers.map((ctr, k) => {
+      const d = ctr.clone().sub(c);
+      // díl ve středu sestavy → po nejdelší ose střídavě na obě strany
+      return d.length() > eps ? d : longest.clone().multiplyScalar(size.length() * 0.25 * (k % 2 ? 1 : -1));
+    });
+    const base = parts.map((i, k) => this.parts[i].offset.clone().sub(dirs[k].clone().multiplyScalar(factor)));
+    this.explodeCtx = { before: this.snapshot(), base, dirs, parts };
+  }
+
+  setExplode(factor: number) {
+    if (!this.explodeCtx) this.beginExplode();
+    const ctx = this.explodeCtx!;
+    this.explodeValue = Math.max(0, factor);
+    ctx.parts.forEach((i, k) => this.setOffset(this.parts[i], ctx.base[k].clone().add(ctx.dirs[k].clone().multiplyScalar(this.explodeValue))));
+    this.updateModelSphere();
+    this.requestRender();
+    this.onChange("move");
+  }
+
+  endExplode() {
+    const ctx = this.explodeCtx;
+    this.explodeCtx = null;
+    if (!ctx) return;
+    this.commit(ctx.before);
+    if (this.section) this.rebuildSection(true);
+    this.onChange("visibility");
+  }
+
+  // ------------------------------------------------------------------ materiál a polotovar
+
+  getPartMaterial(i: number): string | undefined {
+    return this.partMaterial.get(i);
+  }
+
+  setPartMaterial(indices: number[], key: string) {
+    for (const i of indices) if (this.parts[i]) this.partMaterial.set(i, key);
+    this.onChange("material");
+  }
+
+  getStockMode(i: number): StockMode {
+    return this.partStockMode.get(i) ?? "auto";
+  }
+
+  setStockMode(indices: number[], mode: StockMode) {
+    for (const i of indices) if (this.parts[i]) this.partStockMode.set(i, mode);
+    this.onChange("material");
+  }
+
+  /** Viditelné díly (pro výpočet „celý model"). */
+  visibleParts(): number[] {
+    return this.parts.filter((p) => !p.hidden && this.triCount(p.index) > 0).map((p) => p.index);
+  }
+
+  /**
+   * Geometrie pro polotovar: obalový kvádr, objem a rozpoznání rotačního dílu — největší válcová
+   * plocha s osou podél X/Y/Z a průřez obalového kvádru ≈ průměr opsaného válce → kulatina.
+   */
+  stockGeometry(i: number): PartStockGeometry | null {
+    const p = this.parts[i];
+    if (!p) return null;
+    if (p.stockGeom) return p.stockGeom;
+    const info = this.partInfo(i)!;
+    const size = info.size;
+    const c = p.localBox.getCenter(new THREE.Vector3());
+    let round: StockGeometry["round"] = null;
+    let axis: 0 | 1 | 2 = size[0] >= size[1] && size[0] >= size[2] ? 0 : size[1] >= size[2] ? 1 : 2;
+    let bestArea = 0;
+    let cyl: { axis: Vec3; point: Vec3 } | null = null;
+    for (const f of p.topo.faces) {
+      if (f.kind === "cylinder" && f.normal && f.point && f.area > bestArea) {
+        bestArea = f.area;
+        cyl = { axis: f.normal, point: f.point };
+      }
+    }
+    if (cyl) {
+      const k = [0, 1, 2].find((j) => Math.abs(cyl!.axis[j]) > 0.999) as 0 | 1 | 2 | undefined;
+      if (k !== undefined) {
+        const pos = p.mesh.geometry.getAttribute("position").array as Float32Array;
+        const u = (k + 1) % 3;
+        const v = (k + 2) % 3;
+        const cu = cyl.point[u];
+        const cv = cyl.point[v];
+        let maxR = 0;
+        for (let j = 0; j < pos.length; j += 3) {
+          const r = Math.hypot(pos[j + u] - cu, pos[j + v] - cv);
+          if (r > maxR) maxR = r;
+        }
+        const d = maxR * 2;
+        // průřez kvádru ≈ opsaný průměr (souosý rotační díl), ne díra v desce
+        if (Math.abs(size[u] - d) <= d * 0.04 && Math.abs(size[v] - d) <= d * 0.04) {
+          round = { diameter: d, length: size[k] };
+          axis = k;
+          c.setComponent(u, cu);
+          c.setComponent(v, cv);
+        }
+      }
+    }
+    p.stockGeom = {
+      size, round, volumeMm3: info.volume, center: [c.x, c.y, c.z], axis, open: (p.topo.boundaryEdges ?? 0) > 0,
+    };
+    return p.stockGeom;
+  }
+
+  /** Nakreslí polotovar(y) průhledně kolem dílů (null = schovat). */
+  setStockPreview(items: { part: number; result: StockResult }[] | null) {
+    if (this.stockObj) {
+      this.overlayGroup.remove(this.stockObj);
+      disposeObject(this.stockObj);
+      this.stockObj = null;
+    }
+    if (items?.length) {
+      const group = new THREE.Group();
+      const fill = new THREE.MeshBasicMaterial({ color: 0x1f6feb, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+      const line = new THREE.LineBasicMaterial({ color: 0x1f6feb, transparent: true, opacity: 0.9 });
+      for (const { part, result } of items) {
+        const g = this.stockGeometry(part);
+        if (!g) continue;
+        let geom: THREE.BufferGeometry;
+        const obj = new THREE.Group();
+        if (result.kind === "kulatina") {
+          const [D, L] = result.dims;
+          geom = new THREE.CylinderGeometry(D / 2, D / 2, L, 64, 1);
+          // válec three.js leží podél Y → otočit na osu dílu
+          if (g.axis === 0) obj.rotation.z = -Math.PI / 2;
+          else if (g.axis === 2) obj.rotation.x = Math.PI / 2;
+        } else {
+          geom = new THREE.BoxGeometry(result.dims[0], result.dims[1], result.dims[2]);
+        }
+        obj.position.set(...g.center).add(this.parts[part].offset);
+        obj.add(new THREE.Mesh(geom, fill));
+        obj.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom, 20), line));
+        group.add(obj);
+      }
+      this.stockObj = group;
+      this.overlayGroup.add(group);
+    }
+    this.requestRender();
   }
 
   partInfo(i: number): PartInfo | null {
@@ -841,7 +1153,7 @@ export class ViewerEngine {
   private applyClipping() {
     const planes = this.clipPlane ? [this.clipPlane] : null;
     const all: THREE.Material[] = [
-      ...this.materials.values(), ...this.hoverMaterials.values(), this.selMaterial, this.edgeMaterial, this.edgeSelMaterial,
+      ...this.materials.values(), ...this.hoverMaterials.values(), ...this.selMaterials.values(), this.selMaterial, this.edgeMaterial, this.edgeSelMaterial,
       this.stencilBack, this.stencilFront,
     ];
     for (const m of all) {
@@ -854,6 +1166,7 @@ export class ViewerEngine {
   private applyDisplay() {
     for (const m of this.materials.values()) this.applyDisplayToMaterial(m);
     for (const m of this.hoverMaterials.values()) this.applyDisplayToMaterial(m);
+    for (const m of this.selMaterials.values()) this.applyDisplayToMaterial(m);
     this.selMaterial.userData.baseOpacity = 1;
     this.applyDisplayToMaterial(this.selMaterial);
     for (const p of this.parts) this.applyPartState(p);
@@ -870,21 +1183,26 @@ export class ViewerEngine {
     }
     if (p.wires) p.wires.visible = !p.hidden;
     let mat = p.baseMaterial;
-    if (this.selection.has(p.index)) mat = this.selMaterial;
-    else if (this.hoverPart === p.index && this.tool === "select") mat = this.hoverMaterial(p.baseMaterial);
+    // výběr = barva dílu se zvýrazněním (vidět i změnu barvy), ne plná oranžová
+    if (this.selection.has(p.index)) mat = this.tintMaterial(p.baseMaterial, this.selMaterials, 0x8a4600);
+    else if (this.hoverPart === p.index && (this.tool === "select" || this.tool === "move")) mat = this.hoverMaterial(p.baseMaterial);
     p.mesh.material = mat;
   }
 
   private hoverMaterial(base: THREE.Material): THREE.Material {
-    let m = this.hoverMaterials.get(base);
+    return this.tintMaterial(base, this.hoverMaterials, 0x3a2a10);
+  }
+
+  private tintMaterial(base: THREE.Material, cache: Map<THREE.Material, THREE.Material>, emissive: number): THREE.Material {
+    let m = cache.get(base);
     if (!m) {
       const c = (base as THREE.MeshPhongMaterial).clone();
-      c.emissive = new THREE.Color(0x3a2a10);
+      c.emissive = new THREE.Color(emissive);
       c.clippingPlanes = this.clipPlane ? [this.clipPlane] : null;
       c.userData.baseOpacity = base.userData.baseOpacity;
       this.applyDisplayToMaterial(c);
       m = c;
-      this.hoverMaterials.set(base, m);
+      cache.set(base, m);
     }
     return m;
   }
@@ -919,7 +1237,15 @@ export class ViewerEngine {
   // ------------------------------------------------------------------ historie (zpět / vpřed)
 
   private snapshot(): Snapshot {
-    return { hidden: Uint8Array.from(this.parts.map((p) => (p.hidden ? 1 : 0))), measures: [...this.measures] };
+    return {
+      hidden: Uint8Array.from(this.parts.map((p) => (p.hidden ? 1 : 0))),
+      measures: [...this.measures],
+      offsets: Float32Array.from(this.parts.flatMap((p) => [p.offset.x, p.offset.y, p.offset.z])),
+      colors: {
+        over: this.parts.map((p) => p.colorOverride),
+        faces: this.parts.filter((p) => p.faceColors.size).map((p) => [p.index, [...p.faceColors.entries()]]),
+      },
+    };
   }
 
   private commit(before: Snapshot) {
@@ -930,15 +1256,36 @@ export class ViewerEngine {
   }
 
   private restore(s: Snapshot) {
+    const faces = new Map(s.colors.faces.map(([i, list]) => [i, list]));
+    let moved = false;
     this.parts.forEach((p, i) => {
+      const o = new THREE.Vector3(s.offsets[i * 3] ?? 0, s.offsets[i * 3 + 1] ?? 0, s.offsets[i * 3 + 2] ?? 0);
+      if (!o.equals(p.offset)) {
+        this.setOffset(p, o);
+        moved = true;
+      }
       p.hidden = !!s.hidden[i];
       if (p.hidden) this.selection.delete(i);
+      const over = s.colors.over[i] ?? null;
+      const fc = faces.get(i) ?? [];
+      const sameFaces = fc.length === p.faceColors.size && fc.every(([f, c]) => p.faceColors.get(f) === c);
+      if (over !== p.colorOverride || !sameFaces) {
+        p.colorOverride = over;
+        p.faceColors = new Map(fc);
+        this.applyColors(p);
+      }
       this.applyPartState(p);
     });
     this.measures = [...s.measures];
     this.syncMeasureObjects();
+    if (moved) {
+      this.updateModelSphere();
+      this.explodeValue = this.hasOffsets() ? this.explodeValue : 0;
+      this.onChange("move");
+    }
     if (this.section) this.rebuildSection(true);
     this.requestRender();
+    this.onChange("colors");
     this.onChange("visibility");
     this.onChange("selection");
     this.onChange("measures");
@@ -1150,7 +1497,7 @@ export class ViewerEngine {
    * roh, střed křivosti (kružnice, oblouk, osa válce), střed hrany, bod na hraně, plocha.
    * Počítá i s řezem — obrys řezu (hrany, rohy, díry v řezu) a vybarvená plocha řezu.
    */
-  private findSnap(x: number, y: number, alt: boolean, purpose: "distance" | "diameter" | "angle" | "entity" = this.tool === "select" ? "entity" : this.tool): SnapPoint | null {
+  private findSnap(x: number, y: number, alt: boolean, purpose: "distance" | "diameter" | "angle" | "entity" = this.tool === "select" || this.tool === "move" ? "entity" : this.tool): SnapPoint | null {
     const tol = this.touchMode ? 22 : 11;
     const F = this.filter;
     const auto = F === "auto" || F === "shape" || F === "part" || F === "assembly";
@@ -1177,6 +1524,10 @@ export class ViewerEngine {
     };
 
     const collect = (t: SectionTopology, part: number) => {
+      // topologie je v místních souřadnicích dílu → přičíst posunutí (rozebraná sestava)
+      const o = this.parts[part].offset;
+      const shifted = o.x !== 0 || o.y !== 0 || o.z !== 0;
+      if (shifted) t = this.shifted(t, o);
       if (allowVertex) {
         for (let i = 0; i < t.corners.length; i += 3) {
           if (!kept(t.corners[i], t.corners[i + 1], t.corners[i + 2])) continue;
@@ -1309,7 +1660,7 @@ export class ViewerEngine {
       this.updateSnap(this.findSnap(x, y, alt, "entity"));
       return;
     }
-    if (this.tool === "select") {
+    if (this.tool === "select" || this.tool === "move") {
       const hit = this.raycastParts(x, y);
       const part = hit?.part ?? null;
       if (part !== this.hoverPart) {
@@ -1319,7 +1670,7 @@ export class ViewerEngine {
         if (part !== null) this.applyPartState(this.parts[part]);
         this.requestRender();
       }
-      this.container.style.cursor = part !== null ? "pointer" : "default";
+      this.container.style.cursor = part !== null ? (this.tool === "move" ? "move" : "pointer") : "default";
       return;
     }
     this.container.style.cursor = "crosshair";
@@ -1390,6 +1741,7 @@ export class ViewerEngine {
     const p = this.parts[s.part];
     if (!p) return;
     const group = new THREE.Group();
+    group.position.copy(p.offset);
     group.renderOrder = 10;
     // křivka
     if (curveIdx >= 0) {
@@ -1437,7 +1789,8 @@ export class ViewerEngine {
     if (s.kind === "face" || s.kind === "vertex") return -1;
     const g = s.geometry;
     if (!g?.circle && !g?.line) return -1;
-    const ref = g.circle ? g.circle.center : g.line!.point;
+    const r0 = g.circle ? g.circle.center : g.line!.point;
+    const ref: Vec3 = [r0[0] - p.offset.x, r0[1] - p.offset.y, r0[2] - p.offset.z];
     let best = -1;
     let bd = Infinity;
     p.topo.curves.forEach((c, i) => {
@@ -1502,6 +1855,12 @@ export class ViewerEngine {
       if (pl && s) this.sectionFromPlane(pl.normal, pl.point, s.part);
       return;
     }
+    if (this.tool === "move") {
+      const hit = this.raycastParts(x, y);
+      if (hit) this.select(this.moveGroup(hit.part), info.additive);
+      else if (!info.additive) this.clearSelection();
+      return;
+    }
     if (this.tool === "select") {
       if (ENTITY_FILTERS.includes(this.filter)) {
         const s = info.touch || !this.snap ? this.findSnap(x, y, info.alt, "entity") : this.snap;
@@ -1552,12 +1911,15 @@ export class ViewerEngine {
       this.select(this.filter === "shape" ? [hit.part] : this.filter === "assembly" ? this.assemblyGroup(hit.part) : this.partGroup(hit.part));
     }
     let facePlane: ContextRequest["facePlane"] = null;
+    let face: ContextRequest["face"] = null;
     if (hit && !hit.cap) {
       const p = this.parts[hit.part];
-      const f = p.topo.faces[p.topo.triFace[hit.tri]];
+      const fi = p.topo.triFace[hit.tri];
+      const f = p.topo.faces[fi];
       if (f?.kind === "plane" && f.normal && f.point) facePlane = { normal: f.normal, point: f.point, part: hit.part };
+      if (f) face = { part: hit.part, index: fi };
     }
-    this.onContext({ part: hit?.part ?? null, clientX, clientY, facePlane });
+    this.onContext({ part: hit?.part ?? null, clientX, clientY, facePlane, face });
   }
 
   // ------------------------------------------------------------------ výběrový filtr a entity
@@ -1649,7 +2011,10 @@ export class ViewerEngine {
     } else if (s.kind === "midpoint") title = "Střed hrany";
     else if (s.kind === "vertex") title = "Roh (bod)";
     rows.push(["X", mm(s.point[0])], ["Y", mm(s.point[1])], ["Z", mm(s.point[2])]);
-    return { kind: s.kind, title, rows, part: s.part, plane: g?.plane && !g.sectionCap ? g.plane : undefined };
+    return {
+      kind: s.kind, title, rows, part: s.part, plane: g?.plane && !g.sectionCap ? g.plane : undefined,
+      face: s.kind === "face" && !g?.sectionCap ? g?.faceIndex : undefined,
+    };
   }
 
   /** Měřit vzdálenost od vybrané entity (první bod hotový). */
@@ -1660,6 +2025,152 @@ export class ViewerEngine {
     this.pending = e;
     this.syncPending();
     this.onChange("pending");
+  }
+
+  // ------------------------------------------------------------------ barvy
+
+  /** Zobrazená barva dílu (lineární) — přepsaná, ze souboru, nebo výchozí. */
+  private displayColor(p: PartView): THREE.Color {
+    if (p.colorOverride !== null) return new THREE.Color().setHex(p.colorOverride, THREE.SRGBColorSpace);
+    return (p.origColor ?? DEFAULT_COLOR).clone();
+  }
+
+  /** Barva dílu jako sRGB hex (pro výběr barvy v kartě). */
+  partColorHex(i: number): number {
+    const p = this.parts[i];
+    return p ? this.displayColor(p).getHex(THREE.SRGBColorSpace) : 0xb8c0ca;
+  }
+
+  hasColorChanges(): boolean {
+    return this.parts.some((p) => p.colorOverride !== null || p.faceColors.size > 0);
+  }
+
+  /** Sestaví materiál / barvy vrcholů dílu podle barvy dílu a barev ploch. */
+  private applyColors(p: PartView) {
+    const g = p.mesh.geometry;
+    const useVC = p.faceColors.size > 0 || (!!p.origVC && p.colorOverride === null);
+    if (!useVC) {
+      if (g.getAttribute("color")) g.deleteAttribute("color");
+      p.baseMaterial = this.material(p.colorOverride !== null ? this.displayColor(p) : p.origColor, false, p.opacity);
+    } else {
+      const n = g.getAttribute("position").count;
+      const arr = new Float32Array(n * 3);
+      if (p.colorOverride === null && p.origVC && p.origVC.length === arr.length) arr.set(p.origVC);
+      else {
+        const c = this.displayColor(p);
+        for (let i = 0; i < n; i++) {
+          arr[i * 3] = c.r;
+          arr[i * 3 + 1] = c.g;
+          arr[i * 3 + 2] = c.b;
+        }
+      }
+      const idx = g.index ? (g.index.array as Uint32Array) : null;
+      const tmp = new THREE.Color();
+      for (const [face, hex] of p.faceColors) {
+        tmp.setHex(hex, THREE.SRGBColorSpace);
+        for (const t of this.faceTriangles(p, face)) {
+          for (let k = 0; k < 3; k++) {
+            const v = idx ? idx[t * 3 + k] : t * 3 + k;
+            arr[v * 3] = tmp.r;
+            arr[v * 3 + 1] = tmp.g;
+            arr[v * 3 + 2] = tmp.b;
+          }
+        }
+      }
+      g.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+      p.baseMaterial = this.material(null, true, p.opacity);
+    }
+    this.applyPartState(p);
+  }
+
+  private colorChange(fn: () => boolean) {
+    const before = this.snapshot();
+    if (!fn()) return;
+    this.commit(before);
+    if (this.section) this.rebuildSection(true);
+    this.requestRender();
+    this.onChange("colors");
+  }
+
+  /** Barva dílů (null = původní). Celý díl přebarví i plochy. */
+  setPartColor(indices: number[], hex: number | null) {
+    this.colorChange(() => {
+      let changed = false;
+      for (const i of indices) {
+        const p = this.parts[i];
+        if (!p) continue;
+        if (p.colorOverride === hex && !p.faceColors.size) continue;
+        p.colorOverride = hex;
+        p.faceColors.clear();
+        this.applyColors(p);
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
+  /** Barva jedné plochy dílu (null = jako díl). */
+  setFaceColor(part: number, face: number, hex: number | null) {
+    this.colorChange(() => {
+      const p = this.parts[part];
+      if (!p || face < 0 || face >= p.topo.faces.length) return false;
+      if (hex === null) {
+        if (!p.faceColors.delete(face)) return false;
+      } else {
+        if (p.faceColors.get(face) === hex) return false;
+        p.faceColors.set(face, hex);
+      }
+      this.applyColors(p);
+      return true;
+    });
+  }
+
+  /** Barevně odlišit díly (vybrané, jinak všechny viditelné). */
+  colorPartsDistinct(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.filter((p) => !p.hidden).map((p) => p.index);
+    this.colorChange(() => {
+      list.forEach((i, k) => {
+        const p = this.parts[i];
+        if (!p) return;
+        p.colorOverride = COLOR_PALETTE[k % (COLOR_PALETTE.length - 2)];
+        p.faceColors.clear();
+        this.applyColors(p);
+      });
+      return list.length > 0;
+    });
+  }
+
+  /** Barevně odlišit plochy dílů (vybraných, jinak všech viditelných). */
+  colorFacesDistinct(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.filter((p) => !p.hidden).map((p) => p.index);
+    this.colorChange(() => {
+      let changed = false;
+      for (const i of list) {
+        const p = this.parts[i];
+        if (!p || !p.topo.faces.length) continue;
+        p.faceColors = new Map(p.topo.faces.map((_, f) => [f, COLOR_PALETTE[f % (COLOR_PALETTE.length - 2)]]));
+        this.applyColors(p);
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
+  /** Původní barvy ze souboru (vybrané díly, jinak všechny). */
+  resetColors(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.map((p) => p.index);
+    this.colorChange(() => {
+      let changed = false;
+      for (const i of list) {
+        const p = this.parts[i];
+        if (!p || (p.colorOverride === null && !p.faceColors.size)) continue;
+        p.colorOverride = null;
+        p.faceColors.clear();
+        this.applyColors(p);
+        changed = true;
+      }
+      return changed;
+    });
   }
 
   // ------------------------------------------------------------------ řez
@@ -1835,9 +2346,8 @@ export class ViewerEngine {
   }
 
   private capMaterial(p: PartView): THREE.Material {
-    const base = (p.baseMaterial as THREE.MeshPhongMaterial).color ?? DEFAULT_COLOR;
     // světlejší odstín barvy dílu + šrafy → řez je hned poznat od ploch modelu
-    const c = (p.baseMaterial.userData.vc ? DEFAULT_COLOR.clone() : base.clone()).lerp(new THREE.Color(1, 1, 1), 0.35);
+    const c = this.displayColor(p).lerp(new THREE.Color(1, 1, 1), 0.35);
     const key = c.getHexString();
     let m = this.capMaterials.get(key);
     if (!m) {
@@ -1880,6 +2390,8 @@ export class ViewerEngine {
       k++;
       const back = new THREE.Mesh(p.mesh.geometry, this.stencilBack);
       const front = new THREE.Mesh(p.mesh.geometry, this.stencilFront);
+      back.position.copy(p.offset);
+      front.position.copy(p.offset);
       back.renderOrder = base;
       front.renderOrder = base;
       back.userData.kind = front.userData.kind = "stencil";
@@ -1922,13 +2434,16 @@ export class ViewerEngine {
     for (const p of this.parts) {
       if (p.hidden || this.triCount(p.index) === 0 || !plane.intersectsBox(p.box)) continue;
       const g = p.mesh.geometry;
-      const segs = sliceMesh(g.getAttribute("position").array as Float32Array, g.index ? (g.index.array as Uint32Array) : null, def);
+      // síť je v místních souřadnicích dílu → rovina posunutá o posunutí dílu
+      const local = { normal: def.normal, constant: def.constant + plane.normal.dot(p.offset) };
+      const segs = sliceMesh(g.getAttribute("position").array as Float32Array, g.index ? (g.index.array as Uint32Array) : null, local);
       if (!segs.length) continue;
       const topo = chainSegments(segs, tol);
       this.sectionTopo.set(p.index, topo);
       const lg = new THREE.BufferGeometry();
       lg.setAttribute("position", new THREE.BufferAttribute(topo.edgeSegments, 3));
       const lines = new THREE.LineSegments(lg, this.sectionLineMaterial);
+      lines.position.copy(p.offset);
       lines.renderOrder = 90000;
       lines.userData.kind = "contour";
       lines.userData.ownGeometry = true;
@@ -2101,4 +2616,23 @@ function disposeObject(o: THREE.Object3D) {
     if (Array.isArray(mat)) mat.forEach((y) => y.dispose());
     else mat?.dispose();
   });
+}
+
+/** Topologie posunutá o vektor (rozebraná sestava) — jen pro hledání uchopení. */
+function shiftTopology(t: SectionTopology, o: THREE.Vector3): SectionTopology {
+  const sh = (v: Vec3): Vec3 => [v[0] + o.x, v[1] + o.y, v[2] + o.z];
+  const edge = new Float32Array(t.edgeSegments.length);
+  for (let i = 0; i < edge.length; i += 3) {
+    edge[i] = t.edgeSegments[i] + o.x;
+    edge[i + 1] = t.edgeSegments[i + 1] + o.y;
+    edge[i + 2] = t.edgeSegments[i + 2] + o.z;
+  }
+  const corners = new Float32Array(t.corners.length);
+  for (let i = 0; i < corners.length; i += 3) {
+    corners[i] = t.corners[i] + o.x;
+    corners[i + 1] = t.corners[i + 1] + o.y;
+    corners[i + 2] = t.corners[i + 2] + o.z;
+  }
+  const curves = t.curves.map((c) => ({ ...c, start: sh(c.start), end: sh(c.end), mid: sh(c.mid), center: c.center ? sh(c.center) : undefined }));
+  return { edgeSegments: edge, corners, segCurve: t.segCurve, curves };
 }

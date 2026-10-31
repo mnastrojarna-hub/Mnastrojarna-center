@@ -60,7 +60,7 @@ export function allowance(dimensionMm: number): number {
 }
 
 /** Přídavek na délku (upnutí + zarovnání čel). */
-function lengthAllowance(lengthMm: number): number {
+export function lengthAllowance(lengthMm: number): number {
   if (lengthMm <= 100) return 4;
   if (lengthMm <= 300) return 6;
   return 10;

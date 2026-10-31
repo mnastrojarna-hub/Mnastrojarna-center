@@ -68,8 +68,8 @@ export function CustomersBrowser({
         actions={<CustomerDialog owners={owners} defaultOwnerId={userId} size="lg" />}
       >
         <p>
-          Zákazníci se zakládají sami — když v Knize zakázek <b>vyfotíš objednávku</b> od nové firmy, AI ji přečte
-          a zákazníka založí. Nebo ho přidej ručně tlačítkem níže.
+          Klikni na <b>Nový zákazník</b> a vyfoť cokoli od firmy (e-mail, objednávku, fakturu, vizitku) nebo jen napiš IČO —
+          AI a ARES vyplní zbytek a založí se jen zákazník, žádná zakázka.
         </p>
       </FriendlyEmpty>
     );
