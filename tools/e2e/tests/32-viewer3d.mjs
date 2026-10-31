@@ -116,6 +116,14 @@ await test("desktop: Dokumenty → klik na STEP otevře 3D prohlížeč, Zpět v
     await page.goto(`${BASE}/documents`);
     const link = page.getByRole("link", { name: "Otevřít KOSTKA-ZAOBLENA.step" }).first();
     await link.waitFor();
+    // počkat na dojezd úvodní animace obsahu (layout: animate-fade-in posouvá stránku o 4 px / 200 ms) —
+    // jinak Playwright vyhodnotí odkaz jako „nestabilní", klik opakuje s vynuceným scrollIntoView
+    // (block end / center) a posune <main> sám ještě před otevřením prohlížeče (200 → 30 / 388)
+    await page.evaluate(() =>
+      Promise.all((document.querySelector("main")?.getAnimations({ subtree: true }) ?? [])
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => null))),
+    );
     // posunout stránku, ať jde ověřit návrat na stejné místo
     await page.evaluate(() => document.querySelector("main")?.scrollTo(0, 200));
     const scrollBefore = await page.evaluate(() => document.querySelector("main")?.scrollTop ?? 0);

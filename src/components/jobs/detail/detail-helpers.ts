@@ -864,26 +864,11 @@ export function tagTone(tag: string): string {
 }
 
 // ── Záložky ─────────────────────────────────────────────────
-export type DetailTab = "prehled" | "vyroba" | "polozky" | "nabidky" | "nakup" | "dokumenty" | "komunikace" | "historie";
-export const DETAIL_TABS: DetailTab[] = ["prehled", "vyroba", "polozky", "nabidky", "nakup", "dokumenty", "komunikace", "historie"];
-
-export function isDetailTab(v: unknown): v is DetailTab {
-  return typeof v === "string" && (DETAIL_TABS as string[]).includes(v);
-}
+// klíče záložek v samostatném malém modulu (používá je i přednačítání JS záložek v layoutu aplikace)
+export { DETAIL_TABS, detailTabOf, isDetailTab, type DetailTab } from "./tab-keys";
 
 /** id obalu záložek karty zakázky (posun do zorného pole po odkazové akci / ?tab=). */
 export const DETAIL_TABS_ID = "zalozky-zakazky";
-
-/** Anglické aliasy záložek (odkazy akcí toku: ?tab=items / quotes / production / purchasing). */
-const TAB_ALIASES: Record<string, DetailTab> = {
-  overview: "prehled", items: "polozky", quotes: "nabidky", production: "vyroba", purchasing: "nakup",
-  documents: "dokumenty", history: "historie", communication: "komunikace", posta: "komunikace", mail: "komunikace",
-};
-
-export function detailTabOf(v: unknown): DetailTab | null {
-  if (isDetailTab(v)) return v;
-  return typeof v === "string" ? TAB_ALIASES[v] ?? null : null;
-}
 
 /** Výběr z možností vyhledávání (bez diakritiky, prefix má přednost). */
 export function normalizeSearch(s: string): string {
