@@ -5,6 +5,7 @@ import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
 import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
 import { buildAssemblyGroups, type AssemblyGroups } from "@/lib/viewer3d/assembly-groups";
 import type { StockGeometry, StockMode, StockResult } from "@/lib/viewer3d/stock";
+import { displayColor, textBounds } from "@/lib/viewer3d/drawing-model";
 import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
   type MeasureMode, type Measurement, type SnapGeometry, type SnapKind, type SnapPoint,
@@ -59,6 +60,16 @@ export function pickFilters(drawing: boolean) {
 }
 
 const ENTITY_FILTERS: PickFilter[] = ["face", "edge", "vertex", "center", "midpoint"];
+
+/** Barvy vrcholů sRGB 0–1 → lineární (nové pole). */
+function srgbToLinear(src: Float32Array): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    out[i] = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }
+  return out;
+}
 
 /** Vybraná entita (plocha / hrana / bod) — popis pro kartu. */
 export interface EntityInfo {
@@ -271,7 +282,7 @@ export class ViewerEngine {
   private darkBg = false;
   private lineVC = new THREE.LineBasicMaterial({ vertexColors: true });
   private lineHover = new THREE.LineBasicMaterial({ color: 0xd97706 });
-  private textItems: { part: number; obj: { color: number; sync: (cb?: () => void) => void }; fg: boolean }[] = [];
+  private textItems: { part: number; obj: { color: number; sync: (cb?: () => void) => void }; raw: [number, number, number] | null }[] = [];
   private hatch: THREE.Texture | null = null;
   private stencilBack = new THREE.MeshBasicMaterial({
     side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
@@ -497,11 +508,15 @@ export class ViewerEngine {
         this.modelGroup.add(edges);
       }
       let wires: THREE.LineSegments | null = null;
+      // barvy čar výkresu jsou sRGB → lineární prostor rendereru (jinak by ztmavená žlutá a černá zesvětlaly)
+      const lineLight = part.lines && part.lineColors?.length === part.lines.length ? srgbToLinear(part.lineColors) : undefined;
+      const darkSrc = model.drawing?.darkColors[index];
+      const lineDark = darkSrc && part.lines && darkSrc.length === part.lines.length ? srgbToLinear(darkSrc) : undefined;
       if (part.lines?.length) {
         const wg = new THREE.BufferGeometry();
         wg.setAttribute("position", new THREE.BufferAttribute(part.lines, 3));
-        const lc = part.lineColors && part.lineColors.length === part.lines.length ? part.lineColors : null;
-        if (lc) wg.setAttribute("color", new THREE.BufferAttribute(lc.slice(), 3));
+        const lc = lineLight ?? null;
+        if (lc) wg.setAttribute("color", new THREE.BufferAttribute((this.darkBg ? lineDark ?? lc : lc).slice(), 3));
         wires = new THREE.LineSegments(wg, lc ? this.lineVC : this.edgeMaterial);
         wires.matrixAutoUpdate = false;
         this.modelGroup.add(wires);
@@ -512,13 +527,19 @@ export class ViewerEngine {
       if (part.lines?.length) {
         for (let i = 0; i < part.lines.length; i += 3) box.expandByPoint(new THREE.Vector3(part.lines[i], part.lines[i + 1], part.lines[i + 2]));
       }
+      // texty výkresu (přibližně — písmo se načítá až potom), ať „celý výkres" zahrne i popisky
+      for (const t of model.drawing?.texts ?? []) {
+        if (t.part !== index) continue;
+        const [x0, y0, x1, y1] = textBounds(t);
+        box.expandByPoint(new THREE.Vector3(x0, y0, 0)).expandByPoint(new THREE.Vector3(x1, y1, 0));
+      }
       this.parts.push({
         index, name: part.name, mesh, edges, wires,
         topo: topo ?? { edgeSegments: new Float32Array(0), curves: [], segCurve: new Uint32Array(0), corners: new Float32Array(0), triFace: new Uint32Array(0), faces: [] },
         baseMaterial: mat, hidden: false, box, sphere: box.getBoundingSphere(new THREE.Sphere()),
         origColor: baseColor, origVC, opacity: part.opacity ?? 1, colorOverride: null, faceColors: new Map(),
         offset: new THREE.Vector3(), localBox: box.clone(),
-        lineLight: part.lineColors ?? undefined, lineDark: model.drawing?.darkColors[index],
+        lineLight, lineDark,
       });
     });
     this.is2D = !!model.drawing;
@@ -1252,10 +1273,10 @@ export class ViewerEngine {
           tx.lineHeight = 1.35;
           tx.position.set(t.x, t.y, 0.001);
           tx.rotation.z = t.rotation;
-          const fg = !t.color;
-          tx.color = fg ? (this.darkBg ? 0xededef : 0x121214) : new THREE.Color(t.color![0], t.color![1], t.color![2]).getHex();
+          const item = { part, obj: tx as unknown as { color: number; sync: (cb?: () => void) => void }, raw: t.color };
+          tx.color = this.textColor(item, p);
           batch.add(tx);
-          this.textItems.push({ part, obj: tx as unknown as { color: number; sync: (cb?: () => void) => void }, fg });
+          this.textItems.push(item);
         }
         batch.position.copy(p.offset);
         batch.visible = !p.hidden;
@@ -1279,16 +1300,20 @@ export class ViewerEngine {
       const src = dark ? p.lineDark ?? p.lineLight : p.lineLight;
       (p.wires.geometry.getAttribute("color") as THREE.BufferAttribute).copyArray(src).needsUpdate = true;
     }
-    for (const t of this.textItems) {
-      if (!t.fg) continue;
-      t.obj.color = dark ? 0xededef : 0x121214;
-    }
+    for (const t of this.textItems) t.obj.color = this.textColor(t, this.parts[t.part]);
     for (const p of this.parts) if (p.texts) (p.texts as unknown as { sync: (cb?: () => void) => void }).sync(() => this.requestRender());
     this.requestRender();
   }
 
   isDrawing(): boolean {
     return this.is2D;
+  }
+
+  /** Barva textu výkresu (sRGB hex): barva hladiny nastavená uživatelem, jinak z výkresu upravená pro pozadí. */
+  private textColor(t: { raw: [number, number, number] | null }, p: PartView | undefined): number {
+    if (p && p.colorOverride !== null) return p.colorOverride;
+    const [r, g, b] = displayColor(t.raw ?? "fg", this.darkBg);
+    return (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
   }
 
   private applyDisplayToMaterial(m: THREE.Material) {
@@ -2220,10 +2245,7 @@ export class ViewerEngine {
         }
       }
       attr.needsUpdate = true;
-      for (const t of this.textItems) {
-        if (t.part !== p.index) continue;
-        t.obj.color = p.colorOverride !== null ? p.colorOverride : t.fg ? (this.darkBg ? 0xededef : 0x121214) : t.obj.color;
-      }
+      for (const t of this.textItems) if (t.part === p.index) t.obj.color = this.textColor(t, p);
       (p.texts as unknown as { sync?: (cb?: () => void) => void } | null)?.sync?.(() => this.requestRender());
       this.applyPartState(p);
       return;

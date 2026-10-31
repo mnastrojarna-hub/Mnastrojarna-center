@@ -71,6 +71,10 @@ const nextConfig = {
       "./node_modules/@img/sharp-linuxmusl-x64/**",
     ],
   },
+  // OpenCascade / LibreDWG (wasm 7–11 MB) v adresářích s verzí → týden v cache prohlížeče
+  async headers() {
+    return [{ source: "/vendor/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] }];
+  },
   webpack(config, { isServer, webpack }) {
     if (!isServer) {
       // LibreDWG (DWG v prohlížeči výkresů, Web Worker): emscripten glue má větev pro Node

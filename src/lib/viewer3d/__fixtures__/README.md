@@ -5,4 +5,4 @@ Testovací modely pro prohlížeč 3D — převzaté z testovacích souborů pro
 
 `priruba-cp1250.dxf` — vlastní testovací výkres příruby (DXF R2000, kódová stránka ANSI_1250 →
 čeština, hladiny KONTURA/OSY/KOTY/POPIS, polyčára se zaoblenými rohy přes bulge, blok OTVOR
-vložený 4×, TEXT s `%%c`, MTEXT s `\P`).
+vložený 4×, TEXT s `%%c`, MTEXT s `\P`; generuje `gen-priruba-dxf.mjs`).

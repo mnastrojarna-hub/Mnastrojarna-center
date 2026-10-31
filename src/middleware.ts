@@ -6,7 +6,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // vendor/ (OpenCascade, LibreDWG — wasm prohlížeče výkresů) a fonts/ jsou veřejné statické soubory:
+  // bez kontroly přihlášení (rychlejší načtení, cache)
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|vendor/|fonts/|favicon.ico|icon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

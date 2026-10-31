@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evalSpline, parseDxf } from "./dxf";
-import { bulgeArc, drawingToModel } from "../drawing-model";
+import { bulgeArc, displayColor, drawingToModel, textBounds } from "../drawing-model";
 import { sniffFile } from "../sniff";
 import { readFileSync } from "node:fs";
 
@@ -65,10 +65,10 @@ describe("DXF → 2D výkres", () => {
     expect(circles.find((c) => c.kind === "circle" && c.r === 6)!.color).toEqual([0, 0, 1]);
   });
 
-  it("český text z kódové stránky 1250, %%c = ⌀, MTEXT bez formátování", () => {
+  it("český text z kódové stránky 1250, %%c = Ø, MTEXT bez formátování", () => {
     const d = parseDxf(cp1250(dxf()));
     const texts = d.entities.filter((e) => e.kind === "text").map((e) => (e.kind === "text" ? e.text : ""));
-    expect(texts).toContain("Výkres č. 1 — ŘEZ A-A ⌀20");
+    expect(texts).toContain("Výkres č. 1 — ŘEZ A-A Ø20");
     expect(texts).toContain("Pozn.:\nMateriál 1.4301");
   });
 
@@ -152,10 +152,29 @@ describe("DXF → 2D výkres", () => {
     expect(Math.max(...ys)).toBeCloseTo(120);
     const texts = m.model.drawing!.texts.map((t) => t.text);
     expect(texts).toContain("PŘÍRUBA — materiál 1.4301, tloušťka 10 mm");
-    expect(texts).toContain("⌀50 H7");
+    expect(texts).toContain("Ø50 H7");
     expect(texts).toContain("Nekótované rozměry ISO 2768-mK\nSrazit hrany 0,5×45°");
     // „200" zarovnané na střed
     expect(m.model.drawing!.texts.find((t) => t.text === "200")).toMatchObject({ hAlign: "center", x: 100 });
+  });
+
+  it("odhad obdélníku textu (zarovnání, otočení) a barvy pro pozadí", () => {
+    const base = { part: 0, height: 5, hAlign: "center" as const, vAlign: "middle" as const, color: null };
+    const [x0, y0, x1, y1] = textBounds({ ...base, x: 100, y: 50, text: "ABCD", rotation: 0 });
+    expect((x0 + x1) / 2).toBeCloseTo(100);
+    expect((y0 + y1) / 2).toBeCloseTo(50);
+    expect(x1 - x0).toBeGreaterThan(4 * 5 * 0.6); // 4 znaky ~ 0,77 × výška
+    const r = textBounds({ ...base, x: 0, y: 0, text: "ABCD", rotation: Math.PI / 2, hAlign: "left", vAlign: "bottom" });
+    expect(r[3]).toBeGreaterThan(10); // otočený o 90° roste do +Y
+    expect(r[2]).toBeLessThanOrEqual(1e-9);
+    // MTEXT se zalomením na šířku 20: víc řádků, šířka ≤ 20
+    const m = textBounds({ ...base, x: 0, y: 0, text: "dlouhý text na více řádků", rotation: 0, hAlign: "left", vAlign: "top", width: 20 });
+    expect(m[2] - m[0]).toBeCloseTo(20);
+    expect(m[3]).toBeCloseTo(0);
+    expect(m[1]).toBeLessThan(-3 * 5);
+    // žlutá na světlém pozadí ztmavená, černá (barva 7) bílá na tmavém
+    expect(displayColor([1, 1, 0], false)[0]).toBeLessThan(0.7);
+    expect(displayColor("fg", true)[0]).toBeGreaterThan(0.9);
   });
 
   it("binární DXF a nesmysl → srozumitelná chyba", () => {

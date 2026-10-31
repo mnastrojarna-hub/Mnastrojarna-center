@@ -82,14 +82,17 @@ const DWG_ERR_OUTOFMEM = 8192;
 interface LoadedLib {
   lib: LibreDwgEx;
   types: Record<string, number | string>;
+  /** Kódová stránka DWG (DwgCodePage) → jméno kódování pro TextDecoder. */
+  encodingOf: (codepage: number) => string;
 }
 
 const libCache = new Map<string, Promise<LoadedLib>>();
 let tmpSeq = 0;
 
+/** Bez koncového lomítka (knihovna skládá `${dir}/libredwg-web.wasm`); kořen „/" → "" (ne „//…" = jiný host). */
 function normalizeWasmDir(wasmDir: string): string {
-  const dir = wasmDir.replace(/[\\/]+$/, "");
-  return dir || "/";
+  if (!wasmDir) return ".";
+  return wasmDir.replace(/[\\/]+$/, "");
 }
 
 /** Instance LibreDWG pro daný adresář s `libredwg-web.wasm` (sdílená, líně vytvořená). */
@@ -100,6 +103,7 @@ function loadLibreDwg(wasmDir: string): Promise<LoadedLib> {
     const created = import("@mlightcad/libredwg-web").then(async (m) => ({
       lib: await m.LibreDwg.create(dir),
       types: m.Dwg_Object_Type as unknown as Record<string, number | string>,
+      encodingOf: m.dwgCodePageToEncoding as (codepage: number) => string,
     }));
     p = created;
     libCache.set(dir, created);
@@ -108,6 +112,59 @@ function loadLibreDwg(wasmDir: string): Promise<LoadedLib> {
     });
   }
   return p;
+}
+
+const ZERO_REF = Object.freeze({ absolute_ref: 0, value: 0, handleref: Object.freeze({ value: 0 }) });
+/** Pole entit, která prohlížeč nepotřebuje (šířky polyčar, vzor šrafy, body semínek, tloušťka). */
+const SKIPPED_FIELDS: Readonly<Record<string, number>> = Object.freeze({
+  thickness: 0, num_widths: 0, widths: 0, num_deflines: 0, deflines: 0, num_seeds: 0,
+});
+
+/**
+ * „Hostitel" pro LibreDwg.convert(): stejné metody, ale data, která 2D prohlížeč nepoužívá
+ * (xdata, vlastník, rozšiřující slovník, typ čáry, náhledy bloků a výkresu, šířky, vzor šrafy),
+ * se z WASM vůbec nečtou — převod je o ~40 % rychlejší (marshalling embind je hlavní náklad).
+ */
+function fastConvertHost(lib: LibreDwgEx): LibreDwgEx {
+  const host = Object.create(lib) as LibreDwgEx;
+  // metody třídy a wasmInstance jako vlastní vlastnosti — volání neprochází pastí `get` Proxy knihovny
+  const proto = Object.getPrototypeOf(lib) as Record<string, unknown> | null;
+  if (proto) {
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      if (name === "constructor") continue;
+      const fn = Object.getOwnPropertyDescriptor(proto, name)?.value;
+      if (typeof fn === "function") Object.defineProperty(host, name, { value: fn, writable: true, configurable: true });
+    }
+  }
+  const wasm = (lib as unknown as { wasmInstance?: unknown }).wasmInstance;
+  if (wasm) Object.defineProperty(host, "wasmInstance", { value: wasm, writable: true, configurable: true });
+  const dynapi = lib.dwg_dynapi_entity_data;
+  Object.assign(host, {
+    dwg_object_entity_get_xdata: () => [],
+    dwg_object_entity_get_handle_object: () => ZERO_REF,
+    dwg_object_entity_get_ownerhandle_object: () => ZERO_REF,
+    dwg_object_entity_get_xdicobjhandle_object: () => ZERO_REF,
+    dwg_object_entity_get_ltype_object_ref: () => ZERO_REF,
+    dwg_object_entity_get_line_weight: () => 0,
+    dwg_object_entity_get_ltype_scale: () => 1,
+    dwg_entity_block_header_get_preview: () => null,
+    dwg_ptr_to_hatch_defline_array: () => [],
+    dwg_bmp: () => null,
+    dwg_dynapi_entity_data(this: LibreDwgEx, obj: number, field: string) {
+      return Object.prototype.hasOwnProperty.call(SKIPPED_FIELDS, field) ? SKIPPED_FIELDS[field] : dynapi.call(this, obj, field);
+    },
+  });
+  return host;
+}
+
+/** DwgDatabase z načteného souboru: rychlá cesta, při nečekané chybě JS (ne pádu WASM) běžný convert(). */
+function convertDatabase(lib: LibreDwgEx, data: number): DwgDatabase {
+  try {
+    return lib.convert.call(fastConvertHost(lib), data) as DwgDatabase;
+  } catch (e) {
+    if (typeof WebAssembly !== "undefined" && e instanceof WebAssembly.RuntimeError) throw e;
+    return lib.convert(data);
+  }
 }
 
 /** Zahodí instanci (po pádu uvnitř WASM je její stav nepoužitelný). */
@@ -132,8 +189,9 @@ export async function parseDwg(bytes: Uint8Array, wasmDir: string): Promise<Draw
   }
   let lib: LibreDwgEx;
   let types: Record<string, number | string>;
+  let encodingOf: (codepage: number) => string;
   try {
-    ({ lib, types } = await loadLibreDwg(wasmDir));
+    ({ lib, types, encodingOf } = await loadLibreDwg(wasmDir));
   } catch {
     throw new ModelImportError("Modul pro čtení DWG (WebAssembly) se nepodařilo načíst — zkus stránku obnovit.");
   }
@@ -142,6 +200,7 @@ export async function parseDwg(bytes: Uint8Array, wasmDir: string): Promise<Draw
   let db: DwgDatabase;
   let version = "";
   let readError = 0;
+  let encoding: string | undefined;
   let dropped: DroppedByBlock = new Map();
   try {
     // dwg_read_file přímo (místo dwg_read_data): chybový kód bez výpisu do konzole
@@ -167,10 +226,11 @@ export async function parseDwg(bytes: Uint8Array, wasmDir: string): Promise<Draw
     if (!data || lib.dwg_get_num_objects(data) === 0) throw new ModelImportError(DWG_READ_ERROR);
     try {
       version = lib.dwg_get_version_type(data)?.hdr ?? "";
+      encoding = encodingOf(lib.dwg_get_codepage(data));
     } catch {
-      version = "";
+      version = version || "";
     }
-    db = lib.convert(data);
+    db = convertDatabase(lib, data);
     // doplnění toho, co convert() vynechává (MINSERT, ARC_DIMENSION, …), a soupis nepodporovaných typů
     try {
       dropped = supplementDatabase(lib, types, data, db);
@@ -195,7 +255,7 @@ export async function parseDwg(bytes: Uint8Array, wasmDir: string): Promise<Draw
     }
   }
 
-  const drawing = dwgDatabaseToDrawing(db, { version, dropped });
+  const drawing = dwgDatabaseToDrawing(db, { version, dropped, encoding });
   if (readError >= DWG_ERR_CRITICAL) {
     drawing.warnings = ["Soubor DWG je částečně poškozený — výkres nemusí být úplný.", ...(drawing.warnings ?? [])];
   }
@@ -207,7 +267,10 @@ export async function parseDwg(bytes: Uint8Array, wasmDir: string): Promise<Draw
 /** Entity, které convert() vynechal a nekreslí se: blok (jméno velkými písmeny) → typ (DXF jméno) → počet. */
 export type DroppedByBlock = Map<string, Map<string, number>>;
 
-/** Typy entit, které LibreDwg.convert() převádí (ostatní tiše vynechává). */
+/**
+ * Typy entit, které LibreDwg.convert() z @mlightcad/libredwg-web 0.8.1 převádí (ostatní tiše vynechává).
+ * Při povýšení knihovny zkontrolovat — kdyby začala převádět MINSERT / ARC_DIMENSION, patří sem (jinak by byly dvakrát).
+ */
 const CONVERTED_TYPES = [
   "3DFACE", "3DSOLID", "ARC", "ARCALIGNEDTEXT", "ATTDEF", "CIRCLE", "DIMENSION_ALIGNED", "DIMENSION_LINEAR",
   "DIMENSION_ANG3PT", "DIMENSION_ANG2LN", "DIMENSION_DIAMETER", "DIMENSION_ORDINATE", "DIMENSION_RADIUS", "ELLIPSE",
@@ -233,7 +296,7 @@ interface RawRef {
  * ARC_DIMENSION / LARGE_RADIAL_DIMENSION (přes jejich blok *D…). Ostatní vynechané typy (REGION,
  * HELIX, objekty aplikací…) jen sečte pro upozornění.
  */
-function supplementDatabase(lib: LibreDwgEx, types: Record<string, number | string>, data: number, db: DwgDatabase): DroppedByBlock {
+export function supplementDatabase(lib: LibreDwgEx, types: Record<string, number | string>, data: number, db: DwgDatabase): DroppedByBlock {
   const T = (n: string): number => {
     const v = types[`DWG_TYPE_${n}`];
     return typeof v === "number" ? v : -1;
@@ -278,10 +341,7 @@ function supplementDatabase(lib: LibreDwgEx, types: Record<string, number | stri
     if (!name) name = lib.dwg_dynapi_entity_data(hdr, "name") as string | undefined;
     const rec = name ? records.get(String(name).toUpperCase()) : undefined;
     if (!rec) continue;
-    let handles: Set<string> | null = null;
     const add = (e: DwgEntity) => {
-      if (!handles) handles = new Set((rec.entities ?? []).map((x) => String(x.handle ?? "").toUpperCase()));
-      if (e.handle && handles.has(e.handle)) return; // novější verze knihovny už ji převedla
       if (!rec.entities) rec.entities = [];
       rec.entities.push(e);
     };
@@ -363,6 +423,8 @@ export interface DwgConvertOptions {
   version?: string;
   /** Entity vynechané už při čtení (nepodporované typy) po blocích — započtou se do upozornění. */
   dropped?: DroppedByBlock;
+  /** Kódování 8bitových řetězců výkresu (z kódové stránky DWG), např. „windows-1250". */
+  encoding?: string;
 }
 
 interface Ctx {
@@ -383,6 +445,9 @@ interface Ctx {
   /** Jména bloků na aktuální cestě vnoření (detekce cyklů). */
   stack: string[];
   limitHit: boolean;
+  /** Verze souboru (AC10xx) a kódování 8bitových řetězců — oprava textů MULTILEADER v R2004 a starších. */
+  version: string;
+  encoding: string;
 }
 
 /** Kontext vykreslení: transformace do světa (mm), zděděná hladina a barva BYBLOCK. */
@@ -437,6 +502,8 @@ export function dwgDatabaseToDrawing(db: DwgDatabase, opts: DwgConvertOptions = 
     cyclic: new Set(),
     stack: [],
     limitHit: false,
+    version: opts.version ?? "",
+    encoding: opts.encoding || "windows-1252",
   };
 
   const scale = insunitsToMm(typeof db.header?.INSUNITS === "number" ? db.header.INSUNITS : undefined);
@@ -952,16 +1019,20 @@ function emitInsert(ctx: Ctx, ins: DwgInsertEntity, env: Env, layer: string, col
       const sin = Math.sin(rot);
       const ents = block.entities ?? [];
       noteDropped(ctx, block.name);
-      for (let r = 0; r < rows && !ctx.limitHit; r++) {
-        for (let c = 0; c < cols && !ctx.limitHit; c++) {
-          // T(ip + R·(c·cs, r·rs)) · R(rot) · S(xs, ys) · T(−base)
-          const ox = c * cs;
-          const oy = r * rs;
-          const local = trs(ix + cos * ox - sin * oy, iy + sin * ox + cos * oy, rot, xs, ys);
-          local[4] -= local[0] * bx + local[2] * by;
-          local[5] -= local[1] * bx + local[3] * by;
-          emitAll(ctx, ents, { m: mul(m, local), layer, byBlock: color, inDim: false });
+      // prázdný blok se neprochází; nesmyslně velké pole (MINSERT 10⁵ × 10⁵) jen do stropu entit
+      const cells = ents.length ? rows * cols : 0;
+      for (let k = 0; k < cells && !ctx.limitHit; k++) {
+        if (k >= MAX_DWG_ENTITIES) {
+          ctx.limitHit = true;
+          break;
         }
+        // T(ip + R·(c·cs, r·rs)) · R(rot) · S(xs, ys) · T(−base)
+        const ox = (k % cols) * cs;
+        const oy = Math.floor(k / cols) * rs;
+        const local = trs(ix + cos * ox - sin * oy, iy + sin * ox + cos * oy, rot, xs, ys);
+        local[4] -= local[0] * bx + local[2] * by;
+        local[5] -= local[1] * bx + local[3] * by;
+        emitAll(ctx, ents, { m: mul(m, local), layer, byBlock: color, inDim: false });
       }
     } finally {
       ctx.stack.pop();
@@ -1094,6 +1165,30 @@ function emitHatch(ctx: Ctx, h: DwgHatchEntity, env: Env, layer: string, color: 
   }
 }
 
+/**
+ * Soubory do R2004 (< AC1021) mají 8bitové řetězce, ale libredwg-web čte text MULTILEADER jako
+ * UTF-16 → dvojice bajtů slepené do jednoho znaku („xx\\Pxx" → „硸停硸"). Rozložit zpět na bajty
+ * a dekódovat kódovou stránkou výkresu; jiné texty nechat beze změny.
+ */
+export function repairLegacyText(s: string, version: string, encoding = "windows-1252"): string {
+  if (!s || !version || !/^AC\d{4}$/.test(version) || version >= "AC1021") return s;
+  for (let i = 0; i < s.length - 1; i++) if (s.charCodeAt(i) <= 0xff) return s;
+  const bytes: number[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    bytes.push(c & 0xff);
+    if (c > 0xff) bytes.push(c >> 8);
+  }
+  while (bytes.length && bytes[bytes.length - 1] === 0) bytes.pop();
+  // jen pokud z toho vznikne rozumný text (bez řídicích znaků kromě tabulátoru / konce řádku)
+  if (!bytes.length || bytes.some((b) => b < 0x20 && b !== 9 && b !== 10 && b !== 13)) return s;
+  try {
+    return new TextDecoder(encoding).decode(new Uint8Array(bytes));
+  } catch {
+    return String.fromCharCode(...bytes);
+  }
+}
+
 function emitMultiLeader(ctx: Ctx, ml: DwgMultiLeaderEntity, env: Env, layer: string, color: DrawColor): void {
   const m = env.m;
   for (const sec of ml.leaderSections ?? []) {
@@ -1116,7 +1211,7 @@ function emitMultiLeader(ctx: Ctx, ml: DwgMultiLeaderEntity, env: Env, layer: st
     }
   }
   if (ml.hasMText !== false && ml.textContent && ml.textAnchor) {
-    const text = plainText(String(ml.textContent));
+    const text = plainText(repairLegacyText(String(ml.textContent), ctx.version, ctx.encoding));
     if (text.trim()) {
       const [hA, vA] = attachment(num(ml.textAttachmentPoint, 1));
       const d = ml.textDirection;

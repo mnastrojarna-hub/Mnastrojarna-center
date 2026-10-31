@@ -110,7 +110,7 @@ export function plainText(s: string): string {
     .replace(/\\~/g, " ")
     .replace(/\\\\/g, "\\")
     .replace(/[{}]/g, "")
-    .replace(/%%[cC]/g, "⌀")
+    .replace(/%%[cC]/g, "Ø") // ⌀ v písmu Roboto chybí
     .replace(/%%[dD]/g, "°")
     .replace(/%%[pP]/g, "±")
     .replace(/%%%/g, "%")

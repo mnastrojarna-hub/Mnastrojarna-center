@@ -579,11 +579,11 @@ await test("desktop: DXF výkres — hladiny, skrytí + zpět, měření průmě
     const st = await page.getByTestId("viewer3d-status").innerText();
     expect(/DXF/.test(st), `formát DXF ve stavu: ${st}`);
     expect(/4 hladiny/.test(st), `4 hladiny: ${st}`);
-    expect(/200,00 ×/.test(st), `šířka výkresu 200 mm: ${st}`);
+    expect(/200,0+ ×/.test(st) && /4 hladiny/.test(st), `výkres široký 200 mm: ${st}`);
     // 2D: bez řezu, hmotnosti a pohledů
     expect((await page.getByTestId("tool-section").count()) === 0, "bez řezu");
     expect((await page.getByTestId("tool-views").count()) === 0, "bez pohledů");
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(1500); // písmo textů (troika) se načítá asynchronně
     await page.screenshot({ path: path.join(ARTIFACTS, "viewer2d-dxf.png") });
     // hladiny: skrýt v seznamu, Ctrl+Z vrátí
     const tree = page.getByTestId("viewer3d-tree");
@@ -660,21 +660,28 @@ if (files.dwg) {
       await waitModel(page);
       const st = await page.getByTestId("viewer3d-status").innerText();
       expect(/DWG/.test(st) && /hladin/.test(st) && /mm/.test(st), `DWG ve stavu: ${st}`);
-      await page.waitForTimeout(400);
+      await page.waitForTimeout(1500);
       await page.screenshot({ path: path.join(ARTIFACTS, "viewer2d-dwg.png") });
       await page.getByTestId("tool-distance").click();
       const b = await canvasBox(page);
+      // husté projetí plochy, dva kliky na místa s uchopením (rohy, čáry, kružnice)
       let n = 0;
-      for (let i = 0; i < 400 && n < 2; i++) {
-        const x = b.x + b.width / 2 + ((i * 37) % 300) - 150;
-        const y = b.y + b.height / 2 + ((i * 53) % 240) - 120;
-        await page.mouse.move(x, y);
-        if (await page.getByTestId("snap-marker").count()) {
-          await page.mouse.click(x, y);
-          n++;
-          await page.waitForTimeout(50);
+      let last = null;
+      for (let dy = -200; dy <= 200 && n < 2; dy += 8) {
+        for (let dx = -300; dx <= 300 && n < 2; dx += 10) {
+          const x = b.x + b.width / 2 + dx;
+          const y = b.y + b.height / 2 + dy;
+          if (last && Math.hypot(x - last[0], y - last[1]) < 60) continue;
+          await page.mouse.move(x, y);
+          if (await page.getByTestId("snap-marker").count()) {
+            await page.mouse.click(x, y);
+            last = [x, y];
+            n++;
+            await page.waitForTimeout(50);
+          }
         }
       }
+      expect(n === 2, `dva body s uchopením (${n})`);
       await page.getByTestId("measure-item").first().waitFor({ timeout: 5000 });
       expect(/mm/.test(await page.getByTestId("measure-item").first().innerText()), "měření v DWG");
     });

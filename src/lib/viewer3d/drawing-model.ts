@@ -13,8 +13,8 @@ export type { DrawingText };
 const FG_LIGHT: [number, number, number] = [0.07, 0.07, 0.08];
 const FG_DARK: [number, number, number] = [0.93, 0.93, 0.94];
 
-/** Na světlém pozadí příliš světlé barvy (žlutá, bílá) ztmavit, na tmavém naopak. */
-function display(c: DrawColor, dark: boolean): [number, number, number] {
+/** Na světlém pozadí příliš světlé barvy (žlutá, bílá) ztmavit, na tmavém naopak (sRGB 0–1). */
+export function displayColor(c: DrawColor, dark: boolean): [number, number, number] {
   if (c === "fg") return dark ? FG_DARK : FG_LIGHT;
   const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   if (!dark && l > 0.75) return [c[0] * 0.6, c[1] * 0.6, c[2] * 0.6];
@@ -69,8 +69,8 @@ function newBuilder(): Builder {
 function addPolyline(b: Builder, pts: Pt[], color: DrawColor, closed: boolean, info: Partial<Curve> & { kind: Curve["kind"] }) {
   if (pts.length < 2) return;
   const segStart = b.seg.length / 6;
-  const cl = display(color, false);
-  const cd = display(color, true);
+  const cl = displayColor(color, false);
+  const cd = displayColor(color, true);
   let length = 0;
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i];
@@ -158,6 +158,40 @@ function addEntity(b: Builder, e: DrawEntity) {
     }
     default:
   }
+}
+
+/**
+ * Přibližný obdélník textu [minX, minY, maxX, maxY] ještě před vykreslením písma — aby „celý výkres"
+ * (F, první zobrazení, rozměry) zahrnul i popisky mimo obrys. Roboto: velká písmena ≈ 0,711 em,
+ * průměrná šířka znaku ≈ 0,55 em, řádkování 1,35.
+ */
+export function textBounds(t: DrawingText): [number, number, number, number] {
+  const em = t.height / 0.711;
+  const lines = t.text.split("\n");
+  let w = Math.max(1, ...lines.map((l) => l.length)) * em * 0.55;
+  let n = lines.length;
+  if (t.width && t.width > 0 && w > t.width) {
+    n += Math.ceil(w / t.width) - 1;
+    w = t.width;
+  }
+  const h = n * em * 1.35;
+  const x0 = t.hAlign === "left" ? 0 : t.hAlign === "center" ? -w / 2 : -w;
+  const y0 = t.vAlign === "top" ? -h : t.vAlign === "middle" ? -h / 2 : t.vAlign === "bottom" ? 0 : -0.25 * em - (n - 1) * em * 1.35;
+  const cos = Math.cos(t.rotation);
+  const sin = Math.sin(t.rotation);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [dx, dy] of [[x0, y0], [x0 + w, y0], [x0, y0 + h], [x0 + w, y0 + h]]) {
+    const x = t.x + dx * cos - dy * sin;
+    const y = t.y + dx * sin + dy * cos;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  return [minX, minY, maxX, maxY];
 }
 
 export interface DrawingModel {
