@@ -5,7 +5,7 @@ import { extensionOf, MODEL_EXTENSIONS } from "@/lib/viewer3d/sniff";
  * přílohy e-mailů, faktury dodavatelů, vygenerovaná PDF, náhledy anonymizace.
  */
 
-const VIEWER_PATH = /^\/api\/(?:jobs\/files\/[^/]+|emails\/attachment\/[^/]+|supplier-invoices\/files\/[^/]+|pdf\/.+|drawings\/anonymize\/[^/]+\/(?:preview|download))$/;
+const VIEWER_PATH = /^\/api\/(?:jobs\/files\/[^/]+|emails\/attachment\/[^/]+|supplier-invoices\/files\/[^/]+|pdf\/.+|drawings\/anonymize\/[^/]+\/preview)$/;
 
 export function isViewerPath(pathname: string): boolean {
   return VIEWER_PATH.test(pathname);

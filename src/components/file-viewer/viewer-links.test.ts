@@ -14,6 +14,8 @@ describe("odkazy na prohlížeč", () => {
     expect(isViewerPath("/api/pdf/job/abc")).toBe(true);
     expect(isViewerPath("/api/pdf/nabidka")).toBe(true);
     expect(isViewerPath("/api/drawings/anonymize/abc/preview")).toBe(true);
+    // kopie pro dodavatele se stahuje, neotevírá
+    expect(isViewerPath("/api/drawings/anonymize/abc/download")).toBe(false);
     expect(isViewerPath("/api/jobs/files")).toBe(false);
     expect(isViewerPath("/api/search")).toBe(false);
     expect(isViewerPath("/orders/abc")).toBe(false);
