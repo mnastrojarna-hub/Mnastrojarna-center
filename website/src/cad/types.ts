@@ -13,14 +13,41 @@ export type SketchPlane =
   | { kind: "base"; name: PlaneName; offset: number }
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
-export type SketchEntity =
+/** Entita skici. `construction` = pomocná geometrie (nevytváří profil). */
+export type SketchEntity = { construction?: boolean } & (
   | { id: string; type: "rect"; cx: number; cy: number; w: number; h: number; r: number; angle: number }
   | { id: string; type: "circle"; cx: number; cy: number; r: number }
   | { id: string; type: "polygon"; cx: number; cy: number; r: number; sides: number; angle: number }
   | { id: string; type: "slot"; cx: number; cy: number; length: number; width: number; angle: number }
   | { id: string; type: "polyline"; points: Vec2[]; closed: boolean }
-  | { id: string; type: "arc"; a: Vec2; b: Vec2; c: Vec2 } // oblouk třemi body (a → c přes b), jen 2D/DXF
-  | { id: string; type: "line"; a: Vec2; b: Vec2; construction?: boolean };
+  | { id: string; type: "arc"; a: Vec2; b: Vec2; c: Vec2 } // oblouk třemi body (a → c přes b)
+  | { id: string; type: "line"; a: Vec2; b: Vec2 }
+  | { id: string; type: "point"; p: Vec2 }
+  | { id: string; type: "ellipse"; cx: number; cy: number; rx: number; ry: number; angle: number }
+  /** hladká křivka (interpolační spline přes body) */
+  | { id: string; type: "spline"; points: Vec2[]; closed: boolean }
+);
+
+/** Odkaz na charakteristický bod/část entity skici: „a“, „b“, „c“ (konce/body), „center“, „p3“ (bod lomené čáry), „self“ (celá entita). */
+export type SketchRef = { e: string; k: string };
+
+/** Geometrická vazba ve skice (řeší ji numerický řešič). */
+export type SketchConstraint = {
+  id: string;
+  type: "horizontal" | "vertical" | "coincident" | "parallel" | "perpendicular" | "tangent" | "equal" | "fixed" | "concentric" | "midpoint" | "pointOnCurve" | "symmetric" | "collinear";
+  refs: SketchRef[];
+};
+
+/** Kóta ve skice. Řídicí (driving) kóta mění geometrii, referenční jen ukazuje hodnotu. */
+export type SketchDim = {
+  id: string;
+  type: "distance" | "horizontal" | "vertical" | "radius" | "diameter" | "angle" | "length";
+  refs: SketchRef[];
+  value: number;
+  driving: boolean;
+  /** posun popisku kóty od geometrie (mm ve skice) */
+  offset?: Vec2;
+};
 
 export type BoolMode = "new" | "add" | "cut" | "intersect";
 export type Axis = "X" | "Y" | "Z";
@@ -34,7 +61,7 @@ export type KernelImportFormat = "step" | "brep" | "stl";
 export type ExportFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl";
 
 export type Feature = { id: string; name: string; suppressed?: boolean } & (
-  | { type: "sketch"; plane: SketchPlane; entities: SketchEntity[] }
+  | { type: "sketch"; plane: SketchPlane; entities: SketchEntity[]; constraints?: SketchConstraint[]; dims?: SketchDim[] }
   | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number }
   | { type: "revolve"; sketchId: string; angle: number; axis: "x" | "y"; mode: BoolMode }
   | { type: "box"; size: Vec3; position: Vec3; centered: boolean; mode: BoolMode }
@@ -92,6 +119,18 @@ export type Feature = { id: string; name: string; suppressed?: boolean } & (
   | { type: "datum"; origin: Vec3; normal: Vec3; xDir: Vec3; size: number }
   /** Text – vystouplý (add) nebo gravírovaný (cut) do tělesa. */
   | { type: "text"; text: string; height: number; depth: number; plane: SketchPlane; position: Vec2; angle: number; mode: "add" | "cut" }
+  /** Přímé úpravy: posunout (vytáhnout/zatlačit) vybrané plochy o vzdálenost podél normály. */
+  | { type: "pushPull"; faces: number[]; distance: number }
+  /** Přímé úpravy: odstranit plochy (např. zaoblení, díry) a zacelit těleso. */
+  | { type: "deleteFace"; faces: number[] }
+  /** Přímé úpravy: odsadit plochy (offset) – kladně ven, záporně dovnitř. */
+  | { type: "offsetFace"; faces: number[]; distance: number }
+  /** Žebro z otevřené skici (čára) s tloušťkou, dotažené k tělesu. */
+  | { type: "rib"; sketchId: string; thickness: number; direction: "normal" | "inPlane"; flip: boolean }
+  /** Šroubovice / pružina (tažení kruhového průřezu po šroubovici). */
+  | { type: "spring"; radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis; mode: BoolMode }
+  /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
+  | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
   | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean }
 );
@@ -125,13 +164,16 @@ export type CadDoc = {
   kind?: "part" | "assembly";
   /** komponenty sestavy */
   components?: AsmComponent[];
+  /** barvy jednotlivých ploch výsledného tělesa (index plochy → #rrggbb) */
+  faceColors?: Record<number, string>;
 };
 
 /** Umístění komponenty: posun (mm) a natočení kolem os X, Y, Z (°, v tomto pořadí). */
 export type Placement = { position: Vec3; rotation: Vec3 };
 
 /** Zdroj komponenty: vložený parametrický díl, nebo importovaný soubor (STEP/BREP/STL). */
-export type ComponentSource = { kind: "part"; doc: CadDoc } | { kind: "file"; fileName: string; format: KernelImportFormat; data: string };
+/** Zdroj komponenty: díl, importovaný soubor, nebo podsestava (vnořená sestava). */
+export type ComponentSource = { kind: "part"; doc: CadDoc } | { kind: "file"; fileName: string; format: KernelImportFormat; data: string } | { kind: "asm"; doc: CadDoc };
 
 export type AsmComponent = {
   id: string;
@@ -169,6 +211,8 @@ export type BuildResult = {
   paramErrors?: string[];
   mesh: MeshData | null;
   metrics: { volume: number; area: number; bbox: [Vec3, Vec3]; faces: number; edges: number } | null;
+  /** polohy topologických vrcholů tělesa (x,y,z po trojicích) – pro výběr bodů */
+  vertices?: Float32Array;
   ms: number;
 };
 
