@@ -48,6 +48,11 @@ Testy: `src/cad/**/*.test.ts` (vitest, OCCT se inicializuje v Node). E2E: `e2e/c
 - **F – jádro 2**: **hotovo** (pushPull/offsetFace/deleteFace/rib/spring/thicken, podsestavy, normálie).
 - **D – DWG export**: ✅ `cad/formats/dwg.ts` (acad-ts, R2000–R2018, vrstvy/typy čar ISO 128, round-trip testy); tlačítko DWG + volba verze ve výkresu. **Ověřit v reálném AutoCAD/ZWCAD** (knihovna je mladá).
 
+### Ověření (poslední stav)
+- `npm run typecheck`, `npm run lint`: čisté. `npm test`: 199 testů. `npm run build`: OK (`/cad` 1,5 kB + 105 kB sdílené; jádro, knihovna, DWG a PDF se načítají líně).
+- E2E `e2e/cad.e2e.cjs` (16 kroků): úvodní obrazovka → ukázka → skica + vysunutí → paleta → měření → knihovna M8×30 → výkres DXF/DWG R2018/SVG/PDF → rám formy → kusovník → STEP; bez JS chyb.
+- Snímky všech nástrojů: `/tmp/claude-0/cadshots/tools.cjs` (28 snímků) + ruční kóty/poznámky ověřeny v prohlížeči (kóta, poznámka, drsnost, tolerance, základna).
+
 ### Zapojení po dokončení pracovníků (checklist pro vedoucího / další relaci)
 1. ~~Settings/Palette/Start/MoldPanel/LibraryDialog/DWG/náhledy~~ – vše zapojeno.
 2. Používat `ui.tsx` (Modal/FloatPanel/Row/Btn/Toggle/Segmented/Kbd) místo lokálních kopií v `cad-app.tsx` (kosmetika).
