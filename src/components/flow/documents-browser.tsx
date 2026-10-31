@@ -15,6 +15,7 @@ import { czDay, fileKindCounts, filterFiles, formatBytes, isImageFile, todayPrag
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { fileOriginLabel, type FileFlowInfo } from "./flow-state";
 import { fileLockText } from "./file-lock";
+import { PrintButton } from "@/components/print/print-button";
 import type { FileLock } from "@/lib/jobs/types";
 
 /** Dokument zakázky pro přehled (čistá data ze serveru). */
@@ -261,6 +262,7 @@ function FileCard({ file: f, today }: { file: FlowFile; today: string }) {
               <Download className="h-4 w-4" />
             </a>
           </Button>
+          <PrintButton href={href} filename={f.filename} />
         </div>
       </div>
     </li>

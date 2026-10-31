@@ -15,6 +15,18 @@ import type { DrawingItem } from "@/lib/data/types";
 import { cn, formatDate } from "@/lib/utils";
 import { DrawingSpecChips } from "@/components/jobs/drawing-spec-chips";
 import { MATERIAL_GROUPS, classifyMaterial } from "@/lib/jobs/material-groups";
+import { PrintButton } from "@/components/print/print-button";
+
+/** Přípona pro rozhodnutí o tisku (DXF / STEP vytisknout nejde; obrázek rozhodne obsah). */
+const PRINT_EXT: Record<DrawingItem["fileType"], string | null> = { PDF: "pdf", STEP: "step", DXF: "dxf", IMG: null };
+
+/**
+ * Tisk výkresu z archivu: soubor ze zakázky stejnou routou jako „soubor"; výkres nahraný přímo do
+ * archivu přes serverový náhled po stranách (tatáž kontrola práv jako editor anonymizace).
+ */
+function drawingPrintHref(d: DrawingItem): string {
+  return d.jobFileId ? `/api/jobs/files/${d.jobFileId}` : `/api/drawings/anonymize/${d.id}/preview?table=drawings`;
+}
 
 const TYPE_STYLE: Record<DrawingItem["fileType"], { label: string; icon: typeof FileText; badge: string }> = {
   PDF: { label: "PDF", icon: FileText, badge: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" },
@@ -127,6 +139,23 @@ export default async function DrawingsPage({ searchParams }: { searchParams: Pro
                           <Download className="h-3 w-3" /> pro dodavatele
                         </a>
                       )}
+                      <span className="flex items-center gap-0.5">
+                        <PrintButton
+                          href={drawingPrintHref(d)}
+                          filename={PRINT_EXT[d.fileType] ? `${d.number}.${PRINT_EXT[d.fileType]}` : null}
+                          label={`Tisknout výkres ${d.number}`}
+                          className="h-8 w-8"
+                          testId="drawing-print"
+                        />
+                        {anon[d.id]?.status === "done" && (
+                          <PrintButton
+                            href={`/api/drawings/anonymize/${anon[d.id].fileId}/download${anon[d.id].table === "drawings" ? "?table=drawings" : ""}`}
+                            label={`Tisknout výkres ${d.number} pro dodavatele (anonymizovaný)`}
+                            className="h-8 w-8 text-primary"
+                            testId="drawing-print-anon"
+                          />
+                        )}
+                      </span>
                       <span className="text-[11px] text-muted-foreground">{formatDate(d.uploadedAt)}</span>
                     </span>
                     {/* štítky pod řádkem na celou šířku (na mobilu je pravý sloupec nemačká) */}

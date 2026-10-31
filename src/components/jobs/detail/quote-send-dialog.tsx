@@ -9,6 +9,7 @@ import { MailFields, type MailDraft } from "@/components/flow/document-send-dial
 import { applySalutation } from "@/lib/contacts/tone";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
+import { PrintButton } from "@/components/print/print-button";
 
 type Step = "preparing" | "unpriced" | "form" | "sending";
 
@@ -196,17 +197,20 @@ export function QuoteSendDialog({
           ) : blocked ? null : (
             <>
               {file ? (
-                <a
-                  href={`/api/jobs/files/${file.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 rounded-lg border bg-violet-50 px-3 py-2 text-sm hover:brightness-95 dark:bg-violet-500/10"
-                >
-                  <Paperclip className="h-4 w-4 text-violet-600" />
-                  <FileText className="h-4 w-4 text-violet-600" />
-                  <span className="min-w-0 flex-1 truncate font-medium">{file.filename}</span>
-                  <span className="inline-flex items-center gap-1 text-xs text-violet-700 dark:text-violet-300">Náhled <ExternalLink className="h-3 w-3" /></span>
-                </a>
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={`/api/jobs/files/${file.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border bg-violet-50 px-3 py-2 text-sm hover:brightness-95 dark:bg-violet-500/10"
+                  >
+                    <Paperclip className="h-4 w-4 text-violet-600" />
+                    <FileText className="h-4 w-4 text-violet-600" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{file.filename}</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-violet-700 dark:text-violet-300">Náhled <ExternalLink className="h-3 w-3" /></span>
+                  </a>
+                  <PrintButton href={`/api/jobs/files/${file.id}`} filename={file.filename} variant="outline" className="h-10 w-10 shrink-0" />
+                </div>
               ) : (
                 <Button type="button" variant="outline" onClick={() => void prepare()}>
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu

@@ -26,6 +26,7 @@ import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 import { useRunner } from "./production-context";
 import { PaymentDialog } from "./payment-dialog";
 import { InvoiceInfoDialog, ownInvoiceFile } from "./invoice-dialog";
+import { PrintButton } from "@/components/print/print-button";
 import {
   CONFIRMED_DL_TITLE, INVOICE_TONE, closingStamp, confirmedDeliveryFile, invoiceTone, stampLabel,
 } from "./production-helpers";
@@ -171,9 +172,12 @@ function DeliveryStep({
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" data-testid="closing-delivery-notes">
           <span>{delivered === "all" ? "Dodáno —" : delivered === "part" ? "Dodáno částečně —" : "Vystaveno —"}</span>
           {notes.map((n, i) => n.id ? (
-            <a key={n.id} href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono font-medium text-foreground underline-offset-2 hover:underline">
-              <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden /> {n.number}
-            </a>
+            <span key={n.id} className="inline-flex items-center gap-0.5">
+              <a href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono font-medium text-foreground underline-offset-2 hover:underline">
+                <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden /> {n.number}
+              </a>
+              <PrintButton href={`/api/jobs/files/${n.id}`} label={`Tisknout ${n.number}`} className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
+            </span>
           ) : (
             // DL bez PDF v Dokumentech (smazaný soubor) — číslo zůstává, odkaz ne
             <span key={`${n.number}-${i}`} className="inline-flex items-center gap-1 font-mono font-medium text-foreground">
@@ -192,9 +196,12 @@ function DeliveryStep({
           <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             {closing.deliveryNoteNumber && <span>DL č. <strong className="font-mono">{closing.deliveryNoteNumber}</strong></span>}
             {file ? (
-              <a href={`/api/jobs/files/${file.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-green-800 underline-offset-2 hover:underline dark:text-green-300">
-                <FileCheck2 className="h-3.5 w-3.5" /> Otevřít potvrzený DL <ExternalLink className="h-3 w-3" />
-              </a>
+              <span className="inline-flex items-center gap-0.5">
+                <a href={`/api/jobs/files/${file.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-green-800 underline-offset-2 hover:underline dark:text-green-300">
+                  <FileCheck2 className="h-3.5 w-3.5" /> Otevřít potvrzený DL <ExternalLink className="h-3 w-3" />
+                </a>
+                <PrintButton href={`/api/jobs/files/${file.id}`} filename={file.filename} label="Tisknout potvrzený DL" className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
+              </span>
             ) : (
               <span className="opacity-80">bez skenu</span>
             )}
@@ -302,9 +309,12 @@ function InvoiceStep({
           <p className="flex flex-wrap items-center gap-x-2 font-semibold">
             <span>Faktura {closing.invoiceNumber ? <span className="font-mono">{closing.invoiceNumber}</span> : <span className="font-normal text-muted-foreground">(bez čísla)</span>}</span>
             {pdf ? (
-              <a href={`/api/jobs/files/${pdf.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-400">
-                PDF <ExternalLink className="h-3 w-3" />
-              </a>
+              <span className="inline-flex items-center gap-0.5">
+                <a href={`/api/jobs/files/${pdf.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-400">
+                  PDF <ExternalLink className="h-3 w-3" />
+                </a>
+                <PrintButton href={`/api/jobs/files/${pdf.id}`} filename={pdf.filename} label="Tisknout fakturu" className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
+              </span>
             ) : margins && !ownInvoiceFile(job.files ?? []) ? (
               <span className="text-xs font-normal text-muted-foreground">vystavená mimo systém</span>
             ) : null}

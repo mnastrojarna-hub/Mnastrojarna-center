@@ -4,28 +4,13 @@ import * as React from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { AlertTriangle, Loader2, Minus, MoveHorizontal, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { loadPdfJs as loadLib } from "./pdfjs";
 
 /**
  * PDF přímo v aplikaci (pdf.js) — funguje stejně na počítači i na telefonu (Android neumí PDF
  * v kartě zobrazit, iOS ho otevře bez cesty zpět). Strany se kreslí postupně podle posunu,
  * přiblížení tlačítky, Ctrl+kolečkem nebo dvěma prsty.
  */
-
-type PdfJs = typeof import("pdfjs-dist");
-let lib: Promise<PdfJs> | null = null;
-
-function loadLib(): Promise<PdfJs> {
-  if (!lib) {
-    lib = import("pdfjs-dist").then((m) => {
-      m.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-      return m;
-    });
-    lib.catch(() => {
-      lib = null;
-    });
-  }
-  return lib;
-}
 
 /** Největší plátno (px²) — iOS víc nevykreslí. */
 const MAX_CANVAS_PIXELS = 16_000_000;

@@ -21,6 +21,7 @@ import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { FlowEmpty } from "./flow-header";
 import { FlowActionBar, FlowProposalChip } from "./flow-actions";
+import { PrintButton } from "@/components/print/print-button";
 import { czDay, filterQuotes } from "./flow-utils";
 import { STATE_PARAM, actionPalette, parseStateParam, stateParamValue, type FlowQuoteInfo } from "./flow-state";
 
@@ -307,6 +308,9 @@ function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; toda
                 <Eye className="h-4 w-4 text-violet-600 dark:text-violet-400" /> PDF
               </a>
             </Button>
+          )}
+          {pdfHref && (
+            <PrintButton href={pdfHref} filename={`nabidka-${quote.number}.pdf`} variant="outline" size="icon" className="h-11 w-11 sm:h-9 sm:w-9" label={`Tisknout nabídku ${quote.number}`} />
           )}
           <FlowActionBar
             target={{

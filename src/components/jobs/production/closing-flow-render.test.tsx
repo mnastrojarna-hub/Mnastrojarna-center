@@ -141,7 +141,9 @@ describe("karta „Dodání, faktura a platba“ (A2)", () => {
     expect(t).toContain("Dodáno — DL-2026-071 DL-2026-065");
     expect(t).not.toContain("PREJMENOVANO");
     expect(html).toContain('href="/api/jobs/files/dl1"');
-    expect((html.match(/\/api\/jobs\/files\//g) ?? []).length).toBe(1);
+    expect((html.match(/ href="\/api\/jobs\/files\//g) ?? []).length).toBe(1);
+    // DL s PDF má vedle odkazu i „Tisknout" (DL bez souboru ne)
+    expect((html.match(/data-print-href="\/api\/jobs\/files\//g) ?? []).length).toBe(1);
   });
 
   // review A2 #4: „dílčí" faktura účtovala celou objednávku → při dílčí dodávce se faktura z aplikace nenabízí

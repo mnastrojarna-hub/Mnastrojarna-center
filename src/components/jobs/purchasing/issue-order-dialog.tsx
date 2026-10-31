@@ -24,6 +24,7 @@ import {
   draftsFromJobItems, purchaseDraftsTotal, purchaseOrderFormFromDraft, purchaseOrderFormToInput, validatePurchaseOrderForm,
   type PurchaseOrderFormState,
 } from "./purchasing-model";
+import { PrintButton } from "@/components/print/print-button";
 
 type Step = "loading" | "form" | "issuing" | "done";
 
@@ -249,12 +250,16 @@ export function IssueOrderDialog({
               </div>
             )}
 
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-4">
               <Button asChild variant="outline" size="lg" className="h-12">
                 <a href={`/api/pdf/purchase-order/${issued.id}?download=1`}>
                   <Download className="h-4 w-4" /> Stáhnout PDF
                 </a>
               </Button>
+              <PrintButton
+                href={issued.fileId ? `/api/jobs/files/${issued.fileId}` : `/api/pdf/purchase-order/${issued.id}`}
+                filename="objednavka.pdf" label="Tisknout" showLabel variant="outline" size="lg" className="h-12"
+              />
               <Button asChild variant="outline" size="lg" className="h-12">
                 <a href={issued.fileId ? `/api/jobs/files/${issued.fileId}` : `/api/pdf/purchase-order/${issued.id}`} target="_blank" rel="noopener noreferrer">
                   <FileText className="h-4 w-4" /> Otevřít PDF

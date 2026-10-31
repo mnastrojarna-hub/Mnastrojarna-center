@@ -22,6 +22,7 @@ import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
 import { relativeTime, cn } from "@/lib/utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ApprovalPurchaseOrder, ResolvedApproval } from "@/lib/data/queries";
+import { PrintButton } from "@/components/print/print-button";
 
 /** Položka fronty; proposedBy = kdo návrh připravil („✨ AI", „Systém (plánovač)"); quoteHref = „Otevřít nabídku". */
 type QueueItem = ApprovalItem & { proposedBy?: string; quoteHref?: string | null; purchaseOrder?: ApprovalPurchaseOrder | null };
@@ -175,6 +176,9 @@ function ApprovalRow({
               <a href={`/api/jobs/files/${po.fileId}`} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">
                 <FileText className="h-3 w-3" aria-hidden /> Otevřít PDF
               </a>
+            )}
+            {po?.fileId && (
+              <PrintButton href={`/api/jobs/files/${po.fileId}`} label="Tisknout objednávku" className="h-8 w-8" iconClassName="h-3.5 w-3.5" />
             )}
             {po?.jobId && (
               <Link href={`/orders/${po.jobId}?tab=vyroba`} className="inline-flex min-h-8 items-center gap-0.5 font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline">

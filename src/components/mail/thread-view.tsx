@@ -24,6 +24,8 @@ import { categoryStyle, neutralWhileAsking } from "@/lib/email/visibility";
 import { AskingCategoryPill } from "@/components/mail/thread-row";
 import type { EmailCategory } from "@/lib/data/types";
 import { cn, formatDate } from "@/lib/utils";
+import { PrintButton } from "@/components/print/print-button";
+import { printabilityOf } from "@/lib/print/print-links";
 
 function initials(name: string): string {
   const parts = name.split(/[\s.@_-]+/).filter(Boolean);
@@ -428,10 +430,16 @@ function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCate
           {m.attachments.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {m.attachments.map((a) => (
-                <a key={a.id} href={`/api/emails/attachment/${a.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent" data-testid="message-attachment">
-                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="truncate">{a.filename}</span>
-                  {a.sizeBytes ? <span className="text-muted-foreground">· {fmtSize(a.sizeBytes)}</span> : null}
-                </a>
+                <span key={a.id} className="inline-flex max-w-full items-center">
+                  <a href={`/api/emails/attachment/${a.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent" data-testid="message-attachment">
+                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="truncate">{a.filename}</span>
+                    {a.sizeBytes ? <span className="text-muted-foreground">· {fmtSize(a.sizeBytes)}</span> : null}
+                  </a>
+                  {/* tisk přílohy (PDF, fotky, výkresy) — u Wordu / ZIPu tlačítko není, DXF s nápovědou */}
+                  {(printabilityOf(a.filename).ok || /\.(dxf|dwg)$/i.test(a.filename)) && (
+                    <PrintButton href={`/api/emails/attachment/${a.id}`} filename={a.filename} className="h-7 w-7" iconClassName="h-3.5 w-3.5" testId="attachment-print" />
+                  )}
+                </span>
               ))}
             </div>
           )}

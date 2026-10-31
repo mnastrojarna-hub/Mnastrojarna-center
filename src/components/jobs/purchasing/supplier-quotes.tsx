@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { compareSupplierQuotes } from "./purchasing-model";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ChangeStamp } from "@/lib/jobs/flow-status";
+import { PrintButton } from "@/components/print/print-button";
 
 /** Kdo nabídku zapsal (created_by + čas založení). */
 function createdStamp(q: SupplierQuoteView): ChangeStamp {
@@ -178,6 +179,7 @@ export function SupplierQuoteCard({
               </a>
             </Button>
           )}
+          {quote.fileId && <PrintButton href={`/api/jobs/files/${quote.fileId}`} label="Tisknout nabídku dodavatele" />}
           <Button size="icon-sm" variant="ghost" onClick={onDelete} disabled={busy !== null} aria-label="Smazat nabídku" className="ml-auto text-muted-foreground hover:text-red-600">
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -309,6 +311,7 @@ export function PendingCapturedQuotes({ items }: { items: PendingCapturedQuote[]
                 <Paperclip className="h-4 w-4" />
               </a>
             </Button>
+            <PrintButton href={`/api/jobs/files/${it.fileId}`} label={`Tisknout dokument nabídky ${it.supplierName || "dodavatele"}`} size="sm" className="px-2.5" />
             <Button size="sm" variant="success" disabled={busy !== null} onClick={() => void importOne(it)}>
               {busy === it.fileId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Zapsat
             </Button>

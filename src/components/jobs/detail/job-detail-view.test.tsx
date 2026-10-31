@@ -175,6 +175,9 @@ describe("Karta zakázky — render", () => {
     expect(html).toContain("Objednávka");
     expect(html).toContain("v2");
     expect(html).toContain("/api/jobs/files/f2");
+    // „Tisknout" u každého dokumentu vedle „Stáhnout" (tisková stránka, stejná route)
+    expect(html).toContain('data-print-href="/api/jobs/files/f2"');
+    expect(html).toContain('aria-label="Tisknout');
     expect(html).toContain("Zobrazit archiv (1)");
     expect(html).toContain("Přetáhni sem soubory");
   });

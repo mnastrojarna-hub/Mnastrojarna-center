@@ -14,6 +14,7 @@ import {
   draftInvoiceEmail, draftJobDocumentEmail, generateJobDocument, sendJobDocument, type JobDocumentKind,
 } from "@/app/actions/job-documents";
 import { INVOICE_NUMBER_PLACEHOLDER, fillInvoicePlaceholders, parseEmailList } from "@/lib/jobs/document-emails";
+import { PrintButton } from "@/components/print/print-button";
 
 export interface MailDraft {
   to: string;
@@ -93,21 +94,24 @@ export function MailFields({ mail, onChange, disabled, context, idPrefix = "doc-
   );
 }
 
-/** Odkaz na přílohu (PDF) — otevře náhled v novém panelu. */
+/** Odkaz na přílohu (PDF) — otevře náhled v novém panelu; vedle „Tisknout". */
 export function AttachmentChip({ fileId, filename }: { fileId: string; filename: string }) {
   return (
-    <a
-      href={`/api/jobs/files/${fileId}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-2.5 rounded-lg border bg-violet-50 px-3 py-2 text-sm transition hover:brightness-95 dark:bg-violet-500/10"
-    >
-      <Paperclip className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
-      <span className="min-w-0 flex-1 truncate font-medium">{filename}</span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-xs text-violet-700 dark:text-violet-300">
-        Náhled <ExternalLink className="h-3 w-3" />
-      </span>
-    </a>
+    <div className="flex items-center gap-1.5">
+      <a
+        href={`/api/jobs/files/${fileId}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border bg-violet-50 px-3 py-2 text-sm transition hover:brightness-95 dark:bg-violet-500/10"
+      >
+        <Paperclip className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+        <span className="min-w-0 flex-1 truncate font-medium">{filename}</span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-xs text-violet-700 dark:text-violet-300">
+          Náhled <ExternalLink className="h-3 w-3" />
+        </span>
+      </a>
+      <PrintButton href={`/api/jobs/files/${fileId}`} filename={filename} variant="outline" className="h-10 w-10 shrink-0" />
+    </div>
   );
 }
 
@@ -431,6 +435,7 @@ export function DocumentSendDialog({
                   >
                     <Eye className="h-3.5 w-3.5" /> Náhled bez uložení
                   </a>
+                  <PrintButton href={`/api/pdf/job/${jobId}?type=faktura`} filename="faktura-nahled.pdf" label="Tisknout náhled faktury" />
                 </div>
               ) : blocked ? null : (
                 <Button type="button" variant="outline" onClick={() => void prepare()}>
