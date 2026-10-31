@@ -1710,6 +1710,8 @@ export class ViewerEngine {
       // plocha je na jednom konci dílu → jít do poloviny k druhému
       pos = Math.abs(at - max) < Math.abs(at - min) ? (at + min) / 2 : (at + max) / 2;
     }
+    // vybraná plocha je teď odříznutá → zrušit její zvýraznění
+    if (this.entity) this.setEntity(null);
     this.setSection(n, pos, "Rovina plochy");
   }
 

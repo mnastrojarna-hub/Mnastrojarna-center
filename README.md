@@ -44,9 +44,11 @@ doklady a učí se z ručních oprav.
   BREP (OpenCascade ve WebAssembly), STL, OBJ, PLY, 3MF, glTF a **3D PDF** (U3D / PRC).
   Ovládání jako ZW3D (kolečko = zoom ke kurzoru, prostřední/levé = otáčení kolem bodu, Shift/Ctrl
   nebo pravé = posun, dotyk: 1 prst otáčí, 2 prsty posun + zoom), orientační kostka a standardní
-  pohledy, strom sestavy, mazání / izolace dílů se **zpět / vpřed (Ctrl+Z / Ctrl+Y)**, měření
-  vzdálenosti s uchopením (roh, střed díry, střed hrany, hrana, plocha; rovnoběžné plochy, rozteč
-  os), průměr / poloměr, úhel, rozměry / objem / hmotnost dílu. Kód: `src/components/viewer3d`,
+  pohledy, strom sestavy, mazání / izolace dílů i celých podsestav se **zpět / vpřed (Ctrl+Z / Ctrl+Y)**,
+  **výběrový filtr** (lišta i pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed
+  křivosti, střed hrany), **řez** rovinou XY / XZ / YZ nebo plochou (posuvník, otočení, šrafovaná
+  plocha řezu, měření na řezu), měření vzdálenosti s uchopením (roh, střed díry, střed hrany, hrana,
+  plocha; rovnoběžné plochy, rozteč os), průměr / poloměr, úhel, rozměry / objem / hmotnost dílu. Kód: `src/components/viewer3d`,
   `src/components/file-viewer`, `src/lib/viewer3d` (OpenCascade se kopíruje do `public/vendor`
   skriptem `tools/vendor-occt.mjs` při instalaci a buildu).
 
