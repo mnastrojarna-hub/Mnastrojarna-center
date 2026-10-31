@@ -1,4 +1,4 @@
-// E2E 36 · Výjimky v toku (majitel 31. 10.): „chybí tlačítka … zákazník neobjednal, nepovede se výroba, reklamace,
+// E2E 37 · Výjimky v toku (majitel 31. 10.): „chybí tlačítka … zákazník neobjednal, nepovede se výroba, reklamace,
 // vyrábějte bez objednávky … aktualizace výkresu … oprava zakázky". Jedno srozumitelné tlačítko ve skupině
 // „Co se stalo?" (⋯ karty, menu stavu v Knize), zakázka se sama uklidí do správné záložky Knihy, vše v historii s autorem.
 //  1. Zákazník neobjednal (důvod) → Nerealizované & zrušené s chipem důvodu → Obnovit poptávku.
@@ -25,7 +25,7 @@ const SHOTS = process.env.FLOWEXC_SHOTS || null;
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 const norm = (s) => String(s ?? "").replace(/[  ]/g, " ").replace(/\s+/g, " ").trim();
 
-console.log(`36 · Výjimky v toku (značka ${TAG})`);
+console.log(`37 · Výjimky v toku (značka ${TAG})`);
 
 async function cleanup() {
   const jobs = sql(`select id from orders where title like ${lit(`${P}%`)}`).split("\n").filter(Boolean);
