@@ -129,6 +129,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
   const [search, setSearch] = React.useState("");
   const router = useRouter();
   const access = useAccess();
+  // stálá hodnota kontextu: překreslení ⌘K (oprávnění po načtení) nesmí měnit kontext nad stránkou
+  const ctxValue = React.useMemo(() => ({ open, setOpen }), [open]);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -181,7 +183,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
   const nothing = !actions.length && !nav.length && groups.every((g) => !g.items.length);
 
   return (
-    <CommandPaletteContext.Provider value={{ open, setOpen }}>
+    <CommandPaletteContext.Provider value={ctxValue}>
       {children}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent hideClose aria-describedby={undefined} className="top-[8%] w-[calc(100%-1.5rem)] max-w-xl overflow-hidden p-0 sm:top-[12%]">
