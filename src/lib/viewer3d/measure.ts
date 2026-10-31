@@ -26,6 +26,12 @@ export interface SnapGeometry {
   circle?: { center: Vec3; normal: Vec3; radius: number; full: boolean };
   /** Index plochy v topologii dílu (pro zvýraznění). */
   faceIndex?: number;
+  /** Plocha plochy (mm²). */
+  faceArea?: number;
+  /** Délka hrany (mm). */
+  curveLength?: number;
+  /** Bod leží na vybarvené ploše řezu. */
+  sectionCap?: boolean;
 }
 
 export interface SnapPoint {

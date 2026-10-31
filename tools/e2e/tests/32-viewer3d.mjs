@@ -258,6 +258,105 @@ await test("desktop: 3D PDF (U3D) — 3D model i stránky PDF", async () => {
   });
 });
 
+await test("desktop: výběrový filtr (plocha, hrana), řez rovinou i z plochy, měření na řezu", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.cone}`)}&name=kuzel.STP`);
+    await waitModel(page);
+    const box = await canvasBox(page);
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // filtr Plocha → klik vybere plochu a ukáže kartu (typ, plocha, souřadnice)
+    await page.getByTestId("tool-filter").click();
+    await page.getByTestId("filter-items").getByRole("radio", { name: /Plocha/ }).click();
+    await page.getByTestId("filter-badge").waitFor();
+    let face = "";
+    for (let dy = -120; dy <= 120 && !face; dy += 24) {
+      for (let dx = -160; dx <= 160 && !face; dx += 24) {
+        await page.mouse.click(cx + dx, cy + dy);
+        face = await page.getByTestId("viewer3d-entity").innerText({ timeout: 300 }).catch(() => "");
+      }
+    }
+    expect(/plocha/i.test(face) && /X/.test(face), `karta plochy: ${face}`);
+
+    // filtr Hrana (pravým tlačítkem) → projet a najít hranu
+    await page.mouse.click(cx, cy, { button: "right" });
+    await page.getByTestId("viewer3d-context").getByRole("button", { name: /^Hrana$/ }).click();
+    let edgeText = "";
+    for (let dx = -220; dx <= 220 && !edgeText; dx += 8) {
+      await page.mouse.move(cx + dx, cy - 40);
+      await page.waitForTimeout(20);
+      if (await page.getByTestId("snap-marker").count()) {
+        await page.mouse.click(cx + dx, cy - 40);
+        edgeText = await page.getByTestId("viewer3d-entity").innerText().catch(() => "");
+      }
+    }
+    expect(/Kružnice|Oblouk|Úsečka|Hrana/.test(edgeText), `karta hrany: ${edgeText}`);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-filter-edge.png") });
+
+    // řez rovinou XZ (zepředu) + posuvník
+    await page.getByTestId("tool-section").click();
+    await page.getByTestId("section-y").click();
+    await page.getByTestId("section-slider").waitFor();
+    await page.keyboard.press("0");
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-section-xz.png") });
+    const pos0 = await page.getByTestId("section-position").inputValue();
+    await page.getByTestId("section-slider").focus();
+    for (let i = 0; i < 40; i++) await page.keyboard.press("ArrowRight");
+    const pos1 = await page.getByTestId("section-position").inputValue();
+    expect(pos0 !== pos1, `posuvník posune řez (${pos0} → ${pos1})`);
+    await page.getByTestId("section-flip").click();
+
+    // měření na řezu: filtr Automaticky, pohled kolmo na řez, chytit střed kružnice v řezu
+    await page.getByTestId("tool-filter").click();
+    await page.getByTestId("filter-items").getByRole("radio", { name: /Automaticky/ }).click();
+    await page.getByTestId("tool-distance").click();
+    await page.getByTestId("section-y").click();
+    await page.getByRole("button", { name: /Pohled kolmo/ }).click();
+    await page.waitForTimeout(500);
+    const kinds = new Set();
+    const marker = page.getByTestId("snap-marker");
+    for (let y = cy - 150; y <= cy + 150 && !(kinds.has("face") && kinds.size > 1); y += 30) {
+      for (let x = cx - 200; x <= cx + 200; x += 25) {
+        await page.mouse.move(x, y);
+        await page.waitForTimeout(25);
+        const k = (await marker.count()) ? await marker.getAttribute("data-kind", { timeout: 200 }).catch(() => null) : null;
+        if (k) kinds.add(k);
+        if (kinds.has("face") && kinds.size > 1) break;
+      }
+    }
+    expect(kinds.has("face") && (kinds.has("vertex") || kinds.has("edge") || kinds.has("center")), `uchopení na řezu: ${[...kinds].join(", ")}`);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-section-measure.png") });
+    await page.getByTestId("section-off").click();
+    await page.getByTestId("section-slider").waitFor({ state: "detached" });
+
+    // řez z plochy (filtr Plocha → karta → „Řez touto plochou")
+    await page.getByTestId("tool-select").click();
+    await page.keyboard.press("0");
+    await page.waitForTimeout(450);
+    await page.getByTestId("tool-filter").click();
+    await page.getByTestId("filter-items").getByRole("radio", { name: /Plocha/ }).click();
+    let done = false;
+    for (let dy = -160; dy <= 160 && !done; dy += 20) {
+      for (let dx = -200; dx <= 200 && !done; dx += 20) {
+        await page.mouse.click(cx + dx, cy + dy);
+        if (await page.getByTestId("entity-section").count()) {
+          await page.getByTestId("entity-section").click();
+          done = true;
+        }
+      }
+    }
+    expect(done, "rovinná plocha → řez touto plochou");
+    await page.getByTestId("section-slider").waitFor();
+    expect(/Rovina plochy/.test(await page.getByTestId("section-panel").innerText()), "řez z plochy");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-section-face.png") });
+  });
+});
+
 if (files.asm) {
   await test("desktop: sestava — strom dílů, izolace, skrytí v stromu", async () => {
     await withContext(browser, errors, async (ctx) => {
@@ -272,6 +371,24 @@ if (files.asm) {
       await tree.getByRole("button", { name: "Skrýt díl" }).first().click();
       await page.waitForFunction(() => /skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
       await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-assembly.png") });
+      await page.getByTestId("tool-showall").click();
+      await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+      // filtr Sestava: klik na díl vybere celou podsestavu, Delete ji smaže, Ctrl+Z vrátí
+      await page.getByTestId("tool-filter").click();
+      await page.getByTestId("filter-items").getByRole("radio", { name: /Sestava/ }).click();
+      const b = await canvasBox(page);
+      let hidden = 0;
+      for (let dx = -60; dx <= 60 && !hidden; dx += 20) {
+        await page.mouse.click(b.x + b.width / 2 + dx, b.y + b.height / 2);
+        if (await page.getByTestId("viewer3d-part").count()) {
+          await page.keyboard.press("Delete");
+          const st = await page.getByTestId("viewer3d-status").innerText();
+          hidden = Number(/\((\d+) skryto\)/.exec(st)?.[1] ?? 0);
+        }
+      }
+      expect(hidden > 1, `Delete se sestavou smaže víc dílů najednou (${hidden})`);
+      await page.keyboard.press("Control+z");
+      await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
     });
   });
 }

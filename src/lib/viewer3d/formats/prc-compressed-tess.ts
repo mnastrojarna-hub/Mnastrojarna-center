@@ -7,6 +7,11 @@
  * správnou topologii je nutné dekódovat i normály (úhly + bitové příznaky).
  *
  * Výstupem je běžná MeshTess (vrcholy, trojúhelníky seskupené po plochách, normály v rozích).
+ *
+ * Kódování je ztrátové a u dlouhých úzkých trojúhelníků (typické pro CAD) se drobné odchylky
+ * mezi naší rekonstrukcí a kodérem zesilují — od určitého místa průchodu se síť „rozletí".
+ * Proto se kvalita průběžně hlídá (souhlas převzatých normál s plochou trojúhelníku, zpětně
+ * přeložené uzavírací trojúhelníky) a zobrazí se jen spolehlivý začátek průchodu.
  */
 
 import { BitReader, PrcFormatError } from "./prc-bits";
@@ -247,7 +252,7 @@ const V_NONE = 0;
 const V_SINGLE = 1;
 const V_MULTI = 2;
 
-/** Rozpor v rekonstrukci (špatně zvolená orientace dříve) — podnět k návratu v prohledávání. */
+/** Rozpor v rekonstrukci (data neodpovídají průchodu — např. odkaz mimo rozsah). */
 class Conflict extends Error {
   constructor() {
     super("rozpor v průchodu sítí");
@@ -280,11 +285,19 @@ interface Traversal {
    * v souboru null.
    */
   bad: Uint8Array | null;
+  /** Index prvního přeloženého uzavíracího trojúhelníku (viz FOLD_TAN), jinak −1. */
+  firstFold: number;
   detail: string;
 }
 
 /** Trojúhelník je „špatný", když převzatá normála svírá s jeho plochou úhel nad ~60°. */
 const BAD_DOT = 0.5;
+/**
+ * Uzavírací trojúhelník (vrchol je odkaz na existující bod), který se přeloží zpět přes
+ * rodiče pod úhlem menším než ~20°, v platné síti z CAD prakticky nenastane — v rozjeté
+ * rekonstrukci je běžný. Funguje i bez normál v souboru.
+ */
+const FOLD_TAN = Math.tan((20 * Math.PI) / 180);
 /** Rozjetí = aspoň BAD_LIMIT špatných trojúhelníků v okně BAD_WINDOW po sobě jdoucích. */
 const BAD_WINDOW = 32;
 const BAD_LIMIT = 4;
@@ -299,8 +312,8 @@ const MIN_PARTIAL_SHARE = 0.2;
  */
 function cleanPrefix(t: Traversal): number {
   const bad = t.bad;
-  if (!bad) return t.exact ? t.done : 0;
-  const n = t.done;
+  const n = t.firstFold >= 0 ? Math.min(t.done, t.firstFold) : t.done;
+  if (!bad) return t.exact || n < t.done ? n : 0;
   let count = 0;
   for (let i = 0; i < Math.min(BAD_WINDOW, n); i++) count += bad[i];
   for (let k = 0; k < n; k++) {
@@ -401,6 +414,7 @@ function rebuildOnce(d: CompressedData, orient: Orient): Traversal {
   const triNormal = withNormals ? new Float32Array(numTri * 9) : null;
   const triStyle = new Int32Array(numTri).fill(-1);
   const bad = withNormals ? new Uint8Array(numTri) : null;
+  let firstFold = -1;
   const fail = (detail: string, done: number): Traversal => ({
     done,
     exact: false,
@@ -409,6 +423,7 @@ function rebuildOnce(d: CompressedData, orient: Orient): Traversal {
     triNormal,
     triStyle,
     bad,
+    firstFold,
     detail,
   });
   if (d.edgeStatus.length < numTri - 1) return fail("chybí příznaky hran", 0);
@@ -895,6 +910,15 @@ function rebuildOnce(d: CompressedData, orient: Orient): Traversal {
           nv = nextRef();
           if (nv === ex || nv === ey) conflict();
           loadPoint(ta, nv);
+          if (firstFold < 0) {
+            // poloha odkazovaného vrcholu v soustavě hrany: osa Y míří k rodiči
+            const qx = ta[0] - bo[0],
+              qy = ta[1] - bo[1],
+              qz = ta[2] - bo[2];
+            const b = qx * by[0] + qy * by[1] + qz * by[2];
+            const c = qx * bz[0] + qy * bz[1] + qz * bz[2];
+            if (b > 0 && Math.abs(c) < b * FOLD_TAN) firstFold = k;
+          }
         } else {
           const e = encoded(0);
           const a = P[e] * tol,
@@ -926,6 +950,6 @@ function rebuildOnce(d: CompressedData, orient: Orient): Traversal {
     refFlagIdx === d.isRef.length &&
     (!withNormals || (bitPos === d.normalBits.length && anglePos === d.angles.length));
   if (!exact) return fail("data nespotřebována přesně", numTri);
-  return { done: numTri, exact: true, verts, tris, triNormal, triStyle, bad, detail: "" };
+  return { done: numTri, exact: true, verts, tris, triNormal, triStyle, bad, firstFold, detail: "" };
 }
 

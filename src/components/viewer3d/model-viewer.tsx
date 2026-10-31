@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import {
-  AlertTriangle, Box, ChevronDown, ChevronRight, Diameter, Eye, EyeOff, Focus, HelpCircle, Layers, ListTree, Loader2,
-  Maximize2, MousePointer2, Redo2, Ruler, Trash2, TriangleRight, Undo2, X, ZoomIn, ZoomOut,
+  AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
+  ListTree, Loader2, Maximize2, MousePointer2, Redo2, Ruler, ScanEye, Scissors, Trash2, TriangleRight, Undo2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import type { ModelNode } from "@/lib/viewer3d/types";
 import type { LoadStage } from "@/lib/viewer3d/worker-protocol";
 import { fmtMm, steelMassKg, type Measurement } from "@/lib/viewer3d/measure";
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import { cn } from "@/lib/utils";
-import { ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type StdView, type Tool } from "./engine";
+import {
+  PICK_FILTERS, ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
+} from "./engine";
 import { loadModel } from "./load-model";
 
 export interface ModelViewerProps {
@@ -88,7 +90,8 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const [modelFormat, setModelFormat] = React.useState<string>(formatLabel ?? "");
   const { bump, subscribeSnap } = useEngineEvents();
   const [menu, setMenu] = React.useState<ContextRequest | null>(null);
-  const [panel, setPanel] = React.useState<"tree" | "views" | "display" | null>(null);
+  const [panel, setPanel] = React.useState<"tree" | "views" | "display" | "filter" | null>(null);
+  const [sectionOpen, setSectionOpen] = React.useState(false);
   const [help, setHelp] = React.useState(false);
   const [isWide, setIsWide] = React.useState(true);
 
@@ -144,9 +147,9 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       const eng = engineRef.current;
       if (!eng || stage !== "ready") return;
-      if (e.key === "Escape" && (menu || panel || help)) {
+      if (e.key === "Escape" && (menu || (panel && panel !== "tree") || help)) {
         setMenu(null);
-        setPanel((p) => (p === "tree" && isWide ? p : null));
+        setPanel((p) => (p === "tree" ? p : null));
         setHelp(false);
         e.preventDefault();
         e.stopPropagation();
@@ -168,6 +171,15 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const measures = eng?.getMeasures() ?? [];
   const hidden = eng?.hiddenCount() ?? 0;
   const display = eng?.getDisplay() ?? "shaded-edges";
+  const filter = eng?.getPickFilter() ?? "auto";
+  const entity = eng?.getEntity() ?? null;
+  const section = eng?.getSection() ?? null;
+  const sectionPicking = eng?.isSectionPicking() ?? false;
+  const entityMode = ["face", "edge", "vertex", "center", "midpoint"].includes(filter);
+  const openSection = () => {
+    setSectionOpen(true);
+    if (!isWide) setPanel(null);
+  };
 
   const setTool = (t: Tool) => {
     eng?.setTool(eng.getTool() === t && t !== "select" ? "select" : t);
@@ -207,9 +219,17 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             canUndo={eng!.canUndo()}
             canRedo={eng!.canRedo()}
             hasSelection={selection.length > 0}
+            canDelete={selection.length > 0 || !!entity}
             hidden={hidden}
             panel={panel}
-            onPanel={(p) => setPanel((cur) => (cur === p ? null : p))}
+            onPanel={(p) => {
+              setPanel((cur) => (cur === p ? null : p));
+              if (!isWide && p === "tree") setSectionOpen(false);
+            }}
+            filterLabel={PICK_FILTERS.find((f) => f.key === filter)?.label ?? ""}
+            filterActive={filter !== "auto"}
+            sectionActive={!!section || sectionOpen}
+            onSection={() => (sectionOpen ? setSectionOpen(false) : openSection())}
             onUndo={() => eng!.undo()}
             onRedo={() => eng!.redo()}
             onDelete={() => eng!.deleteSelected()}
@@ -236,8 +256,25 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               ))}
             </Popover>
           )}
-          {panel === "tree" && (
-            <TreePanel engine={eng!} wide={isWide} onClose={() => setPanel(null)} />
+          {panel === "filter" && (
+            <Popover wide={isWide} onClose={() => setPanel(null)} title="Výběrový filtr (co vybírám / chytám)">
+              <FilterItems current={filter} onPick={(f) => { eng!.setPickFilter(f); setPanel(null); }} />
+            </Popover>
+          )}
+
+          {/* levý sloupec (telefon: dole nad lištou): řez + strom dílů */}
+          {(sectionOpen || panel === "tree") && (
+            <div
+              className={cn(
+                "pointer-events-none absolute z-30 flex flex-col gap-2",
+                isWide ? "bottom-10 left-2 top-14 w-72" : "inset-x-2 bottom-[4.25rem] max-h-[62%] justify-end",
+              )}
+            >
+              {sectionOpen && (
+                <SectionPanel engine={eng!} picking={sectionPicking} onClose={() => { eng!.cancelSectionPick(); setSectionOpen(false); }} />
+              )}
+              {panel === "tree" && <TreePanel engine={eng!} onClose={() => setPanel(null)} />}
+            </div>
           )}
 
           {/* pravý sloupec (telefon: nahoře vedle kostky): vybraný díl + měření */}
@@ -248,7 +285,8 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             )}
           >
             {tool === "select" && selection.length > 0 && <PartCard engine={eng!} selection={selection} />}
-            {(tool !== "select" || (measures.length > 0 && (isWide || selection.length === 0))) && (
+            {tool === "select" && entity && <EntityCard engine={eng!} onSection={openSection} />}
+            {(tool !== "select" || (measures.length > 0 && (isWide || (selection.length === 0 && !entity)))) && (
               <MeasurePanel
                 wide={isWide}
                 tool={tool}
@@ -262,7 +300,14 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           </div>
 
           {/* uchopení při měření */}
-          {tool !== "select" && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
+          {(tool !== "select" || entityMode || sectionPicking) && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
+
+          {/* aktivní filtr / výběr plochy pro řez — připomínka nahoře */}
+          {(filter !== "auto" || sectionPicking) && (
+            <div className={cn("pointer-events-none absolute z-20 rounded-full bg-[#272425]/85 px-3 py-1 text-xs font-medium text-white", isWide ? "left-1/2 top-[3.6rem] -translate-x-1/2" : "left-2 top-2")} data-testid="filter-badge">
+              {sectionPicking ? "Klikni na rovinnou plochu pro řez" : `Filtr: ${PICK_FILTERS.find((f) => f.key === filter)?.label}`}
+            </div>
+          )}
 
           {/* stavový řádek */}
           <StatusBar engine={eng!} format={modelFormat} wide={isWide} warnings={warnings} />
@@ -271,6 +316,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             <ContextMenu
               req={menu}
               engine={eng!}
+              onSection={openSection}
               onClose={() => setMenu(null)}
               hostRect={hostRef.current?.getBoundingClientRect() ?? null}
             />
@@ -325,9 +371,14 @@ function Toolbar(p: {
   canUndo: boolean;
   canRedo: boolean;
   hasSelection: boolean;
+  canDelete: boolean;
   hidden: number;
   panel: string | null;
-  onPanel: (p: "tree" | "views" | "display") => void;
+  onPanel: (p: "tree" | "views" | "display" | "filter") => void;
+  filterLabel: string;
+  filterActive: boolean;
+  sectionActive: boolean;
+  onSection: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDelete: () => void;
@@ -354,7 +405,10 @@ function Toolbar(p: {
       <ToolButton icon={Undo2} label="Zpět" kbd="Ctrl+Z" disabled={!p.canUndo} onClick={p.onUndo} testId="tool-undo" />
       <ToolButton icon={Redo2} label="Vpřed" kbd="Ctrl+Y" disabled={!p.canRedo} onClick={p.onRedo} testId="tool-redo" />
       <Sep />
-      <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.hasSelection} onClick={p.onDelete} testId="tool-delete" />
+      <ToolButton icon={Filter} label={p.filterActive ? p.filterLabel : "Filtr"} active={p.panel === "filter" || p.filterActive} onClick={() => p.onPanel("filter")} testId="tool-filter" />
+      <ToolButton icon={Scissors} label="Řez" active={p.sectionActive} onClick={p.onSection} testId="tool-section" />
+      <Sep />
+      <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
       <ToolButton icon={Focus} label="Izolovat" kbd="I" disabled={!p.hasSelection} onClick={p.onIsolate} testId="tool-isolate" />
       <ToolButton icon={Eye} label={p.hidden ? `Ukázat vše (${p.hidden})` : "Ukázat vše"} disabled={!p.hidden} onClick={p.onShowAll} testId="tool-showall" />
       <Sep />
@@ -410,15 +464,12 @@ function collectParts(n: ModelNode, out: number[] = []): number[] {
   return out;
 }
 
-function TreePanel({ engine, wide, onClose }: { engine: ViewerEngine; wide: boolean; onClose: () => void }) {
+function TreePanel({ engine, onClose }: { engine: ViewerEngine; onClose: () => void }) {
   const root = engine.getTree();
   const sel = new Set(engine.getSelection());
   return (
     <div
-      className={cn(
-        "absolute z-30 flex flex-col overflow-hidden rounded-xl border bg-card/95 shadow-xl backdrop-blur",
-        wide ? "bottom-10 left-2 top-14 w-72" : "inset-x-2 bottom-[4.25rem] max-h-[55%]",
-      )}
+      className="pointer-events-auto flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card/95 shadow-xl backdrop-blur"
       onPointerDown={(e) => e.stopPropagation()}
       data-testid="viewer3d-tree"
     >
@@ -430,7 +481,7 @@ function TreePanel({ engine, wide, onClose }: { engine: ViewerEngine; wide: bool
       <div className="min-h-0 flex-1 overflow-auto p-1 text-sm scrollbar-thin">
         <TreeNode node={root} engine={engine} sel={sel} depth={0} />
       </div>
-      <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">Klik = vybrat · oko = skrýt / ukázat · Ctrl+klik = více dílů</p>
+      <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">Klik = vybrat · Del = smazat · oko = skrýt / ukázat · Ctrl+klik = více</p>
     </div>
   );
 }
@@ -575,6 +626,156 @@ function MeasurePanel({
   );
 }
 
+// ---------------------------------------------------------------- filtr, řez, entita
+
+function FilterItems({ current, onPick }: { current: PickFilter; onPick: (f: PickFilter) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Výběrový filtr" data-testid="filter-items">
+      {PICK_FILTERS.map((f) => (
+        <button
+          key={f.key}
+          type="button"
+          role="radio"
+          aria-checked={current === f.key}
+          onClick={() => onPick(f.key)}
+          className={cn("flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-accent", current === f.key && "bg-accent")}
+        >
+          <span className={cn("mt-1 h-3 w-3 shrink-0 rounded-full border-2", current === f.key ? "border-primary bg-primary" : "border-muted-foreground/50")} />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">{f.label}</span>
+            <span className="block text-[11px] leading-tight text-muted-foreground">{f.hint}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function fmtPos(v: number): string {
+  return v.toFixed(2).replace(".", ",");
+}
+
+function SectionPanel({ engine, picking, onClose }: { engine: ViewerEngine; picking: boolean; onClose: () => void }) {
+  const st = engine.getSection();
+  const [text, setText] = React.useState("");
+  React.useEffect(() => {
+    if (st) setText(fmtPos(st.position));
+  }, [st?.position]); // eslint-disable-line react-hooks/exhaustive-deps
+  const commitText = () => {
+    const v = Number(text.replace(",", ".").replace(/\s/g, ""));
+    if (st && Number.isFinite(v)) engine.setSectionPosition(v);
+  };
+  const axisBtn = (axis: "x" | "y" | "z", label: string, sub: string) => (
+    <button
+      type="button"
+      onClick={() => engine.setSectionAxis(axis)}
+      className={cn("flex min-h-10 flex-col items-center justify-center rounded-lg border px-1 py-1 text-xs font-medium hover:bg-accent", st?.label === label && "border-primary bg-primary/10")}
+      data-testid={`section-${axis}`}
+    >
+      {label.replace("Rovina ", "")}
+      <span className="text-[10px] font-normal text-muted-foreground">{sub}</span>
+    </button>
+  );
+  return (
+    <div className="pointer-events-auto shrink-0 rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur" onPointerDown={(e) => e.stopPropagation()} data-testid="section-panel">
+      <div className="flex items-center gap-2">
+        <Scissors className="h-4 w-4 text-primary" />
+        <span className="flex-1 font-semibold">Řez</span>
+        <button type="button" onClick={onClose} aria-label="Zavřít panel řezu" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-2 grid grid-cols-4 gap-1.5">
+        {axisBtn("z", "Rovina XY", "shora")}
+        {axisBtn("y", "Rovina XZ", "zepředu")}
+        {axisBtn("x", "Rovina YZ", "zboku")}
+        <button
+          type="button"
+          onClick={() => (picking ? engine.cancelSectionPick() : engine.startSectionPick())}
+          className={cn("flex min-h-10 flex-col items-center justify-center rounded-lg border px-1 py-1 text-xs font-medium hover:bg-accent", (picking || st?.label === "Rovina plochy") && "border-primary bg-primary/10")}
+          data-testid="section-face"
+        >
+          <Crosshair className="h-3.5 w-3.5" />
+          <span className="text-[10px] font-normal text-muted-foreground">z plochy</span>
+        </button>
+      </div>
+      {picking && <p className="mt-2 rounded-md bg-blue-50 px-2 py-1.5 text-xs text-blue-900 dark:bg-blue-500/10 dark:text-blue-200">Klikni na rovinnou plochu modelu — řez povede rovnoběžně s ní.</p>}
+      {st && (
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{st.label}</span>
+            <span className="tabular-nums">{fmtPos(st.min)} … {fmtPos(st.max)} mm</span>
+          </div>
+          <input
+            type="range"
+            min={st.min}
+            max={st.max}
+            step={Math.max((st.max - st.min) / 1000, 0.001)}
+            value={st.position}
+            onChange={(e) => engine.setSectionPosition(Number(e.target.value))}
+            className="w-full accent-[#E03930]"
+            aria-label="Poloha řezu"
+            data-testid="section-slider"
+          />
+          <div className="flex items-center gap-1.5">
+            <label className="flex flex-1 items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs">
+              <span className="text-muted-foreground">Poloha</span>
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={commitText}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitText();
+                }}
+                inputMode="decimal"
+                className="w-full min-w-0 bg-transparent text-right tabular-nums outline-none"
+                aria-label="Poloha řezu v mm"
+                data-testid="section-position"
+              />
+              <span className="text-muted-foreground">mm</span>
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button type="button" onClick={() => engine.flipSection()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="section-flip"><ArrowLeftRight className="h-3.5 w-3.5" /> Otočit stranu</button>
+            <button type="button" onClick={() => engine.viewSection()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><ScanEye className="h-3.5 w-3.5" /> Pohled kolmo</button>
+            <button type="button" onClick={() => engine.clearSection()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium text-red-600 hover:bg-accent dark:text-red-400" data-testid="section-off"><X className="h-3.5 w-3.5" /> Vypnout řez</button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Na řezu jde měřit — chytají se hrany řezu, rohy i středy děr.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EntityCard({ engine, onSection }: { engine: ViewerEngine; onSection: () => void }) {
+  const e = engine.getEntity();
+  if (!e) return null;
+  return (
+    <div className="pointer-events-auto shrink-0 overflow-auto rounded-xl border border-[#1f6feb]/40 bg-card/95 p-3 text-sm shadow-xl backdrop-blur" onPointerDown={(ev) => ev.stopPropagation()} data-testid="viewer3d-entity">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{e.title}</p>
+          <p className="truncate text-xs text-muted-foreground">{engine.partName(e.part)}</p>
+          <dl className="mt-1 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
+            {e.rows.map(([k, v]) => (
+              <React.Fragment key={k}>
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd className="text-right">{v}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+        </div>
+        <button type="button" onClick={() => engine.setEntity(null)} aria-label="Zrušit výběr" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {e.plane && (
+          <button type="button" onClick={() => { engine.sectionFromPlane(e.plane!.normal, e.plane!.point, e.part); onSection(); }} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="entity-section"><Scissors className="h-3.5 w-3.5" /> Řez touto plochou</button>
+        )}
+        <button type="button" onClick={() => engine.measureFromEntity()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Ruler className="h-3.5 w-3.5" /> Měřit odsud</button>
+        <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat díl</button>
+      </div>
+    </div>
+  );
+}
+
 function SnapLayer({ engine, subscribe }: { engine: ViewerEngine; subscribe: (fn: () => void) => () => void }) {
   const [, setV] = React.useState(0);
   React.useEffect(() => subscribe(() => setV((x) => x + 1)), [subscribe]);
@@ -668,7 +869,7 @@ function StatusBar({ engine, format, wide, warnings }: { engine: ViewerEngine; f
   );
 }
 
-function ContextMenu({ req, engine, onClose, hostRect }: { req: ContextRequest; engine: ViewerEngine; onClose: () => void; hostRect: DOMRect | null }) {
+function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: ContextRequest; engine: ViewerEngine; onClose: () => void; onSection: () => void; hostRect: DOMRect | null }) {
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     const close = (e: PointerEvent) => {
@@ -677,24 +878,46 @@ function ContextMenu({ req, engine, onClose, hostRect }: { req: ContextRequest; 
     window.addEventListener("pointerdown", close, true);
     return () => window.removeEventListener("pointerdown", close, true);
   }, [onClose]);
-  const left = hostRect ? Math.min(req.clientX - hostRect.left, hostRect.width - 230) : 8;
-  const top = hostRect ? Math.min(req.clientY - hostRect.top, hostRect.height - 260) : 8;
+  const width = 240;
+  const left = hostRect ? Math.min(req.clientX - hostRect.left, hostRect.width - width - 4) : 8;
+  const top = hostRect ? Math.min(req.clientY - hostRect.top, Math.max(4, hostRect.height - 520)) : 8;
   const sel = engine.getSelection();
+  const filter = engine.getPickFilter();
   const act = (f: () => void) => () => {
     f();
     onClose();
   };
+  const part = req.part;
   return (
-    <div ref={ref} className="absolute z-50 w-56 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-xl" style={{ left: Math.max(4, left), top: Math.max(4, top) }} data-testid="viewer3d-context">
-      {req.part !== null && (
+    <div
+      ref={ref}
+      className="absolute z-50 max-h-[calc(100%-8px)] overflow-auto rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-xl scrollbar-thin"
+      style={{ left: Math.max(4, left), top: Math.max(4, top), width }}
+      data-testid="viewer3d-context"
+    >
+      {part !== null && (
         <>
-          <p className="truncate px-2.5 py-1 text-xs font-semibold text-muted-foreground">{engine.partName(req.part)}</p>
-          <MenuItem onClick={act(() => engine.deleteSelected())} kbd="Del"><Trash2 className="h-4 w-4" /> Smazat díl</MenuItem>
-          <MenuItem onClick={act(() => engine.isolate(sel.length ? sel : [req.part!]))} kbd="I"><Focus className="h-4 w-4" /> Izolovat</MenuItem>
+          <p className="truncate px-2.5 py-1 text-xs font-semibold text-muted-foreground">{engine.partName(part)}</p>
+          <MenuItem onClick={act(() => (sel.length ? engine.deleteSelected() : engine.hideParts(engine.partGroup(part))))} kbd="Del"><Trash2 className="h-4 w-4" /> Smazat díl</MenuItem>
+          <MenuItem onClick={act(() => engine.hideParts(engine.assemblyGroup(part)))}><Trash2 className="h-4 w-4" /> Smazat celou podsestavu</MenuItem>
+          <MenuItem onClick={act(() => engine.isolate(sel.length ? sel : engine.partGroup(part)))} kbd="I"><Focus className="h-4 w-4" /> Izolovat</MenuItem>
           <MenuItem onClick={act(() => engine.fit(true))} kbd="F"><Maximize2 className="h-4 w-4" /> Přiblížit na díl</MenuItem>
+          {req.facePlane && (
+            <MenuItem onClick={act(() => { engine.sectionFromPlane(req.facePlane!.normal, req.facePlane!.point, req.facePlane!.part); onSection(); })}>
+              <Scissors className="h-4 w-4" /> Řez touto plochou
+            </MenuItem>
+          )}
           <div className="my-1 border-t" />
         </>
       )}
+      <p className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Vybírat / chytat</p>
+      {PICK_FILTERS.map((f) => (
+        <MenuItem key={f.key} active={filter === f.key} onClick={act(() => engine.setPickFilter(f.key))}>
+          <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full border-2", filter === f.key ? "border-primary bg-primary" : "border-muted-foreground/50")} />
+          {f.label}
+        </MenuItem>
+      ))}
+      <div className="my-1 border-t" />
       <MenuItem onClick={act(() => engine.showAll())}><Eye className="h-4 w-4" /> Ukázat vše</MenuItem>
       <MenuItem onClick={act(() => engine.fit())} kbd="Ctrl+F"><Maximize2 className="h-4 w-4" /> Celý model</MenuItem>
       <MenuItem onClick={act(() => engine.setView("iso"))} kbd="0"><Box className="h-4 w-4" /> Izometrie</MenuItem>
@@ -710,10 +933,12 @@ const HELP: [string, string][] = [
   ["Přiblížení", "kolečko myši (ke kurzoru) · roztažení 2 prstů"],
   ["Celý model", "F nebo Ctrl+F · dvojklik do prázdna"],
   ["Výběr dílu", "klik · Ctrl / Shift + klik = více dílů"],
-  ["Smazat / skrýt díl", "Del nebo H · Izolovat = I"],
+  ["Smazat díl", "klik na díl + Del (nebo H) · Izolovat = I · pravé tlačítko = smazat díl / celou podsestavu"],
+  ["Výběrový filtr", "tlačítko Filtr nebo pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed křivosti, střed hrany"],
+  ["Řez", "tlačítko Řez: rovina XY / XZ / YZ nebo „z plochy“ (klik na plochu), posuvník polohy, otočit stranu; pravé tlačítko na ploše = řez touto plochou"],
   ["Zpět / vpřed", "Ctrl+Z / Ctrl+Y"],
   ["Pohledy", "0 izometrie · 1 zepředu · 2 zezadu · 3 zleva · 4 zprava · 5 shora · 6 zespodu · klik na kostku"],
-  ["Měření", "M = vzdálenost · na kružnici chytá střed · Alt = bod na hraně · Esc = zrušit"],
+  ["Měření", "M = vzdálenost · Průměr / rádius · Úhel · na kružnici chytá střed · Alt = bod na hraně · filtr omezí, co se chytá · Esc = zrušit"],
   ["Místní nabídka", "pravé tlačítko · na telefonu podržet prst"],
 ];
 

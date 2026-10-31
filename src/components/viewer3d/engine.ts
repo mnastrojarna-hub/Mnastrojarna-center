@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-mesh-bvh";
 import type { ModelNode, ParsedModel } from "@/lib/viewer3d/types";
 import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
+import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
 import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
   type MeasureMode, type Measurement, type SnapGeometry, type SnapKind, type SnapPoint,
@@ -22,7 +23,45 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 export type DisplayMode = "shaded-edges" | "shaded" | "wireframe" | "xray";
 export type Tool = "select" | MeasureMode;
 export type StdView = "front" | "back" | "left" | "right" | "top" | "bottom" | "iso";
-export type ChangeKind = "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending";
+export type ChangeKind =
+  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity";
+
+/** Výběrový filtr jako v ZW3D — co se vybírá / na co se uchopuje. */
+export type PickFilter = "auto" | "shape" | "part" | "assembly" | "face" | "edge" | "vertex" | "center" | "midpoint";
+
+export const PICK_FILTERS: { key: PickFilter; label: string; hint: string }[] = [
+  { key: "auto", label: "Automaticky", hint: "díl při výběru; při měření roh, střed díry, hrana, plocha" },
+  { key: "shape", label: "Tvar (těleso)", hint: "jedno těleso" },
+  { key: "part", label: "Díl", hint: "celý díl (všechna jeho tělesa)" },
+  { key: "assembly", label: "Sestava", hint: "celá podsestava, do které díl patří" },
+  { key: "face", label: "Plocha", hint: "rovina, válec, obecná plocha" },
+  { key: "edge", label: "Hrana", hint: "úsečka, kružnice, oblouk, křivka" },
+  { key: "vertex", label: "Bod / roh", hint: "koncový bod hrany" },
+  { key: "center", label: "Střed křivosti", hint: "střed kružnice, oblouku, osa válce" },
+  { key: "midpoint", label: "Střed hrany", hint: "polovina hrany" },
+];
+
+const ENTITY_FILTERS: PickFilter[] = ["face", "edge", "vertex", "center", "midpoint"];
+
+/** Vybraná entita (plocha / hrana / bod) — popis pro kartu. */
+export interface EntityInfo {
+  kind: SnapKind;
+  title: string;
+  rows: [string, string][];
+  part: number;
+  /** Rovinná plocha → jde z ní udělat řez. */
+  plane?: { normal: Vec3; point: Vec3 };
+}
+
+/** Stav řezu pro panel. */
+export interface SectionState {
+  normal: Vec3;
+  position: number;
+  min: number;
+  max: number;
+  flipped: boolean;
+  label: string;
+}
 
 export interface PartInfo {
   index: number;
@@ -39,6 +78,8 @@ export interface ContextRequest {
   part: number | null;
   clientX: number;
   clientY: number;
+  /** Rovinná plocha pod kurzorem (nabídka „Řez touto plochou"). */
+  facePlane?: { normal: Vec3; point: Vec3; part: number } | null;
 }
 
 export interface SnapState {
@@ -146,12 +187,44 @@ export class ViewerEngine {
   private bvhQueue: number[] = [];
   private cubeHover = false;
 
+  // výběrový filtr a vybraná entita
+  private filter: PickFilter = "auto";
+  private entity: SnapPoint | null = null;
+  private entityObj: THREE.Object3D | null = null;
+  // strom sestavy: díl → uzel, uzel → rodič
+  private nodeParts: number[][] = [];
+  private nodeAll: number[][] = [];
+  private nodeParent: number[] = [];
+  private partNode: number[] = [];
+
+  // řez
+  private clipPlane: THREE.Plane | null = null;
+  private section: { normal: THREE.Vector3; position: number; flipped: boolean; label: string } | null = null;
+  private sectionGroup = new THREE.Group();
+  private sectionTopo = new Map<number, SectionTopology>();
+  private sectionTimer: number | null = null;
+  private sectionPick = false;
+  private capMaterials = new Map<string, THREE.Material>();
+  private hatch: THREE.Texture | null = null;
+  private stencilBack = new THREE.MeshBasicMaterial({
+    side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
+    stencilFunc: THREE.AlwaysStencilFunc, stencilFail: THREE.IncrementWrapStencilOp,
+    stencilZFail: THREE.IncrementWrapStencilOp, stencilZPass: THREE.IncrementWrapStencilOp,
+  });
+  private stencilFront = new THREE.MeshBasicMaterial({
+    side: THREE.FrontSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
+    stencilFunc: THREE.AlwaysStencilFunc, stencilFail: THREE.DecrementWrapStencilOp,
+    stencilZFail: THREE.DecrementWrapStencilOp, stencilZPass: THREE.DecrementWrapStencilOp,
+  });
+  private sectionLineMaterial = new THREE.LineBasicMaterial({ color: 0x111317 });
+
   constructor(
     private container: HTMLElement,
     private onChange: (kind: ChangeKind) => void,
     private onContext: (req: ContextRequest) => void,
   ) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: true, powerPreference: "high-performance" });
+    this.renderer.localClippingEnabled = true;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.autoClear = false;
@@ -178,7 +251,9 @@ export class ViewerEngine {
     const rim = new THREE.DirectionalLight(0xffffff, 0.35);
     rim.position.set(0, -0.6, -0.8);
     this.camera.add(rim);
-    this.scene.add(this.camera, this.modelGroup, this.overlayGroup);
+    // překryvy (měření, uchopení) až po řezu — skupina s vlastním pořadím
+    this.overlayGroup.renderOrder = 100000;
+    this.scene.add(this.camera, this.modelGroup, this.sectionGroup, this.overlayGroup);
 
     this.cube = new ViewCube(true);
     this.controls = new CadControls(canvas, {
@@ -212,6 +287,12 @@ export class ViewerEngine {
     this.selMaterial.dispose();
     this.edgeMaterial.dispose();
     this.edgeSelMaterial.dispose();
+    this.stencilBack.dispose();
+    this.stencilFront.dispose();
+    this.sectionLineMaterial.dispose();
+    for (const m of this.capMaterials.values()) m.dispose();
+    this.hatch?.dispose();
+    if (this.sectionTimer !== null) window.clearTimeout(this.sectionTimer);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
@@ -228,6 +309,8 @@ export class ViewerEngine {
     this.modelGroup.clear();
     this.parts = [];
     this.clearMeasureObjects();
+    this.clearSectionObjects();
+    this.setEntityObj(null);
   }
 
   // ------------------------------------------------------------------ model
@@ -243,6 +326,8 @@ export class ViewerEngine {
         transparent: opacity < 1, opacity, depthWrite: opacity >= 1,
       });
       m.userData.baseOpacity = opacity;
+      m.userData.vc = vertexColors;
+      m.clippingPlanes = this.clipPlane ? [this.clipPlane] : null;
       this.materials.set(key, m);
       this.applyDisplayToMaterial(m);
     }
@@ -260,6 +345,10 @@ export class ViewerEngine {
     this.redoStack = [];
     this.measures = [];
     this.pending = null;
+    this.entity = null;
+    this.section = null;
+    this.clipPlane = null;
+    this.indexTree(model.root, model.parts.length);
 
     model.parts.forEach((part, index) => {
       const g = new THREE.BufferGeometry();
@@ -354,9 +443,45 @@ export class ViewerEngine {
     // BVH pro rychlý výběr — postupně, ať první vykreslení nečeká
     this.bvhQueue = this.parts.map((p) => p.index).sort((a, b) => this.triCount(b) - this.triCount(a));
     this.scheduleBvh();
+    this.applyClipping();
     this.onChange("visibility");
     this.onChange("history");
     this.onChange("measures");
+    this.onChange("section");
+  }
+
+  /** Strom sestavy → rychlé dotazy „díl tohoto tělesa" a „podsestava". */
+  private indexTree(root: ModelNode, partCount: number) {
+    this.nodeParts = [];
+    this.nodeAll = [];
+    this.nodeParent = [];
+    this.partNode = new Array(partCount).fill(-1);
+    const visit = (n: ModelNode, parent: number): number[] => {
+      const id = this.nodeParts.length;
+      this.nodeParts.push(n.parts);
+      this.nodeAll.push([]);
+      this.nodeParent.push(parent);
+      for (const p of n.parts) if (p >= 0 && p < partCount && this.partNode[p] < 0) this.partNode[p] = id;
+      const all = [...n.parts];
+      for (const c of n.children) all.push(...visit(c, id));
+      this.nodeAll[id] = all;
+      return all;
+    };
+    visit(root, -1);
+  }
+
+  /** Všechna tělesa dílu, do kterého patří těleso i. */
+  partGroup(i: number): number[] {
+    const n = this.partNode[i];
+    return n >= 0 && this.nodeParts[n].length ? [...this.nodeParts[n]] : [i];
+  }
+
+  /** Všechna tělesa podsestavy, do které patří díl tělesa i. */
+  assemblyGroup(i: number): number[] {
+    const n = this.partNode[i];
+    if (n < 0) return [i];
+    const parent = this.nodeParent[n];
+    return parent >= 0 ? [...this.nodeAll[parent]] : [...this.nodeAll[n]];
   }
 
   private triCount(i: number): number {
@@ -664,12 +789,14 @@ export class ViewerEngine {
 
   // ------------------------------------------------------------------ výběr a zobrazení
 
-  private raycastParts(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number } | null {
+  private raycastParts(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number; cap?: boolean } | null {
     if (!this.parts.length) return null;
     this.updateFrustum();
     const ndc = new THREE.Vector2((x / this.width) * 2 - 1, -(y / this.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    this.raycaster.firstHitOnly = true;
+    const plane = this.clipPlane;
+    // s řezem potřebujeme všechny průsečíky (první může být v odříznuté části)
+    this.raycaster.firstHitOnly = !plane;
     const meshes: THREE.Mesh[] = [];
     for (const p of this.parts) {
       if (p.hidden || this.triCount(p.index) === 0) continue;
@@ -677,13 +804,27 @@ export class ViewerEngine {
       this.ensureBvh(p);
       meshes.push(p.mesh);
     }
+    const eps = this.modelSphere.radius * 1e-6;
     let best: THREE.Intersection | null = null;
     for (const m of meshes) {
       const hits = this.raycaster.intersectObject(m, false);
-      if (hits[0] && (!best || hits[0].distance < best.distance)) best = hits[0];
+      for (const h of hits) {
+        if (plane && plane.distanceToPoint(h.point) < -eps) continue;
+        if (!best || h.distance < best.distance) best = h;
+        break;
+      }
     }
     if (!best) return null;
-    return { part: best.object.userData.part as number, point: best.point.clone(), tri: best.faceIndex ?? 0, distance: best.distance };
+    const part = best.object.userData.part as number;
+    if (plane && best.face) {
+      // díváme se do vnitřku tělesa → vidíme vybarvený řez (víčko) v rovině řezu
+      const n = best.face.normal;
+      if (n.dot(this.raycaster.ray.direction) > 0) {
+        const q = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+        if (q) return { part, point: q, tri: -1, distance: this.raycaster.ray.origin.distanceTo(q), cap: true };
+      }
+    }
+    return { part, point: best.point.clone(), tri: best.faceIndex ?? 0, distance: best.distance };
   }
 
   private applyDisplayToMaterial(m: THREE.Material) {
@@ -694,6 +835,20 @@ export class ViewerEngine {
     m.opacity = opacity;
     m.depthWrite = opacity >= 1;
     m.needsUpdate = true;
+  }
+
+  /** Ořezová rovina na všechny materiály modelu (posun roviny už jen mění její hodnoty). */
+  private applyClipping() {
+    const planes = this.clipPlane ? [this.clipPlane] : null;
+    const all: THREE.Material[] = [
+      ...this.materials.values(), ...this.hoverMaterials.values(), this.selMaterial, this.edgeMaterial, this.edgeSelMaterial,
+      this.stencilBack, this.stencilFront,
+    ];
+    for (const m of all) {
+      m.clippingPlanes = planes;
+      m.needsUpdate = true;
+    }
+    this.requestRender();
   }
 
   private applyDisplay() {
@@ -725,6 +880,7 @@ export class ViewerEngine {
     if (!m) {
       const c = (base as THREE.MeshPhongMaterial).clone();
       c.emissive = new THREE.Color(0x3a2a10);
+      c.clippingPlanes = this.clipPlane ? [this.clipPlane] : null;
       c.userData.baseOpacity = base.userData.baseOpacity;
       this.applyDisplayToMaterial(c);
       m = c;
@@ -781,6 +937,7 @@ export class ViewerEngine {
     });
     this.measures = [...s.measures];
     this.syncMeasureObjects();
+    if (this.section) this.rebuildSection(true);
     this.requestRender();
     this.onChange("visibility");
     this.onChange("selection");
@@ -821,6 +978,7 @@ export class ViewerEngine {
       this.applyPartState(this.parts[i]);
     }
     if (hidden && this.hoverPart !== null && changed.includes(this.hoverPart)) this.hoverPart = null;
+    if (this.section) this.rebuildSection(true);
     this.commit(before);
     this.requestRender();
     this.onChange("visibility");
@@ -838,6 +996,16 @@ export class ViewerEngine {
 
   deleteSelected() {
     if (this.selection.size) this.hideParts([...this.selection]);
+    else if (this.entity) {
+      // vybraná plocha / hrana / bod → smazat díl, ke kterému patří
+      const part = this.entity.part;
+      this.setEntity(null);
+      this.hideParts(this.partGroup(part));
+    }
+  }
+
+  hasDeletable(): boolean {
+    return this.selection.size > 0 || !!this.entity;
   }
 
   isolate(indices: number[]) {
@@ -854,6 +1022,7 @@ export class ViewerEngine {
       this.applyPartState(p);
     }
     if (!changed) return;
+    if (this.section) this.rebuildSection(true);
     this.commit(before);
     this.requestRender();
     this.onChange("visibility");
@@ -893,6 +1062,14 @@ export class ViewerEngine {
 
   /** Zrušit rozdělané měření / výběr (Esc). */
   cancel() {
+    if (this.sectionPick) {
+      this.cancelSectionPick();
+      return true;
+    }
+    if (this.entity) {
+      this.setEntity(null);
+      return true;
+    }
     if (this.pending) {
       this.pending = null;
       this.syncPending();
@@ -968,12 +1145,26 @@ export class ViewerEngine {
     return s.depth <= this.toScreen(hit.point).depth + eps;
   }
 
-  /** Najde místo k uchopení pod kurzorem. */
-  private findSnap(x: number, y: number, alt: boolean): SnapPoint | null {
+  /**
+   * Najde místo k uchopení pod kurzorem podle nástroje a výběrového filtru (ZW3D):
+   * roh, střed křivosti (kružnice, oblouk, osa válce), střed hrany, bod na hraně, plocha.
+   * Počítá i s řezem — obrys řezu (hrany, rohy, díry v řezu) a vybarvená plocha řezu.
+   */
+  private findSnap(x: number, y: number, alt: boolean, purpose: "distance" | "diameter" | "angle" | "entity" = this.tool === "select" ? "entity" : this.tool): SnapPoint | null {
     const tol = this.touchMode ? 22 : 11;
-    const mode = this.tool;
+    const F = this.filter;
+    const auto = F === "auto" || F === "shape" || F === "part" || F === "assembly";
+    const pointy = purpose === "distance" || purpose === "entity";
+    const allowVertex = pointy && !alt && (auto || F === "vertex");
+    const allowCenter = !alt && (auto ? pointy : F === "center") && purpose !== "angle";
+    const allowMid = pointy && !alt && (auto || F === "midpoint");
+    const allowEdge = auto || F === "edge" || (F === "center" && purpose !== "angle");
+    const allowFace = auto || F === "face" || F === "center";
     const hit = this.raycastParts(x, y);
     const wpp = this.worldPerPx();
+    const plane = this.clipPlane;
+    const eps = this.modelSphere.radius * 1e-5;
+    const kept = (px: number, py: number, pz: number) => !plane || plane.normal.x * px + plane.normal.y * py + plane.normal.z * pz + plane.constant >= -eps;
 
     interface Cand { kind: SnapKind; point: Vec3; part: number; d: number; pri: number; check: Vec3; geometry?: SnapGeometry }
     const cands: Cand[] = [];
@@ -985,38 +1176,31 @@ export class ViewerEngine {
       return [((nx + 1) / 2) * this.width, ((1 - ny) / 2) * this.height];
     };
 
-    for (const p of this.parts) {
-      if (p.hidden) continue;
-      const [cx, cy] = proj(p.sphere.center.x, p.sphere.center.y, p.sphere.center.z);
-      if (Math.hypot(cx - x, cy - y) > p.sphere.radius / wpp + tol) continue;
-      const t = p.topo;
-      // rohy
-      if (mode === "distance" && !alt) {
+    const collect = (t: SectionTopology, part: number) => {
+      if (allowVertex) {
         for (let i = 0; i < t.corners.length; i += 3) {
+          if (!kept(t.corners[i], t.corners[i + 1], t.corners[i + 2])) continue;
           const [sx, sy] = proj(t.corners[i], t.corners[i + 1], t.corners[i + 2]);
           const d = Math.hypot(sx - x, sy - y);
           if (d <= tol) {
             const pt: Vec3 = [t.corners[i], t.corners[i + 1], t.corners[i + 2]];
-            cands.push({ kind: "vertex", point: pt, part: p.index, d, pri: 0, check: pt });
+            cands.push({ kind: "vertex", point: pt, part, d, pri: 0, check: pt });
           }
         }
       }
-      // středy kružnic, středy hran
-      if (mode === "distance" && !alt) {
-        for (const c of t.curves) {
-          if (c.center && (c.kind === "circle" || c.kind === "arc")) {
-            const [sx, sy] = proj(c.center[0], c.center[1], c.center[2]);
-            const d = Math.hypot(sx - x, sy - y);
-            if (d <= tol) cands.push({ kind: "center", point: c.center, part: p.index, d, pri: 1, check: c.mid, geometry: circleGeom(c) });
-          }
-          if (!c.closed && c.kind !== "circle") {
-            const [sx, sy] = proj(c.mid[0], c.mid[1], c.mid[2]);
-            const d = Math.hypot(sx - x, sy - y);
-            if (d <= tol * 0.8) cands.push({ kind: "midpoint", point: c.mid, part: p.index, d, pri: 2, check: c.mid, geometry: lineGeom(c) });
-          }
+      for (const c of t.curves) {
+        if (allowCenter && c.center && (c.kind === "circle" || c.kind === "arc") && kept(c.mid[0], c.mid[1], c.mid[2])) {
+          const [sx, sy] = proj(c.center[0], c.center[1], c.center[2]);
+          const d = Math.hypot(sx - x, sy - y);
+          if (d <= tol) cands.push({ kind: "center", point: c.center, part, d, pri: 1, check: c.mid, geometry: circleGeom(c) });
+        }
+        if (allowMid && !c.closed && c.kind !== "circle" && kept(c.mid[0], c.mid[1], c.mid[2])) {
+          const [sx, sy] = proj(c.mid[0], c.mid[1], c.mid[2]);
+          const d = Math.hypot(sx - x, sy - y);
+          if (d <= tol * 0.8) cands.push({ kind: "midpoint", point: c.mid, part, d, pri: 2, check: c.mid, geometry: lineGeom(c) ?? circleOrNone(c) });
         }
       }
-      // hrany (nejbližší bod na úsečce v obraze)
+      if (!allowEdge && !allowCenter) return;
       const seg = t.edgeSegments;
       for (let s = 0; s < seg.length; s += 6) {
         const [ax, ay] = proj(seg[s], seg[s + 1], seg[s + 2]);
@@ -1028,39 +1212,69 @@ export class ViewerEngine {
         u = Math.max(0, Math.min(1, u));
         const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
         if (d > tol) continue;
-        const curve = t.curves[t.segCurve[s / 6]];
         const pt: Vec3 = [seg[s] + (seg[s + 3] - seg[s]) * u, seg[s + 1] + (seg[s + 4] - seg[s + 1]) * u, seg[s + 2] + (seg[s + 5] - seg[s + 2]) * u];
+        if (!kept(pt[0], pt[1], pt[2])) continue;
+        const curve = t.curves[t.segCurve[s / 6]];
         const isCircle = !!curve && (curve.kind === "circle" || curve.kind === "arc") && !!curve.center;
-        if (mode === "diameter") {
-          if (isCircle) cands.push({ kind: "edge", point: pt, part: p.index, d, pri: 1, check: pt, geometry: circleGeom(curve) });
+        if (purpose === "diameter") {
+          if (isCircle && F === "center") cands.push({ kind: "center", point: curve.center!, part, d, pri: 1, check: pt, geometry: circleGeom(curve) });
+          else if (isCircle && allowEdge) cands.push({ kind: "edge", point: pt, part, d, pri: 1, check: pt, geometry: circleGeom(curve) });
           continue;
         }
-        if (mode === "angle") {
-          if (curve?.kind === "line") cands.push({ kind: "edge", point: pt, part: p.index, d, pri: 1, check: pt, geometry: lineGeom(curve) });
+        if (purpose === "angle") {
+          if (allowEdge && curve?.kind === "line") cands.push({ kind: "edge", point: pt, part, d, pri: 1, check: pt, geometry: lineGeom(curve) });
           continue;
         }
-        // měření vzdálenosti: na kružnici → střed (díry), jinak bod na hraně
-        if (isCircle && !alt) cands.push({ kind: "center", point: curve.center!, part: p.index, d, pri: 1.5, check: pt, geometry: circleGeom(curve) });
-        else cands.push({ kind: "edge", point: pt, part: p.index, d, pri: 3, check: pt, geometry: curve?.kind === "line" ? lineGeom(curve) : undefined });
+        // na kružnici / oblouku: střed (díry) — automaticky nebo s filtrem „Střed křivosti"
+        if (isCircle && allowCenter && (F === "center" || (auto && !alt))) {
+          cands.push({ kind: "center", point: curve.center!, part, d, pri: 1.5, check: pt, geometry: circleGeom(curve) });
+        } else if (allowEdge && F !== "center") {
+          const geometry = curve?.kind === "line" ? lineGeom(curve) : isCircle ? circleGeom(curve) : undefined;
+          cands.push({ kind: "edge", point: pt, part, d, pri: 3, check: pt, geometry: geometry ? { ...geometry, curveLength: curve?.length } : { curveLength: curve?.length } });
+        }
       }
+    };
+
+    for (const p of this.parts) {
+      if (p.hidden) continue;
+      const [cx, cy] = proj(p.sphere.center.x, p.sphere.center.y, p.sphere.center.z);
+      if (Math.hypot(cx - x, cy - y) > p.sphere.radius / wpp + tol) continue;
+      collect(p.topo, p.index);
+      const st = this.sectionTopo.get(p.index);
+      if (st) collect(st, p.index);
     }
     cands.sort((a, b) => a.pri - b.pri || a.d - b.d);
     for (const c of cands.slice(0, 8)) {
       if (this.visibleAt(c.check)) return { kind: c.kind, point: c.point, part: c.part, geometry: c.geometry };
     }
-    if (hit) {
-      const p = this.parts[hit.part];
+    if (!hit || !allowFace) return null;
+    const p = this.parts[hit.part];
+    const geometry: SnapGeometry = {};
+    if (hit.cap && plane) {
+      // plocha řezu
+      geometry.plane = { normal: [plane.normal.x, plane.normal.y, plane.normal.z], point: [hit.point.x, hit.point.y, hit.point.z] };
+      geometry.sectionCap = true;
+    } else {
       const fi = p.topo.triFace[hit.tri];
       const f = fi !== undefined ? p.topo.faces[fi] : undefined;
-      const geometry: SnapGeometry = {};
       if (f?.kind === "plane" && f.normal && f.point) geometry.plane = { normal: f.normal, point: f.point };
       if (f?.kind === "cylinder" && f.normal && f.point && f.radius) geometry.cylinder = { axis: f.normal, point: f.point, radius: f.radius };
-      if (mode === "diameter" && !geometry.cylinder) return null;
-      if (mode === "angle" && !geometry.plane && !geometry.cylinder) return null;
       geometry.faceIndex = fi;
-      return { kind: "face", point: [hit.point.x, hit.point.y, hit.point.z], part: hit.part, geometry };
+      if (f) geometry.faceArea = f.area;
     }
-    return null;
+    const pt: Vec3 = [hit.point.x, hit.point.y, hit.point.z];
+    if (F === "center") {
+      // střed křivosti válcové plochy = bod na ose v rovině kurzoru
+      const cyl = geometry.cylinder;
+      if (!cyl) return null;
+      const ax = new THREE.Vector3(...cyl.axis).normalize();
+      const o = new THREE.Vector3(...cyl.point);
+      const c = o.addScaledVector(ax, new THREE.Vector3(...pt).sub(new THREE.Vector3(...cyl.point)).dot(ax));
+      return { kind: "center", point: [c.x, c.y, c.z], part: hit.part, geometry: { ...geometry, circle: { center: [c.x, c.y, c.z], normal: cyl.axis, radius: cyl.radius, full: true } } };
+    }
+    if (purpose === "diameter" && !geometry.cylinder) return null;
+    if (purpose === "angle" && !geometry.plane && !geometry.cylinder) return null;
+    return { kind: "face", point: pt, part: hit.part, geometry };
   }
 
   private queueHover(x: number, y: number, alt: boolean) {
@@ -1084,6 +1298,17 @@ export class ViewerEngine {
   }
 
   private doHover(x: number, y: number, alt: boolean) {
+    if (this.sectionPick) {
+      const s = this.findSnap(x, y, false, "angle");
+      this.updateSnap(s?.geometry?.plane ? s : null);
+      this.container.style.cursor = "crosshair";
+      return;
+    }
+    if (this.tool === "select" && ENTITY_FILTERS.includes(this.filter)) {
+      this.container.style.cursor = "crosshair";
+      this.updateSnap(this.findSnap(x, y, alt, "entity"));
+      return;
+    }
     if (this.tool === "select") {
       const hit = this.raycastParts(x, y);
       const part = hit?.part ?? null;
@@ -1161,7 +1386,7 @@ export class ViewerEngine {
   }
 
   /** Zvýraznit hranu / plochu, na kterou se uchopuje. */
-  private highlightSnap(s: SnapPoint, curveIdx: number) {
+  private highlightSnap(s: SnapPoint, curveIdx: number, color = 0xff6a00) {
     const p = this.parts[s.part];
     if (!p) return;
     const group = new THREE.Group();
@@ -1172,7 +1397,7 @@ export class ViewerEngine {
       const arr = p.topo.edgeSegments.slice(c.segStart * 6, (c.segStart + c.segCount) * 6);
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(arr, 3));
-      const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xff6a00, depthTest: false, transparent: true }));
+      const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true }));
       l.renderOrder = 10;
       group.add(l);
     } else if (s.kind === "face") {
@@ -1196,7 +1421,7 @@ export class ViewerEngine {
           const g = new THREE.BufferGeometry();
           g.setAttribute("position", new THREE.BufferAttribute(out, 3));
           const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-            color: 0xff8a1f, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide,
+            color: color === 0xff6a00 ? 0xff8a1f : color, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide,
             polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
           }));
           mesh.renderOrder = 9;
@@ -1271,9 +1496,20 @@ export class ViewerEngine {
       }
       return;
     }
+    if (this.sectionPick) {
+      const s = this.findSnap(x, y, false, "angle");
+      const pl = s?.geometry?.plane;
+      if (pl && s) this.sectionFromPlane(pl.normal, pl.point, s.part);
+      return;
+    }
     if (this.tool === "select") {
+      if (ENTITY_FILTERS.includes(this.filter)) {
+        const s = info.touch || !this.snap ? this.findSnap(x, y, info.alt, "entity") : this.snap;
+        this.setEntity(s);
+        return;
+      }
       const hit = this.raycastParts(x, y);
-      if (hit) this.select([hit.part], info.additive);
+      if (hit) this.select(this.filter === "shape" ? [hit.part] : this.filter === "assembly" ? this.assemblyGroup(hit.part) : this.partGroup(hit.part), info.additive);
       else if (!info.additive) this.clearSelection();
       return;
     }
@@ -1312,8 +1548,391 @@ export class ViewerEngine {
   private openContext(x: number, y: number, clientX: number, clientY: number) {
     if (this.inCube(x, y)) return;
     const hit = this.raycastParts(x, y);
-    if (hit && !this.selection.has(hit.part)) this.select([hit.part]);
-    this.onContext({ part: hit?.part ?? null, clientX, clientY });
+    if (hit && !this.selection.has(hit.part) && this.tool === "select" && !ENTITY_FILTERS.includes(this.filter)) {
+      this.select(this.filter === "shape" ? [hit.part] : this.filter === "assembly" ? this.assemblyGroup(hit.part) : this.partGroup(hit.part));
+    }
+    let facePlane: ContextRequest["facePlane"] = null;
+    if (hit && !hit.cap) {
+      const p = this.parts[hit.part];
+      const f = p.topo.faces[p.topo.triFace[hit.tri]];
+      if (f?.kind === "plane" && f.normal && f.point) facePlane = { normal: f.normal, point: f.point, part: hit.part };
+    }
+    this.onContext({ part: hit?.part ?? null, clientX, clientY, facePlane });
+  }
+
+  // ------------------------------------------------------------------ výběrový filtr a entity
+
+  setPickFilter(f: PickFilter) {
+    this.filter = f;
+    this.snap = null;
+    this.clearSnapHighlight();
+    if (!ENTITY_FILTERS.includes(f)) this.setEntity(null);
+    else if (this.selection.size) this.clearSelection();
+    if (this.hoverPart !== null) {
+      const p = this.parts[this.hoverPart];
+      this.hoverPart = null;
+      if (p) this.applyPartState(p);
+    }
+    this.requestRender();
+    this.onChange("filter");
+    this.onChange("snap");
+  }
+
+  getPickFilter(): PickFilter {
+    return this.filter;
+  }
+
+  private setEntityObj(obj: THREE.Object3D | null) {
+    if (this.entityObj) {
+      this.overlayGroup.remove(this.entityObj);
+      disposeObject(this.entityObj);
+    }
+    this.entityObj = obj;
+    if (obj) this.overlayGroup.add(obj);
+  }
+
+  /** Vybrat plochu / hranu / bod (filtr entit). */
+  setEntity(s: SnapPoint | null) {
+    this.entity = s;
+    if (!s) this.setEntityObj(null);
+    else {
+      const prev = this.snapHighlight;
+      const prevKey = this.snapShapeKey;
+      this.snapHighlight = null;
+      this.highlightSnap(s, this.parts[s.part] ? this.curveAt(this.parts[s.part], s) : -1, 0x1f6feb);
+      const shape = this.snapHighlight as THREE.Object3D | null;
+      if (shape) this.overlayGroup.remove(shape);
+      this.snapHighlight = prev;
+      this.snapShapeKey = prevKey;
+      const group = new THREE.Group();
+      if (shape) group.add(shape);
+      const pg = new THREE.BufferGeometry();
+      pg.setAttribute("position", new THREE.Float32BufferAttribute(s.point, 3));
+      const pts = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x1f6feb, size: 10, sizeAttenuation: false, depthTest: false }));
+      group.add(pts);
+      this.setEntityObj(group);
+    }
+    this.requestRender();
+    this.onChange("entity");
+  }
+
+  getEntity(): EntityInfo | null {
+    const s = this.entity;
+    if (!s) return null;
+    const g = s.geometry;
+    const mm = (v: number) => `${v.toFixed(3).replace(".", ",")} mm`;
+    const xyz = (v: Vec3) => v.map((x) => x.toFixed(3).replace(".", ",")).join("; ");
+    const rows: [string, string][] = [];
+    let title = "Bod";
+    if (s.kind === "face") {
+      if (g?.sectionCap) title = "Plocha řezu";
+      else if (g?.cylinder) {
+        title = "Válcová plocha";
+        rows.push(["Průměr", `Ø ${mm(g.cylinder.radius * 2)}`], ["Poloměr", `R ${mm(g.cylinder.radius)}`], ["Osa", xyz(g.cylinder.axis)]);
+      } else if (g?.plane) {
+        title = "Rovinná plocha";
+        rows.push(["Normála", xyz(g.plane.normal)]);
+      } else title = "Plocha";
+      if (g?.faceArea) rows.push(["Plocha", `${(g.faceArea / 100).toFixed(3).replace(".", ",")} cm²`]);
+    } else if (s.kind === "edge") {
+      if (g?.circle) {
+        title = g.circle.full ? "Kružnice" : "Oblouk";
+        rows.push(["Průměr", `Ø ${mm(g.circle.radius * 2)}`], ["Poloměr", `R ${mm(g.circle.radius)}`], ["Střed", xyz(g.circle.center)]);
+      } else if (g?.line) {
+        title = "Úsečka";
+        rows.push(["Délka", mm(g.line.length)], ["Směr", xyz(g.line.dir)]);
+      } else title = "Hrana";
+      if (g?.curveLength && !g?.line) rows.push(["Délka", mm(g.curveLength)]);
+    } else if (s.kind === "center") {
+      title = "Střed křivosti";
+      if (g?.circle) rows.push(["Průměr", `Ø ${mm(g.circle.radius * 2)}`], ["Poloměr", `R ${mm(g.circle.radius)}`]);
+    } else if (s.kind === "midpoint") title = "Střed hrany";
+    else if (s.kind === "vertex") title = "Roh (bod)";
+    rows.push(["X", mm(s.point[0])], ["Y", mm(s.point[1])], ["Z", mm(s.point[2])]);
+    return { kind: s.kind, title, rows, part: s.part, plane: g?.plane && !g.sectionCap ? g.plane : undefined };
+  }
+
+  /** Měřit vzdálenost od vybrané entity (první bod hotový). */
+  measureFromEntity() {
+    const e = this.entity;
+    if (!e) return;
+    this.setTool("distance");
+    this.pending = e;
+    this.syncPending();
+    this.onChange("pending");
+  }
+
+  // ------------------------------------------------------------------ řez
+
+  getSection(): SectionState | null {
+    if (!this.section) return null;
+    const [min, max] = this.sectionRange(this.section.normal);
+    return {
+      normal: [this.section.normal.x, this.section.normal.y, this.section.normal.z],
+      position: this.section.position, min, max, flipped: this.section.flipped, label: this.section.label,
+    };
+  }
+
+  isSectionPicking(): boolean {
+    return this.sectionPick;
+  }
+
+  /** Rozsah modelu (viditelné díly) podél normály. */
+  private sectionRange(n: THREE.Vector3): [number, number] {
+    const b = this.visibleBox();
+    if (b.isEmpty()) return [-1, 1];
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      const v = new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z);
+      const d = v.dot(n);
+      min = Math.min(min, d);
+      max = Math.max(max, d);
+    }
+    return [min, max];
+  }
+
+  /** Řez standardní rovinou (XY = normála Z …) v polovině modelu. */
+  setSectionAxis(axis: "x" | "y" | "z") {
+    const n = axis === "x" ? new THREE.Vector3(1, 0, 0) : axis === "y" ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    const [min, max] = this.sectionRange(n);
+    const label = axis === "z" ? "Rovina XY" : axis === "y" ? "Rovina XZ" : "Rovina YZ";
+    this.setSection(n, (min + max) / 2, label);
+  }
+
+  /** Řez rovnoběžně s plochou — první poloha uprostřed dílu (hned je vidět dovnitř). */
+  sectionFromPlane(normal: Vec3, point: Vec3, part?: number) {
+    const n = new THREE.Vector3(...normal).normalize();
+    const at = new THREE.Vector3(...point).dot(n);
+    let pos = at;
+    if (part !== undefined && this.parts[part]) {
+      const [min, max] = this.boxRange(this.parts[part].box, n);
+      // plocha je na jednom konci dílu → jít do poloviny k druhému
+      pos = Math.abs(at - max) < Math.abs(at - min) ? (at + min) / 2 : (at + max) / 2;
+    }
+    this.setSection(n, pos, "Rovina plochy");
+  }
+
+  private boxRange(b: THREE.Box3, n: THREE.Vector3): [number, number] {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      const d = new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).dot(n);
+      min = Math.min(min, d);
+      max = Math.max(max, d);
+    }
+    return [min, max];
+  }
+
+  startSectionPick() {
+    this.sectionPick = true;
+    this.onChange("section");
+  }
+
+  cancelSectionPick() {
+    if (!this.sectionPick) return;
+    this.sectionPick = false;
+    this.updateSnap(null);
+    this.onChange("section");
+  }
+
+  private setSection(n: THREE.Vector3, position: number, label: string) {
+    const was = !!this.clipPlane;
+    this.sectionPick = false;
+    this.section = { normal: n.clone().normalize(), position, flipped: this.section?.flipped ?? false, label };
+    if (!this.clipPlane) this.clipPlane = new THREE.Plane();
+    this.updatePlane();
+    if (!was) this.applyClipping();
+    this.updateSnap(null);
+    this.rebuildSection(true);
+    this.onChange("section");
+  }
+
+  setSectionPosition(position: number) {
+    if (!this.section) return;
+    this.section.position = position;
+    this.updatePlane();
+    this.rebuildSection(false);
+    this.onChange("section");
+  }
+
+  flipSection() {
+    if (!this.section) return;
+    this.section.flipped = !this.section.flipped;
+    this.updatePlane();
+    this.rebuildSection(true);
+    this.onChange("section");
+  }
+
+  clearSection() {
+    this.sectionPick = false;
+    if (!this.section) return this.onChange("section");
+    this.section = null;
+    this.clipPlane = null;
+    this.applyClipping();
+    this.clearSectionObjects();
+    this.updateSnap(null);
+    this.onChange("section");
+  }
+
+  /** Pohled kolmo na řez (na odkrytou plochu). */
+  viewSection() {
+    if (!this.section) return;
+    const n = this.section.normal.clone().multiplyScalar(this.section.flipped ? -1 : 1);
+    const up = Math.abs(n.z) > 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    this.setViewDir(n, this.zUp ? up : new THREE.Vector3(0, 1, 0), true);
+  }
+
+  /** Ponechává se strana n·p ≤ poloha (otočeno: ≥). */
+  private updatePlane() {
+    if (!this.section || !this.clipPlane) return;
+    const { normal: n, position, flipped } = this.section;
+    if (flipped) this.clipPlane.set(n.clone(), -position);
+    else this.clipPlane.set(n.clone().negate(), position);
+    this.requestRender();
+  }
+
+  private clearSectionObjects() {
+    if (this.sectionTimer !== null) {
+      window.clearTimeout(this.sectionTimer);
+      this.sectionTimer = null;
+    }
+    for (const o of [...this.sectionGroup.children]) {
+      this.sectionGroup.remove(o);
+      const m = o as THREE.Mesh;
+      // geometrie dílů se sdílí — mazat jen vlastní (víčko, obrys)
+      if (m.userData.ownGeometry) m.geometry?.dispose();
+    }
+    this.sectionTopo.clear();
+  }
+
+  /** Šrafování plochy řezu (jako na výkresu) — šikmé čáry, opakuje se ve světových souřadnicích. */
+  private hatchTexture(): THREE.Texture {
+    if (!this.hatch) {
+      const c = document.createElement("canvas");
+      c.width = 64;
+      c.height = 64;
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.strokeStyle = "#3a3f47";
+      ctx.lineWidth = 5;
+      for (const o of [-64, 0, 64]) {
+        ctx.beginPath();
+        ctx.moveTo(o, 64);
+        ctx.lineTo(o + 64, 0);
+        ctx.stroke();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      this.hatch = t;
+    }
+    return this.hatch;
+  }
+
+  private capMaterial(p: PartView): THREE.Material {
+    const base = (p.baseMaterial as THREE.MeshPhongMaterial).color ?? DEFAULT_COLOR;
+    // světlejší odstín barvy dílu + šrafy → řez je hned poznat od ploch modelu
+    const c = (p.baseMaterial.userData.vc ? DEFAULT_COLOR.clone() : base.clone()).lerp(new THREE.Color(1, 1, 1), 0.35);
+    const key = c.getHexString();
+    let m = this.capMaterials.get(key);
+    if (!m) {
+      m = new THREE.MeshBasicMaterial({
+        color: c, map: this.hatchTexture(), side: THREE.DoubleSide, stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc,
+        stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp,
+        polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+      });
+      this.capMaterials.set(key, m);
+    }
+    return m;
+  }
+
+  /**
+   * Vybarvení řezu (stencil: zadní stěny +1, přední −1 → uvnitř tělesa ≠ 0 → víčko v rovině řezu)
+   * a obrys řezu (čáry + uchopení). Víčka hned, obrys po krátké pauze (posuvník).
+   */
+  private rebuildSection(immediate: boolean) {
+    if (!this.section || !this.clipPlane) return;
+    // víčka a stencil
+    for (const o of [...this.sectionGroup.children]) {
+      if (o.userData.kind === "cap" || o.userData.kind === "stencil") {
+        this.sectionGroup.remove(o);
+        if (o.userData.ownGeometry) (o as THREE.Mesh).geometry.dispose();
+      }
+    }
+    const plane = this.clipPlane;
+    const size = this.modelSphere.radius * 4 + 1;
+    const capGeom = new THREE.PlaneGeometry(size, size);
+    // šrafy po ~1/40 velikosti modelu
+    this.hatchTexture().repeat.set(size / (this.modelSphere.radius / 20), size / (this.modelSphere.radius / 20));
+    const center = plane.projectPoint(this.modelSphere.center, new THREE.Vector3());
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), plane.normal);
+    let k = 0;
+    let firstCap = true;
+    for (const p of this.parts) {
+      if (p.hidden || this.triCount(p.index) === 0) continue;
+      if (!plane.intersectsBox(p.box)) continue;
+      const base = 1000 + k * 3;
+      k++;
+      const back = new THREE.Mesh(p.mesh.geometry, this.stencilBack);
+      const front = new THREE.Mesh(p.mesh.geometry, this.stencilFront);
+      back.renderOrder = base;
+      front.renderOrder = base;
+      back.userData.kind = front.userData.kind = "stencil";
+      const cap = new THREE.Mesh(capGeom, this.capMaterial(p));
+      cap.position.copy(center);
+      cap.quaternion.copy(q);
+      cap.renderOrder = base + 1;
+      cap.userData.kind = "cap";
+      if (firstCap) {
+        cap.userData.ownGeometry = true;
+        firstCap = false;
+      }
+      cap.userData.part = p.index;
+      this.sectionGroup.add(back, front, cap);
+    }
+    if (firstCap) capGeom.dispose();
+    this.requestRender();
+    // obrys řezu
+    if (this.sectionTimer !== null) window.clearTimeout(this.sectionTimer);
+    const run = () => {
+      this.sectionTimer = null;
+      this.rebuildContours();
+    };
+    if (immediate) run();
+    else this.sectionTimer = window.setTimeout(run, 90);
+  }
+
+  private rebuildContours() {
+    for (const o of [...this.sectionGroup.children]) {
+      if (o.userData.kind === "contour") {
+        this.sectionGroup.remove(o);
+        (o as THREE.LineSegments).geometry.dispose();
+      }
+    }
+    this.sectionTopo.clear();
+    const plane = this.clipPlane;
+    if (!plane) return;
+    const def = { normal: [plane.normal.x, plane.normal.y, plane.normal.z] as Vec3, constant: plane.constant };
+    const tol = Math.max(this.modelSphere.radius * 1e-6, 1e-6);
+    for (const p of this.parts) {
+      if (p.hidden || this.triCount(p.index) === 0 || !plane.intersectsBox(p.box)) continue;
+      const g = p.mesh.geometry;
+      const segs = sliceMesh(g.getAttribute("position").array as Float32Array, g.index ? (g.index.array as Uint32Array) : null, def);
+      if (!segs.length) continue;
+      const topo = chainSegments(segs, tol);
+      this.sectionTopo.set(p.index, topo);
+      const lg = new THREE.BufferGeometry();
+      lg.setAttribute("position", new THREE.BufferAttribute(topo.edgeSegments, 3));
+      const lines = new THREE.LineSegments(lg, this.sectionLineMaterial);
+      lines.renderOrder = 90000;
+      lines.userData.kind = "contour";
+      lines.userData.ownGeometry = true;
+      this.sectionGroup.add(lines);
+    }
+    this.requestRender();
   }
 
   // ------------------------------------------------------------------ objekty měření
@@ -1416,7 +2035,7 @@ export class ViewerEngine {
     switch (k) {
       case "Delete":
       case "Backspace":
-        if (!this.selection.size) return false;
+        if (!this.hasDeletable()) return false;
         this.deleteSelected();
         return true;
       case "h":
@@ -1461,6 +2080,10 @@ export class ViewerEngine {
 
 function circleGeom(c: { center?: Vec3; normal?: Vec3; radius?: number; kind: string }): SnapGeometry {
   return { circle: { center: c.center!, normal: c.normal ?? [0, 0, 1], radius: c.radius ?? 0, full: c.kind === "circle" } };
+}
+
+function circleOrNone(c: { center?: Vec3; normal?: Vec3; radius?: number; kind: string }): SnapGeometry | undefined {
+  return c.center && (c.kind === "circle" || c.kind === "arc") ? circleGeom(c) : undefined;
 }
 
 function lineGeom(c: { kind: string; start: Vec3; normal?: Vec3; length: number }): SnapGeometry | undefined {
