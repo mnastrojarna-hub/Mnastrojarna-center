@@ -12,9 +12,9 @@ export const SITE = {
   founded: 2012,
   isoSince: 2017,
   minOrderCzk: 50_000,
-  phone: "+420 774 534 513",
-  phoneHref: "tel:+420774534513",
-  email: "info@nastrojarstvi.com",
+  phone: "+420 734 846 246",
+  phoneHref: "tel:+420734846246",
+  email: "vit.volny@mnastrojarna.cz",
   ico: "04304080",
   dic: "CZ04304080",
   dataBox: "u8h7mrg",
@@ -22,17 +22,16 @@ export const SITE = {
   billing: { street: "Varšavská 715/36", zip: "120 00", city: "Praha 2 – Vinohrady" },
 } as const;
 
-export type TeamId = "semorad" | "volny" | "sponer";
+export type TeamId = "volny" | "sponer";
 export type Person = { id: TeamId; name: string; phone?: string; phoneHref?: string; email: string; initials: string; photo?: string };
 
-/** Pořadí: jednatel, obchod, technolog. Fotky doplnit do public/team/ a pole `photo`. */
+/** Kontaktní osoby: primární kontakt je obchodní zástupce Vít Volný. Fotky doplnit do public/team/ a pole `photo`. */
 export const TEAM: Person[] = [
-  { id: "semorad", name: "Jiří Semorád", phone: "+420 774 534 513", phoneHref: "tel:+420774534513", email: "semorad@nastrojarstvi.com", initials: "JS" },
   { id: "volny", name: "Vít Volný", phone: "+420 734 846 246", phoneHref: "tel:+420734846246", email: "vit.volny@mnastrojarna.cz", initials: "VV" },
   { id: "sponer", name: "Dominik Šponer", phone: "+420 607 688 841", phoneHref: "tel:+420607688841", email: "dominik.sponer@mnastrojarna.cz", initials: "DŠ" },
 ];
-export const SALES = TEAM[1];
-export const TECH = TEAM[2];
+export const SALES = TEAM[0];
+export const TECH = TEAM[1];
 
 export type IconName = "mill" | "axes" | "wire" | "die" | "machine" | "prototype" | "spare" | "cad" | "measure" | "stock";
 

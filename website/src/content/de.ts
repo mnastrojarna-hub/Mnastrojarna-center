@@ -59,6 +59,13 @@ export const de: Dict = {
   },
 
   common: {
+    emailCta: "Zeichnung per E-Mail senden",
+    callCta: "Anrufen",
+    primaryContact: "Hauptansprechpartner",
+    mailSubject: "Anfrage über die Website",
+    mailBody: "Guten Tag,\n\nanbei meine Anfrage. Zeichnung / 3D-Modell im Anhang.\n\nMenge:\nWerkstoff:\nTermin:\n\nMit freundlichen Grüßen\n",
+    cadMailBody: "Guten Tag,\n\nich sende ein Modell aus dem Mnástrojárna CAD – die Datei {file} habe ich heruntergeladen und füge sie bei.\n\nMenge:\nWerkstoff:\nTermin:\n\nMit freundlichen Grüßen\n",
+    fitMailBody: "Guten Tag,\n\nich interessiere mich für die Fertigung dieses Teils: {desc}.\nZeichnung im Anhang.\n\nMit freundlichen Grüßen\n",
     moreAboutService: "Mehr zur Leistung",
     allServices: "Alle Leistungen",
     uploadAndQuote: "Zeichnung hochladen und anfragen",
@@ -108,7 +115,6 @@ export const de: Dict = {
   },
 
   team: {
-    semorad: { role: "Geschäftsführer", focus: "Preisangebote, Rahmenverträge und strategische Aufträge." },
     volny: { role: "Vertriebsmitarbeiter", focus: "Ihr erster Ansprechpartner für neue Projekte, Anfragen und langfristige Zusammenarbeit." },
     sponer: { role: "Technologe", focus: "Technische Zeichnungsanalyse, Wahl der Fertigungstechnologie und Herstellbarkeit der Teile." },
   },
@@ -128,7 +134,7 @@ export const de: Dict = {
   ],
 
   process: [
-    { t: "Anfrage", d: "Senden Sie uns Zeichnung oder 3D-Modell über das Formular. PDF, STEP oder DXF genügen." },
+    { t: "Anfrage", d: "Senden Sie Zeichnung oder 3D-Modell per E-Mail an Vít Volný. PDF, STEP oder DXF genügen." },
     { t: "Technische Analyse", d: "Unser Technologe prüft Herstellbarkeit, Werkstoff und Technologie – und schlägt Einsparpotenziale vor." },
     { t: "Angebot", d: "Sie erhalten ein übersichtliches Angebot mit Preis und verbindlichem Liefertermin." },
     { t: "Fertigung und Prüfung", d: "Eigene Werkstatt, keine Subunternehmer. Jedes Teil durchläuft die Endkontrolle." },
@@ -504,7 +510,7 @@ export const de: Dict = {
     aboutAlt: "Multifunktionales Dreh-Fräs-Zentrum HYPERTUN 65 bei Mnástrojárna",
     teamEyebrow: "Ansprechpartner",
     teamTitle: "Sie sprechen direkt mit den Entscheidern",
-    teamLead: "Kein Callcenter. Vertrieb, Technologie und Geschäftsführung über eine E-Mail oder ein Telefonat erreichbar.",
+    teamLead: "Kein Callcenter. Ihr Hauptansprechpartner ist unser Vertriebsmitarbeiter Vít Volný; technische Fragen klärt direkt unser Technologe.",
     fitEyebrow: "Offen und ehrlich",
     fitTitle: "Wem wir am meisten helfen",
     faqTitle: "Häufige Fragen",
@@ -737,10 +743,10 @@ export const de: Dict = {
     },
     contact: {
       metaTitle: "Kontakt – Mnástrojárna Pelhřimov",
-      metaDescription: "Kontakt zur Mnástrojárna s.r.o.: Betriebsstätte Mezná 9, 393 01 Pelhřimov, Tschechien. Vertrieb, Technologie und Geschäftsführung. Firmen-Nr. (IČO) 04304080.",
+      metaDescription: "Kontakt zur Mnástrojárna s.r.o.: Betriebsstätte Mezná 9, 393 01 Pelhřimov, Tschechien. Hauptansprechpartner: Vertrieb, Vít Volný. Firmen-Nr. (IČO) 04304080.",
       eyebrow: "Kontakt",
       title: "Sprechen wir über *Ihr Projekt*",
-      lead: "Der schnellste Weg zum Angebot ist das Anfrageformular mit Zeichnung. Für Beratung rufen Sie uns an oder schreiben Sie direkt an unsere Ansprechpartner.",
+      lead: "Der schnellste Weg zum Angebot ist eine E-Mail mit Zeichnung direkt an Vít Volný. Technische Fragen beantwortet unser Technologe Dominik Šponer.",
       cta: "Anfrage mit Zeichnung senden",
       navigate: "Route planen (Mapy.cz)",
       general: "Allgemein",
@@ -773,7 +779,7 @@ export const de: Dict = {
       title: "Datenschutzerklärung",
       controller: "Verantwortlicher für die Verarbeitung personenbezogener Daten ist {name}, Firmen-Nr. (IČO) {ico}, mit Sitz in {address}. Kontakt: {email}, Datenbox (ISDS) {dataBox}.",
       sections: [
-        { h: "Welche Daten wir verarbeiten und warum", p: "Beim Absenden des Anfrageformulars verarbeiten wir Identifikations- und Kontaktdaten (Name, Position, Unternehmen, Firmen- bzw. Registernummer, E-Mail, Telefon) sowie die technischen Unterlagen, die Sie uns zur Verfügung stellen. Wir verwenden die Daten ausschließlich zur Bearbeitung der Anfrage, zur Angebotserstellung und für die anschließende geschäftliche Kommunikation (Rechtsgrundlage gemäß DSGVO: Durchführung vorvertraglicher Maßnahmen und berechtigtes Interesse). Die Firmennummer (IČO) überprüfen wir im öffentlichen tschechischen Unternehmensregister ARES." },
+        { h: "Welche Daten wir verarbeiten und warum", p: "Wenn Sie uns eine Anfrage per E-Mail senden, verarbeiten wir Identifikations- und Kontaktdaten (Name, Position, Unternehmen, Firmen- bzw. Registernummer, E-Mail, Telefon) sowie die technischen Unterlagen, die Sie uns zur Verfügung stellen. Wir verwenden die Daten ausschließlich zur Bearbeitung der Anfrage, zur Angebotserstellung und für die anschließende geschäftliche Kommunikation (Rechtsgrundlage gemäß DSGVO: Durchführung vorvertraglicher Maßnahmen und berechtigtes Interesse). Die Firmennummer (IČO) überprüfen wir im öffentlichen tschechischen Unternehmensregister ARES." },
         { h: "Speicherdauer", p: "Daten aus Anfragen, die nicht zu einer Zusammenarbeit führen, speichern wir höchstens 3 Jahre. Daten im Zusammenhang mit ausgeführten Aufträgen bewahren wir für die gesetzlich vorgeschriebene Dauer auf." },
         { h: "Online-CAD", p: "Im Online-CAD erstellte Modelle werden ausschließlich in Ihrem Browser verarbeitet und gespeichert und nicht an unseren Server übertragen, sofern Sie sie nicht selbst einer Anfrage beifügen." },
         { h: "Cookies", p: "Ohne Ihre Einwilligung verwenden wir ausschließlich technisch notwendige Speicher. Analyse- und Marketing-Cookies (Google Analytics / Google Ads) setzen wir nur nach Ihrer Einwilligung ein, die Sie jederzeit widerrufen können, indem Sie die Websitedaten in Ihrem Browser löschen. YouTube-Videos werden (im Modus youtube-nocookie) erst geladen, wenn Sie auf Abspielen klicken." },

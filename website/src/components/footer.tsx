@@ -17,7 +17,6 @@ export function Footer({ locale }: { locale: Locale }) {
     ["/cad", f.links.cad],
     [href(locale, "careers"), f.links.careers],
     [href(locale, "contact"), f.links.contact],
-    [href(locale, "rfq"), f.links.rfq],
   ];
   return (
     <footer className="relative overflow-hidden border-t border-ink-700/10 bg-white text-ink-700/70">

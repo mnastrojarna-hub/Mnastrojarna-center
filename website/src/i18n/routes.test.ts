@@ -9,7 +9,7 @@ import { LOCALES, SERVICE_IDS, alternates, href, resolvePath, type PageKey } fro
 
 const APP = path.resolve(__dirname, "../app");
 const base = { cs: "(cs)/(site)", en: "(en)", de: "(de)" } as const;
-const KEYS: PageKey[] = ["home", "services", "cases", "machinery", "quality", "references", "about", "contact", "rfq", "careers", "privacy"];
+const KEYS: PageKey[] = ["home", "services", "cases", "machinery", "quality", "references", "about", "contact", "careers", "privacy"];
 
 describe("lokalizované trasy", () => {
   it("každá adresa z tabulky má soubor stránky", () => {

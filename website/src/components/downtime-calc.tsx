@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import type { Dict } from "@/content/cs";
 import { Icon } from "./icons";
@@ -60,9 +59,9 @@ export function DowntimeCalc({ t, ctaHref, locale }: { t: Dict["calc"]; ctaHref:
           </p>
         </div>
         <div className="relative mt-8 flex flex-wrap items-center gap-3">
-          <Link href={ctaHref} className="btn-primary">
+          <a href={ctaHref} className="btn-primary">
             {t.cta} <Icon name="arrow" className="h-4 w-4" />
-          </Link>
+          </a>
           <span className="font-mono text-[11px] uppercase tracking-widest text-ink-700/45">
             {fmt(perHour * hours)} {t.currency} {t.perEvent}
           </span>

@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { massKg, meshMetrics } from "./mesh-metrics";
 
@@ -30,20 +27,4 @@ describe("meshMetrics", () => {
   it("hmotnost oceli 1000 cm³ = 7,85 kg", () => {
     expect(massKg(1_000_000, 7.85)).toBeCloseTo(7.85, 6);
   });
-});
-
-describe("STEP přes OpenCascade (stejná knihovna jako ve web workeru)", () => {
-  it("přečte cube.stp a změří ho", async () => {
-    const require = createRequire(import.meta.url);
-    const occt = await (require("occt-import-js") as () => Promise<{ ReadStepFile: (b: Uint8Array, p: unknown) => { success: boolean; meshes: { attributes: { position: { array: number[] } }; index: { array: number[] } }[] } }>)();
-    const res = occt.ReadStepFile(new Uint8Array(fs.readFileSync(path.join(__dirname, "__fixtures__", "cube.stp"))), {
-      linearUnit: "millimeter",
-    });
-    expect(res.success).toBe(true);
-    const m = meshMetrics(res.meshes.map((x) => ({ position: x.attributes.position.array, index: x.index.array })));
-    const [a, b, c] = m.size;
-    expect(a).toBeGreaterThan(0);
-    // krychle → objem ≈ a·b·c
-    expect(m.volume).toBeCloseTo(a * b * c, 0);
-  }, 30_000);
 });

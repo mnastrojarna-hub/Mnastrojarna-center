@@ -65,6 +65,13 @@ export const cs = {
   },
 
   common: {
+    emailCta: "Poslat výkres e-mailem",
+    callCta: "Zavolat",
+    primaryContact: "Primární kontakt",
+    mailSubject: "Poptávka z webu",
+    mailBody: "Dobrý den,\n\nposílám poptávku. V příloze výkres / 3D model.\n\nMnožství:\nMateriál:\nTermín:\n\nS pozdravem\n",
+    cadMailBody: "Dobrý den,\n\nposílám model z Mnástrojárna CAD – soubor {file} jsem si stáhl do počítače a přikládám ho.\n\nMnožství:\nMateriál:\nTermín:\n\nS pozdravem\n",
+    fitMailBody: "Dobrý den,\n\nmám zájem o výrobu dílu: {desc}.\nV příloze výkres.\n\nS pozdravem\n",
     moreAboutService: "Více o službě",
     allServices: "Všechny služby",
     uploadAndQuote: "Nahrát výkres a poptat",
@@ -109,7 +116,6 @@ export const cs = {
   },
 
   team: {
-    semorad: { role: "Jednatel", focus: "Cenové nabídky, rámcové smlouvy a strategické zakázky." },
     volny: { role: "Obchodní zástupce", focus: "Váš první kontakt pro nové projekty, poptávky a dlouhodobou spolupráci." },
     sponer: { role: "Technolog", focus: "Technická analýza výkresů, volba technologie a vyrobitelnost dílů." },
   },
@@ -129,7 +135,7 @@ export const cs = {
   ],
 
   process: [
-    { t: "Poptávka", d: "Pošlete výkres nebo 3D model přes formulář. Stačí PDF, STEP nebo DXF." },
+    { t: "Poptávka", d: "Pošlete výkres nebo 3D model e-mailem Vítu Volnému. Stačí PDF, STEP nebo DXF." },
     { t: "Technická analýza", d: "Technolog posoudí vyrobitelnost, materiál a technologii – a navrhne úspory." },
     { t: "Cenová nabídka", d: "Dostanete přehlednou nabídku s cenou a závazným termínem dodání." },
     { t: "Výroba a kontrola", d: "Vlastní dílna, žádní subdodavatelé. Každý díl projde výstupní kontrolou." },
@@ -462,7 +468,7 @@ export const cs = {
     aboutAlt: "Multifunkční soustružnicko-frézovací centrum HYPERTUN 65 v Mnástrojárně",
     teamEyebrow: "Kontaktní osoby",
     teamTitle: "Mluvíte přímo s lidmi, kteří rozhodují",
-    teamLead: "Žádné call centrum. Obchod, technologie i vedení firmy na jeden e-mail nebo telefon.",
+    teamLead: "Žádné call centrum. Váš primární kontakt je obchodní zástupce Vít Volný, technické dotazy řeší přímo technolog.",
     fitEyebrow: "Férově na rovinu",
     fitTitle: "Komu pomůžeme nejvíc",
     faqTitle: "Časté otázky",
@@ -695,10 +701,10 @@ export const cs = {
     },
     contact: {
       metaTitle: "Kontakt – Mnástrojárna Pelhřimov",
-      metaDescription: "Kontakt na Mnástrojárnu s.r.o.: provozovna Mezná 9, 393 01 Pelhřimov. Obchod, technologie a vedení firmy. IČO 04304080.",
+      metaDescription: "Kontakt na Mnástrojárnu s.r.o.: provozovna Mezná 9, 393 01 Pelhřimov. Primární kontakt: obchodní zástupce Vít Volný. IČO 04304080.",
       eyebrow: "Kontakt",
       title: "Pojďme probrat *váš projekt*",
-      lead: "Nejrychlejší cesta k nabídce je poptávkový formulář s výkresem. Pro konzultace volejte nebo pište přímo našim lidem.",
+      lead: "Nejrychlejší cesta k nabídce je e-mail s výkresem přímo Vítu Volnému. Technické dotazy rád zodpoví technolog Dominik Šponer.",
       cta: "Poslat poptávku s výkresem",
       navigate: "Navigovat (Mapy.cz)",
       general: "Obecné",
@@ -731,7 +737,7 @@ export const cs = {
       title: "Ochrana osobních údajů",
       controller: "Správcem osobních údajů je {name}, IČO {ico}, se sídlem {address}. Kontakt: {email}, datová schránka {dataBox}.",
       sections: [
-        { h: "Jaké údaje zpracováváme a proč", p: "Při odeslání poptávkového formuláře zpracováváme identifikační a kontaktní údaje (jméno, pozice, firma, IČO, e-mail, telefon) a technickou dokumentaci, kterou nám poskytnete. Údaje používáme výhradně k vyřízení poptávky, přípravě nabídky a navazující obchodní komunikaci (právní základ: jednání o smlouvě a oprávněný zájem). IČO ověřujeme ve veřejném registru ARES." },
+        { h: "Jaké údaje zpracováváme a proč", p: "Při zaslání poptávky e-mailem zpracováváme identifikační a kontaktní údaje (jméno, pozice, firma, IČO, e-mail, telefon) a technickou dokumentaci, kterou nám poskytnete. Údaje používáme výhradně k vyřízení poptávky, přípravě nabídky a navazující obchodní komunikaci (právní základ: jednání o smlouvě a oprávněný zájem). IČO ověřujeme ve veřejném registru ARES." },
         { h: "Jak dlouho", p: "Údaje z poptávek, které nevedou ke spolupráci, uchováváme nejdéle 3 roky. Údaje související s realizovanými zakázkami po dobu stanovenou právními předpisy." },
         { h: "Online CAD", p: "Modely vytvořené v online CAD se zpracovávají a ukládají pouze ve vašem prohlížeči a na náš server se neodesílají, pokud je sami nepřipojíte k poptávce." },
         { h: "Cookies", p: "Bez vašeho souhlasu používáme pouze technicky nezbytné úložiště. Analytické a marketingové cookies (Google Analytics / Google Ads) spouštíme jen po udělení souhlasu, který můžete kdykoli odvolat vymazáním dat webu ve vašem prohlížeči. Videa z YouTube se načtou (v režimu youtube-nocookie) až po kliknutí na tlačítko přehrát." },

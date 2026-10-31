@@ -59,6 +59,13 @@ export const en: Dict = {
   },
 
   common: {
+    emailCta: "Send a drawing by e-mail",
+    callCta: "Call",
+    primaryContact: "Primary contact",
+    mailSubject: "Enquiry from the website",
+    mailBody: "Hello,\n\nplease find my enquiry below. Drawing / 3D model attached.\n\nQuantity:\nMaterial:\nRequired date:\n\nKind regards\n",
+    cadMailBody: "Hello,\n\nI am sending a model from Mnástrojárna CAD – I downloaded the file {file} and attach it.\n\nQuantity:\nMaterial:\nRequired date:\n\nKind regards\n",
+    fitMailBody: "Hello,\n\nI am interested in having this part made: {desc}.\nDrawing attached.\n\nKind regards\n",
     moreAboutService: "More about this service",
     allServices: "All services",
     uploadAndQuote: "Upload a drawing and request a quote",
@@ -108,7 +115,6 @@ export const en: Dict = {
   },
 
   team: {
-    semorad: { role: "Managing Director", focus: "Quotations, framework agreements and strategic projects." },
     volny: { role: "Sales Representative", focus: "Your first point of contact for new projects, enquiries and long-term cooperation." },
     sponer: { role: "Process Engineer", focus: "Technical drawing analysis, choice of technology and part manufacturability." },
   },
@@ -128,7 +134,7 @@ export const en: Dict = {
   ],
 
   process: [
-    { t: "Enquiry", d: "Send a drawing or 3D model via the form. PDF, STEP or DXF is all we need." },
+    { t: "Enquiry", d: "E-mail a drawing or 3D model to Vít Volný. PDF, STEP or DXF is all we need." },
     { t: "Technical review", d: "Our process engineer assesses manufacturability, material and technology – and suggests savings." },
     { t: "Quotation", d: "You receive a clear quotation with price and a binding delivery date." },
     { t: "Manufacturing & inspection", d: "Our own workshop, no subcontractors. Every part passes final inspection." },
@@ -504,7 +510,7 @@ export const en: Dict = {
     aboutAlt: "HYPERTUN 65 multi-function turn-mill centre at Mnástrojárna",
     teamEyebrow: "Contacts",
     teamTitle: "You talk directly to the decision-makers",
-    teamLead: "No call centre. Sales, engineering and management just one e-mail or phone call away.",
+    teamLead: "No call centre. Your primary contact is our sales representative Vít Volný; technical questions go straight to our process engineer.",
     fitEyebrow: "Straight talk",
     fitTitle: "Who we can help most",
     faqTitle: "Frequently asked questions",
@@ -737,10 +743,10 @@ export const en: Dict = {
     },
     contact: {
       metaTitle: "Contact – Mnástrojárna Pelhřimov",
-      metaDescription: "Contact Mnástrojárna s.r.o.: workshop at Mezná 9, 393 01 Pelhřimov, Czech Republic. Sales, engineering and management. Company reg. no. 04304080.",
+      metaDescription: "Contact Mnástrojárna s.r.o.: workshop at Mezná 9, 393 01 Pelhřimov, Czech Republic. Primary contact: sales representative Vít Volný. Company reg. no. 04304080.",
       eyebrow: "Contact",
       title: "Let's discuss *your project*",
-      lead: "The fastest route to a quotation is the enquiry form with your drawing. For consultations, call or write directly to our people.",
+      lead: "The fastest route to a quotation is an e-mail with your drawing straight to Vít Volný. Technical questions are answered by our process engineer Dominik Šponer.",
       cta: "Send an enquiry with your drawing",
       navigate: "Directions (Mapy.cz)",
       general: "General",
@@ -773,7 +779,7 @@ export const en: Dict = {
       title: "Privacy policy",
       controller: "The controller of personal data is {name}, company reg. no. {ico}, registered office at {address}. Contact: {email}, data box {dataBox}.",
       sections: [
-        { h: "What data we process and why", p: "When you submit the enquiry form, we process identification and contact data (name, position, company, company reg. no., e-mail, telephone) and the technical documentation you provide. We use the data solely to handle your enquiry, prepare a quotation and for related business communication (legal basis: pre-contractual negotiations and legitimate interest). We verify company registration numbers in the public Czech business register ARES." },
+        { h: "What data we process and why", p: "When you send us an enquiry by e-mail, we process identification and contact data (name, position, company, company reg. no., e-mail, telephone) and the technical documentation you provide. We use the data solely to handle your enquiry, prepare a quotation and for related business communication (legal basis: pre-contractual negotiations and legitimate interest). We verify company registration numbers in the public Czech business register ARES." },
         { h: "How long", p: "Data from enquiries that do not lead to cooperation is kept for a maximum of 3 years. Data relating to completed orders is kept for the period required by law." },
         { h: "Online CAD", p: "Models created in the online CAD are processed and stored only in your browser and are not sent to our server unless you attach them to an enquiry yourself." },
         { h: "Cookies", p: "Without your consent we use only technically necessary storage. Analytics and marketing cookies (Google Analytics / Google Ads) are enabled only once you have given consent, which you can withdraw at any time by clearing the website data in your browser. YouTube videos are loaded (in youtube-nocookie mode) only after you click the play button." },

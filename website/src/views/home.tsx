@@ -9,8 +9,9 @@ import { ServicesIndex } from "@/components/services-index";
 import { VideoShowcase } from "@/components/video-showcase";
 import { getDict } from "@/content";
 import { ALL_PHOTOS, CASES } from "@/content/cases";
-import { REFERENCES, SERVICE_FACTS, SERVICE_ORDER, VIDEOS, YOUTUBE_CHANNEL } from "@/content/site";
+import { REFERENCES, SALES, SERVICE_FACTS, SERVICE_ORDER, VIDEOS, YOUTUBE_CHANNEL } from "@/content/site";
 import { href, type Locale } from "@/i18n/config";
+import { mailToSales } from "@/lib/contact";
 import { faqJsonLd, pageMeta, videoJsonLd } from "@/lib/seo";
 
 export function homeMeta(locale: Locale) {
@@ -65,9 +66,9 @@ export function HomeView({ locale }: { locale: Locale }) {
             </h1>
             <p className="mt-8 max-w-xl animate-fade-up text-lg leading-relaxed text-ink-700/70 [animation-delay:500ms] md:text-xl">{h.heroLead}</p>
             <div className="mt-10 flex animate-fade-up flex-col gap-3 [animation-delay:650ms] sm:flex-row">
-              <Link href={href(locale, "rfq")} className="btn-primary !px-8 !py-4 !text-base" data-magnetic>
-                <Icon name="upload" className="h-5 w-5" /> {t.common.uploadAndQuote}
-              </Link>
+              <a href={mailToSales(t.common.mailSubject, t.common.mailBody)} className="btn-primary !px-8 !py-4 !text-base" data-magnetic>
+                <Icon name="mail" className="h-5 w-5" /> {t.common.emailCta}
+              </a>
               <Link href={href(locale, "cases")} className="btn-ghost !px-8 !py-4 !text-base" data-magnetic>
                 {h.heroScroll} <Icon name="arrow" className="h-5 w-5" />
               </Link>
@@ -290,11 +291,21 @@ export function HomeView({ locale }: { locale: Locale }) {
               <Accent text={h.finalTitle} />
             </h2>
             <p className="mt-8 max-w-xl text-lg text-ink-700/65">{h.finalLead}</p>
-            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-700/40">{t.common.ctaFoot}</p>
+            <p className="mt-6 text-[15px] text-ink-700/70">
+              {t.common.primaryContact}: <strong className="text-ink-700">{SALES.name}</strong> ·{" "}
+              <a href={SALES.phoneHref} className="text-brand hover:underline">
+                {SALES.phone}
+              </a>{" "}
+              ·{" "}
+              <a href={`mailto:${SALES.email}`} className="text-brand hover:underline">
+                {SALES.email}
+              </a>
+            </p>
+            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-700/40">{t.common.ctaFoot}</p>
           </div>
           <div className="flex justify-center lg:col-span-4">
-            <Link
-              href={href(locale, "rfq")}
+            <a
+              href={mailToSales(t.common.mailSubject, t.common.mailBody)}
               data-magnetic
               className="group relative grid h-56 w-56 place-items-center rounded-full bg-brand text-center text-white shadow-[0_40px_80px_-30px_rgba(224,57,48,.8)] transition-transform duration-500 hover:scale-105 md:h-64 md:w-64"
             >
@@ -303,7 +314,7 @@ export function HomeView({ locale }: { locale: Locale }) {
                 {h.finalCta}
                 <Icon name="arrow" className="mx-auto mt-3 h-7 w-7 transition-transform duration-500 group-hover:translate-x-1" />
               </span>
-            </Link>
+            </a>
           </div>
         </div>
       </section>

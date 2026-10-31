@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Dict } from "@/content/cs";
 import { checkFit, type FitShape } from "@/lib/fit";
@@ -29,7 +28,7 @@ function Field({ label, value, set, unit = "mm" }: { label: string; value: numbe
 }
 
 /** „Vejde se váš díl?“ — okamžitá orientační kontrola proti pracovním rozsahům strojů. */
-export function FitChecker({ t, names, rfqHref }: { t: T; names: Record<string, string>; rfqHref: string }) {
+export function FitChecker({ t, names, email, subject, bodyTpl }: { t: T; names: Record<string, string>; email: string; subject: string; bodyTpl: string }) {
   const [shape, setShape] = useState<FitShape>("rot");
   const [d, setD] = useState(180);
   const [len, setLen] = useState(420);
@@ -90,9 +89,9 @@ export function FitChecker({ t, names, rfqHref }: { t: T; names: Record<string, 
               </li>
             ))}
           </ul>
-          <Link href={`${rfqHref}?popis=${encodeURIComponent(desc)}`} className="btn-primary mt-6">
+          <a href={`mailto:${email}?subject=${encodeURIComponent(`${subject} – ${desc}`)}&body=${encodeURIComponent(bodyTpl.replace("{desc}", desc))}`} className="btn-primary mt-6">
             {t.fitCta} <Icon name="arrow" className="h-4 w-4" />
-          </Link>
+          </a>
         </div>
       </div>
     </div>

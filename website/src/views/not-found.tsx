@@ -20,8 +20,8 @@ function NotFoundInner({ locale }: { locale: Locale }) {
           <Link href={href(locale, "home")} className="btn-ghost">
             {p.home}
           </Link>
-          <Link href={href(locale, "rfq")} className="btn-primary">
-            {getDict(locale).nav.rfq} <Icon name="arrow" className="h-4 w-4" />
+          <Link href={href(locale, "contact")} className="btn-primary">
+            {getDict(locale).nav.contact} <Icon name="arrow" className="h-4 w-4" />
           </Link>
         </div>
       </div>

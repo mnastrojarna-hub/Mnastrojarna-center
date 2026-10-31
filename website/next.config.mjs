@@ -8,7 +8,7 @@ const legacy = [
   ["/cz/o-nas/certifikaty", "/kvalita"],
   ["/cz/o-nas/reference", "/reference"],
   ["/cz/o-nas/galerie", "/strojovy-park"],
-  ["/cz/o-nas/akce", "/poptavka"],
+  ["/cz/o-nas/akce", "/kontakt"],
   ["/cz/sluzby/oblasti-cinnosti", "/sluzby"],
   ["/cz/sluzby/vyroba-dilu-na-zakazku", "/sluzby/cnc-obrabeni"],
   ["/cz/technologie/cnc-obrabeni", "/sluzby/cnc-obrabeni"],
@@ -19,6 +19,10 @@ const legacy = [
   ["/cz/kontakt", "/kontakt"],
   ["/cz/mapa-stranek", "/sitemap.xml"],
   ["/3d-prohlizec", "/cad"],
+  // poptávkový formulář byl zrušen → kontakt (primární kontakt Vít Volný)
+  ["/poptavka", "/kontakt"],
+  ["/en/request-a-quote", "/en/contact"],
+  ["/de/anfrage", "/de/kontakt"],
 ];
 
 const securityHeaders = [

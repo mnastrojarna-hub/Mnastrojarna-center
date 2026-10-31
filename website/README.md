@@ -13,10 +13,10 @@ Nový web Mnástrojárny s.r.o. — **„Váš partner ve strojírenství“**. 
   - prvky: vysunutí (symetrické, opačně), rotace, kvádr/válec/trubka/kužel/koule, díra se zahloubením (kliknutím na plochu), zaoblení a sražení vybraných hran, skořepina, lineární/kruhové pole, zrcadlení, import STEP,
   - strom prvků (úpravy, potlačení, mazání), zpět/vpřed, automatické ukládání, projekt `.mncad`,
   - export **STEP**, **STL**, **2D výkres** (pohledy ISO E, izometrie, kóty, razítko) do **PDF / DXF / SVG**, DXF přímo ze skici,
-  - „Poptat výrobu“ předá model jako STEP do poptávky.
-- **Poptávkový formulář ve 3 krocích** s kvalifikací leadů (pod 50 000 Kč nelze odeslat, IČO + ARES, skóre A/B/C, přílohy, NDA, antispam) a 3D náhledem přiloženého STEP.
+  - „Poptat výrobu“ uloží model jako STEP a otevře e-mail obchodníkovi (Vít Volný) – soubor stačí přiložit.
+- **Kontakt bez formuláře** – všechna CTA („Poptat výrobu“, kalkulačky, služby, CAD) otevírají e-mail s předvyplněným předmětem přímo primárnímu kontaktu **Vítu Volnému** (`SALES` v `src/content/site.ts`); technolog Dominik Šponer je uveden jako druhý kontakt. Staré URL poptávky (`/poptavka`, `/en/request-a-quote`, `/de/anfrage`) přesměrují 301 na kontakt.
 - **SEO**: metadata a canonical, JSON-LD (Organization/LocalBusiness, Service, FAQPage, BreadcrumbList, WebApplication), sitemap, robots, OG obrázek, 301 ze všech starých URL.
-- **Měření konverzí**: GA4 / Google Ads s Consent Mode (`rfq_start`, `rfq_step`, `generate_lead`, `cad_open`, `cad_feature`, `cad_export`, `cad_to_rfq`).
+- **Měření konverzí**: GA4 / Google Ads s Consent Mode (`cad_open`, `cad_feature`, `cad_export`, `cad_to_rfq`; kliky na `mailto:`/`tel:` lze měřit v GA4 jako odchozí odkazy).
 
 ## Archiv zakázek
 
@@ -83,27 +83,24 @@ npm run dev        # http://localhost:3100
 npm run typecheck && npm run lint && npm test && npm run build
 ```
 
-Bez nastaveného SMTP/webhooku se poptávka v dev režimu jen vypíše do konzole.
-
 E2E testy (běžící server na :3100):
 
 ```bash
-node e2e/hook-server.cjs /tmp/hook.json &
-LEAD_WEBHOOK_URL=http://localhost:3999/ npm run build && LEAD_WEBHOOK_URL=http://localhost:3999/ npm start &
-mkdir -p /tmp/e2e/shots && HOOK_FILE=/tmp/hook.json node e2e/rfq.e2e.cjs /tmp/e2e src/lib/__fixtures__/cube.stp
-node e2e/cad.e2e.cjs /tmp/e2e   # CAD: skica → vysunutí → zaoblení → díra → STEP/DXF/SVG → poptávka
-node e2e/i18n.e2e.cjs /tmp/e2e  # jazyky: přepínač, anglická poptávka (VAT ID), mobil
+npm run build && npm start &
+mkdir -p /tmp/e2e/shots
+node e2e/cad.e2e.cjs /tmp/e2e   # CAD: skica → vysunutí → zaoblení → díra → STEP/DXF/SVG → poptávka (STEP + e-mail)
+node e2e/i18n.e2e.cjs /tmp/e2e  # jazyky: přepínač, přesměrování poptávky, kontakt V. Volný, mobil
 ```
 
 ## Nasazení na Vercel
 
 1. Vercel → **Add New Project** → stejný GitHub repozitář.
 2. **Root Directory: `website`** (Framework: Next.js, Node 22).
-3. Environment Variables podle `.env.example` (minimálně `SMTP_*` + `LEAD_TO`).
+3. Environment Variables podle `.env.example` (vše volitelné – GA4, Search Console).
 4. Domains: `www.mnastrojarna.cz` (+ přesměrování `mnastrojarna.cz` → `www`).
 5. Po spuštění: Google Search Console → odeslat `https://www.mnastrojarna.cz/sitemap.xml`.
 
-Poptávky chodí e-mailem do firemní schránky, takže je **CNC Sales OS** (IMAP synchronizace) automaticky převezme jako poptávku — není potřeba další integrace.
+Poptávky chodí e-mailem přímo do schránky Víta Volného, takže je **CNC Sales OS** (IMAP / Microsoft 365 synchronizace) převezme jako poptávku — web nepotřebuje žádný backend ani SMTP.
 
 ## Doplnit
 

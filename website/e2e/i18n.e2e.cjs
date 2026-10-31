@@ -1,5 +1,5 @@
-// E2E: jazykové verze — přepínač EN/DE/CZ, anglická poptávka se zahraničním VAT ID, mobil bez přetékání.
-// Spuštění (server :3100 s LEAD_WEBHOOK_URL na e2e/hook-server.cjs): node e2e/i18n.e2e.cjs <složka se shots/>
+// E2E: jazykové verze — přepínač EN/DE/CZ, přesměrování zrušené poptávky, kontakt na V. Volného, mobil bez přetékání.
+// Spuštění (server :3100): node e2e/i18n.e2e.cjs <složka se shots/>
 const { chromium } = require('playwright');
 const S = process.argv[2];
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -16,31 +16,13 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   await page.waitForURL(/\/sluzby\/elektroerozivni-obrabeni/);
   ok(true, 'DE → CZ přepínač: ' + page.url());
   ok(await page.evaluate(() => document.documentElement.lang) === 'cs', 'html lang cs');
-  // EN poptávka
+  // poptávkový formulář je zrušen → přesměrování na kontakt, CTA = e-mail V. Volnému
   await page.goto('http://localhost:3100/en/request-a-quote', { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: /Continue/ }).click();
-  const err1 = await page.locator('[role=alert]').first().innerText();
-  ok(/[a-z]/.test(err1) && !/[ěščřžý]/.test(err1), 'anglická validace: ' + err1);
-  await page.getByRole('button', { name: 'CNC machining', exact: true }).click();
-  await page.locator('input[name=budget][value="pod-50k"]').check();
-  ok(await page.getByRole('button', { name: /Continue/ }).isDisabled(), 'pod 50k zablokováno (EN)');
-  await page.locator('input[name=budget][value="1-5m"]').check();
-  await page.locator('#description').fill('Spare rollers for our packaging line, 1.4301, quantity 40 per year.');
-  await page.getByRole('button', { name: /Continue/ }).click();
-  await page.getByRole('button', { name: /Continue/ }).click();
-  await page.locator('#ico').fill('DE123456789');
-  await page.locator('#company').fill('Test Packaging GmbH');
-  await page.locator('#name').fill('John Tester');
-  await page.locator('#email').fill('john@test-packaging.de');
-  await page.locator('input[type=checkbox]').last().check();
-  await page.waitForTimeout(3100);
-  await page.getByRole('button', { name: /Send request|Submit|Send/ }).click();
-  await page.locator('h2').filter({ hasText: /.+/ }).first().waitFor();
-  await page.waitForTimeout(1500);
-  const h2 = await page.locator('h2').first().innerText();
-  ok(!/[ěščřžý]/.test(h2), 'potvrzení v angličtině: ' + h2);
-  const hook = JSON.parse(require('fs').readFileSync(S + '/hook.json', 'utf8'));
-  ok(hook.lead.locale === 'en' && hook.score.grade, `lead locale=${hook.lead.locale} skóre ${hook.score.grade} ${hook.score.score} (${hook.score.reasons.join('; ')})`);
+  ok(/\/en\/contact/.test(page.url()), 'EN /request-a-quote → kontakt: ' + page.url());
+  const cta = await page.locator('header a[href^="mailto:"]').first().getAttribute('href');
+  ok(cta && cta.startsWith('mailto:vit.volny@mnastrojarna.cz'), 'CTA v hlavičce: ' + (cta || '').slice(0, 60));
+  const body = await page.locator('main').innerText();
+  ok(!/Semor/i.test(body), 'kontakt bez J. Semoráda');
   // screenshoty
   for (const [p, n] of [['/en', 'en-home'], ['/en/references', 'en-refs'], ['/de/leistungen/werkzeugbau', 'de-service'], ['/de', 'de-home']]) {
     await page.goto('http://localhost:3100' + p, { waitUntil: 'networkidle' });

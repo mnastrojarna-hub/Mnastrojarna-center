@@ -7,7 +7,6 @@ const PAGES: [PageKey, number, MetadataRoute.Sitemap[number]["changeFrequency"]]
   ["home", 1, "weekly"],
   ["services", 0.9, "monthly"],
   ["cases", 0.9, "monthly"],
-  ["rfq", 0.9, "yearly"],
   ["machinery", 0.8, "monthly"],
   ["references", 0.8, "monthly"],
   ["quality", 0.7, "yearly"],

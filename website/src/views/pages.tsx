@@ -7,8 +7,9 @@ import { FitChecker } from "@/components/fit-checker";
 import { Gallery } from "@/components/gallery";
 import { JsonLd } from "@/components/json-ld";
 import { fill, getDict } from "@/content";
-import { GALLERY, MACHINES, VIDEOS, SALES, SERVICE_FACTS, SERVICE_ORDER, SITE, TEAM, TECH } from "@/content/site";
+import { GALLERY, MACHINES, VIDEOS, SALES, SERVICE_FACTS, SERVICE_ORDER, SITE, TECH } from "@/content/site";
 import { href, type Locale, type ServiceId } from "@/i18n/config";
+import { mailToSales } from "@/lib/contact";
 import { ORG_ID, breadcrumbJsonLd, faqJsonLd, pageMeta, videoJsonLd } from "@/lib/seo";
 
 type P = { locale: Locale };
@@ -69,7 +70,7 @@ export function ServiceView({ locale, id }: P & { id: ServiceId }) {
   const s = t.services[id];
   const facts = SERVICE_FACTS[id];
   const others = SERVICE_ORDER.filter((x) => x !== id).slice(0, 3);
-  const rfq = `${href(locale, "rfq")}?sluzba=${id}`;
+  const rfq = mailToSales(`${t.common.mailSubject} – ${s.title}`, t.common.mailBody);
   const crumbs = [
     { name: t.nav.services, path: href(locale, "services") },
     { name: s.title, path: href(locale, "service", id) },
@@ -79,9 +80,9 @@ export function ServiceView({ locale, id }: P & { id: ServiceId }) {
     <>
       <PageHero locale={locale} eyebrow={p.eyebrow} crumbs={crumbs} title={s.title} lead={s.lead} sheet={String(SERVICE_ORDER.indexOf(id) + 10)}>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link href={rfq} className="btn-primary !px-7 !py-3.5">
-            <Icon name="upload" className="h-5 w-5" /> {t.common.quoteNow}
-          </Link>
+          <a href={rfq} className="btn-primary !px-7 !py-3.5">
+            <Icon name="mail" className="h-5 w-5" /> {t.common.quoteNow}
+          </a>
           <a href={`mailto:${TECH.email}?subject=${encodeURIComponent(`${p.techSubject} – ${s.title}`)}`} className="btn-ghost !px-7 !py-3.5">
             {p.techQuestion}
           </a>
@@ -150,9 +151,15 @@ export function ServiceView({ locale, id }: P & { id: ServiceId }) {
                   {TECH.email}
                 </a>
               </div>
-              <Link href={rfq} className="btn-primary mt-6 w-full">
+              <a href={rfq} className="btn-primary mt-6 w-full">
                 {t.common.quoteNow} <Icon name="arrow" className="h-4 w-4" />
-              </Link>
+              </a>
+              <p className="mt-3 text-center text-[13px] text-ink-700/65">
+                {SALES.name} ·{" "}
+                <a href={SALES.phoneHref} className="text-brand hover:underline">
+                  {SALES.phone}
+                </a>
+              </p>
               <p className="mt-3 text-center text-[12px] text-ink-700/50">{t.minOrderNoVat}</p>
             </div>
           </aside>
@@ -258,7 +265,7 @@ export function MachineryView({ locale }: P) {
         <div className="container relative">
           <SectionHeading eyebrow={p.fitEyebrow} title={p.fitTitle} lead={p.fitLead} />
           <div className="mt-12" data-reveal>
-            <FitChecker t={p} names={names} rfqHref={href(locale, "rfq")} />
+            <FitChecker t={p} names={names} email={SALES.email} subject={t.common.mailSubject} bodyTpl={t.common.fitMailBody} />
           </div>
         </div>
       </section>
@@ -474,9 +481,22 @@ export function ContactView({ locale }: P) {
     <>
       <PageHero locale={locale} eyebrow={p.eyebrow} crumbs={[{ name: t.nav.contact, path: href(locale, "contact") }]} title={p.title} lead={p.lead} sheet="07">
         <div className="mt-10">
-          <Link href={href(locale, "rfq")} className="btn-primary !px-7 !py-3.5">
-            <Icon name="upload" className="h-5 w-5" /> {p.cta}
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <a href={mailToSales(t.common.mailSubject, t.common.mailBody)} className="btn-primary !px-7 !py-3.5" data-magnetic>
+              <Icon name="mail" className="h-5 w-5" /> {p.cta}
+            </a>
+            {SALES.phone && (
+              <a href={SALES.phoneHref} className="btn-ghost !px-7 !py-3.5" data-magnetic>
+                <Icon name="phone" className="h-5 w-5 text-brand" /> {SALES.phone}
+              </a>
+            )}
+          </div>
+          <p className="mt-5 text-[15px] text-ink-700/65">
+            {t.common.primaryContact}: <strong className="text-ink-700">{SALES.name}</strong>, {t.team.volny.role.toLowerCase()} ·{" "}
+            <a href={`mailto:${SALES.email}`} className="text-brand hover:underline">
+              {SALES.email}
+            </a>
+          </p>
         </div>
       </PageHero>
 
@@ -560,7 +580,7 @@ export function CareersView({ locale }: P) {
   return (
     <PageHero locale={locale} eyebrow={p.eyebrow} crumbs={[{ name: p.eyebrow, path: href(locale, "careers") }]} title={p.title} lead={p.lead} sheet="08">
       <div className="mt-10 flex flex-wrap gap-3">
-        <a href={`mailto:${TEAM[0].email}?subject=${encodeURIComponent(p.subject)}`} className="btn-primary !px-7 !py-3.5">
+        <a href={mailToSales(p.subject)} className="btn-primary !px-7 !py-3.5">
           {p.cta}
         </a>
         <span className="btn-ghost pointer-events-none !px-7 !py-3.5">

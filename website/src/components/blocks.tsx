@@ -4,6 +4,7 @@ import { getDict } from "@/content";
 import { MACHINES, REFERENCES, SALES, SERVICE_FACTS, SERVICE_ORDER, TEAM, videoFor, type Person } from "@/content/site";
 import { href, type Locale, type ServiceId } from "@/i18n/config";
 import { cn } from "@/lib/cn";
+import { mailToSales } from "@/lib/contact";
 import { Accent } from "./accent";
 import { Icon } from "./icons";
 import { LiteYouTube } from "./lite-youtube";
@@ -160,6 +161,9 @@ export function PersonCard({ locale, p, i }: { locale: Locale; p: Person; i: num
           </div>
         )}
         <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-700 shadow-sm backdrop-blur">{r.role}</span>
+        {p.id === "volny" && (
+          <span className="absolute right-4 top-4 rounded-full bg-brand px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white shadow-sm">{getDict(locale).common.primaryContact}</span>
+        )}
       </div>
       <div className="p-6">
         <h3 className="font-display text-2xl font-bold uppercase text-ink-700">{p.name}</h3>
@@ -181,7 +185,7 @@ export function PersonCard({ locale, p, i }: { locale: Locale; p: Person; i: num
 
 export function TeamGrid({ locale }: { locale: Locale }) {
   return (
-    <div className="grid gap-5 md:grid-cols-3">
+    <div className="grid max-w-5xl gap-5 md:grid-cols-2">
       {TEAM.map((p, i) => (
         <PersonCard key={p.id} locale={locale} p={p} i={i} />
       ))}
@@ -409,13 +413,21 @@ export function CtaBand({ locale, title, lead }: { locale: Locale; title?: strin
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-ink-700/65">{lead ?? c.ctaLead}</p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href={href(locale, "rfq")} className="btn-primary !px-8 !py-4 !text-base">
-              <Icon name="upload" className="h-5 w-5" /> {c.uploadAndQuote}
-            </Link>
-            <Link href="/cad" className="btn-ghost !px-8 !py-4 !text-base">
-              <Icon name="cube" className="h-5 w-5" /> {c.cadDrawPart}
-            </Link>
+            <a href={mailToSales(c.mailSubject, c.mailBody)} className="btn-primary !px-8 !py-4 !text-base" data-magnetic>
+              <Icon name="mail" className="h-5 w-5" /> {c.emailCta}
+            </a>
+            {SALES.phone && (
+              <a href={SALES.phoneHref} className="btn-ghost !px-8 !py-4 !text-base" data-magnetic>
+                <Icon name="phone" className="h-5 w-5 text-brand" /> {SALES.phone}
+              </a>
+            )}
           </div>
+          <p className="mt-6 text-[14px] text-ink-700/60">
+            {c.primaryContact}: <strong className="text-ink-700">{SALES.name}</strong> · {getDict(locale).team.volny.role} ·{" "}
+            <a href={`mailto:${SALES.email}`} className="text-brand hover:underline">
+              {SALES.email}
+            </a>
+          </p>
           <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700/40">{c.ctaFoot}</p>
         </div>
       </div>

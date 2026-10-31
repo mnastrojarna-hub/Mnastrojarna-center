@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import { EXAMPLES, FEATURE_LABEL, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type BuildResult, type CadDoc, type Feature, type FeatureType, type SketchEntity, type SketchPlane } from "@/cad/types";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
-import { handoffFiles } from "@/lib/file-handoff";
+import { SALES } from "@/content/site";
 import { cn } from "@/lib/cn";
 import { track } from "../analytics";
 import { LogoMark } from "../logo";
@@ -53,7 +52,6 @@ function printSvg(svg: string, sheet: string) {
 const PICK_TYPES = new Set<FeatureType>(["fillet", "chamfer", "shell", "hole"]);
 
 export function CadApp() {
-  const router = useRouter();
   const [hist, setHist] = useState<Hist>(() => ({ past: [], present: emptyDoc(), future: [] }));
   const doc = hist.present;
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -309,11 +307,15 @@ export function CadApp() {
   };
   const toRfq = async () => {
     try {
-      flash("Exportuji model do poptávky…");
+      flash("Ukládám model STEP a otevírám e-mail…");
       const buf = await cad.exportFile(doc, "step");
-      handoffFiles([new File([buf], `${safeName(doc.name)}.step`, { type: "application/step" })]);
+      const file = `${safeName(doc.name)}.step`;
+      download(file, buf, "application/step");
       track("cad_to_rfq");
-      router.push("/poptavka?z=cad");
+      const body = `Dobrý den,\n\nposílám model z Mnástrojárna CAD – soubor ${file} jsem si stáhl do počítače a přikládám ho.\n\nMnožství:\nMateriál:\nTermín:\n\nS pozdravem\n`;
+      setTimeout(() => {
+        window.location.href = `mailto:${SALES.email}?subject=${encodeURIComponent(`Poptávka z webu – ${doc.name}`)}&body=${encodeURIComponent(body)}`;
+      }, 600);
     } catch (e) {
       flash((e as Error).message);
     }

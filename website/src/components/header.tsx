@@ -33,7 +33,7 @@ function LangSwitch({ locale, label, className }: { locale: Locale; label: strin
   );
 }
 
-export function Header({ locale, t, note }: { locale: Locale; t: Dict["nav"]; note: string }) {
+export function Header({ locale, t, note, mailHref, phone, phoneHref }: { locale: Locale; t: Dict["nav"]; note: string; mailHref: string; phone?: string; phoneHref?: string }) {
   const pathname = usePathname() || "/";
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -91,9 +91,14 @@ export function Header({ locale, t, note }: { locale: Locale; t: Dict["nav"]; no
 
           <div className="flex items-center gap-2">
             <LangSwitch locale={locale} label={t.language} className="hidden sm:flex" />
-            <Link href={href(locale, "rfq")} className="btn-primary hidden !px-5 !py-2.5 !text-[14px] md:inline-flex">
+            {phone && (
+              <a href={phoneHref} className="hidden items-center gap-1.5 whitespace-nowrap px-2 font-mono text-[13px] text-ink-700/75 hover:text-brand 2xl:inline-flex">
+                <Icon name="phone" className="h-4 w-4 text-brand" /> {phone}
+              </a>
+            )}
+            <a href={mailHref} className="btn-primary hidden !px-5 !py-2.5 !text-[14px] md:inline-flex">
               {t.rfq} <Icon name="arrow" className="h-4 w-4" />
-            </Link>
+            </a>
             <button type="button" className="rounded-full p-2.5 text-ink-700 xl:hidden" aria-label={open ? t.closeMenu : t.openMenu} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
               <Icon name={open ? "x" : "menu"} />
             </button>
@@ -115,9 +120,14 @@ export function Header({ locale, t, note }: { locale: Locale; t: Dict["nav"]; no
               {n.label}
             </Link>
           ))}
-          <Link href={href(locale, "rfq")} className="btn-primary mt-8 w-full !py-4">
+          <a href={mailHref} className="btn-primary mt-8 w-full !py-4">
             {t.rfq} <Icon name="arrow" className="h-4 w-4" />
-          </Link>
+          </a>
+          {phone && (
+            <a href={phoneHref} className="btn-ghost mt-3 w-full !py-4">
+              <Icon name="phone" className="h-4 w-4 text-brand" /> {phone}
+            </a>
+          )}
           <LangSwitch locale={locale} label={t.language} className="mt-6 self-start" />
           <p className="mt-6 font-mono text-xs uppercase tracking-widest text-ink-700/40">{note}</p>
         </nav>

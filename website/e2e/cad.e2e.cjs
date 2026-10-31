@@ -75,9 +75,9 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   // uložit projekt
   await page.keyboard.press('Control+s').catch(() => {});
   // poptávka
-  await page.getByRole('button', { name: 'Poptat výrobu' }).click();
-  await page.waitForURL(/poptavka/, { timeout: 30000 });
-  ok(true, 'přechod do poptávky');
+  // poptávka = stažení STEP + e-mail obchodníkovi (mailto)
+  [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('button', { name: 'Poptat výrobu' }).click()]);
+  ok(/\.step$/i.test(dl.suggestedFilename()), 'poptávka: STEP stažen ' + dl.suggestedFilename());
   ok(errs.length === 0, 'bez JS chyb ' + errs.join(' | '));
   await b.close();
 })().catch(e => { console.error('ERR', e.message); process.exit(1); });
