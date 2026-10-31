@@ -1,0 +1,64 @@
+{
+  "docKind": "objednavka",
+  "issuer": "zakaznik",
+  "documentNumber": "142/026",
+  "documentDate": "2026-10-28",
+  "customer": {
+    "name": "STROJMETAL, a. s.",
+    "ico": "45274649",
+    "dic": "CZ45274649",
+    "street": "Průmyslová 124",
+    "city": "Kladno",
+    "zip": "272 01",
+    "country": "CZ",
+    "email": "dvorak@strojmetal.cz",
+    "phone": "+420 603 111 222",
+    "contactPerson": "Ing. Jan Dvořák"
+  },
+  "supplier": {
+    "name": "", "ico": "", "dic": "", "street": "", "city": "", "zip": "", "country": "",
+    "email": "", "phone": "", "contactPerson": ""
+  },
+  "customerOrderNumber": "142/026",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "2026-12-04",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "",
+      "revision": "",
+      "name": "Unašeč upravený",
+      "description": "Unašeč upravený 142/026",
+      "material": "",
+      "quantity": 4,
+      "unit": "ks",
+      "unitPrice": 18630,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "",
+      "revision": "",
+      "name": "Matice upravená",
+      "description": "Matice upravená 142/026",
+      "material": "",
+      "quantity": 8,
+      "unit": "ks",
+      "unitPrice": 9620,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 151480,
+  "currency": "CZK",
+  "paymentTerms": "30 dní",
+  "deliveryTerms": "",
+  "deliveryLeadTime": null,
+  "note": "",
+  "summary": "Objednávka 142/026 od Strojmetal a.s. na 2 položky (Unašeč upravený 4 ks, Matice upravená 8 ks) za 151 480 Kč bez DPH.",
+  "confidence": 0.94,
+  "needsClarification": [],
+  "roleEmails": []
+}

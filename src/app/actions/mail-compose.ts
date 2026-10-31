@@ -23,6 +23,11 @@ import {
   ADHOC_ANON_EXT_RE, adhocAnonPrefix, blockedAttachmentMessage, isInlineImage, recipientsAllowOriginals, type BlockReason,
 } from "@/lib/email/attachment-anon";
 import type { JobsDb } from "@/lib/jobs/events";
+import { searchRecipients } from "@/lib/contacts/suggest-server";
+import { aiToneOf, toneFor } from "@/lib/contacts/server";
+import { draftReply } from "@/lib/ai/claude";
+import { getAgentInstructions } from "@/lib/ai/corrections";
+import type { RecipientSuggestion } from "@/lib/contacts/suggest";
 import type { EmailCategory as DbEmailCategory } from "@/lib/supabase/database.types";
 
 /**
@@ -173,44 +178,60 @@ export async function prepareMailUploadAction(input: { filename: string; size: n
   return { ok: true, path: data.path ?? path, token: data.token };
 }
 
-export interface RecipientSuggestion {
-  email: string;
-  name: string;
-  kind: "zákazník" | "dodavatel" | "kolega" | "kontakt";
+export type { RecipientSuggestion } from "@/lib/contacts/suggest";
+
+/**
+ * Našeptávač adres (všude, kde se píše e-mail): kontaktní osoby zákazníků a dodavatelů (jméno, firma,
+ * pozice, účel adresy), firmy, kolegové a adresy z mé pošty (četnost, čerstvost). Kontext (zákazník,
+ * dodavatel, zakázka) dá jejich adresy nahoru — i bez psaní. Viditelnost: src/lib/contacts/suggest-server.ts.
+ */
+export async function searchRecipientsAction(
+  query: string,
+  ctx?: { customerId?: string | null; supplierId?: string | null; jobId?: string | null; exclude?: string[] } | null,
+): Promise<RecipientSuggestion[]> {
+  const { user, can } = await getAccess();
+  if (!user || !user.active || !(can("mail") || can("customers") || can("suppliers") || can("orders"))) return [];
+  if (!isSupabaseConfigured()) return [];
+  const safe = {
+    customerId: isUuidLike(ctx?.customerId) ? ctx!.customerId : null,
+    supplierId: isUuidLike(ctx?.supplierId) ? ctx!.supplierId : null,
+    jobId: isUuidLike(ctx?.jobId) ? ctx!.jobId : null,
+  };
+  const exclude = Array.isArray(ctx?.exclude) ? ctx!.exclude.filter((e) => typeof e === "string").slice(0, 50) : [];
+  try {
+    return await searchRecipients(await db(), { userId: user.id, all: can("mail_all"), mail: can("mail") }, String(query ?? ""), safe, { exclude });
+  } catch {
+    return [];
+  }
 }
 
-/** Našeptávač adres: kontakty zákazníků a dodavatelů, kolegové. */
-export async function searchRecipientsAction(query: string): Promise<RecipientSuggestion[]> {
+/**
+ * „AI návrh odpovědi" v okně psaní: AI (bez klíče šablona) napíše odpověď na zprávu s MÝM tykáním /
+ * vykáním s hlavním adresátem (Komu); bez podpisu a závěrečného pozdravu — podpis schránky je pod textem.
+ */
+export async function draftComposeAction(input: { sourceEmailId: string; to?: string[] }): Promise<{ ok: boolean; error?: string; body?: string; salutation?: string }> {
   const access = await checkFeature("mail");
-  if ("error" in access) return [];
-  const q = (query ?? "").trim().replace(/[%_,()\\]/g, " ").trim().slice(0, 60);
-  if (q.length < 2) return [];
-  const { can } = await getAccess();
+  if ("error" in access) return { ok: false, error: access.error };
+  if (!input || !isUuidLike(input.sourceEmailId)) return { ok: false, error: "Zpráva nenalezena." };
+  const found = await getVisibleEmailRow<{ from_email: string | null; from_name: string | null; subject: string | null; body_text: string | null; category: string | null }>(
+    input.sourceEmailId, "from_email, from_name, subject, body_text, category",
+  );
+  if (!found) return { ok: false, error: "Zpráva nenalezena." };
+  const r = found.row;
+  const to = (Array.isArray(input.to) ? input.to : []).filter((e) => typeof e === "string").slice(0, 20);
+  const main = splitAddresses(to.join(","))[0] ?? splitAddresses(r.from_email)[0] ?? null;
   const c = await db();
-  const like = `%${q}%`;
-  const own = can("mail_all") ? null : access.user.id;
-  let customers = c.from("customers").select("name, email, owner_id").or(`name.ilike.${like},email.ilike.${like}`).not("email", "is", null).limit(8);
-  if (own) customers = customers.or(`owner_id.eq.${own},owner_id.is.null`);
-  const [cu, cc, su, us] = await Promise.all([
-    customers,
-    c.from("customer_contacts").select("name, email, customer:customers!customer_id(name, owner_id)").or(`name.ilike.${like},email.ilike.${like}`).not("email", "is", null).limit(12),
-    c.from("suppliers").select("name, email, contact_person").or(`name.ilike.${like},email.ilike.${like},contact_person.ilike.${like}`).not("email", "is", null).limit(8),
-    c.from("profiles").select("full_name, email, active").or(`full_name.ilike.${like},email.ilike.${like}`).limit(8),
-  ]);
-  const out: RecipientSuggestion[] = [];
-  const add = (email: string | null | undefined, name: string, kind: RecipientSuggestion["kind"]) => {
-    const e = splitAddresses(email)[0];
-    if (e && !out.some((o) => o.email === e)) out.push({ email: e, name: name.trim() || e, kind });
-  };
-  for (const r of (us.data ?? []) as { full_name: string | null; email: string | null; active: boolean | null }[]) if (r.active !== false) add(r.email, r.full_name ?? "", "kolega");
-  for (const r of (cu.data ?? []) as { name: string; email: string | null }[]) add(r.email, r.name, "zákazník");
-  for (const r of (cc.data ?? []) as { name: string; email: string | null; customer: { name: string | null; owner_id: string | null } | { name: string | null; owner_id: string | null }[] | null }[]) {
-    const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer;
-    if (own && cust?.owner_id && cust.owner_id !== own) continue;
-    add(r.email, `${r.name}${cust?.name ? ` (${cust.name})` : ""}`, "kontakt");
+  const tone = await toneFor(c, access.user.id, main ? [main] : [], main && main === splitAddresses(r.from_email)[0] ? r.from_name : null).catch(() => null);
+  try {
+    const rules = await getAgentInstructions("email").catch(() => undefined);
+    const body = await draftReply({
+      from: r.from_email ?? "", subject: r.subject ?? "", body: r.body_text ?? "", category: r.category ?? undefined, rules,
+      tone: tone ? aiToneOf(tone) : null, signal: AbortSignal.timeout(60_000),
+    });
+    return { ok: true, body: body.trim(), salutation: tone?.salutation };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? `AI návrh selhal: ${e.message}` : "AI návrh selhal." };
   }
-  for (const r of (su.data ?? []) as { name: string; email: string | null; contact_person: string | null }[]) add(r.email, r.contact_person ? `${r.contact_person} (${r.name})` : r.name, "dodavatel");
-  return out.slice(0, 12);
 }
 
 export async function saveSignatureAction(signature: string): Promise<{ ok: boolean; error?: string }> {

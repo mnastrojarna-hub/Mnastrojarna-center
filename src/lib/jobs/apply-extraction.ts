@@ -5,6 +5,7 @@ import type {
 import type { JobDetail, JobInput, JobItem, JobItemInput } from "@/lib/jobs/types";
 import { isForward } from "@/lib/jobs/stages";
 import { docNumbersEqual, isSupplierSideDoc, normalizeCompanyName } from "@/lib/jobs/matching";
+import { pairDocLines, type PairTotals } from "@/lib/jobs/item-pairing";
 
 /**
  * „Vyfoť doklad → zakázka se vyplní sama" — čistá logika, CO se do zakázky zapíše.
@@ -91,6 +92,26 @@ export type JobSnapshot = Pick<
 export interface JobItemUpdate {
   id: string;
   patch: Partial<JobItemInput>;
+  /**
+   * Pole, která doklad PŘEPÍŠE i neprázdná: objednávka zákazníka k zakázce ještě bez objednávky —
+   * počet kusů a dohodnutá cena platí podle objednávky. Číslo výkresu, revize a materiál nikdy.
+   */
+  override?: ("quantity" | "unitPrice")[];
+}
+
+/**
+ * Nejistý řádek dokladu (≈ 2 %): možná je to existující položka. Řádek je v newItems (index), ale
+ * bez odpovědi člověka se NEPŘIDÁ — formulář se zeptá „Řádek ‚…' = položka 1 F0N603W88?".
+ */
+export interface PairQuestion {
+  /** Index v newItems. */
+  newIndex: number;
+  itemId: string;
+  /** Popisek položky zakázky („1 · F0N603W88 rev. 02 Unašeč upravený"). */
+  itemLabel: string;
+  reason: string;
+  /** Co se do položky zapíše při „Ano" (stejně jako jisté spárování). */
+  update: JobItemUpdate;
 }
 
 export interface JobUpdatePlan {
@@ -98,6 +119,10 @@ export interface JobUpdatePlan {
   patch: JobInput;
   newItems: JobItemInput[];
   itemUpdates: JobItemUpdate[];
+  /** Nejisté řádky → otázka pro člověka (prázdné = vše jisté). */
+  pairQuestions?: PairQuestion[];
+  /** Kontrola součtu položek proti dokladu (null = nejde spočítat). */
+  pairTotals?: PairTotals | null;
   /** Nový stav (jen posun dopředu), null = neměnit. */
   stageTo: JobStage | null;
   /** České popisky doplněných údajů (pro toast / historii). */
@@ -156,18 +181,65 @@ function toItemInput(item: ExtractedItem, purchase: boolean): JobItemInput {
   return out;
 }
 
-/** Doplní prázdné údaje existující položky z položky dokladu. */
-function itemPatch(current: JobItem, item: ExtractedItem, purchase: boolean): Partial<JobItemInput> {
+/** Text řádku dokladu, jak ho píše zákazník („Unašeč upravený 142/026"), pokud položka říká něco jiného. */
+function lineRef(current: JobItem, item: ExtractedItem): string {
+  const text = clip(item.description || item.name || "", 200);
+  if (!text) return "";
+  const k = nameKey(text);
+  if (!k || (current.note && nameKey(current.note).includes(k))) return "";
+  // jen když řádek nese něco navíc (odkaz „142/026", pozice…) — ne pouhý název + číslo výkresu
+  let rest = ` ${k} `;
+  for (const part of [current.name, current.description, current.drawingNumber, item.drawingNumber, current.revision, item.revision]) {
+    const p = nameKey(part);
+    if (p) rest = rest.replace(` ${p} `, " ");
+  }
+  return rest.trim() ? text : "";
+}
+
+/**
+ * Spárovaný řádek dokladu → úprava existující položky. Vždy jen doplní prázdné údaje (číslo výkresu,
+ * revize, materiál, název, popis se nikdy nepřepíší); objednávka zákazníka k zakázce bez objednávky
+ * (lineWins) navíc přepíše počet kusů a dohodnutou cenu. Text řádku zákazníka a termín položky
+ * se připíšou do poznámky položky.
+ */
+export function pairedItemUpdate(current: JobItem, item: ExtractedItem, purchase: boolean, lineWins: boolean, orderRef = lineWins): JobItemUpdate {
   const p: Partial<JobItemInput> = {};
-  if (isEmpty(current.quantity) && item.quantity > 0) p.quantity = item.quantity;
+  const override: ("quantity" | "unitPrice")[] = [];
+  if (item.quantity > 0) {
+    if (isEmpty(current.quantity)) p.quantity = item.quantity;
+    else if (lineWins && Math.abs(Number(current.quantity) - item.quantity) > 1e-9) {
+      p.quantity = item.quantity;
+      override.push("quantity");
+    }
+  }
   if (item.unitPrice > 0) {
     if (purchase && isEmpty(current.purchaseUnitPrice)) p.purchaseUnitPrice = item.unitPrice;
-    if (!purchase && isEmpty(current.unitPrice)) p.unitPrice = item.unitPrice;
+    if (!purchase) {
+      if (isEmpty(current.unitPrice)) p.unitPrice = item.unitPrice;
+      else if (lineWins && Math.abs(Number(current.unitPrice) - item.unitPrice) > 0.005) {
+        p.unitPrice = item.unitPrice;
+        override.push("unitPrice");
+      }
+    }
   }
+  if (isEmpty(current.drawingNumber) && item.drawingNumber) p.drawingNumber = item.drawingNumber;
   if (isEmpty(current.material) && item.material) p.material = item.material;
   if (isEmpty(current.name) && item.name) p.name = item.name;
   if (isEmpty(current.revision) && item.revision) p.revision = item.revision;
-  return p;
+  if (!purchase && isEmpty(current.description) && item.description && nameKey(item.description) !== nameKey(current.name)) {
+    p.description = item.description;
+  }
+  if (!purchase && orderRef) {
+    // text řádku zákazníka (odkaz „142/026") a termín položky → poznámka položky (připíše se)
+    const ref = p.description ? "" : lineRef(current, item);
+    const notes = [ref ? `Řádek objednávky: ${ref}` : "", item.deliveryDate && !(current.note ?? "").includes(item.deliveryDate) ? `Termín položky ${item.deliveryDate}` : ""].filter(Boolean);
+    if (notes.length) p.note = notes.join(" · ");
+  }
+  return { id: current.id, patch: p, ...(override.length ? { override } : {}) };
+}
+
+function itemLabel(it: JobItem): string {
+  return [`${it.position + 1}`, it.drawingNumber, it.revision ? `rev. ${it.revision}` : "", it.name].filter(Boolean).join(" ");
 }
 
 /** Součet položek, pokud mají všechny cenu (jinak 0). */
@@ -239,30 +311,65 @@ export function planJobUpdate(job: JobSnapshot, doc: ExtractedBusinessDoc): JobU
 
   fill("title", titleFromItems(doc.items));
 
-  // Položky
-  const newItems: JobItemInput[] = [];
-  const updates = new Map<string, Partial<JobItemInput>>();
-  const existing = job.items ?? [];
+  // Položky: řádky dokladu se PÁRUJÍ na existující položky (sdílený párovač item-pairing — číslo
+  // výkresu, název bez odkazů „142/026", počet, cena, pořadí a součet dokladu); přidá se jen opravdu nový řádek
+  const lines: ExtractedItem[] = [];
   for (const item of doc.items) {
     // duplicitní řádek na dokladu
-    if (newItems.some((n) => sameItem(n, item))) continue;
-    const match = existing.find((e) => sameItem(e, item));
-    if (match) {
-      const p = itemPatch(match, item, supplierSide);
-      if (Object.keys(p).length) updates.set(match.id, { ...p, ...(updates.get(match.id) ?? {}) });
-    } else if (!existing.length || !supplierSide) {
-      newItems.push(toItemInput(item, supplierSide));
-    }
+    if (lines.some((n) => sameItem(n, item))) continue;
+    lines.push(item);
   }
-  const itemUpdates = [...updates].map(([id, p]) => ({ id, patch: p }));
-  if (newItems.length) filled.push(`${newItems.length === 1 ? "Nová položka" : "Nové položky"} (${newItems.length})`);
+  const existing = job.items ?? [];
+  const newItems: JobItemInput[] = [];
+  const updates = new Map<string, JobItemUpdate>();
+  const pairQuestions: PairQuestion[] = [];
+  let pairTotals: PairTotals | null = null;
+  const customerOrder = doc.docKind === "objednavka" && !supplierSide;
+  const lineWins = customerOrder && isEmpty(job.customerOrderNumber);
+  const addUpdate = (u: JobItemUpdate) => {
+    if (!Object.keys(u.patch).length) return;
+    const prev = updates.get(u.id);
+    updates.set(u.id, prev
+      ? { id: u.id, patch: { ...u.patch, ...prev.patch }, ...(prev.override || u.override ? { override: [...new Set([...(prev.override ?? []), ...(u.override ?? [])])] } : {}) }
+      : u);
+  };
+  if (existing.length && lines.length) {
+    const wholeDoc = doc.docKind === "objednavka" || doc.docKind === "nabidka" || doc.docKind === "potvrzeni";
+    const res = pairDocLines(lines, existing, {
+      orderTotal: !supplierSide && wholeDoc ? doc.totalWithoutVat || itemsTotal(lines) : null,
+      purchase: supplierSide,
+      lineWins,
+    });
+    pairTotals = res.totals;
+    for (const p of res.pairs) {
+      const match = existing.find((e) => e.id === p.itemId)!;
+      const u = pairedItemUpdate(match, lines[p.line], supplierSide, lineWins);
+      if (p.confidence === "sure") addUpdate(u);
+      else if (!supplierSide) {
+        // nejisté: řádek čeká na odpověď člověka (bez odpovědi se nepřidá ani nezapíše)
+        newItems.push(toItemInput(lines[p.line], supplierSide));
+        pairQuestions.push({ newIndex: newItems.length - 1, itemId: match.id, itemLabel: itemLabel(match), reason: p.reason, update: u });
+      }
+    }
+    // dodavatelský doklad k zakázce s položkami: neznámé řádky se nepřidávají (dodávka může mít díly jiných zakázek)
+    if (!supplierSide) for (const i of res.newLines) newItems.push(toItemInput(lines[i], supplierSide));
+  } else {
+    for (const item of lines) newItems.push(toItemInput(item, supplierSide));
+  }
+  const itemUpdates = [...updates.values()];
+  const added = newItems.length - pairQuestions.length;
+  if (added > 0) filled.push(`${added === 1 ? "Nová položka" : "Nové položky"} (${added})`);
   if (itemUpdates.length) filled.push(`${itemUpdates.length === 1 ? "Doplněná položka" : "Doplněné položky"} (${itemUpdates.length})`);
 
   // Stav jen dopředu (isForward vrací false pro speciální stavy)
   const target = docKindToStage(doc.docKind, doc.issuer);
   const stageTo = target && isForward(job.stage, target) ? target : null;
 
-  return { patch, newItems, itemUpdates, stageTo, filled, filledColumns };
+  return {
+    patch, newItems, itemUpdates, stageTo, filled, filledColumns,
+    ...(pairQuestions.length ? { pairQuestions } : {}),
+    ...(pairTotals ? { pairTotals } : {}),
+  };
 }
 
 // ── Nová zakázka z dokladu ──────────────────────────────────

@@ -138,8 +138,16 @@ describe("planJobUpdate — slučování položek", () => {
       ],
     });
     const plan = planJobUpdate(job, PO);
+    // zakázka bez objednávky: dohodnutá cena platí podle objednávky (override), prázdné údaje se doplní
     expect(plan.itemUpdates).toEqual([
-      { id: "i1", patch: { material: "1.2379", name: "Upínka frézovaná", revision: "B" } },
+      {
+        id: "i1",
+        patch: {
+          material: "1.2379", name: "Upínka frézovaná", revision: "B", unitPrice: 1180,
+          description: "Frézovaný díl dle výkresu, odjehlit, bez ostrých hran", note: "Termín položky 2026-11-27",
+        },
+        override: ["unitPrice"],
+      },
     ]);
     expect(plan.newItems.map((i) => i.drawingNumber)).toEqual(["VK-2292"]);
     expect(plan.filled).toContain("Doplněná položka (1)");
@@ -162,13 +170,25 @@ describe("planJobUpdate — slučování položek", () => {
     expect(plan.newItems[0].drawingNumber).toBe("PB-200");
   });
 
-  it("vyplněné položky nechá být", () => {
+  it("vyplněné položky nechá být (zakázka už objednávku má = revize)", () => {
     const job = snapshot({
-      items: [item({ id: "i1", drawingNumber: "VK-2291", revision: "A", name: "Upínka", material: "C45", quantity: 40, unitPrice: 1000 })],
+      customerOrderNumber: "4795-2026",
+      items: [item({ id: "i1", drawingNumber: "VK-2291", revision: "A", name: "Upínka", description: "Frézovaný díl", material: "C45", quantity: 40, unitPrice: 1000, note: "Termín položky 2026-11-27" })],
     });
     const plan = planJobUpdate(job, doc({ docKind: "objednavka", issuer: "zakaznik", items: [PO.items[0]] }));
     expect(plan.itemUpdates).toEqual([]);
     expect(plan.newItems).toEqual([]);
+  });
+
+  it("objednávka k zakázce bez objednávky: počet a cena podle objednávky, číslo výkresu / revize / materiál zůstanou", () => {
+    const job = snapshot({
+      items: [item({ id: "i1", drawingNumber: "VK-2291", revision: "A", name: "Upínka", description: "Frézovaný díl", material: "C45", quantity: 40, unitPrice: 1000 })],
+    });
+    const plan = planJobUpdate(job, doc({ docKind: "objednavka", issuer: "zakaznik", items: [PO.items[0]] }));
+    expect(plan.newItems).toEqual([]);
+    expect(plan.itemUpdates).toEqual([
+      { id: "i1", patch: { quantity: 50, unitPrice: 1180, note: "Řádek objednávky: Frézovaný díl dle výkresu, odjehlit, bez ostrých hran · Termín položky 2026-11-27" }, override: ["quantity", "unitPrice"] },
+    ]);
   });
 });
 

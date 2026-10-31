@@ -26,7 +26,8 @@ export interface ItemsEditorColumns {
 type Field = keyof Omit<ItemDraft, "key" | "id">;
 
 const cell =
-  "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none transition placeholder:text-muted-foreground/60 hover:border-input focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring";
+  // nápověda prázdného pole: kurzívou, šedě, bez ukázkových hodnot (majitel 30. 10.: „VK-1234 / A / 1.2379" četl jako data)
+  "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none transition placeholder:font-sans placeholder:font-normal placeholder:italic placeholder:text-muted-foreground/50 hover:border-input focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring";
 const bad = "!border-red-400 bg-red-50 dark:bg-red-500/10";
 
 function Cell({
@@ -132,15 +133,15 @@ export function ItemsEditor({
               return (
                 <tr key={d.key} className="border-t align-top [&>td]:px-1 [&>td]:py-1">
                   <td className="pt-2.5 text-center text-xs font-semibold text-muted-foreground">{i + 1}</td>
-                  <td><Cell label="Číslo výkresu" mono value={d.drawingNumber} onChange={(v) => set(i, "drawingNumber", v)} placeholder="VK-1234" /></td>
-                  {columns.revision && <td><Cell label="Revize" value={d.revision} onChange={(v) => set(i, "revision", v)} placeholder="A" /></td>}
+                  <td><Cell label="Číslo výkresu" mono value={d.drawingNumber} onChange={(v) => set(i, "drawingNumber", v)} placeholder="č. výkresu" /></td>
+                  {columns.revision && <td><Cell label="Revize" value={d.revision} onChange={(v) => set(i, "revision", v)} placeholder="rev." /></td>}
                   <td>
                     <Cell label="Název" value={d.name} onChange={(v) => set(i, "name", v)} placeholder="Název dílu" className="font-medium" />
                     <Cell label="Popis" value={d.description} onChange={(v) => set(i, "description", v)} placeholder="popis, úprava, tolerance…" className="h-7 text-xs text-muted-foreground" />
                     <DrawingSpecChips spec={specs?.[d.key]} className="px-2 pb-1" testId={`item-spec-${i}`} />
                   </td>
-                  <td><Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="1.2379" /></td>
-                  <td><Cell label="Množství" numeric value={d.quantity} onChange={(v) => set(i, "quantity", v)} placeholder="1" /></td>
+                  <td><Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="materiál" /></td>
+                  <td><Cell label="Množství" numeric value={d.quantity} onChange={(v) => set(i, "quantity", v)} placeholder="počet" /></td>
                   <td><Cell label="Měrná jednotka" value={d.unit} onChange={(v) => set(i, "unit", v)} placeholder="ks" /></td>
                   <td><Cell label="Cena za MJ" numeric value={d.unitPrice} onChange={(v) => set(i, "unitPrice", v)} placeholder="doplnit" /></td>
                   {columns.vat && <td><Cell label="DPH %" numeric value={d.vatRate} onChange={(v) => set(i, "vatRate", v)} placeholder="21" /></td>}
@@ -173,23 +174,23 @@ export function ItemsEditor({
                 </label>
                 <label>
                   <span className="text-muted-foreground">Č. výkresu</span>
-                  <Cell label="Číslo výkresu" mono value={d.drawingNumber} onChange={(v) => set(i, "drawingNumber", v)} placeholder="VK-1234" className="border-input" />
+                  <Cell label="Číslo výkresu" mono value={d.drawingNumber} onChange={(v) => set(i, "drawingNumber", v)} placeholder="č. výkresu" className="border-input" />
                 </label>
                 {columns.revision ? (
                   <label>
                     <span className="text-muted-foreground">Revize</span>
-                    <Cell label="Revize" value={d.revision} onChange={(v) => set(i, "revision", v)} placeholder="A" className="border-input" />
+                    <Cell label="Revize" value={d.revision} onChange={(v) => set(i, "revision", v)} placeholder="rev." className="border-input" />
                   </label>
                 ) : (
                   <label>
                     <span className="text-muted-foreground">Materiál</span>
-                    <Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="1.2379" className="border-input" />
+                    <Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="materiál" className="border-input" />
                   </label>
                 )}
                 {columns.revision && (
                   <label className="col-span-2">
                     <span className="text-muted-foreground">Materiál</span>
-                    <Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="1.2379" className="border-input" />
+                    <Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="materiál" className="border-input" />
                   </label>
                 )}
                 <label className="col-span-2">

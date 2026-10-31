@@ -43,10 +43,14 @@ import { createSupplierInvoiceFromFile, type InvoiceFileInput } from "@/lib/supp
 import { invoiceFromBusinessDoc } from "@/lib/supplier-invoices/extract";
 import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
 import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
+import { detectRoleEmails } from "@/lib/contacts/role-detect";
+import { ensureContactPerson, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/server";
 import type {
-  CaptureDocKind, CaptureResult, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedParty,
+  CaptureDocKind, CaptureResult, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedItem, ExtractedParty,
 } from "@/lib/jobs/capture-types";
-import type { ActionResult, JobDetail } from "@/lib/jobs/types";
+import type { ActionResult, JobDetail, JobItem } from "@/lib/jobs/types";
+import { pairDocLines } from "@/lib/jobs/item-pairing";
+import { pairedItemUpdate } from "@/lib/jobs/apply-extraction";
 import type { JobStage } from "@/lib/supabase/database.types";
 import {
   CAPTURE_BATCH_MAX_FILES, CAPTURE_BUCKET, CAPTURE_MAX_PAGES, CAPTURE_TTL_MS, REVIEW_FIELD_KEYS, REVIEW_FIELDS,
@@ -54,8 +58,8 @@ import {
   captureSessionPath, captureSortPath, chipByKey, chipFor, defaultCustomerChoice, defaultSupplierChoice, documentNumberFor,
   initialReviewState, isAiReadableMime, isAiValue, isBatchUploadable, isCaptureDocKind, isCaptureHiresPath, isCapturePagePath, isCaptureSortPath,
   isFieldLocked,
-  reviewChanges, reviewItemsToInputs, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
-  sniffDocumentMime,
+  openPairQuestions, reviewChanges, reviewItemsToInputs, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
+  sniffDocumentMime, updateToMerge,
   type AnalyzeCaptureResponse, type CaptureFileRef, type CapturePreview, type CaptureUploadPrep, type PartyMatchView, type ReviewFieldKey,
   type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
@@ -683,6 +687,30 @@ async function jobByCaptureKey(db: JobsDb, captureKey: string): Promise<string |
   return (await resolveMergeTarget(db, row.id))?.id ?? row.merged_into_id;
 }
 
+/**
+ * Adresy s účelem z dokladu (AI roleEmails, a k tomu rozpoznání „faktury zasílejte na …" v poznámce a
+ * podmínkách) → e-maily podle účelu u zákazníka / dodavatele. Ruční nastavení nepřepíše (rememberRoleEmails).
+ */
+export async function rememberDocRoleEmails(
+  db: JobsDb, doc: ExtractedBusinessDoc, party: { customerId: string | null; supplierId: string | null },
+): Promise<number> {
+  if (!party.customerId && !party.supplierId) return 0;
+  const text = [doc.note, doc.paymentTerms, doc.deliveryTerms].filter(Boolean).join("\n");
+  const fromText = detectRoleEmails(text);
+  const ai = doc.roleEmails ?? [];
+  let added = 0;
+  const own = await ownAddressFilter(db);
+  if (party.customerId) {
+    const list = [...ai.filter((r) => r.party === "customer"), ...(party.supplierId ? [] : fromText)];
+    if (list.length) added += await rememberRoleEmails(db, { customerId: party.customerId }, list, { exclude: own });
+  }
+  if (party.supplierId) {
+    const list = [...ai.filter((r) => r.party === "supplier"), ...fromText];
+    if (list.length) added += await rememberRoleEmails(db, { supplierId: party.supplierId }, list, { exclude: own });
+  }
+  return added;
+}
+
 /** Dodavatel podle IČO / DIČ / názvu, jinak nový. */
 export async function findOrCreateSupplier(db: JobsDb, party: ExtractedParty): Promise<{ id: string; name: string; created: boolean } | null> {
   return findOrCreateSupplierByParty(db, party);
@@ -808,6 +836,8 @@ export async function applyBusinessDoc(
     if (!found) return failResult("Zákazníka se nepodařilo založit.", aiUsed);
     customerId = found.id;
     customerCreated = found.created;
+    // nový zákazník z dokladu: kontaktní osoba z dokladu = první kontaktní osoba (jméno, e-mail, telefon)
+    if (found.created) await ensureContactPerson(db, { customerId: found.id }, { name: p.contactPerson, email: p.email, phone: p.phone }).catch(() => null);
     customerAttached = true;
     const { data } = await db.from("customers").select("name, owner_id").eq("id", found.id).maybeSingle();
     const row = data as { name: string; owner_id: string | null } | null;
@@ -829,6 +859,11 @@ export async function applyBusinessDoc(
     supplierId = s.id;
     supplierName = s.name;
   }
+
+  // „Faktury zasílejte na …" z dokladu (AI roleEmails + rozpoznání v poznámce / podmínkách) → e-maily podle účelu
+  await rememberDocRoleEmails(db, doc, { customerId, supplierId }).catch((err) => {
+    console.error(`[capture] E-maily podle účelu se nepodařilo uložit: ${err instanceof Error ? err.message : String(err)}`);
+  });
 
   let jobId: string;
   let jobNumber: string;
@@ -900,8 +935,34 @@ export async function applyBusinessDoc(
       if (rev.revision) {
         orderRevision = rev.changes;
         items.length = 0;
+        state.items = [];
         state.merges = [];
       }
+    }
+
+    // nejistý řádek (≈ 2 %) bez odpovědi se neuloží — formulář se ptá „je to položka X?"
+    const open = openPairQuestions(state.items);
+    if (open.length) {
+      const q = open[0];
+      const what = q.name || q.drawingNumber || q.description || "položka";
+      return failResult(`Rozhodni u řádku „${what}": je to položka ${q.pair!.itemLabel}, nebo nová položka?`, aiUsed);
+    }
+    // pojistka: řádek od AI, který JISTĚ je existující položkou (číslo výkresu, název + počet + cena),
+    // se nepřidá podruhé — zapíše se do té položky (majitel 30. 10.: Z-2026-022 zdvojené položky)
+    if (items.length) {
+      const paired = await pairRowsWithJobItems(db, jobId, state, items, {
+        purchase: supplierSide, margins, orderRef: state.chip === "objednavka_zakaznik",
+        lineWins: state.chip === "objednavka_zakaznik" && isEmptyValue(row.customer_order_number),
+      });
+      Object.assign(itemIds, paired.itemIds);
+      if (paired.labels.length) flowNotes.push(`Spárováno s existujícími položkami (nepřidáno znovu): ${paired.labels.join("; ")}`);
+    }
+    // „Ano" u otázky: řádek se stal doplněním položky — vazby výkresů na ten řádek míří na položku
+    const fromRows = state.merges.filter((m) => m.apply && m.fromKey && !itemIds[m.fromKey]);
+    if (fromRows.length) {
+      const { data: own } = await db.from("order_items").select("id").eq("order_id", jobId).in("id", fromRows.map((m) => m.itemId));
+      const ok = new Set(((own ?? []) as { id: string }[]).map((r) => r.id));
+      for (const m of fromRows) if (ok.has(m.itemId)) itemIds[m.fromKey!] = m.itemId;
     }
 
     // položky nejdřív — když selžou, nic se nezapíše
@@ -951,13 +1012,15 @@ export async function applyBusinessDoc(
       }
     }
 
-    // doplnění existujících položek (jen prázdné údaje; výjimka: počet kusů z objednávky zákazníka
-    // u zakázky, která objednávku ještě neměla — vždy platí objednávka)
+    // doplnění existujících položek (jen prázdné údaje; výjimka: počet kusů a dohodnutá cena z objednávky
+    // zákazníka u zakázky, která objednávku ještě neměla — vždy platí objednávka). Číslo výkresu, revize,
+    // materiál se nikdy nepřepíší; text řádku zákazníka / termín položky se připíše do poznámky.
     const orderQtyWins = state.chip === "objednavka_zakaznik" && isEmptyValue(row.customer_order_number);
+    let overridden = false;
     for (const m of reviewMergePatches(state.merges, margins)) {
       const { data: cur } = await db
         .from("order_items")
-        .select("id, quantity, unit_price, purchase_unit_price, material, name, revision")
+        .select("id, quantity, unit_price, purchase_unit_price, drawing_number, material, name, revision, description, note")
         .eq("id", m.id)
         .eq("order_id", jobId)
         .maybeSingle();
@@ -966,19 +1029,34 @@ export async function applyBusinessDoc(
       const patch: Row = {};
       const map: [keyof typeof m.patch, string][] = [
         ["quantity", "quantity"], ["unitPrice", "unit_price"], ["purchaseUnitPrice", "purchase_unit_price"],
-        ["material", "material"], ["name", "name"], ["revision", "revision"],
+        ["drawingNumber", "drawing_number"], ["material", "material"], ["name", "name"], ["revision", "revision"],
+        ["description", "description"],
       ];
       for (const [k, col] of map) {
         const v = m.patch[k];
         if (v === undefined || v === null || v === "") continue;
         if (col === "purchase_unit_price" && !margins) continue;
-        if (!isEmptyValue(curRow[col]) && !(col === "quantity" && orderQtyWins && m.overrideQuantity)) continue;
+        const wins = orderQtyWins && ((col === "quantity" && m.overrideQuantity) || (col === "unit_price" && m.overridePrice));
+        if (!isEmptyValue(curRow[col]) && !wins) continue;
+        if (wins && !isEmptyValue(curRow[col]) && Number(curRow[col]) !== Number(v)) overridden = true;
         patch[col] = v;
       }
+      const note = typeof m.patch.note === "string" ? m.patch.note.trim() : "";
+      const curNote = typeof curRow.note === "string" ? curRow.note.trim() : "";
+      if (note && !curNote.includes(note)) patch.note = (curNote ? `${curNote}\n${note}` : note).slice(0, 2000);
       if (!Object.keys(patch).length) continue;
       const { error } = await db.from("order_items").update(patch as never).eq("id", m.id);
       if (error) warnings.push(`Položku se nepodařilo doplnit: ${message(error.message)}`);
       else itemsMerged++;
+    }
+    // objednávka změnila počet / cenu spárovaných položek → hodnota zakázky = součet položek (jako ruční úprava)
+    if (overridden) {
+      const { data: all } = await db.from("order_items").select("quantity, unit_price").eq("order_id", jobId);
+      const rows = (all ?? []) as { quantity: number | string | null; unit_price: number | string | null }[];
+      if (rows.length && rows.every((r) => Number(r.unit_price) > 0)) {
+        const value = Math.round(rows.reduce((s, r) => s + (Number(r.quantity) || 0) * Number(r.unit_price), 0) * 100) / 100;
+        await db.from("orders").update({ value } as never).eq("id", jobId);
+      }
     }
 
     // náš dodací list → dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi")
@@ -1269,6 +1347,74 @@ export async function applyDocFlow(
     warnings.push(message(err));
   }
   return { notes, warnings };
+}
+
+/**
+ * Pojistka proti zdvojení položek (sdílený párovač item-pairing): řádky od AI, které JISTĚ odpovídají
+ * existující položce zakázky (a člověk je neoznačil „Je to nová položka"), se ze vkládaných vyřadí
+ * a zapíšou jako doplnění té položky. Mění state.items / items / state.merges na místě.
+ */
+async function pairRowsWithJobItems(
+  db: JobsDb,
+  jobId: string,
+  state: ReviewState,
+  items: ReturnType<typeof reviewItemsToInputs>,
+  opts: { purchase: boolean; lineWins: boolean; orderRef: boolean; margins: boolean },
+): Promise<{ itemIds: Record<string, string>; labels: string[] }> {
+  const out = { itemIds: {} as Record<string, string>, labels: [] as string[] };
+  const idx = state.items.map((r, i) => (r.aiFilled && r.pair?.answer !== "new" ? i : -1)).filter((i) => i >= 0 && items[i]);
+  if (!idx.length) return out;
+  const { data } = await db.from("order_items")
+    .select("id, position, drawing_number, revision, name, description, material, quantity, unit, unit_price, purchase_unit_price, note")
+    .eq("order_id", jobId).order("position");
+  const rows = (data ?? []) as Row[];
+  if (!rows.length) return out;
+  const jobItems: JobItem[] = rows.map((r) => ({
+    id: String(r.id), position: Number(r.position) || 0,
+    drawingNumber: (r.drawing_number as string | null) ?? null, revision: (r.revision as string | null) ?? null,
+    name: (r.name as string | null) ?? null, description: (r.description as string | null) ?? null,
+    material: (r.material as string | null) ?? null, quantity: Number(r.quantity) || 0, unit: (r.unit as string | null) ?? "ks",
+    unitPrice: r.unit_price === null || r.unit_price === undefined ? null : Number(r.unit_price),
+    purchaseUnitPrice: r.purchase_unit_price === null || r.purchase_unit_price === undefined ? null : Number(r.purchase_unit_price),
+    note: (r.note as string | null) ?? null,
+  }));
+  const lines: ExtractedItem[] = idx.map((i) => {
+    const it = items[i];
+    return {
+      drawingNumber: it.drawingNumber ?? "", revision: it.revision ?? "", name: it.name ?? "", description: it.description ?? "",
+      material: it.material ?? "", quantity: it.quantity, unit: it.unit ?? "ks",
+      unitPrice: (opts.purchase ? it.purchaseUnitPrice : it.unitPrice) ?? 0,
+      deliveryDate: /Termín položky (\d{4}-\d{2}-\d{2})/.exec(it.note ?? "")?.[1] ?? "",
+    };
+  });
+  const res = pairDocLines(lines, jobItems, { purchase: opts.purchase, lineWins: opts.lineWins });
+  const drop = new Set<number>();
+  for (const p of res.pairs) {
+    if (p.confidence !== "sure") continue;
+    const i = idx[p.line];
+    const ex = jobItems.find((x) => x.id === p.itemId)!;
+    const key = state.items[i].key;
+    const m = updateToMerge(pairedItemUpdate(ex, lines[p.line], opts.purchase, opts.lineWins, opts.orderRef), ex, opts.margins, key);
+    if (m) {
+      const prev = state.merges.find((x) => x.itemId === ex.id);
+      if (prev) {
+        prev.patch = { ...m.patch, ...prev.patch };
+        prev.apply = true;
+        if (m.override?.length) prev.override = [...new Set([...(prev.override ?? []), ...m.override])];
+      } else state.merges.push(m);
+    }
+    out.itemIds[key] = ex.id;
+    out.labels.push(`${lines[p.line].name || lines[p.line].drawingNumber || "řádek"} → ${[ex.drawingNumber, ex.name].filter(Boolean).join(" ") || `položka ${ex.position + 1}`}`);
+    drop.add(i);
+  }
+  if (drop.size) {
+    const keepRows = state.items.filter((_, i) => !drop.has(i));
+    const keepInputs = items.filter((_, i) => !drop.has(i));
+    state.items = keepRows;
+    items.length = 0;
+    items.push(...keepInputs);
+  }
+  return out;
 }
 
 /**

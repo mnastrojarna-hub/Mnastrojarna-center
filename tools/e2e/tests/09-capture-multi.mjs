@@ -274,8 +274,12 @@ await T("desktop — plná dávka: objednávka, výkres PNG, STEP, nabídka doda
   const o = sqlJson(`select row_to_json(o) from (select invoice_number, delivery_note_number, status from orders where id = ${q(jobId)}) o`);
   expect(o.invoice_number === "FV-E2E-1" && o.delivery_note_number === "DL-E2E-1", `faktura a DL zapsané (${JSON.stringify(o)})`);
   expect(o.status === "fakturovano", `stav posunut dopředu na Vyfakturováno (${o.status})`);
-  const ev = sqlJson(`select json_agg(e) from (select actor_id from job_events where job_id = ${q(jobId)}) e`) ?? [];
-  expect(ev.length > 0 && ev.every((e) => e.actor_id === ADMIN_ID), "všechny události s autorem admin");
+  // automatická anonymizace nahraných souborů (c4ddd80, běží hned při nahrání): s AI = „AI za nahrávajícího"
+  // (actor admin, kind ai), bez AI (jen pravidla, např. sken objednávky) = „Systém" bez autora — obojí správně
+  const ev = sqlJson(`select json_agg(e) from (select actor_id, actor_kind, agent, left(message, 120) as message from job_events where job_id = ${q(jobId)}) e`) ?? [];
+  const anonOk = (e) => e.agent === "drawing-anon" && ((e.actor_kind === "ai" && e.actor_id === ADMIN_ID) || (e.actor_kind === "system" && e.actor_id === null));
+  expect(ev.length > 0 && ev.every((e) => e.actor_id === ADMIN_ID || anonOk(e)), `všechny události s autorem admin (anonymizace: AI za admina / systém) (${JSON.stringify(ev.filter((e) => e.actor_id !== ADMIN_ID && !anonOk(e)))})`);
+  expect(ev.some((e) => e.actor_id === ADMIN_ID && e.actor_kind === "user"), "zápis dávky s autorem admin");
   const tr = sqlJson(`select json_agg(t) from (select kind, source from ai_training_examples where job_id = ${q(jobId)} or created_at >= ${q(since)} and created_by = ${q(ADMIN_ID)}) t`) ?? [];
   expect(tr.some((t) => t.kind === "capture_drawing") && tr.some((t) => t.kind === "capture_sort" && t.source === "corrected"), `učení výkresu i opraveného roztřídění (${JSON.stringify(tr)})`);
   expect(sortPreviews(since).length === 0, `náhledy roztřídění uklizené (${sortPreviews(since).join(", ")})`);

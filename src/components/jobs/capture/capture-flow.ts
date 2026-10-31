@@ -283,6 +283,10 @@ export function reviewProblem(review: ReviewState, target: ReviewTarget, supplie
     && !review.items.some((i) => i.drawingNumber.trim() || i.name.trim() || i.description.trim())) {
     return "Doplň aspoň název zakázky, zákazníka nebo položku.";
   }
+  const ask = review.items.find((i) => i.pair && i.pair.answer === null);
+  if (ask && target.mode === "existing") {
+    return `Rozhodni u řádku „${ask.name || ask.description || ask.drawingNumber}“: je to položka ${ask.pair!.itemLabel}, nebo nová položka?`;
+  }
   return null;
 }
 

@@ -1,6 +1,7 @@
 // Foto dokladu → podrobné stavy toku (spec 2.8) — čistá pravidla bez DB (testy capture-flow-rules.test.ts).
 import type { DocIssuer, ExtractedBusinessDoc, ExtractedItem } from "@/lib/jobs/capture-types";
 import type { DocIssuerKey, OrderMismatch, OrderMismatchKind } from "@/lib/supabase/database.types";
+import { pairDocLines } from "@/lib/jobs/item-pairing";
 
 /** Vystavitel dokladu pro job_files.issuer (neznámý = neuvádět). */
 export function issuerKey(issuer: DocIssuer | null | undefined): DocIssuerKey | null {
@@ -48,14 +49,26 @@ export function pairLines<T extends { id: string; drawingNumber?: string | null;
   }
   const used = new Set<string>();
   const pairs: { item: T; quantity: number }[] = [];
-  const unmatched: Pick<ExtractedItem, "drawingNumber" | "name" | "quantity">[] = [];
-  for (const l of lines) {
+  const rest: number[] = [];
+  lines.forEach((l, i) => {
     const it = byKey.get(lineKey(l));
     if (it && !used.has(it.id)) {
       used.add(it.id);
       pairs.push({ item: it, quantity: num(l.quantity) });
-    } else unmatched.push(l);
-  }
+    } else rest.push(i);
+  });
+  // zbytek sdíleným párovačem (číslo výkresu v textu, název bez odkazů „142/026"…) — jen jisté páry
+  const free = items.filter((it) => !used.has(it.id));
+  const unmatched: Pick<ExtractedItem, "drawingNumber" | "name" | "quantity">[] = [];
+  if (rest.length && free.length) {
+    const res = pairDocLines(rest.map((i) => ({ ...lines[i], quantity: num(lines[i].quantity) })), free);
+    const sure = new Map(res.pairs.filter((p) => p.confidence === "sure").map((p) => [p.line, p.itemId]));
+    rest.forEach((i, n) => {
+      const it = free.find((x) => x.id === sure.get(n));
+      if (it) pairs.push({ item: it, quantity: num(lines[i].quantity) });
+      else unmatched.push(lines[i]);
+    });
+  } else unmatched.push(...rest.map((i) => lines[i]));
   return { pairs, unmatched };
 }
 

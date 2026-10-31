@@ -124,12 +124,12 @@ export function QuickInquiryDialog({
             </label>
             <label className="block space-y-1">
               <span className="text-xs font-medium text-muted-foreground">Co poptává *</span>
-              <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Hřídel VK-2291, C45, broušená" className="h-10" />
+              <Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="co zákazník poptává" className="h-10" />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block space-y-1">
                 <span className="text-xs font-medium text-muted-foreground">Číslo výkresu</span>
-                <Input value={form.drawingNumber} onChange={(e) => set("drawingNumber", e.target.value)} placeholder="VK-2291" className="h-10 font-mono" />
+                <Input value={form.drawingNumber} onChange={(e) => set("drawingNumber", e.target.value)} placeholder="č. výkresu" className="h-10 font-mono placeholder:font-sans placeholder:italic" />
               </label>
               <label className="block space-y-1">
                 <span className="text-xs font-medium text-muted-foreground">Kusů</span>
@@ -141,7 +141,7 @@ export function QuickInquiryDialog({
               </label>
               <label className="block space-y-1">
                 <span className="text-xs font-medium text-muted-foreground">Č. poptávky zákazníka</span>
-                <Input value={form.inquiryNumber} onChange={(e) => set("inquiryNumber", e.target.value)} placeholder="RFQ-1234" className="h-10 font-mono" />
+                <Input value={form.inquiryNumber} onChange={(e) => set("inquiryNumber", e.target.value)} placeholder="č. poptávky zákazníka" className="h-10 font-mono placeholder:font-sans placeholder:italic" />
               </label>
             </div>
             <label className="block space-y-1">

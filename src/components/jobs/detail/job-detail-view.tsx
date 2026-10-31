@@ -173,7 +173,7 @@ export function JobDetailView({
             </TabsContent>
             {/* položky zůstávají připojené, ať se neuložené změny při přepnutí záložky neztratí */}
             <TabsContent value="polozky" forceMount className="data-[state=inactive]:hidden">
-              <ItemsTab items={job.items} currency={job.currency} onDirtyChange={setItemsDirty} />
+              <ItemsTab items={job.items} currency={job.currency} value={job.value} onDirtyChange={setItemsDirty} />
             </TabsContent>
             <TabsContent value="nabidky">
               <QuotesTab job={job} />

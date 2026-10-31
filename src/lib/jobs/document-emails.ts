@@ -2,8 +2,8 @@ import { czDate, czk, leadTimeLabel } from "@/lib/pdf/types";
 
 /**
  * Výchozí e-maily k dokladům zakázky (předmět, text, HTML verze) a kontrola adres.
- * Čistá logika bez DB — testy v document-emails.test.ts. Oslovení je vždy neutrální
- * „Dobrý den," (český vokativ se ze jména spolehlivě odvodit nedá).
+ * Čistá logika bez DB — testy v document-emails.test.ts. Oslovení a tykání / vykání dodá volající
+ * podle nastavení odesílatele k adresátovi (src/lib/contacts/tone.ts); bez něj „Dobrý den," a vykání.
  */
 
 export type DocumentEmailKind = "nabidka" | "potvrzeni" | "dodaci_list" | "faktura" | "ostatni";
@@ -95,6 +95,12 @@ export interface DocumentEmailInput {
    * grafický podpis s logem. Prázdný / bez zadání = jednoduchý textový podpis z `sender` a `company`.
    */
   signatureText?: string | null;
+  /**
+   * Tykání / vykání odesílatele s adresátem (src/lib/contacts/tone.ts) a hotový první řádek
+   * („Ahoj Pavle," / „Dobrý den, pane Nováku,"). Bez zadání = vykání a „Dobrý den,".
+   */
+  address?: "ty" | "vy" | null;
+  salutation?: string | null;
 }
 
 function t(v?: string | null): string {
@@ -167,34 +173,45 @@ export function documentEmailBody(d: DocumentEmailInput): string {
   const facts: string[] = [];
   let intro: string;
   let outro: string;
+  // tykání: „ti posíláme", „tvou objednávku" (bez rodu v minulém čase), vykání beze změny
+  const v = (vy: string, ty: string) => (d.address === "ty" ? ty : vy);
 
   switch (d.kind) {
     case "nabidka": {
-      intro = `děkujeme za Vaši poptávku${inquiry ? ` č. ${inquiry}` : ""}. V příloze Vám zasíláme cenovou nabídku${number ? ` č. ${number}` : ""}${title ? ` na ${quoted(title)}` : ""}.`;
+      intro = `${v("děkujeme za Vaši poptávku", "díky za tvou poptávku")}${inquiry ? ` č. ${inquiry}` : ""}. V příloze ${v("Vám zasíláme", "ti posíláme")} cenovou nabídku${number ? ` č. ${number}` : ""}${title ? ` na ${quoted(title)}` : ""}.`;
       if (t(d.validUntil)) facts.push(line("Platnost nabídky", `do ${dateText(d.validUntil)}`));
       if (d.leadTimeDays && d.leadTimeDays > 0) facts.push(line("Dodací lhůta", `${leadTimeLabel(d.leadTimeDays)} od potvrzení objednávky`));
-      if (job) facts.push(line("Naše číslo zakázky", `${job} (prosíme, uveďte ho ve Vaší objednávce)`));
-      outro = "Pokud budete mít k nabídce jakékoli dotazy nebo budete potřebovat úpravu, rádi Vám vyjdeme vstříc. Těšíme se na Vaši objednávku.";
+      if (job) facts.push(line("Naše číslo zakázky", `${job} (${v("prosíme, uveďte ho ve Vaší objednávce", "prosím, uveď ho v objednávce")})`));
+      outro = v(
+        "Pokud budete mít k nabídce jakékoli dotazy nebo budete potřebovat úpravu, rádi Vám vyjdeme vstříc. Těšíme se na Vaši objednávku.",
+        "Když budeš mít k nabídce dotazy nebo budeš potřebovat úpravu, dej vědět. Těšíme se na tvou objednávku.",
+      );
       break;
     }
     case "potvrzeni": {
       const ref = po ? ` č. ${po}${poDate ? ` ze dne ${poDate}` : ""}` : "";
-      intro = `děkujeme za Vaši objednávku${ref}. V příloze Vám zasíláme její potvrzení${number ? ` č. ${number}` : ""}.`;
+      intro = `${v("děkujeme za Vaši objednávku", "díky za tvou objednávku")}${ref}. V příloze ${v("Vám zasíláme", "ti posíláme")} její potvrzení${number ? ` č. ${number}` : ""}.`;
       if (t(d.deliveryDate)) facts.push(line("Potvrzený termín dodání", dateText(d.deliveryDate)));
       if (t(d.quoteNumber)) facts.push(line("Dle naší nabídky", t(d.quoteNumber)));
       if (job) facts.push(line("Naše číslo zakázky", job));
-      outro = "O průběhu zakázky Vás budeme informovat. V případě jakýchkoli dotazů jsme Vám k dispozici.";
+      outro = v(
+        "O průběhu zakázky Vás budeme informovat. V případě jakýchkoli dotazů jsme Vám k dispozici.",
+        "O průběhu zakázky tě budeme informovat. Když budeš cokoli potřebovat, dej vědět.",
+      );
       break;
     }
     case "dodaci_list": {
-      intro = `v příloze Vám zasíláme dodací list${number ? ` č. ${number}` : ""}${po ? ` k Vaší objednávce č. ${po}` : ""}.`;
+      intro = `v příloze ${v("Vám zasíláme", "ti posíláme")} dodací list${number ? ` č. ${number}` : ""}${po ? ` ${v("k Vaší objednávce", "k tvé objednávce")} č. ${po}` : ""}.`;
       if (t(d.deliveryDate)) facts.push(line("Termín dodání", dateText(d.deliveryDate)));
       if (job) facts.push(line("Naše číslo zakázky", job));
-      outro = "Prosíme o kontrolu dodávky. Pokud by cokoli nesouhlasilo, dejte nám prosím vědět.";
+      outro = v(
+        "Prosíme o kontrolu dodávky. Pokud by cokoli nesouhlasilo, dejte nám prosím vědět.",
+        "Prosím zkontroluj dodávku. Kdyby cokoli nesouhlasilo, dej vědět.",
+      );
       break;
     }
     case "faktura": {
-      intro = `v příloze Vám zasíláme fakturu${number ? ` č. ${number}` : ""}${po ? ` k Vaší objednávce č. ${po}` : ""}.`;
+      intro = `v příloze ${v("Vám zasíláme", "ti posíláme")} fakturu${number ? ` č. ${number}` : ""}${po ? ` ${v("k Vaší objednávce", "k tvé objednávce")} č. ${po}` : ""}.`;
       const cur = t(d.currency) || "CZK";
       const due = d.amount !== null && d.amount !== undefined && Number.isFinite(d.amount) ? d.amount : null;
       const paid = d.paidAmount !== null && d.paidAmount !== undefined && Number.isFinite(d.paidAmount) && d.paidAmount > 0 ? d.paidAmount : null;
@@ -208,7 +225,7 @@ export function documentEmailBody(d: DocumentEmailInput): string {
         if (due !== null && due > 0) facts.push(line("Zbývá uhradit", czk(due, cur)));
         else {
           paidUp = true;
-          facts.push(line("Zbývá uhradit", `${czk(0, cur)} — Faktura je již uhrazena, nic dalšího neplaťte.`));
+          facts.push(line("Zbývá uhradit", `${czk(0, cur)} — Faktura je již uhrazena, nic dalšího ${v("neplaťte", "neplať")}.`));
         }
       } else if (due !== null && due > 0) {
         facts.push(line("Částka k úhradě", czk(due, cur)));
@@ -221,13 +238,13 @@ export function documentEmailBody(d: DocumentEmailInput): string {
     }
     default: {
       const file = t(d.filename);
-      intro = `v příloze Vám zasíláme dokument${file ? ` ${file}` : ""}${job ? ` k zakázce ${job}` : ""}${title ? ` (${title})` : ""}.`;
-      outro = "V případě jakýchkoli dotazů jsme Vám k dispozici.";
+      intro = `v příloze ${v("Vám zasíláme", "ti posíláme")} dokument${file ? ` ${file}` : ""}${job ? ` k zakázce ${job}` : ""}${title ? ` (${title})` : ""}.`;
+      outro = v("V případě jakýchkoli dotazů jsme Vám k dispozici.", "Když budeš mít dotazy, dej vědět.");
     }
   }
 
   return [
-    "Dobrý den,",
+    t(d.salutation) || "Dobrý den,",
     "",
     intro,
     ...(facts.length ? ["", ...facts] : []),

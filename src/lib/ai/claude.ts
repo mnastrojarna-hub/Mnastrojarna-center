@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { EmailCategory, PriorityLevel } from "@/lib/supabase/database.types";
 import { getAiConfig } from "@/lib/settings";
+import { applySalutation } from "@/lib/contacts/tone";
 import type {
   CustomerPricingProfile, HistoricalPrice, PriceBreakdown,
   PricingParams as PricingParamsV2,
@@ -105,19 +106,33 @@ export async function categorizeEmail(input: {
 }
 
 // ── Návrh odpovědi na e-mail ────────────────────────────────
+/**
+ * Tykání / vykání odesílatele s adresátem (src/lib/contacts/tone.ts → toneFor): pokyn do promptu
+ * a hotový první řádek. Bez něj = zdvořilé vykání a „Dobrý den,".
+ */
+export interface AiTone {
+  instruction: string;
+  salutation: string;
+  address: "ty" | "vy";
+}
+
 export async function draftReply(input: {
   from: string;
   subject: string;
   body: string;
   category?: string;
   rules?: string;
+  /** Tykání / vykání odesílatele (ne adresáta) s adresátem. */
+  tone?: AiTone | null;
   /** Přerušení (časový limit synchronizace pošty). */
   signal?: AbortSignal;
 }): Promise<string> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
-    // bez pozdravu a podpisu — podpis odesílatele s logem doplní aplikace při odeslání
-    return "Dobrý den,\n\nděkujeme za Vaši zprávu. (Návrh vygeneruje AI po doplnění Claude API klíče v Nastavení.)";
+    // bez závěrečného pozdravu a podpisu — podpis odesílatele s logem doplní aplikace při odeslání
+    const hello = input.tone?.salutation ?? "Dobrý den,";
+    const thanks = input.tone?.address === "ty" ? "díky za tvou zprávu" : "děkujeme za Vaši zprávu";
+    return `${hello}\n\n${thanks}. (Návrh vygeneruje AI po doplnění Claude API klíče v Nastavení.)`;
   }
 
   const message = await new Anthropic({ apiKey }).messages.create({
@@ -129,6 +144,7 @@ export async function draftReply(input: {
       "odpověď v češtině na příchozí e-mail. Bez vymýšlení cen a termínů — pokud chybí, napiš, že " +
       "je doplníme. Nepodepisuj se a nepiš závěrečný pozdrav — pozdrav a podpis odesílatele doplní aplikace. " +
       "Vrať pouze tělo e-mailu." +
+      (input.tone ? `\n\n${input.tone.instruction}` : "") +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
@@ -138,7 +154,9 @@ export async function draftReply(input: {
     ],
   }, input.signal ? { signal: input.signal, maxRetries: 0 } : undefined);
 
-  return textOf(message).trim();
+  const text = textOf(message).trim();
+  // oslovení vždy přesně podle tykání / vykání (AI ho občas přeformuluje)
+  return input.tone && text ? applySalutation(text, input.tone.salutation) : text;
 }
 
 // ── Firemní AI asistent (Q&A) ───────────────────────────────
@@ -353,6 +371,8 @@ export async function generateQuote(input: {
   inquiry: string;
   estimate?: PriceEstimate;
   rules?: string;
+  /** Tykání / vykání obchodníka s adresátem průvodního e-mailu. */
+  tone?: AiTone | null;
 }): Promise<GeneratedQuote> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
@@ -360,7 +380,7 @@ export async function generateQuote(input: {
       items: [],
       lead_time_days: 0,
       valid_until_days: 30,
-      cover_email: "Nabídku vygeneruje AI po doplnění Claude API klíče v Nastavení.",
+      cover_email: `${input.tone ? `${input.tone.salutation}\n\n` : ""}Nabídku vygeneruje AI po doplnění Claude API klíče v Nastavení.`,
       note: "",
     };
   }
@@ -400,6 +420,7 @@ export async function generateQuote(input: {
       "Jsi obchodník nástrojárny Mnástrojárna. Z poptávky a kalkulace technologa sestav cenovou nabídku " +
       "(položky s cenami, dodací lhůta, platnost) a průvodní e-mail v češtině. Sazba DPH 21 %. " +
       "Průvodní e-mail bez závěrečného pozdravu a podpisu — pozdrav a podpis odesílatele doplní aplikace." +
+      (input.tone ? `\n\nPrůvodní e-mail: ${input.tone.instruction}` : "") +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
@@ -414,7 +435,9 @@ export async function generateQuote(input: {
     ],
   });
 
-  return JSON.parse(textOf(message)) as GeneratedQuote;
+  const quote = JSON.parse(textOf(message)) as GeneratedQuote;
+  if (input.tone && quote.cover_email?.trim()) quote.cover_email = applySalutation(quote.cover_email.trim(), input.tone.salutation);
+  return quote;
 }
 
 // ── Potvrzení (poptávka / objednávka / faktura) ─────────────
@@ -423,10 +446,12 @@ export async function generateConfirmation(input: {
   reference: string;
   customer: string;
   rules?: string;
+  /** Tykání / vykání odesílatele s adresátem. */
+  tone?: AiTone | null;
 }): Promise<string> {
   const { apiKey, model } = await getAiConfig();
   if (!apiKey) {
-    return `Dobrý den,\n\npotvrzujeme přijetí (${input.reference}). (Plný text vygeneruje AI po doplnění klíče.)`;
+    return `${input.tone?.salutation ?? "Dobrý den,"}\n\npotvrzujeme přijetí (${input.reference}). (Plný text vygeneruje AI po doplnění klíče.)`;
   }
 
   const message = await new Anthropic({ apiKey }).messages.create({
@@ -436,6 +461,7 @@ export async function generateConfirmation(input: {
     system:
       "Jsi asistent nástrojárny Mnástrojárna. Napiš krátké zdvořilé potvrzení v češtině. " +
       "Nepodepisuj se a nepiš závěrečný pozdrav — pozdrav a podpis odesílatele doplní aplikace. Vrať pouze tělo e-mailu." +
+      (input.tone ? `\n\n${input.tone.instruction}` : "") +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {
@@ -445,7 +471,8 @@ export async function generateConfirmation(input: {
     ],
   });
 
-  return textOf(message).trim();
+  const text = textOf(message).trim();
+  return input.tone && text ? applySalutation(text, input.tone.salutation) : text;
 }
 
 // ── Čtení z přílohy (výkres / objednávka) přes Claude vision ─

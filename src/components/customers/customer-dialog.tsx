@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { EmailSuggestInput } from "@/components/mail/recipient-field";
 import { Field, FormSection, SelectInput } from "@/components/customers/form-bits";
 import { createCustomer, updateCustomer } from "@/app/actions/crm";
 import {
@@ -224,7 +225,18 @@ export function CustomerDialog({
                 {input("contactPerson", { placeholder: "Ing. Jana Nováková", autoComplete: "name" })}
               </Field>
               <Field id={fid("email")} label="E-mail" error={errors.email}>
-                {input("email", { type: "email", inputMode: "email", placeholder: "nakup@firma.cz", autoComplete: "email" })}
+                <EmailSuggestInput
+                  id={fid("email")}
+                  value={values.email}
+                  onChange={(v) => set("email", v)}
+                  context={customer ? { customerId: customer.id } : null}
+                  placeholder="nakup@firma.cz"
+                  className={cn(errors.email && "border-destructive focus-visible:ring-destructive")}
+                  onPicked={(s) => {
+                    if (!values.contactPerson.trim() && s.name !== s.email && (s.kind === "kontakt" || s.kind === "konverzace")) set("contactPerson", s.name);
+                    if (!values.phone.trim() && s.phone) set("phone", s.phone);
+                  }}
+                />
               </Field>
               <Field id={fid("phone")} label="Telefon">
                 {input("phone", { type: "tel", inputMode: "tel", placeholder: "+420 777 123 456", autoComplete: "tel" })}

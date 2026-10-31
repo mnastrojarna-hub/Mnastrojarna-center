@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { EmailSuggestInput } from "@/components/mail/recipient-field";
 import { StageBadge, FileKindBadge } from "@/components/jobs/stage-badge";
 import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { NativeSelect } from "@/components/jobs/book/native-select";
@@ -17,9 +18,9 @@ import {
   SOURCE_FIELD, SourceMark, TONES,
 } from "@/components/jobs/capture/capture-parts";
 import {
-  CAPTURE_CHIPS, CHIP_GROUPS, MERGE_FIELD_LABELS, REVIEW_FIELDS, REVIEW_FIELD_KEYS, REVIEW_GROUPS, changeChip, chipByKey, defaultCustomerChoice,
-  defaultSupplierChoice, emptyReviewItem, hiddenFieldCount, isAiValue, isFieldLocked, proposeStage, switchTarget,
-  visibleFieldGroups,
+  CAPTURE_CHIPS, CHIP_GROUPS, MERGE_FIELD_LABELS, REVIEW_FIELDS, REVIEW_FIELD_KEYS, REVIEW_GROUPS, answerPairQuestion, changeChip, chipByKey, defaultCustomerChoice,
+  defaultSupplierChoice, emptyReviewItem, hiddenFieldCount, isAiValue, isFieldLocked, openPairQuestions, proposeStage, switchTarget,
+  totalsCheckText, visibleFieldGroups,
   type MergeField, type PartyChoice, type ReviewFieldGroup, type ReviewFieldKey, type ReviewItem,
   type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
@@ -386,14 +387,29 @@ function PartyFields({
         return (
           <div key={f.key} className={cn(f.full && "sm:col-span-2")}>
             <FieldLabel htmlFor={id} extra={ai ? <AiMark /> : undefined}>{f.label}</FieldLabel>
-            <Input
-              id={id}
-              type={f.type ?? "text"}
-              value={party[f.key]}
-              onChange={(e) => onChange({ ...party, [f.key]: e.target.value })}
-              className={cn(ai && AI_FIELD)}
-              autoComplete="off"
-            />
+            {f.key === "email" ? (
+              // e-mail: našeptávač z adresáře a pošty (výběrem doplní i prázdnou kontaktní osobu a telefon)
+              <EmailSuggestInput
+                id={id}
+                value={party.email}
+                onChange={(v) => onChange({ ...party, email: v })}
+                onPicked={(s) => onChange({
+                  ...party, email: s.email,
+                  contactPerson: party.contactPerson || (s.name !== s.email && (s.kind === "kontakt" || s.kind === "konverzace") ? s.name : ""),
+                  phone: party.phone || s.phone || "",
+                })}
+                className={cn(ai && AI_FIELD)}
+              />
+            ) : (
+              <Input
+                id={id}
+                type={f.type ?? "text"}
+                value={party[f.key]}
+                onChange={(e) => onChange({ ...party, [f.key]: e.target.value })}
+                className={cn(ai && AI_FIELD)}
+                autoComplete="off"
+              />
+            )}
           </div>
         );
       })}
@@ -729,6 +745,12 @@ function ItemsSection({
     const p = cleanNumber(priceMode === "purchase" ? it.purchaseUnitPrice : it.unitPrice) ?? 0;
     return s + q * p;
   }, 0);
+  const open = openPairQuestions(review.items);
+  const totalsText = open.length ? totalsCheckText(target.totals, currency, review.chip === "objednavka_zakaznik" ? "objednávka" : "doklad") : null;
+  const answer = (key: string, same: boolean) => {
+    const next = answerPairQuestion(review, key, same);
+    onChange({ items: next.items, merges: next.merges });
+  };
 
   return (
     <Section
@@ -744,6 +766,34 @@ function ItemsSection({
         </Button>
       }
     >
+      {open.length > 0 && (
+        <div className="mb-3 space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="pair-questions">
+          <p className="flex items-start gap-1.5 font-semibold text-amber-900 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            {open.length === 1 ? "Jeden řádek možná už v zakázce je" : `${open.length} řádky možná už v zakázce jsou`} — rozhodni, ať se položky nezdvojí
+          </p>
+          {totalsText && <p className="text-xs font-medium tabular-nums text-amber-900 dark:text-amber-200" data-testid="pair-totals">{totalsText}</p>}
+          <ul className="space-y-2">
+            {open.map((it) => (
+              <li key={it.key} className="rounded-lg border border-amber-200 bg-background p-2.5 dark:border-amber-500/30" data-testid="pair-question">
+                <p className="text-sm">
+                  Řádek {review.chip === "objednavka_zakaznik" ? "objednávky" : "dokladu"} <span className="font-semibold">„{it.name || it.description || it.drawingNumber}“</span>
+                  {" "}= položka <span className="font-semibold">{it.pair!.itemLabel}</span>?
+                </p>
+                {it.pair!.reason && <p className="mt-0.5 text-xs text-muted-foreground">{it.pair!.reason}</p>}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" className="h-9" onClick={() => answer(it.key, true)} data-testid="pair-yes">
+                    <Check /> Ano, je to ona
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => answer(it.key, false)} data-testid="pair-new">
+                    <Plus /> Je to nová položka
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {review.merges.length > 0 && (
         <ul className="mb-3 space-y-1.5">
           {review.merges.map((m, i) => (
@@ -834,13 +884,15 @@ function ItemRow({
       />
     </div>
   );
+  const asking = Boolean(item.pair && item.pair.answer === null);
   return (
-    <li className={cn("rounded-xl border p-2.5", ai && "border-l-4 border-l-fuchsia-400 dark:border-l-fuchsia-500/60")}>
+    <li className={cn("rounded-xl border p-2.5", ai && "border-l-4 border-l-fuchsia-400 dark:border-l-fuchsia-500/60", asking && "border-amber-300 dark:border-amber-500/40")}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
           <span className={cn("flex h-5 w-5 items-center justify-center rounded-full text-[10px]", TONES.teal)}>{index + 1}</span>
           {item.drawingNumber || item.name || "Nová položka"}
           {ai && <AiMark label="" />}
+          {asking && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">čeká na odpověď</span>}
         </span>
         {sources?.length ? (
           <span className="flex min-w-0 flex-1 flex-wrap justify-end gap-x-2">

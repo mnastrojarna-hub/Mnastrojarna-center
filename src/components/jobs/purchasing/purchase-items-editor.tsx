@@ -18,7 +18,8 @@ import {
 type Field = keyof Omit<PurchaseItemDraft, "key">;
 
 const cell =
-  "h-9 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none transition placeholder:text-muted-foreground/60 hover:border-input focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring md:h-8";
+  // nápověda prázdného pole: kurzívou, šedě, bez ukázkových hodnot (nikdo ji nesmí číst jako data)
+  "h-9 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none transition placeholder:font-sans placeholder:font-normal placeholder:italic placeholder:text-muted-foreground/50 hover:border-input focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring md:h-8";
 const bad = "!border-red-400 bg-red-50 dark:bg-red-500/10";
 
 function Cell({
@@ -117,13 +118,13 @@ export function PurchaseItemsEditor({
               return (
                 <tr key={d.key} className="border-t align-top [&>td]:px-1 [&>td]:py-1">
                   <td className="pt-2.5 text-center text-xs font-semibold text-muted-foreground">{i + 1}</td>
-                  <td><Cell label="Číslo výkresu" mono value={d.drawingNumber} onChange={(v) => set(i, "drawingNumber", v)} placeholder="VK-1234" /></td>
+                  <td><Cell label="Číslo výkresu" mono value={d.drawingNumber} onChange={(v) => set(i, "drawingNumber", v)} placeholder="č. výkresu" /></td>
                   <td>
                     <Cell label="Název" value={d.name} onChange={(v) => set(i, "name", v)} placeholder="Název dílu" className="font-medium" />
                     <Cell label="Poznámka" value={d.note} onChange={(v) => set(i, "note", v)} placeholder="poznámka pro dodavatele…" className="h-7 text-xs text-muted-foreground md:h-7" />
                   </td>
-                  <td><Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="1.2379" /></td>
-                  <td><Cell label="Množství" numeric value={d.quantity} onChange={(v) => set(i, "quantity", v)} placeholder="1" /></td>
+                  <td><Cell label="Materiál" value={d.material} onChange={(v) => set(i, "material", v)} placeholder="materiál" /></td>
+                  <td><Cell label="Množství" numeric value={d.quantity} onChange={(v) => set(i, "quantity", v)} placeholder="počet" /></td>
                   <td><Cell label="Měrná jednotka" value={d.unit} onChange={(v) => set(i, "unit", v)} placeholder="ks" /></td>
                   <td><Cell label="Nákupní cena za MJ" numeric value={d.unitPrice} onChange={(v) => set(i, "unitPrice", v)} placeholder="doplnit" className="text-emerald-700 dark:text-emerald-400" /></td>
                   <td className="pt-2.5 text-right font-semibold tabular-nums">

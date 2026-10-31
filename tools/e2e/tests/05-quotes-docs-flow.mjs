@@ -4,7 +4,7 @@
 // položkou, verze, dodací list, faktura), stránky toku /inquiries, /pricing, /quotes,
 // /confirmations, /documents (super admin, obchodník, zaměstnanec) a mobil 390 px.
 // Vlastní data mají prefix „E2E-quotes-docs-flow-" a na konci se uklidí.
-import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest as restCall, restLogin } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, clearMail, test, expect, summary, rest as restCall, restLogin, recipients, setRecipients, fileAttachments } from "../lib.mjs";
 import {
   PREFIX, TAG, lit, userIds, eventually, waitHydrated, expectNoOverflow, waitToast, alertTexts, isoDays,
   fetchPdf, expectPdf, mailsTo, waitMail, createCustomer, createJob, createQuote, cleanupOwnData,
@@ -280,7 +280,7 @@ await T("detail Nabídky: odeslání e-mailem — dialog předvyplněný, mail s
   await chip.waitFor({ timeout: 30_000 });
   const chipText = norm(await chip.innerText());
   expect(chipText.includes(".pdf") && chipText.includes(st.q1.number.replace(/^NAB-/, "")), `příloha PDF s číslem nabídky (${chipText})`);
-  const to = await dlg.getByLabel("Komu").inputValue();
+  const to = await recipients(dlg, "Komu");
   const subject = await dlg.getByLabel("Předmět").inputValue();
   const body = await dlg.getByLabel("Text e-mailu").inputValue();
   expect(to === CUST_EMAIL, `Komu = e-mail zákazníka (${to})`);
@@ -289,10 +289,10 @@ await T("detail Nabídky: odeslání e-mailem — dialog předvyplněný, mail s
   const pdfFile = sql(`select id || '|' || kind || '|' || coalesce(quote_id::text,'-') || '|' || version from job_files where job_id = ${lit(Q1.id)}`);
   expect(pdfFile.split("|")[1] === "nabidka" && pdfFile.split("|")[2] === st.q1.id, `PDF nabídky uložené k zakázce s quote_id (${pdfFile})`);
   // neplatná adresa → hláška, nic neodejde
-  await dlg.getByLabel("Komu").fill("neplatna-adresa");
+  await setRecipients(dlg, "Komu", "neplatna-adresa");
   await dlg.getByRole("button", { name: "Odeslat zákazníkovi" }).click();
   await dlg.getByText(/Neplatná e-mailová adresa/).waitFor({ timeout: 5_000 });
-  await dlg.getByLabel("Komu").fill(CUST_EMAIL);
+  await setRecipients(dlg, "Komu", CUST_EMAIL);
   await shot(page, S("04-quote-send-dialog"));
   const t0 = new Date().toISOString();
   await dlg.getByRole("button", { name: "Odeslat zákazníkovi" }).click();
@@ -301,9 +301,11 @@ await T("detail Nabídky: odeslání e-mailem — dialog předvyplněný, mail s
 
   const mail = await waitMail(CUST_EMAIL, (m) => m.subject.includes(st.q1.number) && m.receivedAt > t0);
   expect(mail, "mail catcher přijal e-mail s nabídkou");
-  expect(mail.attachments?.length === 1, `jedna příloha (${JSON.stringify(mail.attachments)})`);
-  expect(mail.attachments[0].contentType === "application/pdf" && /\.pdf$/i.test(mail.attachments[0].filename), `příloha PDF (${JSON.stringify(mail.attachments[0])})`);
-  expect(mail.attachments[0].size > 1500, "příloha není prázdná");
+  // vedle PDF jen vložené logo podpisu (multipart/related, Content-ID — ne soubor pro zákazníka)
+  const files = fileAttachments(mail);
+  expect(files.length === 1, `jedna příloha (${JSON.stringify(mail.attachments)})`);
+  expect(files[0].contentType === "application/pdf" && /\.pdf$/i.test(files[0].filename), `příloha PDF (${JSON.stringify(files[0])})`);
+  expect(files[0].size > 1500, "příloha není prázdná");
   expect(mail.text.includes(st.q1.number), "text e-mailu s číslem nabídky");
   expect((await mailsTo(CUST_EMAIL)).filter((m) => m.subject.includes(st.q1.number)).length === 1, "odešel právě jeden e-mail");
 
@@ -611,7 +613,7 @@ await T("detail: vystavený doklad (potvrzení) jde z karty zakázky poslat zák
   await page.getByRole("menuitem", { name: "Poslat zákazníkovi e-mailem…" }).click();
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: "Poslat potvrzení objednávky zákazníkovi" }).waitFor({ timeout: 10_000 });
-  await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
+  await eventually(async () => expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu = e-mail zákazníka"), { timeout: 20_000 });
   const subject = await dlg.getByLabel("Předmět").inputValue();
   expect(/Potvrzení objednávky/.test(subject), `předmět potvrzení (${subject})`);
   const filesBefore = filesOf(D1.id, "potvrzeni").length;
@@ -619,7 +621,7 @@ await T("detail: vystavený doklad (potvrzení) jde z karty zakázky poslat zák
   await dlg.getByRole("button", { name: "Odeslat potvrzení objednávky" }).click();
   await waitToast(page, new RegExp(`odesláno na ${esc(CUST_EMAIL)}`), 30_000);
   const mail = await waitMail(CUST_EMAIL, (m) => /Potvrzení objednávky/.test(m.subject) && m.receivedAt > t0);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", "e-mail s PDF potvrzení v příloze");
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", "e-mail s PDF potvrzení v příloze");
   expect(filesOf(D1.id, "potvrzeni").length === filesBefore, "odeslal se existující doklad — nová verze nevznikla");
   await eventually(() => {
     const o = sql(`select coalesce(confirmation_sent_by::text, '-') || '|' || coalesce(confirmation_sent_via, '-') from orders where id = ${lit(D1.id)}`);
@@ -860,7 +862,7 @@ await T("/quotes: super admin Schválit → obchodník Odeslat nabídku (dialog 
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: `Odeslat nabídku ${B1Q.number} zákazníkovi` }).waitFor({ timeout: 10_000 });
   await dlg.locator('a[href^="/api/jobs/files/"]').waitFor({ timeout: 30_000 });
-  await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu = e-mail zákazníka"));
+  await eventually(async () => expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu = e-mail zákazníka"));
   const subject = await dlg.getByLabel("Předmět").inputValue();
   expect(subject.includes(B1Q.number), `předmět s číslem nabídky (${subject})`);
   expect((await dlg.getByLabel("Text e-mailu").inputValue()).length > 40, "text e-mailu předvyplněný");
@@ -869,7 +871,7 @@ await T("/quotes: super admin Schválit → obchodník Odeslat nabídku (dialog 
   await dlg.getByRole("button", { name: "Odeslat nabídku" }).click();
   await waitToast(page, new RegExp(`Nabídka ${esc(B1Q.number)} odeslána na`), 30_000);
   const mail = await waitMail(CUST_EMAIL, (m) => m.subject.includes(B1Q.number) && m.receivedAt > t0);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF přílohou (${JSON.stringify(mail?.attachments)})`);
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", `mail s PDF přílohou (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => {
     const db = sql(`select q.status || '|' || (q.sent_at is not null) || '|' || o.status || '|' || q.state || '|' || q.sent_by || '|' || q.sent_via from quotes q join orders o on o.id = q.job_id where q.id = ${lit(B1Q.id)}`);
     expect(db === `odeslano|true|nabidka|odeslana|${ID.obchod}|email`, `DB po odeslání: ${db}`);
@@ -947,7 +949,7 @@ await T("/confirmations: Potvrdit objednávku → termín, e-mail s PDF → Potv
   await dlg.getByRole("button", { name: "Vystavit a pokračovat k e-mailu" }).click();
   await dlg.getByRole("heading", { name: `Poslat potvrzení zakázky ${C1.number}` }).waitFor({ timeout: 30_000 });
   await dlg.locator('a[href^="/api/jobs/files/"]').waitFor({ timeout: 10_000 });
-  expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu předvyplněno");
+  expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu předvyplněno");
   const subject = await dlg.getByLabel("Předmět").inputValue();
   expect(/Potvrzení/i.test(subject), `předmět potvrzení (${subject})`);
   await shot(page, S("41-confirm-mail-step"));
@@ -956,7 +958,7 @@ await T("/confirmations: Potvrdit objednávku → termín, e-mail s PDF → Potv
   const toast = await waitToast(page, new RegExp(`Objednávka ${esc(C1.number)} potvrzena — potvrzení POT-\\S+ odešlo na`), 30_000);
   expect(toast.includes(CUST_EMAIL), `toast s adresou (${toast})`);
   const mail = await waitMail(CUST_EMAIL, (m) => m.receivedAt > t0 && m.subject === subject);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF potvrzení (${JSON.stringify(mail?.attachments)})`);
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", `mail s PDF potvrzení (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => {
     const o = sql(`select status || '|' || coalesce(due_date::text,'-') || '|' || (confirmed_at is not null) from orders where id = ${lit(C1.id)}`);
     expect(o === `potvrzeno|${isoDays(22)}|true`, `DB: potvrzeno, termín, confirmed_at (${o})`);
@@ -1051,7 +1053,7 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   await done.getByRole("button", { name: "Poslat zákazníkovi" }).click();
   const dlg = page.getByRole("dialog");
   await dlg.getByRole("heading", { name: /Poslat potvrzení objednávky POT-\S+ zákazníkovi/ }).waitFor({ timeout: 10_000 });
-  await eventually(async () => expect((await dlg.getByLabel("Komu").inputValue()) === CUST_EMAIL, "Komu předvyplněno"), { timeout: 20_000 });
+  await eventually(async () => expect((await recipients(dlg, "Komu")) === CUST_EMAIL, "Komu předvyplněno"), { timeout: 20_000 });
   const subject = await dlg.getByLabel("Předmět").inputValue();
   // předmět potvrzení nese číslo objednávky zákazníka (podle něj si ji zákazník spáruje), číslo POT je v PDF
   expect(subject.startsWith(`Potvrzení objednávky č. QDF-DOC-${TAG}`), `předmět s číslem objednávky zákazníka (${subject})`);
@@ -1060,7 +1062,7 @@ await T("/documents: vystavit doklad z panelu (potvrzení) → Hotovo, Poslat z�
   await dlg.getByRole("button", { name: "Odeslat potvrzení objednávky" }).click();
   await dlg.waitFor({ state: "hidden", timeout: 30_000 });
   const mail = await waitMail(CUST_EMAIL, (m) => m.receivedAt > t0 && m.subject === subject);
-  expect(mail && mail.attachments?.length === 1 && mail.attachments[0].contentType === "application/pdf", `mail s PDF (${JSON.stringify(mail?.attachments)})`);
+  expect(mail && fileAttachments(mail).length === 1 && fileAttachments(mail)[0].contentType === "application/pdf", `mail s PDF (${JSON.stringify(mail?.attachments)})`);
   await eventually(() => expect(sql(`select status from orders where id = ${lit(DOC1.id)}`) === "potvrzeno", "DB: Potvrzená objednávka"));
   // zpětná vazba po odeslání (UX)
   await panel.locator('[role="status"]').filter({ hasText: `Odesláno na ${CUST_EMAIL}.` }).waitFor({ timeout: 10_000 });

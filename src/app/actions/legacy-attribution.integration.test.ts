@@ -211,7 +211,8 @@ describe.skipIf(!ENABLED)("Balík 3: starší akce, plánovač a audit — autor
     expect(rows).toHaveLength(1);
     queueIds.push(String(rows[0].id));
     expect(rows[0]).toMatchObject({ type: "reminder", target: `b3-${TAG}@local.test`, order_id: quoteJob, owner_id: id("sales"), status: "pending" });
-    expect((rows[0].payload as { body: string }).body).toContain("Dobrý den, Ing. Eva Testová,");
+    // oslovení v 5. pádě podle vykání obchodníka (kontakty 30. 10.), ne „Dobrý den, Ing. Eva Testová,"
+    expect((rows[0].payload as { body: string }).body).toContain("Dobrý den, paní Testová,");
     expect(quoteReminderText({ number: "NAB-1", customerName: null, contact: null, validUntil: null, sentAt: null }).body).toMatch(/^Dobrý den,\n\ndovolujeme si připomenout naši cenovou nabídku NAB-1\./);
   }, 60_000);
 

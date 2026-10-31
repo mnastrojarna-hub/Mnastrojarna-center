@@ -59,5 +59,6 @@
   "note": "",
   "summary": "Poptávka RFQ-26-0412 od nového zákazníka Hydraulika Morava s.r.o. na těleso ventilu a víko, 400 ks, termín do 15. 12. 2026.",
   "confidence": 0.88,
-  "needsClarification": ["Množství u položky HM-1050-07 je ručně přepsané — ověřit, zda 400 ks"]
+  "needsClarification": ["Množství u položky HM-1050-07 je ručně přepsané — ověřit, zda 400 ks"],
+  "roleEmails": []
 }

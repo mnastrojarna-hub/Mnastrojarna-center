@@ -104,6 +104,25 @@ describe("documentEmailBody", () => {
   });
 });
 
+describe("tykání / vykání (oslovení odesílatele k adresátovi)", () => {
+  it("vykání: vlastní oslovení + Vám / Vaši", () => {
+    const body = documentEmailBody({ ...base, kind: "nabidka", number: "NAB-1", salutation: "Dobrý den, pane Nováku,", address: "vy" });
+    expect(body.startsWith("Dobrý den, pane Nováku,\n\nděkujeme za Vaši poptávku")).toBe(true);
+    expect(body).toContain("V příloze Vám zasíláme cenovou nabídku");
+  });
+  it("tykání: Ahoj Pavle + ti / tvou, bez Vám", () => {
+    for (const kind of ["nabidka", "potvrzeni", "dodaci_list", "faktura", "ostatni"] as const) {
+      const body = documentEmailBody({ ...base, kind, number: "X-1", customerOrderNumber: "PO-1", salutation: "Ahoj Pavle,", address: "ty" });
+      expect(body.startsWith("Ahoj Pavle,\n\n")).toBe(true);
+      expect(body).not.toMatch(/\bV(ám|aši|aší|ás)\b/);
+      expect(body).toMatch(/\bti posíláme\b/);
+    }
+  });
+  it("bez nastavení beze změny", () => {
+    expect(documentEmailBody({ ...base, kind: "faktura" }).startsWith("Dobrý den,\n\nv příloze Vám zasíláme fakturu")).toBe(true);
+  });
+});
+
 describe("documentEmailHtml", () => {
   it("escapuje text, odstavce a řádky", () => {
     const html = documentEmailHtml("Dobrý den,\n\n<b>pozor</b> & \"x\"\nřádek 2", { companyName: "A & B", web: "www.ab.cz" });

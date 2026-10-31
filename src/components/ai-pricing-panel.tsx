@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AiConfidence } from "@/components/ai-confidence";
+import { EmailSuggestInput } from "@/components/mail/recipient-field";
 import { CorrectionButton } from "@/components/correction-button";
 import { submitAiQuote, type SubmitQuoteResult } from "@/app/actions/ai-quote";
 import { submitPricingFeedback } from "@/app/actions/pricing";
@@ -208,12 +209,18 @@ export function AiPricingPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Číslo výkresu"><Input value={form.drawingNumber} onChange={upd("drawingNumber")} placeholder="např. VK-1234" /></Field>
-          <Field label="Materiál"><Input value={form.material} onChange={upd("material")} placeholder="např. 1.2379 / C45 / 1.4301" /></Field>
-          <Field label="Rozměry polotovaru"><Input value={form.dimensions} onChange={upd("dimensions")} placeholder="⌀50 × 120 / 120 × 80 × 25 mm" /></Field>
-          <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" placeholder="50" /></Field>
+          <Field label="Číslo výkresu"><Input value={form.drawingNumber} onChange={upd("drawingNumber")} placeholder="č. výkresu" className="placeholder:italic" /></Field>
+          <Field label="Materiál"><Input value={form.material} onChange={upd("material")} placeholder="materiál (označení oceli / slitiny)" className="placeholder:italic" /></Field>
+          <Field label="Rozměry polotovaru"><Input value={form.dimensions} onChange={upd("dimensions")} placeholder="průměr × délka nebo D × Š × V (mm)" className="placeholder:italic" /></Field>
+          <Field label="Množství (ks)"><Input value={form.quantity} onChange={upd("quantity")} type="number" placeholder="počet ks" className="placeholder:italic" /></Field>
           <Field label="Zákazník"><Input value={form.customer} onChange={upd("customer")} placeholder="Název firmy (načte cenový profil)" /></Field>
-          <Field label="E-mail zákazníka (pro odeslání)"><Input value={form.customerEmail} onChange={upd("customerEmail")} type="email" placeholder="nepovinné" /></Field>
+          <Field label="E-mail zákazníka (pro odeslání)">
+            <EmailSuggestInput
+              id="pricing-customer-email" value={form.customerEmail} placeholder="nepovinné" aria-label="E-mail zákazníka (pro odeslání)"
+              onChange={(v) => setForm((f) => ({ ...f, customerEmail: v }))}
+              onPicked={(s) => setForm((f) => ({ ...f, customer: f.customer || s.company || "" }))}
+            />
+          </Field>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -581,7 +588,9 @@ function SubmitBar({ quote, customer }: { quote: Quote; customer: string }) {
   return (
     <div className="space-y-2 rounded-lg border p-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail zákazníka (pro odeslání)" type="email" className="sm:max-w-xs" />
+        <div className="sm:w-72">
+          <EmailSuggestInput id="quote-customer-email" value={email} onChange={setEmail} placeholder="E-mail zákazníka (pro odeslání)" aria-label="E-mail zákazníka (pro odeslání)" />
+        </div>
         <div className="flex gap-2">
           <Button size="sm" onClick={() => submit(false)} disabled={busy !== ""}>
             {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Uložit &amp; zařadit ke schválení

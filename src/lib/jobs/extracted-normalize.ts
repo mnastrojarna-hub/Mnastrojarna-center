@@ -1,5 +1,6 @@
 import type {
   CaptureDocKind, DocIssuer, ExtractedBusinessDoc, ExtractedItem, ExtractedLeadFrom, ExtractedLeadTime, ExtractedLeadUnit, ExtractedParty,
+  ExtractedRoleEmail,
 } from "@/lib/jobs/capture-types";
 
 /**
@@ -86,6 +87,25 @@ export function normalizeDic(v: unknown): string {
 
 function normalizeEmail(v: unknown): string {
   return cleanText(v).replace(/^mailto:/i, "").replace(/\s+/g, "").toLowerCase();
+}
+
+const ROLE_EMAIL_ROLES = ["fakturace", "nakup", "nabidky", "komunikace"] as const;
+
+/** roleEmails z AI: jen platné adresy, známé účely, bez duplicit (max. 10). */
+export function normalizeRoleEmails(v: unknown): ExtractedRoleEmail[] {
+  if (!Array.isArray(v)) return [];
+  const out: ExtractedRoleEmail[] = [];
+  for (const raw of v) {
+    if (!isObj(raw)) continue;
+    const email = normalizeEmail(pick(raw, "email"));
+    const role = cleanText(pick(raw, "role")).toLowerCase() as ExtractedRoleEmail["role"];
+    const party = cleanText(pick(raw, "party")).toLowerCase() === "supplier" ? "supplier" : "customer";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || !(ROLE_EMAIL_ROLES as readonly string[]).includes(role)) continue;
+    if (out.some((o) => o.email === email && o.role === role && o.party === party)) continue;
+    out.push({ party, role, email });
+    if (out.length >= 10) break;
+  }
+  return out;
 }
 
 function validYmd(y: number, m: number, d: number): string {
@@ -185,7 +205,7 @@ export function emptyExtracted(): ExtractedBusinessDoc {
     ourOrderConfirmationNumber: "", supplierNumberAtCustomer: "",
     requiredDeliveryDate: "", promisedDeliveryDate: "",
     items: [], totalWithoutVat: 0, currency: "", paymentTerms: "", deliveryTerms: "", deliveryLeadTime: null,
-    note: "", summary: "", confidence: 0, needsClarification: [],
+    note: "", summary: "", confidence: 0, needsClarification: [], roleEmails: [],
   };
 }
 
@@ -293,6 +313,7 @@ export function normalizeExtracted(raw: unknown): ExtractedBusinessDoc {
     summary: cleanMultiline(pick(o, "summary")),
     confidence: normalizeConfidence(pick(o, "confidence")),
     needsClarification: normalizeStringList(pick(o, "needsClarification")),
+    roleEmails: normalizeRoleEmails(pick(o, "roleEmails")),
   };
 
   // Odvozená čísla z čísla dokladu (jen tam, kde je význam jednoznačný)

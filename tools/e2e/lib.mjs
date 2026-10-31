@@ -137,6 +137,16 @@ export async function latestMail(to, waitMs = 15_000) {
   return r.json();
 }
 
+/** Logo grafického podpisu (3dfcb3e) — vložená část multipart/related (Content-ID, inline), ne soubor pro zákazníka. */
+export function isSignatureLogo(a) {
+  return a?.contentType === "image/png" && a?.filename === "mnastrojarna-logo.png";
+}
+
+/** Přílohy, které zákazník vidí jako soubory (bez vloženého loga podpisu). */
+export function fileAttachments(mail) {
+  return (mail?.attachments ?? []).filter((a) => !isSignatureLogo(a));
+}
+
 // ── Mini runner ────────────────────────────────────────────
 const results = [];
 export async function test(name, fn) {
@@ -153,6 +163,30 @@ export async function test(name, fn) {
 
 export function expect(cond, message) {
   if (!cond) throw new Error(`Očekávání selhalo: ${message}`);
+}
+
+/**
+ * Pole adresátů se štítky (Komu / Kopie / Příjemce): hodnota = adresy spojené „, " (+ rozepsaný text).
+ * Dřív `getByLabel("Komu").inputValue()` — od kontaktů 30. 10. jsou adresy štítky s našeptávačem.
+ */
+export async function recipients(scope, label = "Komu") {
+  const field = scope.locator(`[data-recipient-field="${label}"]`).first();
+  const chips = (await field.getAttribute("data-value")) ?? "";
+  const typed = (await field.locator("input").first().inputValue().catch(() => "")).trim();
+  return [chips, typed].filter(Boolean).join(", ");
+}
+
+/** Nastaví adresáty pole se štítky: odebere stávající štítky a napíše nové (Enter je potvrdí). */
+export async function setRecipients(scope, label, text) {
+  const field = scope.locator(`[data-recipient-field="${label}"]`).first();
+  for (let i = 0; i < 20; i++) {
+    const x = field.getByRole("button", { name: /^Odebrat / });
+    if (!(await x.count())) break;
+    await x.first().click();
+  }
+  const input = field.locator("input").first();
+  await input.fill(text);
+  await input.press("Tab");
 }
 
 export function summary(extraErrors = []) {

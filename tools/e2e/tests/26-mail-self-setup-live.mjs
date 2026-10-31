@@ -368,7 +368,10 @@ await T("přeposlání e-mailu zákazníka s výkresem dodavateli: výkres se an
   expect(/Výkres ještě není anonymizovaný/.test(bt) && bt.includes(fname), `hláška: ${bt}`);
   expect(!(await dlg.getByTestId("compose-send-original").count()), "obchodník nemá „Poslat originál“");
   expect((await ctl("/sent")).length === sentBefore, "nic neodešlo");
-  expect(sql(`select count(*) from drawing_anon_adhoc where user_id = '${uid}' and filename = '${fname}' and anon_via = 'email'`) === "1", "výkres zařazen k anonymizaci na požádání");
+  // řádek vzniká s anon_via = email; šťouchnutí ho hned zpracuje jako ruční běh (via → „rucne") — testovací
+  // „PDF" není čitelné, takže s opraveným pdf.js (904ff35) doběhne do „nelze" dřív, než se sem test dostane
+  const adhoc = sql(`select a.anon_via || '|' || coalesce(l.diff->>'source', '') from drawing_anon_adhoc a left join audit_log l on l.entity_id = a.id::text and l.action = 'drawing_anon_adhoc' where a.user_id = '${uid}' and a.filename = '${fname}'`).split("\n").filter(Boolean);
+  expect(adhoc.length === 1 && /^(email|rucne)\|email_forward$/.test(adhoc[0]), `výkres zařazen k anonymizaci na požádání (${adhoc.join(", ")})`);
   await snap(page, "posta-preposlani-vykres-blokovan");
   await dlg.getByTestId("compose-send-without").click();
   await page.getByTestId("sync-msg").filter({ hasText: /Odesláno/ }).waitFor({ timeout: 60_000 });

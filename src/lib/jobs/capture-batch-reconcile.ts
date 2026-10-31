@@ -13,12 +13,13 @@ import {
 } from "@/lib/jobs/capture-batch";
 import {
   CHIP_FIELDS, MERGE_FIELD_LABELS, REVIEW_FIELDS, REVIEW_FIELD_KEYS, buildExistingTarget, buildNewTarget, chipFor,
-  defaultSupplierChoice, initialReviewState, itemInputToReview,
+  defaultSupplierChoice, initialReviewState, itemInputToReview, openPairQuestions,
   sanitizeReviewState, type CaptureChipKey, type FieldValues, type MergeField, type PartyChoice, type PartyMatchView,
   type ReviewFieldKey, type ReviewItem, type ReviewState, type ReviewTarget, type TargetJob,
 } from "@/lib/jobs/capture-review";
 import { docFieldValues, planJobUpdate, planNewJob, type JobUpdatePlan, type NewJobPlan } from "@/lib/jobs/apply-extraction";
 import { docNumbersEqual, nameSimilarity, normalizeCompanyName } from "@/lib/jobs/matching";
+import { PAIR_SURE, pairDocLines, scoreLinePair } from "@/lib/jobs/item-pairing";
 import { emptyExtracted, emptyParty } from "@/lib/jobs/extracted-normalize";
 import { guessFileKind, isJobFileKind } from "@/lib/jobs/file-kinds";
 import { cleanDate, cleanNumber, isUuid } from "@/lib/jobs/mapping";
@@ -947,11 +948,20 @@ function stripDocOnly<T extends { patch?: JobInput; input?: JobInput }>(plan: T)
   return { ...plan, ...(plan.patch ? { patch: strip(plan.patch) } : {}), ...(plan.input ? { input: strip(plan.input) } : {}) };
 }
 
-function matchItem<T extends { drawingNumber?: string | null; name?: string | null }>(list: T[], row: { drawingNumber?: string | null; name?: string | null }): T | null {
+type MatchRow = { drawingNumber?: string | null; revision?: string | null; name?: string | null; description?: string | null; quantity?: number | null; unitPrice?: number | null };
+
+function matchItem<T extends MatchRow>(list: T[], row: MatchRow): T | null {
   if (row.drawingNumber) {
     const hit = list.find((x) => x.drawingNumber && docNumbersEqual(x.drawingNumber, row.drawingNumber));
     if (hit) return hit;
   }
+  // sdílený párovač (item-pairing): číslo výkresu v textu, název bez odkazů „142/026", počet, cena
+  let best: { x: T; score: number } | null = null;
+  for (const x of list) {
+    const s = scoreLinePair(row, { id: "", ...x });
+    if (!s.incompatible && s.score >= PAIR_SURE && (!best || s.score > best.score)) best = { x, score: s.score };
+  }
+  if (best) return best.x;
   if (row.name) {
     // podle názvu jen bez rozporu čísel (různá čísla výkresu = různé díly, i když se jmenují podobně)
     return list.find((x) => x.name && nameSimilarity(x.name, row.name) >= SAME_NAME
@@ -1436,13 +1446,17 @@ export function groupDocOf(docs: ReconcileDoc[], ourIco: string, opts: { today?:
  * objednávky → doplnění položky přepíše množství (override, výchozí „použít"); zakázka už s objednávkou
  * (revize) → položky se nemění, jen upozornění. Vrací texty upozornění.
  */
-function orderQuantityMerges(t: ReviewTarget, job: TargetJob & { items?: JobItem[] }, items: ExtractedItem[]): string[] {
+function orderQuantityMerges(t: ReviewTarget, job: TargetJob & { items?: JobItem[] }, items: ExtractedItem[], orderTotal = 0): string[] {
   const notes: string[] = [];
   const jobItems = job.items ?? [];
   const hasOrder = Boolean((job.customerOrderNumber ?? "").trim());
-  for (const it of items) {
+  // stejný párovač jako plán zakázky (planJobUpdate) — jen jisté páry
+  const pairing = jobItems.length ? pairDocLines(items, jobItems, { lineWins: !hasOrder, orderTotal: orderTotal || itemsTotal(items) }) : { pairs: [] };
+  for (const p of pairing.pairs) {
+    if (p.confidence !== "sure") continue;
+    const it = items[p.line];
+    const ex = jobItems.find((x) => x.id === p.itemId);
     if (!(it.quantity > 0)) continue;
-    const ex = matchItem(jobItems, it);
     if (!ex || !(Number(ex.quantity) > 0) || Math.abs(Number(ex.quantity) - it.quantity) < 1e-9) continue;
     const what = it.drawingNumber || it.name || ex.drawingNumber || ex.name || `položka ${ex.position + 1}`;
     const unit = ex.unit || it.unit || "ks";
@@ -1454,7 +1468,7 @@ function orderQuantityMerges(t: ReviewTarget, job: TargetJob & { items?: JobItem
     const m = t.merges.find((x) => x.itemId === ex.id);
     if (m) {
       m.patch = { ...m.patch, quantity: qty };
-      m.override = ["quantity"];
+      m.override = [...new Set([...(m.override ?? []), "quantity" as const])];
     } else {
       t.merges.push({
         itemId: ex.id, label: [ex.drawingNumber, ex.name].filter(Boolean).join(" ") || `Položka ${ex.position + 1}`,
@@ -1532,7 +1546,7 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
       if (docValues) docValues = { ...docValues, customerRequiredDate: dl.date };
     }
     const t = buildExistingTarget({ job, plan, docValues, reason: cand.reason, score: cand.score, margins });
-    if (isOrderPrimary) qtyNotes[t.key] = orderQuantityMerges(t, job, groupDoc.items);
+    if (isOrderPrimary) qtyNotes[t.key] = orderQuantityMerges(t, job, groupDoc.items, groupDoc.totalWithoutVat);
     const st = batchStage(defaultStageDocs, { mode: "existing", stage: job.stage });
     t.stageTo = st === "keep" ? null : st;
     for (const k of DOC_ONLY_FIELDS) { delete t.proposed[k]; delete t.conflicts[k]; }
@@ -1928,6 +1942,8 @@ export function canAutoApplyBatch(review: BatchReviewModel, summaries: DocExtrac
     if (!rg || !g.job.targetKey) return false;
     const t = rg.model.targets.find((x) => x.key === g.job.targetKey);
     if (!t) return false;
+    // nejistý řádek (≈ 2 %) = otázka pro člověka, nikdy tiché přidání
+    if (openPairQuestions(g.job.items).length) return false;
     if (t.mode === "existing") {
       const fixedOk = Boolean(review.fixedJobId && t.jobId === review.fixedJobId);
       if (!fixedOk && (t.score ?? 0) < AUTO_SCORE) return false;

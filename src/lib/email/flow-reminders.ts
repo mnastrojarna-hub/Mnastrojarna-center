@@ -3,6 +3,8 @@ import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/su
 import { cronActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import { COMPANY } from "@/lib/company";
 import type { FlowProposal } from "@/lib/supabase/database.types";
+import { recipientsFor, toneFor } from "@/lib/contacts/server";
+import { DEFAULT_TONE, salutationFor } from "@/lib/contacts/tone";
 
 /**
  * Plánovač toku (spouští cron s poštou): AI dělá vše, člověk jen potvrdí.
@@ -24,16 +26,21 @@ export interface FlowRemindersResult {
 const DAY_MS = 86_400_000;
 
 /** Text připomenutí nabídky (zákazník, číslo, platnost) — upraví se ve frontě před odesláním. */
-export function quoteReminderText(q: { number: string; customerName: string | null; contact: string | null; validUntil: string | null; sentAt: string | null }): { subject: string; body: string } {
-  const greet = q.contact?.trim() ? `Dobrý den, ${q.contact.trim()},` : "Dobrý den,";
+export function quoteReminderText(q: {
+  number: string; customerName: string | null; contact: string | null; validUntil: string | null; sentAt: string | null;
+  /** Oslovení a tykání / vykání obchodníka s adresátem (src/lib/contacts/tone.ts); bez nich vykání. */
+  salutation?: string | null; address?: "ty" | "vy" | null;
+}): { subject: string; body: string } {
+  const greet = q.salutation?.trim() || salutationFor(DEFAULT_TONE, q.contact);
+  const ty = q.address === "ty";
   const when = q.sentAt ? new Date(q.sentAt).toLocaleDateString("cs-CZ", { timeZone: "Europe/Prague" }) : null;
   const valid = q.validUntil ? new Date(`${q.validUntil}T12:00:00Z`).toLocaleDateString("cs-CZ", { timeZone: "Europe/Prague" }) : null;
   const body = [
     greet,
     "",
-    `dovolujeme si připomenout naši cenovou nabídku ${q.number}${when ? ` ze dne ${when}` : ""}.`,
+    `${ty ? "jen připomínám" : "dovolujeme si připomenout"} naši cenovou nabídku ${q.number}${when ? ` ze dne ${when}` : ""}.`,
     valid ? `Nabídka platí do ${valid}.` : null,
-    "Máte k ní dotazy nebo připomínky? Rádi ji upravíme podle Vašich požadavků.",
+    ty ? "Máš k ní dotazy nebo připomínky? Rádi ji upravíme podle tvých požadavků." : "Máte k ní dotazy nebo připomínky? Rádi ji upravíme podle Vašich požadavků.",
     "",
     "S pozdravem",
     COMPANY.name,
@@ -78,13 +85,13 @@ export async function runFlowReminders(opts: {
   const today = now.toISOString().slice(0, 10);
   // propadlé řeší „Vypršela platnost"; nejnovější odeslání první (staré nezahltí dávku)
   let qq = db.from("quotes")
-    .select("id, number, job_id, sent_at, valid_until, owner_id, customer:customers!customer_id(name, email), job:orders!job_id(id, number, owner_id, customer_contact, customer_contact_email, customer:customers!customer_id(name, email))")
+    .select("id, number, job_id, sent_at, valid_until, owner_id, customer:customers!customer_id(id, name, email), job:orders!job_id(id, number, owner_id, customer_contact, customer_contact_email, customer:customers!customer_id(id, name, email))")
     .eq("state", "odeslana").eq("archived", false).lt("sent_at", sentBefore)
     .or(`valid_until.is.null,valid_until.gte.${today}`)
     .order("sent_at", { ascending: false }).limit(BATCH);
   if (opts.jobIds) qq = qq.in("job_id", opts.jobIds);
   const { data: quotes } = await qq;
-  type Party = { name: string | null; email: string | null };
+  type Party = { id?: string | null; name: string | null; email: string | null };
   type Q = {
     id: string; number: string; job_id: string | null; sent_at: string | null; valid_until: string | null; owner_id: string | null;
     customer: Party | Party[] | null;
@@ -107,8 +114,17 @@ export async function runFlowReminders(opts: {
     if (last && last >= (q.sent_at ?? "1970-01-01")) continue;
     const job = one(q.job);
     const customer = one(job?.customer) ?? one(q.customer);
-    const target = (job?.customer_contact_email || customer?.email || "").trim() || null;
-    const text = quoteReminderText({ number: q.number, customerName: customer?.name ?? null, contact: job?.customer_contact ?? null, validUntil: q.valid_until, sentAt: q.sent_at });
+    // komu: kontakt zakázky → e-mail zákazníka pro nabídky → e-mail zákazníka; oslovení dle tykání obchodníka
+    const pick = customer?.id
+      ? await recipientsFor(db, "nabidka", { customerId: customer.id }, { email: job?.customer_contact_email, name: job?.customer_contact }).catch(() => null)
+      : null;
+    const target = (pick?.to[0] || job?.customer_contact_email || customer?.email || "").trim() || null;
+    const ownerId = job?.owner_id ?? q.owner_id;
+    const tone = target ? await toneFor(db, ownerId, [target], target === job?.customer_contact_email?.trim().toLowerCase() ? job?.customer_contact : null).catch(() => null) : null;
+    const text = quoteReminderText({
+      number: q.number, customerName: customer?.name ?? null, contact: job?.customer_contact ?? null, validUntil: q.valid_until, sentAt: q.sent_at,
+      salutation: tone?.salutation ?? null, address: tone?.setting.address ?? null,
+    });
     const days = q.sent_at ? Math.floor((now.getTime() - Date.parse(q.sent_at)) / DAY_MS) : QUOTE_REMINDER_DAYS;
     const { error } = await db.from("approval_queue").insert({
       type: "reminder",

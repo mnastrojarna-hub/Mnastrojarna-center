@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { categorizeEmail, draftReply } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
 import { apiRequire } from "@/lib/auth/session";
+import { userAiTone } from "@/lib/contacts/ai-tone";
 
 /**
  * Analyzuje e-mail AI (kategorie, priorita, spam, shrnutí) a volitelně
@@ -20,7 +21,8 @@ export async function POST(req: Request) {
     const analysis = await categorizeEmail({ from, subject, body: body ?? "", rules });
     let draft: string | undefined;
     if (withDraft && !analysis.is_spam && analysis.category !== "spam") {
-      draft = await draftReply({ from, subject, body: body ?? "", category: analysis.category, rules });
+      const tone = await userAiTone(auth.user.id, from);
+      draft = await draftReply({ from, subject, body: body ?? "", category: analysis.category, rules, tone });
     }
     return NextResponse.json({ analysis, draft });
   } catch (err) {

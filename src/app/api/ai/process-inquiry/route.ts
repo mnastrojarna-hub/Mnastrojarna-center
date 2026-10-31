@@ -4,6 +4,7 @@ import { generateQuote } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
 import { runPricingFlow } from "@/lib/ai/pricing-flow";
 import { submitAiQuote } from "@/app/actions/ai-quote";
+import { userAiTone } from "@/lib/contacts/ai-tone";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -30,12 +31,13 @@ export async function POST(req: Request) {
       drawingText: inquiry,
     });
 
-    // 2) Vygeneruj nabídku z kalkulace
+    // 2) Vygeneruj nabídku z kalkulace (průvodní e-mail s tykáním / vykáním obchodníka k adresátovi)
     const quote = await generateQuote({
       customer,
       inquiry,
       estimate,
       rules: await getAgentInstructions("quote"),
+      tone: await userAiTone(auth.user.id, body.customerEmail),
     });
 
     // 3) Ulož + PDF archiv + fronta schválení (+ odeslání při plné automatice)
