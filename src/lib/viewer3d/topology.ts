@@ -52,6 +52,8 @@ export interface PartTopology {
   /** Plocha každého trojúhelníku. */
   triFace: Uint32Array;
   faces: FaceInfo[];
+  /** Okrajové hrany (síť není uzavřená → objem / hmotnost jen orientačně). */
+  boundaryEdges?: number;
 }
 
 export interface TopologyInput {
@@ -542,6 +544,7 @@ export function computeTopology(input: TopologyInput): PartTopology {
 
   // hrany ploch: okrajové, mezi různými plochami, ostré (u sítí bez B-repu)
   const cap = edges.a.length;
+  let boundaryEdges = 0;
   const featA: number[] = [];
   const featB: number[] = [];
   const featF1: number[] = [];
@@ -553,7 +556,10 @@ export function computeTopology(input: TopologyInput): PartTopology {
     let f1 = triFace[t1];
     let f2 = f1;
     let feature = false;
-    if (c === 1) feature = true;
+    if (c === 1) {
+      feature = true;
+      boundaryEdges++;
+    }
     else if (c > 2) {
       feature = true;
       f2 = edges.t2[h] >= 0 ? triFace[edges.t2[h]] : f1;
@@ -700,5 +706,6 @@ export function computeTopology(input: TopologyInput): PartTopology {
     corners,
     triFace,
     faces,
+    boundaryEdges,
   };
 }

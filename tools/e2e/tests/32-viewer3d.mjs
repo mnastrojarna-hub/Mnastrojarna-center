@@ -408,6 +408,43 @@ await test("desktop: barvy dílu a plochy (pravé tlačítko bez nabídky prohl�
   });
 });
 
+await test("desktop: materiál → hmotnost dílu a polotovaru (kulatina u rotačního dílu), přídavek, polotovar v 3D", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.cone}`)}&name=kuzel.STP`);
+    await waitModel(page);
+    await page.getByTestId("tool-mass").click();
+    const panel = page.getByTestId("mass-panel");
+    await panel.waitFor();
+    // rotační díl → kulatina
+    const label = await page.getByTestId("mass-stock-label").innerText();
+    expect(/^Kulatina ⌀\d+ × \d+ mm$/.test(label), `polotovar rotačního dílu: ${label}`);
+    // ocel C45 → hliník: hmotnost klesne zhruba na třetinu
+    await page.getByTestId("mass-material").selectOption("12050");
+    const steel = await page.getByTestId("mass-part").innerText();
+    await page.getByTestId("mass-material").selectOption("alu_6082");
+    const alu = await page.getByTestId("mass-part").innerText();
+    const kg = (t) => Number(t.replace(/[^\d,]/g, "").replace(",", "."));
+    expect(kg(steel) > 0 && Math.abs(kg(alu) / kg(steel) - 2.7 / 7.85) < 0.05, `hliník vs ocel: ${alu} / ${steel}`);
+    const stockAlu = kg(await page.getByTestId("mass-stock").innerText());
+    expect(stockAlu > kg(alu), "polotovar je těžší než hotový díl");
+    // vlastní přídavek změní rozměr polotovaru
+    await page.getByTestId("mass-allowance").fill("20");
+    const label2 = await page.getByTestId("mass-stock-label").innerText();
+    expect(label2 !== label, `přídavek 20 mm: ${label} → ${label2}`);
+    // přířez místo kulatiny
+    await panel.getByRole("radio", { name: "Přířez" }).click();
+    expect(/^Přířez /.test(await page.getByTestId("mass-stock-label").innerText()), "přířez");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-mass.png") });
+    await page.getByTestId("mass-allowance").fill("");
+    await panel.getByRole("radio", { name: "Auto" }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-mass-round.png") });
+  });
+});
+
 if (files.asm) {
   await test("desktop: sestava — strom dílů, izolace, skrytí v stromu", async () => {
     await withContext(browser, errors, async (ctx) => {

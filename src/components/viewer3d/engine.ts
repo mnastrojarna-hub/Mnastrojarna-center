@@ -3,6 +3,7 @@ import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-
 import type { ModelNode, ParsedModel } from "@/lib/viewer3d/types";
 import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
 import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
+import type { StockGeometry, StockMode, StockResult } from "@/lib/viewer3d/stock";
 import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
   type MeasureMode, type Measurement, type SnapGeometry, type SnapKind, type SnapPoint,
@@ -24,7 +25,8 @@ export type DisplayMode = "shaded-edges" | "shaded" | "wireframe" | "xray";
 export type Tool = "select" | MeasureMode;
 export type StdView = "front" | "back" | "left" | "right" | "top" | "bottom" | "iso";
 export type ChangeKind =
-  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity" | "colors";
+  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity" | "colors"
+  | "material";
 
 /** Výběrový filtr jako v ZW3D — co se vybírá / na co se uchopuje. */
 export type PickFilter = "auto" | "shape" | "part" | "assembly" | "face" | "edge" | "vertex" | "center" | "midpoint";
@@ -113,6 +115,17 @@ interface PartView {
   /** Uživatelská barva dílu (sRGB hex) a barvy ploch (plocha → hex). */
   colorOverride: number | null;
   faceColors: Map<number, number>;
+  /** Geometrie pro polotovar (počítá se líně). */
+  stockGeom?: PartStockGeometry;
+}
+
+/** Geometrie dílu pro výpočet polotovaru + kde ho nakreslit. */
+export interface PartStockGeometry extends StockGeometry {
+  center: Vec3;
+  /** Osa rotačního dílu (0 = X, 1 = Y, 2 = Z), jinak nejdelší rozměr. */
+  axis: 0 | 1 | 2;
+  /** Síť není uzavřená → objem jen orientačně. */
+  open: boolean;
 }
 
 interface Snapshot {
@@ -224,6 +237,10 @@ export class ViewerEngine {
   private sectionTimer: number | null = null;
   private sectionPick = false;
   private capMaterials = new Map<string, THREE.Material>();
+  // materiál a polotovar
+  private partMaterial = new Map<number, string>();
+  private partStockMode = new Map<number, StockMode>();
+  private stockObj: THREE.Object3D | null = null;
   private hatch: THREE.Texture | null = null;
   private stencilBack = new THREE.MeshBasicMaterial({
     side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
@@ -331,6 +348,11 @@ export class ViewerEngine {
     this.clearMeasureObjects();
     this.clearSectionObjects();
     this.setEntityObj(null);
+    if (this.stockObj) {
+      this.overlayGroup.remove(this.stockObj);
+      disposeObject(this.stockObj);
+      this.stockObj = null;
+    }
   }
 
   // ------------------------------------------------------------------ model
@@ -368,6 +390,9 @@ export class ViewerEngine {
     this.entity = null;
     this.section = null;
     this.clipPlane = null;
+    this.partMaterial.clear();
+    this.partStockMode.clear();
+    this.setStockPreview(null);
     this.indexTree(model.root, model.parts.length);
 
     model.parts.forEach((part, index) => {
@@ -568,6 +593,117 @@ export class ViewerEngine {
     let n = 0;
     for (const p of this.parts) n += this.triCount(p.index);
     return n;
+  }
+
+  // ------------------------------------------------------------------ materiál a polotovar
+
+  getPartMaterial(i: number): string | undefined {
+    return this.partMaterial.get(i);
+  }
+
+  setPartMaterial(indices: number[], key: string) {
+    for (const i of indices) if (this.parts[i]) this.partMaterial.set(i, key);
+    this.onChange("material");
+  }
+
+  getStockMode(i: number): StockMode {
+    return this.partStockMode.get(i) ?? "auto";
+  }
+
+  setStockMode(indices: number[], mode: StockMode) {
+    for (const i of indices) if (this.parts[i]) this.partStockMode.set(i, mode);
+    this.onChange("material");
+  }
+
+  /** Viditelné díly (pro výpočet „celý model"). */
+  visibleParts(): number[] {
+    return this.parts.filter((p) => !p.hidden && this.triCount(p.index) > 0).map((p) => p.index);
+  }
+
+  /**
+   * Geometrie pro polotovar: obalový kvádr, objem a rozpoznání rotačního dílu — největší válcová
+   * plocha s osou podél X/Y/Z a průřez obalového kvádru ≈ průměr opsaného válce → kulatina.
+   */
+  stockGeometry(i: number): PartStockGeometry | null {
+    const p = this.parts[i];
+    if (!p) return null;
+    if (p.stockGeom) return p.stockGeom;
+    const info = this.partInfo(i)!;
+    const size = info.size;
+    const c = p.box.getCenter(new THREE.Vector3());
+    let round: StockGeometry["round"] = null;
+    let axis: 0 | 1 | 2 = size[0] >= size[1] && size[0] >= size[2] ? 0 : size[1] >= size[2] ? 1 : 2;
+    let bestArea = 0;
+    let cyl: { axis: Vec3; point: Vec3 } | null = null;
+    for (const f of p.topo.faces) {
+      if (f.kind === "cylinder" && f.normal && f.point && f.area > bestArea) {
+        bestArea = f.area;
+        cyl = { axis: f.normal, point: f.point };
+      }
+    }
+    if (cyl) {
+      const k = [0, 1, 2].find((j) => Math.abs(cyl!.axis[j]) > 0.999) as 0 | 1 | 2 | undefined;
+      if (k !== undefined) {
+        const pos = p.mesh.geometry.getAttribute("position").array as Float32Array;
+        const u = (k + 1) % 3;
+        const v = (k + 2) % 3;
+        const cu = cyl.point[u];
+        const cv = cyl.point[v];
+        let maxR = 0;
+        for (let j = 0; j < pos.length; j += 3) {
+          const r = Math.hypot(pos[j + u] - cu, pos[j + v] - cv);
+          if (r > maxR) maxR = r;
+        }
+        const d = maxR * 2;
+        // průřez kvádru ≈ opsaný průměr (souosý rotační díl), ne díra v desce
+        if (Math.abs(size[u] - d) <= d * 0.04 && Math.abs(size[v] - d) <= d * 0.04) {
+          round = { diameter: d, length: size[k] };
+          axis = k;
+          c.setComponent(u, cu);
+          c.setComponent(v, cv);
+        }
+      }
+    }
+    p.stockGeom = {
+      size, round, volumeMm3: info.volume, center: [c.x, c.y, c.z], axis, open: (p.topo.boundaryEdges ?? 0) > 0,
+    };
+    return p.stockGeom;
+  }
+
+  /** Nakreslí polotovar(y) průhledně kolem dílů (null = schovat). */
+  setStockPreview(items: { part: number; result: StockResult }[] | null) {
+    if (this.stockObj) {
+      this.overlayGroup.remove(this.stockObj);
+      disposeObject(this.stockObj);
+      this.stockObj = null;
+    }
+    if (items?.length) {
+      const group = new THREE.Group();
+      const fill = new THREE.MeshBasicMaterial({ color: 0x1f6feb, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+      const line = new THREE.LineBasicMaterial({ color: 0x1f6feb, transparent: true, opacity: 0.9 });
+      for (const { part, result } of items) {
+        const g = this.stockGeometry(part);
+        if (!g) continue;
+        let geom: THREE.BufferGeometry;
+        const obj = new THREE.Group();
+        if (result.kind === "kulatina") {
+          const [D, L] = result.dims;
+          geom = new THREE.CylinderGeometry(D / 2, D / 2, L, 64, 1);
+          // válec three.js leží podél Y → otočit na osu dílu
+          if (g.axis === 0) obj.rotation.z = -Math.PI / 2;
+          else if (g.axis === 2) obj.rotation.x = Math.PI / 2;
+        } else {
+          geom = new THREE.BoxGeometry(result.dims[0], result.dims[1], result.dims[2]);
+        }
+        obj.position.set(...g.center);
+        obj.add(new THREE.Mesh(geom, fill));
+        obj.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom, 20), line));
+        group.add(obj);
+      }
+      this.stockObj = group;
+      this.overlayGroup.add(group);
+    }
+    this.requestRender();
   }
 
   partInfo(i: number): PartInfo | null {

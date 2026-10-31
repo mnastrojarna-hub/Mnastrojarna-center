@@ -4,11 +4,15 @@ import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
   ListTree, Loader2, Maximize2, MousePointer2, PaintBucket, Palette, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
-  Undo2, X, ZoomIn, ZoomOut,
+  Undo2, Weight, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import type { ModelNode } from "@/lib/viewer3d/types";
 import type { LoadStage } from "@/lib/viewer3d/worker-protocol";
-import { fmtMm, steelMassKg, type Measurement } from "@/lib/viewer3d/measure";
+import { fmtMm, type Measurement } from "@/lib/viewer3d/measure";
+import { fmtKg, massKg, stockFor, type StockMode, type StockResult } from "@/lib/viewer3d/stock";
+import {
+  DEFAULT_VIEWER_MATERIALS, GROUP_LABEL, guessMaterialKey, lastMaterialKey, loadViewerMaterials, rememberMaterialKey, type ViewerMaterial,
+} from "./materials-client";
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import { cn } from "@/lib/utils";
 import {
@@ -111,6 +115,8 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const [menu, setMenu] = React.useState<ContextRequest | null>(null);
   const [panel, setPanel] = React.useState<"tree" | "views" | "display" | "filter" | null>(null);
   const [sectionOpen, setSectionOpen] = React.useState(false);
+  const [massOpen, setMassOpen] = React.useState(false);
+  const materials = useViewerMaterials();
   const [bg, setBg] = React.useState<Background>("light");
   React.useEffect(() => setBg(loadBackground()), []);
   const pickBg = (b: Background) => {
@@ -264,6 +270,8 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             filterActive={filter !== "auto"}
             sectionActive={!!section || sectionOpen}
             onSection={() => (sectionOpen ? setSectionOpen(false) : openSection())}
+            massActive={massOpen}
+            onMass={() => setMassOpen((o) => !o)}
             onUndo={() => eng!.undo()}
             onRedo={() => eng!.redo()}
             onDelete={() => eng!.deleteSelected()}
@@ -339,9 +347,12 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               isWide ? "bottom-10 right-2 top-[7.25rem] w-72" : "left-2 right-[7rem] top-2 max-h-[46%]",
             )}
           >
-            {tool === "select" && selection.length > 0 && <PartCard engine={eng!} selection={selection} />}
+            {massOpen && <MassPanel engine={eng!} materials={materials} selection={selection} onClose={() => setMassOpen(false)} />}
+            {!massOpen && tool === "select" && selection.length > 0 && (
+              <PartCard engine={eng!} selection={selection} materials={materials} onMass={() => setMassOpen(true)} />
+            )}
             {tool === "select" && entity && <EntityCard engine={eng!} onSection={openSection} />}
-            {(tool !== "select" || (measures.length > 0 && (isWide || (selection.length === 0 && !entity)))) && (
+            {(tool !== "select" || (measures.length > 0 && !massOpen && (isWide || (selection.length === 0 && !entity)))) && (
               <MeasurePanel
                 wide={isWide}
                 tool={tool}
@@ -434,6 +445,8 @@ function Toolbar(p: {
   filterActive: boolean;
   sectionActive: boolean;
   onSection: () => void;
+  massActive: boolean;
+  onMass: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDelete: () => void;
@@ -462,6 +475,7 @@ function Toolbar(p: {
       <Sep />
       <ToolButton icon={Filter} label={p.filterActive ? p.filterLabel : "Filtr"} active={p.panel === "filter" || p.filterActive} onClick={() => p.onPanel("filter")} testId="tool-filter" />
       <ToolButton icon={Scissors} label="Řez" active={p.sectionActive} onClick={p.onSection} testId="tool-section" />
+      <ToolButton icon={Weight} label="Hmotnost" active={p.massActive} onClick={p.onMass} testId="tool-mass" />
       <Sep />
       <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
       <ToolButton icon={Focus} label="Izolovat" kbd="I" disabled={!p.hasSelection} onClick={p.onIsolate} testId="tool-isolate" />
@@ -837,6 +851,207 @@ function EntityCard({ engine, onSection }: { engine: ViewerEngine; onSection: ()
   );
 }
 
+// ---------------------------------------------------------------- materiál, hmotnost, polotovar
+
+function useViewerMaterials(): ViewerMaterial[] {
+  const [list, setList] = React.useState<ViewerMaterial[]>(DEFAULT_VIEWER_MATERIALS);
+  React.useEffect(() => {
+    let alive = true;
+    void loadViewerMaterials().then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return list;
+}
+
+/** Materiál dílu: zvolený, podle názvu dílu, naposledy použitý, jinak ocel C45. */
+function materialOf(engine: ViewerEngine, part: number, list: ViewerMaterial[]): ViewerMaterial {
+  const key = engine.getPartMaterial(part) ?? guessMaterialKey(engine.partName(part), list) ?? lastMaterialKey() ?? "12050";
+  return list.find((m) => m.key === key) ?? list.find((m) => m.key === "12050") ?? list[0];
+}
+
+function shortMaterial(label: string): string {
+  return label.length > 34 ? `${label.slice(0, 32)}…` : label;
+}
+
+const STOCK_MODES: { key: StockMode; label: string }[] = [
+  { key: "auto", label: "Auto" },
+  { key: "prirez", label: "Přířez" },
+  { key: "kulatina", label: "Kulatina" },
+];
+
+/**
+ * Hmotnost dílu a polotovaru přímo v 3D: materiál ze seznamu (hustota přednastavená v Nacenění),
+ * objem z modelu, polotovar s přídavky — průhledně nakreslený kolem dílu.
+ */
+function MassPanel({ engine, materials, selection, onClose }: { engine: ViewerEngine; materials: ViewerMaterial[]; selection: number[]; onClose: () => void }) {
+  const scope = selection.length ? selection : engine.visibleParts();
+  const [allowanceText, setAllowanceText] = React.useState("");
+  const [show3D, setShow3D] = React.useState(true);
+  const allowanceMm = allowanceText.trim() === "" ? null : Number(allowanceText.replace(",", "."));
+  const validAllowance = allowanceMm === null || (Number.isFinite(allowanceMm) && allowanceMm >= 0) ? allowanceMm : null;
+
+  const rows = scope.map((i) => {
+    const mat = materialOf(engine, i, materials);
+    const geom = engine.stockGeometry(i);
+    const res = geom ? stockFor(geom, mat.density, engine.getStockMode(i), validAllowance) : null;
+    return { i, mat, geom, res };
+  }).filter((r): r is { i: number; mat: ViewerMaterial; geom: NonNullable<typeof r.geom>; res: StockResult } => !!r.res && !!r.geom);
+  const keys = new Set(rows.map((r) => r.mat.key));
+  const currentKey = keys.size === 1 ? [...keys][0] : "";
+  const modes = new Set(scope.map((i) => engine.getStockMode(i)));
+  const currentMode = modes.size === 1 ? [...modes][0] : null;
+  const totalPart = rows.reduce((s, r) => s + r.res.partMassKg, 0);
+  const totalStock = rows.reduce((s, r) => s + r.res.massKg, 0);
+  const anyOpen = rows.some((r) => r.geom.open);
+  const one = rows.length === 1 ? rows[0] : null;
+
+  // polotovar v 3D (průhledně kolem dílu)
+  const previewKey = show3D ? rows.map((r) => `${r.i}:${r.res.label}`).join("|") : "";
+  React.useEffect(() => {
+    engine.setStockPreview(previewKey ? rows.slice(0, 400).map((r) => ({ part: r.i, result: r.res })) : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, previewKey]);
+  React.useEffect(() => () => engine.setStockPreview(null), [engine]);
+
+  const groups = React.useMemo(() => {
+    const m = new Map<string, ViewerMaterial[]>();
+    for (const x of materials) {
+      const g = GROUP_LABEL[x.group] ?? x.group;
+      m.set(g, [...(m.get(g) ?? []), x]);
+    }
+    return [...m.entries()];
+  }, [materials]);
+
+  const title = selection.length === 1 ? engine.partName(selection[0]) : selection.length ? `Vybráno dílů: ${selection.length}` : `Celý model (${scope.length} ${scope.length === 1 ? "díl" : scope.length < 5 ? "díly" : "dílů"})`;
+  const fmtCm3 = (mm3: number) => `${(mm3 / 1000).toFixed(2).replace(".", ",")} cm³`;
+
+  return (
+    <div className="pointer-events-auto flex min-h-0 shrink flex-col overflow-hidden rounded-xl border border-[#1f6feb]/40 bg-card/95 text-sm shadow-xl backdrop-blur" onPointerDown={(e) => e.stopPropagation()} data-testid="mass-panel">
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <Weight className="h-4 w-4 text-[#1f6feb]" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-tight">Hmotnost a polotovar</p>
+          <p className="truncate text-[11px] text-muted-foreground" title={title}>{title}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Zavřít" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2.5 overflow-auto p-3 scrollbar-thin">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-muted-foreground">Materiál</span>
+          <select
+            value={currentKey}
+            onChange={(e) => {
+              engine.setPartMaterial(scope, e.target.value);
+              rememberMaterialKey(e.target.value);
+            }}
+            className="h-10 w-full rounded-md border bg-background px-2 text-sm md:h-9"
+            data-testid="mass-material"
+          >
+            {!currentKey && <option value="">Různé materiály…</option>}
+            {groups.map(([g, list]) => (
+              <optgroup key={g} label={g}>
+                {list.map((m) => (
+                  <option key={m.key} value={m.key}>{m.label} · {m.density.toString().replace(".", ",")} kg/dm³</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-muted/50 p-2">
+            <p className="text-[11px] text-muted-foreground">Hotový díl</p>
+            <p className="text-base font-bold tabular-nums" data-testid="mass-part">{fmtKg(totalPart)}</p>
+            {one && <p className="text-[11px] text-muted-foreground">objem {fmtCm3(one.geom.volumeMm3)}</p>}
+          </div>
+          <div className="rounded-lg bg-[#1f6feb]/10 p-2">
+            <p className="text-[11px] text-muted-foreground">Polotovar</p>
+            <p className="text-base font-bold tabular-nums text-[#1f6feb]" data-testid="mass-stock">{fmtKg(totalStock)}</p>
+            {one && <p className="text-[11px] text-muted-foreground">využití {one.res.utilization} %</p>}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted-foreground">Polotovar</span>
+          <div className="grid grid-cols-3 gap-1 rounded-lg border p-0.5" role="radiogroup" aria-label="Druh polotovaru">
+            {STOCK_MODES.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                role="radio"
+                aria-checked={currentMode === m.key}
+                onClick={() => engine.setStockMode(scope, m.key)}
+                className={cn("h-8 rounded-md text-xs font-medium", currentMode === m.key ? "bg-foreground text-background" : "hover:bg-accent")}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {one && <p className="text-sm font-medium tabular-nums" data-testid="mass-stock-label">{one.res.label}</p>}
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Přídavek</span>
+            <input
+              value={allowanceText}
+              onChange={(e) => setAllowanceText(e.target.value)}
+              placeholder="standard"
+              inputMode="decimal"
+              className="h-8 w-24 rounded-md border bg-background px-2 text-right tabular-nums"
+              aria-label="Přídavek na rozměr v mm"
+              data-testid="mass-allowance"
+            />
+            <span className="text-muted-foreground">mm na rozměr</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground">Standard jako v nacenění: 3–8 mm podle velikosti, délka kulatiny 4–10 mm, kulatina na běžný průměr tyče.</p>
+        </div>
+
+        {one && (
+          <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
+            <dt className="text-muted-foreground">Rozměr dílu</dt>
+            <dd className="text-right">{one.geom.size.map(fmt1).join(" × ")} mm</dd>
+            <dt className="text-muted-foreground">Objem polotovaru</dt>
+            <dd className="text-right">{fmtCm3(one.res.volumeMm3)}</dd>
+            <dt className="text-muted-foreground">Odpad (třísky)</dt>
+            <dd className="text-right">{fmtKg(one.res.wasteKg)}</dd>
+            <dt className="text-muted-foreground">Hustota</dt>
+            <dd className="text-right">{one.mat.density.toString().replace(".", ",")} kg/dm³</dd>
+          </dl>
+        )}
+
+        {rows.length > 1 && (
+          <div className="overflow-hidden rounded-lg border">
+            <table className="w-full text-[11px] tabular-nums">
+              <thead className="bg-muted/50 text-muted-foreground">
+                <tr><th className="px-2 py-1 text-left font-medium">Díl</th><th className="px-2 py-1 text-right font-medium">Díl</th><th className="px-2 py-1 text-right font-medium">Polotovar</th></tr>
+              </thead>
+              <tbody className="divide-y">
+                {rows.slice(0, 200).map((r) => (
+                  <tr key={r.i} className="cursor-pointer hover:bg-accent/60" onClick={() => engine.select([r.i])} title={`${r.res.label} · ${r.mat.label}`}>
+                    <td className="max-w-[7rem] truncate px-2 py-1">{engine.partName(r.i)}</td>
+                    <td className="px-2 py-1 text-right">{fmtKg(r.res.partMassKg)}</td>
+                    <td className="px-2 py-1 text-right">{fmtKg(r.res.massKg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <label className="flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={show3D} onChange={(e) => setShow3D(e.target.checked)} className="h-4 w-4 accent-[#1f6feb]" data-testid="mass-show3d" />
+          Ukázat polotovar v 3D (modře)
+        </label>
+        {anyOpen && (
+          <p className="flex items-start gap-1 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> Síť modelu není uzavřená (např. z 3D PDF / STL) — objem a hmotnost jsou jen orientační.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Vlastní barva: použije se až po potvrzení v systémovém výběru barvy (nativní „change"),
  * ne při každém pohybu — jinak by vznikly desítky kroků „zpět".
@@ -916,8 +1131,9 @@ function SnapMarker({ kind, x, y, text }: { kind: string; x: number; y: number; 
 
 // ---------------------------------------------------------------- díl, stav, nabídka, nápověda
 
-function PartCard({ engine, selection }: { engine: ViewerEngine; selection: number[] }) {
+function PartCard({ engine, selection, materials, onMass }: { engine: ViewerEngine; selection: number[]; materials: ViewerMaterial[]; onMass: () => void }) {
   const one = selection.length === 1 ? engine.partInfo(selection[0]) : null;
+  const mat = one ? materialOf(engine, one.index, materials) : null;
   return (
     <div
       className="pointer-events-auto shrink-0 overflow-auto rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur"
@@ -935,8 +1151,13 @@ function PartCard({ engine, selection }: { engine: ViewerEngine; selection: numb
                 <>
                   <dt className="text-muted-foreground">Objem</dt>
                   <dd className="text-right">{(one.volume / 1000).toFixed(2).replace(".", ",")} cm³</dd>
-                  <dt className="text-muted-foreground">Hmotnost (ocel)</dt>
-                  <dd className="text-right">{steelMassKg(one.volume).toFixed(3).replace(".", ",")} kg</dd>
+                  <dt className="text-muted-foreground">Hmotnost</dt>
+                  <dd className="text-right">
+                    <button type="button" onClick={onMass} className="font-semibold text-[#1f6feb] underline-offset-2 hover:underline" title="Materiál a polotovar">
+                      {mat ? fmtKg(massKg(one.volume, mat.density)) : "—"}
+                    </button>
+                    {mat && <span className="block text-[10px] text-muted-foreground">{shortMaterial(mat.label)}</span>}
+                  </dd>
                 </>
               )}
               <dt className="text-muted-foreground">Povrch</dt>
@@ -955,7 +1176,10 @@ function PartCard({ engine, selection }: { engine: ViewerEngine; selection: numb
       <div className="mt-2 space-y-1.5 border-t pt-2">
         <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva {selection.length > 1 ? "dílů" : "dílu"}</p>
         <ColorSwatches value={engine.partColorHex(selection[0])} onPick={(c) => engine.setPartColor(selection, c)} testId="part-colors" />
-        <button type="button" onClick={() => engine.colorFacesDistinct(selection)} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><PaintBucket className="h-3.5 w-3.5" /> Odlišit plochy barevně</button>
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => engine.colorFacesDistinct(selection)} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><PaintBucket className="h-3.5 w-3.5" /> Odlišit plochy barevně</button>
+          <button type="button" onClick={onMass} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="part-mass"><Weight className="h-3.5 w-3.5" /> Materiál a polotovar</button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
@@ -1065,6 +1289,7 @@ const HELP: [string, string][] = [
   ["Výběr dílu", "klik · Ctrl / Shift + klik = více dílů"],
   ["Smazat díl", "klik na díl + Del (nebo H) · Izolovat = I · pravé tlačítko = smazat díl / celou podsestavu"],
   ["Výběrový filtr", "tlačítko Filtr nebo pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed křivosti, střed hrany"],
+  ["Hmotnost", "tlačítko Hmotnost: vyber materiál (hustota z Nacenění) → hmotnost dílu, polotovar (přířez / kulatina s přídavkem) a jeho hmotnost, polotovar modře v 3D; bez výběru celý model"],
   ["Řez", "tlačítko Řez: rovina XY / XZ / YZ nebo „z plochy“ (klik na plochu), posuvník polohy, otočit stranu; pravé tlačítko na ploše = řez touto plochou"],
   ["Zpět / vpřed", "Ctrl+Z / Ctrl+Y"],
   ["Pohledy", "0 izometrie · 1 zepředu · 2 zezadu · 3 zleva · 4 zprava · 5 shora · 6 zespodu · klik na kostku"],

@@ -48,7 +48,9 @@ doklady a učí se z ručních oprav.
   **výběrový filtr** (lišta i pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed
   křivosti, střed hrany), **řez** rovinou XY / XZ / YZ nebo plochou (posuvník, otočení, šrafovaná
   plocha řezu, měření na řezu), měření vzdálenosti s uchopením (roh, střed díry, střed hrany, hrana,
-  plocha; rovnoběžné plochy, rozteč os), průměr / poloměr, úhel, rozměry / objem / hmotnost dílu. Kód: `src/components/viewer3d`,
+  plocha; rovnoběžné plochy, rozteč os), průměr / poloměr, úhel, rozměry / objem dílu, **hmotnost dílu a polotovaru** podle materiálu
+  z Nacenění (přířez / kulatina s přídavky jako v kalkulaci, polotovar nakreslený v 3D), barvy dílů
+  a ploch. Kód: `src/components/viewer3d`,
   `src/components/file-viewer`, `src/lib/viewer3d` (OpenCascade se kopíruje do `public/vendor`
   skriptem `tools/vendor-occt.mjs` při instalaci a buildu).
 
