@@ -4,6 +4,7 @@ import * as React from "react";
 import { CheckCircle2, Download, Loader2, Printer, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DocumentSendDialog } from "@/components/flow/document-send-dialog";
+import { printDocument } from "@/components/print/print-action";
 import { cn } from "@/lib/utils";
 
 export interface IssuedNote {
@@ -21,32 +22,11 @@ export function noteDownloadHref(fileId: string): string {
 }
 
 /**
- * Vytiskne PDF bez opuštění stránky: stáhne ho (podepsaný odkaz úložiště), vloží do skrytého
- * rámu a otevře tisk. Když to prohlížeč nedovolí (mobil, blokace), otevře PDF v novém panelu.
+ * Vytiskne PDF dokumentu zakázky — tisková stránka (strany jako obrázky, funguje i na telefonu:
+ * AirPrint / tisk Androidu), na počítači bez opuštění stránky. Viz components/print.
  */
-export async function printPdf(fileId: string): Promise<void> {
-  const url = `/api/jobs/files/${fileId}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(String(res.status));
-    const blob = await res.blob();
-    const obj = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
-    const frame = document.createElement("iframe");
-    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
-    frame.src = obj;
-    frame.onload = () => {
-      try {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-      } catch {
-        window.open(url, "_blank", "noopener");
-      }
-      setTimeout(() => { frame.remove(); URL.revokeObjectURL(obj); }, 60_000);
-    };
-    document.body.appendChild(frame);
-  } catch {
-    window.open(url, "_blank", "noopener");
-  }
+export async function printPdf(fileId: string, filename?: string | null): Promise<void> {
+  await printDocument({ href: `/api/jobs/files/${fileId}`, filename: filename ?? null });
 }
 
 /**
@@ -90,10 +70,10 @@ export function DeliveryNoteResult({
           </a>
         </Button>
         <Button
-          type="button" variant="outline" className="h-11 sm:h-10" disabled={printing}
+          type="button" variant="outline" className="h-11 sm:h-10" disabled={printing} data-testid="delivery-note-print"
           onClick={async () => {
             setPrinting(true);
-            try { await printPdf(note.fileId); } finally { setPrinting(false); }
+            try { await printPdf(note.fileId, note.filename); } finally { setPrinting(false); }
           }}
         >
           {printing ? <Loader2 className="animate-spin" /> : <Printer />} Vytisknout

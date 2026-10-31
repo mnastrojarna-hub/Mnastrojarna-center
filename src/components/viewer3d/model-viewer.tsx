@@ -3,9 +3,10 @@
 import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
-  ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
+  ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Printer, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
   Undo2, Weight, X, ZoomIn, ZoomOut,
 } from "lucide-react";
+import { printDocument } from "@/components/print/print-action";
 import type { ModelNode } from "@/lib/viewer3d/types";
 import type { LoadStage } from "@/lib/viewer3d/worker-protocol";
 import { fmtMm, type Measurement } from "@/lib/viewer3d/measure";
@@ -289,6 +290,11 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             onShowAll={() => eng!.showAll()}
             onFit={() => eng!.fit()}
             onHelp={() => setHelp(true)}
+            onPrint={() => {
+              // „Tisknout pohled": snímek aktuálního pohledu (PNG) → tisk
+              const url = eng!.screenshot();
+              void fetch(url).then((r) => r.blob()).then((blob) => printDocument({ blob, filename: `${name.replace(/\.[^.]+$/, "")}-pohled.png` }));
+            }}
           />
 
           {panel === "views" && (
@@ -477,6 +483,7 @@ function Toolbar(p: {
   onShowAll: () => void;
   onFit: () => void;
   onHelp: () => void;
+  onPrint: () => void;
 }) {
   return (
     <div
@@ -509,6 +516,7 @@ function Toolbar(p: {
       <ToolButton icon={Box} label="Pohledy" active={p.panel === "views"} onClick={() => p.onPanel("views")} testId="tool-views" />
       <ToolButton icon={Layers} label="Zobrazení" active={p.panel === "display"} onClick={() => p.onPanel("display")} testId="tool-display" />
       <ToolButton icon={ListTree} label="Díly" active={p.panel === "tree"} onClick={() => p.onPanel("tree")} testId="tool-tree" />
+      <ToolButton icon={Printer} label="Tisknout pohled" onClick={p.onPrint} testId="tool-print" />
       <ToolButton icon={HelpCircle} label="Ovládání" onClick={p.onHelp} testId="tool-help" />
     </div>
   );

@@ -18,6 +18,7 @@ import { FULLSCREEN_DIALOG, Field } from "./ui-bits";
 import {
   purchaseDraftsToInput, purchaseOrderFormFromView, validatePurchaseOrderForm, type PurchaseOrderFormState,
 } from "./purchasing-model";
+import { PrintButton } from "@/components/print/print-button";
 
 type Step = "preparing" | "form" | "sending";
 
@@ -116,17 +117,20 @@ export function SendPurchaseOrderDialog({
             </div>
           ) : (
             <>
-              <a
-                href={pdfHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 rounded-lg border bg-red-50/60 px-3 py-2 text-sm hover:brightness-95 dark:bg-red-500/10"
-              >
-                <Paperclip className="h-4 w-4 text-red-600" />
-                <FileText className="h-4 w-4 text-red-600" />
-                <span className="min-w-0 flex-1 truncate font-medium">{attachment ?? `Objednávka ${order?.number ?? ""}.pdf`}</span>
-                <span className="inline-flex items-center gap-1 text-xs text-red-700 dark:text-red-300">Náhled <ExternalLink className="h-3 w-3" /></span>
-              </a>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={pdfHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border bg-red-50/60 px-3 py-2 text-sm hover:brightness-95 dark:bg-red-500/10"
+                >
+                  <Paperclip className="h-4 w-4 text-red-600" />
+                  <FileText className="h-4 w-4 text-red-600" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{attachment ?? `Objednávka ${order?.number ?? ""}.pdf`}</span>
+                  <span className="inline-flex items-center gap-1 text-xs text-red-700 dark:text-red-300">Náhled <ExternalLink className="h-3 w-3" /></span>
+                </a>
+                {order && <PrintButton href={pdfHref} filename={attachment ?? "objednavka.pdf"} label="Tisknout objednávku" variant="outline" className="h-10 w-10 shrink-0" />}
+              </div>
               <MailFields mail={mail} onChange={setMail} context={supplierId ? { supplierId } : null} idPrefix="po-mail" />
             </>
           )}

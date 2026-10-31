@@ -11,6 +11,7 @@ import { useAccess } from "@/components/access-provider";
 import type { JobFile } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { anonApi, downloadUrl, previewUrl, type AnonTableParam, type SendQueueDto } from "./anon-api";
+import { PrintButton } from "@/components/print/print-button";
 import { FileAnonBadge } from "./anon-badge";
 import { describeCounts, displayReason, isBudgetWait, NOTHING_REMOVED, sendQueueText, sendQueueWhat, type AnonUiStatus } from "./anon-status";
 
@@ -74,9 +75,13 @@ export function ForSupplierLink({ file, onReviewDownload, wrapClassName }: { fil
   // „Ke kontrole" už nevzniká (plná automatika) — hotová kopie se stahuje bez potvrzování
   void onReviewDownload;
   return wrap(
-    <a href={downloadUrl(file.id)} className={cls} title={`Anonymizovaná kopie: ${file.anon?.filename ?? ""}`} data-testid="anon-for-supplier">
-      <Download className="h-3.5 w-3.5" /> Pro dodavatele
-    </a>,
+    <span className="inline-flex items-center gap-0.5">
+      <a href={downloadUrl(file.id)} className={cls} title={`Anonymizovaná kopie: ${file.anon?.filename ?? ""}`} data-testid="anon-for-supplier">
+        <Download className="h-3.5 w-3.5" /> Pro dodavatele
+      </a>
+      {/* tisk anonymizované kopie (tatáž route jako stažení — originál zákazníka se netiskne) */}
+      <PrintButton href={downloadUrl(file.id)} filename={file.anon?.filename ?? null} label="Tisknout pro dodavatele" className="h-8 w-8 text-emerald-800 dark:text-emerald-200" testId="anon-print" />
+    </span>,
   );
 }
 

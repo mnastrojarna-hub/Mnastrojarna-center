@@ -126,3 +126,107 @@
     font-size: 16px !important;
   }
 }
+
+/*
+ * Tisk dokumentů (/print a tisk z aplikace, viz components/print). Strany dokumentu jsou v #mn-print-out
+ * (přímý potomek <body>); <html data-mn-print> = tiskne se dokument → při tisku zmizí vše ostatní
+ * (lišty, menu, dialogy, debug lišta). @page (orientace podle první strany, okraje 0) vkládá komponenta.
+ */
+#mn-print-out {
+  display: none;
+}
+@media screen {
+  body.mn-print-body {
+    background: #e7e5e4;
+  }
+  .dark body.mn-print-body {
+    background: #1c1917;
+  }
+  html[data-mn-print="page"] #mn-print-out,
+  html[data-mn-print="embed"] #mn-print-out {
+    display: block;
+    padding: 12px 12px 112px;
+  }
+  html[data-mn-print] .mn-print-page {
+    margin: 0 auto 12px;
+    max-width: 960px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  }
+  html[data-mn-print] .mn-print-page img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  html[data-mn-print] .mn-print-text {
+    margin: 0 auto;
+    max-width: 960px;
+    background: #fff;
+    color: #000;
+    padding: 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+}
+@media print {
+  html[data-mn-print] body > *:not(#mn-print-out) {
+    display: none !important;
+  }
+  html[data-mn-print],
+  html[data-mn-print] body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  html[data-mn-print] #mn-print-out {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  html[data-mn-print] .mn-print-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: none;
+    background: #fff;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  html[data-mn-print] .mn-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  html[data-mn-print] .mn-print-page[data-orient="landscape"] {
+    page: mn-landscape;
+  }
+  html[data-mn-print] .mn-print-page[data-orient="portrait"] {
+    page: mn-portrait;
+  }
+  html[data-mn-print] .mn-print-page img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  html[data-mn-print] .mn-print-text {
+    margin: 0;
+    padding: 12mm;
+    color: #000;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 10pt/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+}

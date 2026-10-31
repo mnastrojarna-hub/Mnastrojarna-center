@@ -17,6 +17,7 @@ import type { Notify } from "@/components/jobs/detail/toast";
 import { ConfirmPurchaseOrderDialog, SendPurchaseOrderDialog } from "./purchase-order-dialogs";
 import { CancelPurchaseOrderDialog, ReceivePurchaseOrderDialog } from "./purchase-receive-dialog";
 import { TRANSITION_LABELS, purchaseNextStep } from "./purchasing-model";
+import { PrintButton } from "@/components/print/print-button";
 
 const TRANSITION_ICONS: Record<PurchaseOrderStatus, LucideIcon> = {
   navrh: RotateCcw,
@@ -139,6 +140,7 @@ export function PurchaseOrderActions({
           <FileText className="h-4 w-4" /> PDF
         </a>
       </Button>
+      <PrintButton href={pdfHref} filename={`objednavka-${order.number}.pdf`} label={`Tisknout objednávku ${order.number}`} variant="outline" size={size === "sm" ? "icon-sm" : "icon"} />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button size={size === "sm" ? "icon-sm" : "icon"} variant="ghost" aria-label={`Další akce objednávky ${order.number}`} disabled={busy !== null}>

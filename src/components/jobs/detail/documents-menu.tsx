@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
 import { primaryQuote } from "./detail-helpers";
 import { ConfirmDialog } from "./confirm-dialog";
+import { PrintMenuItem } from "@/components/print/print-button";
 
 const DOCS: { kind: JobDocumentKind; label: string; hint: string; icon: LucideIcon; tone: string }[] = [
   { kind: "nabidka", label: "Nabídka", hint: "PDF z aktuální nabídky", icon: FileText, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
@@ -163,6 +164,7 @@ export function DocumentsMenu({
                       </span>
                     </a>
                   </DropdownMenuItem>
+                  <PrintMenuItem href={`/api/jobs/files/${invoiceFile.id}`} filename={invoiceFile.filename} label={`Tisknout fakturu ${invoiceNo ?? ""}`.trim()} />
                   <DropdownMenuItem onSelect={() => setInvoiceSend(true)} className="items-center gap-2.5 py-2">
                     {tile}
                     <span className="min-w-0 flex-1">
@@ -212,17 +214,20 @@ export function DocumentsMenu({
             return (
               <React.Fragment key={d.kind}>
                 {deliveryNotes.map((n) => (
-                  <DropdownMenuItem key={n.id} asChild className="items-center gap-2.5 py-2">
-                    <a href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer">
-                      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", d.tone)}>
-                        <Icon className="!size-4 !text-current" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium leading-tight">Dodací list {n.number}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">{n.label ? `${n.label} · ` : ""}stáhnout PDF</span>
-                      </span>
-                    </a>
-                  </DropdownMenuItem>
+                  <React.Fragment key={n.id}>
+                    <DropdownMenuItem asChild className="items-center gap-2.5 py-2">
+                      <a href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer">
+                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", d.tone)}>
+                          <Icon className="!size-4 !text-current" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium leading-tight">Dodací list {n.number}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">{n.label ? `${n.label} · ` : ""}stáhnout PDF</span>
+                        </span>
+                      </a>
+                    </DropdownMenuItem>
+                    <PrintMenuItem href={`/api/jobs/files/${n.id}`} filename={n.filename} label={`Tisknout DL ${n.number}`} />
+                  </React.Fragment>
                 ))}
                 {undocumented && (
                   <DropdownMenuItem onSelect={() => void generate(d.kind)} className="items-center gap-2.5 py-2">

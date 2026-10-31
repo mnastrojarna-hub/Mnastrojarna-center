@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { AlertTriangle, ArrowLeft, Box, Download, ExternalLink, FileQuestion, FileText, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Box, Download, ExternalLink, FileQuestion, FileText, Loader2, Printer } from "lucide-react";
 import { filenameFromDisposition, sniffFile, type Sniffed } from "@/lib/viewer3d/sniff";
 import { pdfHas3D } from "@/lib/viewer3d/formats/pdf3d";
+import { printModeFor, safePrintSrc } from "@/lib/print/print-links";
+import { printDocument } from "@/components/print/print-action";
 import { cn } from "@/lib/utils";
 import { PdfView } from "./pdf-view";
 import { ImageView } from "./image-view";
@@ -131,6 +133,33 @@ export function FileViewer({ request, onBack, standalone = false }: { request: V
   const title = data?.filename ?? request.filename ?? "Dokument";
   const isModel = data?.sniffed.kind === "model" || !!data?.has3D;
   const modelBytes = React.useMemo(() => (data && (data.sniffed.kind === "model" || data.has3D) ? (data.bytes.buffer as ArrayBuffer) : null), [data]);
+  // tisk: PDF (u 3D PDF v režimu Stránky), obrázky, text — 3D model má vlastní „Tisknout pohled"
+  const printable = Boolean(data) && (data!.sniffed.kind === "pdf" || data!.sniffed.kind === "image" || data!.sniffed.kind === "text") && !(data!.has3D && mode === "3d");
+  const print = React.useCallback(() => {
+    if (!data) return;
+    const href = request.blob ? null : safePrintSrc(request.href);
+    // telefon: tisková stránka (vlastní „Tisknout" i „Zpět"); počítač: už stažený obsah, dialog hned
+    if (href && printModeFor(navigator.userAgent, navigator.maxTouchPoints ?? 0) === "page") {
+      void printDocument({ href, filename: data.filename });
+      return;
+    }
+    const type = data.sniffed.kind === "pdf" ? "application/pdf" : data.contentType || "";
+    void printDocument({ blob: request.blob ?? new Blob([data.bytes as BlobPart], { type }), filename: data.filename });
+  }, [data, request.blob, request.href]);
+
+  // Ctrl+P / Cmd+P v prohlížeči vytiskne dokument, ne stránku aplikace
+  React.useEffect(() => {
+    if (!printable) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        e.stopPropagation();
+        print();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [printable, print]);
 
   return (
     <div className="flex h-full flex-col bg-background" data-testid="file-viewer">
@@ -156,6 +185,18 @@ export function FileViewer({ request, onBack, standalone = false }: { request: V
               <FileText className="h-3.5 w-3.5" /> Stránky
             </button>
           </div>
+        )}
+        {printable && (
+          <button
+            type="button"
+            onClick={print}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-accent"
+            aria-label="Tisknout"
+            title="Tisknout (Ctrl+P)"
+            data-testid="viewer-print"
+          >
+            <Printer className="h-5 w-5" />
+          </button>
         )}
         {data && (
           <a

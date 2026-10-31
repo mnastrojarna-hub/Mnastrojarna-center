@@ -4,6 +4,7 @@ import * as React from "react";
 import { Download, FileText } from "lucide-react";
 import type { SupplierInvoiceFileView } from "@/lib/supplier-invoices/types";
 import { cn } from "@/lib/utils";
+import { PrintButton } from "@/components/print/print-button";
 
 /** Náhled faktury (fotka / PDF) vedle položek — soubory jdou přes route s kontrolou práv. */
 export function InvoicePreview({ files, className, emptyText = "Bez souboru" }: { files: SupplierInvoiceFileView[]; className?: string; emptyText?: string }) {
@@ -36,6 +37,7 @@ export function InvoicePreview({ files, className, emptyText = "Bez souboru" }: 
         <FileText className="h-3.5 w-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{f.filename}</span>
         <a href={`${f.href}?download=1`} className="inline-flex min-h-8 items-center gap-1 font-medium text-foreground hover:underline"><Download className="h-3.5 w-3.5" /> Stáhnout</a>
+        <PrintButton href={f.href} filename={f.filename} label="Tisknout" showLabel className="h-8 px-2 text-xs font-medium text-foreground" />
       </div>
     </div>
   );

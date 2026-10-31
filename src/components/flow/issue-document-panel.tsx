@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { DocumentSendDialog } from "./document-send-dialog";
 import { FlowCombo, type ComboItem } from "./flow-combo";
 import { ISSUABLE_KINDS } from "./flow-utils";
+import { PrintButton } from "@/components/print/print-button";
 
 export interface IssueJob {
   id: string;
@@ -227,6 +228,7 @@ export function IssueDocumentPanel({ jobs, canInvoice = true }: { jobs: IssueJob
                     <a href={`/api/jobs/files/${n.fileId}`} target="_blank" rel="noopener noreferrer">PDF <ExternalLink className="h-3.5 w-3.5" /></a>
                   </Button>
                 )}
+                {n.fileId && <PrintButton href={`/api/jobs/files/${n.fileId}`} label={`Tisknout ${n.number}`} variant="outline" className="h-8 w-8" />}
               </li>
             ))}
           </ul>
@@ -277,6 +279,7 @@ export function IssueDocumentPanel({ jobs, canInvoice = true }: { jobs: IssueJob
                 Otevřít PDF <ExternalLink className="h-3.5 w-3.5" />
               </a>
             </Button>
+            <PrintButton href={`/api/jobs/files/${done.fileId}`} label="Tisknout" showLabel variant="outline" />
             <Button type="button" size="sm" variant="send" onClick={() => setSending(true)}>
               <Send className="h-4 w-4" /> {done.sentTo ? "Poslat znovu" : "Poslat zákazníkovi"}
             </Button>
@@ -292,6 +295,7 @@ export function IssueDocumentPanel({ jobs, canInvoice = true }: { jobs: IssueJob
             </a>
           </Button>
         )}
+        {job && <PrintButton href={`/api/pdf/job/${job.id}?type=${previewType}`} filename="nahled.pdf" label="Tisknout náhled" showLabel size="default" />}
         {kind === "faktura" ? (
           <Button asChild={Boolean(job)} type="button" disabled={!job} className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-600/90">
             {job ? (

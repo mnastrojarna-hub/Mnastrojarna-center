@@ -30,6 +30,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { QuoteEditorDialog } from "./quote-editor-dialog";
 import { QuoteSendDialog } from "./quote-send-dialog";
 import { PersonChip } from "./inline-field";
+import { PrintButton } from "@/components/print/print-button";
 import { useFlowActions } from "./flow-actions";
 import {
   quoteActions, quoteDisplayOf, splitQuotes, quoteFormFromJob, quoteFormFromQuote, formatMoney, formatQty, longDate,
@@ -323,6 +324,7 @@ function QuoteCard({
               <FileSearch className="h-4 w-4 text-violet-600" /> PDF náhled
             </a>
           </Button>
+          <PrintButton href={pdfHref} filename={`nabidka-${quote.number}.pdf`} variant="outline" showLabel label="Tisknout" />
           {menuActions.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -12,6 +12,7 @@ import type { JobDetail } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { deliveredSummary } from "./delivery-dialog";
 import { noteDownloadHref } from "./delivery-note-result";
+import { PrintButton } from "@/components/print/print-button";
 import { DocumentSendDialog } from "@/components/flow/document-send-dialog";
 import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 
@@ -103,6 +104,7 @@ export function DeliveryCard({ job, className }: { job: JobDetail; className?: s
                   <Button asChild size="sm" variant="ghost" className="h-9 px-2">
                     <a href={noteDownloadHref(n.id)} download={n.filename} aria-label={`Stáhnout ${n.number}`}><Download /></a>
                   </Button>
+                  <PrintButton href={`/api/jobs/files/${n.id}`} filename={n.filename} label={`Tisknout ${n.number}`} size="sm" className="h-9 px-2" />
                   <Button type="button" size="sm" variant="ghost" className="h-9 px-2" aria-label={`Poslat ${n.number} zákazníkovi`} onClick={() => setSending(n)}>
                     <Send />
                   </Button>

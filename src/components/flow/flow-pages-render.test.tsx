@@ -160,6 +160,9 @@ describe("přehled nabídek", () => {
     expect(text(html)).toContain("Zákazník objednal");
     expect(html).toContain('aria-label="Další akce nabídky NAB-2026-031"');
     expect(html).toContain("bg-violet-700"); // primární tlačítko v odstínu nabídky (kontrast AA)
+    // tisk PDF nabídky jedním klepnutím vedle „PDF" (tatáž route jako náhled)
+    expect(html).toContain('data-print-href="/api/pdf/job/j3?type=nabidka&amp;quoteId=q1"');
+    expect(html).toContain('aria-label="Tisknout nabídku NAB-2026-031"');
   });
 
   it("bez podrobných stavů z DB: stav ze staršího status, nic se nerozbije", () => {
@@ -231,6 +234,9 @@ describe("#25 zamčené dokumenty", async () => {
     expect(html).toContain('data-locked="price"');
     for (const id of ["f1", "f2", "f3"]) expect(html).not.toContain(`/api/jobs/files/${id}`);
     expect(html).toContain('href="/api/jobs/files/f4?download=1"');
+    // „Tisknout" jen u dokumentu, který uživatel smí otevřít (zamčené bez tlačítka)
+    expect(html).toContain('data-print-href="/api/jobs/files/f4"');
+    expect(html.match(/data-testid="print-button"/g)).toHaveLength(1);
     expect(text(html)).toContain("Nabídka Kalírna");
     expect(text(html)).toContain("Z-2026-101");
   });

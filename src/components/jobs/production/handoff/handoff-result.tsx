@@ -8,6 +8,7 @@ import type { HandoffKind, HandoffResult } from "@/lib/jobs/production-handoff-t
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { doneToast } from "./handoff-model";
+import { PrintButton } from "@/components/print/print-button";
 
 type PoRow = HandoffResult["purchaseOrders"][number];
 
@@ -92,6 +93,9 @@ export function HandoffResultView({
                     className="inline-flex h-9 items-center gap-1 rounded-md border px-3 text-xs font-semibold hover:bg-accent">
                     <ExternalLink className="h-3.5 w-3.5" /> Otevřít PDF
                   </a>
+                )}
+                {p.pdf === "ok" && p.fileId && canSend && (
+                  <PrintButton href={`/api/jobs/files/${p.fileId}`} label="Tisknout objednávku" variant="outline" className="h-9 w-9" />
                 )}
                 {p.pdf === "chyba" && (
                   <Button type="button" size="sm" variant="outline" onClick={() => void retry()} disabled={busy !== null}>

@@ -21,6 +21,7 @@ import { ownInvoiceFile } from "@/components/jobs/production/invoice-dialog";
 import type { JobProductionData } from "@/components/jobs/production/production-tab";
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
 import { TechnologyCard } from "./technology-card";
+import { PrintButton } from "@/components/print/print-button";
 
 /** „změna · J. Novák · před 2 dny" pod klíčovým polem (M12). */
 function FieldStamp({ stamps, column }: { stamps?: Record<string, ChangeStamp>; column: string }) {
@@ -80,9 +81,12 @@ function DocNumbers({ job }: { job: JobDetail }) {
         {notes.length ? (
           <span className="flex flex-wrap gap-x-2 gap-y-0.5" data-field="delivery-notes">
             {notes.map((n) => n.id ? (
-              <a key={n.id} href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400">
-                {n.number} <ExternalLink className="h-3 w-3" aria-hidden />
-              </a>
+              <span key={n.id} className="inline-flex items-center gap-0.5">
+                <a href={`/api/jobs/files/${n.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400">
+                  {n.number} <ExternalLink className="h-3 w-3" aria-hidden />
+                </a>
+                <PrintButton href={`/api/jobs/files/${n.id}`} label={`Tisknout ${n.number}`} className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
+              </span>
             ) : <span key={n.number} className="font-mono">{n.number}</span>)}
           </span>
         ) : legacyDl ? <span className="font-mono">{legacyDl}</span> : <span className="text-muted-foreground">—</span>}
@@ -90,9 +94,12 @@ function DocNumbers({ job }: { job: JobDetail }) {
       <ReadOnly label="Číslo faktury" icon={ReceiptText} iconClass="text-emerald-600">
         {invoice ? (
           invoiceFile && perms.margins ? (
-            <a href={`/api/jobs/files/${invoiceFile.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400" data-field="invoice-pdf">
-              {invoice} <ExternalLink className="h-3 w-3" aria-hidden />
-            </a>
+            <span className="inline-flex items-center gap-0.5">
+              <a href={`/api/jobs/files/${invoiceFile.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400" data-field="invoice-pdf">
+                {invoice} <ExternalLink className="h-3 w-3" aria-hidden />
+              </a>
+              <PrintButton href={`/api/jobs/files/${invoiceFile.id}`} filename={invoiceFile.filename} label={`Tisknout fakturu ${invoice}`} className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
+            </span>
           ) : <span className="font-mono">{invoice}</span>
         ) : <span className="text-muted-foreground">—</span>}
       </ReadOnly>

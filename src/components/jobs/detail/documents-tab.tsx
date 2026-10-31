@@ -27,13 +27,14 @@ import { useJobDetail } from "./detail-context";
 import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
-import { anonApi } from "@/components/anonymize/anon-api";
+import { anonApi, downloadUrl as anonDownloadUrl } from "@/components/anonymize/anon-api";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import { unsupportedHowTo } from "@/lib/anonymize/candidate";
 import {
   AnonFileBadge, AnonMenuItems, AnonSummaryLine, ForSupplierLink, ReviewDownloadDialog, SendQueueNotice, SupplierPackButton, anonInFlight, supplierReady, supplierSummary,
 } from "@/components/anonymize/anon-file-menu";
 import { AnonymizeEditor } from "@/components/anonymize/anonymize-editor";
+import { PrintButton, PrintMenuItem } from "@/components/print/print-button";
 
 /** Doklady, které jde z karty poslat zákazníkovi e-mailem (PDF v příloze). */
 const SENDABLE: Partial<Record<JobFileKind, { kind: JobDocumentKind; what: string }>> = {
@@ -180,6 +181,7 @@ function FileRow({
             <Download className="h-4 w-4" />
           </a>
         </Button>
+        <PrintButton href={fileUrl(file.id)} filename={file.filename} label={forSupplier ? "Tisknout originál (interně)" : "Tisknout"} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" aria-label="Další akce dokumentu" disabled={busy}>
@@ -197,6 +199,10 @@ function FileRow({
             <DropdownMenuItem asChild>
               <a href={fileUrl(file.id, true)}><Download /> {forSupplier ? "Stáhnout originál (interně)" : "Stáhnout"}</a>
             </DropdownMenuItem>
+            <PrintMenuItem href={fileUrl(file.id)} filename={file.filename} label={forSupplier ? "Tisknout originál (interně)" : "Tisknout"} />
+            {forSupplier && (
+              <PrintMenuItem href={anonDownloadUrl(file.id)} filename={file.anon?.filename ?? null} label="Tisknout pro dodavatele (anonymizovaný)" testId="print-anon-menu-item" />
+            )}
             {onSend && !file.archived && SENDABLE[file.kind] && (
               <DropdownMenuItem onSelect={() => onSend(file)}>
                 <Send /> Poslat zákazníkovi e-mailem…
@@ -344,6 +350,7 @@ function Lightbox({ images, index, onIndex, onClose }: { images: JobFile[]; inde
           <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium text-white">{f.title || f.filename}</DialogTitle>
           {images.length > 1 && <span className="text-xs text-white/60">{index + 1} / {images.length}</span>}
           <a href={fileUrl(f.id, true)} className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Stáhnout"><Download className="h-4 w-4" /></a>
+          <PrintButton href={fileUrl(f.id)} filename={f.filename} className="h-9 w-9 text-white/80 hover:bg-white/10 hover:text-white" />
           <a href={fileUrl(f.id)} target="_blank" rel="noopener noreferrer" className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Otevřít v novém panelu"><ExternalLink className="h-4 w-4" /></a>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Zavřít"><X className="h-5 w-5" /></button>
         </div>

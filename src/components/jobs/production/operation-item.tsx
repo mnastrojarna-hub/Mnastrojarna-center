@@ -26,6 +26,7 @@ import { performerRole } from "@/lib/jobs/production-handoff";
 import { stepLabel } from "@/lib/jobs/production";
 import { ensureHandoffDocuments, reissueStepPurchaseOrder, sendStepPurchaseOrder } from "@/app/actions/production-handoff";
 import { useRunner } from "./production-context";
+import { PrintButton } from "@/components/print/print-button";
 
 const PO_TONE: Record<"amber" | "green" | "grey" | "red" | "lime", string> = {
   amber: "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200",
@@ -49,6 +50,9 @@ function PoChip({ op, chip, canSend }: { op: JobOperation; chip: NonNullable<Ret
       </span>
       {canSend && po?.fileId && (
         <a href={`/api/jobs/files/${po.fileId}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-sky-700 hover:underline dark:text-sky-400">PDF</a>
+      )}
+      {canSend && po?.fileId && (
+        <PrintButton href={`/api/jobs/files/${po.fileId}`} label="Tisknout objednávku" className="h-7 w-7" iconClassName="h-3.5 w-3.5" />
       )}
       {canSend && chip.action === "send" && po && (
         <button type="button" disabled={busy} onClick={() => void run(key, () => sendStepPurchaseOrder(po.id), { success: `Objednávka ${po.number ?? ""} odeslána dodavateli.` })}
