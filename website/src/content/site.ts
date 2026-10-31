@@ -42,6 +42,7 @@ export const SERVICE_FACTS: Record<ServiceId, { icon: IconName; machines?: strin
   "nahradni-dily-pro-vyrobni-linky": { icon: "spare", photo: "/img/zakazky/rotory-s-drazkami/1.jpg", machines: ["hypertun-65", "axile-g8", "sab-50"] },
   nastrojarstvi: { icon: "die", photo: "/img/zakazky/paletove-upinaci-pripravky/1.jpg", machines: ["fanuc-robocut", "axile-g8", "mcv-754q"] },
   "jednoucelove-stroje": { icon: "machine", photo: "/img/zakazky/pripravky-s-pneumatikou/1.jpg" },
+  "vyroba-pripravku": { icon: "die", photo: "/img/zakazky/paletove-upinaci-pripravky/2.jpg", machines: ["mcv-754q", "axile-g8", "fanuc-robocut"] },
   "vyroba-prototypu": { icon: "prototype", photo: "/img/zakazky/tvarove-slozita-skrin/2.jpg", machines: ["axile-g8", "hypertun-65", "fanuc-robocut"] },
   "programovani-a-konstrukce": { icon: "cad", photo: "/img/zakazky/desky-skorepiny-a-mereni/7.jpg" },
   "mereni-a-kontrola-kvality": { icon: "measure", photo: "/img/zakazky/desky-skorepiny-a-mereni/1.jpg" },
