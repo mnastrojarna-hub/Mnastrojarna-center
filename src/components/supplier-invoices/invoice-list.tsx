@@ -104,7 +104,7 @@ export function InvoiceList({ items, totals, suppliers, perms, filter, visibilit
         }
         actions={
           <Button asChild variant="success" size="lg" className="h-11">
-            <Link href="/supplier-invoices/upload"><Upload className="h-4 w-4" /> Nahrát fakturu</Link>
+            <Link href="/supplier-invoices/upload"><Upload className="h-4 w-4" /> Zanést fakturu</Link>
           </Button>
         }
       >

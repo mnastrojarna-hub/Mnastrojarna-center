@@ -1,5 +1,5 @@
-// E2E: Faktury dodavatelů. Zaměstnanec na mobilu (390 px) nahraje fakturu → „Děkujeme, nahráno — fakturu
-// zpracuje super admin." a fakturu nikde nevidí. Super admin ji otevře (AI už navrhla rozdělení podle
+// E2E: Faktury dodavatelů. Zaměstnanec na mobilu (390 px) zanese fakturu → „Faktura zapsána ✓" s hlavičkou
+// (31. 10.) a seznam ani detail faktur nevidí. Super admin ji otevře (AI už navrhla rozdělení podle
 // OV-2099-901 a dopravu do režie), položku „Kalení — sdružené zakázky" rozdělí 600 / 400 na dvě zakázky
 // (Rozdělit → částka → zbytek se dopočítá), uloží a potvrdí, označí zaplaceno. Zakázka v Nákupu ukáže
 // skutečný náklad z faktury. Režim „všichni vidí faktury" — obchodník vidí, zaplaceno nemění.
@@ -21,7 +21,7 @@ const PO_NUMBER = "OV-2099-901";
 const HRUBY = "d4000000-0000-0000-0000-000000000001";
 const lit = (v) => (v === null || v === undefined ? "null" : `'${String(v).replace(/'/g, "''")}'`);
 const INVOICE_WHERE = "(supplier_key = '25874411' and number_norm = 'FA20260815') or supplier_key = '27999990' or number like 'E2E-SINV-%'";
-const THANKS = "Děkujeme, nahráno — fakturu zpracuje super admin.";
+const RECORDED = "Faktura zapsána ✓";
 
 async function removeBucket(bucket, paths) {
   const list = paths.filter(Boolean);
@@ -151,7 +151,7 @@ async function uploadAsWorker(page, shotName) {
 
 let invoiceId = null;
 
-await test("zaměstnanec (390 px): Nahrát fakturu → „Děkujeme, nahráno“; fakturu ani seznam nevidí", async () => {
+await test("zaměstnanec (390 px): Zanést fakturu → „Faktura zapsána ✓“ s hlavičkou (31. 10.); seznam ani detail nevidí", async () => {
   const { context, page } = await ctx(USERS.dilna, { mobile: true });
   try {
     await page.goto(`${BASE}/supplier-invoices/upload`);
@@ -159,9 +159,11 @@ await test("zaměstnanec (390 px): Nahrát fakturu → „Děkujeme, nahráno“
     await noOverflow(page, "upload 390");
     await snap(page, "01-worker-upload-mobile-light");
     const msg = await uploadAsWorker(page, "02-worker-thanks-mobile-light");
-    expect(msg === THANKS, `poděkování: „${msg}“`);
+    expect(msg === RECORDED, `potvrzení: „${msg}“`);
+    // 31. 10.: nahrávající vidí potvrzení s hlavičkou (dodavatel, číslo, částka, splatnost) — nic dalšího
     const body = await page.locator("main").getByTestId("invoice-upload-done").textContent();
-    expect(!/FA-2026-0815|Hrubý|31\s?500/.test(body ?? ""), "zaměstnanec po nahrání vidí údaje faktury");
+    expect(/FA-2026-0815/.test(body ?? "") && /Hrubý/.test(body ?? "") && /38\s?115/.test(body ?? ""), `potvrzení bez hlavičky: ${body}`);
+    expect((await page.locator("main").getByRole("link", { name: /Otevřít fakturu/ }).count()) === 0, "zaměstnanec má odkaz na fakturu");
     // seznam faktur a soubor faktury jsou pro zaměstnance zavřené
     const row = await eventually(() => invoiceRow());
     expect(row, "faktura v DB nevznikla");
@@ -184,7 +186,7 @@ await test("zaměstnanec (390 px): Nahrát fakturu → „Děkujeme, nahráno“
   }
 });
 
-await test("AI přečte fakturu na pozadí: dodavatel Hrubý, 3 položky, návrhy (OV-2099-901 → zakázka A, doprava → režie), ke kontrole", async () => {
+await test("AI přečetla fakturu: dodavatel Hrubý, 3 položky, návrhy (OV-2099-901 → zakázka A, doprava → režie), ke kontrole", async () => {
   expect(invoiceId, "chybí faktura z předchozího kroku");
   const row = await eventually(() => {
     const r = sql(`select status || '|' || coalesce(supplier_id::text, '') || '|' || (select count(*) from supplier_invoice_items where invoice_id = ${lit(invoiceId)}) from supplier_invoices where id = ${lit(invoiceId)}`);
@@ -221,7 +223,7 @@ await test("AI přečte fakturu na pozadí: dodavatel Hrubý, 3 položky, návrh
   const { context, page } = await ctx(USERS.dilna, { mobile: true, dark: true });
   try {
     const msg = await uploadAsWorker(page, "03-worker-thanks-mobile-dark");
-    expect(msg === THANKS, `poděkování (podruhé): ${msg}`);
+    expect(/^Tahle faktura už je zapsaná \(.+\)\.$/.test(msg ?? ""), `podruhé: ${msg}`);
     const n = sql(`select count(*) from supplier_invoices where ${INVOICE_WHERE}`);
     expect(n === "1", `stejný soubor znovu → ${n} faktur`);
   } finally {

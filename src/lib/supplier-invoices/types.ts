@@ -45,8 +45,28 @@ export interface SupplierInvoiceRefs {
   drawingNumbers: string[];
 }
 
+/**
+ * Druh dokladu podle AI (31. 10.: „Zanést fakturu" bere jen účetní doklad — dodací list, nabídku,
+ * objednávku… AI pozná a nahrávající se rozhodne „Přesto zapsat jako fakturu").
+ */
+export type InvoiceDocumentType =
+  | "faktura" | "zalohova_faktura" | "dobropis"
+  | "dodaci_list" | "nabidka" | "objednavka" | "potvrzeni_objednavky" | "upominka" | "jiny";
+
+/** Rekapitulace DPH z faktury (po sazbách). */
+export interface VatBreakdownRow {
+  /** Sazba v % (21, 12, 0). */
+  rate: number;
+  /** Základ bez DPH. */
+  base: number;
+  /** DPH. */
+  vat: number;
+}
+
 export interface SupplierInvoiceExtract {
   supplier: InvoiceSupplierParty;
+  /** Druh dokladu (chybí u starších vytěžení = faktura). */
+  documentType?: InvoiceDocumentType;
   number: string;
   variableSymbol: string;
   /** RRRR-MM-DD | "" */
@@ -57,6 +77,8 @@ export interface SupplierInvoiceExtract {
   totalNet: number;
   totalVat: number;
   totalGross: number;
+  /** Rekapitulace DPH (prázdná = neuvedena / jedna sazba z položek). */
+  vatBreakdown?: VatBreakdownRow[];
   items: SupplierInvoiceExtractItem[];
   references: SupplierInvoiceRefs;
   isCreditNote: boolean;

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useAccess } from "@/components/access-provider";
 import { createJobFromEmail } from "@/app/actions/mail";
-import { processOrderFromEmailAction, recordSupplierInvoiceFromEmailAction, type OrderChoice } from "@/app/actions/mail-actions";
+import { processOrderFromEmailAction, type OrderChoice } from "@/app/actions/mail-actions";
 import { mailActionHref, type MailActionKey } from "@/lib/email/mail-actions";
 import { flowActionHref } from "@/components/flow/flow-state";
 
@@ -45,6 +45,11 @@ export function useMailActionRunner(opts: {
       return;
     }
     if (key === "job.assign") return; // výběr zakázky dělá lišta zakázky (dialog)
+    if (key === "invoice.record") {
+      // 31. 10.: Zanést fakturu s přílohou e-mailu předvybranou → AI přečte → potvrzení s hlavičkou
+      router.push(`/supplier-invoices/upload?email=${encodeURIComponent(t.emailId)}`);
+      return;
+    }
     setBusy({ threadId: t.threadId, key });
     let navigating = false;
     try {
@@ -72,23 +77,6 @@ export function useMailActionRunner(opts: {
         });
         router.push(`/orders/${r.jobId}`);
         return;
-      }
-      if (key === "invoice.record") {
-        const r = await recordSupplierInvoiceFromEmailAction(t.emailId);
-        if (!r.ok) return onNotice({ ok: false, text: r.error });
-        if (r.noFiles) {
-          navigating = true;
-          onNotice({ ok: true, text: "E-mail nemá přílohu s fakturou — nahraj ji ručně." });
-          router.push("/supplier-invoices/upload");
-          return;
-        }
-        return onNotice({
-          ok: true,
-          text: r.created
-            ? `Faktura zapsána do Faktur dodavatelů (${r.created}) — AI ji přečte a rozdělí na zakázky${r.canView ? "" : ", zpracuje super admin"}.`
-            : "Faktura už je ve Fakturách dodavatelů.",
-          ...(r.canView ? { href: "/supplier-invoices", hrefLabel: "Otevřít Faktury dodavatelů" } : {}),
-        });
       }
     } catch {
       onNotice({ ok: false, text: "Spojení se nepovedlo — zkus to znovu." });

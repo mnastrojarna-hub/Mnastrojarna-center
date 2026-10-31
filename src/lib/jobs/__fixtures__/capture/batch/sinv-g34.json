@@ -1,0 +1,67 @@
+{
+  "supplier": {
+    "name": "E2E Frézárna Plán s.r.o.",
+    "ico": "27999934",
+    "dic": "CZ27999934",
+    "street": "Průmyslová 34",
+    "city": "Olomouc",
+    "zip": "77900",
+    "country": "CZ",
+    "email": "fakturace@e2e-27999934.cz",
+    "phone": "+420 585 000 934",
+    "contactPerson": "Eva Testová",
+    "bankAccount": "29009934/2010"
+  },
+  "documentType": "faktura",
+  "number": "FV-34-2026-001",
+  "variableSymbol": "34202601",
+  "issueDate": "2026-10-28",
+  "taxableDate": "2026-10-28",
+  "dueDate": "2026-11-12",
+  "currency": "CZK",
+  "totalNet": 10000,
+  "totalVat": 2100.0,
+  "totalGross": 12100.0,
+  "vatBreakdown": [
+    {
+      "rate": 21,
+      "base": 10000,
+      "vat": 2100.0
+    }
+  ],
+  "items": [
+    {
+      "text": "Frézování dílů dle výkresu",
+      "code": "",
+      "quantity": 1,
+      "unit": "kpl",
+      "unitPrice": 9000,
+      "amount": 9000,
+      "vatRate": 21,
+      "refs": []
+    },
+    {
+      "text": "Doprava",
+      "code": "",
+      "quantity": 1,
+      "unit": "kpl",
+      "unitPrice": 1000,
+      "amount": 1000,
+      "vatRate": 21,
+      "refs": []
+    }
+  ],
+  "references": {
+    "purchaseOrderNumbers": [],
+    "jobNumbers": [],
+    "customerOrderNumbers": [],
+    "deliveryNoteNumbers": [],
+    "drawingNumbers": []
+  },
+  "isCreditNote": false,
+  "isProforma": false,
+  "exchangeRate": 0,
+  "confidence": 0.94,
+  "summary": "Testovací doklad (E2E).",
+  "needsClarification": []
+}

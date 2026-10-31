@@ -3,6 +3,7 @@ import { getAccess, requireFeature } from "@/lib/auth/session";
 import { getSetting } from "@/lib/settings";
 import { listSupplierInvoices, type InvoiceListView } from "@/lib/data/supplier-invoices";
 import { InvoiceList, type ListView } from "@/components/supplier-invoices/invoice-list";
+import { SupplierInvoiceTabs } from "@/components/supplier-invoices/invoice-tabs";
 import { parseVisibility, VISIBILITY_SETTING_KEY } from "@/lib/supplier-invoices/access";
 import { isUuid, todayIso } from "@/lib/jobs/mapping";
 
@@ -43,7 +44,7 @@ export default async function SupplierInvoicesPage({ searchParams }: { searchPar
   if (!data) {
     return <p className="rounded-xl border p-4 text-sm text-muted-foreground">Faktury se nepodařilo načíst.</p>;
   }
-  return (
+  const list = (
     <InvoiceList
       items={data.items}
       totals={data.totals}
@@ -53,5 +54,13 @@ export default async function SupplierInvoicesPage({ searchParams }: { searchPar
       visibility={visibility}
       today={today}
     />
+  );
+  // Platební plán vidí jen super admin (stejné právo jako zaplaceno / nezaplaceno)
+  if (!data.perms.paid) return list;
+  return (
+    <div className="space-y-3">
+      <SupplierInvoiceTabs active="faktury" />
+      {list}
+    </div>
   );
 }
