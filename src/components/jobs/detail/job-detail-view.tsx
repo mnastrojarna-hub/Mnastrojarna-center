@@ -9,18 +9,29 @@ import { JobDetailProvider, type DetailPerms } from "./detail-context";
 import { JobToolbar, JobHeader } from "./job-header";
 import { StageTimeline } from "./stage-timeline";
 import { DeadlinePanel } from "./deadline-panel";
+import dynamic from "next/dynamic";
 import { OverviewTab } from "./overview-tab";
 import { ItemsTab } from "./items-tab";
-import { QuotesTab } from "./quotes-tab";
-import { DocumentsTab } from "./documents-tab";
-import { HistoryTab } from "./history-tab";
-import { CommunicationTab } from "@/components/jobs/communication/communication-tab";
 import { COMMUNICATION_TAB, useJobMailCount } from "@/components/jobs/communication/job-mail-context";
 import { UploadQueue } from "./upload-controls";
 import { DETAIL_TABS_ID, detailTabOf, isDetailTab, type DetailTab } from "./detail-helpers";
 import { FlowActionsProvider, type FlowAccess } from "./flow-actions";
-import { ProductionTab, type JobProductionData } from "@/components/jobs/production/production-tab";
-import { PurchasingTab } from "@/components/jobs/purchasing/purchasing-tab";
+import type { JobProductionData } from "@/components/jobs/production/production-tab";
+
+/**
+ * Záložky mimo Přehled a Položky (ty jsou vidět hned / zůstávají připojené) se načítají až při otevření —
+ * menší JavaScript karty zakázky (rychlejší první vykreslení hlavně na mobilu). Otevřená přes ?tab=
+ * se vykreslí na serveru jako dřív.
+ */
+function TabLoading() {
+  return <div className="h-40 animate-pulse rounded-xl border bg-muted/40" aria-busy="true" aria-label="Načítám záložku…" />;
+}
+const QuotesTab = dynamic(() => import("./quotes-tab").then((m) => m.QuotesTab), { loading: TabLoading });
+const DocumentsTab = dynamic(() => import("./documents-tab").then((m) => m.DocumentsTab), { loading: TabLoading });
+const HistoryTab = dynamic(() => import("./history-tab").then((m) => m.HistoryTab), { loading: TabLoading });
+const CommunicationTab = dynamic(() => import("@/components/jobs/communication/communication-tab").then((m) => m.CommunicationTab), { loading: TabLoading });
+const ProductionTab = dynamic(() => import("@/components/jobs/production/production-tab").then((m) => m.ProductionTab), { loading: TabLoading });
+const PurchasingTab = dynamic(() => import("@/components/jobs/purchasing/purchasing-tab").then((m) => m.PurchasingTab), { loading: TabLoading });
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
 import { sortOperations, stepLabel } from "@/lib/jobs/production";
 import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";

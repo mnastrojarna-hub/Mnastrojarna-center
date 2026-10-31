@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
@@ -132,6 +133,70 @@ function newestFirst<T extends { id: string; created_at?: string | null }>(rows:
 }
 
 // ── Kniha zakázek ───────────────────────────────────────────
+/**
+ * Řádky zakázek z DB pro listJobs (bez JS filtrů a řazení) — jednou za požadavek pro stejné parametry.
+ * Argumenty jsou primitivní hodnoty + objekt rozsahu (getFlowScope je také v cache → stejná instance).
+ * null = chyba / bez přístupu. Volající pole nemění (filterJobs vrací nové pole).
+ */
+const loadJobItems = cache(async (
+  stagesKey: string, ownerId: string, assigneeId: string, customerId: string, supplierId: string, changedBy: string,
+  narrowed: FlowScope | null, light = false,
+): Promise<JobListItem[] | null> => {
+  const s = await session("orders");
+  if (!s) return null;
+  const stages = stagesKey ? stagesKey.split(",") as JobStage[] : null;
+  const build = () => {
+    // #24: sloučená zakázka (zdroj) žije jen v historii cíle — odkaz na ni přesměruje
+    let query = s.db.from("orders").select(light ? JOB_SORT_SELECT : JOB_LIST_SELECT).is("merged_into_id", null);
+    if (stages) query = query.in("status", stages);
+    if (ownerId) query = query.eq("owner_id", ownerId);
+    if (assigneeId) query = query.eq("assignee_id", assigneeId);
+    if (customerId) query = query.eq("customer_id", customerId);
+    if (supplierId) query = query.eq("supplier_id", supplierId);
+    // „Změnil": poslední změna hlavního stavu nebo dílčího stavu (poptávka, objednávka) tímto účtem
+    if (changedBy) {
+      query = query.or(`stage_changed_by.eq.${changedBy},inquiry_status_changed_by.eq.${changedBy},order_status_changed_by.eq.${changedBy}`);
+    }
+    return query.order("created_at", { ascending: false }).order("id");
+  };
+  const { data, error } = narrowed
+    ? await fetchScoped<JobRow>(build, narrowed, { jobColumn: "id", max: MAX_ROWS, order: (r) => newestFirst(r as (JobRow & { created_at?: string })[]) })
+    : await fetchPaged<JobRow>((from, to) => build().range(from, to), MAX_ROWS);
+  warn("list", error);
+  if (error) return null;
+  return data.map((r) => rowToJobListItem(r, s.view));
+});
+
+/**
+ * Jen sloupce pro filtr termínu a řazení (created / updated / deadline / number / stage) — krátký výpis
+ * („posledních 6", „5 po termínu") vybere id z lehkých řádků a plné řádky dočte jen pro ně (dřív se
+ * kvůli 6 řádkům četly všechny zakázky se všemi vazbami, stovky kB až MB).
+ */
+const JOB_SORT_SELECT = "id, number, status, created_at, updated_at, due_date, customer_required_date, max_tolerated_date, supplier_promised_date";
+const LIGHT_SORTS = new Set(["created", "updated", "deadline", "number", "stage"]);
+const LIGHT_MAX = 100;
+
+/** Dá se krátký výpis vybrat z lehkých řádků se stejným výsledkem? (filtry jen nad sloupci JOB_SORT_SELECT) */
+function lightEligible(filters: JobFilters, narrowed: FlowScope | null): boolean {
+  const limit = filters.limit ?? 0;
+  return !narrowed && limit > 0 && limit <= LIGHT_MAX && LIGHT_SORTS.has(filters.sort ?? "created")
+    && !(filters.q ?? "").trim() && !(filters.step ?? "").trim() && !(filters.location ?? "").trim() && !filters.payment
+    && !(filters.inquiry ?? []).length && !(filters.order ?? []).length && !(filters.delivery ?? []).length
+    && filters.deadline !== "krok";
+}
+
+/** Plné řádky Knihy pro vybraná id (pořadí = ids). */
+async function loadJobItemsByIds(ids: string[]): Promise<JobListItem[] | null> {
+  if (!ids.length) return [];
+  const s = await session("orders");
+  if (!s) return null;
+  const { data, error } = await s.db.from("orders").select(JOB_LIST_SELECT).in("id", ids);
+  warn("list:ids", error);
+  if (error) return null;
+  const byId = new Map(((data ?? []) as unknown as JobRow[]).map((r) => [r.id, rowToJobListItem(r, s.view)]));
+  return ids.map((id) => byId.get(id)).filter((j): j is JobListItem => Boolean(j));
+}
+
 /** Zakázky Knihy; s opts.scope jen „moje" obchodního toku (stránky toku), bez něj všechny (Kniha). */
 export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}): Promise<JobListItem[]> {
   const narrowed = narrowScope(opts);
@@ -144,35 +209,24 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
       if (id !== undefined && id !== "" && !isUuid(id)) return [];
     }
     const stages = resolveStageFilter(filters);
-    const build = () => {
-      // #24: sloučená zakázka (zdroj) žije jen v historii cíle — odkaz na ni přesměruje
-      let query = s.db.from("orders").select(JOB_LIST_SELECT).is("merged_into_id", null);
-      if (stages) query = query.in("status", stages);
-      if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
-      if (filters.assigneeId) query = query.eq("assignee_id", filters.assigneeId);
-      if (filters.customerId) query = query.eq("customer_id", filters.customerId);
-      if (filters.supplierId) query = query.eq("supplier_id", filters.supplierId);
-      // „Změnil": poslední změna hlavního stavu nebo dílčího stavu (poptávka, objednávka) tímto účtem
-      if (filters.changedBy) {
-        const id = filters.changedBy;
-        query = query.or(`stage_changed_by.eq.${id},inquiry_status_changed_by.eq.${id},order_status_changed_by.eq.${id}`);
-      }
-      return query.order("created_at", { ascending: false }).order("id");
-    };
-    const { data, error } = narrowed
-      ? await fetchScoped<JobRow>(build, narrowed, { jobColumn: "id", max: MAX_ROWS, order: (r) => newestFirst(r as (JobRow & { created_at?: string })[]) })
-      : await fetchPaged<JobRow>((from, to) => build().range(from, to), MAX_ROWS);
-    warn("list", error);
-    if (error) return [];
-
-    const items = data.map((r) => rowToJobListItem(r, s.view));
+    const light = lightEligible(filters, narrowed);
+    // stejný dotaz do DB (stavy + sloupcové filtry + rozsah) v jednom požadavku jen jednou — např. Kniha
+    // čte „objednávky v běhu" i seznam segmentu (React cache)
+    const items = await loadJobItems(
+      stages ? [...stages].sort().join(",") : "",
+      filters.ownerId || "", filters.assigneeId || "", filters.customerId || "", filters.supplierId || "", filters.changedBy || "",
+      narrowed, light,
+    );
+    if (!items) return [];
     const filtered = filterJobs(items, {
       q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
       inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery,
     });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
-    return limit ? sorted.slice(0, limit) : sorted;
+    const top = limit ? sorted.slice(0, limit) : sorted;
+    if (!light) return top;
+    return (await loadJobItemsByIds(top.map((j) => j.id))) ?? [];
   } catch (err) {
     console.error(`[data:jobs:list] ${err instanceof Error ? err.message : String(err)}`);
     return [];
@@ -199,6 +253,24 @@ export async function listJobOrderRefs(): Promise<Pick<JobListItem, "id" | "numb
   } catch (err) {
     console.error(`[data:jobs:order-refs] ${err instanceof Error ? err.message : String(err)}`);
     return [];
+  }
+}
+
+/**
+ * Číslo a název zakázky pro titulek stránky (generateMetadata) — jeden lehký dotaz. Titulek se počítá
+ * i při prefetchi odkazu (každý viditelný řádek Knihy); dřív to byla celá karta (getJob = 5–8 dotazů).
+ */
+export async function getJobTitle(id: string): Promise<{ number: string; title: string } | null> {
+  if (!isUuid(id)) return null;
+  const s = await session("orders");
+  if (!s) return null;
+  try {
+    const { data, error } = await s.db.from("orders").select("number, title").eq("id", id).maybeSingle();
+    warn("title", error);
+    const row = data as { number: string | null; title: string | null } | null;
+    return row ? { number: row.number ?? "—", title: row.title ?? "" } : null;
+  } catch {
+    return null;
   }
 }
 
@@ -248,6 +320,47 @@ export async function getJob(id: string): Promise<JobDetail | null> {
   } catch (err) {
     console.error(`[data:jobs:detail] ${err instanceof Error ? err.message : String(err)}`);
     return null;
+  }
+}
+
+/**
+ * Detaily více zakázek NAJEDNOU pro panely toku (Nacenění, Potvrzení): zakázka s položkami, zákazníkem
+ * a osobami + nabídky s položkami — 2 dotazy místo 5–8 na každou zakázku (dřív 40× getJob = 200+ dotazů).
+ * Dokumenty a historie zůstávají prázdné (panely je nepoužívají — plnou kartu dává getJob).
+ * Pořadí výsledku = pořadí `ids`; neexistující / nepovolené id chybí.
+ */
+export async function getJobsForPanels(ids: string[]): Promise<JobDetail[]> {
+  const wanted = Array.from(new Set(ids.filter(isUuid)));
+  if (!wanted.length) return [];
+  const s = await session("orders");
+  if (!s) return [];
+  try {
+    const parts = chunkIds(wanted);
+    const [jobParts, quoteParts] = await Promise.all([
+      Promise.all(parts.map((part) => s.db.from("orders").select(JOB_DETAIL_SELECT).in("id", part))),
+      Promise.all(parts.map((part) => s.db.from("quotes").select(JOB_QUOTE_SELECT).in("job_id", part).order("created_at", { ascending: false }))),
+    ]);
+    const jobs: JobRow[] = [];
+    for (const r of jobParts) {
+      warn("panels", r.error);
+      if (r.error) return [];
+      jobs.push(...((r.data ?? []) as unknown as JobRow[]));
+    }
+    const quotesByJob = new Map<string, QuoteRow[]>();
+    for (const r of quoteParts) {
+      warn("panels:quotes", r.error);
+      for (const q of (r.data ?? []) as unknown as (QuoteRow & { job_id: string | null })[]) {
+        if (!q.job_id) continue;
+        const list = quotesByJob.get(q.job_id) ?? [];
+        list.push(q);
+        quotesByJob.set(q.job_id, list);
+      }
+    }
+    const byId = new Map(jobs.map((row) => [row.id, rowToJobDetail(row, { quotes: quotesByJob.get(row.id) ?? [], files: [], events: [] }, s.view)]));
+    return wanted.map((id) => byId.get(id)).filter((d): d is JobDetail => Boolean(d));
+  } catch (err) {
+    console.error(`[data:jobs:panels] ${err instanceof Error ? err.message : String(err)}`);
+    return [];
   }
 }
 

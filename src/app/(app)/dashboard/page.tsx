@@ -20,7 +20,7 @@ import {
 } from "@/lib/data/queries";
 import { FlowStateTiles, MoversPanel } from "@/components/dashboard/flow-overview";
 import { getJobStageCounts, listJobs } from "@/lib/data/jobs";
-import { getSetupStatus } from "@/lib/setup/status";
+import { getSetupChecklist } from "@/lib/setup/status";
 import { getAnonReviewCount } from "@/lib/data/anonymize";
 import { EyeOff } from "lucide-react";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
@@ -33,7 +33,7 @@ import { cn, formatCZK, relativeTime } from "@/lib/utils";
 export default async function DashboardPage() {
   await requireFeature("dashboard");
   const { can } = await getAccess();
-  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved] = await Promise.all([
+  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved, anonReview] = await Promise.all([
     getEmails(),
     getApprovalQueue(),
     getJobStageCounts(),
@@ -41,11 +41,12 @@ export default async function DashboardPage() {
     listJobs({ group: "aktivni", deadline: "overdue", sort: "deadline", dir: "asc", limit: 5 }),
     listPendingQuoteApprovals(),
     can("commissions") ? getCommissions("month") : Promise.resolve([]),
-    getSetupStatus(),
+    getSetupChecklist(),
     getFlowDashboard(),
     getResolvedApprovals(5),
+    // dřív až po všem ostatním (o round-trip později)
+    getAnonReviewCount(),
   ]);
-  const anonReview = await getAnonReviewCount();
   // #25: dlaždice = fronta AI + ruční nabídky kolegů (oba panely níže je vypíšou)
   const waitingApproval = approvals.length + quotes.length;
   // chip „Ke schválení“ = stejné nabídky jako panel níže (ruční kolegů + AI ve frontě), ne vrácené autorovi

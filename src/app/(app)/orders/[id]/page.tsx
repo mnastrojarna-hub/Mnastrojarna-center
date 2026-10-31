@@ -6,7 +6,7 @@ import { getMergeBanner, getMergeRedirect, getMergedSourceInfo } from "@/lib/dat
 import { MergeBanner, MergedSourceBanner } from "@/components/jobs/detail/merge-banner";
 import { getFieldStamps, getJobStamps, listJobPayments, listOrderRevisions } from "@/lib/data/flow-status";
 import { FIELD_STAMP_COLUMNS } from "@/components/jobs/detail/detail-helpers";
-import { getJob, getJobFormOptions } from "@/lib/data/jobs";
+import { getJob, getJobFormOptions, getJobTitle } from "@/lib/data/jobs";
 import { getJobProduction } from "@/lib/data/production";
 import { getJobPurchasing } from "@/lib/data/purchasing";
 import { JobDetailView } from "@/components/jobs/detail/job-detail-view";
@@ -17,14 +17,15 @@ export const dynamic = "force-dynamic";
 // předání do výroby: jedno odeslání = PDF objednávek + e-maily dodavatelům (akce běží ve funkci stránky)
 export const maxDuration = 60;
 
-// metadata i stránka čtou stejnou zakázku — jeden dotaz na požadavek
+// stránka čte zakázku jednou na požadavek
 const loadJob = cache(getJob);
 
 type Params = { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
+// titulek jedním lehkým dotazem — počítá se i při prefetchi každého viditelného řádku Knihy (dřív celá karta)
 export async function generateMetadata({ params }: Pick<Params, "params">): Promise<Metadata> {
   const { id } = await params;
-  const job = await loadJob(id);
+  const job = await getJobTitle(id);
   return { title: job ? `${job.number} — ${job.title} | Kniha zakázek` : "Zakázka nenalezena" };
 }
 

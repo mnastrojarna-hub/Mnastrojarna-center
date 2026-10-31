@@ -4,6 +4,7 @@ import { createAdminClient, createClient, hasServiceKey } from "@/lib/supabase/s
 import { canPersistEnv, isVercel } from "./runtime-env";
 import { superAdminExists } from "./guard";
 import { getSetting } from "@/lib/settings";
+import { getVerifiedAuthUser } from "@/lib/supabase/verified-claims";
 
 /** Reprezentativní tabulky schématu — pokud existují, migrace proběhly. */
 export const REQUIRED_TABLES = [
@@ -91,44 +92,79 @@ export async function checkSchemaTables(): Promise<SchemaCheck> {
   }
 }
 
+/** Přihlášený uživatel (ověřený token, bez síťového volání na Auth — viz verified-claims.ts). */
+async function signedInUser(): Promise<{ email: string | null } | null> {
+  try {
+    return await getVerifiedAuthUser(await createClient());
+  } catch {
+    return null; // bez session
+  }
+}
+
+/** AI klíč, počet schránek a firemní údaje (servisním klíčem). */
+async function loadChecklistExtras(): Promise<{ aiConfigured: boolean; mailboxCount: number; company: Record<string, string> }> {
+  const [apiKey, mailboxCount, values] = await Promise.all([
+    getSetting("anthropic_api_key"),
+    (async () => {
+      try {
+        const db = createAdminClient();
+        const { count } = await db.from("mailboxes").select("id", { count: "exact", head: true });
+        return (count as number | null) ?? 0;
+      } catch {
+        return 0;
+      }
+    })(),
+    Promise.all(COMPANY_SETTING_KEYS.map((k) => getSetting(k))),
+  ]);
+  const company: Record<string, string> = {};
+  COMPANY_SETTING_KEYS.forEach((k, i) => {
+    company[k] = values[i] ?? "";
+  });
+  return { aiConfigured: Boolean(apiKey), mailboxCount, company };
+}
+
+/**
+ * Kontrolní seznam prvního spuštění pro AI přehled — bez kontroly 14 tabulek schématu (přihlášený
+ * uživatel s načteným přehledem schéma má; plnou kontrolu dělá průvodce /setup přes getSetupStatus).
+ */
+export async function getSetupChecklist(): Promise<{
+  supabase: { configured: boolean; secretKeySet: boolean };
+  aiConfigured: boolean;
+  mailboxCount: number;
+  companyFilled: boolean;
+}> {
+  const configured = isSupabaseConfigured();
+  const secretKeySet = hasServiceKey();
+  const extras = secretKeySet ? await loadChecklistExtras() : null;
+  return {
+    supabase: { configured, secretKeySet },
+    aiConfigured: extras ? extras.aiConfigured : Boolean(process.env.ANTHROPIC_API_KEY),
+    mailboxCount: extras?.mailboxCount ?? 0,
+    companyFilled: Boolean(extras?.company.company_name && extras?.company.company_ico),
+  };
+}
+
 export async function getSetupStatus(): Promise<SetupStatus> {
   const { url, key } = getSupabaseEnv();
   const configured = isSupabaseConfigured();
   const secretKeySet = hasServiceKey();
 
-  const [schema, adminExists] = await Promise.all([checkSchemaTables(), superAdminExists()]);
-
-  let signedIn = false;
-  let signedInEmail: string | null = null;
-  if (configured) {
-    try {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      signedIn = Boolean(user);
-      signedInEmail = user?.email ?? null;
-    } catch {
-      // bez session
-    }
-  }
+  // vše najednou (dřív tabulky → přihlášení → nastavení → schránky postupně = 4 round-tripy za sebou);
+  // počet schránek a nastavení se použijí jen při servisním klíči a hotovém schématu (jako dřív)
+  const [schema, adminExists, signed, extras] = await Promise.all([
+    checkSchemaTables(),
+    superAdminExists(),
+    configured ? signedInUser() : Promise.resolve(null),
+    secretKeySet ? loadChecklistExtras() : Promise.resolve(null),
+  ]);
+  const signedIn = Boolean(signed);
+  const signedInEmail = signed?.email ?? null;
 
   let aiConfigured = false;
   let mailboxCount = 0;
-  const company: Record<string, string> = {};
-  if (secretKeySet && schema.ok) {
-    aiConfigured = Boolean(await getSetting("anthropic_api_key"));
-    try {
-      const db = createAdminClient();
-      const { count } = await db.from("mailboxes").select("id", { count: "exact", head: true });
-      mailboxCount = count ?? 0;
-    } catch {
-      mailboxCount = 0;
-    }
-    const values = await Promise.all(COMPANY_SETTING_KEYS.map((k) => getSetting(k)));
-    COMPANY_SETTING_KEYS.forEach((k, i) => {
-      company[k] = values[i] ?? "";
-    });
+  let company: Record<string, string> = {};
+  if (secretKeySet && schema.ok && extras) {
+    ({ aiConfigured, mailboxCount, company } = extras);
   } else if (process.env.ANTHROPIC_API_KEY) {
     aiConfigured = true;
   }

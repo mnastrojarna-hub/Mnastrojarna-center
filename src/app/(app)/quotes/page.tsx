@@ -37,12 +37,11 @@ export default async function QuotesPage({
   const scope = await getFlowScope(await flowWhoFrom(sp));
   const canPrice = can("pricing");
   const approver = can("quote_approval");
+  // počty a fronta schvalování na seznamu nezávisí — běží souběžně s ním (o round-trip dřív)
+  const countsP = getFlowCounts({ mine: mineParam(scope) });
+  const pendingP = approver ? listPendingQuoteApprovals() : Promise.resolve([]);
   const list = await listQuotes({ includeArchived: true }, { scope });
-  const [info, counts, pending] = await Promise.all([
-    getFlowQuoteInfo(list.map((q) => q.id)),
-    getFlowCounts({ mine: mineParam(scope) }),
-    approver ? listPendingQuoteApprovals() : Promise.resolve([]),
-  ]);
+  const [info, counts, pending] = await Promise.all([getFlowQuoteInfo(list.map((q) => q.id)), countsP, pendingP]);
   const today = todayPrague();
   const openByJob = new Map<string, number>();
   for (const q of list) {

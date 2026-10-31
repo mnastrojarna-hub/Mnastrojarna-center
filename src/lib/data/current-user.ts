@@ -2,6 +2,7 @@ import "server-only";
 import { createClient, createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/supabase/database.types";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { getVerifiedAuthUser } from "@/lib/supabase/verified-claims";
 
 export interface CurrentUser {
   id: string;
@@ -37,9 +38,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!isSupabaseConfigured()) return null;
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // podpis tokenu ověřen lokálně (bez síťového volání na Auth, viz verified-claims.ts)
+    const user = await getVerifiedAuthUser(supabase);
     if (!user) return null;
 
     let fullName = (user.user_metadata?.full_name as string | undefined) ?? "";

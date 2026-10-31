@@ -17,14 +17,20 @@ export default async function InboxPage({
   const sp = await searchParams;
   const raw = typeof sp.schranka === "string" ? sp.schranka : undefined;
   const folder = isMailFolder(sp.slozka) ? sp.slozka : "inbox";
+  // bez ?schranka= nezávisí vlákna na seznamu schránek → vše najednou (dřív schránky → stav → vlákna za sebou)
+  const unscoped = raw
+    ? null
+    : Promise.all([listThreads({ folder, mailboxId: null, limit: 50 }), getFolderCounts(null)]);
   const [{ can }, mailboxes] = await Promise.all([getAccess(), getMailboxesForUser()]);
   const all = can("mail_all");
   const mailboxId =
     raw && ((all && raw === NO_MAILBOX) || mailboxes.some((m) => m.id === raw)) ? raw : undefined;
-  const [initial, counts] = await Promise.all([
-    listThreads({ folder, mailboxId: mailboxId ?? null, limit: 50 }),
-    getFolderCounts(mailboxId ?? null),
-  ]);
+  const [initial, counts] = unscoped && !mailboxId
+    ? await unscoped
+    : await Promise.all([
+      listThreads({ folder, mailboxId: mailboxId ?? null, limit: 50 }),
+      getFolderCounts(mailboxId ?? null),
+    ]);
 
   return (
     <InboxView

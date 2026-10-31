@@ -43,6 +43,10 @@ export interface FlowQuote extends Omit<FlowQuoteInfo, "id"> {
   onlyOpen: boolean;
 }
 
+/** Kolik řádků vykreslit napoprvé a o kolik přidat tlačítkem „Zobrazit další". */
+const QUOTE_PAGE = 50;
+const QUOTE_STEP = 100;
+
 function money(value: number | null, currency: string): string {
   if (value === null || value === undefined) return "bez ceny";
   try {
@@ -90,6 +94,10 @@ function Board({
   const [q, setQ] = React.useState("");
   const chips = React.useMemo(() => chipsOf(quotes, counts), [quotes, counts]);
   const shown = React.useMemo(() => filterQuotes(quotes, { states, q }), [quotes, states, q]);
+  // vykreslit po dávkách (stovky řádků = pomalé první zobrazení hlavně na mobilu); nový filtr = od začátku
+  const [limit, setLimit] = React.useState(QUOTE_PAGE);
+  React.useEffect(() => setLimit(QUOTE_PAGE), [states, q]);
+  const visible = shown.length > limit ? shown.slice(0, limit) : shown;
 
   function change(keys: string[]) {
     const next = keys.length ? keys : [...OPEN_QUOTE];
@@ -143,9 +151,18 @@ function Board({
           )}
         </FlowEmpty>
       ) : (
-        <ul className="space-y-2">
-          {shown.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} canPrice={canPrice} approver={approver} />)}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {visible.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} canPrice={canPrice} approver={approver} />)}
+          </ul>
+          {shown.length > visible.length && (
+            <div className="flex justify-center pt-1">
+              <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => setLimit((n) => n + QUOTE_STEP)}>
+                Zobrazit další {Math.min(QUOTE_STEP, shown.length - visible.length)} z {shown.length - visible.length}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

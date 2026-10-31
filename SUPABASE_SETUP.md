@@ -62,6 +62,35 @@ Publishable a URL jsou bezpečné pro prohlížeč. Servisní klíč (`sb_secret
 
 ---
 
+## Rychlost: region serveru a ověřování přihlášení (povinné po nasazení)
+
+**1. Region funkcí Vercelu MUSÍ být u databáze.** Každá stránka posílá do Supabase několik dotazů
+za sebou; každý jde přes síť server → databáze. Výchozí region Vercelu je `iad1` (Washington), projekt
+Supabase `cqdhkzvzxdnzutizsjuz` běží v **AWS eu-west-1 (Irsko)** (zjištěno z adresy databáze
+`db.cqdhkzvzxdnzutizsjuz.supabase.co`) → ~75 ms na každý dotaz navíc. Proto `vercel.json` nastavuje
+`"regions": ["dub1"]` (Dublin = stejné místo jako databáze, ~1–2 ms).
+
+- Ověř: **Supabase → Project Settings → General → Region** (má být *West EU (Ireland)* / `eu-west-1`).
+  Pokud je jiný, změň `regions` ve `vercel.json`: Frankfurt `eu-central-1` → `fra1`, Londýn `eu-west-2` →
+  `lhr1`, Paříž `eu-west-3` → `cdg1`, Stockholm `eu-north-1` → `arn1`, USA východ `us-east-1` → `iad1`.
+- Po nasazení zkontroluj **Vercel → Project → Settings → Functions → Function Region** (musí ukazovat
+  totéž; hodnota z `vercel.json` má přednost) a v logu funkce sloupec region.
+
+**2. Ověření přihlášení bez síťového volání.** Aplikace ověřuje podpis přihlašovacího tokenu lokálně
+(`src/lib/supabase/verified-claims.ts`) — dřív šly na každé zobrazení stránky 2 dotazy na Supabase Auth.
+Aby to fungovalo, nastav **jedno** z:
+
+- (doporučeno) **Supabase → Project Settings → JWT Keys → přepnout na asymetrické klíče** (ECC P-256:
+  „Create standby key" → „Rotate keys"; starý klíč zůstane platný pro už vydané tokeny). Veřejný klíč si
+  aplikace stáhne sama (JWKS), nic dalšího se nenastavuje.
+- nebo do Vercel env (jen server) `SUPABASE_JWT_SECRET` = *Legacy JWT secret* ze stejné stránky.
+
+Bez toho vše funguje dál, jen ověření přihlášení zůstane síťovým voláním (jako dřív). Deaktivace účtu
+platí okamžitě (profil se čte při každém požadavku); odhlášení na jiném zařízení platí nejpozději
+do vypršení tokenu (výchozí 1 h) — stejně jako pro databázi (PostgREST ověřuje token také jen podpisem).
+
+---
+
 ## Přihlašování (Supabase Auth) — povinné nastavení po nasazení
 
 Dashboard → projekt → **Authentication**:
