@@ -1,4 +1,4 @@
-// E2E 32 · Schvalování nabídek PER UŽIVATEL (31. 10.) — „Schvalovat nabídky bude nutné jen u Šponera — ten je
+// E2E 35 · Schvalování nabídek PER UŽIVATEL (31. 10.) — „Schvalovat nabídky bude nutné jen u Šponera — ten je
 // vystaví, ale nemůže je bez schválení odeslat. Volný a superadmin je budou moci posílat a vystavovat bez schvalování."
 // Super admin ve Správě uživatelů vypne obchodníkovi A „Nabídky musí schválit super admin" (štítek v seznamu,
 // atribuce, audit) a zapne mu „Smí schvalovat nabídky ostatních" (31. 10.: „Volný může schvalovat nabídky
@@ -31,7 +31,7 @@ const B = { email: `e2e32-b-${TAG.toLowerCase()}@local.test`, password: PASSWORD
 const CUST_EMAIL = `e2e32-${TAG.toLowerCase()}@local.test`;
 const st = { quoteA: null, quoteB: null, quoteA2: null };
 
-console.log(`32 · Schvalování nabídek per uživatel (značka ${TAG})`);
+console.log(`35 · Schvalování nabídek per uživatel (značka ${TAG})`);
 
 async function adminApi(method, p, body) {
   const env = localEnv();
