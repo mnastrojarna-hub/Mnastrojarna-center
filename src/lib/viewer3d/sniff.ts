@@ -4,7 +4,7 @@
  * a soubory z CAD mívají přípony velkými písmeny nebo žádné.
  */
 
-export type Model3DFormat = "step" | "iges" | "brep" | "stl" | "obj" | "ply" | "off" | "3mf" | "glb" | "gltf" | "u3d" | "prc";
+export type Model3DFormat = "step" | "iges" | "brep" | "stl" | "obj" | "ply" | "off" | "3mf" | "glb" | "gltf" | "u3d" | "prc" | "dxf" | "dwg";
 export type ViewKind = "pdf" | "image" | "model" | "text" | "unsupported";
 
 export interface Sniffed {
@@ -28,6 +28,8 @@ export const MODEL_EXTENSIONS: Record<string, Model3DFormat> = {
   gltf: "gltf",
   u3d: "u3d",
   prc: "prc",
+  dxf: "dxf",
+  dwg: "dwg",
 };
 
 const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
@@ -103,6 +105,11 @@ export function sniffFile(bytes: Uint8Array, filename?: string | null, contentTy
   if (/^ISO-10303-21\s*;/i.test(headTrim)) return { kind: "model", format: "step", label: STEP_LABEL(head) };
   if (startsWith(bytes, [0x55, 0x33, 0x44, 0x00])) return { kind: "model", format: "u3d", label: "U3D" };
   if (head.startsWith("PRC")) return { kind: "model", format: "prc", label: "PRC" };
+  // DWG: „AC1012"…„AC1032" na začátku
+  if (/^AC10\d{2}/.test(head)) return { kind: "model", format: "dwg", label: `DWG (${head.slice(0, 6)})` };
+  // DXF: binární se značkou, textový začíná skupinou 0 / SECTION (případně komentářem 999)
+  if (head.startsWith("AutoCAD Binary DXF")) return { kind: "model", format: "dxf", label: "DXF (binární)" };
+  if (/^(?:999\s*\r?\n[^\n]*\r?\n\s*)?0\s*\r?\n\s*SECTION\s*\r?\n/.test(headTrim)) return { kind: "model", format: "dxf", label: "DXF (výkres)" };
   if (startsWith(bytes, [0x67, 0x6c, 0x54, 0x46])) return { kind: "model", format: "glb", label: "glTF (GLB)" };
   if (/^DBRep_DrawableShape/.test(headTrim) || /^CASCADE Topology/.test(headTrim)) return { kind: "model", format: "brep", label: "BREP (OpenCascade)" };
   if (/^ply\r?\n/.test(headTrim)) return { kind: "model", format: "ply", label: "PLY" };
@@ -119,7 +126,7 @@ export function sniffFile(bytes: Uint8Array, filename?: string | null, contentTy
   if (fmt) {
     const labels: Record<Model3DFormat, string> = {
       step: "STEP", iges: "IGES", brep: "BREP", stl: "STL", obj: "OBJ", ply: "PLY", off: "OFF", "3mf": "3MF",
-      glb: "glTF (GLB)", gltf: "glTF", u3d: "U3D", prc: "PRC",
+      glb: "glTF (GLB)", gltf: "glTF", u3d: "U3D", prc: "PRC", dxf: "DXF (výkres)", dwg: "DWG (výkres)",
     };
     return { kind: "model", format: fmt, label: labels[fmt] };
   }

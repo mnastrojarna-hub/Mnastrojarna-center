@@ -1,0 +1,408 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: 224 57 48;
+  --ink: 15 14 14;
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-[#fbfbfa] text-ink-700 antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  /* dlouhá složená slova (němčina) — dělení dle jazyka stránky */
+  h1,
+  h2,
+  h3,
+  .h-display {
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
+  ::selection {
+    background: rgb(var(--brand) / 0.85);
+    color: white;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-[15px] font-semibold tracking-tight transition-all duration-300 will-change-transform;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white shadow-[0_10px_30px_-10px_rgba(224,57,48,.8)] hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-[0_18px_40px_-12px_rgba(224,57,48,.9)];
+  }
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.8s ease;
+  }
+  .btn-primary:hover::after {
+    transform: translateX(120%);
+  }
+  .btn-ghost-dark {
+    @apply btn border border-white/15 bg-white/5 text-white backdrop-blur hover:border-white/40 hover:bg-white/10;
+  }
+  .btn-ghost {
+    @apply btn border border-ink-700/15 bg-white text-ink-700 hover:border-ink-700/40;
+  }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-brand-600;
+  }
+  .eyebrow::before {
+    content: "";
+    @apply inline-block h-px w-6 bg-brand;
+  }
+  .h-display {
+    @apply font-display font-bold uppercase leading-[0.95] tracking-tight;
+  }
+  .section {
+    @apply py-20 md:py-28;
+  }
+  .card {
+    @apply rounded-2xl border border-ink-700/10 bg-white p-6 transition-all duration-300;
+  }
+  .card-dark {
+    @apply rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all duration-300;
+  }
+  .input {
+    @apply w-full rounded-xl border border-ink-700/15 bg-white px-4 py-3 text-[15px] text-ink-700 outline-none transition placeholder:text-steel-400 focus:border-brand focus:ring-4 focus:ring-brand/15;
+  }
+  .label {
+    @apply mb-1.5 block text-[13px] font-semibold text-ink-700;
+  }
+  .prose-mn p {
+    @apply mb-4 text-[17px] leading-relaxed text-ink-700/80;
+  }
+}
+
+/* Technický rastr (blueprint) */
+.bg-grid {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.bg-grid-light {
+  background-image: linear-gradient(rgba(39, 36, 37, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 36, 37, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.mask-fade {
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+.text-glow {
+  text-shadow: 0 0 28px rgba(224, 57, 48, 0.55);
+}
+.noise::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Reveal při scrollu — třídu .is-visible přidává <RevealObserver/>; bez JS je vše vidět. */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.js [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Karta se září sledující kurzor */
+.spot {
+  position: relative;
+  isolation: isolate;
+}
+.spot::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(224, 57, 48, 0.75), transparent 45%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s;
+  z-index: -1;
+}
+.spot:hover::before {
+  opacity: 1;
+}
+
+/* Logo — animace */
+.mn-logo .band {
+  transform-box: fill-box;
+}
+.mn-logo.animate .band {
+  animation: band-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.mn-logo.animate .band:nth-child(1) { animation-delay: 0.05s; }
+.mn-logo.animate .band:nth-child(2) { animation-delay: 0.15s; }
+.mn-logo.animate .band:nth-child(3) { animation-delay: 0.25s; }
+.mn-logo.animate .band:nth-child(4) { animation-delay: 0.35s; }
+.mn-logo.animate .chip {
+  transform-box: fill-box;
+  animation: chip-out 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: 0.55s;
+}
+.mn-logo .chip {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-box: fill-box;
+}
+.mn-logo:hover .chip:nth-child(odd) { transform: translate(-3px, 2px); }
+.mn-logo:hover .chip:nth-child(even) { transform: translate(-2px, 3px); }
+.mn-logo .glow {
+  transition: opacity 0.4s;
+}
+.mn-logo:hover .glow {
+  opacity: 0.9 !important;
+}
+
+@keyframes band-in {
+  0% { transform: translateX(-30%); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes chip-out {
+  0% { transform: translate(40%, -40%) scale(0.2); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .js [data-reveal] { opacity: 1; transform: none; }
+}
+
+.scanx {
+  animation: scanx 5s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+@keyframes scanx {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.marquee-track {
+  animation: marquee 45s linear infinite;
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ---------- Světlý „výkresový“ styl ---------- */
+.paper {
+  background: radial-gradient(ellipse at 70% 40%, #ffffff 0%, #f7f6f5 60%, #f1efee 100%);
+}
+/* ořezové značky v rozích sekcí (jako na výkresovém listu) */
+.crop {
+  position: relative;
+}
+.crop::before,
+.crop::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border-color: rgba(39, 36, 37, 0.35);
+}
+.crop::before {
+  left: 0;
+  top: 0;
+  border-left: 1px solid;
+  border-top: 1px solid;
+}
+.crop::after {
+  right: 0;
+  bottom: 0;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+/* odkazové kóty v hero */
+.callout-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 1s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+  animation-delay: calc(1.2s + var(--i) * 0.35s);
+}
+.callout-dot {
+  opacity: 0;
+  animation: pop 0.4s ease forwards;
+  animation-delay: calc(1s + var(--i) * 0.35s);
+}
+.callout-label {
+  opacity: 0;
+  animation: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: calc(1.9s + var(--i) * 0.35s);
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pop {
+  to { opacity: 1; }
+}
+
+/* kóta jako dekor: čára se šipkami, kreslí se při zobrazení */
+.dim {
+  position: relative;
+  height: 1px;
+  background: currentColor;
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 1.2s cubic-bezier(0.6, 0, 0.2, 1);
+}
+.is-visible .dim,
+.dim.is-visible {
+  transform: scaleX(1);
+}
+.dim::before,
+.dim::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 9px;
+  background: currentColor;
+}
+.dim::before { left: 0; }
+.dim::after { right: 0; }
+
+/* odhalení textu po řádcích */
+.line-reveal > span {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.line-reveal > span > span {
+  display: inline-block;
+  transform: translateY(105%);
+  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.1, 1) forwards;
+  animation-delay: calc(var(--l, 0) * 0.12s + 0.1s);
+}
+@keyframes rise {
+  to { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .callout-line { stroke-dashoffset: 0; }
+  .callout-dot, .callout-label { opacity: 1; }
+  .line-reveal > span > span { transform: none; }
+  .dim { transform: none; }
+}
+
+/* ---------- v3: pohybový systém ---------- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 9999px;
+}
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: #e03930;
+}
+.cursor-ring {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1px solid rgba(39, 36, 37, 0.35);
+  display: grid;
+  place-items: center;
+  transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), margin 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 0.3s, border-color 0.3s;
+}
+.cursor-ring.is-link {
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-color: #e03930;
+}
+.cursor-ring.has-label {
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  background: #e03930;
+  border-color: #e03930;
+  color: #fff;
+  font: 500 11px/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+html.has-cursor body,
+html.has-cursor a,
+html.has-cursor button,
+html.has-cursor [data-cursor] {
+  cursor: none;
+}
+
+/* vertikální sloupce fotek v hero */
+.photo-col {
+  animation: col-up var(--dur, 60s) linear infinite;
+}
+.photo-col.down {
+  animation-name: col-down;
+}
+@keyframes col-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes col-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+.logo-row {
+  animation: marquee 50s linear infinite;
+}
+.logo-row.rev {
+  animation-direction: reverse;
+}
+.marquee-pause:hover .logo-row,
+.marquee-pause:hover .photo-col {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-col, .logo-row { animation: none; }
+}

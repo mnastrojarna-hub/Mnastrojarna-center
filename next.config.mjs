@@ -71,6 +71,30 @@ const nextConfig = {
       "./node_modules/@img/sharp-linuxmusl-x64/**",
     ],
   },
+  // OpenCascade / LibreDWG (wasm 7–11 MB) v adresářích s verzí → týden v cache prohlížeče
+  async headers() {
+    return [{ source: "/vendor/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] }];
+  },
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) {
+      // LibreDWG (DWG v prohlížeči výkresů, Web Worker): emscripten glue má větev pro Node
+      // (`await import("node:module")`), která se v prohlížeči nikdy nespustí → prázdná náhrada.
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(/^node:module$/, (r) => {
+          if (/[\\/]@mlightcad[\\/]libredwg-web[\\/]/.test(r.context ?? "")) {
+            r.request = "data:text/javascript,export const createRequire = () => () => ({});";
+          }
+        }),
+      );
+      // wasm (10 MB) se načítá z /vendor/libredwg-* (locateFile, tools/vendor-occt.mjs) — nebalit ho
+      // podruhé jako asset přes `new URL("libredwg-web.wasm", import.meta.url)`
+      config.module.rules.push({
+        test: /[\\/]@mlightcad[\\/]libredwg-web[\\/]wasm[\\/]libredwg-web\.js$/,
+        parser: { url: false },
+      });
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

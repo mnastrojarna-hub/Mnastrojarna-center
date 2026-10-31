@@ -19,7 +19,7 @@ const VIEWABLE = new Set([
 /** Soubory, které prohlížeč neumí — klik nechá výchozí chování (stažení / nová karta). */
 const NOT_VIEWABLE = new Set([
   "doc", "docx", "xls", "xlsx", "xlsm", "ppt", "pptx", "odt", "ods", "zip", "rar", "7z", "msg", "eml",
-  "dwg", "dxf", "x_t", "x_b", "sldprt", "sldasm", "slddrw", "catpart", "catproduct", "catdrawing", "prt", "asm",
+  "x_t", "x_b", "sldprt", "sldasm", "slddrw", "catpart", "catproduct", "catdrawing", "prt", "asm",
   "ipt", "iam", "idw", "par", "psm", "jt", "sat", "3dm", "f3d", "heic", "heif", "tif", "tiff",
 ]);
 

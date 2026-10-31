@@ -28,7 +28,8 @@ describe("odkazy na prohlížeč", () => {
     expect(isViewableName("foto.jpg")).toBe(true);
     expect(isViewableName("nabidka.docx")).toBe(false);
     expect(isViewableName("dil.sldprt")).toBe(false);
-    expect(isViewableName("výkres.dxf")).toBe(false);
+    expect(isViewableName("výkres.dxf")).toBe(true);
+    expect(isViewableName("VYKRES.DWG")).toBe(true);
     expect(isViewableName(null)).toBeNull();
     expect(isViewableName("bez-pripony")).toBeNull();
   });

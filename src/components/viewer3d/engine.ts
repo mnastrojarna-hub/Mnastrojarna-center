@@ -5,6 +5,7 @@ import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
 import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
 import { buildAssemblyGroups, type AssemblyGroups } from "@/lib/viewer3d/assembly-groups";
 import type { StockGeometry, StockMode, StockResult } from "@/lib/viewer3d/stock";
+import { displayColor, textBounds } from "@/lib/viewer3d/drawing-model";
 import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
   type MeasureMode, type Measurement, type SnapGeometry, type SnapKind, type SnapPoint,
@@ -44,7 +45,31 @@ export const PICK_FILTERS: { key: PickFilter; label: string; hint: string }[] = 
   { key: "midpoint", label: "Střed hrany", hint: "polovina hrany" },
 ];
 
+/** Filtr u 2D výkresu (DXF / DWG): díl = hladina, bez ploch a sestav. */
+const DRAWING_FILTERS: { key: PickFilter; label: string; hint: string }[] = [
+  { key: "auto", label: "Automaticky", hint: "hladina při výběru; při měření roh, střed kružnice, čára" },
+  { key: "part", label: "Hladina", hint: "celá hladina výkresu" },
+  { key: "edge", label: "Čára", hint: "úsečka, kružnice, oblouk, křivka" },
+  { key: "vertex", label: "Bod / roh", hint: "koncový bod čáry, vrchol polyčáry" },
+  { key: "center", label: "Střed kružnice", hint: "střed kružnice / oblouku" },
+  { key: "midpoint", label: "Střed čáry", hint: "polovina čáry" },
+];
+
+export function pickFilters(drawing: boolean) {
+  return drawing ? DRAWING_FILTERS : PICK_FILTERS;
+}
+
 const ENTITY_FILTERS: PickFilter[] = ["face", "edge", "vertex", "center", "midpoint"];
+
+/** Barvy vrcholů sRGB 0–1 → lineární (nové pole). */
+function srgbToLinear(src: Float32Array): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    out[i] = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }
+  return out;
+}
 
 /** Vybraná entita (plocha / hrana / bod) — popis pro kartu. */
 export interface EntityInfo {
@@ -121,6 +146,10 @@ interface PartView {
   /** Posunutí dílu (rozebrání sestavy) a obalový kvádr bez posunu; box / sphere jsou světové. */
   offset: THREE.Vector3;
   localBox: THREE.Box3;
+  /** 2D výkres: barvy čar pro světlé / tmavé pozadí, texty hladiny. */
+  lineLight?: Float32Array;
+  lineDark?: Float32Array;
+  texts?: THREE.Object3D | null;
 }
 
 /** Geometrie dílu pro výpočet polotovaru + kde ho nakreslit. */
@@ -248,6 +277,12 @@ export class ViewerEngine {
   private moveCtx: { parts: number[]; start: THREE.Vector3[]; from: THREE.Vector3; before: Snapshot; moved: boolean } | null = null;
   private explodeCtx: { before: Snapshot; base: THREE.Vector3[]; dirs: THREE.Vector3[]; parts: number[] } | null = null;
   private explodeValue = 0;
+  // 2D výkres (DXF / DWG)
+  private is2D = false;
+  private darkBg = false;
+  private lineVC = new THREE.LineBasicMaterial({ vertexColors: true });
+  private lineHover = new THREE.LineBasicMaterial({ color: 0xd97706 });
+  private textItems: { part: number; obj: { color: number; sync: (cb?: () => void) => void }; raw: [number, number, number] | null }[] = [];
   private hatch: THREE.Texture | null = null;
   private stencilBack = new THREE.MeshBasicMaterial({
     side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
@@ -335,6 +370,8 @@ export class ViewerEngine {
     this.selMaterial.dispose();
     this.edgeMaterial.dispose();
     this.edgeSelMaterial.dispose();
+    this.lineVC.dispose();
+    this.lineHover.dispose();
     this.stencilBack.dispose();
     this.stencilFront.dispose();
     this.sectionLineMaterial.dispose();
@@ -349,6 +386,7 @@ export class ViewerEngine {
 
   private clearModel() {
     for (const p of this.parts) {
+      (p.texts as unknown as { dispose?: () => void } | null)?.dispose?.();
       p.mesh.geometry.disposeBoundsTree?.();
       p.mesh.geometry.dispose();
       p.edges?.geometry.dispose();
@@ -470,10 +508,16 @@ export class ViewerEngine {
         this.modelGroup.add(edges);
       }
       let wires: THREE.LineSegments | null = null;
+      // barvy čar výkresu jsou sRGB → lineární prostor rendereru (jinak by ztmavená žlutá a černá zesvětlaly)
+      const lineLight = part.lines && part.lineColors?.length === part.lines.length ? srgbToLinear(part.lineColors) : undefined;
+      const darkSrc = model.drawing?.darkColors[index];
+      const lineDark = darkSrc && part.lines && darkSrc.length === part.lines.length ? srgbToLinear(darkSrc) : undefined;
       if (part.lines?.length) {
         const wg = new THREE.BufferGeometry();
         wg.setAttribute("position", new THREE.BufferAttribute(part.lines, 3));
-        wires = new THREE.LineSegments(wg, this.edgeMaterial);
+        const lc = lineLight ?? null;
+        if (lc) wg.setAttribute("color", new THREE.BufferAttribute((this.darkBg ? lineDark ?? lc : lc).slice(), 3));
+        wires = new THREE.LineSegments(wg, lc ? this.lineVC : this.edgeMaterial);
         wires.matrixAutoUpdate = false;
         this.modelGroup.add(wires);
       }
@@ -483,14 +527,25 @@ export class ViewerEngine {
       if (part.lines?.length) {
         for (let i = 0; i < part.lines.length; i += 3) box.expandByPoint(new THREE.Vector3(part.lines[i], part.lines[i + 1], part.lines[i + 2]));
       }
+      // texty výkresu (přibližně — písmo se načítá až potom), ať „celý výkres" zahrne i popisky
+      for (const t of model.drawing?.texts ?? []) {
+        if (t.part !== index) continue;
+        const [x0, y0, x1, y1] = textBounds(t);
+        box.expandByPoint(new THREE.Vector3(x0, y0, 0)).expandByPoint(new THREE.Vector3(x1, y1, 0));
+      }
       this.parts.push({
         index, name: part.name, mesh, edges, wires,
         topo: topo ?? { edgeSegments: new Float32Array(0), curves: [], segCurve: new Uint32Array(0), corners: new Float32Array(0), triFace: new Uint32Array(0), faces: [] },
         baseMaterial: mat, hidden: false, box, sphere: box.getBoundingSphere(new THREE.Sphere()),
         origColor: baseColor, origVC, opacity: part.opacity ?? 1, colorOverride: null, faceColors: new Map(),
         offset: new THREE.Vector3(), localBox: box.clone(),
+        lineLight, lineDark,
       });
     });
+    this.is2D = !!model.drawing;
+    // vypnuté hladiny výkresu → po otevření skryté (mimo historii)
+    for (const i of model.drawing?.hidden ?? []) if (this.parts[i]) this.parts[i].hidden = true;
+    if (this.is2D) this.buildTexts(model);
 
     const all = new THREE.Box3();
     for (const p of this.parts) all.union(p.box);
@@ -499,7 +554,8 @@ export class ViewerEngine {
     if (this.modelSphere.radius <= 0) this.modelSphere.radius = 1;
     this.camDist = this.modelSphere.radius * 6 + 10;
     this.applyDisplay();
-    this.setView("iso", false);
+    if (this.is2D) this.setViewDir(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0), false);
+    else this.setView("iso", false);
     // BVH pro rychlý výběr — postupně, ať první vykreslení nečeká
     this.bvhQueue = this.parts.map((p) => p.index).sort((a, b) => this.triCount(b) - this.triCount(a));
     this.scheduleBvh();
@@ -606,6 +662,7 @@ export class ViewerEngine {
       o.position.copy(v);
       o.updateMatrix();
     }
+    if (p.texts) p.texts.position.copy(v);
   }
 
   /** Koule modelu (ořez hloubky kamery) po rozebrání — model může narůst. */
@@ -933,6 +990,10 @@ export class ViewerEngine {
     r.setViewport(0, 0, this.width, this.height);
     r.clear();
     r.render(this.scene, this.camera);
+    if (this.is2D) {
+      this.updateLabels();
+      return;
+    }
     // orientační kostka vpravo nahoře
     const s = Math.min(CUBE_SIZE_PX, Math.round(Math.min(this.width, this.height) * 0.28));
     this.cube.sync(this.camera);
@@ -951,6 +1012,7 @@ export class ViewerEngine {
   }
 
   private inCube(x: number, y: number): { u: number; v: number } | null {
+    if (this.is2D) return null;
     const c = this.cubeRect();
     if (x < c.x || x > c.x + c.s || y < c.y || y > c.y + c.s) return null;
     return { u: (x - c.x) / c.s, v: (y - c.y) / c.s };
@@ -980,6 +1042,7 @@ export class ViewerEngine {
   }
 
   private beginRotate(x: number, y: number) {
+    if (this.is2D) return;
     this.anim = null;
     const hit = this.raycastParts(x, y);
     if (hit) this.pivot.copy(hit.point);
@@ -991,6 +1054,8 @@ export class ViewerEngine {
   }
 
   private rotateBy(dx: number, dy: number) {
+    // výkres se neotáčí — tažení posouvá (jako v CAD 2D)
+    if (this.is2D) return this.panBy(dx, dy);
     this.anim = null;
     const ang = Math.PI / Math.max(300, Math.min(this.width, this.height));
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
@@ -1085,6 +1150,8 @@ export class ViewerEngine {
   }
 
   setView(view: StdView, animate = true) {
+    // výkres jen v půdorysu (klávesy pohledů = srovnat a vycentrovat)
+    if (this.is2D) return this.setViewDir(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0), animate);
     const d = VIEW_DIRS[view];
     this.setViewDir(this.mapDir(d.dir), this.mapDir(d.up), animate);
   }
@@ -1103,6 +1170,7 @@ export class ViewerEngine {
 
   private raycastParts(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number; cap?: boolean } | null {
     if (!this.parts.length) return null;
+    if (this.is2D) return this.pickLine(x, y);
     this.updateFrustum();
     const ndc = new THREE.Vector2((x / this.width) * 2 - 1, -(y / this.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
@@ -1137,6 +1205,115 @@ export class ViewerEngine {
       }
     }
     return { part, point: best.point.clone(), tri: best.faceIndex ?? 0, distance: best.distance };
+  }
+
+  /** 2D: nejbližší čára pod kurzorem (výběr hladiny). */
+  private pickLine(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number } | null {
+    this.updateFrustum();
+    const tol = this.touchMode ? 16 : 7;
+    const m = this.camera.matrixWorldInverse.clone().premultiply(this.camera.projectionMatrix).elements;
+    const proj = (px: number, py: number): [number, number] => {
+      const nx = m[0] * px + m[4] * py + m[12];
+      const ny = m[1] * px + m[5] * py + m[13];
+      return [((nx + 1) / 2) * this.width, ((1 - ny) / 2) * this.height];
+    };
+    let best: { part: number; d: number; px: number; py: number } | null = null;
+    const wpp = this.worldPerPx();
+    for (const p of this.parts) {
+      if (p.hidden) continue;
+      const [cx, cy] = proj(p.sphere.center.x, p.sphere.center.y);
+      if (Math.hypot(cx - x, cy - y) > p.sphere.radius / wpp + tol) continue;
+      const seg = p.topo.edgeSegments;
+      const ox = p.offset.x;
+      const oy = p.offset.y;
+      for (let s = 0; s < seg.length; s += 6) {
+        const [ax, ay] = proj(seg[s] + ox, seg[s + 1] + oy);
+        const [bx, by] = proj(seg[s + 3] + ox, seg[s + 4] + oy);
+        const vx = bx - ax;
+        const vy = by - ay;
+        const l2 = vx * vx + vy * vy;
+        const u = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / l2)) : 0;
+        const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
+        if (d <= tol && (!best || d < best.d)) {
+          best = { part: p.index, d, px: seg[s] + ox + (seg[s + 3] - seg[s]) * u, py: seg[s + 1] + oy + (seg[s + 4] - seg[s + 1]) * u };
+        }
+      }
+    }
+    if (!best) return null;
+    const point = new THREE.Vector3(best.px, best.py, 0);
+    return { part: best.part, point, tri: -1, distance: point.clone().sub(this.camera.position).length() };
+  }
+
+  /** 2D: texty hladin (SDF písmo Roboto s diakritikou), dávkově po hladinách. */
+  private buildTexts(model: ParsedModel) {
+    const texts = model.drawing?.texts ?? [];
+    this.textItems = [];
+    if (!texts.length) return;
+    void import("troika-three-text").then((troika) => {
+      if (this.disposed) return;
+      const byPart = new Map<number, typeof texts>();
+      for (const t of texts.slice(0, 20000)) {
+        const list = byPart.get(t.part) ?? [];
+        list.push(t);
+        byPart.set(t.part, list);
+      }
+      for (const [part, list] of byPart) {
+        const p = this.parts[part];
+        if (!p) continue;
+        const batch = new troika.BatchedText();
+        for (const t of list) {
+          const tx = new troika.Text();
+          tx.text = t.text;
+          tx.font = "/fonts/Roboto-Regular.ttf";
+          // výška textu v CAD = výška velkých písmen (Roboto ≈ 0,711 em)
+          tx.fontSize = t.height / 0.711;
+          tx.anchorX = t.hAlign;
+          tx.anchorY = t.vAlign === "baseline" ? "bottom-baseline" : t.vAlign === "bottom" ? "bottom" : t.vAlign === "middle" ? "middle" : "top";
+          if (t.width) tx.maxWidth = t.width;
+          tx.lineHeight = 1.35;
+          tx.position.set(t.x, t.y, 0.001);
+          tx.rotation.z = t.rotation;
+          const item = { part, obj: tx as unknown as { color: number; sync: (cb?: () => void) => void }, raw: t.color };
+          tx.color = this.textColor(item, p);
+          batch.add(tx);
+          this.textItems.push(item);
+        }
+        batch.position.copy(p.offset);
+        batch.visible = !p.hidden;
+        p.texts = batch;
+        this.modelGroup.add(batch);
+        batch.sync(() => this.requestRender());
+      }
+      this.requestRender();
+    }).catch(() => {
+      /* texty se nenačetly — výkres zůstane bez nich */
+    });
+  }
+
+  /** Tmavé / světlé pozadí: barva popředí (ACI 7) černá ↔ bílá. */
+  setDarkBackground(dark: boolean) {
+    if (this.darkBg === dark) return;
+    this.darkBg = dark;
+    for (const p of this.parts) {
+      if (!p.wires || !p.lineLight) continue;
+      if (p.colorOverride !== null) continue;
+      const src = dark ? p.lineDark ?? p.lineLight : p.lineLight;
+      (p.wires.geometry.getAttribute("color") as THREE.BufferAttribute).copyArray(src).needsUpdate = true;
+    }
+    for (const t of this.textItems) t.obj.color = this.textColor(t, this.parts[t.part]);
+    for (const p of this.parts) if (p.texts) (p.texts as unknown as { sync: (cb?: () => void) => void }).sync(() => this.requestRender());
+    this.requestRender();
+  }
+
+  isDrawing(): boolean {
+    return this.is2D;
+  }
+
+  /** Barva textu výkresu (sRGB hex): barva hladiny nastavená uživatelem, jinak z výkresu upravená pro pozadí. */
+  private textColor(t: { raw: [number, number, number] | null }, p: PartView | undefined): number {
+    if (p && p.colorOverride !== null) return p.colorOverride;
+    const [r, g, b] = displayColor(t.raw ?? "fg", this.darkBg);
+    return (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
   }
 
   private applyDisplayToMaterial(m: THREE.Material) {
@@ -1181,7 +1358,14 @@ export class ViewerEngine {
       p.edges.visible = showEdges || (!p.hidden && this.display === "wireframe");
       p.edges.material = this.selection.has(p.index) ? this.edgeSelMaterial : this.edgeMaterial;
     }
-    if (p.wires) p.wires.visible = !p.hidden;
+    if (p.wires) {
+      p.wires.visible = !p.hidden;
+      if (p.lineLight) {
+        p.wires.material = this.selection.has(p.index) ? this.edgeSelMaterial
+          : this.hoverPart === p.index && (this.tool === "select" || this.tool === "move") ? this.lineHover : this.lineVC;
+      }
+    }
+    if (p.texts) p.texts.visible = !p.hidden;
     let mat = p.baseMaterial;
     // výběr = barva dílu se zvýrazněním (vidět i změnu barvy), ne plná oranžová
     if (this.selection.has(p.index)) mat = this.tintMaterial(p.baseMaterial, this.selMaterials, 0x8a4600);
@@ -1598,7 +1782,7 @@ export class ViewerEngine {
     for (const c of cands.slice(0, 8)) {
       if (this.visibleAt(c.check)) return { kind: c.kind, point: c.point, part: c.part, geometry: c.geometry };
     }
-    if (!hit || !allowFace) return null;
+    if (!hit || !allowFace || this.is2D) return null;
     const p = this.parts[hit.part];
     const geometry: SnapGeometry = {};
     if (hit.cap && plane) {
@@ -2047,6 +2231,25 @@ export class ViewerEngine {
 
   /** Sestaví materiál / barvy vrcholů dílu podle barvy dílu a barev ploch. */
   private applyColors(p: PartView) {
+    if (p.lineLight && p.wires) {
+      // 2D hladina: barva všech čar hladiny (null = barvy z výkresu)
+      const attr = p.wires.geometry.getAttribute("color") as THREE.BufferAttribute;
+      if (p.colorOverride === null) attr.copyArray(this.darkBg ? p.lineDark ?? p.lineLight : p.lineLight);
+      else {
+        const c = new THREE.Color().setHex(p.colorOverride, THREE.SRGBColorSpace);
+        const arr = attr.array as Float32Array;
+        for (let i = 0; i < arr.length; i += 3) {
+          arr[i] = c.r;
+          arr[i + 1] = c.g;
+          arr[i + 2] = c.b;
+        }
+      }
+      attr.needsUpdate = true;
+      for (const t of this.textItems) if (t.part === p.index) t.obj.color = this.textColor(t, p);
+      (p.texts as unknown as { sync?: (cb?: () => void) => void } | null)?.sync?.(() => this.requestRender());
+      this.applyPartState(p);
+      return;
+    }
     const g = p.mesh.geometry;
     const useVC = p.faceColors.size > 0 || (!!p.origVC && p.colorOverride === null);
     if (!useVC) {

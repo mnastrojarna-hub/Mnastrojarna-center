@@ -55,9 +55,15 @@ doklady a učí se z ručních oprav.
   plocha řezu, měření na řezu), měření vzdálenosti s uchopením (roh, střed díry, střed hrany, hrana,
   plocha; rovnoběžné plochy, rozteč os), průměr / poloměr, úhel, rozměry / objem dílu, **hmotnost dílu a polotovaru** podle materiálu
   z Nacenění (přířez / kulatina s přídavky jako v kalkulaci, polotovar nakreslený v 3D), barvy dílů
-  a ploch. Kód: `src/components/viewer3d`,
-  `src/components/file-viewer`, `src/lib/viewer3d` (OpenCascade se kopíruje do `public/vendor`
-  skriptem `tools/vendor-occt.mjs` při instalaci a buildu).
+  a ploch. **2D výkresy DXF a DWG** ve stejném prohlížeči: hladiny jako díly (seznam hladin, skrýt /
+  izolovat / barva, vypnuté hladiny skryté, zpět / vpřed), barvy z výkresu (černá ↔ bílá podle pozadí),
+  texty a MTEXT (čeština i ze starších výkresů v kódové stránce 1250), bloky, kóty, polyčáry
+  s oblouky, spliny, elipsy; posun / zoom bez otáčení, měření s uchopením rohů, středů kružnic
+  a polovin čar, průměr / poloměr, úhel. DXF čte `dxf-parser` (MIT), DWG (R13–2018) **LibreDWG**
+  ve WebAssembly (`@mlightcad/libredwg-web`, licence **GPL-3.0** — v pořádku pro interní provoz
+  firmy; při distribuci aplikace třetím stranám nutno řešit licenci). Kód: `src/components/viewer3d`,
+  `src/components/file-viewer`, `src/lib/viewer3d` (OpenCascade a LibreDWG se kopírují do
+  `public/vendor` skriptem `tools/vendor-occt.mjs` při instalaci a buildu).
 
 ### Role a oprávnění
 

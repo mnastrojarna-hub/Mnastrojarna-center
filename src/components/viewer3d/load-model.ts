@@ -2,7 +2,7 @@ import type { ParsedModel } from "@/lib/viewer3d/types";
 import type { PartTopology } from "@/lib/viewer3d/topology";
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import {
-  OCCT_JS_URL, OCCT_WASM_URL, type LoadStage, type WorkerFormat, type WorkerRequest, type WorkerResponse,
+  OCCT_JS_URL, OCCT_WASM_URL, LIBREDWG_WASM_DIR, type LoadStage, type WorkerFormat, type WorkerRequest, type WorkerResponse,
 } from "@/lib/viewer3d/worker-protocol";
 
 /**
@@ -83,11 +83,13 @@ export async function loadModel(src: ModelSource, onStage: (s: LoadStage) => voi
   // vlastní kopie pro worker (předává se vlastnictvím; originál může volající použít znovu)
   const bytes = src.bytes.slice(0);
   const res = await runWorker(
-    { id, type: "import", format, bytes, name: src.name, occtJs, occtWasm },
+    { id, type: "import", format, bytes, name: src.name, occtJs, occtWasm, dwgWasmDir: new URL(LIBREDWG_WASM_DIR, window.location.origin).toString() },
     [bytes],
     onStage,
     signal,
   );
-  if (!res.model.parts.length) throw new Error("V souboru není žádné těleso k zobrazení.");
+  if (!res.model.parts.length) {
+    throw new Error(res.model.drawing ? "Výkres je prázdný — v modelovém prostoru nic není (jen rozvržení / výkresový list?)." : "V souboru není žádné těleso k zobrazení.");
+  }
   return { ...res, zUp: format !== "obj" };
 }
