@@ -79,6 +79,10 @@ async function setup() {
   files.pdf = await upload(job, "vykres-E2E.pdf", await minimalPdf(), "application/pdf", "vykres");
   files.pair = await upload(job, "dve-kostky.obj", Buffer.from(twoCubesObj()), "text/plain", "model_3d");
   files.pdf3d = await upload(job, "plocha-3D.pdf", await pdfWithU3D(), "application/pdf", "model_3d");
+  files.dxf = await upload(job, "PRIRUBA-200x120.dxf", fs.readFileSync(path.join(FIX, "priruba-cp1250.dxf")), "application/dxf", "vykres");
+  if (fs.existsSync(path.join(FIX, "../formats/__fixtures__/dwg-sample.dwg"))) {
+    files.dwg = await upload(job, "VYKRES.dwg", fs.readFileSync(path.join(FIX, "../formats/__fixtures__/dwg-sample.dwg")), "application/acad", "vykres");
+  }
   if (EXTRA && fs.existsSync(EXTRA)) files.asm = await upload(job, "SESTAVA.stp", fs.readFileSync(EXTRA), "application/octet-stream", "model_3d");
   return { job, files };
 }
@@ -560,6 +564,119 @@ if (files.asm) {
       expect(hidden > 1, `Delete se sestavou smaže víc dílů najednou (${hidden})`);
       await page.keyboard.press("Control+z");
       await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+    });
+  });
+}
+
+await test("desktop: DXF výkres — hladiny, skrytí + zpět, měření průměru, výběr hladiny, tmavé pozadí", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/documents`);
+    await page.getByRole("link", { name: "Otevřít PRIRUBA-200x120.dxf" }).first().click();
+    await page.getByTestId("file-viewer").waitFor();
+    await waitModel(page);
+    const st = await page.getByTestId("viewer3d-status").innerText();
+    expect(/DXF/.test(st), `formát DXF ve stavu: ${st}`);
+    expect(/4 hladiny/.test(st), `4 hladiny: ${st}`);
+    expect(/200,00 ×/.test(st), `šířka výkresu 200 mm: ${st}`);
+    // 2D: bez řezu, hmotnosti a pohledů
+    expect((await page.getByTestId("tool-section").count()) === 0, "bez řezu");
+    expect((await page.getByTestId("tool-views").count()) === 0, "bez pohledů");
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer2d-dxf.png") });
+    // hladiny: skrýt v seznamu, Ctrl+Z vrátí
+    const tree = page.getByTestId("viewer3d-tree");
+    if (!(await tree.count())) await page.getByTestId("tool-tree").click();
+    await tree.waitFor();
+    const treeText = await tree.innerText();
+    expect(/Hladiny výkresu/.test(treeText) && /KONTURA/.test(treeText) && /POPIS/.test(treeText), `seznam hladin: ${treeText.slice(0, 120)}`);
+    await tree.getByRole("button", { name: "Skrýt díl" }).first().click();
+    await page.waitForFunction(() => /skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+    await page.keyboard.press("Control+z");
+    await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+    await page.getByTestId("tool-tree").click();
+    // posun levým tlačítkem (žádné otáčení) a kolečko
+    const b = await canvasBox(page);
+    const cx = b.x + b.width / 2;
+    const cy = b.y + b.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.wheel(0, -200);
+    await page.keyboard.press("f");
+    await page.waitForTimeout(450);
+    // průměr: projet okolí středu, chytit kružnici ⌀50 → Ø 50
+    await page.getByTestId("tool-diameter").click();
+    let found = "";
+    for (let dy = -140; dy <= 140 && !found; dy += 6) {
+      for (let dx = -160; dx <= 160 && !found; dx += 8) {
+        await page.mouse.move(cx + dx, cy + dy);
+        if (await page.getByTestId("snap-marker").count()) {
+          await page.mouse.click(cx + dx, cy + dy);
+          await page.getByTestId("measure-item").first().waitFor({ timeout: 3000 }).catch(() => null);
+          const t = (await page.getByTestId("measure-item").first().innerText().catch(() => "")) ?? "";
+          if (/50,00/.test(t)) found = t;
+          else if (t) await page.keyboard.press("Control+z");
+        }
+      }
+    }
+    expect(found, "Ø 50 středového otvoru");
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer2d-dxf-diameter.png") });
+    await page.keyboard.press("Escape");
+    // výběrový filtr výkresu: hladina / čára / bod / střed kružnice — bez ploch a sestav
+    await page.getByTestId("tool-filter").click();
+    const filterText = await page.getByTestId("filter-items").innerText();
+    expect(/Hladina/.test(filterText) && /Střed kružnice/.test(filterText) && !/Plocha/.test(filterText), `filtr pro výkres: ${filterText.slice(0, 80)}`);
+    await page.getByTestId("filter-items").getByRole("radio", { name: /Automaticky/ }).click();
+    // klik na čáru vybere hladinu → karta, Delete skryje, Ctrl+Z vrátí
+    await page.getByTestId("tool-select").click();
+    let card = "";
+    for (let dy = -140; dy <= 140 && !card; dy += 4) {
+      await page.mouse.click(cx, cy + dy);
+      card = await page.getByTestId("viewer3d-part").innerText({ timeout: 300 }).catch(() => "");
+    }
+    expect(card, "klik na čáru vybere hladinu");
+    await page.keyboard.press("Delete");
+    await page.waitForFunction(() => /skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+    await page.keyboard.press("Control+z");
+    await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+    // tmavé pozadí
+    await page.getByTestId("tool-display").click();
+    await page.getByRole("button", { name: "Pozadí Tmavé" }).click();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer2d-dxf-dark.png") });
+    await page.getByTestId("viewer-back").click();
+    await page.getByTestId("file-viewer").waitFor({ state: "detached" });
+  });
+});
+
+if (files.dwg) {
+  await test("desktop: DWG výkres (LibreDWG) — otevření, hladiny, měření", async () => {
+    await withContext(browser, errors, async (ctx) => {
+      const page = await ctx.newPage();
+      await login(page, USERS.admin);
+      await page.goto(`${BASE}/documents`);
+      await page.getByRole("link", { name: "Otevřít VYKRES.dwg" }).first().click();
+      await waitModel(page);
+      const st = await page.getByTestId("viewer3d-status").innerText();
+      expect(/DWG/.test(st) && /hladin/.test(st) && /mm/.test(st), `DWG ve stavu: ${st}`);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: path.join(ARTIFACTS, "viewer2d-dwg.png") });
+      await page.getByTestId("tool-distance").click();
+      const b = await canvasBox(page);
+      let n = 0;
+      for (let i = 0; i < 400 && n < 2; i++) {
+        const x = b.x + b.width / 2 + ((i * 37) % 300) - 150;
+        const y = b.y + b.height / 2 + ((i * 53) % 240) - 120;
+        await page.mouse.move(x, y);
+        if (await page.getByTestId("snap-marker").count()) {
+          await page.mouse.click(x, y);
+          n++;
+          await page.waitForTimeout(50);
+        }
+      }
+      await page.getByTestId("measure-item").first().waitFor({ timeout: 5000 });
+      expect(/mm/.test(await page.getByTestId("measure-item").first().innerText()), "měření v DWG");
     });
   });
 }

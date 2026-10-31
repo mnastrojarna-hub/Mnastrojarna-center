@@ -17,7 +17,7 @@ import {
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import { cn } from "@/lib/utils";
 import {
-  COLOR_PALETTE, PICK_FILTERS, ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
+  COLOR_PALETTE, ViewerEngine, pickFilters, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
 } from "./engine";
 import { loadModel } from "./load-model";
 
@@ -121,6 +121,9 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const materials = useViewerMaterials();
   const [bg, setBg] = React.useState<Background>("light");
   React.useEffect(() => setBg(loadBackground()), []);
+  React.useEffect(() => {
+    engineRef.current?.setDarkBackground(bg === "dark" || bg === "black");
+  }, [bg, stage]);
   const pickBg = (b: Background) => {
     setBg(b);
     try {
@@ -214,6 +217,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const sectionPicking = eng?.isSectionPicking() ?? false;
   const entityMode = ["face", "edge", "vertex", "center", "midpoint"].includes(filter);
   const measuring = tool === "distance" || tool === "diameter" || tool === "angle";
+  const drawing = eng?.isDrawing() ?? false;
   const openSection = () => {
     setSectionOpen(true);
     if (!isWide) setPanel(null);
@@ -269,10 +273,11 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               setPanel((cur) => (cur === p ? null : p));
               if (!isWide && p === "tree") setSectionOpen(false);
             }}
-            filterLabel={PICK_FILTERS.find((f) => f.key === filter)?.label ?? ""}
+            filterLabel={pickFilters(drawing).find((f) => f.key === filter)?.label ?? ""}
             filterActive={filter !== "auto"}
             sectionActive={!!section || sectionOpen}
             onSection={() => (sectionOpen ? setSectionOpen(false) : openSection())}
+            drawing={drawing}
             massActive={massOpen}
             onMass={() => setMassOpen((o) => !o)}
             explodeActive={explodeOpen || tool === "move"}
@@ -309,7 +314,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           )}
           {panel === "display" && (
             <Popover wide={isWide} onClose={() => setPanel(null)} title="Zobrazení">
-              {DISPLAYS.map((d) => (
+              {!drawing && DISPLAYS.map((d) => (
                 <MenuItem key={d.key} active={display === d.key} onClick={() => { eng!.setDisplay(d.key); setPanel(null); }}>{d.label}</MenuItem>
               ))}
               <div className="my-1 border-t" />
@@ -337,7 +342,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           )}
           {panel === "filter" && (
             <Popover wide={isWide} onClose={() => setPanel(null)} title="Výběrový filtr (co vybírám / chytám)">
-              <FilterItems current={filter} onPick={(f) => { eng!.setPickFilter(f); setPanel(null); }} />
+              <FilterItems drawing={drawing} current={filter} onPick={(f) => { eng!.setPickFilter(f); setPanel(null); }} />
             </Popover>
           )}
 
@@ -398,7 +403,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           {/* aktivní filtr / výběr plochy pro řez — připomínka nahoře */}
           {(filter !== "auto" || sectionPicking) && (
             <div className={cn("pointer-events-none absolute z-20 rounded-full bg-[#272425]/85 px-3 py-1 text-xs font-medium text-white", isWide ? "left-1/2 top-[3.6rem] -translate-x-1/2" : "left-2 top-2")} data-testid="filter-badge">
-              {sectionPicking ? "Klikni na rovinnou plochu pro řez" : `Filtr: ${PICK_FILTERS.find((f) => f.key === filter)?.label}`}
+              {sectionPicking ? "Klikni na rovinnou plochu pro řez" : `Filtr: ${pickFilters(drawing).find((f) => f.key === filter)?.label}`}
             </div>
           )}
 
@@ -414,7 +419,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               hostRect={hostRef.current?.getBoundingClientRect() ?? null}
             />
           )}
-          {help && <HelpOverlay onClose={() => setHelp(false)} />}
+          {help && <HelpOverlay drawing={drawing} onClose={() => setHelp(false)} />}
         </>
       )}
     </div>
@@ -459,6 +464,8 @@ const Sep = () => <span aria-hidden className="mx-0.5 h-7 w-px shrink-0 bg-borde
 
 function Toolbar(p: {
   wide: boolean;
+  /** 2D výkres — bez řezu, hmotnosti, rozebrání a 3D pohledů. */
+  drawing: boolean;
   tool: Tool;
   onTool: (t: Tool) => void;
   canUndo: boolean;
@@ -504,16 +511,20 @@ function Toolbar(p: {
       <ToolButton icon={Redo2} label="Vpřed" kbd="Ctrl+Y" disabled={!p.canRedo} onClick={p.onRedo} testId="tool-redo" />
       <Sep />
       <ToolButton icon={Filter} label={p.filterActive ? p.filterLabel : "Filtr"} active={p.panel === "filter" || p.filterActive} onClick={() => p.onPanel("filter")} testId="tool-filter" />
-      <ToolButton icon={Scissors} label="Řez" active={p.sectionActive} onClick={p.onSection} testId="tool-section" />
-      <ToolButton icon={Weight} label="Hmotnost" active={p.massActive} onClick={p.onMass} testId="tool-mass" />
-      <ToolButton icon={Move3d} label="Rozebrat" active={p.explodeActive} onClick={p.onExplode} testId="tool-explode" />
+      {!p.drawing && (
+        <>
+          <ToolButton icon={Scissors} label="Řez" active={p.sectionActive} onClick={p.onSection} testId="tool-section" />
+          <ToolButton icon={Weight} label="Hmotnost" active={p.massActive} onClick={p.onMass} testId="tool-mass" />
+          <ToolButton icon={Move3d} label="Rozebrat" active={p.explodeActive} onClick={p.onExplode} testId="tool-explode" />
+        </>
+      )}
       <Sep />
       <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
       <ToolButton icon={Focus} label="Izolovat" kbd="I" disabled={!p.hasSelection} onClick={p.onIsolate} testId="tool-isolate" />
       <ToolButton icon={Eye} label={p.hidden ? `Ukázat vše (${p.hidden})` : "Ukázat vše"} disabled={!p.hidden} onClick={p.onShowAll} testId="tool-showall" />
       <Sep />
       <ToolButton icon={Maximize2} label="Celý model" kbd="F" onClick={p.onFit} testId="tool-fit" />
-      <ToolButton icon={Box} label="Pohledy" active={p.panel === "views"} onClick={() => p.onPanel("views")} testId="tool-views" />
+      {!p.drawing && <ToolButton icon={Box} label="Pohledy" active={p.panel === "views"} onClick={() => p.onPanel("views")} testId="tool-views" />}
       <ToolButton icon={Layers} label="Zobrazení" active={p.panel === "display"} onClick={() => p.onPanel("display")} testId="tool-display" />
       <ToolButton icon={ListTree} label="Díly" active={p.panel === "tree"} onClick={() => p.onPanel("tree")} testId="tool-tree" />
       <ToolButton icon={Printer} label="Tisknout pohled" onClick={p.onPrint} testId="tool-print" />
@@ -576,7 +587,7 @@ function TreePanel({ engine, onClose }: { engine: ViewerEngine; onClose: () => v
     >
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <ListTree className="h-4 w-4 text-muted-foreground" />
-        <span className="flex-1 text-sm font-semibold">Díly sestavy ({engine.partCount()})</span>
+        <span className="flex-1 text-sm font-semibold">{engine.isDrawing() ? "Hladiny výkresu" : "Díly sestavy"} ({engine.partCount()})</span>
         <button type="button" onClick={onClose} aria-label="Zavřít strom" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1 text-sm scrollbar-thin">
@@ -729,10 +740,10 @@ function MeasurePanel({
 
 // ---------------------------------------------------------------- filtr, řez, entita
 
-function FilterItems({ current, onPick }: { current: PickFilter; onPick: (f: PickFilter) => void }) {
+function FilterItems({ current, onPick, drawing }: { current: PickFilter; onPick: (f: PickFilter) => void; drawing: boolean }) {
   return (
     <div role="radiogroup" aria-label="Výběrový filtr" data-testid="filter-items">
-      {PICK_FILTERS.map((f) => (
+      {pickFilters(drawing).map((f) => (
         <button
           key={f.key}
           type="button"
@@ -1266,8 +1277,12 @@ function PartCard({ engine, selection, materials, onMass }: { engine: ViewerEngi
         <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva {selection.length > 1 ? "dílů" : "dílu"}</p>
         <ColorSwatches value={engine.partColorHex(selection[0])} onPick={(c) => engine.setPartColor(selection, c)} testId="part-colors" />
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => engine.colorFacesDistinct(selection)} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><PaintBucket className="h-3.5 w-3.5" /> Odlišit plochy barevně</button>
-          <button type="button" onClick={onMass} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="part-mass"><Weight className="h-3.5 w-3.5" /> Materiál a polotovar</button>
+          {!engine.isDrawing() && (
+            <>
+              <button type="button" onClick={() => engine.colorFacesDistinct(selection)} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><PaintBucket className="h-3.5 w-3.5" /> Odlišit plochy barevně</button>
+              <button type="button" onClick={onMass} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="part-mass"><Weight className="h-3.5 w-3.5" /> Materiál a polotovar</button>
+            </>
+          )}
         </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1290,8 +1305,14 @@ function StatusBar({ engine, format, wide, warnings }: { engine: ViewerEngine; f
       )}
       data-testid="viewer3d-status"
     >
-      <span className="font-medium text-foreground tabular-nums">{size.map(fmt1).join(" × ")} mm</span>
-      <span>· {engine.partCount()} {engine.partCount() === 1 ? "díl" : engine.partCount() < 5 ? "díly" : "dílů"}{hidden ? ` (${hidden} skryto)` : ""}</span>
+      <span className="font-medium text-foreground tabular-nums">{(engine.isDrawing() ? size.slice(0, 2) : size).map(fmt1).join(" × ")} mm</span>
+      <span>
+        · {engine.partCount()}{" "}
+        {engine.isDrawing()
+          ? engine.partCount() === 1 ? "hladina" : engine.partCount() < 5 ? "hladiny" : "hladin"
+          : engine.partCount() === 1 ? "díl" : engine.partCount() < 5 ? "díly" : "dílů"}
+        {hidden ? ` (${hidden} skryto)` : ""}
+      </span>
       {format && <span>· {format}</span>}
       {warnings.length > 0 && (
         <span className="pointer-events-auto inline-flex items-center gap-1 text-amber-700 dark:text-amber-400" title={warnings.join("\n")}>
@@ -1321,6 +1342,7 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
     onClose();
   };
   const part = req.part;
+  const drawing = engine.isDrawing();
   return (
     <div
       ref={ref}
@@ -1331,10 +1353,10 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
       {part !== null && (
         <>
           <p className="truncate px-2.5 py-1 text-xs font-semibold text-muted-foreground">{engine.partName(part)}</p>
-          <MenuItem onClick={act(() => (sel.length ? engine.deleteSelected() : engine.hideParts(engine.partGroup(part))))} kbd="Del"><Trash2 className="h-4 w-4" /> Smazat díl</MenuItem>
-          <MenuItem onClick={act(() => engine.hideParts(engine.assemblyGroup(part)))}><Trash2 className="h-4 w-4" /> Smazat celou podsestavu</MenuItem>
+          <MenuItem onClick={act(() => (sel.length ? engine.deleteSelected() : engine.hideParts(engine.partGroup(part))))} kbd="Del"><Trash2 className="h-4 w-4" /> {drawing ? "Skrýt hladinu" : "Smazat díl"}</MenuItem>
+          {!drawing && <MenuItem onClick={act(() => engine.hideParts(engine.assemblyGroup(part)))}><Trash2 className="h-4 w-4" /> Smazat celou podsestavu</MenuItem>}
           <MenuItem onClick={act(() => engine.isolate(sel.length ? sel : engine.partGroup(part)))} kbd="I"><Focus className="h-4 w-4" /> Izolovat</MenuItem>
-          <MenuItem onClick={act(() => engine.fit(true))} kbd="F"><Maximize2 className="h-4 w-4" /> Přiblížit na díl</MenuItem>
+          <MenuItem onClick={act(() => engine.fit(true))} kbd="F"><Maximize2 className="h-4 w-4" /> {drawing ? "Přiblížit na hladinu" : "Přiblížit na díl"}</MenuItem>
           {engine.partMoved(part) && (
             <MenuItem onClick={act(() => engine.resetOffsets(sel.length ? sel : engine.partGroup(part)))}><RotateCcw className="h-4 w-4" /> Vrátit díl na místo</MenuItem>
           )}
@@ -1344,7 +1366,7 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
             </MenuItem>
           )}
           <div className="space-y-1 px-2.5 py-1.5" data-testid="context-colors">
-            <p className="flex items-center gap-1 text-xs text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva dílu</p>
+            <p className="flex items-center gap-1 text-xs text-muted-foreground"><Palette className="h-3.5 w-3.5" /> {drawing ? "Barva hladiny" : "Barva dílu"}</p>
             <ColorSwatches compact value={engine.partColorHex(part)} onPick={(c) => { engine.setPartColor(sel.length ? sel : engine.partGroup(part), c); onClose(); }} />
             {req.face && (
               <>
@@ -1357,7 +1379,7 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
         </>
       )}
       <p className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Vybírat / chytat</p>
-      {PICK_FILTERS.map((f) => (
+      {pickFilters(drawing).map((f) => (
         <MenuItem key={f.key} active={filter === f.key} onClick={act(() => engine.setPickFilter(f.key))}>
           <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full border-2", filter === f.key ? "border-primary bg-primary" : "border-muted-foreground/50")} />
           {f.label}
@@ -1367,7 +1389,7 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
       <MenuItem onClick={act(() => engine.showAll())}><Eye className="h-4 w-4" /> Ukázat vše</MenuItem>
       {engine.hasOffsets() && <MenuItem onClick={act(() => engine.resetOffsets())}><RotateCcw className="h-4 w-4" /> Složit sestavu zpět</MenuItem>}
       <MenuItem onClick={act(() => engine.fit())} kbd="Ctrl+F"><Maximize2 className="h-4 w-4" /> Celý model</MenuItem>
-      <MenuItem onClick={act(() => engine.setView("iso"))} kbd="0"><Box className="h-4 w-4" /> Izometrie</MenuItem>
+      {!drawing && <MenuItem onClick={act(() => engine.setView("iso"))} kbd="0"><Box className="h-4 w-4" /> Izometrie</MenuItem>}
       <MenuItem onClick={act(() => engine.undo())} kbd="Ctrl+Z"><Undo2 className="h-4 w-4" /> Zpět</MenuItem>
       <MenuItem onClick={act(() => engine.redo())} kbd="Ctrl+Y"><Redo2 className="h-4 w-4" /> Vpřed</MenuItem>
     </div>
@@ -1391,16 +1413,28 @@ const HELP: [string, string][] = [
   ["Místní nabídka", "pravé tlačítko · na telefonu podržet prst"],
 ];
 
-function HelpOverlay({ onClose }: { onClose: () => void }) {
+/** Nápověda u 2D výkresu (DXF / DWG). */
+const HELP_2D: [string, string][] = [
+  ["Posun", "prostřední, levé nebo pravé tlačítko + táhnout · 1–2 prsty"],
+  ["Přiblížení", "kolečko myši (ke kurzoru) · roztažení 2 prstů"],
+  ["Celý výkres", "F nebo Ctrl+F · dvojklik do prázdna"],
+  ["Hladiny", "tlačítko Díly = seznam hladin: skrýt, izolovat, barva · vypnuté hladiny z výkresu jsou skryté (Ukázat vše)"],
+  ["Výběr", "klik na čáru = hladina · Ctrl / Shift + klik = více · Del = skrýt · Ctrl+Z / Ctrl+Y"],
+  ["Výběrový filtr", "hladina, čára, bod/roh, střed kružnice, střed čáry"],
+  ["Měření", "M = vzdálenost · Průměr / rádius kružnice a oblouku · Úhel · chytá rohy, středy kružnic, poloviny čar · Esc = zrušit"],
+  ["Barvy", "barvy hladin z výkresu; na tmavém pozadí se černá kreslí bíle · pravé tlačítko = barva hladiny"],
+];
+
+function HelpOverlay({ onClose, drawing }: { onClose: () => void; drawing?: boolean }) {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-3" onPointerDown={onClose}>
       <div className="max-h-full w-full max-w-lg overflow-auto rounded-xl border bg-card p-4 shadow-2xl" onPointerDown={(e) => e.stopPropagation()} role="dialog" aria-label="Ovládání prohlížeče">
         <div className="flex items-center justify-between">
-          <p className="font-semibold">Ovládání (jako ZW3D)</p>
+          <p className="font-semibold">{drawing ? "Ovládání výkresu (DXF / DWG)" : "Ovládání (jako ZW3D)"}</p>
           <button type="button" onClick={onClose} className="rounded p-1 hover:bg-accent" aria-label="Zavřít"><X className="h-4 w-4" /></button>
         </div>
         <dl className="mt-3 space-y-2 text-sm">
-          {HELP.map(([k, v]) => (
+          {(drawing ? HELP_2D : HELP).map(([k, v]) => (
             <div key={k} className="grid grid-cols-[8.5rem,1fr] gap-2">
               <dt className="font-medium">{k}</dt>
               <dd className="text-muted-foreground">{v}</dd>

@@ -8,6 +8,7 @@ import { occtToModel, type OcctResult } from "./occt";
 import { parseObj, parsePly, parseStl } from "./formats/mesh";
 import { decodePdf3D, decodePRC, decodeU3D } from "./formats/embedded3d";
 import { ModelImportError, type ParsedModel } from "./types";
+import { drawingToModel } from "./drawing-model";
 import type { WorkerRequest, WorkerResponse } from "./worker-protocol";
 
 /** Minimální typy workeru (lib „webworker" by v projektu kolidovala s typy DOM). */
@@ -64,7 +65,9 @@ function collectTransfer(model: ParsedModel, topo: PartTopology[]): Transferable
     add(p.normals);
     add(p.indices);
     add(p.lines);
+    add(p.lineColors);
   }
+  for (const c of model.drawing?.darkColors ?? []) add(c);
   for (const t of topo) {
     add(t.edgeSegments);
     add(t.segCurve);
@@ -116,12 +119,32 @@ async function importModel(req: Extract<WorkerRequest, { type: "import" }>): Pro
     case "pdf":
       post({ id: req.id, type: "progress", stage: "parse" });
       return decodePdf3D(bytes);
+    case "dxf": {
+      post({ id: req.id, type: "progress", stage: "parse" });
+      const { parseDxf } = await import("./formats/dxf");
+      return withTopology(drawingToModel(parseDxf(bytes)));
+    }
+    case "dwg": {
+      post({ id: req.id, type: "progress", stage: "engine" });
+      const { parseDwg } = await import("./formats/dwg");
+      const d = await parseDwg(bytes, req.dwgWasmDir);
+      return withTopology(drawingToModel(d));
+    }
     default:
       throw new ModelImportError("Tento formát 3D modelu zatím neumím otevřít.");
   }
 }
 
+/** Výkres má topologii z přesné geometrie (ne ze sítě) — předá se dál s modelem. */
+const drawingTopo = new WeakMap<ParsedModel, PartTopology[]>();
+function withTopology(d: { model: ParsedModel; topology: PartTopology[] }): ParsedModel {
+  drawingTopo.set(d.model, d.topology);
+  return d.model;
+}
+
 function topologies(model: ParsedModel): PartTopology[] {
+  const t = drawingTopo.get(model);
+  if (t) return t;
   return model.parts.map((p) => computeTopology({ positions: p.positions, indices: p.indices, faces: p.faces }));
 }
 

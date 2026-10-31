@@ -20,3 +20,17 @@ for (const f of ["occt-import-js.js", "occt-import-js.wasm"]) {
   if (!same) fs.copyFileSync(src, dst);
 }
 console.log(`[vendor-occt] public/vendor/occt-${version} připraveno.`);
+
+// LibreDWG (čtení DWG ve WebAssembly, GPL-3.0) — wasm se načítá za běhu z public/vendor
+const dwgDir = path.join(root, "node_modules", "@mlightcad", "libredwg-web");
+if (fs.existsSync(dwgDir)) {
+  const { version: dwgVersion } = JSON.parse(fs.readFileSync(path.join(dwgDir, "package.json"), "utf8"));
+  const out = path.join(root, "public", "vendor", `libredwg-${dwgVersion}`);
+  fs.mkdirSync(out, { recursive: true });
+  for (const f of ["libredwg-web.wasm", "libredwg-web.js"]) {
+    const src = path.join(dwgDir, "wasm", f);
+    const dst = path.join(out, f);
+    if (!fs.existsSync(dst) || fs.statSync(dst).size !== fs.statSync(src).size) fs.copyFileSync(src, dst);
+  }
+  console.log(`[vendor-occt] public/vendor/libredwg-${dwgVersion} připraveno.`);
+}

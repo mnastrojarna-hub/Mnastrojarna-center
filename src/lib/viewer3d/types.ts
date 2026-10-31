@@ -30,6 +30,33 @@ export interface MeshPart {
   faces?: FaceRange[] | null;
   /** Úsečky (dvojice bodů xyz) — drátová geometrie / polyčáry. */
   lines?: Float32Array | null;
+  /** Barvy vrcholů úseček (rgb 0–1) — 2D výkresy. */
+  lineColors?: Float32Array | null;
+}
+
+/** Text 2D výkresu (DXF / DWG). */
+export interface DrawingText {
+  /** Index dílu (hladiny). */
+  part: number;
+  x: number;
+  y: number;
+  text: string;
+  /** Výška písma (velká písmena) v mm. */
+  height: number;
+  rotation: number;
+  hAlign: "left" | "center" | "right";
+  vAlign: "baseline" | "bottom" | "middle" | "top";
+  /** Šířka odstavce (zalomení). */
+  width?: number;
+  /** Barva [r,g,b] 0–1, null = barva popředí (černá / bílá podle pozadí). */
+  color: [number, number, number] | null;
+}
+
+/** Navíc u 2D výkresu: texty, barvy čar pro tmavé pozadí, vypnuté hladiny. */
+export interface DrawingExtras {
+  texts: DrawingText[];
+  darkColors: Float32Array[];
+  hidden: number[];
 }
 
 /** Uzel stromu sestavy. */
@@ -47,6 +74,8 @@ export interface ParsedModel {
   format: string;
   /** Upozornění pro uživatele (část modelu se nenačetla apod.). */
   warnings?: string[];
+  /** 2D výkres (DXF / DWG) — díly jsou hladiny. */
+  drawing?: DrawingExtras;
 }
 
 /** Chyba importu se srozumitelnou hláškou pro uživatele. */
