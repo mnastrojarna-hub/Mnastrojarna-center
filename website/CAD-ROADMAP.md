@@ -62,6 +62,60 @@ Testy: `src/cad/**/*.test.ts` (vitest, OCCT se inicializuje v Node). E2E: `e2e/c
 7. **AI vrstva**: „nakresli přírubu DN80 se 6 dírami M16“ → historie prvků (Claude API, nástroje = `newFeature` schema), kontrola vyrobitelnosti (tenké stěny, hluboké kapsy, poloměry nástrojů), odhad technologie a času.
 8. **Cloud**: ukládání projektů do Supabase (CNC Sales OS – zákazník má své modely u poptávky), sdílení odkazem, verze.
 
+
+## Audit požadavků zadavatele (všechny zprávy od začátku projektu)
+
+Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · ❌ nesplněno (plán níže) · ⛔ nelze (technicky/licenčně) – říkáme na rovinu
+
+### Web mnastrojarna.cz
+| # | Požadavek | Stav | Poznámka / co zbývá |
+| --- | --- | --- | --- |
+| 1 | Nový web, výrazně lepší design, animace, konverze | ✅ | v3 (fotostěna, GSAP/Lenis, 3D příběh, případovky, video) |
+| 2 | Slogan „Váš partner ve strojírenství“ | ✅ | všude vč. razítka výkresu |
+| 3 | Logo zachovat, oživit (glow/animace) | ✅ | `components/logo.tsx` – animace pásů štítu |
+| 4 | Obsah fakticky z původního webu, ale NE kopírovat (strojový park, služby přepsat) | ✅ | přepsáno; fráze „od polotovaru k protokolu“ se v textech už nevyskytuje (0×) |
+| 5 | Noví kolegové Šponer (technolog) a Volný (obchod) | ✅ | Volný = primární kontakt, Semorád odstraněn |
+| 6 | Jen B2B, min. 50 000 Kč, bez telefonátů obchodníků/důchodců | ✅ | štítek min. zakázky, texty cílí na firmy; formulář zrušen (e-mail Volnému) |
+| 7 | Top SEO | 🟡 | metadata, JSON-LD, sitemap, hreflang hotovo. **Chybí změřit Lighthouse/Core Web Vitals a doladit** (úkol níže) |
+| 8 | Ambice „největší nástrojárna v ČR“ v tónu webu | ✅ | manifest, claim „Vyrobíme, co ostatní odmítli“ – **čeká na vaše potvrzení claimu** |
+| 9 | Fáze 2: online 3D/2D CAD | ✅→🚧 | existuje a rozšiřuje se na profesionální CAD (viz níže) |
+| 10 | Navrhnout víc přidané hodnoty | ✅ | kalkulačka prostoje, kontrola obálky strojů, archiv zakázek, video dílna, CAD |
+| 11 | Bílé pozadí, prémiový, nápaditý vzhled (ne tmavý) | ✅ | |
+| 12 | EN + DE verze s referencemi | ✅ | `/en`, `/de`, logo wall ve všech jazycích |
+| 13 | Žádný odhad ceny z historie, žádný zákaznický portál (zatím) | ✅ | nepřidáno |
+| 14 | Použít stávající reference | ✅ | 16 klientů + 2 partneři z původního webu |
+| 15 | Reálné fotky, YouTube kanál, galerie, historické zakázky, žádná fotobanka | ✅ | 5 videí, 10 případovek z vlastních fotek |
+| 16 | Reálné popisy reálných zakázek | 🟡 | struktura připravena (`cases.ts`: brief/solution/result), **0 z 10 vyplněno – potřebuji vaše texty** |
+| 17 | Fotky týmu | 🟡 | `public/team/` prázdné – **potřebuji fotky Volný, Šponer** |
+| 18 | Potvrzení: jména klientů v hero (Bosch Powertrain, Rimowa, Valeo, Edscha), „platíte až při odběru“ u konsignace | 🟡 | **čeká na vaše ANO/NE** |
+| 19 | Zrušit formulář, Volný primární kontakt, Semorád pryč, push | ✅ | |
+| 20 | Náhled webu bez nasazení | ✅ | videa + snímky poslány; lokální spuštění popsáno |
+
+### Mnástrojárna CAD
+| # | Požadavek | Stav | Poznámka / co zbývá |
+| --- | --- | --- | --- |
+| 21 | Plnohodnotný CAD jako ZW3D/Inventor, „nakreslit cokoli“, uložit do počítače | 🟡 | historie prvků 30+ typů, uložení .mncad/STEP; **chybí plošné modelování (surfacing), více těles v dílu, proměnné zaoblení** |
+| 22 | Dramaticky lepší UI, barevné ikony, 1:1 ZW3D (UX, UI, grafika, ovládání) | 🟡 | ribbon, správce, formulář OK/Storno, ViewCube, schéma myši ZW3D hotovo; **dokončují se: výběrový filtr entit, kontextové nabídky dle entity, gizmo, inspektor** (pracovník M) |
+| 23 | Import/export všech formátů, nejnovější i historické verze | 🟡/⛔ | STEP/IGES/BREP/STL/OBJ/3MF/glTF/PLY/OFF/DXF ✅. **⛔ nativní SLDPRT/IPT/Z3/CATPart/PRT/X_T – uzavřené formáty, bez licence ODA/Spatial nečitelné** → návod na STEP. **❌ JT (ISO 14306) a 3D PDF – otevřené, lze doplnit později** |
+| 24 | Výkresy PDF, DXF, **DWG** | 🟡 | PDF/DXF ✅. **DWG ❌** – libredwg-web umí jen DWG→DXF; prověřit kompilaci `dwg_write` z LibreDWG do wasm (GPL) – úkol níže |
+| 25 | Stavy (konfigurace) | ✅ | |
+| 26 | Složité sestavy forem obrovské velikosti, rychlost | 🟡 | sestavy, podsestavy, rám formy ✅; **výkon pro tisíce dílů ❌ (progresivní síť, IndexedDB cache, více workerů)** |
+| 27 | Hlavičky (razítka) a kusovníky ve výkresech | ✅ | |
+| 28 | Skica: práce s rovinami, zjištěné vzdálenosti, pravé tlačítko, uchopení rohu/hrany/křivky/středu | 🚧 | pracovník S (přichytávání, vazby, kóty, řešič, nástroje úprav) |
+| 29 | Entity: prvek/plocha/hrana/bod/sestava/podsestava/tvar – otáčet, barvy, mazat, posouvat jednotlivé prvky/plochy/tvary | 🚧 | jádro ✅ (pushPull, offsetFace, deleteFace, barvy ploch, transform), UI pracovník M |
+| 30 | Snímky všech nástrojů + počet nástrojů vs. ZW3D | ❌ | udělat po zapojení (viz checklist); do zprávy uvést poctivé srovnání počtu příkazů |
+| 31 | Top UI/UX vč. ikon, **nastavení** a používání | 🟡 | `settings-dialog.tsx` (7 karet, zkratky, jednotky mm/in, export/import) hotovo – **zapojit** |
+| 32 | Obrovský adresář normalizovaných dílů „stačí napsat“: ozubená kola, řetězová kola, normálie, ocelové profily… | 🚧 | pracovník L (`cad/library`, parser, dialog s náhledem) |
+| 33 | Pracovat až do limitu, nic neztratit, předat dál | ✅ | WIP commity po každém kroku, tento dokument |
+| 34 | AI vrstva (21. století) – zadání textem, kontrola vyrobitelnosti | ❌ | etapa 7 níže |
+
+### Úkoly z auditu (doplnit do nejbližší etapy)
+- [ ] Lighthouse (mobil + desktop) pro `/`, `/sluzby/cnc-obrabeni`, `/zakazky`, `/en` → cíl ≥ 90 Performance/SEO/Best practices; opravit nálezy (velikost fotek `public/img/zakazky` → WebP/AVIF přes `next/image`, lazy video).
+- [ ] DWG export: zkusit sestavit LibreDWG s `dwg_write` do wasm (Emscripten) nebo nabídnout konverzi DXF→DWG v CNC Sales OS (server, ODA File Converter je zdarma pro nekomerční… ověřit licenci) – jinak zůstává DXF.
+- [ ] JT a 3D PDF export (otevřené formáty) – nízká priorita.
+- [ ] Snímky všech nástrojů CAD + tabulka počtu příkazů (náš CAD vs. ZW3D Standard) do zprávy zadavateli.
+- [ ] Vyžádat od zadavatele: texty k 10 zakázkám, fotky týmu, potvrzení claimu/klientů/konsignace.
+
 ## Známá omezení (říkat zákazníkovi na rovinu)
 - Nativní formáty SolidWorks/Inventor/ZW3D/CATIA/NX/Creo nelze číst (uzavřené formáty) – návod na STEP.
 - DWG se nezapisuje (DXF ano).
