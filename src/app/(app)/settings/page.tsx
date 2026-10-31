@@ -1,8 +1,10 @@
 import type { ComponentProps } from "react";
 import Link from "next/link";
 import {
-  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText, EyeOff,
+  Mail, KeyRound, Database, ArrowRight, SlidersHorizontal, FileUp, Users, Sparkles, ShieldCheck, ScrollText, EyeOff, Send,
 } from "lucide-react";
+import { RfqWeightsSettings } from "@/components/settings/rfq-weights-settings";
+import { getRfqWeights } from "@/lib/data/rfq";
 import { DrawingAnonSettings } from "@/components/settings/drawing-anon-settings";
 import { getAnonSettingsPanel } from "@/lib/data/anonymize";
 import { PageHeader } from "@/components/page-header";
@@ -22,12 +24,13 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   // Data se čtou servisním klíčem → nejdřív oprávnění
   await requireFeature("settings");
-  const [settings, mailboxes, users, anon, access] = await Promise.all([
+  const [settings, mailboxes, users, anon, access, rfqWeights] = await Promise.all([
     getIntegrationSettingsMeta(),
     getMailboxes(),
     getUsers(),
     getAnonSettingsPanel(),
     getAccess(),
+    getRfqWeights(),
   ]);
   const configured = isSupabaseConfigured();
   const serviceKey = hasServiceKey();
@@ -133,6 +136,21 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* 31. 10.: Poptávky dodavatelům — doporučený dodavatel (cena / termín / kvalita) */}
+      <Card id="poptavky-dodavatelum">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Send className="h-4 w-4 text-muted-foreground" /> Doporučení dodavatele (poptávky)
+          </CardTitle>
+          <CardDescription>
+            Z nabídek dodavatelů v poptávkovém kole vybere „Doporučujeme“ podle ceny, termínu a kvality. Kolik která část váží, nastavíš tady.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RfqWeightsSettings initial={rfqWeights} />
+        </CardContent>
+      </Card>
 
       {/* Audit — samostatná stránka */}
       <Link href="/settings/audit" className="group block">

@@ -104,7 +104,8 @@ const TECHNOLOGY_KIND: Record<string, OperationKind> = {
   tepelne_zpracovani: "tepelne_zpracovani", povrchova_uprava: "povrchova_uprava",
 };
 
-function kindsOfTechnologies(technologies: (string | null | undefined)[]): OperationKind[] {
+/** Všechny druhy kroků z technologií dodavatele (i víc rodin — doporučení dodavatelů k poptávce). */
+export function kindsOfTechnologies(technologies: (string | null | undefined)[]): OperationKind[] {
   const out: OperationKind[] = [];
   for (const raw of technologies) {
     const t = String(raw ?? "").trim();

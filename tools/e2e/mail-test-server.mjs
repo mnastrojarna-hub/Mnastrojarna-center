@@ -44,6 +44,8 @@ export const ACCOUNTS = [
   { user: "outbox@nastrojarstvi.test", pass: "Outbox-Heslo-1", imap: true, pop3: true },
   { user: "vit26@nastrojarstvi.test", pass: "Vit26-Heslo-1", imap: true, pop3: true },
   { user: "podpis25@nastrojarstvi.test", pass: "Podpis25-Heslo-1", imap: true, pop3: true },
+  // E2E 39: poptávky dodavatelům — schránka zaměstnance se „Smí poptávat dodavatele" (odpověď dodavatele s PD-…)
+  { user: "poptavky39@nastrojarstvi.test", pass: "Poptavky39-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {

@@ -119,6 +119,19 @@ export interface TechNext {
   label: string;
   /** Proč právě tohle („Kalení: TepKal ještě neposlal cenu"). */
   hint: string | null;
+  /** „Poptat dodavatele" (rfq.create): co poptat — operaci kroku a jeho položky (null = celý díl / všechny položky). */
+  rfq?: RfqTarget;
+}
+
+export interface RfqTarget {
+  kinds: OperationKind[] | null;
+  itemIds: string[] | null;
+}
+
+/** Krok → co poptat: obrábění / výroba / kompletní dodávka = celý díl, jinak jen operace; položky skupiny (ne „všechny"). */
+export function rfqTargetOf(step: Pick<TechStepView, "kind">, group: Pick<TechGroupView, "all" | "items"> | null): RfqTarget {
+  const whole = step.kind === "vyroba" || step.kind === "kompletni_dodavka" || ["soustruzeni", "frezovani", "vrtani", "plech"].includes(step.kind);
+  return { kinds: whole ? null : [step.kind], itemIds: group && !group.all ? group.items.map((i) => i.id) : null };
 }
 
 export interface TechCardView {
@@ -444,19 +457,26 @@ export function techNextAction(
     if (r) return r;
   }
   const early = ctx.stage === "poptavka" || ctx.stage === "naceneni" || ctx.stage === "nabidka";
+  // 31. 10.: „Poptat dodavatele" otevře poptávkové kolo rovnou pro krok (operace) a jeho položky
+  const rfqFor = (s: TechStepView): TechNext | null => {
+    const r = allowed("rfq.create", "Poptat dodavatele", null);
+    if (!r) return null;
+    const group = view.groups.find((g) => g.steps.some((x) => x.id === s.id));
+    return { ...r, rfq: rfqTargetOf(s, group ?? null) };
+  };
   const noWho = steps.find((s) => s.phase === "bez_firmy");
   if (noWho) {
     if (early && !noWho.quoteCount) {
-      const r = allowed("pricing.supplierPrice", "Poptat dodavatele", `${stepName(noWho)}: zatím žádná nabídka — zapiš ji v Nákupu`);
-      if (r) return r;
+      const r = rfqFor(noWho);
+      if (r) return { ...r, hint: `${stepName(noWho)}: zatím žádná nabídka — pošli poptávku 2–5 dodavatelům` };
     }
     return allowed("production.plan", "Doplnit, kdo to dělá", `${stepName(noWho)}: firma zatím nevybraná`);
   }
   // naceňuje se a firma kroku ještě neposlala nabídku (žádná ani bez ceny) → poptat ji
   const unquoted = early ? steps.find((s) => s.phase === "k_objednani" && !s.cost && (s.who.type === "supplier" || s.who.type === "free")) : null;
   if (unquoted) {
-    const r = allowed("pricing.supplierPrice", "Poptat dodavatele", `${stepName(unquoted)}: ${unquoted.whoText} — zatím bez nabídky`);
-    if (r) return r;
+    const r = rfqFor(unquoted);
+    if (r) return { ...r, hint: `${stepName(unquoted)}: ${unquoted.whoText} — zatím bez nabídky` };
   }
   const unsent = steps.find((s) => s.phase === "k_odeslani");
   if (unsent) {

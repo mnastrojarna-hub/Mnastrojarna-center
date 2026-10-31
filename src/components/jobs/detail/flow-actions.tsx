@@ -43,6 +43,7 @@ import { approvedToast } from "@/components/flow/quote-approval-copy";
 import { DETAIL_TABS_ID, addDaysIso, type DetailTab } from "./detail-helpers";
 import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
 import { EXCEPTION_DIALOG_KEYS, FlowExceptionDialog } from "./flow-exception-dialogs";
+import { useRfq } from "@/components/rfq/rfq-context";
 
 /**
  * Akce podrobných stavů na kartě zakázky: jeden poskytovatel drží fakta toku (deriveFlow),
@@ -153,6 +154,7 @@ export function FlowActionsProvider({
   children: React.ReactNode;
 }) {
   const { jobId, notify, perms } = useJobDetail();
+  const rfq = useRfq();
   const settle = useSettledRefresh();
   const client = useAccess();
   const [dialog, setDialog] = React.useState<DialogState>(null);
@@ -210,6 +212,11 @@ export function FlowActionsProvider({
   }, [directCtx, settle]);
 
   const run = React.useCallback((key: FlowActionKey, opts: { quoteId?: string; itemId?: string } = {}) => {
+    // 31. 10.: poptávkové kolo u dodavatelů — vlastní dialog (RfqProvider)
+    if (key === "rfq.create") {
+      if (rfq?.canRfq) rfq.open();
+      return;
+    }
     const tab = TAB_OF[key];
     if (tab) {
       setTab(tab === "nakup" && !perms.margins ? "polozky" : tab);
@@ -229,7 +236,7 @@ export function FlowActionsProvider({
       return;
     }
     setDialog({ key, quoteId: opts.quoteId, itemId: opts.itemId });
-  }, [setTab, perms.margins, runDirect, notify, job.quotes, activeQuoteId]);
+  }, [setTab, perms.margins, runDirect, notify, job.quotes, activeQuoteId, rfq]);
 
   const undo = React.useCallback(async (key: FlowActionKey) => {
     const res = await undoDirectAction(key, directCtx());

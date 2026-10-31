@@ -1657,7 +1657,9 @@ export type FlowActionKey =
   // výjimky v toku (31. 10.) — „Co se stalo?"
   | "job.notOrdered" | "job.decline" | "job.reopenLost" | "job.pause" | "job.resume" | "production.failed"
   | "claim.open" | "claim.resolve" | "claim.close" | "order.startWithoutPo" | "order.poArrived" | "order.correct"
-  | "drawing.update";
+  | "drawing.update"
+  // poptávky dodavatelům (31. 10.) — poptávkové kolo (dialog „Poptat dodavatele")
+  | "rfq.create";
 
 export interface FlowActionMeta {
   key: FlowActionKey;
@@ -1754,6 +1756,8 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "order.poArrived": act({ key: "order.poArrived", label: "Objednávka zákazníka dorazila…", icon: ShoppingCart, intent: "primary", feature: "workflow", kind: "dialog" }),
   "order.correct": act({ key: "order.correct", label: "Oprava zakázky…", icon: ClipboardPen, intent: "secondary", feature: "orders", kind: "dialog" }),
   "drawing.update": act({ key: "drawing.update", label: "Aktualizace výkresu…", icon: FileDiff, intent: "secondary", feature: "workflow", kind: "dialog" }),
+  // 31. 10.: poptávkové kolo u dodavatelů (anonymně, každý zvlášť) — obchodník, super admin, zaměstnanec s „Smí poptávat"
+  "rfq.create": act({ key: "rfq.create", label: "Poptat dodavatele", icon: Send, intent: "primary", feature: "rfq", kind: "dialog" }),
 };
 
 /** Výjimky v toku — v menu „⋯" jako první skupina „Co se stalo?". */

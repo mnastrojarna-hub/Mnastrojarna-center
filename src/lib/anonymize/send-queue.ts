@@ -37,6 +37,18 @@ export interface SendPayload {
    */
   originalFileIds?: string[];
   originalConfirmedBy?: string;
+  /**
+   * 31. 10. poptávka dodavateli: neutrální názvy příloh (id souboru → „VK-2291_C.pdf", „Poptavka-PD-2026-004.pdf") —
+   * nikdy původní název (často nese jméno zákazníka). Jen bezpečné znaky, přípona zůstane z odesílaného souboru.
+   */
+  neutralNames?: Record<string, string>;
+}
+
+/** Bezpečný název přílohy (bez cesty a řídicích znaků). */
+function safeAttachmentName(v: unknown): string | null {
+  // eslint-disable-next-line no-control-regex
+  const s = String(v ?? "").normalize("NFC").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").trim().slice(0, 100);
+  return s && !/^\.+$/.test(s) ? s : null;
 }
 
 export interface SendQueueRow {
@@ -70,6 +82,11 @@ function cleanPayload(p: SendPayload): SendPayload {
     reviewedFileIds: ids(p.reviewedFileIds),
     ...(p.purchaseOrderId && /^[0-9a-f-]{36}$/i.test(p.purchaseOrderId) ? { purchaseOrderId: p.purchaseOrderId } : {}),
     ...(p.recipientLabel ? { recipientLabel: String(p.recipientLabel).slice(0, 200) } : {}),
+    ...(p.neutralNames && typeof p.neutralNames === "object" ? {
+      neutralNames: Object.fromEntries(Object.entries(p.neutralNames)
+        .filter(([k]) => /^[0-9a-f-]{36}$/i.test(k)).slice(0, 80)
+        .map(([k, v]) => [k.toLowerCase(), safeAttachmentName(v)]).filter((e): e is [string, string] => Boolean(e[1]))),
+    } : {}),
   };
 }
 
@@ -212,7 +229,10 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
     total += bytes.length;
     // originál bez anonymizace (super admin) bez původního názvu — ten často nese jméno zákazníka
     const ext = /\.[A-Za-z0-9]{1,8}$/.exec(d.filename)?.[0]?.toLowerCase() ?? "";
-    const base = asOriginal.original && d.source === "original" ? `original${ext}` : d.filename;
+    const neutral = p.neutralNames?.[id.toLowerCase()];
+    // poptávka dodavateli: neutrální název (číslo výkresu / naše číslo) s příponou skutečně odesílaného souboru
+    const base = neutral ? `${neutral.replace(/\.[A-Za-z0-9]{1,8}$/, "")}${ext || (/\.[A-Za-z0-9]{1,8}$/.exec(neutral)?.[0] ?? "")}`
+      : asOriginal.original && d.source === "original" ? `original${ext}` : d.filename;
     let name = base;
     for (let i = 2; names.has(name.toLowerCase()); i++) name = base.replace(/(\.[^.]+)?$/, `-${i}$1`);
     names.add(name.toLowerCase());
