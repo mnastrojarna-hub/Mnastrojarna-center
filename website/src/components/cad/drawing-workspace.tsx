@@ -116,7 +116,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   const [dimKind, setDimKind] = useState<DimKind>("auto");
   const [annPts, setAnnPts] = useState<Vec2[]>([]);
   const [hover, setHover] = useState<Vec2 | null>(null);
-  const [prompt, setPrompt] = useState<null | { kind: AnnTool; x: number; y: number; done: (v: Record<string, string>) => void }>(null);
+  const [prompt, setPrompt] = useState<null | { id: string; kind: AnnTool; x: number; y: number; done: (v: Record<string, string>) => void }>(null);
   const dirty = useRef(false);
 
   useEffect(() => {
@@ -336,7 +336,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
     const used = new Set(ann.filter((a): a is Extract<DrawingAnnotation, { type: "datum" }> => a.type === "datum").map((a) => a.label));
     return "ABCDEFGHJKLMNPRSTUVWXYZ".split("").find((c) => !used.has(c)) ?? "A";
   };
-  const ask = (kind: AnnTool, e: { clientX: number; clientY: number }) => new Promise<Record<string, string> | null>((resolve) => setPrompt({ kind, x: e.clientX, y: e.clientY, done: (v) => { setPrompt(null); resolve(v); } }));
+  const ask = (kind: AnnTool, e: { clientX: number; clientY: number }) => new Promise<Record<string, string> | null>((resolve) => setPrompt({ id: uid(), kind, x: e.clientX, y: e.clientY, done: (v) => { setPrompt(null); resolve(v); } }));
   const onCanvasClick = async (e: React.PointerEvent) => {
     if (!annTool || !res) return;
     const raw = toSheet(e);
@@ -640,6 +640,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
           className={cn("relative min-w-0 flex-1 touch-none overflow-hidden", annTool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}
           onPointerDown={(e) => {
             if (annTool && e.button === 0) {
+              e.preventDefault(); // nebrat fokus formuláři poznámky, který se při kliku otevře
               void onCanvasClick(e);
               return;
             }
@@ -708,7 +709,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
           </div>
         </main>
       </div>
-      {prompt && <AnnPrompt kind={prompt.kind} x={prompt.x} y={prompt.y} onDone={prompt.done} onCancel={() => prompt.done({})} />}
+      {prompt && <AnnPrompt key={prompt.id} kind={prompt.kind} x={prompt.x} y={prompt.y} onDone={prompt.done} onCancel={() => prompt.done({})} />}
     </div>
   );
 }
@@ -717,7 +718,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
 function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number; y: number; onDone: (v: Record<string, string>) => void; onCancel: () => void }) {
   const [v, setV] = useState<Record<string, string>>((): Record<string, string> => (kind === "roughness" ? { ra: "Ra 3,2" } : kind === "gdt" ? { symbol: "pos", value: "0,1", datum: "" } : kind === "text" ? { text: "", size: "3.5" } : { text: "" }));
   const first = useRef<HTMLInputElement>(null);
-  useEffect(() => first.current?.focus(), []);
+  useEffect(() => {
+    first.current?.focus();
+    const t = setTimeout(() => first.current?.focus(), 60); // po případném přesunu fokusu výchozí akcí kliknutí
+    return () => clearTimeout(t);
+  }, []);
   const left = Math.min(x + 8, window.innerWidth - 300);
   const top = Math.min(y + 8, window.innerHeight - 200);
   const submit = () => onDone(v);
