@@ -36,6 +36,8 @@ export type SketchConstraint = {
   id: string;
   type: "horizontal" | "vertical" | "coincident" | "parallel" | "perpendicular" | "tangent" | "equal" | "fixed" | "concentric" | "midpoint" | "pointOnCurve" | "symmetric" | "collinear";
   refs: SketchRef[];
+  /** cílové hodnoty u vazby „fixed“ (souřadnice bodu nebo parametry entity) */
+  value?: number[];
 };
 
 /** Kóta ve skice. Řídicí (driving) kóta mění geometrii, referenční jen ukazuje hodnotu. */

@@ -3,6 +3,7 @@
  * Běží ve web workeru (prohlížeč) i v Node (testy). Předpokládá zavolané setOC().
  */
 import * as r from "replicad";
+import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { importBody } from "./formats/kernel-import";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
@@ -144,6 +145,22 @@ export function sketchPathWire(sk: SketchF): r.Wire {
   const ordered = chainSegs(segs);
   const edges = ordered.map((s) => (s.kind === "line" ? r.makeLine(W(s.a), W(s.b)) : r.makeThreePointArc(W(s.a), W(s.m), W(s.b))));
   return r.assembleWire(edges);
+}
+
+/** Otevřená (nebo uzavřená) křivka skici jako seřazené 2D segmenty – pro žebro. */
+function sketchChain(sk: SketchF): Seg[] {
+  const segs: Seg[] = [];
+  for (const e of sk.entities) {
+    if (e.construction) continue;
+    if (e.type === "line") segs.push({ kind: "line", a: e.a, b: e.b });
+    else if (e.type === "arc") segs.push({ kind: "arc", a: e.a, m: e.b, b: e.c });
+    else if (e.type === "polyline") {
+      e.points.slice(1).forEach((p, i) => segs.push({ kind: "line", a: e.points[i], b: p }));
+      if (e.closed && e.points.length > 2) segs.push({ kind: "line", a: e.points[e.points.length - 1], b: e.points[0] });
+    }
+  }
+  if (!segs.length) throw new Error(`Skica „${sk.name}“ musí obsahovat čáru (úsečku, lomenou čáru nebo oblouk).`);
+  return chainSegs(segs);
 }
 
 const near2 = (p: Vec2, q: Vec2, eps = 1e-3) => Math.abs(p[0] - q[0]) < eps && Math.abs(p[1] - q[1]) < eps;
@@ -385,6 +402,8 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
       const s = d.sketchOnPlane(plane).extrude(f.mode === "cut" ? -f.depth : f.depth) as Shape;
       return s;
     }
+    case "spring":
+      return springSolid(f);
     default:
       return null;
   }
@@ -522,6 +541,30 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           next = acc;
           break;
         }
+        case "pushPull":
+          if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+          next = pushPull(body, f.faces, f.distance);
+          break;
+        case "offsetFace":
+          if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+          next = offsetFaces(body, f.faces, f.distance);
+          break;
+        case "deleteFace":
+          if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+          next = deleteFaces(body, f.faces);
+          break;
+        case "thicken": {
+          if (!body) throw new Error("Zesílení potřebuje těleso s plochami.");
+          const tool = thickenFaces(body, f.faces, f.thickness);
+          next = f.mode === "new" ? tool : applyMode(body, tool, f.mode);
+          break;
+        }
+        case "rib": {
+          if (!body) throw new Error("Žebro potřebuje těleso, ke kterému se připojí.");
+          const sk = needSketch({ sketches, body }, f.sketchId, "skica žebra");
+          next = body.fuse(ribTool(body, sk, sketchChain(sk), planeOf(sk.plane), f.thickness, f.direction, f.flip));
+          break;
+        }
         case "mirror": {
           if (!body) throw new Error("Není co zrcadlit.");
           const origin: Vec3 = f.plane === "YZ" ? [f.offset, 0, 0] : f.plane === "XZ" ? [0, f.offset, 0] : [0, 0, f.offset];
@@ -558,6 +601,15 @@ function humanError(e: unknown): string {
 export async function buildDoc(doc: CadDoc, opts: { tolerance?: number } = {}): Promise<BuildResult & { body: Shape | null }> {
   const t0 = Date.now();
   const { body, status, paramErrors } = await buildShape(doc);
+  return shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance });
+}
+
+/** Síť, hrany, vrcholy a metriky libovolného tělesa (i složeného – např. podsestavy). */
+export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; paramErrors?: string[]; t0?: number; tolerance?: number } = {}): BuildResult & { body: Shape | null } {
+  const t0 = o.t0 ?? Date.now();
+  const status = o.status ?? [];
+  const paramErrors = o.paramErrors ?? [];
+  const opts = { tolerance: o.tolerance };
   if (!body) return { status, paramErrors, mesh: null, metrics: null, ms: Date.now() - t0, body: null };
   const tol = opts.tolerance ?? Math.max(0.01, bboxDiag(body) / 2000);
   const m = body.mesh({ tolerance: tol, angularTolerance: 0.2 });
@@ -591,7 +643,16 @@ export async function buildDoc(doc: CadDoc, opts: { tolerance?: number } = {}): 
       edgeGroups,
     },
     metrics: { volume, area, bbox: bb, faces: body.faces.length, edges: body.edges.length },
+    vertices: safeVertices(body),
   };
+}
+
+function safeVertices(body: Shape): Float32Array {
+  try {
+    return vertexPositions(body);
+  } catch {
+    return new Float32Array(0);
+  }
 }
 
 /** Informace o ploše (pro „skicu na ploše“). */

@@ -26,6 +26,12 @@ export const FEATURE_LABEL: Record<FeatureType, string> = {
   datum: "Rovina",
   text: "Text",
   thread: "Závit",
+  pushPull: "Vytáhnout/Zatlačit",
+  deleteFace: "Odstranit plochu",
+  offsetFace: "Odsadit plochu",
+  rib: "Žebro",
+  spring: "Pružina",
+  thicken: "Zesílit",
 };
 
 /**
@@ -136,6 +142,24 @@ export function newFeature(doc: CadDoc, type: NewFeatureType, extra: Partial<Fea
       break;
     case "thread":
       f = { ...base, type, designation: "M20", position: [0, 0, 0], axis: "Z", length: 30, modeled: false };
+      break;
+    case "pushPull":
+      f = { ...base, type, faces: [], distance: 5 };
+      break;
+    case "deleteFace":
+      f = { ...base, type, faces: [] };
+      break;
+    case "offsetFace":
+      f = { ...base, type, faces: [], distance: 1 };
+      break;
+    case "rib":
+      f = { ...base, type, sketchId: lastSketch?.id ?? "", thickness: 5, direction: "normal", flip: false };
+      break;
+    case "spring":
+      f = { ...base, type, radius: 10, pitch: 5, turns: 8, wire: 2, position: [0, 0, 0], axis: "Z", mode };
+      break;
+    case "thicken":
+      f = { ...base, type, faces: [], thickness: 2, mode: "add" };
       break;
   }
   return { ...f, ...extra } as Feature;

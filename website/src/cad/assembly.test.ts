@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { assemblyShape, interference, partEntry } from "./asm-kernel";
-import { alignFaces, apply3, bomCsv, computeBom, eulerXYZ, moldBase, partComponent, rotMatrix, screwISO4762, sourceKey, transformPoint } from "./assembly";
+import { alignFaces, apply3, asmComponent, bomCsv, composePlacement, compressionSpring, computeBom, dissolveSubassembly, dowelISO8734, emptyAssembly, eulerXYZ, flattenAssembly, makeSubassembly, moldBase, nutISO4032, partComponent, rotMatrix, screwDIN912, screwISO4762, sourceKey, transformPoint, washerISO7089 } from "./assembly";
 import { emptyDoc, type CadDoc } from "./types";
 
 beforeAll(async () => {
@@ -79,4 +79,83 @@ describe("sestava", () => {
     expect(bom.some((b) => b.name === "Rozpěrka" && b.qty === 2)).toBe(true);
     expect(bom.some((b) => b.name.startsWith("Vodicí sloupek") && b.qty === 4)).toBe(true);
   }, 180_000);
+});
+
+describe("podsestavy", () => {
+  const sub = (): CadDoc => ({ ...emptyAssembly("Pod"), components: [partComponent(cube("A"), { position: [10, 0, 0] }), partComponent(cube("A"), { position: [20, 0, 0] })] });
+  it("zploštění skládá umístění přes úrovně", () => {
+    const top: CadDoc = { ...emptyAssembly("Top"), components: [asmComponent(sub(), { position: [0, 0, 100], rotation: [0, 0, 90] }), partComponent(cube("B"))] };
+    const flat = flattenAssembly(top);
+    expect(flat).toHaveLength(3);
+    const p = transformPoint(flat[0].placement, [0, 0, 0]);
+    expect(p[0]).toBeCloseTo(0, 6);
+    expect(p[1]).toBeCloseTo(10, 6);
+    expect(p[2]).toBeCloseTo(100, 6);
+    expect(flat[0].path).toHaveLength(2);
+    expect(flat[0].path[0]).toBe(top.components![0].id);
+    const c = composePlacement({ position: [1, 2, 3], rotation: [0, 0, 0] }, { position: [1, 1, 1], rotation: [0, 0, 0] });
+    expect(c.position).toEqual([2, 3, 4]);
+  });
+  it("kusovník plochý (násobí počty) i strukturovaný (podsestava + díly)", () => {
+    const s1 = sub();
+    const top: CadDoc = { ...emptyAssembly("Top"), components: [asmComponent(s1), asmComponent(s1, { position: [0, 50, 0] }), partComponent(cube("B"))] };
+    const info = () => ({ material: "Ocel", massKg: 1 });
+    const flat = computeBom(top, info);
+    expect(flat.find((r) => r.name === "A")?.qty).toBe(4);
+    expect(flat.find((r) => r.name === "B")?.qty).toBe(1);
+    const st = computeBom(top, info, { structured: true });
+    const subRow = st.find((r) => r.assembly);
+    expect(subRow?.qty).toBe(2);
+    expect(subRow?.massKg).toBe(2);
+    expect(st.find((r) => r.name === "A")?.level).toBe(1);
+    expect(st.find((r) => r.name === "A")?.qty).toBe(2);
+  });
+  it("vytvořit a rozpustit podsestavu se zachováním světové polohy", () => {
+    const top: CadDoc = { ...emptyAssembly("Top"), components: [partComponent(cube("A"), { position: [5, 0, 0], rotation: [0, 0, 30] }), partComponent(cube("B"), { position: [0, 7, 0] }), partComponent(cube("C"))] };
+    const before = flattenAssembly(top).map((f) => transformPoint(f.placement, [1, 2, 3]));
+    const { doc: made, id } = makeSubassembly(top, [top.components![0].id, top.components![1].id], "Sub");
+    expect(made.components).toHaveLength(2);
+    expect(made.components!.find((c) => c.id === id)?.source.kind).toBe("asm");
+    const moved = { ...made, components: made.components!.map((c) => (c.id === id ? { ...c, placement: { position: [0, 0, 40] as [number, number, number], rotation: [90, 0, 0] as [number, number, number] } } : c)) };
+    const worldMoved = flattenAssembly(moved).map((f) => transformPoint(f.placement, [1, 2, 3]));
+    const back = dissolveSubassembly(moved, id);
+    expect(back.components).toHaveLength(3);
+    flattenAssembly(back).forEach((f, i) => {
+      const w = transformPoint(f.placement, [1, 2, 3]);
+      const exp = worldMoved.find((x) => Math.hypot(x[0] - w[0], x[1] - w[1], x[2] - w[2]) < 1e-6);
+      expect(exp, `bod ${i}`).toBeDefined();
+    });
+    // před přesunem se světové polohy nezmění
+    const same = flattenAssembly(made).map((f) => transformPoint(f.placement, [1, 2, 3]));
+    for (const b of before) expect(same.some((x) => Math.hypot(x[0] - b[0], x[1] - b[1], x[2] - b[2]) < 1e-6)).toBe(true);
+  });
+  it("vnořená sestava: těleso a kolize uvnitř podsestavy", async () => {
+    const s1: CadDoc = { ...emptyAssembly("Pod"), components: [partComponent(cube("A")), partComponent(cube("B"), { position: [5, 0, 0] })] };
+    const top: CadDoc = { ...emptyAssembly("Top"), components: [asmComponent(s1, { position: [0, 0, 50] }), partComponent(cube("C"), { position: [0, 0, 300] })] };
+    const shape = await assemblyShape(top);
+    expect(r.measureVolume(shape!)).toBeCloseTo(3000, 0);
+    const res = await interference(top);
+    expect(res).toHaveLength(1);
+    expect(res[0].aPath).toHaveLength(2);
+    expect(res[0].a).toBe(top.components![0].id);
+  }, 60_000);
+  it("cyklus/hloubka – klíč zdroje se neuvaří", () => {
+    const a: CadDoc = { ...emptyAssembly("A"), components: [] };
+    let d = a;
+    for (let i = 0; i < 20; i++) d = { ...emptyAssembly(`L${i}`), components: [asmComponent(d)] };
+    expect(typeof sourceKey({ kind: "asm", doc: d })).toBe("string");
+  });
+});
+
+describe("normálie", () => {
+  it("podložka, matice, kolík, DIN 912, pružina se postaví", async () => {
+    for (const d of [washerISO7089("M8"), nutISO4032("M10"), dowelISO8734(6, 30), screwDIN912("M8", 30), compressionSpring(20, 2, 40, 8)]) {
+      const e = await partEntry(sourceKey({ kind: "part", doc: d }), { kind: "part", doc: d });
+      const bad = e.result.status.filter((s) => !s.ok);
+      expect(bad, `${d.name}: ${bad.map((b) => b.error).join(",")}`).toEqual([]);
+      expect(e.result.metrics?.volume ?? 0).toBeGreaterThan(0);
+    }
+    const w = await partEntry("w", { kind: "part", doc: washerISO7089("M8") });
+    expect(w.result.metrics!.volume).toBeCloseTo((Math.PI / 4) * (16 * 16 - 8.4 * 8.4) * 1.6, 1);
+  }, 120_000);
 });

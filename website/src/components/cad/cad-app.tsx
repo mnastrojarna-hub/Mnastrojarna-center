@@ -17,12 +17,15 @@ import { cn } from "@/lib/cn";
 import { track } from "../analytics";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName } from "./cad-icons";
+import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
+import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
 import { AsmProps, AsmTree, BomTable, MoldWizard } from "./asm-panel";
+import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { FEATURE_TONE, Manager } from "./manager";
 import { EntityProps, FeatureProps, ParamContext } from "./props";
 import { ContextMenu, Dropdown, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, type SketchTool } from "./sketcher";
-import { Viewport, type AsmView, type Datum, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
+import { Viewport, type AsmView, type Datum, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
 
@@ -107,7 +110,17 @@ export function CadApp() {
   const [section, setSection] = useState<Section>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [measure, setMeasure] = useState(false);
-  const [measurePts, setMeasurePts] = useState<Vec3[]>([]);
+  // výběr entit, inspektor, měření
+  const [selFilter, setSelFilter] = useState<SelFilter>("all");
+  const [selection, setSelection] = useState<SelItem[]>([]);
+  const [inspect, setInspect] = useState<{ item: SelItem; info: EntityInfo } | null>(null);
+  const [inspectOpen, setInspectOpen] = useState(true);
+  const [measureSel, setMeasureSel] = useState<SelItem[]>([]);
+  const [measureRes, setMeasureRes] = useState<MeasureResult | null>(null);
+  const [gizmoOn, setGizmoOn] = useState<{ target: "component" | "body"; id: string; mode: "translate" | "rotate" } | null>(null);
+  const [bodyHidden, setBodyHidden] = useState(false);
+  const [bodyOpacity, setBodyOpacity] = useState(1);
+  const [bomFlat, setBomFlat] = useState(true);
   const [massOpen, setMassOpen] = useState(false);
   const [drawingOpen, setDrawingOpen] = useState(false);
   const [appMenu, setAppMenu] = useState(false);
@@ -234,14 +247,12 @@ export function CadApp() {
   const resolved = useMemo(() => resolveDoc(doc), [doc]);
 
   // ---------- sestava: sítě dílů (mezipaměť podle obsahu) ----------
-  const compKeys = useMemo(() => new Map((doc.components ?? []).map((c) => [c.id, sourceKey(c.source)])), [doc.components]);
+  const leaves = useMemo(() => (isAsm ? flattenLeaves(doc) : []), [isAsm, doc]);
+  const compKeys = useMemo(() => new Map(leaves.map((l) => [l.id, l.key])), [leaves]);
   useEffect(() => {
     if (core !== "ready" || !isAsm) return;
     const need = new Map<string, AsmComponent["source"]>();
-    for (const c of doc.components ?? []) {
-      const k = compKeys.get(c.id)!;
-      if (!asmCache.current.has(k)) need.set(k, c.source);
-    }
+    for (const l of leaves) if (!asmCache.current.has(l.key)) need.set(l.key, l.comp.source);
     if (!need.size) return;
     let alive = true;
     setAsmLoading((n) => n + 1);
@@ -256,32 +267,45 @@ export function CadApp() {
     return () => {
       alive = false;
     };
-  }, [doc.components, compKeys, core, isAsm]);
+  }, [leaves, core, isAsm]);
 
   const asmViews = useMemo<AsmView[]>(() => {
     if (!isAsm) return [];
-    const comps = (doc.components ?? []).filter((c) => !c.hidden);
+    const comps = leaves.filter((l) => !l.hidden);
     const centers = new Map<string, Vec3>();
-    for (const c of comps) {
-      const r = asmCache.current.get(compKeys.get(c.id)!);
+    for (const l of comps) {
+      const r = asmCache.current.get(l.key);
       const b = r?.metrics?.bbox;
-      if (b) centers.set(c.id, transformPoint(c.placement, [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2, (b[0][2] + b[1][2]) / 2]));
+      if (b) centers.set(l.id, transformPoint(matrixToPlacement(l.matrix), [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2, (b[0][2] + b[1][2]) / 2]));
     }
     const all = [...centers.values()];
     const mid: Vec3 = all.length ? ([0, 1, 2].map((k) => all.reduce((s, v) => s + v[k], 0) / all.length) as Vec3) : [0, 0, 0];
     const clashIds = new Set((clashes ?? []).flatMap((x) => [x.a, x.b]));
     const out: AsmView[] = [];
-    for (const c of comps) {
-      const key = compKeys.get(c.id)!;
-      const r = asmCache.current.get(key);
+    for (const l of comps) {
+      const r = asmCache.current.get(l.key);
       if (!r?.mesh) continue;
-      const off = explode && centers.has(c.id) ? explodeOffset(mid, centers.get(c.id)!, explode, "Z") : [0, 0, 0];
-      const pl = { ...c.placement, position: [c.placement.position[0] + off[0], c.placement.position[1] + off[1], c.placement.position[2] + off[2]] as Vec3 };
-      out.push({ id: c.id, key, mesh: r.mesh, matrix: placementMatrix(pl), color: c.color ?? "#b9c2cc", selected: c.id === asmSel || c.id === mate?.compId, dim: !!mate && c.id !== mate.compId && !mate.local ? false : false, clash: clashIds.has(c.id) });
+      const off = explode && centers.has(l.id) ? explodeOffset(mid, centers.get(l.id)!, explode, "Z") : [0, 0, 0];
+      const m = [...l.matrix];
+      m[12] += off[0];
+      m[13] += off[1];
+      m[14] += off[2];
+      const top = (doc.components ?? []).find((c) => c.id === l.topId);
+      out.push({
+        id: l.id,
+        topId: l.topId,
+        key: l.key,
+        mesh: r.mesh,
+        vertices: r.vertices,
+        matrix: m,
+        color: l.comp.color ?? top?.color ?? "#b9c2cc",
+        selected: l.topId === asmSel || l.topId === mate?.compId,
+        clash: clashIds.has(l.topId) || clashIds.has(l.id),
+      });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAsm, doc.components, compKeys, asmVer, explode, asmSel, mate, clashes]);
+  }, [isAsm, leaves, asmVer, explode, asmSel, mate, clashes]);
 
   const asmPartInfo = useCallback(
     (c: AsmComponent) => {
@@ -293,7 +317,7 @@ export function CadApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [asmVer],
   );
-  const bom = useMemo(() => (isAsm ? computeBom(doc, asmPartInfo) : []), [isAsm, doc, asmPartInfo]);
+  const bom = useMemo(() => (isAsm ? bomOf(doc, bomFlat, asmPartInfo) : []), [isAsm, doc, asmPartInfo, bomFlat]);
 
   const setComp = (id: string, patch: Partial<AsmComponent>) => commit({ ...doc, components: (doc.components ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)) });
   const insertComponent = (c: AsmComponent) => {
@@ -345,24 +369,29 @@ export function CadApp() {
     setMate({ mode, compId });
     setMeasure(false);
   };
-  const onPickComponent = async (id: string | null, face: number) => {
-    if (!mate) return setAsmSel(id);
-    if (!id || face < 0) return;
+  /** vazba: leafId = list (díl), face = index plochy v dílu */
+  const onMateFace = async (leafId: string, face: number) => {
+    if (!mate || face < 0) return;
+    const leaf = leaves.find((l) => l.id === leafId);
+    if (!leaf) return;
     const comps = doc.components ?? [];
+    const moving = comps.find((c) => c.id === mate.compId);
+    if (!moving) return;
     if (!mate.local) {
-      if (id !== mate.compId) return flash("Nejdřív klikněte na plochu vybrané (pohyblivé) komponenty.");
-      const info = await cad.asmFace(compKeys.get(id)!, face);
+      if (leaf.topId !== mate.compId) return flash("Nejdřív klikněte na plochu vybrané (pohyblivé) komponenty.");
+      const info = await cad.asmFace(leaf.key, face);
       if (!info?.planar) return flash("Vazby zatím umí rovinné plochy – vyberte rovinnou plochu.");
-      setMate({ ...mate, local: { origin: info.origin, normal: info.normal } });
+      // plocha listu → souřadnice komponenty nejvyšší úrovně
+      const rel = mul4(invPlacementMatrix(moving.placement), leaf.matrix);
+      const relPl = matrixToPlacement(rel);
+      setMate({ ...mate, local: { origin: transformPoint(relPl, info.origin), normal: apply3(rotMatrix(relPl.rotation), info.normal) } });
       return;
     }
-    if (id === mate.compId) return flash("Teď klikněte na plochu jiné komponenty.");
-    const target = comps.find((c) => c.id === id);
-    const moving = comps.find((c) => c.id === mate.compId);
-    if (!target || !moving) return;
-    const info = await cad.asmFace(compKeys.get(id)!, face);
+    if (leaf.topId === mate.compId) return flash("Teď klikněte na plochu jiné komponenty.");
+    const info = await cad.asmFace(leaf.key, face);
     if (!info?.planar) return flash("Cílová plocha musí být rovinná.");
-    const world = { origin: transformPoint(target.placement, info.origin), normal: apply3(rotMatrix(target.placement.rotation), info.normal) };
+    const wp = matrixToPlacement(leaf.matrix);
+    const world = { origin: transformPoint(wp, info.origin), normal: apply3(rotMatrix(wp.rotation), info.normal) };
     setComp(moving.id, { placement: alignFaces(moving.placement, mate.local, world, mate.mode) });
     setMate(null);
     flash("Vazba použita – komponenta zarovnána.");
@@ -463,23 +492,22 @@ export function CadApp() {
   };
 
   // ---------- výběr v modelu ----------
+  const FACE_PICK = new Set<string>(["shell", "hole", "draft", "pushPull", "deleteFace", "offsetFace", "thicken"]);
   const pickMode: PickMode = isAsm
     ? mate
       ? "asmFace"
-      : measure
-        ? "measure"
-        : "component"
+      : "select"
     : planePick
-    ? "face-plane"
-    : measure
-      ? "measure"
-      : active?.type === "fillet" || active?.type === "chamfer"
-        ? active.edges === "all"
-          ? "none"
-          : "edges"
-        : active?.type === "shell" || active?.type === "hole" || active?.type === "draft"
-          ? "faces"
-          : "none";
+      ? "face-plane"
+      : measure
+        ? "select"
+        : active?.type === "fillet" || active?.type === "chamfer"
+          ? active.edges === "all"
+            ? "none"
+            : "edges"
+          : active && FACE_PICK.has(active.type)
+            ? "faces"
+            : "select";
 
   const onPickEdge = (i: number) => {
     if (!active || (active.type !== "fillet" && active.type !== "chamfer") || active.edges === "all") return;
@@ -493,7 +521,7 @@ export function CadApp() {
   };
   const onPickFace = async (i: number, point?: [number, number, number]) => {
     if (planePick) return sketchOnFace(i);
-    if (active?.type === "shell" || active?.type === "draft") {
+    if (active && "faces" in active && active.type !== "hole" && FACE_PICK.has(active.type)) {
       const faces = active.faces.includes(i) ? active.faces.filter((x) => x !== i) : [...active.faces, i];
       updateFeature(active.id, { faces } as Partial<Feature>);
     }
@@ -617,7 +645,8 @@ export function CadApp() {
   // ---------- nástroje ----------
   const toggleMeasure = () => {
     setMeasure((m) => !m);
-    setMeasurePts([]);
+    setMeasureSel([]);
+    setMeasureRes(null);
     setActiveId(null);
   };
   const toggleSection = () => {
@@ -662,12 +691,18 @@ export function CadApp() {
         if (active) cancelEdit();
         setPlanePick(false);
         setMeasure(false);
-        setMeasurePts([]);
+        setMeasureSel([]);
+        setMeasureRes(null);
+        setSelection([]);
+        setGizmoOn(null);
         setCtx(null);
         return;
       }
       if (e.key === "Enter" && active) return okEdit();
       if ((e.key === "Delete" || e.key === "Backspace") && active) return removeFeature(active.id);
+      if ((e.key === "Delete" || e.key === "Backspace") && !isAsm && selection.some((x) => x.kind === "face")) {
+        return addWithFaces("deleteFace");
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && isAsm && asmSel) {
         commit({ ...doc, components: (doc.components ?? []).filter((x) => x.id !== asmSel) });
         return setAsmSel(null);
@@ -680,6 +715,8 @@ export function CadApp() {
       if (k === "m") toggleMeasure();
       if (k === "x") toggleSection();
       if (k === "p") setPref("ortho", !prefs.ortho);
+      if (k === "g" && isAsm && asmSel) setGizmoOn((g) => (g ? null : { target: "component", id: asmSel, mode: "translate" }));
+      if (k === "r" && gizmoOn) setGizmoOn({ ...gizmoOn, mode: gizmoOn.mode === "translate" ? "rotate" : "translate" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

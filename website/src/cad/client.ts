@@ -1,6 +1,7 @@
 "use client";
 import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
 import type { Interference } from "./asm-kernel";
+import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
 import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo } from "./types";
 
 let worker: Worker | null = null;
@@ -43,5 +44,7 @@ export const cad = {
   asmParts: (parts: { key: string; source: ComponentSource }[]) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts }),
   asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),
   interference: (doc: CadDoc) => call<Interference[]>({ op: "interference", doc }),
+  inspect: (src: ShapeSrc, ref: EntRef, density?: number) => call<EntityInfo>({ op: "inspect", src, ref, density }),
+  measureEnt: (a: { src: ShapeSrc; ref: EntRef }, b: { src: ShapeSrc; ref: EntRef } | null) => call<MeasureResult>({ op: "measureEnt", a, b }),
   drawing: (doc: CadDoc, meta: DrawingMeta, opts?: Partial<DrawingOptions>) => call<DrawingResult>({ op: "drawing", doc, meta, opts }),
 };

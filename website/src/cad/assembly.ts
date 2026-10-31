@@ -112,8 +112,15 @@ export function alignFaces(placement: Placement, local: { origin: Vec3; normal: 
 // ---------------- identita zdroje (cache, kusovník) ----------------
 
 /** Rychlý hash obsahu zdroje – stejné díly sdílí síť (instancování) a sčítají se v kusovníku. */
-export function sourceKey(s: ComponentSource): string {
-  const str = s.kind === "part" ? JSON.stringify({ f: s.doc.features, v: s.doc.variables, b: s.doc.bindings, c: s.doc.activeConfig, cf: s.doc.configs }) : `${s.format}:${s.data.length}:${s.data.slice(0, 2048)}:${s.data.slice(-2048)}`;
+export function sourceKey(s: ComponentSource, depth = 0): string {
+  const str =
+    s.kind === "part"
+      ? JSON.stringify({ f: s.doc.features, v: s.doc.variables, b: s.doc.bindings, c: s.doc.activeConfig, cf: s.doc.configs })
+      : s.kind === "asm"
+        ? depth > MAX_DEPTH
+          ? "asm:cycle"
+          : "asm:" + JSON.stringify((s.doc.components ?? []).map((c) => [sourceKey(c.source, depth + 1), c.placement, c.hidden ? 1 : 0]))
+        : `${s.format}:${s.data.length}:${s.data.slice(0, 2048)}:${s.data.slice(-2048)}`;
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   for (let i = 0; i < str.length; i++) {
@@ -126,29 +133,169 @@ export function sourceKey(s: ComponentSource): string {
 
 // ---------------- kusovník ----------------
 
-export type BomRow = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; group?: string; ids: string[] };
+/** Řádek kusovníku. `level` = úroveň zanoření (0 = hlavní sestava) ve strukturovaném kusovníku. */
+export type BomRow = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; group?: string; ids: string[]; level?: number; assembly?: boolean };
 
-export function computeBom(asm: CadDoc, info: (c: AsmComponent) => { material?: string; massKg?: number }): BomRow[] {
+const GROUP_ORDER = ["Podsestavy", "Desky", "Tvarové díly", "Vedení", "Vyhazování", "Normálie"];
+const byGroup = (a: BomRow, b: BomRow) => {
+  const ga = GROUP_ORDER.indexOf(a.group ?? "");
+  const gb = GROUP_ORDER.indexOf(b.group ?? "");
+  return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb);
+};
+
+/** Hmotnost a materiál komponenty; u podsestavy součet hmotností dílů. */
+function compInfo(c: AsmComponent, info: (c: AsmComponent) => { material?: string; massKg?: number }, depth = 0): { material?: string; massKg?: number } {
+  if (c.source.kind !== "asm") return info(c);
+  if (depth > MAX_DEPTH) return {};
+  let m = 0;
+  let known = true;
+  for (const ch of c.source.doc.components ?? []) {
+    const i = compInfo(ch, info, depth + 1);
+    if (i.massKg == null) known = false;
+    else m += i.massKg;
+  }
+  return { massKg: known ? m : undefined };
+}
+
+function aggregate(comps: { c: AsmComponent; n: number }[], info: (c: AsmComponent) => { material?: string; massKg?: number }, level: number): BomRow[] {
   const rows = new Map<string, BomRow>();
-  for (const c of asm.components ?? []) {
+  for (const { c, n } of comps) {
     const key = `${sourceKey(c.source)}|${c.name}|${c.number ?? ""}`;
     const r = rows.get(key);
     if (r) {
-      r.qty++;
+      r.qty += n;
       r.ids.push(c.id);
     } else {
-      const i = info(c);
-      rows.set(key, { pos: 0, name: c.name, number: c.number, qty: 1, material: i.material, massKg: i.massKg, group: c.group, ids: [c.id] });
+      const i = compInfo(c, info);
+      rows.set(key, { pos: 0, name: c.name, number: c.number, qty: n, material: i.material, massKg: i.massKg, group: c.source.kind === "asm" ? (c.group ?? "Podsestavy") : c.group, ids: [c.id], level, assembly: c.source.kind === "asm" || undefined });
     }
   }
-  const order = ["Desky", "Tvarové díly", "Vedení", "Vyhazování", "Normálie"];
-  const list = [...rows.values()].sort((a, b) => {
-    const ga = order.indexOf(a.group ?? "");
-    const gb = order.indexOf(b.group ?? "");
-    return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb);
-  });
+  return [...rows.values()].sort(byGroup);
+}
+
+/**
+ * Kusovník sestavy.
+ * • výchozí (plochý): jen díly, podsestavy se rozloží a počty se násobí,
+ * • `structured`: podsestavy jako samostatné řádky a pod nimi jejich díly (`level` 1, 2…, počty na 1 ks podsestavy).
+ */
+export function computeBom(asm: CadDoc, info: (c: AsmComponent) => { material?: string; massKg?: number }, opts: { structured?: boolean } = {}): BomRow[] {
+  let list: BomRow[];
+  if (!opts.structured) {
+    const leafs: { c: AsmComponent; n: number }[] = [];
+    const walk = (doc: CadDoc, depth: number) => {
+      if (depth > MAX_DEPTH) return;
+      for (const c of doc.components ?? []) {
+        if (c.source.kind === "asm") walk(c.source.doc, depth + 1);
+        else leafs.push({ c, n: 1 });
+      }
+    };
+    walk(asm, 0);
+    list = aggregate(leafs, info, 0);
+  } else {
+    list = [];
+    const walk = (doc: CadDoc, level: number) => {
+      if (level > MAX_DEPTH) return;
+      for (const row of aggregate((doc.components ?? []).map((c) => ({ c, n: 1 })), info, level)) {
+        list.push(row);
+        const c = (doc.components ?? []).find((x) => x.id === row.ids[0]);
+        if (c?.source.kind === "asm") walk(c.source.doc, level + 1);
+      }
+    };
+    walk(asm, 0);
+  }
   list.forEach((r, i) => (r.pos = i + 1));
   return list;
+}
+
+// ---------------- podsestavy ----------------
+
+export const MAX_DEPTH = 16;
+
+/** Složení umístění: rodič ∘ dítě (dítě je v souřadnicích rodiče). */
+export function composePlacement(parent: Placement, child: Placement): Placement {
+  const Rp = rotMatrix(parent.rotation);
+  const R = mul3(Rp, rotMatrix(child.rotation));
+  const t = apply3(Rp, child.position);
+  return {
+    position: [t[0] + parent.position[0], t[1] + parent.position[1], t[2] + parent.position[2]].map((v) => Math.round(v * 1e9) / 1e9) as Vec3,
+    rotation: eulerXYZ(R),
+  };
+}
+
+/** Inverze umístění. */
+export function invertPlacement(p: Placement): Placement {
+  const R = rotMatrix(p.rotation);
+  const Rt: Mat3 = [R[0], R[3], R[6], R[1], R[4], R[7], R[2], R[5], R[8]];
+  const t = apply3(Rt, p.position);
+  return { position: [-t[0], -t[1], -t[2]], rotation: eulerXYZ(Rt) };
+}
+
+export type FlatComponent = {
+  /** listová komponenta (díl nebo soubor) */
+  comp: AsmComponent;
+  /** cesta id od hlavní sestavy (path[0] = komponenta nejvyšší úrovně) */
+  path: string[];
+  /** světové umístění */
+  placement: Placement;
+  /** matice 4×4 po sloupcích (three.js) */
+  matrix: number[];
+  key: string;
+  /** skrytá kvůli skryté nadřazené podsestavě */
+  hidden: boolean;
+};
+
+/** Rozloží sestavu na listové komponenty se světovým umístěním (rekurzivně přes podsestavy, max. 16 úrovní). */
+export function flattenAssembly(doc: CadDoc): FlatComponent[] {
+  const out: FlatComponent[] = [];
+  const walk = (d: CadDoc, parent: Placement | null, path: string[], hidden: boolean, depth: number) => {
+    if (depth > MAX_DEPTH) return;
+    for (const c of d.components ?? []) {
+      const pl = parent ? composePlacement(parent, c.placement) : c.placement;
+      const h = hidden || !!c.hidden;
+      if (c.source.kind === "asm") walk(c.source.doc, pl, [...path, c.id], h, depth + 1);
+      else out.push({ comp: c, path: [...path, c.id], placement: pl, matrix: placementMatrix(pl), key: sourceKey(c.source), hidden: h });
+    }
+  };
+  walk(doc, null, [], false, 0);
+  return out;
+}
+
+/** Z vybraných komponent (nejvyšší úrovně) udělá podsestavu; světové polohy zůstanou zachovány. */
+export function makeSubassembly(asm: CadDoc, compIds: string[], name = "Podsestava"): { doc: CadDoc; id: string } {
+  const comps = asm.components ?? [];
+  const picked = comps.filter((c) => compIds.includes(c.id));
+  if (!picked.length) throw new Error("Vyberte komponenty pro podsestavu.");
+  const sub: CadDoc = { ...emptyAssembly(name), components: picked.map((c) => ({ ...c, fixed: false })) };
+  const id = uid();
+  const comp: AsmComponent = { id, name, source: { kind: "asm", doc: sub }, placement: { position: [0, 0, 0], rotation: [0, 0, 0] }, group: "Podsestavy" };
+  const first = comps.findIndex((c) => compIds.includes(c.id));
+  const rest = comps.filter((c) => !compIds.includes(c.id));
+  rest.splice(Math.min(first, rest.length), 0, comp);
+  return { doc: { ...asm, components: rest }, id };
+}
+
+/** Rozpustí podsestavu – její komponenty se přesunou o úroveň výš se zachovanou světovou polohou. */
+export function dissolveSubassembly(asm: CadDoc, compId: string): CadDoc {
+  const comps = asm.components ?? [];
+  const i = comps.findIndex((c) => c.id === compId);
+  const c = comps[i];
+  if (!c || c.source.kind !== "asm") throw new Error("Vybraná komponenta není podsestava.");
+  const children = (c.source.doc.components ?? []).map((ch) => ({ ...ch, id: uid(), placement: composePlacement(c.placement, ch.placement), hidden: ch.hidden || c.hidden }));
+  const next = [...comps];
+  next.splice(i, 1, ...children);
+  return { ...asm, components: next };
+}
+
+/** Vloží sestavu jako podsestavu (komponentu). */
+export function asmComponent(doc: CadDoc, placement: Partial<Placement> = {}, extra: Partial<AsmComponent> = {}): AsmComponent {
+  return {
+    id: uid(),
+    name: doc.name,
+    source: { kind: "asm", doc: { ...doc, kind: "assembly" } },
+    placement: { position: placement.position ?? [0, 0, 0], rotation: placement.rotation ?? [0, 0, 0] },
+    group: "Podsestavy",
+    ...extra,
+  };
 }
 
 export function bomCsv(rows: BomRow[]): string {
@@ -213,6 +360,71 @@ export function screwISO4762(size: keyof typeof ISO4762 | string, length: number
     { id: uid(), name: "Imbus", type: "extrude", sketchId: hex, distance: g.t, symmetric: false, reverse: true, mode: "cut" },
     { id: uid(), name: "Sražení", type: "chamfer", distance: Math.max(0.3, d * 0.08), edges: "all" },
   ], `ISO 4762 – ${size}×${length} – 12.9`);
+}
+
+/** DIN 912 = ISO 4762 (válcový šroub s vnitřním šestihranem). */
+export function screwDIN912(size: string, length: number): CadDoc {
+  const d = screwISO4762(size, length);
+  return { ...d, props: { number: `DIN 912 – ${size}×${length} – 12.9` } };
+}
+
+/** Podložka ISO 7089 (normální řada) – d1 / d2 / h. */
+export const ISO7089: Record<string, [number, number, number]> = {
+  M3: [3.2, 7, 0.5],
+  M4: [4.3, 9, 0.8],
+  M5: [5.3, 10, 1],
+  M6: [6.4, 12, 1.6],
+  M8: [8.4, 16, 1.6],
+  M10: [10.5, 20, 2],
+  M12: [13, 24, 2.5],
+  M16: [17, 30, 3],
+  M20: [21, 37, 3],
+  M24: [25, 44, 4],
+};
+
+export function washerISO7089(size: string): CadDoc {
+  const [d1, d2, h] = ISO7089[size] ?? ISO7089.M8;
+  return part(`Podložka ${size}`, "ocel", [{ id: uid(), name: "Podložka", type: "tube", outer: d2, inner: d1, height: h, position: [0, 0, 0], axis: "Z", mode: "new" }], `ISO 7089 – ${size} – 200 HV`);
+}
+
+/** Šestihranná matice ISO 4032 – s (otvor klíče) / m (výška). */
+export const ISO4032: Record<string, [number, number]> = {
+  M3: [5.5, 2.4],
+  M4: [7, 3.2],
+  M5: [8, 4.7],
+  M6: [10, 5.2],
+  M8: [13, 6.8],
+  M10: [16, 8.4],
+  M12: [18, 10.8],
+  M16: [24, 14.8],
+  M20: [30, 18],
+  M24: [36, 21.5],
+};
+
+export function nutISO4032(size: string): CadDoc {
+  const [sw, m] = ISO4032[size] ?? ISO4032.M8;
+  const d = Number(String(size).replace(/[^\d.]/g, "")) || 8;
+  const hex = uid();
+  return part(`Matice ${size}`, "ocel", [
+    sk(hex, "Šestihran", { kind: "base", name: "XY", offset: 0 }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: sw / Math.sqrt(3), sides: 6, angle: 0 }]),
+    { id: uid(), name: "Tělo", type: "extrude", sketchId: hex, distance: m, symmetric: false, reverse: false, mode: "new" },
+    { id: uid(), name: "Závit", type: "hole", position: [0, 0, m], axis: "Z", flip: false, diameter: d * 0.85, depth: 0, cbDiameter: 0, cbDepth: 0, kind: "tapped", thread: size },
+  ], `ISO 4032 – ${size} – 8`);
+}
+
+/** Válcový kolík ISO 8734 (kalený). */
+export function dowelISO8734(d: number, length: number): CadDoc {
+  return part(`Kolík Ø${d}×${length}`, "ocel", [
+    { id: uid(), name: "Kolík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
+    { id: uid(), name: "Sražení", type: "chamfer", distance: Math.max(0.2, d * 0.1), edges: "all" },
+  ], `ISO 8734 – Ø${d}×${length} – A`);
+}
+
+/** Tlačná pružina (konce bez broušení) – průměr pružiny D, drát d, volná délka L0, počet činných závitů n. */
+export function compressionSpring(D: number, wire: number, freeLength: number, turns: number): CadDoc {
+  return part(`Pružina tlačná ${D}×${wire}×${freeLength}`, "ocel", [
+    { id: uid(), name: "Pružina", type: "spring", radius: D / 2, pitch: freeLength / turns, turns, wire, position: [0, 0, 0], axis: "Z", mode: "new" },
+  ], `Pružina tlačná D${D} d${wire} L0=${freeLength}`);
 }
 
 /** Vodicí sloupek (typ s osazením, jako HASCO Z00 / Meusburger E1000 – zjednodušeně). */

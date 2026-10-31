@@ -3,8 +3,8 @@
  * složení sestavy do jednoho tělesa (compound) pro export/výkres a kontrola kolizí.
  */
 import * as r from "replicad";
-import { sourceKey } from "./assembly";
-import { buildDoc, buildShape } from "./build";
+import { flattenAssembly, MAX_DEPTH, sourceKey } from "./assembly";
+import { buildDoc, buildShape, shapeResult } from "./build";
 import type { BuildResult, CadDoc, ComponentSource, Placement, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -23,18 +23,19 @@ function trim() {
   }
 }
 
-function sourceDoc(s: ComponentSource): CadDoc {
+function sourceDoc(s: Exclude<ComponentSource, { kind: "asm" }>): CadDoc {
   if (s.kind === "part") return s.doc;
   return { app: "mnastrojarna-cad", version: 2, name: s.fileName, material: "ocel", features: [{ id: "imp", name: s.fileName, type: "import", fileName: s.fileName, format: s.format, data: s.data }] };
 }
 
-export async function partEntry(key: string, s: ComponentSource): Promise<Entry> {
+export async function partEntry(key: string, s: ComponentSource, depth = 0): Promise<Entry> {
   const hit = cache.get(key);
   if (hit) {
     hit.used = ++tick;
     return hit;
   }
-  const res = await buildDoc(sourceDoc(s));
+  // podsestava = složené těleso z jejích komponent (jedna tuhá síť)
+  const res = s.kind === "asm" ? shapeResult(await assemblyShape(s.doc, depth + 1)) : await buildDoc(sourceDoc(s));
   const { body, ...result } = res;
   const e: Entry = { body, result, used: ++tick };
   cache.set(key, e);
@@ -53,11 +54,12 @@ export function placed(s: Shape, p: Placement): Shape {
 }
 
 /** Sestava → jedno těleso (compound) se všemi viditelnými komponentami na svých místech. */
-export async function assemblyShape(doc: CadDoc): Promise<Shape | null> {
+export async function assemblyShape(doc: CadDoc, depth = 0): Promise<Shape | null> {
+  if (depth > MAX_DEPTH) throw new Error("Sestava je zanořená příliš hluboko (nebo obsahuje sama sebe).");
   const shapes: Shape[] = [];
   for (const c of doc.components ?? []) {
     if (c.hidden) continue;
-    const e = await partEntry(sourceKey(c.source), c.source);
+    const e = await partEntry(sourceKey(c.source), c.source, depth);
     if (e.body) shapes.push(placed(e.body, c.placement));
   }
   if (!shapes.length) return null;
@@ -70,17 +72,18 @@ export async function shapeOfDoc(doc: CadDoc): Promise<Shape | null> {
   return (await buildShape(doc)).body;
 }
 
-export type Interference = { a: string; b: string; volume: number };
+/** Kolize dvou listových dílů. `a`/`b` = id komponent nejvyšší úrovně (pro zvýraznění), `aPath`/`bPath` = celé cesty. */
+export type Interference = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] };
 
-/** Kontrola kolizí: rychlé síto podle obalových kvádrů, pak přesný průnik těles. */
+/** Kontrola kolizí listových dílů (i uvnitř podsestav): síto podle obalových kvádrů, pak přesný průnik. */
 export async function interference(doc: CadDoc, tolerance = 1e-3): Promise<Interference[]> {
-  const items: { id: string; shape: Shape; box: [Vec3, Vec3] }[] = [];
-  for (const c of doc.components ?? []) {
-    if (c.hidden) continue;
-    const e = await partEntry(sourceKey(c.source), c.source);
+  const items: { path: string[]; shape: Shape; box: [Vec3, Vec3] }[] = [];
+  for (const f of flattenAssembly(doc)) {
+    if (f.hidden) continue;
+    const e = await partEntry(f.key, f.comp.source);
     if (!e.body) continue;
-    const s = placed(e.body, c.placement);
-    items.push({ id: c.id, shape: s, box: s.boundingBox.bounds as [Vec3, Vec3] });
+    const s = placed(e.body, f.placement);
+    items.push({ path: f.path, shape: s, box: s.boundingBox.bounds as [Vec3, Vec3] });
   }
   const out: Interference[] = [];
   for (let i = 0; i < items.length; i++)
@@ -91,7 +94,7 @@ export async function interference(doc: CadDoc, tolerance = 1e-3): Promise<Inter
       try {
         const x = items[i].shape.intersect(items[j].shape);
         const v = r.measureVolume(x);
-        if (v > tolerance) out.push({ a: items[i].id, b: items[j].id, volume: v });
+        if (v > tolerance) out.push({ a: items[i].path[0], b: items[j].path[0], volume: v, aPath: items[i].path, bPath: items[j].path });
       } catch {
         /* nelze určit – přeskočit */
       }

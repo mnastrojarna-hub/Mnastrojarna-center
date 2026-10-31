@@ -434,6 +434,70 @@ export function FeatureProps({
                 <PickInfo n={f.faces.length} what="otevřených ploch" hint={pickHint} onClear={() => set({ faces: [] })} />
               </>
             );
+          case "pushPull":
+            return (
+              <>
+                <Num label="Vzdálenost" value={f.distance} step={0.5} hint="+ ven · − dovnitř" bind={b("distance")} onChange={(v) => set({ distance: v })} />
+                <PickInfo n={f.faces.length} what="rovinných ploch" hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Info>Přímá úprava: plocha se posune po své normále. Kladná hodnota přidá materiál, záporná odebere.</Info>
+              </>
+            );
+          case "offsetFace":
+            return (
+              <>
+                <Num label="Odsazení" value={f.distance} step={0.1} hint="+ ven · − dovnitř" bind={b("distance")} onChange={(v) => set({ distance: v })} />
+                <PickInfo n={f.faces.length} what="ploch k odsazení" hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Info>Funguje i na zakřivených plochách – např. odsazení stěny díry o +0,5 mm díru zmenší.</Info>
+              </>
+            );
+          case "deleteFace":
+            return (
+              <>
+                <PickInfo n={f.faces.length} what="ploch k odstranění" hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Info>Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.</Info>
+              </>
+            );
+          case "thicken":
+            return (
+              <>
+                <Num label="Tloušťka" value={f.thickness} step={0.5} hint="+ ven · − dovnitř" bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
+                <PickInfo n={f.faces.length} what="ploch k zesílení" hint={pickHint} onClear={() => set({ faces: [] })} />
+                {mode}
+              </>
+            );
+          case "rib":
+            return (
+              <>
+                <SketchPick label="Čára žebra (otevřená skica)" value={f.sketchId} sketches={sketches} onChange={(v) => set({ sketchId: v })} />
+                <Num label="Tloušťka" value={f.thickness} min={0.01} step={0.5} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
+                <Seg
+                  label="Směr tloušťky"
+                  value={f.direction}
+                  options={[
+                    { v: "normal", l: "Kolmo na skicu" },
+                    { v: "inPlane", l: "V rovině skici" },
+                  ]}
+                  onChange={(v) => set({ direction: v })}
+                />
+                <Check label="Obrátit stranu" value={f.flip} onChange={(v) => set({ flip: v })} />
+                <Info>Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.</Info>
+              </>
+            );
+          case "spring":
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Num label="Průměr pružiny" value={f.radius * 2} min={0.01} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
+                  <Num label="Průměr drátu" value={f.wire} min={0.01} step={0.1} bind={b("wire")} onChange={(v) => set({ wire: v })} />
+                  <Num label="Stoupání" value={f.pitch} min={0.01} step={0.5} bind={b("pitch")} onChange={(v) => set({ pitch: v })} />
+                  <Num label="Počet závitů" value={f.turns} min={0.25} step={0.5} suffix="" bind={b("turns")} onChange={(v) => set({ turns: v })} />
+                </div>
+                <Info>Volná délka {Math.round(f.pitch * f.turns * 100) / 100} mm</Info>
+                <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                <Vec label="Poloha" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                {mode}
+              </>
+            );
           case "draft":
             return (
               <>

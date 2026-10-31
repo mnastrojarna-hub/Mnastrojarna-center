@@ -98,9 +98,70 @@ export function shapeSegs(e: SketchEntity): Seg[] | null {
       if (!e.closed || e.points.length < 3) return null;
       return e.points.map((a, i) => ({ kind: "line", a, b: e.points[(i + 1) % e.points.length] }));
     }
+    case "ellipse":
+      return arcsThrough(ellipsePoints(e, 48), true);
+    case "spline":
+      if (e.points.length < 2) return null;
+      return arcsThrough(splinePoints(e.points, e.closed, 12), e.closed);
     default:
       return null;
   }
+}
+
+/** Body elipsy (n vzorků, bez opakování prvního bodu). */
+export function ellipsePoints(e: { cx: number; cy: number; rx: number; ry: number; angle: number }, n = 72): Vec2[] {
+  const t = (e.angle * Math.PI) / 180;
+  const ct = Math.cos(t);
+  const st = Math.sin(t);
+  return Array.from({ length: n }, (_, i) => {
+    const u = (i / n) * Math.PI * 2;
+    const x = Math.abs(e.rx) * Math.cos(u);
+    const y = Math.abs(e.ry) * Math.sin(u);
+    return [e.cx + x * ct - y * st, e.cy + x * st + y * ct] as Vec2;
+  });
+}
+
+/** Interpolační spline (centripetální Catmull-Rom) přes body; `perSpan` vzorků na úsek. */
+export function splinePoints(pts: Vec2[], closed: boolean, perSpan = 16): Vec2[] {
+  const n = pts.length;
+  if (n < 2) return [...pts];
+  if (n === 2 && !closed) return [pts[0], pts[1]];
+  const P = (i: number): Vec2 => {
+    if (closed) return pts[((i % n) + n) % n];
+    if (i < 0) return [2 * pts[0][0] - pts[1][0], 2 * pts[0][1] - pts[1][1]];
+    if (i >= n) return [2 * pts[n - 1][0] - pts[n - 2][0], 2 * pts[n - 1][1] - pts[n - 2][1]];
+    return pts[i];
+  };
+  const out: Vec2[] = [];
+  const spans = closed ? n : n - 1;
+  for (let i = 0; i < spans; i++) {
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+    const tj = (a: Vec2, b: Vec2) => Math.max(1e-6, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    const t0 = 0, t1 = t0 + tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
+    for (let k = 0; k < perSpan; k++) {
+      const t = t1 + ((t2 - t1) * k) / perSpan;
+      const L = (pa: Vec2, pb: Vec2, ta: number, tb: number): Vec2 => [((tb - t) * pa[0] + (t - ta) * pb[0]) / (tb - ta), ((tb - t) * pa[1] + (t - ta) * pb[1]) / (tb - ta)];
+      const A1 = L(p0, p1, t0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+      const B1 = L(A1, A2, t0, t2), B2 = L(A2, A3, t1, t3);
+      out.push(L(B1, B2, t1, t2));
+    }
+  }
+  if (!closed) out.push(pts[n - 1]);
+  return out;
+}
+
+/** Aproximace hladké křivky oblouky přes trojice vzorků (G0, velmi blízko křivce). */
+function arcsThrough(pts: Vec2[], closed: boolean): Seg[] {
+  const P = closed ? [...pts, pts[0]] : pts;
+  if (P.length % 2 === 0) P.splice(P.length - 1, 0, [(P[P.length - 2][0] + P[P.length - 1][0]) / 2, (P[P.length - 2][1] + P[P.length - 1][1]) / 2]);
+  const segs: Seg[] = [];
+  for (let i = 0; i + 2 < P.length; i += 2) {
+    const [a, m, b] = [P[i], P[i + 1], P[i + 2]];
+    const cc = circleFrom3(a, m, b);
+    if (!cc || cc.r > 1e5 * Math.hypot(b[0] - a[0], b[1] - a[1])) segs.push({ kind: "line", a, b });
+    else segs.push({ kind: "arc", a, m, b });
+  }
+  return segs;
 }
 
 /** Najde všechny uzavřené profily ve skice (tvary + smyčky poskládané z úseček/oblouků). */
@@ -108,7 +169,11 @@ export function findLoops(entities: SketchEntity[]): { loops: Loop[]; openCount:
   const loops: Loop[] = [];
   const open: { seg: Seg; id: string }[] = [];
   for (const e of entities) {
-    if (e.type === "line" && e.construction) continue;
+    if (e.construction || e.type === "point") continue;
+    if (e.type === "spline" && !e.closed) {
+      (shapeSegs(e) ?? []).forEach((seg) => open.push({ seg, id: e.id }));
+      continue;
+    }
     if (e.type === "circle") {
       if (e.r > 0) loops.push({ kind: "circle", cx: e.cx, cy: e.cy, r: e.r, sourceIds: [e.id] });
       continue;
@@ -224,8 +289,14 @@ export function sketchToDxf(entities: SketchEntity[]): string {
   add(0, "SECTION", 2, "HEADER", 9, "$INSUNITS", 70, 4, 0, "ENDSEC");
   add(0, "SECTION", 2, "ENTITIES");
   for (const e of entities) {
-    if (e.type === "circle") add(0, "CIRCLE", 8, "0", 10, f(e.cx), 20, f(e.cy), 30, 0, 40, f(e.r));
-    else if (e.type === "line") line(e.a, e.b, e.construction ? "KONSTRUKCE" : "0");
+    const layer = e.construction ? "KONSTRUKCE" : "0";
+    if (e.type === "point") add(0, "POINT", 8, layer, 10, f(e.p[0]), 20, f(e.p[1]), 30, 0);
+    else if (e.type === "ellipse" || e.type === "spline") {
+      const { pts, closed } = entityPath(e);
+      const P = closed ? [...pts, pts[0]] : pts;
+      P.slice(1).forEach((p, i) => line(P[i], p, layer));
+    } else if (e.type === "circle") add(0, "CIRCLE", 8, layer, 10, f(e.cx), 20, f(e.cy), 30, 0, 40, f(e.r));
+    else if (e.type === "line") line(e.a, e.b, layer);
     else if (e.type === "arc") {
       const cc = circleFrom3(e.a, e.b, e.c);
       if (!cc) line(e.a, e.c);
@@ -257,6 +328,9 @@ export function sketchToDxf(entities: SketchEntity[]): string {
 
 /** Body entity pro vykreslení (SVG polyline). */
 export function entityPath(e: SketchEntity): { pts: Vec2[]; closed: boolean } {
+  if (e.type === "point") return { pts: [e.p], closed: false };
+  if (e.type === "ellipse") return { pts: ellipsePoints(e, 72), closed: true };
+  if (e.type === "spline") return { pts: splinePoints(e.points, e.closed, 16), closed: e.closed };
   if (e.type === "circle") return { pts: loopPolygon({ kind: "circle", cx: e.cx, cy: e.cy, r: e.r, sourceIds: [] }), closed: true };
   if (e.type === "line") return { pts: [e.a, e.b], closed: false };
   if (e.type === "arc") return { pts: arcPoints(e.a, e.b, e.c, 32), closed: false };
@@ -278,9 +352,155 @@ export function snapPoints(e: SketchEntity): Vec2[] {
       return e.points;
     case "circle":
       return [[e.cx, e.cy], [e.cx + e.r, e.cy], [e.cx - e.r, e.cy], [e.cx, e.cy + e.r], [e.cx, e.cy - e.r]];
+    case "point":
+      return [e.p];
+    case "spline":
+      return e.points;
+    case "ellipse":
+      return Object.values(keyPoints(e));
     default: {
       const segs = shapeSegs(e);
       return [[(e as { cx: number }).cx, (e as { cy: number }).cy], ...(segs ? segs.map((s) => s.a) : [])];
+    }
+  }
+}
+
+// ---------------- charakteristické body a primitiva (uchopování, vazby, ořez) ----------------
+
+const rotD = (p: Vec2, c: Vec2, deg: number) => rot(p, c, deg);
+
+/** Pojmenované charakteristické body entity (klíče shodné s SketchRef.k). */
+export function keyPoints(e: SketchEntity): Record<string, Vec2> {
+  const out: Record<string, Vec2> = {};
+  switch (e.type) {
+    case "line":
+      out.a = e.a;
+      out.b = e.b;
+      out.mid = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
+      break;
+    case "arc": {
+      out.a = e.a;
+      out.c = e.c;
+      const cc = circleFrom3(e.a, e.b, e.c);
+      if (cc) {
+        out.center = cc.c;
+        const pts = arcPoints(e.a, e.b, e.c, 2);
+        out.mid = pts[1];
+      }
+      break;
+    }
+    case "circle":
+      out.center = [e.cx, e.cy];
+      out.q0 = [e.cx + e.r, e.cy];
+      out.q1 = [e.cx, e.cy + e.r];
+      out.q2 = [e.cx - e.r, e.cy];
+      out.q3 = [e.cx, e.cy - e.r];
+      break;
+    case "rect": {
+      const c: Vec2 = [e.cx, e.cy];
+      out.center = c;
+      const hw = e.w / 2;
+      const hh = e.h / 2;
+      const cs: Vec2[] = [rotD([e.cx - hw, e.cy - hh], c, e.angle), rotD([e.cx + hw, e.cy - hh], c, e.angle), rotD([e.cx + hw, e.cy + hh], c, e.angle), rotD([e.cx - hw, e.cy + hh], c, e.angle)];
+      cs.forEach((p, i) => {
+        out[`c${i}`] = p;
+        const q = cs[(i + 1) % 4];
+        out[`m${i}`] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      });
+      break;
+    }
+    case "polygon": {
+      out.center = [e.cx, e.cy];
+      const n = Math.max(3, Math.round(e.sides));
+      for (let i = 0; i < n; i++) {
+        const t = (e.angle * Math.PI) / 180 + (i / n) * Math.PI * 2 + Math.PI / 2;
+        out[`c${i}`] = [e.cx + e.r * Math.cos(t), e.cy + e.r * Math.sin(t)];
+      }
+      break;
+    }
+    case "slot": {
+      const c: Vec2 = [e.cx, e.cy];
+      out.center = c;
+      const L = Math.max(0, e.length - e.width) / 2;
+      out.e0 = rotD([e.cx - L, e.cy], c, e.angle);
+      out.e1 = rotD([e.cx + L, e.cy], c, e.angle);
+      break;
+    }
+    case "polyline":
+    case "spline":
+      e.points.forEach((p, i) => (out[`p${i}`] = p));
+      break;
+    case "point":
+      out.p = e.p;
+      break;
+    case "ellipse": {
+      const c: Vec2 = [e.cx, e.cy];
+      out.center = c;
+      out.q0 = rotD([e.cx + e.rx, e.cy], c, e.angle);
+      out.q1 = rotD([e.cx, e.cy + e.ry], c, e.angle);
+      out.q2 = rotD([e.cx - e.rx, e.cy], c, e.angle);
+      out.q3 = rotD([e.cx, e.cy - e.ry], c, e.angle);
+      break;
+    }
+  }
+  return out;
+}
+
+/** Geometrické primitivum: úsečka, nebo oblouk/kružnice (a0 → a0+sweep proti směru hodin, rad). */
+export type Prim = { kind: "line"; a: Vec2; b: Vec2; id: string; part?: string } | { kind: "arc"; c: Vec2; r: number; a0: number; sweep: number; id: string; part?: string };
+
+/** Oblouk třemi body → střed, poloměr, počáteční úhel a průběh (kladně = CCW). */
+export function arcGeom(a: Vec2, m: Vec2, b: Vec2): { c: Vec2; r: number; a0: number; sweep: number } | null {
+  const cc = circleFrom3(a, m, b);
+  if (!cc) return null;
+  const ang = (p: Vec2) => Math.atan2(p[1] - cc.c[1], p[0] - cc.c[0]);
+  const TAU = Math.PI * 2;
+  const nrm = (x: number) => ((x % TAU) + TAU) % TAU;
+  const a0 = ang(a);
+  const am = nrm(ang(m) - a0);
+  const ab = nrm(ang(b) - a0);
+  const sweep = am < ab ? ab : ab - TAU;
+  // normalizovat na CCW
+  if (sweep < 0) return { c: cc.c, r: cc.r, a0: ang(b), sweep: -sweep };
+  return { c: cc.c, r: cc.r, a0, sweep };
+}
+
+function segPrim(s: Seg, id: string, part?: string): Prim | null {
+  if (s.kind === "line") return { kind: "line", a: s.a, b: s.b, id, part };
+  const g = arcGeom(s.a, s.m, s.b);
+  return g ? { kind: "arc", ...g, id, part } : { kind: "line", a: s.a, b: s.b, id, part };
+}
+
+/** Primitiva entity (pro uchopení, průsečíky, ořez). */
+export function prims(e: SketchEntity): Prim[] {
+  switch (e.type) {
+    case "line":
+      return [{ kind: "line", a: e.a, b: e.b, id: e.id }];
+    case "arc": {
+      const g = arcGeom(e.a, e.b, e.c);
+      return g ? [{ kind: "arc", ...g, id: e.id }] : [{ kind: "line", a: e.a, b: e.c, id: e.id }];
+    }
+    case "circle":
+      return [{ kind: "arc", c: [e.cx, e.cy], r: e.r, a0: 0, sweep: Math.PI * 2, id: e.id }];
+    case "point":
+      return [];
+    case "polyline": {
+      const out: Prim[] = e.points.slice(1).map((p, i) => ({ kind: "line" as const, a: e.points[i], b: p, id: e.id, part: `g${i}` }));
+      if (e.closed && e.points.length > 2) out.push({ kind: "line", a: e.points[e.points.length - 1], b: e.points[0], id: e.id, part: `g${e.points.length - 1}` });
+      return out;
+    }
+    case "ellipse":
+    case "spline": {
+      const { pts, closed } = entityPath(e);
+      const P = closed ? [...pts, pts[0]] : pts;
+      return P.slice(1).map((p, i) => ({ kind: "line" as const, a: P[i], b: p, id: e.id }));
+    }
+    case "slot":
+      if (e.length <= e.width) return [{ kind: "arc", c: [e.cx, e.cy], r: e.width / 2, a0: 0, sweep: Math.PI * 2, id: e.id }];
+    // eslint-disable-next-line no-fallthrough
+    default: {
+      const segs = shapeSegs(e) ?? [];
+      return segs.map((sg, i) => segPrim(sg, e.id, e.type === "rect" && !e.r ? `s${i}` : e.type === "polygon" ? `s${i}` : undefined)).filter((x): x is Prim => !!x);
     }
   }
 }
