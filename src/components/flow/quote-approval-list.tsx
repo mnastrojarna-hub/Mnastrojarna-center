@@ -27,20 +27,22 @@ function money(value: number | null, currency: string): string | null {
  * (optimistický zámek updated_at — mezitím upravenou nabídku server odmítne), „Vrátit…“ s důvodem
  * a „Otevřít“ (karta zakázky, záložka Nabídky). Nabídka bez ceny schválit nejde („bez ceny“).
  */
-export function QuoteApprovalList({ items, className, stacked }: {
+export function QuoteApprovalList({ items, className, stacked, canSend = true }: {
   items: PendingQuoteApproval[];
   className?: string;
   /** Tlačítka vždy pod textem (úzký sloupec AI přehledu). */
   stacked?: boolean;
+  /** „Schválit a odeslat“ jen schvalovatel, který smí i odesílat (marže; 31. 10. — zaměstnanec-schvalovatel ne). */
+  canSend?: boolean;
 }) {
   return (
     <ToastProvider>
-      <List items={items} className={className} stacked={stacked} />
+      <List items={items} className={className} stacked={stacked} canSend={canSend} />
     </ToastProvider>
   );
 }
 
-function List({ items, className, stacked }: { items: PendingQuoteApproval[]; className?: string; stacked?: boolean }) {
+function List({ items, className, stacked, canSend }: { items: PendingQuoteApproval[]; className?: string; stacked?: boolean; canSend: boolean }) {
   const router = useRouter();
   const notify = useNotify();
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -86,7 +88,7 @@ function List({ items, className, stacked }: { items: PendingQuoteApproval[]; cl
                   <span className="font-mono text-sm font-bold tracking-tight">{p.number ?? "Nabídka"}</span>
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-400 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-400/50"
-                    title="Čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi."
+                    title="Čeká na tvé schválení — do té doby ji nejde odeslat zákazníkovi."
                   >
                     <ShieldAlert className="h-3.5 w-3.5" aria-hidden /> Neschválená
                   </span>
@@ -118,7 +120,7 @@ function List({ items, className, stacked }: { items: PendingQuoteApproval[]; cl
                   {busy === p.quoteId ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}
                   Schválit
                 </Button>
-                {p.jobId && !p.unpriced && (
+                {p.jobId && !p.unpriced && canSend && (
                   <Button
                     type="button"
                     size="sm"

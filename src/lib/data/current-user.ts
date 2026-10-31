@@ -24,6 +24,30 @@ export interface CurrentUser {
    * Neuvedeno = ano. Rozhoduje DB (quote_author_needs_admin) — tady jen pro texty a nabídku akcí.
    */
   quoteNeedsApproval?: boolean;
+  /**
+   * 31. 10.: „Smí schvalovat nabídky ostatních" (profiles.can_approve_quotes; super admin smí vždy) → quote_approval.
+   * Kterou nabídku smí schválit, rozhoduje mayManageQuoteApproval (a DB quote_user_may_approve).
+   */
+  canApproveQuotes?: boolean;
+}
+
+/**
+ * Schvalovatelé nabídek, kteří nejsou super admin (31. 10. — „Smí schvalovat nabídky ostatních"; aktivní),
+ * pro texty „čeká na schválení (V. Volný nebo super admin)". Chyba / DB bez migrace = prázdný seznam.
+ */
+export async function listQuoteApprovers(): Promise<{ id: string; name: string }[]> {
+  if (!isSupabaseConfigured() || !hasServiceKey()) return [];
+  try {
+    const db = createAdminClient({ actor: null });
+    const { data, error } = await db.from("profiles").select("id, full_name, email")
+      .eq("can_approve_quotes", true).eq("active", true).neq("role", "super_admin").order("full_name");
+    if (error) return [];
+    return ((data ?? []) as { id: string; full_name: string | null; email: string | null }[])
+      .map((p) => ({ id: p.id, name: (p.full_name ?? "").trim() || (p.email ?? "").trim() }))
+      .filter((p) => p.name);
+  } catch {
+    return [];
+  }
 }
 
 export function initialsOf(name: string, email: string): string {
@@ -49,18 +73,19 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     let hasProfile = false;
     let mustChangePassword = false;
     let quoteNeedsApproval = true;
+    let canApproveQuotes = false;
 
     // Profil: servisním klíčem, jinak vlastní session (RLS povoluje číst sám sebe).
     const db = hasServiceKey() ? createAdminClient() : supabase;
     const base = "full_name, role, ai_access, active, password_change_required";
-    let res = await db.from("profiles").select(`${base}, quote_needs_approval`).eq("id", user.id).maybeSingle();
+    let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", user.id).maybeSingle();
     // DB bez migrace 20261030200000 (nasazení kódu před migrací) — přihlášení nesmí spadnout
-    if (res.error && /quote_needs_approval/.test(res.error.message ?? "")) {
+    if (res.error && /quote_needs_approval|can_approve_quotes/.test(res.error.message ?? "")) {
       res = await db.from("profiles").select(base).eq("id", user.id).maybeSingle() as typeof res;
     }
     const profile = res.data as {
       full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean; password_change_required?: boolean;
-      quote_needs_approval?: boolean | null;
+      quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null;
     } | null;
     if (profile) {
       hasProfile = true;
@@ -70,6 +95,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       active = profile.active !== false;
       mustChangePassword = Boolean(profile.password_change_required);
       quoteNeedsApproval = role !== "super_admin" && profile.quote_needs_approval !== false;
+      canApproveQuotes = role === "super_admin" || profile.can_approve_quotes === true;
     }
 
     const email = user.email ?? "";
@@ -85,6 +111,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       hasProfile,
       mustChangePassword,
       quoteNeedsApproval: role !== "super_admin" && quoteNeedsApproval,
+      canApproveQuotes,
     };
   } catch {
     return null;

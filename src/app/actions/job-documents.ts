@@ -37,7 +37,7 @@ import {
 import { FV_SERIES, invoiceDeliveryError, isOwnInvoiceFile } from "@/lib/jobs/invoice-file";
 import { recipientsFor, toneFor } from "@/lib/contacts/server";
 import { normEmail } from "@/lib/contacts/roles";
-import { quoteSnapshotSha } from "@/lib/jobs/quote-approval-store";
+import { quoteSnapshotSha, userMayManageQuoteApproval } from "@/lib/jobs/quote-approval-store";
 import { assertJobFileAccess, FILE_PRICE_SEND } from "@/lib/jobs/job-file-access";
 import { deliveredRows, deliveryNoteNumberOf, undocumentedRows } from "@/lib/jobs/delivery-notes";
 import { fileOfNote, issueDeliveryNote, issuedDeliveryNotes, reissueFromSnapshot } from "@/lib/jobs/delivery-notes-store";
@@ -103,10 +103,11 @@ function unpricedError(n: number, kind: JobDocumentKind): string {
 }
 
 // ── Schvalování nabídek super adminem (#25) ─────────────────
-const ISSUE_PENDING_STAFF = "Nabídka čeká na schválení super admina — PDF k odeslání vystavíš až po schválení. Náhled s vodoznakem otevřeš tlačítkem ‚PDF náhled‘.";
+// 31. 10.: schvaluje super admin nebo schvalovatel nabídek — texty bez „jen super admin"
+const ISSUE_PENDING_STAFF = "Nabídka čeká na schválení — PDF k odeslání vystavíš až po schválení. Náhled s vodoznakem otevřeš tlačítkem ‚PDF náhled‘.";
 const ISSUE_PENDING_ADMIN = "Nabídka zatím není schválená — nejdřív ji schval, pak vystav PDF.";
-const ISSUE_NOTE_REFUSED = "Poznámku k nabídce dopiš v úpravě nabídky — změnu pak schválí super admin.";
-const SNAPSHOT_RESET = "Od schválení se změnily údaje zakázky, které jsou v nabídce (zákazník, termín nebo položky) — schválení se zrušilo a nabídku musí super admin schválit znovu.";
+const ISSUE_NOTE_REFUSED = "Poznámku k nabídce dopiš v úpravě nabídky — změnu pak znovu schválí schvalovatel.";
+const SNAPSHOT_RESET = "Od schválení se změnily údaje zakázky, které jsou v nabídce (zákazník, termín nebo položky) — schválení se zrušilo a nabídku je nutné schválit znovu.";
 const SEND_STALE_PDF = "Toto PDF vzniklo před posledním schválením — vystav nové PDF nabídky a odešli ho.";
 const SEND_UPLOADED_QUOTE = "Nabídku posílej z vystaveného PDF (záložka Nabídky) — nahraný soubor nabídky odešle jen super admin.";
 
@@ -383,7 +384,9 @@ export async function generateJobDocument(
       // #25: neschválenou nabídku k odeslání nevystavíme (náhled s vodoznakem je /api/pdf/job)
       const isAdmin = user.role === "super_admin";
       if (quoteApprovalBlock({ ...quote, approvedBy: quote.approvedBy?.id ?? null })) {
-        return { ok: false, error: isAdmin ? ISSUE_PENDING_ADMIN : ISSUE_PENDING_STAFF, code: "approval" };
+        // 31. 10.: kdo nabídku smí schválit (super admin / schvalovatel cizí nabídky), dostane „nejdřív ji schval"
+        const approver = userMayManageQuoteApproval(user, { createdBy: quote.createdBy?.id ?? null, adminApprovalRequired: quote.adminApprovalRequired });
+        return { ok: false, error: approver ? ISSUE_PENDING_ADMIN : ISSUE_PENDING_STAFF, code: "approval" };
       }
       if (note && needsApproval(quote) && !isAdmin) return { ok: false, error: ISSUE_NOTE_REFUSED, code: "approval" };
       // (odeslaná = podle stavu, ne sent_at — ten u neodeslané nabídky nic neznamená)

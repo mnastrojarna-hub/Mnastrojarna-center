@@ -137,7 +137,7 @@ export interface QuoteData extends DocRefs {
 
 /** Vodoznak náhledu neschválené nabídky (#25). */
 export const UNAPPROVED_WATERMARK = "NESCHVÁLENO — NEODESÍLAT";
-export const UNAPPROVED_BANNER = "Neschválená nabídka — čeká na schválení super admina. Neodesílat zákazníkovi.";
+export const UNAPPROVED_BANNER = "Neschválená nabídka — čeká na schválení. Neodesílat zákazníkovi.";
 
 export interface ConfirmationData extends DocRefs {
   number: string;

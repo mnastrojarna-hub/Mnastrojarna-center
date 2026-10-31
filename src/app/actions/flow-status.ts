@@ -19,7 +19,7 @@ import {
   isQuoteState, lostReasonLabel, lostReasonsFor, paymentKey, quoteFactsFromRow, quoteLabel, quoteSendBlock, reasonRequired,
   relativeStampTime, stageEffect, transitionFeature, userNeedsQuoteApproval, type ActionCtx, type PaymentState, type StageEffect,
 } from "@/lib/jobs/flow-status";
-import { approveQuoteCore } from "@/lib/jobs/quote-approval-store";
+import { approveQuoteCore, userMayManageQuoteApproval } from "@/lib/jobs/quote-approval-store";
 
 /**
  * Akce podrobných stavů obchodního toku. Každý zápis je JEDEN update nebo RPC s optimistickým
@@ -341,6 +341,8 @@ async function applyQuote(
   if (to === "ke_schvaleni") return fail(QUOTE_REQUEST_RETIRED);
   if (to === "rozpracovana" && from === "ke_schvaleni") return fail(QUOTE_UNAPPROVE_PENDING);
   if (to === "schvalena" && !c.can("quote_approval")) return fail(QUOTE_ADMIN_ONLY);
+  // 31. 10.: „Vrátit k úpravě“ (zrušit schválení) jen ten, kdo nabídku smí schválit (vlastní schvalovatel ne)
+  if (to === "rozpracovana" && from === "schvalena" && !userMayManageQuoteApproval(c.user, quote)) return fail(QUOTE_ADMIN_ONLY);
   if (!canTransition("quote", from, to)) {
     if (to === "prijata" && from === "prijata") return quoteResult(c.db, quoteId, jobId);
     return fail(`Z „${QUOTE_STATES[from].label}“ nejde přejít na „${QUOTE_STATES[to].label}“.`);
@@ -501,6 +503,8 @@ export async function returnQuoteToAuthor(quoteId: string, reason: string): Prom
     const jobId = typeof row.job_id === "string" ? row.job_id : null;
     if (quote.state !== "ke_schvaleni" || quote.archived) return fail("Vrátit k přepracování jde jen neschválenou nabídku.");
     if (quote.returnedAt) return fail("Nabídka už je vrácená autorovi — čeká na jeho úpravu.");
+    // 31. 10.: schvalovatel jen cizí nabídku, která schválení potřebuje (vlastní ne) — DB R0 hlídá totéž
+    if (!userMayManageQuoteApproval(c.user, quote)) return fail(QUOTE_ADMIN_ONLY);
     const q = c.db.from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: text } as never)
       .eq("id", quoteId).eq("state", "ke_schvaleni").is("approval_returned_at", null);
     const { data, error } = await withChangeNote(q, `vráceno k přepracování: ${text}`).select("id");

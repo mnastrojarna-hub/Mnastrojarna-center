@@ -15,9 +15,11 @@ import { setQuoteState } from "@/app/actions/flow-status";
 import { StateChip } from "@/components/flow-status/state-chip";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import {
-  FLOW_PALETTE, QUOTE_STATES, VIA_META, approvalReasons, canApproveQuote, lostReasonLabel, quoteSendBlock, sendViewerOf,
+  FLOW_PALETTE, QUOTE_STATES, VIA_META, approvalReasons, canApproveQuote, lostReasonLabel, mayManageQuoteApproval,
+  quoteApproverWhoFor, quoteAwaitsText, quoteSendAfterText, quoteSendBlock, sendViewerOf,
   type FlowActionKey,
 } from "@/lib/jobs/flow-status";
+import { useAccess } from "@/components/access-provider";
 import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
 import { approvedToast, returnedSuffix } from "@/components/flow/quote-approval-copy";
 import { quoteApprovedStamp, quoteCardFlag } from "./approval";
@@ -88,8 +90,10 @@ function QuoteCard({
   const shown = quoteDisplayOf(quote);
   const meta = QUOTE_STATES[shown];
   const facts = flow?.quotes.find((q) => q.id === quote.id) ?? null;
+  const { quoteApprovers } = useAccess();
   const canApprove = facts && flow ? canApproveQuote(facts, flow.ctx, approvalReasons(facts)) : perms.margins;
-  const approver = flow ? flow.ctx.can("quote_approval") : undefined;
+  // 31. 10.: schválení TÉTO nabídky spravuje super admin, nebo schvalovatel cizí nabídky (vlastní ne)
+  const approver = facts && flow ? mayManageQuoteApproval(facts, flow.ctx) : flow ? flow.ctx.can("quote_approval") : undefined;
   // #25: odeslat podle stejných pravidel jako server (schválení + kdo smí); bez kontextu toku starší pravidlo
   const sendBlock = facts && flow ? quoteSendBlock(facts, sendViewerOf(flow.ctx)) : undefined;
   const actions = quoteActions(quote, {
@@ -98,10 +102,12 @@ function QuoteCard({
   const has = (a: QuoteAction) => actions.includes(a);
   const awaiting = !quote.archived && shown === "ke_schvaleni";
   const returned = awaiting && Boolean(quote.returnedAt);
-  const flag = awaiting ? quoteCardFlag(quote) : null;
+  // kdo nabídku schválí (z dat: schvalovatelé kromě autora + super admin; AI nabídku jen super admin)
+  const who = quoteApproverWhoFor({ adminApprovalRequired: quote.adminApprovalRequired, createdBy: quote.createdBy?.id ?? null }, quoteApprovers);
+  const flag = awaiting ? quoteCardFlag(quote, quoteApprovers) : null;
   const stamp = quoteApprovedStamp(quote);
-  // super admin schvaluje sám — „po schválení super adminem“ by mu radilo čekat na sebe
-  const sendLockText = approver ?"Nejdřív schval — pak půjde odeslat." : "Odeslat půjde po schválení super adminem.";
+  // schvalovatel schvaluje sám — „po schválení …“ by mu radilo čekat na sebe
+  const sendLockText = approver ? "Nejdřív schval — pak půjde odeslat." : quoteSendAfterText(who);
   const pdfHref = `/api/pdf/job/${jobId}?type=nabidka&quoteId=${quote.id}`;
   const runFlow = (a: QuoteAction) => {
     const key = FLOW_KEY[a];
@@ -200,7 +206,7 @@ function QuoteCard({
                 </span>
               ) : awaiting ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-px font-medium text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
-                  {approver ? "čeká na tvé schválení" : "čeká na schválení super admina"}
+                  {approver ? "čeká na tvé schválení" : quoteAwaitsText(who)}
                 </span>
               ) : (
                 <span className="text-muted-foreground">{quote.sentAt ? "bez schválení" : "nevyžaduje se"}</span>
@@ -278,7 +284,7 @@ function QuoteCard({
               {busy === "approve" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Schválit
             </Button>
           )}
-          {has("approve") && flow && quote.total !== null && (
+          {has("approve") && flow && quote.total !== null && perms.margins && (
             // #25: rovnou schválit, vystavit PDF a odeslat (dialog s návrhem e-mailu)
             <Button size="sm" variant="send" disabled={Boolean(busy)} onClick={() => flow.run("quote.approveSend", { quoteId: quote.id })}>
               <Send className="h-4 w-4" /> Schválit a odeslat
@@ -360,15 +366,22 @@ export function QuotesTab({ job }: { job: JobDetail }) {
   const flow = useFlowActions();
   const [dialog, setDialog] = React.useState<Dialogs>({ kind: "none" });
   // „Vytvořit nabídku" z hlavičky karty → rovnou editor
+  // (záložka se načítá líně a může se připojit znovu — pokyn z ?nova=1 mohl přijít dřív, než se připojila:
+  // vyřízený pokyn drží karta a za vyřízený se počítá až zavřením editoru; návrat na záložku ho znovu neotevře)
   const signal = flow?.newQuoteSignal ?? 0;
-  const [seenSignal, setSeenSignal] = React.useState(signal);
+  const seen = flow?.newQuoteSeen;
+  const [seenSignal, setSeenSignal] = React.useState(() => (seen ? seen.current : signal));
   if (signal !== seenSignal) {
     setSeenSignal(signal);
     setDialog({ kind: "editor", initial: quoteFormFromJob(job) });
   }
   const [showArchive, setShowArchive] = React.useState(false);
   const { current, archived } = splitQuotes(job.quotes);
-  const close = (o: boolean) => !o && setDialog({ kind: "none" });
+  const close = (o: boolean) => {
+    if (o) return;
+    if (seen) seen.current = signal;
+    setDialog({ kind: "none" });
+  };
   const fallbackTo = job.customerContactEmail ?? job.customerDetail?.email ?? "";
 
   const newQuote = () => setDialog({ kind: "editor", initial: quoteFormFromJob(job) });
@@ -438,6 +451,7 @@ export function QuotesTab({ job }: { job: JobDetail }) {
         quoteNumber={dialog.kind === "editor" ? dialog.quote?.number : undefined}
         approved={dialog.kind === "editor" ? Boolean(dialog.quote?.approvedBy) : false}
         currency={dialog.kind === "editor" ? dialog.quote?.currency ?? job.currency : job.currency}
+        authorId={dialog.kind === "editor" ? dialog.quote?.createdBy?.id ?? null : undefined}
       />
       {dialog.kind === "send" && (
         <QuoteSendDialog

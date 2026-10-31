@@ -6,7 +6,8 @@ import type { CurrentUser } from "@/lib/data/current-user";
 import { getJob } from "@/lib/data/jobs";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import {
-  FLOW_QUOTE_COLUMNS, QUOTE_ADMIN_ONLY, canApproveQuote, quoteFactsFromRow, quoteUnpriced,
+  FLOW_QUOTE_COLUMNS, QUOTE_ADMIN_ONLY, canApproveQuote, mayManageQuoteApproval, quoteFactsFromRow, quoteUnpriced,
+  type QuoteApproverCtx, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import { translateDbError } from "@/lib/jobs/mapping";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
@@ -71,15 +72,31 @@ async function personName(db: JobsDb, id: unknown): Promise<string | null> {
   return (p?.full_name ?? "").trim() || (p?.email ?? "").trim() || null;
 }
 
+/** Kontext schvalovatele z přihlášeného (super admin vždy; jinak „Smí schvalovat nabídky ostatních"). */
+export function approverCtxOf(user: Pick<CurrentUser, "id" | "role" | "active" | "canApproveQuotes">): QuoteApproverCtx {
+  const approver = user.active && (user.role === "super_admin" || user.canApproveQuotes === true);
+  return { can: (f) => f !== "quote_approval" || approver, userId: user.id, isSuperAdmin: user.role === "super_admin" && user.active };
+}
+
+/** Smí přihlášený spravovat schválení této nabídky (server — stejné pravidlo jako UI a DB)? */
+export function userMayManageQuoteApproval(
+  user: Pick<CurrentUser, "id" | "role" | "active" | "canApproveQuotes">,
+  q: Pick<QuoteFacts, "createdBy" | "adminApprovalRequired">,
+): boolean {
+  return mayManageQuoteApproval(q, approverCtxOf(user));
+}
+
 /**
- * Schválení nabídky — jen super admin, jen neschválená nabídka s položkami a cenami. Zapíše
- * approved_by + otisk (čas schválení doplní DB), u AI návrhu i status. S expectedUpdatedAt (seznam
- * ke schválení) projde jen nezměněná nabídka (položky i hlavička vždy posunou updated_at).
+ * Schválení nabídky — super admin, nebo (31. 10.) schvalovatel cizí nabídky, která schválení potřebuje;
+ * jen neschválená nabídka s položkami a cenami. Zapíše approved_by + otisk (čas schválení doplní DB),
+ * u AI návrhu i status. S expectedUpdatedAt (seznam ke schválení) projde jen nezměněná nabídka
+ * (položky i hlavička vždy posunou updated_at).
  */
 export async function approveQuoteCore(
   db: JobsDb, user: CurrentUser, quoteId: string, opts: { expectedUpdatedAt?: string | null; note?: string | null } = {},
 ): Promise<ActionResult<{ jobId: string | null; number: string | null }>> {
-  if (user.role !== "super_admin" || !user.active) return { ok: false, error: QUOTE_ADMIN_ONLY };
+  const ctx = approverCtxOf(user);
+  if (!user.active || !ctx.can("quote_approval")) return { ok: false, error: QUOTE_ADMIN_ONLY };
   const { data, error } = await db.from("quotes").select(FLOW_QUOTE_COLUMNS).eq("id", quoteId).maybeSingle();
   if (error) return { ok: false, error: translateDbError(error.message) };
   const row = data as Row | null;
@@ -88,7 +105,9 @@ export async function approveQuoteCore(
   const jobId = typeof row.job_id === "string" ? row.job_id : null;
   if (facts.state === "schvalena") return { ok: false, error: "Nabídka už je schválená." };
   if (quoteUnpriced(facts)) return { ok: false, error: QUOTE_UNPRICED_APPROVE };
-  if (!canApproveQuote(facts, { can: () => true })) return { ok: false, error: QUOTE_NOT_PENDING };
+  // 31. 10.: schvalovatel jen cizí nabídku, která schválení potřebuje (vlastní nikdy) — DB R3 hlídá totéž
+  if (!mayManageQuoteApproval(facts, ctx)) return { ok: false, error: QUOTE_ADMIN_ONLY };
+  if (!canApproveQuote(facts, ctx)) return { ok: false, error: QUOTE_NOT_PENDING };
   if (opts.expectedUpdatedAt && facts.updatedAt && Date.parse(opts.expectedUpdatedAt) !== Date.parse(facts.updatedAt)) {
     return { ok: false, error: QUOTE_STALE_APPROVE };
   }
@@ -145,8 +164,10 @@ export async function approvalNoticeOrigin(): Promise<string> {
 }
 
 /**
- * Best-effort: systémový e-mail aktivním super adminům „Ke schválení: nabídka …" se seznamem čekajících
- * nabídek. Každému nejvýš jednou za 30 minut (audit_log quote_approval_notice). Chyba nikdy neshodí akci.
+ * Best-effort: systémový e-mail „Ke schválení: nabídka …" se seznamem čekajících nabídek — aktivním super
+ * adminům a (31. 10.) schvalovatelům, kteří tuto nabídku smí schválit (ne autorovi; schvalovatel v seznamu
+ * vidí jen nabídky, které smí schválit). Každému nejvýš jednou za 30 minut (audit_log quote_approval_notice).
+ * Chyba nikdy neshodí akci.
  */
 export async function notifyQuoteApprovers(input: { quoteId: string; jobId: string | null; authorId: string; origin?: string }): Promise<void> {
   if (!isSupabaseConfigured() || !hasServiceKey()) return;
@@ -157,22 +178,30 @@ export async function notifyQuoteApprovers(input: { quoteId: string; jobId: stri
     if (!a || a.role === "super_admin") return;
     const authorName = (a.full_name ?? "").trim() || (a.email ?? "").trim() || "kolega";
 
-    const { data: admins } = await db.from("profiles").select("id, email").eq("role", "super_admin").eq("active", true);
-    const targets = ((admins ?? []) as { id: string; email: string | null }[]).filter((x) => x.email?.trim());
+    const { data: admins } = await db.from("profiles").select("id, email, role").eq("role", "super_admin").eq("active", true);
+    // 31. 10.: schvalovatelé (DB bez migrace → chyba → nikdo navíc)
+    const { data: approverRows } = await db.from("profiles").select("id, email")
+      .eq("can_approve_quotes", true).eq("active", true).neq("role", "super_admin");
+    const approverEmails = (approverRows ?? []) as { id: string; email: string | null }[];
+    type Target = { id: string; email: string | null; superAdmin: boolean };
+    const targets: Target[] = [
+      ...((admins ?? []) as { id: string; email: string | null }[]).map((x) => ({ ...x, superAdmin: true })),
+      ...approverEmails.map((x) => ({ ...x, superAdmin: false })),
+    ].filter((x) => x.email?.trim() && x.id !== input.authorId);
     if (!targets.length) return;
 
     const { data: pendingRows } = await db.from("quotes")
-      .select("id, number, total, currency, job_id, created_at, customer:customers!customer_id(name), creator:profiles!created_by(full_name, email)")
+      .select("id, number, total, currency, job_id, created_at, created_by, admin_approval_required, customer:customers!customer_id(name), creator:profiles!created_by(full_name, email)")
       .eq("state", "ke_schvaleni").eq("archived", false).is("approval_returned_at", null)
-      .order("created_at", { ascending: false }).limit(10);
+      .order("created_at", { ascending: false }).limit(50);
     type P = {
       id: string; number: string | null; total: number | string | null; currency: string | null; job_id: string | null;
+      created_by: string | null; admin_approval_required: boolean | null;
       customer: { name: string } | { name: string }[] | null; creator: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
     };
     const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
-    const pending = (pendingRows ?? []) as P[];
-    const current = pending.find((p) => p.id === input.quoteId);
-    if (!current) return;   // mezitím schválená / vrácená — není o čem psát
+    const all = (pendingRows ?? []) as P[];
+    if (!all.some((p) => p.id === input.quoteId)) return;   // mezitím schválená / vrácená — není o čem psát
 
     const origin = (input.origin ?? (await approvalNoticeOrigin())).replace(/\/+$/, "");
     const customerOf = (p: P) => one(p.customer)?.name ?? "bez zákazníka";
@@ -180,31 +209,37 @@ export async function notifyQuoteApprovers(input: { quoteId: string; jobId: stri
     const amount = (p: P) => (p.total === null || p.total === undefined || p.total === "" ? "bez ceny"
       : czk(Number(p.total), p.currency || "CZK"));
     const link = (p: P) => (p.job_id ? `${origin}/orders/${p.job_id}?tab=nabidky` : `${origin}/quotes`);
-    const subject = `Ke schválení: nabídka ${current.number ?? ""} – ${customerOf(current)} (${authorName})`.replace(/\s+/g, " ").trim();
-    const lines = pending.map((p) => `${p.number ?? "—"} · ${customerOf(p)} · ${authorOf(p)} · ${amount(p)}\n${link(p)}`);
-    // 1 „čeká … nabídka“, 2–4 „čekají … nabídky“, 5+ „čeká … nabídek“
-    const n = pending.length;
-    const count = `${n >= 2 && n <= 4 ? "čekají" : "čeká"} ${n} ${n === 1 ? "nabídka" : n >= 2 && n <= 4 ? "nabídky" : "nabídek"}`;
-    const text = [`Na tvé schválení ${count}:`, "", ...lines, "",
-      "Odeslat zákazníkovi je půjde až po schválení."].join("\n");
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const html = `<p>Na tvé schválení ${count}:</p><ul>${
-      pending.map((p) => `<li>${esc(`${p.number ?? "—"} · ${customerOf(p)} · ${authorOf(p)} · ${amount(p)}`)} — <a href="${esc(link(p))}">Otevřít nabídku</a></li>`).join("")
-    }</ul><p>Odeslat zákazníkovi je půjde až po schválení.</p>`;
 
     const since = new Date(Date.now() - NOTICE_THROTTLE_MS).toISOString();
     for (const t of targets) {
+      // co tento příjemce smí schválit (super admin vše; schvalovatel cizí nabídky se schvalováním — ne vlastní)
+      const mine = all.filter((p) => t.superAdmin
+        || mayManageQuoteApproval({ createdBy: p.created_by, adminApprovalRequired: p.admin_approval_required === true },
+          { can: () => true, userId: t.id, isSuperAdmin: false })).slice(0, 10);
+      const current = mine.find((p) => p.id === input.quoteId);
+      if (!current) continue;
       const { data: recent } = await db.from("audit_log").select("id").eq("action", NOTICE_ACTION).eq("entity_id", t.id)
         .gte("created_at", since).limit(1);
       if ((recent ?? []).length) continue;
+      const subject = `Ke schválení: nabídka ${current.number ?? ""} – ${customerOf(current)} (${authorName})`.replace(/\s+/g, " ").trim();
+      const lines = mine.map((p) => `${p.number ?? "—"} · ${customerOf(p)} · ${authorOf(p)} · ${amount(p)}\n${link(p)}`);
+      // 1 „čeká … nabídka“, 2–4 „čekají … nabídky“, 5+ „čeká … nabídek“
+      const n = mine.length;
+      const count = `${n >= 2 && n <= 4 ? "čekají" : "čeká"} ${n} ${n === 1 ? "nabídka" : n >= 2 && n <= 4 ? "nabídky" : "nabídek"}`;
+      const text = [`Na tvé schválení ${count}:`, "", ...lines, "",
+        "Odeslat zákazníkovi je půjde až po schválení."].join("\n");
+      const html = `<p>Na tvé schválení ${count}:</p><ul>${
+        mine.map((p) => `<li>${esc(`${p.number ?? "—"} · ${customerOf(p)} · ${authorOf(p)} · ${amount(p)}`)} — <a href="${esc(link(p))}">Otevřít nabídku</a></li>`).join("")
+      }</ul><p>Odeslat zákazníkovi je půjde až po schválení.</p>`;
       const res = await sendMail({ to: t.email!.trim(), subject, text, html, from: { system: true }, log: false });
       if (!res.sent) {
-        console.error(`[quote-approval] Upozornění super adminovi neodešlo: ${res.reason ?? "neznámý důvod"}`);
+        console.error(`[quote-approval] Upozornění schvalovateli neodešlo: ${res.reason ?? "neznámý důvod"}`);
         continue;
       }
       await logAudit({
         action: NOTICE_ACTION, entity: "profiles", entityId: t.id, actor: null,
-        diff: { quoteId: input.quoteId, number: current.number, pending: pending.length, author: authorName },
+        diff: { quoteId: input.quoteId, number: current.number, pending: mine.length, author: authorName, ...(t.superAdmin ? {} : { approver: true }) },
       });
     }
   } catch (err) {

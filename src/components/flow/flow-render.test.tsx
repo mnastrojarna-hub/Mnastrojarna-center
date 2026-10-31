@@ -225,6 +225,7 @@ beforeAll(async () => {
 beforeEach(() => {
   access.features = new Set(["workflow", "documents", "orders", "mail", "margins"]);
   Object.assign(scopeState, { all: false, canToggle: false, who: "moje", error: false, mailboxEmails: [] });
+  Object.assign(user, { role: "obchodnik", quoteNeedsApproval: undefined, canApproveQuotes: undefined });
 });
 
 describe("stránky obchodního toku — vykreslení", () => {
@@ -364,6 +365,7 @@ describe("#25 role a viditelnost — stránky toku", () => {
   it("super admin: přepínač „Všichni / Jen moje“, krok Nacenění; Nabídky se sekcí „Ke schválení“", async () => {
     access.features = new Set(["workflow", "documents", "orders", "mail", "margins", "pricing", "quote_approval", "flow_all", "dashboard"]);
     Object.assign(scopeState, { all: true, canToggle: true, who: "vsichni" });
+    Object.assign(user, { role: "super_admin" });
     let html = await page(import("@/app/(app)/inquiries/page"), { searchParams: Promise.resolve({}) });
     expect(html).toContain('aria-label="Koho zobrazit"');
     expect(html).toMatch(/role="radio" aria-checked="true"[^>]*>.*?Všichni/);
@@ -393,5 +395,17 @@ describe("#25 role a viditelnost — stránky toku", () => {
     expect(plain(html)).toContain("čeká na tvé schválení — odeslat půjde po schválení");
     expect(plain(html)).not.toContain("čeká na schválení super admina — odeslat ji zatím nejde");
     expect(plain(html)).toContain("Nacenit poptávku");
+  });
+
+  it("31. 10.: schvalovatel (obchodník se „Smí schvalovat nabídky ostatních“) — vlastní sekce Ke schválení, bez fronty AI", async () => {
+    access.features = new Set(["workflow", "documents", "orders", "mail", "margins", "quote_approval"]);
+    Object.assign(scopeState, { all: false, canToggle: false, who: "moje" });
+    Object.assign(user, { role: "obchodnik", quoteNeedsApproval: false, canApproveQuotes: true });
+    const html = await page(import("@/app/(app)/quotes/page"), { searchParams: Promise.resolve({}) });
+    expect(plain(html)).toContain("Ke schválení (2)");
+    expect(plain(html)).toContain("Nabídky kolegů, které potřebují schválení. Bez schválení je nejde odeslat.");
+    expect(plain(html)).toContain("Vlastní nabídku neschvaluješ — tvoje schválení nepotřebují");
+    expect(plain(html)).not.toContain("Nabídky od kolegů a od AI");
+    expect(plain(html)).toContain("Schválit a odeslat");
   });
 });

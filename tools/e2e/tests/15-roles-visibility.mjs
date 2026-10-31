@@ -329,7 +329,8 @@ try {
     await dlg.getByRole("heading", { name: "Nová nabídka" }).waitFor({ timeout: 30_000 });
     await dlg.locator('input[aria-label="Cena za MJ"]').first().fill("650");
     await dlg.getByRole("button", { name: "Vytvořit nabídku", exact: true }).click();
-    await waitToast(page, /vytvořena — čeká na schválení super admina/);
+    // 31. 10.: „super admina“, nebo se schvalovateli z dat „(V. Volný nebo super admin)“
+    await waitToast(page, /vytvořena — čeká na schválení (super admina|\([^)]*super admin\))/);
     const row = await eventually(() => {
       const r = sql(`select id || '|' || number from quotes where job_id = ${lit(M1.id)}`);
       expect(r, "nabídka v DB");
@@ -339,18 +340,20 @@ try {
     expect(quoteState(st.q1.id) === "ke_schvaleni|true|-", `DB: Neschválená (${quoteState(st.q1.id)})`);
     await page.reload();
     await page.locator('main section[aria-label="Zakázka"] [data-approval="pending"]').first().waitFor({ timeout: 20_000 });
-    expect(norm(await page.locator('main section[aria-label="Zakázka"]').innerText()).includes("Neschválená — čeká na schválení super admina"), "hlavička: štítek");
+    const WHO = "(super admina|\\([^)]*super admin\\))";
+    expect(new RegExp(`Neschválená — čeká na schválení ${WHO}`).test(norm(await page.locator('main section[aria-label="Zakázka"]').innerText())), "hlavička: štítek");
     const card = quoteCard(page, st.q1.number);
     await card.waitFor({ timeout: 15_000 });
     const ct = norm(await card.innerText());
-    expect(ct.includes("Neschválená — čeká na schválení super admina") && ct.includes("čeká na schválení super admina"), `karta: štítek + Schválil čeká (${ct.slice(0, 200)})`);
+    expect(new RegExp(`Neschválená — čeká na schválení ${WHO}`).test(ct) && ct.includes("čeká na schválení"), `karta: štítek + Schválil čeká (${ct.slice(0, 200)})`);
     const send = card.getByRole("button", { name: "Odeslat zákazníkovi" });
     expect(await send.isDisabled(), "Odeslat zákazníkovi zamčené");
-    expect((await send.locator("xpath=..").getAttribute("title")) === "Odeslat půjde po schválení super adminem.", "vysvětlení u zamčeného odeslání");
-    expect(ct.includes("Odeslat půjde po schválení super adminem."), "vysvětlení i jako text (dotyk)");
+    const SEND_AFTER = /^Odeslat půjde po schválení (super adminem|\([^)]*super admin\))\.$/;
+    expect(SEND_AFTER.test(await send.locator("xpath=..").getAttribute("title") ?? ""), "vysvětlení u zamčeného odeslání");
+    expect(/Odeslat půjde po schválení (super adminem|\([^)]*super admin\))\./.test(ct), "vysvětlení i jako text (dotyk)");
     await shot(page, S("10-job-unapproved-obchod"));
     await page.getByRole("button", { name: /^Doklady/ }).first().click();
-    const nab = page.getByRole("menuitem").filter({ hasText: "Neschválená — vystavíš po schválení super adminem" });
+    const nab = page.getByRole("menuitem").filter({ hasText: "Neschválená — vystavíš po schválení" });
     expect(await nab.count() === 1 && (await nab.getAttribute("aria-disabled")) === "true", "Doklady ▾ Nabídka zamčená");
     await page.keyboard.press("Escape");
     const pdf = await page.request.get(`${BASE}/api/pdf/job/${M1.id}?type=nabidka&quoteId=${st.q1.id}`);
@@ -371,7 +374,7 @@ try {
     await panel.getByRole("option").filter({ hasText: M1.number }).first().click();
     await panel.getByRole("button", { name: /^Nabídka/ }).first().click();
     await panel.getByRole("button", { name: "Vystavit PDF" }).click();
-    await panel.locator('[role="alert"]').filter({ hasText: "Nabídka čeká na schválení super admina — PDF k odeslání vystavíš až po schválení." }).waitFor({ timeout: 20_000 });
+    await panel.locator('[role="alert"]').filter({ hasText: "Nabídka čeká na schválení — PDF k odeslání vystavíš až po schválení." }).waitFor({ timeout: 20_000 });
   });
 
   // ═════════════════════ 11 · Kniha řádek a mobil ═════════════════════
@@ -515,7 +518,7 @@ try {
     const dlg = page.getByRole("dialog");
     await dlg.locator('input[type="date"]').fill(sql("select to_char(current_date + 45, 'YYYY-MM-DD')"));
     await dlg.getByRole("button", { name: /Uložit/ }).click();
-    await waitToast(page, /Nabídka upravena — změnu musí super admin znovu schválit/);
+    await waitToast(page, /Nabídka upravena — změnu musí znovu schválit (super admin|.* nebo super admin)\./);
     await eventually(() => expect(quoteState(QV.id) === "ke_schvaleni|true|-", `DB: zase neschválená (${quoteState(QV.id)})`));
     const ev = sql(`select message from job_events where job_id = ${lit(MV.id)} and type = 'quote' order by created_at desc limit 1`);
     expect(ev.includes("schválení zrušeno"), `historie: ${ev}`);
@@ -549,7 +552,7 @@ try {
       await dlg.getByRole("heading", { name: "Nová nabídka" }).waitFor({ timeout: 30_000 });
       await dlg.locator('input[aria-label="Cena za MJ"]').first().fill("480");
       await dlg.getByRole("button", { name: "Vytvořit nabídku", exact: true }).click();
-      await waitToast(dp, /čeká na schválení super admina/);
+      await waitToast(dp, /čeká na schválení (super admina|\([^)]*super admin\))/);
     });
     q2 = sql(`select id || '|' || number from quotes where job_id = ${lit(M2.id)} and created_by = ${lit(ID.dilna)}`).split("|");
     expect(q2[0] && quoteState(q2[0]) === "ke_schvaleni|true|-", "DB: nabídka zaměstnance Neschválená");

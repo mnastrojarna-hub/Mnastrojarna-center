@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { QUOTE_ADMIN_ONLY } from "@/lib/jobs/flow-status";
 
 /**
  * Akce podrobných stavů toku proti lokálnímu Supabase: skutečný PostgREST, klient nese hlavičky
@@ -275,7 +276,7 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
       expect(await quoteRow(qId)).toMatchObject({ approval_required: true, admin_approval_required: true, state: "ke_schvaleni", created_by: id("sales") });
       as("sales");
       expect((await j.approveJobQuote(qId)).error).toBe("K této akci nemáš oprávnění.");
-      expect((await a.setQuoteState(qId, "schvalena")).error).toBe("Nabídku schvaluje jen super admin.");
+      expect((await a.setQuoteState(qId, "schvalena")).error).toBe(QUOTE_ADMIN_ONLY);
       expect((await a.setQuoteState(qId, "ke_schvaleni")).error).toContain("předávat je není potřeba");
       as("admin");
       expect(await a.setQuoteState(qId, "schvalena")).toMatchObject({ ok: true, quoteState: "schvalena" });

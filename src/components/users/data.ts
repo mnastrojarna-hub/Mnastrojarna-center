@@ -19,10 +19,11 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
     const base = "id, email, full_name, role, active, ai_access, phone, position, commission_rate, last_seen_at, created_at";
     const loadProfiles = async () => {
       const res = await db.from("profiles")
-        .select(`${base}, quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at`)
+        .select(`${base}, quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at, `
+          + "can_approve_quotes, quote_approver_changed_by, quote_approver_changed_at")
         .order("created_at", { ascending: true });
       // DB bez migrace 20261030200000 — správa uživatelů jede dál (schvalování = výchozí „ano")
-      if (res.error && /quote_/.test(res.error.message ?? "")) {
+      if (res.error && /quote_|can_approve/.test(res.error.message ?? "")) {
         return await db.from("profiles").select(base).order("created_at", { ascending: true }) as typeof res;
       }
       return res;
@@ -55,6 +56,9 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       quoteNeedsApproval: p.quote_needs_approval !== false,
       quoteApprovalChangedBy: p.quote_approval_changed_by ? nameOf.get(p.quote_approval_changed_by) ?? null : null,
       quoteApprovalChangedAt: p.quote_approval_changed_at ?? null,
+      canApproveQuotes: p.role === "super_admin" || p.can_approve_quotes === true,
+      quoteApproverChangedBy: p.quote_approver_changed_by ? nameOf.get(p.quote_approver_changed_by) ?? null : null,
+      quoteApproverChangedAt: p.quote_approver_changed_at ?? null,
     }));
 
     const mailboxes: MailboxOption[] = ((mailboxesRes.data ?? []) as Mailbox[]).map((m) => ({

@@ -55,6 +55,11 @@ export interface Profile {
   /** Kdo a kdy naposledy změnil quote_needs_approval (píše trigger). */
   quote_approval_changed_by?: string | null;
   quote_approval_changed_at?: string | null;
+  /** Smí schvalovat nabídky ostatních, které schválení potřebují (vlastní ne; super admin vždy; 20261030200000). */
+  can_approve_quotes?: boolean;
+  /** Kdo a kdy naposledy změnil can_approve_quotes (píše trigger). */
+  quote_approver_changed_by?: string | null;
+  quote_approver_changed_at?: string | null;
   created_at: string;
   updated_at: string;
 }

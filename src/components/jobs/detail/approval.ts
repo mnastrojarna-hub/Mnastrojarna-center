@@ -1,4 +1,6 @@
-import { approvedStampText, quoteApprovalFlag, type QuoteApprovalFlag, type QuoteFacts } from "@/lib/jobs/flow-status";
+import {
+  approvedStampText, quoteApprovalFlag, quoteAwaitsText, type QuoteApprovalFlag, type QuoteApprover, type QuoteFacts,
+} from "@/lib/jobs/flow-status";
 import type { JobQuote } from "@/lib/jobs/types";
 import { returnedSuffix } from "@/components/flow/quote-approval-copy";
 
@@ -9,8 +11,9 @@ import { returnedSuffix } from "@/components/flow/quote-approval-copy";
 export function jobApprovalFlag(
   flowQuotes: readonly QuoteFacts[] | null | undefined,
   quotes: readonly JobQuote[],
+  approvers?: readonly QuoteApprover[] | null,
 ): { flag: QuoteApprovalFlag; suffix: string | null; at: string | null } | null {
-  const flag = quoteApprovalFlag(flowQuotes ?? []);
+  const flag = quoteApprovalFlag(flowQuotes ?? [], null, approvers);
   if (!flag) return null;
   const q = quotes.find((x) => x.id === flag.quoteId) ?? null;
   if (flag.kind === "approved") {
@@ -32,21 +35,22 @@ export function jobApprovalFlag(
  * Nápověda pod stavem karty, když nabídka čeká na super admina a uživatel nemá další krok
  * (popis fáze „Připravujeme cenu…“ by byl zavádějící — cena je hotová, čeká se na schválení).
  */
-export function approvalHint(kind: QuoteApprovalFlag["kind"] | null | undefined): string | null {
-  if (kind === "pending") return "Nabídka čeká na schválení super admina — pak ji půjde odeslat zákazníkovi.";
+export function approvalHint(kind: QuoteApprovalFlag["kind"] | null | undefined, who?: string | null): string | null {
+  if (kind === "pending") return `Nabídka ${quoteAwaitsText(who)} — pak ji půjde odeslat zákazníkovi.`;
   if (kind === "returned") return "Nabídka je vrácená autorovi k přepracování — čeká na jeho úpravu.";
   return null;
 }
 
-/** Štítek neschválené / vrácené nabídky pro její kartu (volající ví, že je zobrazená jako „Neschválená“). */
-export function quoteCardFlag(q: JobQuote): QuoteApprovalFlag | null {
+/** Štítek neschválené / vrácené nabídky pro její kartu (volající ví, že je zobrazená jako „Neschválená“).
+ *  31. 10.: `approvers` = schvalovatelé (ne super admin) — „čeká na schválení (V. Volný nebo super admin)“. */
+export function quoteCardFlag(q: JobQuote, approvers?: readonly QuoteApprover[] | null): QuoteApprovalFlag | null {
   if (q.archived) return null;
   return quoteApprovalFlag([{
     id: q.id, number: q.number, revision: q.revision, status: q.status, state: "ke_schvaleni", approvedBy: q.approvedBy?.id ?? null,
     approvalRequired: q.approvalRequired ?? true, createdBy: q.createdBy?.id ?? null, archived: false, sentAt: q.sentAt,
     validUntil: q.validUntil, aiGenerated: q.aiGenerated, supersededBy: null, createdAt: q.createdAt,
     adminApprovalRequired: q.adminApprovalRequired, returnedAt: q.returnedAt ?? null, returnNote: q.returnNote ?? null, total: q.total,
-  }]);
+  }], null, approvers);
 }
 
 /** Razítko schválené nabídky pro kartu nabídky (null = nabídka schválení nepotřebovala nebo ho nemá). */

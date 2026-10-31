@@ -42,14 +42,16 @@ async function guard(): Promise<{ user: CurrentUser; db: AdminDb } | { error: st
   return { user: access.user, db: createAdminClient({ actor: userActor(access.user) }) };
 }
 
-type Target = GuardTarget & { email: string | null; full_name: string; quote_needs_approval?: boolean | null };
+type Target = GuardTarget & {
+  email: string | null; full_name: string; quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null;
+};
 
 async function loadTarget(db: AdminDb, id: string): Promise<Target | null> {
   if (!id || typeof id !== "string") return null;
   const base = "id, role, active, email, full_name";
-  let res = await db.from("profiles").select(`${base}, quote_needs_approval`).eq("id", id).maybeSingle();
+  let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", id).maybeSingle();
   // DB bez migrace 20261030200000 (schvalování nabídek per uživatel)
-  if (res.error && /quote_needs_approval/.test(res.error.message ?? "")) {
+  if (res.error && /quote_needs_approval|can_approve_quotes/.test(res.error.message ?? "")) {
     res = await db.from("profiles").select(base).eq("id", id).maybeSingle() as typeof res;
   }
   return (res.data as Target | null) ?? null;
@@ -215,6 +217,8 @@ export interface UpdateUserChanges {
   aiAccess?: boolean;
   /** „Nabídky musí schválit super admin" (31. 10.; u super admina se nemění — schválení nepotřebuje nikdy). */
   quoteNeedsApproval?: boolean;
+  /** „Smí schvalovat nabídky ostatních" (31. 10.; u super admina se nemění — smí vždy). Nezávislé na quoteNeedsApproval. */
+  canApproveQuotes?: boolean;
 }
 
 /** Neodeslané nabídky autora, které čekají na schválení (přepočet po změně schvalování dělá DB trigger). */
@@ -274,6 +278,14 @@ export async function updateUser(
         update.quote_needs_approval = changes.quoteNeedsApproval;
       }
     }
+    if (changes.canApproveQuotes !== undefined) {
+      if (typeof changes.canApproveQuotes !== "boolean") return { ok: false, error: "Neplatné nastavení schvalování nabídek ostatních." };
+      // super admin schvaluje vždy — u něj se nastavení neukládá
+      const finalRole = (update.role as UserRole | undefined) ?? (target.role as UserRole);
+      if (finalRole !== "super_admin" && changes.canApproveQuotes !== (target.can_approve_quotes === true)) {
+        update.can_approve_quotes = changes.canApproveQuotes;
+      }
+    }
     if (Object.keys(update).length === 0) return { ok: true };
 
     if (update.role !== undefined || update.active !== undefined) {
@@ -306,8 +318,8 @@ export async function updateUser(
       diff: pendingQuotes && pendingQuotes.before !== pendingQuotes.after ? { ...update, pending_quotes: pendingQuotes } : update,
     });
     revalidateUsers();
-    if (approvalChange) {
-      // čekající nabídky se uvolnily / zamkly — tok, nabídky a karty zakázek
+    if (approvalChange || update.can_approve_quotes !== undefined) {
+      // čekající nabídky se uvolnily / zamkly, nebo se změnilo, kdo je schvaluje — tok, nabídky a karty zakázek
       revalidatePath("/quotes");
       revalidatePath("/orders", "layout");
     }

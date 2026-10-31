@@ -24,7 +24,7 @@ import { UserManagement } from "./user-management";
 import { AddUserDialog } from "./add-user-dialog";
 import { AiAccessCard } from "./ai-access-card";
 import { RolePicker } from "./role-picker";
-import { QuoteApprovalToggle, pendingQuotesNote } from "./user-dialogs";
+import { QuoteApprovalToggle, QuoteApproverToggle, pendingQuotesNote } from "./user-dialogs";
 import { ProfileForm } from "@/components/account/profile-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { AuthShell } from "@/components/account/auth-shell";
@@ -87,16 +87,34 @@ describe("správa uživatelů — render", () => {
   it("31. 10.: schvalování nabídek per uživatel — štítek v seznamu, přepínač, zpráva o přepočtu", () => {
     const list: ManagedUser[] = [
       users[0],
-      { ...users[1], id: "u-vit", fullName: "Vít Volný", quoteNeedsApproval: false },
-      { ...users[2], id: "u-dom", fullName: "Dominik Šponer", active: true },   // neuvedeno = se schvalováním
+      { ...users[1], id: "u-vit", fullName: "Vít Volný", quoteNeedsApproval: false, canApproveQuotes: true },
+      { ...users[2], id: "u-dom", fullName: "Dominik Šponer", active: true },   // neuvedeno = se schvalováním, neschvaluje
     ];
     const html = render(<UserManagement users={list} mailboxes={mailboxes} currentUserId="u-admin" aiForAll={false} />);
-    // super admin štítek nemá; Volný bez schválení; Šponer „schvaluje admin"
+    // super admin štítek nemá; Volný bez schválení + „schvaluje nabídky"; Šponer „nabídky se schválením"
     expect(html.match(/data-quote-approval="/g) ?? []).toHaveLength(2);
     expect(html).toContain('data-quote-approval="off"');
     expect(html).toContain("nabídky bez schválení");
     expect(html).toContain('data-quote-approval="on"');
-    expect(html).toContain("schvaluje admin");
+    expect(html).toContain("nabídky se schválením");
+    // 31. 10.: štítek schvalovatele jen u Volného (super admin schvaluje vždy — štítek nepotřebuje)
+    expect(html.match(/data-quote-approver="on"/g) ?? []).toHaveLength(1);
+    expect(html).toContain("schvaluje nabídky");
+    expect(html.indexOf("schvaluje nabídky")).toBeGreaterThan(html.indexOf("Vít Volný"));
+    expect(html.indexOf("schvaluje nabídky")).toBeLessThan(html.indexOf("Dominik Šponer"));
+
+    const approverOn = render(<QuoteApproverToggle id="a1" checked onChange={() => {}} superAdmin={false} changedBy="Jan Šéf" changedAt="2026-10-31T09:00:00Z" />);
+    expect(approverOn).toContain("Smí schvalovat nabídky ostatních");
+    expect(approverOn).toContain("vlastní ne");
+    expect(approverOn).toContain('aria-checked="true"');
+    expect(approverOn).toContain("Naposledy změnil(a) Jan Šéf");
+    const approverOff = render(<QuoteApproverToggle id="a2" checked={false} onChange={() => {}} superAdmin={false} />);
+    expect(approverOff).toContain("Nabídky ostatních neschvaluje.");
+    expect(approverOff).toContain('aria-checked="false"');
+    const approverAdmin = render(<QuoteApproverToggle id="a3" checked={false} onChange={() => {}} superAdmin />);
+    expect(approverAdmin).toContain("Super admin schvaluje nabídky vždy.");
+    expect(approverAdmin).toContain('aria-checked="true"');
+    expect(approverAdmin).toMatch(/<button[^>]*disabled=""/);
 
     const on = render(<QuoteApprovalToggle id="t1" checked onChange={() => {}} superAdmin={false} changedBy="Jan Šéf" changedAt="2026-10-31T09:00:00Z" />);
     expect(on).toContain("Nabídky musí schválit super admin");
@@ -116,7 +134,7 @@ describe("správa uživatelů — render", () => {
     expect(pendingQuotesNote({ before: 2, after: 2 })).toBe("");
     expect(pendingQuotesNote({ before: 2, after: 0 })).toBe(" 2 nabídky už schválení nepotřebuje — jdou odeslat hned.");
     expect(pendingQuotesNote({ before: 1, after: 0 })).toBe(" 1 nabídka už schválení nepotřebuje — jde odeslat hned.");
-    expect(pendingQuotesNote({ before: 0, after: 5 })).toBe(" 5 nabídek teď čekají na schválení super admina.");
+    expect(pendingQuotesNote({ before: 0, after: 5 })).toBe(" 5 nabídek teď čekají na schválení.");
   });
   it("prázdný seznam", () => {
     const html = render(<UserManagement users={[]} mailboxes={[]} currentUserId="x" aiForAll />);

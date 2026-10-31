@@ -12,6 +12,7 @@ import {
   stampText, stampTitle, transitionFeature, approvalReasons, quoteLabel, flowFactsFromRow, quoteFactsFromRow,
   QUOTE_ACCEPT_BLOCKED, QUOTE_ARCHIVED_SEND, QUOTE_AWAITS_APPROVAL, QUOTE_SEND_NO_RIGHT, approvedStampText,
   quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent, sendViewerOf, userNeedsQuoteApproval,
+  QUOTE_PENDING_LABEL, mayManageQuoteApproval, quoteApproverWho, quoteApproverWhoFor, quoteAwaitsText, quoteSendAfterText,
   UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META, canIssueInvoice, invoiceDeliveryOf,
   type ActionCtx, type ChangeStamp, type FlowFacts, type FlowStateMeta, type JobStamps, type QuoteFacts,
 } from "./flow-status";
@@ -490,6 +491,63 @@ describe("menuActions", () => {
     expect(nextAction(f, deriveFlow(f, [returned], TODAY), ADMIN)).toBeNull();
     expect(menuActions(f, deriveFlow(f, [returned], TODAY), ADMIN)).toContain("quote.approve");
   });
+
+  it("31. 10.: schvalovatel (quote_approval bez super admina) — jen cizí nabídku se schvalováním, vlastní nikdy; AI ne", () => {
+    // Volný = obchodník se „Smí schvalovat nabídky ostatních"; Šponer = zaměstnanec se schvalováním, bez práva
+    const VOLNY = ctx(["orders", "workflow", "documents", "margins", "quote_approval"], { userId: "volny" });
+    const SPONER = ctx(["orders", "workflow", "documents"], { userId: "sponer" });
+    const WORKER_APPROVER = ctx(["orders", "workflow", "documents", "quote_approval"], { userId: "dilna" });
+    const sponers = quote({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, createdBy: "sponer", total: 1000 });
+    const volnys = { ...sponers, createdBy: "volny" };
+    const ai = quote({ state: "ke_schvaleni", approvalRequired: true, aiGenerated: true, createdBy: null, total: 1000 });
+    expect(mayManageQuoteApproval(sponers, VOLNY)).toBe(true);
+    expect(canApproveQuote(sponers, VOLNY)).toBe(true);
+    expect(canApproveQuote(volnys, VOLNY)).toBe(false);                  // vlastní nikdy
+    expect(canApproveQuote(volnys, ADMIN)).toBe(true);                   // super admin ano
+    expect(canApproveQuote(ai, VOLNY)).toBe(false);                      // AI nabídku jen super admin
+    expect(canApproveQuote(sponers, SPONER)).toBe(false);                // bez práva nikdy
+    expect(canApproveQuote({ ...sponers, createdBy: null }, VOLNY)).toBe(true);
+    expect(canApproveQuote({ ...sponers, total: null }, VOLNY)).toBe(false);
+    expect(canApproveQuote({ ...sponers, archived: true }, VOLNY)).toBe(false);
+
+    const f = facts({ stage: "naceneni", inquiryStatus: "v_reseni" });
+    const vm = menuActions(f, deriveFlow(f, [sponers], TODAY), { ...VOLNY, withReturn: true });
+    expect(vm).toEqual(expect.arrayContaining(["quote.approve", "quote.approveSend", "quote.returnToAuthor"]));
+    expect(nextAction(f, deriveFlow(f, [sponers], TODAY), VOLNY)?.key).toBe("quote.approve");
+    const own = menuActions(f, deriveFlow(f, [volnys], TODAY), { ...VOLNY, withReturn: true });
+    expect(own).not.toContain("quote.approve");
+    expect(own).not.toContain("quote.returnToAuthor");
+    // zaměstnanec se schvalováním schválí, ale „Schválit a odeslat“ ne (odesílat smí obchodník / autor)
+    const wm = menuActions(f, deriveFlow(f, [sponers], TODAY), WORKER_APPROVER);
+    expect(wm).toContain("quote.approve");
+    expect(wm).not.toContain("quote.approveSend");
+    // Vrátit k úpravě schválené: schvalovatel u cizí ano, u vlastní ne
+    const approvedSponer = { ...sponers, state: "schvalena" as const, approvedBy: "volny" };
+    expect(menuActions(f, deriveFlow(f, [approvedSponer], TODAY), VOLNY)).toContain("quote.unapprove");
+    expect(menuActions(f, deriveFlow(f, [{ ...approvedSponer, createdBy: "volny", approvedBy: "x" }], TODAY), VOLNY)).not.toContain("quote.unapprove");
+    expect(menuActions(f, deriveFlow(f, [approvedSponer], TODAY), SPONER)).not.toContain("quote.unapprove");
+  });
+
+  it("31. 10.: kdo nabídku schválí — z dat (schvalovatelé bez autora + super admin)", () => {
+    const approvers = [{ id: "volny", name: "Vít Volný" }, { id: "nov", name: "Jana Nová" }];
+    expect(quoteApproverWho(approvers, "sponer")).toBe("V. Volný, J. Nová nebo super admin");
+    expect(quoteApproverWho(approvers, "volny")).toBe("J. Nová nebo super admin");
+    expect(quoteApproverWho([{ id: "volny", name: "Vít Volný" }], "volny")).toBeNull();
+    expect(quoteApproverWho([], "x")).toBeNull();
+    expect(quoteApproverWho(null, "x")).toBeNull();
+    expect(quoteApproverWhoFor({ adminApprovalRequired: true, createdBy: "sponer" }, approvers)).toBe("V. Volný, J. Nová nebo super admin");
+    expect(quoteApproverWhoFor({ adminApprovalRequired: false, createdBy: "sponer" }, approvers)).toBeNull();   // AI = super admin
+    expect(quoteAwaitsText("V. Volný nebo super admin")).toBe("čeká na schválení (V. Volný nebo super admin)");
+    expect(quoteAwaitsText(null)).toBe("čeká na schválení super admina");
+    expect(quoteSendAfterText("V. Volný nebo super admin")).toBe("Odeslat půjde po schválení (V. Volný nebo super admin).");
+    expect(quoteSendAfterText(null)).toBe("Odeslat půjde po schválení super adminem.");
+    const pending = quote({ id: "qp", state: "ke_schvaleni", number: "NAB-2026-040", adminApprovalRequired: true, approvalRequired: true, createdBy: "sponer" });
+    expect(quoteApprovalFlag([pending], null, [{ id: "volny", name: "Vít Volný" }])).toMatchObject({
+      kind: "pending", label: "Neschválená — čeká na schválení (V. Volný nebo super admin)",
+      title: "Nabídka NAB-2026-040 čeká na schválení (V. Volný nebo super admin) — do té doby ji nejde odeslat zákazníkovi.",
+    });
+    expect(quoteApprovalFlag([pending], null, [])).toMatchObject({ label: QUOTE_PENDING_LABEL });
+  });
 });
 
 describe("schvalování nabídek super adminem (#25)", () => {
@@ -503,7 +561,7 @@ describe("schvalování nabídek super adminem (#25)", () => {
     expect(FLOW_ACTIONS["pricing.supplierPrice"].feature).toBe("margins");
     expect(FLOW_ACTIONS["quote.returnToAuthor"]).toMatchObject({ label: "Vrátit k přepracování…", kind: "dialog" });
     expect(QUOTE_STATES.ke_schvaleni.label).toBe("Neschválená");
-    expect(QUOTE_STATES.ke_schvaleni.description).toContain("čeká na schválení super admina");
+    expect(QUOTE_STATES.ke_schvaleni.description).toContain("čeká na schválení (super admin nebo schvalovatel nabídek)");
     expect(PRICING_STATES.ceka.label).toBe("Bez ceny");
     expect(PRICING_STATES.ceka.short).toBe("Bez ceny");
   });

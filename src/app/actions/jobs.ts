@@ -642,7 +642,8 @@ function revalidateQuote(jobId: string | null) {
   revalidateJob(jobId);
 }
 
-const PENDING_SUFFIX = " — čeká na schválení super admina";
+// 31. 10.: schvaluje super admin nebo schvalovatel nabídek — historie bez jmen (kdo smí, se může změnit)
+const PENDING_SUFFIX = " — čeká na schválení";
 const QUOTE_EDIT_SENT = "Odeslanou nabídku nejde upravit — vytvoř novou verzi.";
 const QUOTE_EDIT_ARCHIVED = "Archivovanou verzi nabídky neupravuj — obnov ji z archivu, nebo vytvoř novou verzi.";
 

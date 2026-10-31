@@ -188,8 +188,8 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   await dlg.getByLabel("Poznámka na nabídce").fill(`Poznámka E2E ${TAG}`);
   await shot(page, S("01-quote-editor"));
   await dlg.getByRole("button", { name: "Vytvořit nabídku", exact: true }).click();
-  // #25 (§13): obchodníkova nabídka čeká na super admina
-  await waitToast(page, /vytvořena — čeká na schválení super admina/);
+  // #25 (§13): obchodníkova nabídka čeká na super admina (31. 10.: nebo schvalovatele — jména z dat)
+  await waitToast(page, /vytvořena — čeká na schválení (super admina|\([^)]*super admin\))/);
 
   const row = await eventually(() => {
     const r = sql(`select id || '|' || number || '|' || status || '|' || total || '|' || valid_until || '|' || lead_time_days || '|' || created_by || '|' || coalesce(approved_by::text,'-') || '|' || revision || '|' || (case when archived then 't' else 'f' end) || '|' || coalesce(note,'')
@@ -212,7 +212,7 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   expect(items.length === 2 && num(items[0].split("|")[2]) === 1250.5 && num(items[0].split("|")[3]) === PURCHASE, `položky nabídky (${items.join(" ; ")})`);
   expect(sql(`select priced_by from orders where id = ${lit(Q1.id)}`) === ID.obchod, "zakázka: nacenil = obchodník (první nacenená nabídka)");
   const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
-  expect(ev === `Nabídka ${number} vytvořena — čeká na schválení super admina|${ID.obchod}`, `historie: ${ev}`);
+  expect(ev === `Nabídka ${number} vytvořena — čeká na schválení|${ID.obchod}`, `historie: ${ev}`);
 
   const card = quoteCard(page, number);
   await card.waitFor({ timeout: 10_000 });
@@ -224,7 +224,7 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   // #25 (§7): tlačítko zůstává vidět, ale zamčené s vysvětlením
   const sendBtn = card.getByRole("button", { name: "Odeslat zákazníkovi" });
   expect(await sendBtn.count() === 1 && await sendBtn.isDisabled(), "neschválenou nabídku nejde odeslat (tlačítko zamčené)");
-  expect(t.includes("Odeslat půjde po schválení super adminem."), "vysvětlení u zamčeného odeslání");
+  expect(/Odeslat půjde po schválení (super adminem|\([^)]*super admin\))\./.test(t), "vysvětlení u zamčeného odeslání");
   expect(await card.getByRole("button", { name: "Schválit", exact: true }).count() === 0, "obchodník nabídku neschvaluje (jen super admin)");
   expect(/Nabídky\s*1/.test(await page.getByRole("tab", { name: /^Nabídky/ }).innerText()), "záložka Nabídky ukazuje 1");
   await shot(page, S("02-quote-created"));
@@ -371,7 +371,7 @@ await T("detail Nabídky: nová verze (R2) → stará archivována, „Starší 
   st.r2 = { id: n[7], number: r2 };
   expect(sql(`select count(*) from quote_items where quote_id = ${lit(st.r2.id)}`) === "2", "položky zkopírované do nové verze");
   const ev = sql(`select message from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
-  expect(ev === `Nová verze nabídky ${r2} (verze 2) — ${st.q1.number} archivována — čeká na schválení super admina`, `historie: ${ev}`);
+  expect(ev === `Nová verze nabídky ${r2} (verze 2) — ${st.q1.number} archivována — čeká na schválení`, `historie: ${ev}`);
   expect(/Nabídky\s*1/.test(await page.getByRole("tab", { name: /^Nabídky/ }).innerText()), "záložka Nabídky počítá jen aktuální (1)");
   await shot(page, S("07-quote-revision"));
 });

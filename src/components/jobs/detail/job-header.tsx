@@ -31,6 +31,8 @@ import { ProductionHeaderBadges } from "@/components/jobs/production/production-
 import { FlowActionBar, FlowNextHint, FlowProposalLine, FlowStageChip, FlowTrail, StageStamp } from "./flow-header";
 import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
 import { approvalHint, jobApprovalFlag } from "./approval";
+import { useAccess } from "@/components/access-provider";
+import { quoteApproverWhoFor } from "@/lib/jobs/flow-status";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 /** Čip DL v hlavičce: číslo z delivery_notes (jediný zdroj čísla DL); starší data bez řádku → ze souborů. */
@@ -42,9 +44,10 @@ function headerDeliveryNote(job: JobDetail): { id: string; number: string } | nu
 
 export function JobToolbar({ job }: { job: JobDetail }) {
   const { perms } = useJobDetail();
+  const { quoteApprovers } = useAccess();
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [mergeOpen, setMergeOpen] = React.useState(false);
-  const approval = jobApprovalFlag(job.flowQuotes, job.quotes);
+  const approval = jobApprovalFlag(job.flowQuotes, job.quotes, quoteApprovers);
   return (
     // -top-5 = horní odsazení <main> (pt-5): lišta se přilepí bez mezery, kterou by prosvítal obsah
     <div className="sticky -top-5 z-30 -mx-4 border-b bg-background/95 px-4 py-2 shadow-sm backdrop-blur sm:-mx-6 sm:px-6">
@@ -220,7 +223,10 @@ function Stat({ icon: Icon, tone, label, children }: { icon: typeof Banknote; to
  */
 export function JobHeader({ job }: { job: JobDetail }) {
   const { save } = useJobDetail();
-  const approval = jobApprovalFlag(job.flowQuotes, job.quotes);
+  const { quoteApprovers } = useAccess();
+  const approval = jobApprovalFlag(job.flowQuotes, job.quotes, quoteApprovers);
+  // 31. 10.: kdo čekající nabídku schválí (schvalovatelé kromě autora + super admin)
+  const approvalWho = quoteApproverWhoFor(job.flowQuotes?.find((q) => q.id === approval?.flag.quoteId), quoteApprovers);
   const m = stageMeta(job.stage);
   const currentQuotes = job.quotes.filter((q) => !q.archived).length;
   const currentFiles = job.files.filter((f) => !f.archived).length;
@@ -298,7 +304,7 @@ export function JobHeader({ job }: { job: JobDetail }) {
             <FlowProposalLine className="lg:justify-end" />
             <FlowActionBar className="lg:justify-end" />
             <ProductionHeaderBadges job={job} className="lg:justify-end" />
-            <FlowNextHint fallback={approvalHint(approval?.flag.kind) ?? m.description} className="max-w-xs text-xs text-muted-foreground lg:text-right" />
+            <FlowNextHint fallback={approvalHint(approval?.flag.kind, approvalWho) ?? m.description} className="max-w-xs text-xs text-muted-foreground lg:text-right" />
             <PrioritySwitch value={job.priority} />
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, AlertTriangle, FileCheck2, KeyRound, Loader2, Pencil, Trash2, UserX } from "lucide-react";
+import { AlertCircle, AlertTriangle, FileCheck2, KeyRound, Loader2, Pencil, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ export function pendingQuotesNote(p: { before: number; after: number } | undefin
     return ` ${quotesCz(n)} už schválení nepotřebuje — ${n === 1 ? "jde" : "jdou"} odeslat hned.`;
   }
   const n = p.after - p.before;
-  return ` ${quotesCz(n)} ${n === 1 ? "teď čeká" : "teď čekají"} na schválení super admina.`;
+  return ` ${quotesCz(n)} ${n === 1 ? "teď čeká" : "teď čekají"} na schválení.`;
 }
 
 /**
@@ -64,7 +64,7 @@ export function QuoteApprovalToggle({
             {superAdmin
               ? "Super admin schválení nepotřebuje — nabídky vystavuje i odesílá rovnou."
               : on
-                ? "Nabídky vystaví, ale zákazníkovi je odešle až po schválení super adminem."
+                ? "Nabídky vystaví, ale zákazníkovi je odešle až po schválení super adminem nebo schvalovatelem."
                 : "Nabídky vystavuje i odesílá zákazníkovi sám, bez schválení."}
           </p>
           {!superAdmin && changedAt && (
@@ -81,6 +81,60 @@ export function QuoteApprovalToggle({
         disabled={superAdmin || disabled}
         aria-label="Nabídky musí schválit super admin"
         className="mt-1 data-[state=checked]:bg-amber-500"
+      />
+    </div>
+  );
+}
+
+/**
+ * Přepínač „Smí schvalovat nabídky ostatních" (31. 10. — „Volný může schvalovat nabídky Šponera"). Nezávislý
+ * na „Nabídky musí schválit super admin". Super admin schvaluje vždy → u něj zapnutý a zamčený. Vlastní
+ * nabídku neschválí nikdo (rozhoduje DB quote_user_may_approve); tady jen nastavení profilu.
+ */
+export function QuoteApproverToggle({
+  id, checked, onChange, superAdmin, disabled, changedBy, changedAt,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  superAdmin: boolean;
+  disabled?: boolean;
+  changedBy?: string | null;
+  changedAt?: string | null;
+}) {
+  const on = superAdmin || checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-quote-approver={superAdmin ? "admin" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-sky-500/15 text-sky-600 dark:text-sky-400" : "bg-muted text-muted-foreground",
+        )}>
+          <ShieldCheck className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Smí schvalovat nabídky ostatních</label>
+          <p className="text-xs text-muted-foreground">
+            {superAdmin
+              ? "Super admin schvaluje nabídky vždy."
+              : on
+                ? "Schvaluje nabídky kolegů, které schválení potřebují (Schválit, Vrátit k přepracování) — vlastní ne."
+                : "Nabídky ostatních neschvaluje."}
+          </p>
+          {!superAdmin && changedAt && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground" suppressHydrationWarning>
+              Naposledy změnil(a) {changedBy ?? "systém"} · {formatDate(changedAt)}
+            </p>
+          )}
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={superAdmin || disabled}
+        aria-label="Smí schvalovat nabídky ostatních"
+        className="mt-1 data-[state=checked]:bg-sky-600"
       />
     </div>
   );
@@ -143,6 +197,7 @@ export function EditUserDialog({
   const [role, setRole] = React.useState<UserRole>(user.role);
   const [commission, setCommission] = React.useState(String(user.commissionPercent).replace(".", ","));
   const [quoteApproval, setQuoteApproval] = React.useState(user.quoteNeedsApproval !== false);
+  const [quoteApprover, setQuoteApprover] = React.useState(user.canApproveQuotes === true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -154,6 +209,7 @@ export function EditUserDialog({
     setRole(user.role);
     setCommission(String(user.commissionPercent).replace(".", ","));
     setQuoteApproval(user.quoteNeedsApproval !== false);
+    setQuoteApprover(user.canApproveQuotes === true);
     setError(null);
   }, [open, user]);
 
@@ -170,6 +226,7 @@ export function EditUserDialog({
         role: isSelf ? undefined : role,
         commissionRate: role === "obchodnik" || user.commissionPercent > 0 ? commission : undefined,
         quoteNeedsApproval: role === "super_admin" ? undefined : quoteApproval,
+        canApproveQuotes: role === "super_admin" ? undefined : quoteApprover,
       });
       if (!res.ok) {
         setError(res.error ?? "Uložení se nepovedlo.");
@@ -219,6 +276,15 @@ export function EditUserDialog({
             superAdmin={role === "super_admin"}
             changedBy={user.quoteApprovalChangedBy}
             changedAt={user.quoteApprovalChangedAt}
+          />
+
+          <QuoteApproverToggle
+            id={`eu-quote-approver-${user.id}`}
+            checked={quoteApprover}
+            onChange={setQuoteApprover}
+            superAdmin={role === "super_admin"}
+            changedBy={user.quoteApproverChangedBy}
+            changedAt={user.quoteApproverChangedAt}
           />
 
           {(role === "obchodnik" || user.commissionPercent > 0) && (

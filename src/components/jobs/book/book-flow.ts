@@ -3,7 +3,7 @@ import type { JobListItem } from "@/lib/jobs/types";
 import type { UserRole } from "@/lib/supabase/database.types";
 import {
   deriveFlow, nextAction, primaryChip, quoteApprovalFlag, transitionFeature, type ActionCtx, type ChangeStamp,
-  type FlowActionKey, type FlowSnapshot, type PhaseChip, type QuoteApprovalFlag,
+  type FlowActionKey, type FlowSnapshot, type PhaseChip, type QuoteApprovalFlag, type QuoteApprover,
 } from "@/lib/jobs/flow-status";
 
 /**
@@ -19,6 +19,8 @@ export interface BookAccess {
   role: UserRole | null;
   /** Nabídky uživatele musí schválit super admin (profil, 31. 10.). */
   quoteNeedsApproval?: boolean;
+  /** 31. 10.: schvalovatelé (ne super admin) — štítek „čeká na schválení (V. Volný nebo super admin)“. */
+  quoteApprovers?: QuoteApprover[];
 }
 
 export function actionCtxOf(access: BookAccess | null | undefined, job?: Pick<JobListItem, "assignee"> & Partial<Pick<JobListItem, "owner">>): ActionCtx {
@@ -76,7 +78,7 @@ export function rowFlowView(job: JobListItem, access?: BookAccess | null, today?
   const stamp = job.stamps?.stage ?? null;
   const chipStamp = chip && chip.phase !== "proposal" && chip.stamp && !sameStamp(chip.stamp, stamp) ? chip.stamp : null;
   const proposal = facts.proposal;
-  const approval = rowApprovalFlag(job);
+  const approval = rowApprovalFlag(job, access?.quoteApprovers);
   return {
     approval,
     chipIsApproval: approval?.kind === "pending" && isPendingQuoteChip(chip),
@@ -99,8 +101,8 @@ export function isPendingQuoteChip(chip: PhaseChip | null | undefined): boolean 
  * Štítek schválení řádku Knihy (pending / returned; schválenou Kniha neoznačuje). Když je hlavní chip
  * sám „Neschválená“, řádek štítek ukáže MÍSTO chipu (`chipIsApproval`), jinak za ním.
  */
-export function rowApprovalFlag(job: Pick<JobListItem, "flowQuotes">): QuoteApprovalFlag | null {
-  const flag = quoteApprovalFlag(job.flowQuotes ?? []);
+export function rowApprovalFlag(job: Pick<JobListItem, "flowQuotes">, approvers?: readonly QuoteApprover[] | null): QuoteApprovalFlag | null {
+  const flag = quoteApprovalFlag(job.flowQuotes ?? [], null, approvers);
   if (!flag || flag.kind === "approved") return null;
   return flag;
 }

@@ -21,6 +21,7 @@ import {
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { FEATURE_HINTS, FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
 import { listJobs, getJobStageCounts, getJobFormOptions } from "@/lib/data/jobs";
+import { listQuoteApprovers } from "@/lib/data/current-user";
 import { listOperationLocations } from "@/lib/data/production";
 import { paymentStateOf } from "@/lib/jobs/mapping";
 
@@ -58,17 +59,21 @@ export default async function OrdersPage({
 
   const { can, features } = await getAccess();
   const margins = can("margins");
-  const access: BookAccess = { features, userId: user.id, role: user.role, quoteNeedsApproval: user.quoteNeedsApproval !== false };
   const chipSegment = params.segment === "objednavky" || params.segment === "poptavky";
   // objednávky v běhu: hodnota (jen s právem na marže) a faktury po splatnosti
-  const [jobs, counts, options, running, production, flowCounts] = await Promise.all([
+  const [jobs, counts, options, running, production, flowCounts, quoteApprovers] = await Promise.all([
     listJobs(bookParamsToFilters(params)),
     getJobStageCounts(),
     getJobFormOptions(),
     listJobs({ stages: ORDER_STAGES }),
     listOperationLocations(),
     chipSegment ? getFlowCounts() : Promise.resolve({} as Record<string, number>),
+    // 31. 10.: schvalovatelé (štítek „čeká na schválení (V. Volný nebo super admin)“)
+    listQuoteApprovers(),
   ]);
+  const access: BookAccess = {
+    features, userId: user.id, role: user.role, quoteNeedsApproval: user.quoteNeedsApproval !== false, quoteApprovers,
+  };
 
   const today = todayInPrague();
   const overdueInvoices = running.filter((j) => paymentStateOf(j, today) === "po_splatnosti").length;

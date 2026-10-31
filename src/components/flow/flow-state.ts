@@ -1,6 +1,7 @@
 import {
   CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FULFILMENT_STATES, INQUIRY_STATES, ORDER_STATES, PRICING_STATES,
-  QUOTE_STATES, canApproveQuote, deliveryProgress, lostReasonLabel, productionProgress, quoteLabel, quoteSendBlock, quoteUnpriced,
+  QUOTE_STATES, canApproveQuote, deliveryProgress, lostReasonLabel, mayManageQuoteApproval, productionProgress, quoteLabel,
+  quoteSendBlock, quoteUnpriced,
   waitingText, type ActionCtx, type ChangeStamp, type FlowActionKey, type FlowFacts, type FlowPhase, type FlowSnapshot,
   type PaletteKey, type Progress, type QuoteDisplayState, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
@@ -241,13 +242,15 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
   const add = (k: FlowActionKey) => { if (!keys.includes(k)) keys.push(k); };
 
   const unpriced = quoteUnpriced(q);
-  const mayReturn = ctx.withReturn === true && ctx.can("quote_approval") && !q.returnedAt && !q.archived;
+  // 31. 10.: schválení spravuje super admin, nebo schvalovatel cizí nabídky (mayManageQuoteApproval)
+  const manages = mayManageQuoteApproval(q, ctx);
+  const mayReturn = ctx.withReturn === true && manages && !q.returnedAt && !q.archived;
   if (unpriced) {
     // bez ceny nejde odeslat ani schválit — další krok je doplnit cenu (na kartě zakázky)
     next = r.hasJob && ok("quote.edit") ? { key: "quote.edit", label: "Doplnit cenu" } : null;
     add("quote.edit");
     if (st === "ke_schvaleni" && mayReturn) add("quote.returnToAuthor");
-    if (st === "schvalena") add("quote.unapprove");
+    if (st === "schvalena" && manages) add("quote.unapprove");
   } else if (st === "rozpracovana") {
     // rozpracovaná = schválení není nutné (nabídka super admina)
     next = r.hasJob && canSend ? step("quote.send") : null;
@@ -258,12 +261,12 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
     next = q.returnedAt
       ? (q.createdBy === ctx.userId && r.hasJob ? { key: "quote.edit", label: "Upravit podle připomínek" } : null)
       : canApprove ? step("quote.approve") : null;
-    if (canApprove) { add("quote.approve"); if (r.hasJob) add("quote.approveSend"); }
+    if (canApprove) { add("quote.approve"); if (r.hasJob && margins) add("quote.approveSend"); }
     if (mayReturn) add("quote.returnToAuthor");
   } else if (st === "schvalena") {
     next = r.hasJob && canSend ? step("quote.send") : null;
     if (r.hasJob && canSend) { add("quote.send"); add("quote.markSent"); }
-    add("quote.unapprove");
+    if (manages) add("quote.unapprove");
   } else if (st === "odeslana" || st === "pripominky") {
     next = r.display === "vyprsela" ? step("quote.extend") : st === "pripominky" ? step("quote.newRevision") : step("quote.accept");
     if (r.hasJob) {
