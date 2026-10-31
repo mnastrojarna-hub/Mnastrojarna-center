@@ -11,6 +11,7 @@ import {
   Circle,
   Color,
   DwgWriter,
+  type Entity,
   Layer,
   LineType,
   LineTypeSegment,
@@ -209,7 +210,7 @@ export async function sketchToDwg(entities: SketchEntity[], opts: { version?: Dw
     const aux = ctx.layers.get("POMOCNE")!;
     for (const e of entities) {
       const layer = e.construction ? aux : main;
-      let ent: InstanceType<typeof Circle> | InstanceType<typeof LwPolyline> | InstanceType<typeof Point> | null = null;
+      let ent: Entity | null = null;
       if (e.type === "circle") ent = new Circle(new XYZ(e.cx, e.cy, 0), e.r);
       else if (e.type === "point") ent = new Point(new XYZ(e.p[0], e.p[1], 0));
       else if (e.type === "arc") {

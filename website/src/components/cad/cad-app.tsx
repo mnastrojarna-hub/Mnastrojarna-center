@@ -7,7 +7,7 @@ import type { Interference } from "@/cad/asm-kernel";
 import { alignFaces, apply3, bomCsv, emptyAssembly, ejectorPin, explodeOffset, guideBush, guidePillar, locatingRing, moldBase, partComponent, placementMatrix, rotMatrix, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import { cad } from "@/cad/client";
 import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
-import { keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
+import { keyCombo, loadRecent, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
 import { EXAMPLES, FEATURE_LABEL, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
@@ -141,6 +141,7 @@ export function CadApp() {
   const [draftSetup, setDraftSetup] = useState<DraftSetup>({ on: false, pull: [0, 0, 1], minDeg: 1 });
   const [partingZ, setPartingZ] = useState<{ z: number; perimeter: number } | null>(null);
   const docId = useRef(uid());
+  const lastThumb = useRef(0);
   const parentAsm = asmStack.length ? asmStack[asmStack.length - 1] : null;
   const setParentAsm = (v: null) => setAsmStack(v === null ? [] : []);
   const vp = useRef<ViewportHandle>(null);
@@ -206,7 +207,15 @@ export function CadApp() {
         localStorage.setItem(STORE, json);
         if (doc.features.length || doc.components?.length) {
           storeRecentDoc(docId.current, json);
-          pushRecent({ id: docId.current, name: doc.name, kind: doc.kind === "assembly" ? "assembly" : "part", at: Date.now(), features: doc.kind === "assembly" ? (doc.components?.length ?? 0) : doc.features.length }, loadSettings().recentLimit);
+          const entry = { id: docId.current, name: doc.name, kind: (doc.kind === "assembly" ? "assembly" : "part") as "assembly" | "part", at: Date.now(), features: doc.kind === "assembly" ? (doc.components?.length ?? 0) : doc.features.length };
+          const limit = loadSettings().recentLimit;
+          // náhled nejvýš jednou za 10 s (snímek 3D okna zmenšený na 160×120)
+          if (Date.now() - lastThumb.current > 10_000 && vp.current) {
+            lastThumb.current = Date.now();
+            const snap = vp.current.snapshot();
+            if (snap) thumbnail(snap).then((thumb) => pushRecent({ ...entry, thumb }, limit)).catch(() => pushRecent(entry, limit));
+            else pushRecent(entry, limit);
+          } else pushRecent({ ...entry, thumb: loadRecentThumb(docId.current) }, limit);
         }
       } catch {
         /* příliš velké / soukromý režim */
@@ -2199,4 +2208,31 @@ function Modal({ title, icon, onClose, children }: { title: string; icon: CadIco
       </div>
     </div>
   );
+}
+
+/** Zmenší snímek 3D okna (data URL) na náhled 160×120 (JPEG) pro seznam nedávných souborů. */
+function thumbnail(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = 160;
+      c.height = 120;
+      const g = c.getContext("2d");
+      if (!g) return reject(new Error("canvas"));
+      const sc = Math.max(160 / img.width, 120 / img.height);
+      const w = img.width * sc;
+      const h = img.height * sc;
+      g.fillStyle = "#dfe5eb";
+      g.fillRect(0, 0, 160, 120);
+      g.drawImage(img, (160 - w) / 2, (120 - h) / 2, w, h);
+      resolve(c.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = () => reject(new Error("img"));
+    img.src = dataUrl;
+  });
+}
+
+function loadRecentThumb(id: string): string | undefined {
+  return loadRecent().find((r) => r.id === id)?.thumb;
 }
