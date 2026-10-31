@@ -93,7 +93,7 @@ export function CustomerPricingProfile({ customer }: { customer: Customer }) {
             </select>
           </Field>
           <Field label="Roční obrat (Kč)">
-            <Input value={form.annualRevenueCzk} onChange={(e) => set("annualRevenueCzk", e.target.value)} type="number" placeholder="např. 1 500 000" />
+            <Input value={form.annualRevenueCzk} onChange={(e) => set("annualRevenueCzk", e.target.value)} type="number" placeholder="roční obrat v Kč" className="placeholder:italic" />
           </Field>
         </div>
         <label className="flex items-center gap-2 text-sm">

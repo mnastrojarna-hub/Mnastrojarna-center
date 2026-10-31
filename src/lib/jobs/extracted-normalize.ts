@@ -89,7 +89,7 @@ function normalizeEmail(v: unknown): string {
   return cleanText(v).replace(/^mailto:/i, "").replace(/\s+/g, "").toLowerCase();
 }
 
-const ROLE_EMAIL_ROLES = ["fakturace", "nakup", "nabidky", "komunikace"] as const;
+const ROLE_EMAIL_ROLES = ["fakturace", "nakup", "dodaci_listy", "nabidky", "komunikace"] as const;
 
 /** roleEmails z AI: jen platné adresy, známé účely, bez duplicit (max. 10). */
 export function normalizeRoleEmails(v: unknown): ExtractedRoleEmail[] {

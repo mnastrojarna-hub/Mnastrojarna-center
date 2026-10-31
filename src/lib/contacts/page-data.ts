@@ -11,7 +11,7 @@ import type { ContactTones } from "@/components/customers/contacts-manager";
  * Bez oprávnění / DB → prázdné (karta se vykreslí jako dřív).
  */
 export async function getContactBook(kind: PartyKind, id: string): Promise<{
-  roles: RoleEntry[]; contacts: BookContact[]; partyEmail: string | null; tones: ContactTones;
+  roles: RoleEntry[]; contacts: BookContact[]; partyEmail: string | null; tones: ContactTones; schemaMissing?: boolean;
 }> {
   const empty = { roles: [], contacts: [], partyEmail: null, tones: {} };
   if (!isSupabaseConfigured()) return empty;
@@ -27,7 +27,7 @@ export async function getContactBook(kind: PartyKind, id: string): Promise<{
       const s = c.email ? map.get(c.email) : undefined;
       if (c.email && s) tones[c.email] = { address: s.address, summary: toneSummary(s, c.name) };
     }
-    return { roles: book.roles, contacts: book.contacts, partyEmail: book.partyEmail, tones };
+    return { roles: book.roles, contacts: book.contacts, partyEmail: book.partyEmail, tones, ...(book.schemaMissing ? { schemaMissing: true } : {}) };
   } catch {
     return empty;
   }

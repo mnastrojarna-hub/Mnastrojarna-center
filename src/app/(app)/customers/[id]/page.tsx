@@ -273,11 +273,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </Panel>
 
           {/* Kam co posílat — faktury, objednávky, nabídky, běžná pošta */}
-          <Panel icon={<Send />} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="E-maily podle účelu">
+          <Panel icon={<Send />} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="Kam posílat (e-maily podle účelu)">
             <p className="mb-2.5 text-xs text-muted-foreground">
-              Faktura jde vždy na Fakturaci, nabídka na Nabídky, potvrzení a dodací listy na Nákup. Kontakt zakázky má přednost (u faktury jde do kopie).
+              Faktura jde vždy na Faktury, dodací list na Dodací listy, nabídka na Nabídky, potvrzení na Objednávky / potvrzení.
+              Kontakt zakázky má u nabídek a potvrzení přednost (u faktury jde do kopie). Totéž nastavíš i v okně „Upravit“.
             </p>
-            <RoleEmailsEditor kind="customer" partyId={c.id} roles={book.roles} contacts={book.contacts} partyEmail={c.email} />
+            <RoleEmailsEditor kind="customer" partyId={c.id} roles={book.roles} contacts={book.contacts} partyEmail={c.email} schemaMissing={book.schemaMissing} />
           </Panel>
 
           {/* Výkresy — jen s právem na archiv výkresů */}

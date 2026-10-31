@@ -252,7 +252,7 @@ describe.skipIf(!LOCAL_ENABLED)("Kontakty — účely e-mailů, tykání, našep
     // kontext zákazníka: jeho adresy nahoře i bez psaní (fakturační s účelem)
     const ctx = await searchRecipients(svc, vitView, "", { customerId });
     expect(ctx.slice(0, 4).map((s) => s.email)).toEqual(expect.arrayContaining([PAVEL, FAKT]));
-    expect(ctx.find((s) => s.email === FAKT)?.roles).toContain("Fakturace");
+    expect(ctx.find((s) => s.email === FAKT)?.roles).toContain("Faktury");
     // akce pro klienta (dotaz + kontext + vyloučení vybraných)
     asVit();
     const { searchRecipientsAction } = await import("@/app/actions/mail-compose");
@@ -286,6 +286,109 @@ describe.skipIf(!LOCAL_ENABLED)("Kontakty — účely e-mailů, tykání, našep
       await svc.from("suppliers").delete().eq("id", supplierId);
     }
   });
+
+  it("dialog zákazníka: kontakty + Kam posílat najednou → faktura A, dodací list B, běžná pošta C; odebrání, změna adresy, chyba = nic", async () => {
+    asVit();
+    const crm = await import("@/app/actions/crm");
+    const { recipientsFor } = await import("./server");
+    const bd = await import("./book-draft");
+    const { EMPTY_CUSTOMER_FORM } = await import("@/components/customers/model");
+    const D = `dlg-${TAG}.test`;
+    const form = { ...EMPTY_CUSTOMER_FORM, name: `Dialog ${TAG} s.r.o.`, email: `info@${D}` };
+    let d = bd.emptyBookDraft(true);
+    const a = d.contacts[0].key;
+    d = bd.draftUpdateContact(d, a, { name: "Anna Účetní", email: `anna@${D}`, position: "účetní" });
+    const rb = bd.draftAddContact(d);
+    d = bd.draftUpdateContact(rb.draft, rb.key, { name: "Bohouš Sklad", email: `sklad@${D}`, phone: "+420 600 100 200" });
+    const rc = bd.draftAddContact(d);
+    d = bd.draftUpdateContact(rc.draft, rc.key, { name: "Cyril Nákup", email: `cyril@${D}` });
+    for (const [role, key] of [["fakturace", a], ["dodaci_listy", rb.key], ["komunikace", rc.key]] as const) {
+      const r = bd.draftAddRole(d, role, { contactId: key });
+      if ("error" in r) throw new Error(r.error);
+      d = r.draft;
+    }
+    const input = bd.bookInputFromDraft("customer", d);
+    if ("error" in input) throw new Error(input.error);
+    const created = await crm.createCustomer(form, input.input);
+    expect(created.ok, created.error).toBe(true);
+    const id = created.id!;
+    try {
+      const roles = () => localSql(`select r.role || ':' || coalesce(k.email, r.email) || ':' || (case when r.is_default then 't' else 'f' end)
+        from party_role_emails r left join customer_contacts k on k.id = r.contact_id where r.customer_id = '${id}' order by 1`);
+      expect(roles()).toBe(`dodaci_listy:sklad@${D}:t\nfakturace:anna@${D}:t\nkomunikace:cyril@${D}:t`);
+      expect(localSql(`select string_agg(name || '|' || coalesce(position, '') || '|' || coalesce(phone, '') || '|' || is_primary, ';' order by name) from customer_contacts where customer_id = '${id}'`))
+        .toBe("Anna Účetní|účetní||true;Bohouš Sklad||+420 600 100 200|false;Cyril Nákup|||false");
+      expect(localSql(`select contact_person from customers where id = '${id}'`)).toBe("Anna Účetní");
+      expect(localSql(`select count(*) from audit_log where action = 'party_book_saved' and entity_id = '${id}'`)).toBe("1");
+
+      // odeslání: faktura → Anna (Faktury), DL → Bohouš (Dodací listy, i když má zakázka kontakt), potvrzení → kontakt zakázky
+      const job = { email: `vedouci@${D}`, name: "Vedoucí" };
+      expect(await recipientsFor(svc, "faktura", { customerId: id }, null)).toMatchObject({ to: [`anna@${D}`], source: "role" });
+      const dl = await recipientsFor(svc, "dodaci_list", { customerId: id }, job);
+      expect(dl).toMatchObject({ to: [`sklad@${D}`], cc: [], source: "role", reason: "E-mail pro dodací listy (Bohouš Sklad)" });
+      expect((await recipientsFor(svc, "potvrzeni", { customerId: id }, job)).to).toEqual([`vedouci@${D}`]);
+      expect((await recipientsFor(svc, "ostatni", { customerId: id }, null)).to).toEqual([`cyril@${D}`]);
+
+      // druhé uložení z načteného stavu: Cyril pryč (i z Běžné), Bohouš nová adresa (tykání jde za ní), Běžná = adresa
+      await svc.from("contact_tone").insert({ user_id: users.vit.id, email: `sklad@${D}`, address: "ty" });
+      const { loadAddressBook } = await import("./server");
+      let d2 = bd.draftFromBook(await loadAddressBook(svc, { customerId: id }));
+      const cyril = d2.contacts.find((c) => c.name === "Cyril Nákup")!;
+      const bohous = d2.contacts.find((c) => c.name === "Bohouš Sklad")!;
+      d2 = bd.draftRemoveContact(d2, cyril.key);
+      d2 = bd.draftUpdateContact(d2, bohous.key, { email: `prijem@${D}` });
+      const r = bd.draftAddRole(d2, "komunikace", { email: `obchod@${D}` });
+      if ("error" in r) throw new Error(r.error);
+      const in2 = bd.bookInputFromDraft("customer", r.draft);
+      if ("error" in in2) throw new Error(in2.error);
+      const upd = await crm.updateCustomer(id, form, in2.input);
+      expect(upd.ok, upd.error).toBe(true);
+      expect(roles()).toBe(`dodaci_listy:prijem@${D}:t\nfakturace:anna@${D}:t\nkomunikace:obchod@${D}:t`);
+      expect(localSql(`select count(*) from customer_contacts where customer_id = '${id}'`)).toBe("2");
+      expect(localSql(`select email from contact_tone where user_id = '${users.vit.id}' and address = 'ty' and email like '%${D}'`)).toBe(`prijem@${D}`);
+
+      // AI mezitím přidala adresu → dialog ji nesmaže (nebyla v načteném stavu)
+      await svc.from("party_role_emails").insert({ customer_id: id, role: "nabidky", email: `rfq@${D}`, is_default: true, source: "ai" });
+      const upd2 = await crm.updateCustomer(id, form, in2.input);
+      expect(upd2.ok, upd2.error).toBe(true);
+      expect(roles()).toContain(`nabidky:rfq@${D}:t`);
+
+      // chyba v kontaktech → nic se neuloží (ani firma)
+      const bad = await crm.updateCustomer(id, { ...form, name: `Jiný ${TAG}` }, { ...in2.input, contacts: [...in2.input.contacts, { key: "kx", id: null, name: "", position: null, email: null, phone: null, isPrimary: false }] });
+      expect(bad.ok).toBe(false);
+      expect(bad.error).toMatch(/Zadej jméno/);
+      expect(localSql(`select name from customers where id = '${id}'`)).toBe(`Dialog ${TAG} s.r.o.`);
+      // RPC přes REST nejde
+      const vit = await localSession(users.vit.email, users.vit.password);
+      expect((await vit.rpc("save_party_book", { p_kind: "customer", p_party: id, p_book: { contacts: [], roles: [] } })).error).not.toBeNull();
+    } finally {
+      await svc.from("contact_tone").delete().like("email", `%@${D}`);
+      await svc.from("customers").delete().eq("id", id);
+    }
+  }, 60_000);
+
+  it("dodavatel z dialogu: osoby + Objednávky najednou; dodavatel Dodací listy nemá", async () => {
+    asVit();
+    const crm = await import("@/app/actions/crm");
+    const { recipientsFor } = await import("./server");
+    const { EMPTY_SUPPLIER_FORM } = await import("@/components/suppliers/model");
+    const D = `dlgs-${TAG}.test`;
+    const book = {
+      contacts: [{ key: "k1", id: null, name: "Jana Obchod", position: "obchod", email: `jana@${D}`, phone: null, isPrimary: true }],
+      roles: [{ id: null, role: "nakup" as const, contactKey: "k1", email: null, isDefault: true }],
+      knownContactIds: [], knownRoleIds: [],
+    };
+    const bad = await crm.createSupplier({ ...EMPTY_SUPPLIER_FORM, name: `Kooperace ${TAG}` }, { ...book, roles: [{ id: null, role: "dodaci_listy" as never, contactKey: "k1", email: null, isDefault: true }] });
+    expect(bad).toMatchObject({ ok: false, error: "Neplatný účel e-mailu." });
+    const created = await crm.createSupplier({ ...EMPTY_SUPPLIER_FORM, name: `Kooperace ${TAG}`, email: `info@${D}` }, book);
+    expect(created.ok, created.error).toBe(true);
+    try {
+      expect(await recipientsFor(svc, "objednavka_dodavateli", { supplierId: created.id! })).toMatchObject({ to: [`jana@${D}`], reason: "E-mail dodavatele pro objednávky (Jana Obchod)" });
+      expect(localSql(`select contact_person from suppliers where id = '${created.id}'`)).toBe("Jana Obchod");
+    } finally {
+      await svc.from("suppliers").delete().eq("id", created.id!);
+    }
+  }, 30_000);
 
   it("mail_address_suggest: viditelnost podle uživatele, přes REST nejde", async () => {
     const { data } = await svc.rpc("mail_address_suggest", { p_q: TAG.slice(0, 6), p_user: users.vit.id, p_all: false, p_limit: 50 });

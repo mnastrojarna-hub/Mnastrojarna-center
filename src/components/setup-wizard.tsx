@@ -141,24 +141,25 @@ export function SetupWizard({ status }: { status: SetupStatus }) {
 // ── Krok 5: Firemní údaje (jdou na nabídky, faktury, dodací listy) ──
 
 const COMPANY_FIELDS: { key: string; label: string; placeholder?: string; span2?: boolean }[] = [
-  { key: "company_name", label: "Název firmy", placeholder: "MNástrojárna s.r.o.", span2: true },
-  { key: "company_street", label: "Ulice a č.p.", placeholder: "Varšavská 715/36" },
-  { key: "company_city", label: "Město", placeholder: "Praha 2" },
-  { key: "company_zip", label: "PSČ", placeholder: "120 00" },
-  { key: "company_ico", label: "IČO", placeholder: "04304080" },
-  { key: "company_dic", label: "DIČ", placeholder: "CZ04304080" },
-  { key: "company_email", label: "Firemní e-mail", placeholder: "obchod@mnastrojarna.cz" },
-  { key: "company_phone", label: "Telefon", placeholder: "+420 …" },
-  { key: "company_web", label: "Web", placeholder: "www.mnastrojarna.cz" },
-  { key: "company_bank_account", label: "Číslo účtu", placeholder: "123456789/0100" },
-  { key: "company_iban", label: "IBAN", placeholder: "CZ.." },
-  { key: "company_bank_name", label: "Banka", placeholder: "Komerční banka, a.s." },
-  { key: "company_registration", label: "Zápis v OR (spisová značka)", placeholder: "C 245678, Městský soud v Praze", span2: true },
+  // vzory = jen nápověda (kurzíva), nikdy hodnoty, které by vypadaly jako data
+  { key: "company_name", label: "Název firmy", placeholder: "název firmy včetně právní formy", span2: true },
+  { key: "company_street", label: "Ulice a č.p.", placeholder: "ulice a číslo popisné" },
+  { key: "company_city", label: "Město", placeholder: "město" },
+  { key: "company_zip", label: "PSČ", placeholder: "PSČ" },
+  { key: "company_ico", label: "IČO", placeholder: "8 číslic" },
+  { key: "company_dic", label: "DIČ", placeholder: "CZ + číslo" },
+  { key: "company_email", label: "Firemní e-mail", placeholder: "obecný e-mail firmy" },
+  { key: "company_phone", label: "Telefon", placeholder: "telefon" },
+  { key: "company_web", label: "Web", placeholder: "web" },
+  { key: "company_bank_account", label: "Číslo účtu", placeholder: "číslo účtu / kód banky" },
+  { key: "company_iban", label: "IBAN", placeholder: "IBAN" },
+  { key: "company_bank_name", label: "Banka", placeholder: "název banky" },
+  { key: "company_registration", label: "Zápis v OR (spisová značka)", placeholder: "spisová značka a rejstříkový soud", span2: true },
   // kam nám dodavatelé vozí díly (objednávky dodavatelům); prázdné = korespondenční adresa provozovny
-  { key: "company_delivery_address", label: "Dodací adresa (provozovna) — na objednávky dodavatelům", placeholder: "MNástrojárna s.r.o., Mezná 9, 393 01 Mezná", span2: true },
+  { key: "company_delivery_address", label: "Dodací adresa (provozovna) — na objednávky dodavatelům", placeholder: "adresa provozovny, jen když se liší od sídla", span2: true },
   // podpis e-mailu (Pošta → Nastavení pošty): firemní blok varianty Firemní / Vizitka
-  { key: "company_correspondence_address", label: "Doručovací a korespondenční adresa — do podpisu e-mailu", placeholder: "Mezná 9, 393 01 Pelhřimov", span2: true },
-  { key: "company_certifications", label: "Certifikace — do podpisu e-mailu (oddělené čárkou)", placeholder: "ISO 9001, ISO 14001", span2: true },
+  { key: "company_correspondence_address", label: "Doručovací a korespondenční adresa — do podpisu e-mailu", placeholder: "korespondenční adresa", span2: true },
+  { key: "company_certifications", label: "Certifikace — do podpisu e-mailu (oddělené čárkou)", placeholder: "certifikace, oddělené čárkou", span2: true },
 ];
 
 function CompanyStep({
@@ -206,6 +207,7 @@ function CompanyStep({
                 id={f.key}
                 value={values[f.key] ?? ""}
                 placeholder={f.placeholder}
+                className="placeholder:italic"
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
               />
             </div>
@@ -493,8 +495,8 @@ function AdminStep({
       {!done && (
         <CardContent className="space-y-4 pl-[4.25rem] pr-6">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field id="adm-name" label="Jméno" placeholder="Jan Novák" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-            <Field id="adm-email" label="E-mail" type="email" placeholder="admin@mnastrojarna.cz" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Field id="adm-name" label="Jméno" placeholder="jméno a příjmení" className="placeholder:italic" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            <Field id="adm-email" label="E-mail" type="email" placeholder="e-mail správce" className="placeholder:italic" value={email} onChange={(e) => setEmail(e.target.value)} />
             <Field id="adm-pass" label="Heslo (min. 8 znaků)" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           {message && (

@@ -95,7 +95,7 @@ export interface ExtractedBusinessDoc {
 
 export interface ExtractedRoleEmail {
   party: "customer" | "supplier";
-  role: "fakturace" | "nakup" | "nabidky" | "komunikace";
+  role: "fakturace" | "nakup" | "dodaci_listy" | "nabidky" | "komunikace";
   email: string;
 }
 

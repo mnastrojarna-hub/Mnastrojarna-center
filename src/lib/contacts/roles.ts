@@ -2,17 +2,24 @@
  * E-maily zákazníka / dodavatele podle účelu („kam co posílat") a výběr adresátů pro odeslání —
  * čistá logika (testy v roles.test.ts). Data: tabulka party_role_emails + kontaktní osoby.
  *
- * Pravidla výběru (rozhodnutí 30. 10.):
+ * Pravidla výběru (rozhodnutí 30. 10., dodací listy 31. 10.):
  *  - faktura → VŽDY fakturační e-mail (výchozí v Komu, další fakturační v Kopii) + kontakt zakázky v Kopii;
+ *  - dodací list → e-mail pro dodací listy → Objednávky / potvrzení (nákup) → kontakt zakázky → běžná komunikace…;
  *  - ostatní doklady → kontaktní osoba zakázky; když zakázka kontakt nemá → e-mail role
- *    (nabídka → Nabídky, potvrzení / dodací list → Nákup, objednávka dodavateli → Objednávky …);
+ *    (nabídka → Nabídky, potvrzení → Objednávky / potvrzení, objednávka dodavateli → Objednávky …);
  *  - bez role → běžná komunikace → e-mail firmy → hlavní kontakt → první kontakt s e-mailem.
  */
 
-export type ContactRole = "nabidky" | "nakup" | "fakturace" | "komunikace";
+export type ContactRole = "nabidky" | "nakup" | "dodaci_listy" | "fakturace" | "komunikace";
 export type PartyKind = "customer" | "supplier";
 
-export const CONTACT_ROLES: ContactRole[] = ["nabidky", "nakup", "fakturace", "komunikace"];
+export const CONTACT_ROLES: ContactRole[] = ["fakturace", "dodaci_listy", "nabidky", "nakup", "komunikace"];
+
+/** Účely, které se u daného druhu firmy nastavují (a v tomto pořadí ukazují). Dodavatelům DL neposíláme. */
+export const ROLES_FOR: Record<PartyKind, ContactRole[]> = {
+  customer: ["fakturace", "dodaci_listy", "nabidky", "nakup", "komunikace"],
+  supplier: ["nabidky", "nakup", "fakturace", "komunikace"],
+};
 
 export function isContactRole(v: unknown): v is ContactRole {
   return typeof v === "string" && (CONTACT_ROLES as string[]).includes(v);
@@ -20,15 +27,17 @@ export function isContactRole(v: unknown): v is ContactRole {
 
 export const ROLE_TEXT: Record<PartyKind, Record<ContactRole, { label: string; hint: string; reason: string }>> = {
   customer: {
+    fakturace: { label: "Faktury", hint: "faktury, platby, upomínky", reason: "Fakturační e-mail zákazníka" },
+    dodaci_listy: { label: "Dodací listy", hint: "dodací listy při expedici", reason: "E-mail pro dodací listy" },
     nabidky: { label: "Nabídky", hint: "poptávky a naše nabídky", reason: "E-mail zákazníka pro nabídky" },
-    nakup: { label: "Nákup / objednávky", hint: "potvrzení objednávky, dodací listy", reason: "Nákupní e-mail zákazníka (objednávky)" },
-    fakturace: { label: "Fakturace", hint: "faktury a platby", reason: "Fakturační e-mail zákazníka" },
+    nakup: { label: "Objednávky / potvrzení", hint: "potvrzení objednávek, změny termínů", reason: "Nákupní e-mail zákazníka (objednávky)" },
     komunikace: { label: "Běžná komunikace", hint: "ostatní pošta", reason: "Běžný e-mail zákazníka" },
   },
   supplier: {
     nabidky: { label: "Poptávky (RFQ)", hint: "naše poptávky a jejich nabídky", reason: "E-mail dodavatele pro poptávky" },
     nakup: { label: "Objednávky", hint: "naše objednávky, změny a storna", reason: "E-mail dodavatele pro objednávky" },
-    fakturace: { label: "Fakturace", hint: "jejich faktury, upomínky", reason: "Fakturační e-mail dodavatele" },
+    dodaci_listy: { label: "Dodací listy", hint: "dodací listy k materiálu do kooperace", reason: "E-mail dodavatele pro dodací listy" },
+    fakturace: { label: "Faktury", hint: "jejich faktury, upomínky", reason: "Fakturační e-mail dodavatele" },
     komunikace: { label: "Běžná komunikace", hint: "ostatní pošta", reason: "Běžný e-mail dodavatele" },
   },
 };
@@ -41,7 +50,7 @@ export type SendPurpose =
 export const PURPOSE_ROLE: Record<SendPurpose, ContactRole> = {
   nabidka: "nabidky",
   potvrzeni: "nakup",
-  dodaci_list: "nakup",
+  dodaci_list: "dodaci_listy",
   faktura: "fakturace",
   ostatni: "komunikace",
   komunikace: "komunikace",
@@ -76,6 +85,20 @@ export interface PartyAddressBook {
   contacts: BookContact[];
   /** E-mail firmy (customers.email / suppliers.email). */
   partyEmail: string | null;
+  /** V DB chybí tabulky kontaktů / účelů (migrace 20261030170000 neproběhla) — UI ukáže srozumitelnou zprávu. */
+  schemaMissing?: boolean;
+}
+
+/** Hláška pro chybějící tabulky kontaktů / účelů (DB bez migrace 20261030170000_kontakty_role_tykani). */
+export const CONTACTS_SCHEMA_MISSING =
+  "E-maily podle účelu a kontakty dodavatelů zatím nejdou uložit — v databázi chybí aktualizace " +
+  "(migrace 20261030170000_kontakty_role_tykani). Odesílání funguje dál podle kontaktu zakázky a e-mailu firmy.";
+
+/** Chyba Supabase = chybějící tabulka / vazba / funkce (neaplikovaná migrace). */
+export function isMissingSchemaError(err: { code?: string | null; message?: string | null } | null | undefined): boolean {
+  if (!err) return false;
+  if (err.code && ["42P01", "42883", "PGRST200", "PGRST202", "PGRST205"].includes(err.code)) return true;
+  return /does not exist|could not find the (table|function|relationship)|schema cache/i.test(err.message ?? "");
 }
 
 export interface RecipientPick {
@@ -139,6 +162,20 @@ export function pickRecipients(
     const ccNote = jc && cc.includes(jc) ? " · v kopii kontakt zakázky" : cc.length ? " · další fakturační v kopii" : "";
     return { to, cc, reason: `${text.fakturace.reason}${personLabel(roleList[0].entry)}${ccNote}`, source: "role", role };
   }
+  // dodací list: e-mail pro dodací listy → Objednávky / potvrzení → (dál jako ostatní) kontakt zakázky → běžná komunikace…
+  if (purpose === "dodaci_list" && book) {
+    if (roleList.length) {
+      const to = [roleList[0].email];
+      const cc = uniq(roleList.slice(1).map((r) => r.email), to);
+      return { to, cc, reason: `${text.dodaci_listy.reason}${personLabel(roleList[0].entry)}${cc.length ? " · další v kopii" : ""}`, source: "role", role };
+    }
+    const buy = roleAddresses(book, "nakup");
+    if (buy.length) {
+      const to = [buy[0].email];
+      const cc = uniq(buy.slice(1).map((r) => r.email), to);
+      return { to, cc, reason: `${text.nakup.reason}${personLabel(buy[0].entry)} — dodací listy nemají vlastní e-mail`, source: "fallback_role", role };
+    }
+  }
   if (jc) {
     return { to: [jc], cc: [], reason: `Kontaktní osoba zakázky${jcName ? ` (${jcName})` : ""}`, source: "job_contact", role };
   }
@@ -151,7 +188,7 @@ export function pickRecipients(
   if (role !== "komunikace") {
     const general = roleAddresses(book, "komunikace");
     if (general.length) {
-      return { to: [general[0].email], cc: [], reason: `${text.komunikace.reason}${personLabel(general[0].entry)} — ${text[role].label.toLowerCase()} nemá vlastní e-mail`, source: "fallback_role", role };
+      return { to: [general[0].email], cc: [], reason: `${text.komunikace.reason}${personLabel(general[0].entry)} — pro „${text[role].label}“ není nastavený vlastní e-mail`, source: "fallback_role", role };
     }
   }
   const party = normEmail(book.partyEmail);

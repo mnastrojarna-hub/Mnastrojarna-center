@@ -466,7 +466,7 @@ function ConnectForm({ editing, onCancel, onSaved }: { editing: MyMailbox | null
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="min-w-0 space-y-1 text-xs font-medium">
           E-mail
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" placeholder="jmeno@nastrojarstvi.com" aria-label="E-mail schránky" />
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" placeholder="e-mail schránky" aria-label="E-mail schránky" className="placeholder:italic" />
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           Heslo ke schránce{editing?.passwordStored ? " (prázdné = ponechat uložené)" : ""}
@@ -516,7 +516,7 @@ function ConnectForm({ editing, onCancel, onSaved }: { editing: MyMailbox | null
               </label>
               <label className="min-w-0 space-y-1 text-xs font-medium sm:col-span-6">
                 Uživatelské jméno (prázdné = celá e-mailová adresa)
-                <Input value={servers.imapUser} onChange={(e) => set("imapUser", e.target.value)} placeholder={email || "jmeno@nastrojarstvi.com"} autoComplete="off" aria-label="Uživatelské jméno" />
+                <Input value={servers.imapUser} onChange={(e) => set("imapUser", e.target.value)} placeholder={email || "přihlašovací jméno (obvykle e-mail)"} autoComplete="off" aria-label="Uživatelské jméno" className="placeholder:italic" />
               </label>
             </div>
           </fieldset>
@@ -542,7 +542,7 @@ function ConnectForm({ editing, onCancel, onSaved }: { editing: MyMailbox | null
               </label>
               <label className="min-w-0 space-y-1 text-xs font-medium sm:col-span-6">
                 Uživatelské jméno pro SMTP (prázdné = jako u příchozí)
-                <Input value={servers.smtpUser} onChange={(e) => set("smtpUser", e.target.value)} placeholder={servers.imapUser || email || "jmeno@nastrojarstvi.com"} autoComplete="off" aria-label="Uživatelské jméno SMTP" />
+                <Input value={servers.smtpUser} onChange={(e) => set("smtpUser", e.target.value)} placeholder={servers.imapUser || email || "přihlašovací jméno (obvykle e-mail)"} autoComplete="off" aria-label="Uživatelské jméno SMTP" className="placeholder:italic" />
               </label>
             </div>
             <label className="flex min-h-8 items-center gap-2 text-xs">

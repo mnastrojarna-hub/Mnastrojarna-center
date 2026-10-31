@@ -14,6 +14,11 @@ describe("detectRoleEmails", () => {
     expect(detectRoleEmails("Please send invoices to ap@company.test")[0]).toMatchObject({ role: "fakturace", email: "ap@company.test" });
     expect(detectRoleEmails("Rechnungen bitte an rechnung@firma.de senden")[0]).toMatchObject({ role: "fakturace" });
   });
+  it("dodací listy", () => {
+    const r = detectRoleEmails("Objednávky posílejte na nakup@bosch.test, dodací listy prosím zasílejte na sklad@bosch.test.");
+    expect(r.map((x) => [x.role, x.email])).toEqual([["nakup", "nakup@bosch.test"], ["dodaci_listy", "sklad@bosch.test"]]);
+    expect(detectRoleEmails("Delivery notes: receiving@firma.test")[0]).toMatchObject({ role: "dodaci_listy" });
+  });
   it("bez pokynu nic (poděkování za objednávku + podpis)", () => {
     expect(detectRoleEmails("Děkujeme za objednávku.\nS pozdravem\nPavel Novák\nnovak@bosch.test")).toEqual([]);
     expect(detectRoleEmails("bez adresy")).toEqual([]);

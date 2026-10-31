@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  CONTACT_ROLES, normEmail, pickRecipients, roleEntryFromRow, ROLE_TEXT,
+  ROLES_FOR, isMissingSchemaError, normEmail, pickRecipients, roleEntryFromRow, ROLE_TEXT,
   type BookContact, type ContactRole, type PartyAddressBook, type PartyKind, type RecipientPick, type SendPurpose,
 } from "@/lib/contacts/roles";
 import {
@@ -9,7 +9,9 @@ import {
   type ToneSetting, type ToneSuggestion,
 } from "@/lib/contacts/tone";
 import type { DetectedRoleEmail } from "@/lib/contacts/role-detect";
+import type { PartyBookInput } from "@/lib/contacts/book-draft";
 import { COMPANY } from "@/lib/company";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Kontakty na serveru: adresář zákazníka / dodavatele (kontaktní osoby + e-maily podle účelu), výběr
@@ -52,11 +54,13 @@ export async function loadAddressBook(dbIn: unknown, party: PartyRef): Promise<P
   ]);
   if (base.error || !base.data) return null;
   type RoleRow = Parameters<typeof roleEntryFromRow>[0];
+  const schemaMissing = isMissingSchemaError(roles.error) || isMissingSchemaError(contacts.error);
   return {
     kind,
     partyEmail: normEmail((base.data as { email: string | null }).email),
-    contacts: ((contacts.data ?? []) as ContactRow[]).map(bookContact),
+    contacts: ((contacts.error ? [] : contacts.data ?? []) as ContactRow[]).map(bookContact),
     roles: ((roles.error ? [] : roles.data ?? []) as RoleRow[]).map(roleEntryFromRow).filter((r): r is NonNullable<typeof r> => r !== null),
+    ...(schemaMissing ? { schemaMissing: true } : {}),
   };
 }
 
@@ -285,7 +289,7 @@ export async function rememberRoleEmails(
   let added = 0;
   for (const f of found) {
     const email = normEmail(f.email);
-    if (!email || !(CONTACT_ROLES as string[]).includes(f.role) || exclude(email)) continue;
+    if (!email || !(ROLES_FOR[kind] as string[]).includes(f.role) || exclude(email)) continue;
     const role = f.role as ContactRole;
     if (book.roles.some((r) => r.role === role && r.email === email)) continue;
     const contact = book.contacts.find((c) => c.email === email);
@@ -309,4 +313,52 @@ export async function rememberRoleEmails(
 /** Popis role pro UI / důvod („Fakturační e-mail zákazníka"). */
 export function roleReason(kind: PartyKind, role: ContactRole): string {
   return ROLE_TEXT[kind][role].reason;
+}
+
+// ── Adresář z dialogu (kontaktní osoby + účely najednou) ────
+export interface PartyBookSaveSummary {
+  contacts: { added: number; updated: number; removed: number };
+  roles: { added: number; updated: number; removed: number };
+}
+
+/**
+ * Uloží kontaktní osoby a e-maily podle účelu z dialogu firmy v jedné transakci (DB save_party_book).
+ * Vstup už prošel validatePartyBookInput. Tykání kolegů jde za změněnou adresou; zápis do auditu.
+ */
+export async function savePartyBook(
+  dbIn: unknown, kind: PartyKind, partyId: string, input: PartyBookInput,
+): Promise<{ ok: true; summary: PartyBookSaveSummary } | { ok: false; error: string }> {
+  const db = asDb(dbIn);
+  const { data, error } = await db.rpc("save_party_book", { p_kind: kind, p_party: partyId, p_book: input as never });
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      return { ok: false, error: "Kontakty a e-maily podle účelu nejdou uložit — v databázi chybí aktualizace (migrace 20261031100000_kontakty_dodaci_listy_adresar)." };
+    }
+    if (/kontaktní osoba nepatří/i.test(error.message)) return { ok: false, error: "Kontaktní osoba patří k jiné firmě — načti okno znovu." };
+    if (/duplicate key|unique/i.test(error.message)) return { ok: false, error: "Některá adresa je v účelu dvakrát — načti okno znovu." };
+    return { ok: false, error: /[ěščřžýáíéůú]/i.test(error.message) ? error.message : `Kontakty se nepodařilo uložit (${error.message}).` };
+  }
+  const res = (data ?? {}) as { contacts?: PartyBookSaveSummary["contacts"]; roles?: PartyBookSaveSummary["roles"]; moved?: { from: string; to: string }[] };
+  for (const m of res.moved ?? []) await moveToneEmail(db, m.from, m.to).catch(() => null);
+  const summary: PartyBookSaveSummary = {
+    contacts: res.contacts ?? { added: 0, updated: 0, removed: 0 },
+    roles: res.roles ?? { added: 0, updated: 0, removed: 0 },
+  };
+  const changed = Object.values(summary.contacts).some(Boolean) || Object.values(summary.roles).some(Boolean);
+  if (changed) {
+    await logAudit({
+      action: "party_book_saved",
+      entity: kind === "customer" ? "customers" : "suppliers",
+      entityId: partyId,
+      diff: {
+        kind, ...summary,
+        contacts_now: input.contacts.map((c) => `${c.isPrimary ? "★ " : ""}${c.name}${c.email ? ` <${c.email}>` : ""}`),
+        roles_now: input.roles.map((r) => {
+          const c = r.contactKey ? input.contacts.find((x) => x.key === r.contactKey) : null;
+          return `${r.role}${r.isDefault ? "*" : ""}: ${c ? `${c.name} <${c.email}>` : r.email}`;
+        }),
+      },
+    });
+  }
+  return { ok: true, summary };
 }

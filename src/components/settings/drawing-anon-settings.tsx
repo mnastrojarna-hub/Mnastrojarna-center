@@ -171,7 +171,7 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
           <h3 className="text-sm font-semibold">Termíny</h3>
           <label className="block space-y-1">
             <span className="text-sm font-medium">Vždy smazat (vlastní termíny)</span>
-            <Textarea rows={4} value={terms} onChange={(e) => setTerms(e.target.value)} disabled={dis} placeholder={"STROJMETAL\nSKD\nAcme Forge"} className="text-base sm:text-sm" />
+            <Textarea rows={4} value={terms} onChange={(e) => setTerms(e.target.value)} disabled={dis} placeholder={"jeden název nebo výraz na řádek"} className="text-base placeholder:italic sm:text-sm" />
             <span className="block text-xs text-muted-foreground">Jeden na řádek — zkratky a značky zákazníků, které pravidla nemusí poznat.</span>
           </label>
           <label className="block space-y-1">

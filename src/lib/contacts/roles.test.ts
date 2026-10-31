@@ -41,6 +41,20 @@ describe("pickRecipients", () => {
     expect(pickRecipients("faktura", { ...book, roles: [] }, null)).toMatchObject({ to: ["info@bosch.test"] });
     expect(pickRecipients("nabidka", null, null)).toMatchObject({ to: [], source: "none" });
   });
+  it("dodací list: Dodací listy → Objednávky / potvrzení → kontakt zakázky → běžná komunikace", () => {
+    const jc = { email: "novak@bosch.test", name: "Pavel Novák" };
+    const withDl = { ...book, roles: [...book.roles, entry({ role: "dodaci_listy", email: "sklad@bosch.test", isDefault: true }), entry({ role: "dodaci_listy", email: "eva@bosch.test", contactId: "c2", contactName: "Eva Účetní" }), entry({ role: "nakup", email: "nakup@bosch.test", isDefault: true })] };
+    const r = pickRecipients("dodaci_list", withDl, jc);
+    expect(r).toMatchObject({ to: ["sklad@bosch.test"], cc: ["eva@bosch.test"], source: "role", role: "dodaci_listy" });
+    expect(r.reason).toBe("E-mail pro dodací listy · další v kopii");
+    const buyOnly = { ...book, roles: [...book.roles, entry({ role: "nakup", email: "nakup@bosch.test", isDefault: true })] };
+    const b = pickRecipients("dodaci_list", buyOnly, jc);
+    expect(b).toMatchObject({ to: ["nakup@bosch.test"], source: "fallback_role" });
+    expect(b.reason).toContain("dodací listy nemají vlastní e-mail");
+    expect(pickRecipients("dodaci_list", book, jc)).toMatchObject({ to: ["novak@bosch.test"], source: "job_contact" });
+    // potvrzení objednávky se dodacím listům nepřizpůsobuje: kontakt zakázky má přednost před nákupem
+    expect(pickRecipients("potvrzeni", buyOnly, jc)).toMatchObject({ to: ["novak@bosch.test"], source: "job_contact" });
+  });
   it("dodavatel: objednávka na e-mail pro objednávky", () => {
     const sup: PartyAddressBook = { kind: "supplier", partyEmail: "info@ocel.test", contacts: [], roles: [entry({ role: "nakup", email: "objednavky@ocel.test", isDefault: true })] };
     const r = pickRecipients("objednavka_dodavateli", sup, null);

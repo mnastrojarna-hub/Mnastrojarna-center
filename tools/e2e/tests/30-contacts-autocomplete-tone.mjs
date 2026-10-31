@@ -130,10 +130,10 @@ await T("karta zákazníka: kontakt = jméno, pozice, telefon, e-mail; nový kon
   await form.getByRole("button", { name: "Uložit kontakt" }).click();
   await eventually(() => expect(sql(`select name || '|' || position || '|' || phone from customer_contacts where customer_id = ${lit(CUST)} and email = ${lit(JANA)}`) === "Jana Konstruktérová|konstruktérka|+420 777 300 302", "kontakt uložen"));
 
-  // Fakturace = samotná adresa, Nabídky = kontaktní osoba Pavel
+  // Faktury = samotná adresa, Nabídky = kontaktní osoba Pavel
   const fakt = page.getByTestId("role-fakturace").first();
-  await fakt.getByRole("button", { name: "Přidat e-mail: Fakturace" }).click();
-  await fakt.getByLabel("Nový e-mail: Fakturace").fill(FAKT);
+  await fakt.getByRole("button", { name: "Přidat e-mail: Faktury" }).click();
+  await fakt.getByLabel("Nový e-mail: Faktury").fill(FAKT);
   await fakt.getByRole("button", { name: "Přidat", exact: true }).click();
   await eventually(() => expect(roleRows().includes(`fakturace:${FAKT}:t`), `Fakturace uložena (${roleRows()})`));
   const nab = page.getByTestId("role-nabidky").first();
@@ -265,7 +265,7 @@ await T("nabídka: Komu = e-mail pro nabídky (Pavel, s důvodem), text „Ahoj 
   const ccInput = dlg.locator("#quote-mail-cc");
   await ccInput.fill("fakt");
   await suggestion(dlg, FAKT).waitFor({ timeout: 15_000 });
-  expect(norm(await suggestion(dlg, FAKT).innerText()).includes("Fakturace"), "návrh nese účel Fakturace");
+  expect(norm(await suggestion(dlg, FAKT).innerText()).includes("Faktury"), "návrh nese účel Faktury");
   await snap(page, "desktop-09-quote-send");
   await suggestion(dlg, FAKT).click();
   await eventually(async () => expect((await recipients(dlg, "Kopie")) === FAKT, "Kopie = fakturační"));

@@ -49,7 +49,8 @@ export function ProfileForm({ fullName, phone, email }: { fullName: string; phon
             type="tel"
             inputMode="tel"
             autoComplete="tel"
-            placeholder="+420 777 123 456"
+            placeholder="telefon"
+            className="placeholder:italic"
             value={tel}
             onChange={(e) => setTel(e.target.value)}
           />

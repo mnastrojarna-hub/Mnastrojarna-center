@@ -130,8 +130,8 @@ const roleEmailSchema = {
   properties: {
     party: { type: "string", enum: ["customer", "supplier"], description: "Čí adresa: customer = odběratel (náš zákazník), supplier = dodavatel" },
     role: {
-      type: "string", enum: ["fakturace", "nakup", "nabidky", "komunikace"],
-      description: "fakturace = faktury / účetní doklady, nakup = objednávky / nákup, nabidky = poptávky a nabídky, komunikace = obecný kontakt",
+      type: "string", enum: ["fakturace", "nakup", "dodaci_listy", "nabidky", "komunikace"],
+      description: "fakturace = faktury / účetní doklady, nakup = objednávky / nákup, dodaci_listy = dodací listy / příjem zboží, nabidky = poptávky a nabídky, komunikace = obecný kontakt",
     },
     email: str("E-mailová adresa přesně z dokladu"),
   },
@@ -259,7 +259,7 @@ export function systemPrompt(): string {
       "fotce sniž confidence (0–1) a do needsClarification napiš česky a konkrétně, co má člověk ověřit.",
 
     "roleEmails: jen když doklad VÝSLOVNĚ říká, kam co posílat (‚faktury zasílejte na …‘, ‚Fakturace: …‘, ‚objednávky na …‘, " +
-      "‚poptávky / RFQ: …‘), uveď adresu s účelem (fakturace, nakup, nabidky, komunikace) a čí je (customer / supplier). " +
+      "‚dodací listy na …‘, ‚poptávky / RFQ: …‘), uveď adresu s účelem (fakturace, nakup, dodaci_listy, nabidky, komunikace) a čí je (customer / supplier). " +
       "Obyčejný e-mail v hlavičce bez účelu sem nepatří (ten je v customer.email / supplier.email). Jinak prázdné pole.",
   ].join("\n\n");
 }

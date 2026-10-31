@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Award, Contact, Factory, Loader2, Pencil, Plus, Save, Wrench } from "lucide-react";
+import { Award, Factory, Loader2, Pencil, Plus, Save, Wrench } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmailSuggestInput } from "@/components/mail/recipient-field";
-import { SupplierContactsSection } from "@/components/suppliers/supplier-contacts";
+import { PartyBookEditor } from "@/components/contacts/party-book-editor";
+import { usePartyBookDraft } from "@/components/contacts/use-party-book";
 import { Field, FormSection } from "@/components/customers/form-bits";
 import { StarRatingInput, TagInput } from "@/components/suppliers/tag-input";
 import { createSupplier, updateSupplier } from "@/app/actions/crm";
@@ -26,7 +27,13 @@ export interface SupplierSuggestions {
 
 const NO_SUGGESTIONS: SupplierSuggestions = { technologies: [], materials: [], certifications: [] };
 
-/** „Nový dodavatel" / „Upravit dodavatele" — kooperace, technologie, materiály, hodnocení. */
+/** Vzor v prázdném poli = jen nápověda (kurzíva), nikdy hodnota, která by vypadala jako data. */
+const HINT = "placeholder:italic placeholder:text-muted-foreground/80";
+
+/**
+ * „Nový dodavatel" / „Upravit dodavatele" — kooperace, technologie, materiály, hodnocení, všechny kontaktní
+ * osoby a „Kam posílat" (poptávky, objednávky, faktury, běžná pošta). Uloží se vše najednou.
+ */
 export function SupplierDialog({
   supplier,
   suggestions = NO_SUGGESTIONS,
@@ -55,9 +62,12 @@ export function SupplierDialog({
   const [touched, setTouched] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // nový dodavatel uložený, ale kontakty ne → další „Uložit" už jen upraví
+  const [createdId, setCreatedId] = React.useState<string | null>(null);
+  const book = usePartyBookDraft("supplier", supplier?.id ?? null, open);
 
   const errors = touched ? validateSupplierForm(values) : {};
-  const dirty = JSON.stringify(values) !== JSON.stringify(initial);
+  const dirty = JSON.stringify(values) !== JSON.stringify(initial) || book.dirty;
 
   function set<K extends SupplierField>(key: K, v: SupplierFormValues[K]) {
     setValues((cur) => ({ ...cur, [key]: v }));
@@ -79,12 +89,20 @@ export function SupplierDialog({
       document.getElementById(`sup-${first}`)?.focus();
       return;
     }
+    const prepared = book.prepare();
+    if ("error" in prepared) {
+      setError(prepared.error);
+      return;
+    }
     setBusy(true);
     setError(null);
-    const res = supplier ? await updateSupplier(supplier.id, values) : await createSupplier(values);
+    const targetId = supplier?.id ?? createdId;
+    const res = targetId ? await updateSupplier(targetId, values, prepared.input) : await createSupplier(values, prepared.input);
     setBusy(false);
     if (!res.ok) {
       setError(res.error ?? "Uložení se nepovedlo.");
+      const newId = !supplier ? (res as { id?: string }).id ?? null : null;
+      if (newId && res.partySaved) setCreatedId(newId);
       return;
     }
     setOpen(false);
@@ -99,7 +117,7 @@ export function SupplierDialog({
       onChange={(e) => set(k, e.target.value)}
       aria-invalid={Boolean(errors[k])}
       aria-describedby={errors[k] ? `${fid(k)}-error` : undefined}
-      className={cn(errors[k] && "border-destructive focus-visible:ring-destructive")}
+      className={cn(HINT, errors[k] && "border-destructive focus-visible:ring-destructive")}
       {...props}
     />
   );
@@ -112,6 +130,7 @@ export function SupplierDialog({
           setValues(initial);
           setTouched(false);
           setError(null);
+          setCreatedId(null);
           setOpen(true);
         } else requestClose();
       }}
@@ -152,61 +171,54 @@ export function SupplierDialog({
         </div>
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
-          <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4 scrollbar-thin sm:px-6">
+          <div className="flex-1 space-y-6 overflow-y-auto overflow-x-hidden px-4 py-4 scrollbar-thin sm:px-6">
             <FormSection icon={<Factory />} tone="bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" title="Firma">
               <Field id={fid("name")} label="Název" required error={errors.name} className="sm:col-span-2">
-                {text("name", { placeholder: "Kalírna Brno s.r.o.", autoFocus: !editing, autoComplete: "organization" })}
+                {text("name", { placeholder: "název firmy", autoFocus: !editing, autoComplete: "organization" })}
               </Field>
               <Field id={fid("ico")} label="IČO" error={errors.ico}>
-                {text("ico", { inputMode: "numeric", placeholder: "12345678" })}
+                {text("ico", { inputMode: "numeric", placeholder: "8 číslic" })}
               </Field>
               <Field id={fid("dic")} label="DIČ">
-                {text("dic", { placeholder: "CZ12345678" })}
+                {text("dic", { placeholder: "CZ + číslo" })}
               </Field>
               <Field id={fid("address")} label="Adresa" className="sm:col-span-2">
-                {text("address", { placeholder: "Hlavní 12, 602 00 Brno", autoComplete: "street-address" })}
+                {text("address", { placeholder: "ulice, PSČ a město", autoComplete: "street-address" })}
               </Field>
               <Field id={fid("country")} label="Země">
-                {text("country", { placeholder: "CZ" })}
+                {text("country", { placeholder: "kód země" })}
               </Field>
               <Field id={fid("leadDays")} label="Obvyklá dodací lhůta (dní)" error={errors.leadDays}>
-                {text("leadDays", { inputMode: "numeric", placeholder: "14" })}
+                {text("leadDays", { inputMode: "numeric", placeholder: "počet dní" })}
               </Field>
-            </FormSection>
-
-            <FormSection icon={<Contact />} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title="Kontakt">
-              <Field id={fid("contactPerson")} label="Kontaktní osoba">
-                {text("contactPerson", { placeholder: "Pavel Dvořák", autoComplete: "name" })}
-              </Field>
-              <Field id={fid("email")} label="E-mail" error={errors.email}>
+              <Field id={fid("email")} label="E-mail firmy" error={errors.email} hint="Obecná adresa — použije se, když účel nemá vlastní.">
                 <EmailSuggestInput
                   id={fid("email")}
                   value={values.email}
                   onChange={(v) => set("email", v)}
                   context={supplier ? { supplierId: supplier.id } : null}
-                  placeholder="obchod@kalirna.cz"
+                  placeholder="obecný e-mail firmy"
                   className={cn(errors.email && "border-destructive focus-visible:ring-destructive")}
-                  onPicked={(s) => {
-                    if (!values.contactPerson.trim() && s.name !== s.email && (s.kind === "kontakt" || s.kind === "konverzace" || s.kind === "dodavatel") && s.name !== s.company) set("contactPerson", s.name);
-                    if (!values.phone.trim() && s.phone) set("phone", s.phone);
-                  }}
                 />
               </Field>
-              <Field id={fid("phone")} label="Telefon">
-                {text("phone", { type: "tel", inputMode: "tel", placeholder: "+420 777 123 456", autoComplete: "tel" })}
+              <Field id={fid("phone")} label="Telefon firmy">
+                {text("phone", { type: "tel", inputMode: "tel", placeholder: "telefon na firmu", autoComplete: "tel" })}
               </Field>
-              <Field id={fid("website")} label="Web">
-                {text("website", { inputMode: "url", placeholder: "kalirna.cz" })}
+              <Field id={fid("website")} label="Web" className="sm:col-span-2">
+                {text("website", { inputMode: "url", placeholder: "web" })}
               </Field>
             </FormSection>
 
-            {supplier ? (
-              <div className="rounded-2xl border bg-muted/20 p-3 sm:p-4">
-                <SupplierContactsSection supplierId={supplier.id} />
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Další kontaktní osoby a e-maily pro objednávky / poptávky přidáš po založení dodavatele (Upravit).</p>
-            )}
+            <PartyBookEditor
+              kind="supplier"
+              partyId={supplier?.id ?? createdId}
+              draft={book.draft}
+              onChange={book.setDraft}
+              partyEmail={values.email.trim() || null}
+              loadError={book.loadError}
+              schemaMissing={book.schemaMissing}
+              idPrefix="sup"
+            />
 
             <FormSection icon={<Wrench />} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="Co umí" hint="Enter nebo čárka přidá štítek.">
               <Field id={fid("technologies")} label="Technologie" className="sm:col-span-2">
@@ -214,7 +226,7 @@ export function SupplierDialog({
                   id={fid("technologies")}
                   value={values.technologies}
                   onChange={(v) => set("technologies", v)}
-                  placeholder="Frézování, Soustružení, Kalení…"
+                  placeholder="technologie (frézování, kalení…)"
                   suggestions={suggestions.technologies}
                 />
               </Field>
@@ -223,7 +235,7 @@ export function SupplierDialog({
                   id={fid("materials")}
                   value={values.materials}
                   onChange={(v) => set("materials", v)}
-                  placeholder="1.2343, AL 7075, nerez…"
+                  placeholder="materiály (označení oceli, slitiny…)"
                   suggestions={suggestions.materials}
                   colored={false}
                 />
@@ -233,7 +245,7 @@ export function SupplierDialog({
                   id={fid("certifications")}
                   value={values.certifications}
                   onChange={(v) => set("certifications", v)}
-                  placeholder="ISO 9001, IATF 16949…"
+                  placeholder="certifikace"
                   suggestions={suggestions.certifications}
                   colored={false}
                 />
@@ -250,19 +262,20 @@ export function SupplierDialog({
                   rows={3}
                   value={values.note}
                   onChange={(e) => set("note", e.target.value)}
-                  placeholder="Např. drží termíny, kalí do 60 HRC, minimální zakázka 2 000 Kč…"
+                  placeholder="poznámka pro tým (spolehlivost, limity, minimální zakázka…)"
+                  className={HINT}
                 />
               </Field>
             </FormSection>
           </div>
 
           <div className="border-t bg-background/95 px-4 py-3 sm:px-6">
-            {error && <p className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+            {error && <p className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert" data-testid="supplier-dialog-error">{error}</p>}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" onClick={requestClose} disabled={busy}>Zrušit</Button>
-              <Button type="submit" variant="success" disabled={busy}>
+              <Button type="submit" variant="success" disabled={busy || book.loading}>
                 {busy ? <Loader2 className="animate-spin" /> : <Save />}
-                {editing ? "Uložit změny" : "Založit dodavatele"}
+                {editing || createdId ? "Uložit změny" : "Založit dodavatele"}
               </Button>
             </div>
           </div>

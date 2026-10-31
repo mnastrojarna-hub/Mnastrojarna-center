@@ -489,7 +489,7 @@ function MailboxForm({
           </select>
         </Field>
         <Field label="E-mail schránky">
-          <Input value={form.email} onChange={set("email")} placeholder="jmeno@nastrojarstvi.com" type="email" aria-label="E-mail schránky" autoComplete="off" />
+          <Input value={form.email} onChange={set("email")} placeholder="e-mail schránky" type="email" aria-label="E-mail schránky" className="placeholder:italic" autoComplete="off" />
         </Field>
         <Field label="Popis (volitelné)">
           <Input value={form.displayName} onChange={set("displayName")} placeholder="např. Obchod" aria-label="Popis schránky" />
@@ -641,7 +641,7 @@ function MailboxForm({
                     </select>
                   </Field>
                   <Field label="Uživatel (výchozí = celá e-mailová adresa)" className="sm:col-span-6">
-                    <Input value={form.imap_user} onChange={set("imap_user")} placeholder={form.email || "jmeno@nastrojarstvi.com"} aria-label="Uživatel příchozího serveru" />
+                    <Input value={form.imap_user} onChange={set("imap_user")} placeholder={form.email || "přihlašovací jméno (obvykle e-mail)"} aria-label="Uživatel příchozího serveru" className="placeholder:italic" />
                   </Field>
                 </div>
                 {form.imap_skip_name_check && (
@@ -670,7 +670,7 @@ function MailboxForm({
                     </select>
                   </Field>
                   <Field label="Uživatel (výchozí = jako příchozí)" className="sm:col-span-6">
-                    <Input value={form.smtp_user} onChange={set("smtp_user")} placeholder={form.imap_user || form.email || "jmeno@nastrojarstvi.com"} aria-label="Uživatel odchozího serveru" />
+                    <Input value={form.smtp_user} onChange={set("smtp_user")} placeholder={form.imap_user || form.email || "přihlašovací jméno (obvykle e-mail)"} aria-label="Uživatel odchozího serveru" className="placeholder:italic" />
                   </Field>
                 </div>
                 {form.smtp_tls === "none" && (
