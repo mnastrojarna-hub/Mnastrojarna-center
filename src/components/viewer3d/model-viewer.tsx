@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
-  ListTree, Loader2, Maximize2, MousePointer2, PaintBucket, Palette, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
+  ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
   Undo2, Weight, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import type { ModelNode } from "@/lib/viewer3d/types";
@@ -55,7 +55,7 @@ const DISPLAYS: { key: DisplayMode; label: string }[] = [
   { key: "xray", label: "Průhledný (rentgen)" },
 ];
 
-const TOOL_HINT: Record<Exclude<Tool, "select">, [string, string]> = {
+const TOOL_HINT: Record<Exclude<Tool, "select" | "move">, [string, string]> = {
   distance: ["Klikni na 1. místo — roh, střed díry, střed hrany, hranu nebo plochu.", "Klikni na 2. místo."],
   diameter: ["Klikni na kružnici, oblouk nebo válcovou plochu (díra, čep).", ""],
   angle: ["Klikni na 1. hranu nebo rovinnou plochu.", "Klikni na 2. hranu nebo plochu."],
@@ -116,6 +116,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const [panel, setPanel] = React.useState<"tree" | "views" | "display" | "filter" | null>(null);
   const [sectionOpen, setSectionOpen] = React.useState(false);
   const [massOpen, setMassOpen] = React.useState(false);
+  const [explodeOpen, setExplodeOpen] = React.useState(false);
   const materials = useViewerMaterials();
   const [bg, setBg] = React.useState<Background>("light");
   React.useEffect(() => setBg(loadBackground()), []);
@@ -211,6 +212,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const section = eng?.getSection() ?? null;
   const sectionPicking = eng?.isSectionPicking() ?? false;
   const entityMode = ["face", "edge", "vertex", "center", "midpoint"].includes(filter);
+  const measuring = tool === "distance" || tool === "diameter" || tool === "angle";
   const openSection = () => {
     setSectionOpen(true);
     if (!isWide) setPanel(null);
@@ -272,6 +274,14 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             onSection={() => (sectionOpen ? setSectionOpen(false) : openSection())}
             massActive={massOpen}
             onMass={() => setMassOpen((o) => !o)}
+            explodeActive={explodeOpen || tool === "move"}
+            onExplode={() => {
+              setExplodeOpen((o) => !o);
+              if (!isWide) {
+                setSectionOpen(false);
+                setPanel(null);
+              }
+            }}
             onUndo={() => eng!.undo()}
             onRedo={() => eng!.redo()}
             onDelete={() => eng!.deleteSelected()}
@@ -326,13 +336,24 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           )}
 
           {/* levý sloupec (telefon: dole nad lištou): řez + strom dílů */}
-          {(sectionOpen || panel === "tree") && (
+          {(sectionOpen || panel === "tree" || explodeOpen) && (
             <div
               className={cn(
                 "pointer-events-none absolute z-30 flex flex-col gap-2",
                 isWide ? "bottom-10 left-2 top-14 w-72" : "inset-x-2 bottom-[4.25rem] max-h-[62%] justify-end",
               )}
             >
+              {explodeOpen && (
+                <ExplodePanel
+                  engine={eng!}
+                  moveTool={tool === "move"}
+                  onMoveTool={(on) => eng!.setTool(on ? "move" : "select")}
+                  onClose={() => {
+                    setExplodeOpen(false);
+                    if (eng!.getTool() === "move") eng!.setTool("select");
+                  }}
+                />
+              )}
               {sectionOpen && (
                 <SectionPanel engine={eng!} picking={sectionPicking} onClose={() => { eng!.cancelSectionPick(); setSectionOpen(false); }} />
               )}
@@ -348,11 +369,11 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
             )}
           >
             {massOpen && <MassPanel engine={eng!} materials={materials} selection={selection} onClose={() => setMassOpen(false)} />}
-            {!massOpen && tool === "select" && selection.length > 0 && (
+            {!massOpen && (tool === "select" || tool === "move") && selection.length > 0 && (
               <PartCard engine={eng!} selection={selection} materials={materials} onMass={() => setMassOpen(true)} />
             )}
             {tool === "select" && entity && <EntityCard engine={eng!} onSection={openSection} />}
-            {(tool !== "select" || (measures.length > 0 && !massOpen && (isWide || (selection.length === 0 && !entity)))) && (
+            {(measuring || (measures.length > 0 && !massOpen && (isWide || (selection.length === 0 && !entity)))) && (
               <MeasurePanel
                 wide={isWide}
                 tool={tool}
@@ -366,7 +387,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
           </div>
 
           {/* uchopení při měření */}
-          {(tool !== "select" || entityMode || sectionPicking) && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
+          {(measuring || (tool === "select" && entityMode) || sectionPicking) && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
 
           {/* aktivní filtr / výběr plochy pro řez — připomínka nahoře */}
           {(filter !== "auto" || sectionPicking) && (
@@ -447,6 +468,8 @@ function Toolbar(p: {
   onSection: () => void;
   massActive: boolean;
   onMass: () => void;
+  explodeActive: boolean;
+  onExplode: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onDelete: () => void;
@@ -476,6 +499,7 @@ function Toolbar(p: {
       <ToolButton icon={Filter} label={p.filterActive ? p.filterLabel : "Filtr"} active={p.panel === "filter" || p.filterActive} onClick={() => p.onPanel("filter")} testId="tool-filter" />
       <ToolButton icon={Scissors} label="Řez" active={p.sectionActive} onClick={p.onSection} testId="tool-section" />
       <ToolButton icon={Weight} label="Hmotnost" active={p.massActive} onClick={p.onMass} testId="tool-mass" />
+      <ToolButton icon={Move3d} label="Rozebrat" active={p.explodeActive} onClick={p.onExplode} testId="tool-explode" />
       <Sep />
       <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
       <ToolButton icon={Focus} label="Izolovat" kbd="I" disabled={!p.hasSelection} onClick={p.onIsolate} testId="tool-isolate" />
@@ -632,7 +656,7 @@ function MeasurePanel({
   onClear: () => void;
   onDone: () => void;
 }) {
-  const hint = tool !== "select" ? TOOL_HINT[tool][pending ? 1 : 0] || TOOL_HINT[tool][0] : null;
+  const hint = tool !== "select" && tool !== "move" ? TOOL_HINT[tool][pending ? 1 : 0] || TOOL_HINT[tool][0] : null;
   const list = [...measures].reverse();
   const [collapsed, setCollapsed] = React.useState(false);
   return (
@@ -652,7 +676,7 @@ function MeasurePanel({
             {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 rotate-90" />}
           </button>
         )}
-        {tool !== "select" && (
+        {tool !== "select" && tool !== "move" && (
           <button type="button" onClick={onDone} className="rounded p-1 hover:bg-accent" aria-label="Ukončit měření"><X className="h-4 w-4" /></button>
         )}
       </div>
@@ -722,6 +746,63 @@ function FilterItems({ current, onPick }: { current: PickFilter; onPick: (f: Pic
 
 function fmtPos(v: number): string {
   return v.toFixed(2).replace(".", ",");
+}
+
+/** Rozebrání sestavy: rozložený pohled posuvníkem, tažení dílů (Ctrl / režim Táhnout), složení zpět. */
+function ExplodePanel({ engine, moveTool, onMoveTool, onClose }: { engine: ViewerEngine; moveTool: boolean; onMoveTool: (on: boolean) => void; onClose: () => void }) {
+  const value = engine.getExplode();
+  const end = () => engine.endExplode();
+  return (
+    <div className="pointer-events-auto shrink-0 rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur" onPointerDown={(e) => e.stopPropagation()} data-testid="explode-panel">
+      <div className="flex items-center gap-2">
+        <Move3d className="h-4 w-4 text-primary" />
+        <span className="flex-1 font-semibold">Rozebrání sestavy</span>
+        <button type="button" onClick={onClose} aria-label="Zavřít panel rozebrání" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-2 space-y-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Rozložit díly od středu</span>
+          <span className="tabular-nums">{Math.round(value * 100)} %</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={2}
+          step={0.01}
+          value={value}
+          onPointerDown={() => engine.beginExplode()}
+          onChange={(e) => engine.setExplode(Number(e.target.value))}
+          onPointerUp={end}
+          onKeyUp={end}
+          onBlur={end}
+          className="w-full accent-[#E03930]"
+          aria-label="Rozložení sestavy"
+          data-testid="explode-slider"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => onMoveTool(!moveTool)}
+        aria-pressed={moveTool}
+        className={cn("mt-2 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-medium", moveTool ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent")}
+        data-testid="explode-move-tool"
+      >
+        <Move3d className="h-4 w-4" /> {moveTool ? "Táhnutí dílů zapnuto" : "Táhnout díly myší / prstem"}
+      </button>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Kdykoli: <strong>Ctrl + táhni díl</strong> = přesun (vybraný díl, nebo celá podsestava s filtrem Sestava). <strong>Shift</strong> při tažení = jen po ose X / Y / Z. Ctrl+Z vrátí.
+      </p>
+      <button
+        type="button"
+        disabled={!engine.hasOffsets()}
+        onClick={() => engine.resetOffsets()}
+        className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent disabled:opacity-40"
+        data-testid="explode-reset"
+      >
+        <RotateCcw className="h-3.5 w-3.5" /> Složit zpět
+      </button>
+    </div>
+  );
 }
 
 function SectionPanel({ engine, picking, onClose }: { engine: ViewerEngine; picking: boolean; onClose: () => void }) {
@@ -1246,6 +1327,9 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
           <MenuItem onClick={act(() => engine.hideParts(engine.assemblyGroup(part)))}><Trash2 className="h-4 w-4" /> Smazat celou podsestavu</MenuItem>
           <MenuItem onClick={act(() => engine.isolate(sel.length ? sel : engine.partGroup(part)))} kbd="I"><Focus className="h-4 w-4" /> Izolovat</MenuItem>
           <MenuItem onClick={act(() => engine.fit(true))} kbd="F"><Maximize2 className="h-4 w-4" /> Přiblížit na díl</MenuItem>
+          {engine.partMoved(part) && (
+            <MenuItem onClick={act(() => engine.resetOffsets(sel.length ? sel : engine.partGroup(part)))}><RotateCcw className="h-4 w-4" /> Vrátit díl na místo</MenuItem>
+          )}
           {req.facePlane && (
             <MenuItem onClick={act(() => { engine.sectionFromPlane(req.facePlane!.normal, req.facePlane!.point, req.facePlane!.part); onSection(); })}>
               <Scissors className="h-4 w-4" /> Řez touto plochou
@@ -1273,6 +1357,7 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
       ))}
       <div className="my-1 border-t" />
       <MenuItem onClick={act(() => engine.showAll())}><Eye className="h-4 w-4" /> Ukázat vše</MenuItem>
+      {engine.hasOffsets() && <MenuItem onClick={act(() => engine.resetOffsets())}><RotateCcw className="h-4 w-4" /> Složit sestavu zpět</MenuItem>}
       <MenuItem onClick={act(() => engine.fit())} kbd="Ctrl+F"><Maximize2 className="h-4 w-4" /> Celý model</MenuItem>
       <MenuItem onClick={act(() => engine.setView("iso"))} kbd="0"><Box className="h-4 w-4" /> Izometrie</MenuItem>
       <MenuItem onClick={act(() => engine.undo())} kbd="Ctrl+Z"><Undo2 className="h-4 w-4" /> Zpět</MenuItem>
@@ -1287,6 +1372,7 @@ const HELP: [string, string][] = [
   ["Přiblížení", "kolečko myši (ke kurzoru) · roztažení 2 prstů"],
   ["Celý model", "F nebo Ctrl+F · dvojklik do prázdna"],
   ["Výběr dílu", "klik · Ctrl / Shift + klik = více dílů"],
+  ["Rozebrat sestavu", "Ctrl + táhni díl = přesun (Shift = jen po ose X/Y/Z) · tlačítko Rozebrat: posuvník rozložení, táhnutí bez Ctrl (telefon), Složit zpět"],
   ["Smazat díl", "klik na díl + Del (nebo H) · Izolovat = I · pravé tlačítko = smazat díl / celou podsestavu"],
   ["Výběrový filtr", "tlačítko Filtr nebo pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed křivosti, střed hrany"],
   ["Hmotnost", "tlačítko Hmotnost: vyber materiál (hustota z Nacenění) → hmotnost dílu, polotovar (přířez / kulatina s přídavkem) a jeho hmotnost, polotovar modře v 3D; bez výběru celý model"],

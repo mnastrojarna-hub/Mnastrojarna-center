@@ -22,11 +22,11 @@ THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 export type DisplayMode = "shaded-edges" | "shaded" | "wireframe" | "xray";
-export type Tool = "select" | MeasureMode;
+export type Tool = "select" | "move" | MeasureMode;
 export type StdView = "front" | "back" | "left" | "right" | "top" | "bottom" | "iso";
 export type ChangeKind =
   | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity" | "colors"
-  | "material";
+  | "material" | "move";
 
 /** Výběrový filtr jako v ZW3D — co se vybírá / na co se uchopuje. */
 export type PickFilter = "auto" | "shape" | "part" | "assembly" | "face" | "edge" | "vertex" | "center" | "midpoint";
@@ -117,6 +117,9 @@ interface PartView {
   faceColors: Map<number, number>;
   /** Geometrie pro polotovar (počítá se líně). */
   stockGeom?: PartStockGeometry;
+  /** Posunutí dílu (rozebrání sestavy) a obalový kvádr bez posunu; box / sphere jsou světové. */
+  offset: THREE.Vector3;
+  localBox: THREE.Box3;
 }
 
 /** Geometrie dílu pro výpočet polotovaru + kde ho nakreslit. */
@@ -131,6 +134,7 @@ export interface PartStockGeometry extends StockGeometry {
 interface Snapshot {
   hidden: Uint8Array;
   measures: Measurement[];
+  offsets: Float32Array;
   colors: { over: (number | null)[]; faces: [number, [number, number][]][] };
 }
 
@@ -241,6 +245,11 @@ export class ViewerEngine {
   private partMaterial = new Map<number, string>();
   private partStockMode = new Map<number, StockMode>();
   private stockObj: THREE.Object3D | null = null;
+  // rozebrání sestavy
+  private moveArm: { part: number } | null = null;
+  private moveCtx: { parts: number[]; start: THREE.Vector3[]; from: THREE.Vector3; before: Snapshot; moved: boolean } | null = null;
+  private explodeCtx: { before: Snapshot; base: THREE.Vector3[]; dirs: THREE.Vector3[]; parts: number[] } | null = null;
+  private explodeValue = 0;
   private hatch: THREE.Texture | null = null;
   private stencilBack = new THREE.MeshBasicMaterial({
     side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
@@ -303,6 +312,10 @@ export class ViewerEngine {
       hover: (x, y, info) => this.queueHover(x, y, info.alt),
       leave: () => this.clearHover(),
       contextMenu: (x, y, cx, cy) => this.openContext(x, y, cx, cy),
+      canMove: (x, y, info) => this.canMove(x, y, info),
+      moveStart: (x, y) => this.moveStart(x, y),
+      moveTo: (x, y, info) => this.moveTo(x, y, info),
+      moveEnd: () => this.moveEnd(),
     });
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(container);
@@ -477,6 +490,7 @@ export class ViewerEngine {
         topo: topo ?? { edgeSegments: new Float32Array(0), curves: [], segCurve: new Uint32Array(0), corners: new Float32Array(0), triFace: new Uint32Array(0), faces: [] },
         baseMaterial: mat, hidden: false, box, sphere: box.getBoundingSphere(new THREE.Sphere()),
         origColor: baseColor, origVC, opacity: part.opacity ?? 1, colorOverride: null, faceColors: new Map(),
+        offset: new THREE.Vector3(), localBox: box.clone(),
       });
     });
 
@@ -595,6 +609,171 @@ export class ViewerEngine {
     return n;
   }
 
+  // ------------------------------------------------------------------ rozebrání sestavy (posun dílů)
+
+  private shiftCache = new WeakMap<SectionTopology, { key: string; t: SectionTopology }>();
+
+  /** Posunutá topologie s cache (nepřepočítávat při každém pohybu myši). */
+  private shifted(t: SectionTopology, o: THREE.Vector3): SectionTopology {
+    const key = `${o.x},${o.y},${o.z}`;
+    const c = this.shiftCache.get(t);
+    if (c?.key === key) return c.t;
+    const r = shiftTopology(t, o);
+    this.shiftCache.set(t, { key, t: r });
+    return r;
+  }
+
+  private setOffset(p: PartView, v: THREE.Vector3) {
+    p.offset.copy(v);
+    p.box = p.localBox.clone().translate(v);
+    p.sphere = p.box.getBoundingSphere(new THREE.Sphere());
+    for (const o of [p.mesh, p.edges, p.wires]) {
+      if (!o) continue;
+      o.position.copy(v);
+      o.updateMatrix();
+    }
+  }
+
+  /** Koule modelu (ořez hloubky kamery) po rozebrání — model může narůst. */
+  private updateModelSphere() {
+    const all = new THREE.Box3();
+    for (const p of this.parts) all.union(p.box);
+    if (all.isEmpty()) return;
+    all.getBoundingSphere(this.modelSphere);
+    this.camDist = Math.max(this.camDist, this.modelSphere.radius * 6 + 10);
+    this.placeCamera();
+  }
+
+  hasOffsets(): boolean {
+    return this.parts.some((p) => p.offset.lengthSq() > 0);
+  }
+
+  partMoved(i: number): boolean {
+    return (this.parts[i]?.offset.lengthSq() ?? 0) > 0;
+  }
+
+  /** Co se táhne: díl / těleso / podsestava podle filtru. */
+  private moveGroup(part: number): number[] {
+    return this.filter === "shape" ? [part] : this.filter === "assembly" ? this.assemblyGroup(part) : this.partGroup(part);
+  }
+
+  /** Volá ovládání při stisku: Ctrl + díl (výběr) nebo nástroj Přesun → tažení posouvá díl. */
+  canMove(x: number, y: number, info: { button: number; ctrl: boolean }): boolean {
+    this.moveArm = null;
+    if (this.sectionPick || info.button !== 0) return false;
+    const want = this.tool === "move" || (this.tool === "select" && info.ctrl && !ENTITY_FILTERS.includes(this.filter));
+    if (!want) return false;
+    const hit = this.raycastParts(x, y);
+    if (!hit) return false;
+    this.moveArm = { part: hit.part };
+    return true;
+  }
+
+  moveStart(x: number, y: number) {
+    const arm = this.moveArm;
+    if (!arm) return;
+    const parts = this.selection.has(arm.part) ? [...this.selection] : this.moveGroup(arm.part);
+    if (!this.selection.has(arm.part)) this.select(parts);
+    this.moveCtx = {
+      parts, start: parts.map((i) => this.parts[i].offset.clone()), from: this.viewPlanePoint(x, y), before: this.snapshot(), moved: false,
+    };
+    this.anim = null;
+  }
+
+  moveTo(x: number, y: number, info: { axisLock: boolean }) {
+    const ctx = this.moveCtx;
+    if (!ctx) return;
+    const d = this.viewPlanePoint(x, y).sub(ctx.from);
+    if (info.axisLock) {
+      // Shift: jen po ose X / Y / Z, která je pohybu nejblíž
+      const ax = Math.abs(d.x), ay = Math.abs(d.y), az = Math.abs(d.z);
+      if (ax >= ay && ax >= az) d.set(d.x, 0, 0);
+      else if (ay >= az) d.set(0, d.y, 0);
+      else d.set(0, 0, d.z);
+    }
+    ctx.parts.forEach((i, k) => this.setOffset(this.parts[i], ctx.start[k].clone().add(d)));
+    ctx.moved = d.lengthSq() > 0;
+    this.requestRender();
+  }
+
+  moveEnd() {
+    const ctx = this.moveCtx;
+    this.moveCtx = null;
+    this.moveArm = null;
+    if (!ctx?.moved) return;
+    this.commit(ctx.before);
+    this.updateModelSphere();
+    if (this.section) this.rebuildSection(true);
+    this.requestRender();
+    this.onChange("move");
+    this.onChange("visibility");
+  }
+
+  /** Vrátit díly na původní místo (bez parametru celou sestavu). */
+  resetOffsets(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.map((p) => p.index);
+    const before = this.snapshot();
+    let changed = false;
+    for (const i of list) {
+      const p = this.parts[i];
+      if (!p || p.offset.lengthSq() === 0) continue;
+      this.setOffset(p, new THREE.Vector3());
+      changed = true;
+    }
+    if (!changed) return;
+    if (!this.hasOffsets()) this.explodeValue = 0;
+    this.commit(before);
+    this.updateModelSphere();
+    if (this.section) this.rebuildSection(true);
+    this.requestRender();
+    this.onChange("move");
+    this.onChange("visibility");
+  }
+
+  getExplode(): number {
+    return this.explodeValue;
+  }
+
+  /** Začátek tažení posuvníku rozložení (jeden krok zpět za celé tažení). */
+  beginExplode() {
+    const parts = this.parts.filter((p) => !p.hidden && this.triCount(p.index) > 0).map((p) => p.index);
+    // směr od středu sestavy ke středu dílu (bez aktuálního rozložení)
+    const factor = this.explodeValue;
+    const centers = parts.map((i) => this.parts[i].localBox.getCenter(new THREE.Vector3()));
+    const all = new THREE.Box3();
+    for (const i of parts) all.union(this.parts[i].localBox);
+    const c = all.getCenter(new THREE.Vector3());
+    const size = all.getSize(new THREE.Vector3());
+    const longest = size.x >= size.y && size.x >= size.z ? new THREE.Vector3(1, 0, 0) : size.y >= size.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    const eps = Math.max(size.length() * 1e-4, 1e-6);
+    const dirs = centers.map((ctr, k) => {
+      const d = ctr.clone().sub(c);
+      // díl ve středu sestavy → po nejdelší ose střídavě na obě strany
+      return d.length() > eps ? d : longest.clone().multiplyScalar(size.length() * 0.25 * (k % 2 ? 1 : -1));
+    });
+    const base = parts.map((i, k) => this.parts[i].offset.clone().sub(dirs[k].clone().multiplyScalar(factor)));
+    this.explodeCtx = { before: this.snapshot(), base, dirs, parts };
+  }
+
+  setExplode(factor: number) {
+    if (!this.explodeCtx) this.beginExplode();
+    const ctx = this.explodeCtx!;
+    this.explodeValue = Math.max(0, factor);
+    ctx.parts.forEach((i, k) => this.setOffset(this.parts[i], ctx.base[k].clone().add(ctx.dirs[k].clone().multiplyScalar(this.explodeValue))));
+    this.updateModelSphere();
+    this.requestRender();
+    this.onChange("move");
+  }
+
+  endExplode() {
+    const ctx = this.explodeCtx;
+    this.explodeCtx = null;
+    if (!ctx) return;
+    this.commit(ctx.before);
+    if (this.section) this.rebuildSection(true);
+    this.onChange("visibility");
+  }
+
   // ------------------------------------------------------------------ materiál a polotovar
 
   getPartMaterial(i: number): string | undefined {
@@ -630,7 +809,7 @@ export class ViewerEngine {
     if (p.stockGeom) return p.stockGeom;
     const info = this.partInfo(i)!;
     const size = info.size;
-    const c = p.box.getCenter(new THREE.Vector3());
+    const c = p.localBox.getCenter(new THREE.Vector3());
     let round: StockGeometry["round"] = null;
     let axis: 0 | 1 | 2 = size[0] >= size[1] && size[0] >= size[2] ? 0 : size[1] >= size[2] ? 1 : 2;
     let bestArea = 0;
@@ -695,7 +874,7 @@ export class ViewerEngine {
         } else {
           geom = new THREE.BoxGeometry(result.dims[0], result.dims[1], result.dims[2]);
         }
-        obj.position.set(...g.center);
+        obj.position.set(...g.center).add(this.parts[part].offset);
         obj.add(new THREE.Mesh(geom, fill));
         obj.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom, 20), line));
         group.add(obj);
@@ -1032,7 +1211,7 @@ export class ViewerEngine {
     let mat = p.baseMaterial;
     // výběr = barva dílu se zvýrazněním (vidět i změnu barvy), ne plná oranžová
     if (this.selection.has(p.index)) mat = this.tintMaterial(p.baseMaterial, this.selMaterials, 0x8a4600);
-    else if (this.hoverPart === p.index && this.tool === "select") mat = this.hoverMaterial(p.baseMaterial);
+    else if (this.hoverPart === p.index && (this.tool === "select" || this.tool === "move")) mat = this.hoverMaterial(p.baseMaterial);
     p.mesh.material = mat;
   }
 
@@ -1087,6 +1266,7 @@ export class ViewerEngine {
     return {
       hidden: Uint8Array.from(this.parts.map((p) => (p.hidden ? 1 : 0))),
       measures: [...this.measures],
+      offsets: Float32Array.from(this.parts.flatMap((p) => [p.offset.x, p.offset.y, p.offset.z])),
       colors: {
         over: this.parts.map((p) => p.colorOverride),
         faces: this.parts.filter((p) => p.faceColors.size).map((p) => [p.index, [...p.faceColors.entries()]]),
@@ -1103,7 +1283,13 @@ export class ViewerEngine {
 
   private restore(s: Snapshot) {
     const faces = new Map(s.colors.faces.map(([i, list]) => [i, list]));
+    let moved = false;
     this.parts.forEach((p, i) => {
+      const o = new THREE.Vector3(s.offsets[i * 3] ?? 0, s.offsets[i * 3 + 1] ?? 0, s.offsets[i * 3 + 2] ?? 0);
+      if (!o.equals(p.offset)) {
+        this.setOffset(p, o);
+        moved = true;
+      }
       p.hidden = !!s.hidden[i];
       if (p.hidden) this.selection.delete(i);
       const over = s.colors.over[i] ?? null;
@@ -1118,6 +1304,11 @@ export class ViewerEngine {
     });
     this.measures = [...s.measures];
     this.syncMeasureObjects();
+    if (moved) {
+      this.updateModelSphere();
+      this.explodeValue = this.hasOffsets() ? this.explodeValue : 0;
+      this.onChange("move");
+    }
     if (this.section) this.rebuildSection(true);
     this.requestRender();
     this.onChange("colors");
@@ -1332,7 +1523,7 @@ export class ViewerEngine {
    * roh, střed křivosti (kružnice, oblouk, osa válce), střed hrany, bod na hraně, plocha.
    * Počítá i s řezem — obrys řezu (hrany, rohy, díry v řezu) a vybarvená plocha řezu.
    */
-  private findSnap(x: number, y: number, alt: boolean, purpose: "distance" | "diameter" | "angle" | "entity" = this.tool === "select" ? "entity" : this.tool): SnapPoint | null {
+  private findSnap(x: number, y: number, alt: boolean, purpose: "distance" | "diameter" | "angle" | "entity" = this.tool === "select" || this.tool === "move" ? "entity" : this.tool): SnapPoint | null {
     const tol = this.touchMode ? 22 : 11;
     const F = this.filter;
     const auto = F === "auto" || F === "shape" || F === "part" || F === "assembly";
@@ -1359,6 +1550,10 @@ export class ViewerEngine {
     };
 
     const collect = (t: SectionTopology, part: number) => {
+      // topologie je v místních souřadnicích dílu → přičíst posunutí (rozebraná sestava)
+      const o = this.parts[part].offset;
+      const shifted = o.x !== 0 || o.y !== 0 || o.z !== 0;
+      if (shifted) t = this.shifted(t, o);
       if (allowVertex) {
         for (let i = 0; i < t.corners.length; i += 3) {
           if (!kept(t.corners[i], t.corners[i + 1], t.corners[i + 2])) continue;
@@ -1491,7 +1686,7 @@ export class ViewerEngine {
       this.updateSnap(this.findSnap(x, y, alt, "entity"));
       return;
     }
-    if (this.tool === "select") {
+    if (this.tool === "select" || this.tool === "move") {
       const hit = this.raycastParts(x, y);
       const part = hit?.part ?? null;
       if (part !== this.hoverPart) {
@@ -1501,7 +1696,7 @@ export class ViewerEngine {
         if (part !== null) this.applyPartState(this.parts[part]);
         this.requestRender();
       }
-      this.container.style.cursor = part !== null ? "pointer" : "default";
+      this.container.style.cursor = part !== null ? (this.tool === "move" ? "move" : "pointer") : "default";
       return;
     }
     this.container.style.cursor = "crosshair";
@@ -1572,6 +1767,7 @@ export class ViewerEngine {
     const p = this.parts[s.part];
     if (!p) return;
     const group = new THREE.Group();
+    group.position.copy(p.offset);
     group.renderOrder = 10;
     // křivka
     if (curveIdx >= 0) {
@@ -1619,7 +1815,8 @@ export class ViewerEngine {
     if (s.kind === "face" || s.kind === "vertex") return -1;
     const g = s.geometry;
     if (!g?.circle && !g?.line) return -1;
-    const ref = g.circle ? g.circle.center : g.line!.point;
+    const r0 = g.circle ? g.circle.center : g.line!.point;
+    const ref: Vec3 = [r0[0] - p.offset.x, r0[1] - p.offset.y, r0[2] - p.offset.z];
     let best = -1;
     let bd = Infinity;
     p.topo.curves.forEach((c, i) => {
@@ -1682,6 +1879,12 @@ export class ViewerEngine {
       const s = this.findSnap(x, y, false, "angle");
       const pl = s?.geometry?.plane;
       if (pl && s) this.sectionFromPlane(pl.normal, pl.point, s.part);
+      return;
+    }
+    if (this.tool === "move") {
+      const hit = this.raycastParts(x, y);
+      if (hit) this.select(this.moveGroup(hit.part), info.additive);
+      else if (!info.additive) this.clearSelection();
       return;
     }
     if (this.tool === "select") {
@@ -2213,6 +2416,8 @@ export class ViewerEngine {
       k++;
       const back = new THREE.Mesh(p.mesh.geometry, this.stencilBack);
       const front = new THREE.Mesh(p.mesh.geometry, this.stencilFront);
+      back.position.copy(p.offset);
+      front.position.copy(p.offset);
       back.renderOrder = base;
       front.renderOrder = base;
       back.userData.kind = front.userData.kind = "stencil";
@@ -2255,13 +2460,16 @@ export class ViewerEngine {
     for (const p of this.parts) {
       if (p.hidden || this.triCount(p.index) === 0 || !plane.intersectsBox(p.box)) continue;
       const g = p.mesh.geometry;
-      const segs = sliceMesh(g.getAttribute("position").array as Float32Array, g.index ? (g.index.array as Uint32Array) : null, def);
+      // síť je v místních souřadnicích dílu → rovina posunutá o posunutí dílu
+      const local = { normal: def.normal, constant: def.constant + plane.normal.dot(p.offset) };
+      const segs = sliceMesh(g.getAttribute("position").array as Float32Array, g.index ? (g.index.array as Uint32Array) : null, local);
       if (!segs.length) continue;
       const topo = chainSegments(segs, tol);
       this.sectionTopo.set(p.index, topo);
       const lg = new THREE.BufferGeometry();
       lg.setAttribute("position", new THREE.BufferAttribute(topo.edgeSegments, 3));
       const lines = new THREE.LineSegments(lg, this.sectionLineMaterial);
+      lines.position.copy(p.offset);
       lines.renderOrder = 90000;
       lines.userData.kind = "contour";
       lines.userData.ownGeometry = true;
@@ -2434,4 +2642,23 @@ function disposeObject(o: THREE.Object3D) {
     if (Array.isArray(mat)) mat.forEach((y) => y.dispose());
     else mat?.dispose();
   });
+}
+
+/** Topologie posunutá o vektor (rozebraná sestava) — jen pro hledání uchopení. */
+function shiftTopology(t: SectionTopology, o: THREE.Vector3): SectionTopology {
+  const sh = (v: Vec3): Vec3 => [v[0] + o.x, v[1] + o.y, v[2] + o.z];
+  const edge = new Float32Array(t.edgeSegments.length);
+  for (let i = 0; i < edge.length; i += 3) {
+    edge[i] = t.edgeSegments[i] + o.x;
+    edge[i + 1] = t.edgeSegments[i + 1] + o.y;
+    edge[i + 2] = t.edgeSegments[i + 2] + o.z;
+  }
+  const corners = new Float32Array(t.corners.length);
+  for (let i = 0; i < corners.length; i += 3) {
+    corners[i] = t.corners[i] + o.x;
+    corners[i + 1] = t.corners[i + 1] + o.y;
+    corners[i + 2] = t.corners[i + 2] + o.z;
+  }
+  const curves = t.curves.map((c) => ({ ...c, start: sh(c.start), end: sh(c.end), mid: sh(c.mid), center: c.center ? sh(c.center) : undefined }));
+  return { edgeSegments: edge, corners, segCurve: t.segCurve, curves };
 }

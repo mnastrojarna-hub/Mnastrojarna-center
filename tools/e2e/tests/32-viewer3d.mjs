@@ -54,6 +54,18 @@ async function pdfWithU3D() {
   return Buffer.from(await doc.save());
 }
 
+/** Sestava ze dvou kostek 20 mm vedle sebe (OBJ, dva objekty = dva díly). */
+function twoCubesObj() {
+  const cube = (name, ox, base) => {
+    const v = [];
+    for (const [x, y, z] of [[0, 0, 0], [20, 0, 0], [20, 20, 0], [0, 20, 0], [0, 0, 20], [20, 0, 20], [20, 20, 20], [0, 20, 20]]) v.push(`v ${x + ox} ${y} ${z}`);
+    const f = [[1, 3, 2], [1, 4, 3], [5, 6, 7], [5, 7, 8], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 4, 8], [3, 8, 7], [4, 1, 5], [4, 5, 8]]
+      .map((t) => `f ${t.map((i) => i + base).join(" ")}`);
+    return [`o ${name}`, ...v, ...f].join("\n");
+  };
+  return `${cube("KostkaA", 0, 0)}\n${cube("KostkaB", 20, 8)}\n`;
+}
+
 async function setup() {
   cleanup();
   const adminId = sql(`select id from profiles where email = 'admin@local.test'`);
@@ -65,6 +77,7 @@ async function setup() {
   files.cone = await upload(job, "kuzel.STP", fs.readFileSync(path.join(FIX, "conical-surface.step")), "application/octet-stream", "model_3d");
   files.stl = await upload(job, "kostka.stl", fs.readFileSync(path.join(FIX, "cube-10mm.stl")), "model/stl", "model_3d");
   files.pdf = await upload(job, "vykres-E2E.pdf", await minimalPdf(), "application/pdf", "vykres");
+  files.pair = await upload(job, "dve-kostky.obj", Buffer.from(twoCubesObj()), "text/plain", "model_3d");
   files.pdf3d = await upload(job, "plocha-3D.pdf", await pdfWithU3D(), "application/pdf", "model_3d");
   if (EXTRA && fs.existsSync(EXTRA)) files.asm = await upload(job, "SESTAVA.stp", fs.readFileSync(EXTRA), "application/octet-stream", "model_3d");
   return { job, files };
@@ -442,6 +455,57 @@ await test("desktop: materiál → hmotnost dílu a polotovaru (kulatina u rota�
     await panel.getByRole("radio", { name: "Auto" }).click();
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-mass-round.png") });
+  });
+});
+
+await test("desktop: rozebrání sestavy — Ctrl + tažení dílu, rozložení posuvníkem, zpět, složit", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.pair}`)}&name=dve-kostky.obj`);
+    await waitModel(page);
+    const status = () => page.getByTestId("viewer3d-status").innerText();
+    const size0 = (await status()).split("mm")[0];
+    expect(/40,00 × 20,00 × 20,00/.test(size0) || /20,00 × 40,00/.test(size0) || /40,00/.test(size0), `sestava 40 × 20 × 20: ${size0}`);
+    await page.keyboard.press("5"); // shora
+    await page.waitForTimeout(500);
+    const b = await canvasBox(page);
+    // Ctrl + tažení levé kostky doleva
+    const sx = b.x + b.width / 2 - 60;
+    const sy = b.y + b.height / 2;
+    await page.keyboard.down("Control");
+    await page.mouse.move(sx, sy);
+    await page.mouse.down();
+    await page.mouse.move(sx - 80, sy, { steps: 6 });
+    await page.mouse.move(sx - 160, sy, { steps: 6 });
+    await page.mouse.up();
+    await page.keyboard.up("Control");
+    await page.waitForTimeout(200);
+    const size1 = (await status()).split("mm")[0];
+    expect(size1 !== size0, `po přesunu dílu je sestava větší (${size0} → ${size1})`);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-move-part.png") });
+    // Ctrl+Z vrátí
+    await page.keyboard.press("Control+z");
+    await page.waitForTimeout(150);
+    expect((await status()).split("mm")[0] === size0, "Ctrl+Z vrátí díl");
+    // rozložení posuvníkem
+    await page.getByTestId("tool-explode").click();
+    await page.getByTestId("explode-panel").waitFor();
+    const slider = page.getByTestId("explode-slider");
+    await slider.focus();
+    for (let i = 0; i < 60; i++) await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+    const size2 = (await status()).split("mm")[0];
+    expect(size2 !== size0, `rozložená sestava (${size0} → ${size2})`);
+    await page.keyboard.press("0");
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-explode.png") });
+    // táhnutí bez Ctrl v režimu Táhnout díly
+    await page.getByTestId("explode-move-tool").click();
+    expect(/zapnuto/.test(await page.getByTestId("explode-move-tool").innerText()), "režim táhnutí");
+    await page.getByTestId("explode-reset").click();
+    await page.waitForTimeout(150);
+    expect((await status()).split("mm")[0] === size0, "Složit zpět");
   });
 });
 

@@ -4,7 +4,8 @@
  *  - prostřední tlačítko (nebo levé) tažením = otáčení kolem bodu pod kurzorem,
  *  - Shift / Ctrl + prostřední nebo levé, případně pravé tlačítko tažením = posun,
  *  - klik = výběr / měření, pravý klik = místní nabídka, dvojklik do prázdna = zobrazit vše,
- *  - dotyk: 1 prst otáčí, 2 prsty posun + přiblížení (pinch), ťuknutí = výběr, podržení = nabídka.
+ *  - dotyk: 1 prst otáčí, 2 prsty posun + přiblížení (pinch), ťuknutí = výběr, podržení = nabídka,
+ *  - Ctrl + tažení dílu = přesun dílu (rozebrání sestavy); Shift při tom = jen po ose.
  */
 
 export interface ControlsHandlers {
@@ -18,6 +19,11 @@ export interface ControlsHandlers {
   hover(x: number, y: number, info: { alt: boolean }): void;
   leave(): void;
   contextMenu(x: number, y: number, clientX: number, clientY: number): void;
+  /** Smí tažení z tohoto místa přesouvat díl? (Ctrl + díl, nebo nástroj Přesun.) */
+  canMove?(x: number, y: number, info: { button: number; ctrl: boolean; touch: boolean }): boolean;
+  moveStart?(x: number, y: number): void;
+  moveTo?(x: number, y: number, info: { axisLock: boolean }): void;
+  moveEnd?(): void;
 }
 
 interface Ptr {
@@ -31,7 +37,7 @@ interface Ptr {
   t: number;
 }
 
-type DragMode = "rotate" | "pan" | null;
+type DragMode = "rotate" | "pan" | "move" | null;
 
 const DRAG_PX_MOUSE = 4;
 const DRAG_PX_TOUCH = 9;
@@ -110,6 +116,7 @@ export class CadControls {
     if (touch && this.ptrs.size === 2) {
       // druhý prst → pinch (zrušit otáčení / ťuknutí)
       this.clearLongPress();
+      if (this.dragging && this.mode === "move") this.h.moveEnd?.();
       if (this.dragging) this.h.endInteraction();
       this.dragging = true;
       this.mode = null;
@@ -123,6 +130,7 @@ export class CadControls {
     this.pinch = null;
     const panMod = e.shiftKey || e.ctrlKey || e.metaKey;
     this.mode = e.button === 2 ? "pan" : e.button === 0 || e.button === 1 ? (panMod ? "pan" : "rotate") : null;
+    if (e.button === 0 && this.h.canMove?.(x, y, { button: e.button, ctrl: e.ctrlKey || e.metaKey, touch })) this.mode = "move";
     if (touch) {
       this.clearLongPress();
       this.longPress = window.setTimeout(() => {
@@ -169,8 +177,17 @@ export class CadControls {
       this.dragging = true;
       this.clearLongPress();
       if (this.mode === "rotate") this.h.beginRotate(p.sx, p.sy);
+      if (this.mode === "move") {
+        this.h.moveStart?.(p.sx, p.sy);
+        this.h.moveTo?.(x, y, { axisLock: e.shiftKey });
+        return;
+      }
       // první pohyb od místa stisku
       this.apply(x - p.sx, y - p.sy);
+      return;
+    }
+    if (this.mode === "move") {
+      this.h.moveTo?.(x, y, { axisLock: e.shiftKey });
       return;
     }
     this.apply(x - lx, y - ly);
@@ -200,10 +217,12 @@ export class CadControls {
       return;
     }
     const wasDragging = this.dragging;
+    const wasMove = this.mode === "move";
     this.dragging = false;
     this.pinch = null;
     this.mode = null;
     if (wasDragging) {
+      if (wasMove) this.h.moveEnd?.();
       this.h.endInteraction();
       return;
     }
@@ -231,6 +250,7 @@ export class CadControls {
     this.ptrs.delete(e.pointerId);
     this.clearLongPress();
     if (this.ptrs.size === 0) {
+      if (this.dragging && this.mode === "move") this.h.moveEnd?.();
       if (this.dragging) this.h.endInteraction();
       this.dragging = false;
       this.pinch = null;
