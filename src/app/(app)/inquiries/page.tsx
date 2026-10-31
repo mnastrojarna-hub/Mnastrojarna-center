@@ -20,6 +20,7 @@ import { FlowMailList } from "@/components/flow/flow-mail-list";
 import { FlowStateFilter } from "@/components/flow/flow-state-filter";
 import { FlowRowState } from "@/components/flow/flow-row-state";
 import { FlowActionBar } from "@/components/flow/flow-actions";
+import { RfqListLink } from "@/components/rfq/rfq-list-link";
 import { toFlowEmails } from "@/components/flow/flow-data";
 import { QuickInquiryDialog } from "@/components/flow/quick-inquiry-dialog";
 import { bookHref, todayPrague } from "@/components/flow/flow-utils";
@@ -48,6 +49,8 @@ export default async function InquiriesPage({
   const mail = can("mail");
   // #25: Nacenění zatím jen super admin — ostatní nabídku vytvoří ručně v kartě zakázky
   const canPrice = can("pricing");
+  // 31. 10.: poptávky dodavatelům (obchodník, super admin, zaměstnanec se „Smí poptávat")
+  const canRfq = can("rfq");
   const selected = parseStateParam(sp[STATE_PARAM], INQUIRY_ORDER, OPEN_INQUIRY);
   const withClosed = selected.some((k) => CLOSED_JOB_KEYS.includes(k));
   // #25: obchodní tok jen „moje" (super admin všichni, nebo „Jen moje")
@@ -171,6 +174,36 @@ export default async function InquiriesPage({
               renderBadge={(j) => <JobAnonBadge badge={anonBadges[j.id]} />}
               renderAction={(j) => {
                 const st = states[j.id];
+                // 31. 10.: poptávkové kolo u dodavatelů vedle dalšího kroku (poptávka / nacenění)
+                const rfqLink = canRfq && (j.stage === "poptavka" || j.stage === "naceneni") ? <RfqListLink jobId={j.id} /> : null;
+                if (rfqLink) {
+                  return (
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+                      {rfqLink}
+                      {st ? (
+                        <FlowActionBar
+                          target={{
+                            jobId: j.id, jobNumber: j.number, facts: st.facts, quotes: st.quotes, quote: st.snapshot.activeQuote,
+                            today, onlyOpenQuote: st.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
+                            quoteAuthor: st.quoteAuthor ?? null,
+                          }}
+                          next={st.next}
+                          menu={st.menu}
+                          palette={st.next ? actionPalette(st.next.key) : undefined}
+                          canPrice={canPrice}
+                        />
+                      ) : canPrice ? (
+                        <Button asChild size="sm" className="min-h-11 bg-amber-500 text-amber-950 shadow-sm hover:bg-amber-500/90 sm:min-h-9">
+                          <Link href={`/pricing?job=${j.id}`}><Calculator className="h-4 w-4" /> Nacenit</Link>
+                        </Button>
+                      ) : (
+                        <Button asChild size="sm" className="min-h-11 bg-violet-700 text-white shadow-sm hover:bg-violet-800 sm:min-h-9">
+                          <Link href={`/orders/${j.id}?tab=nabidky&nova=1`}><FilePlus className="h-4 w-4" /> Vytvořit nabídku</Link>
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
                 if (!st) {
                   return canPrice ? (
                     <Button asChild size="sm" className="min-h-11 w-full bg-amber-500 text-amber-950 shadow-sm hover:bg-amber-500/90 sm:min-h-9 sm:w-auto">

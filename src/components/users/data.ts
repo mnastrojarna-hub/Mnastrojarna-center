@@ -18,6 +18,12 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
     const db = createAdminClient();
     const base = "id, email, full_name, role, active, ai_access, phone, position, commission_rate, last_seen_at, created_at";
     const loadProfiles = async () => {
+      const withRfq = await db.from("profiles")
+        .select(`${base}, quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at, `
+          + "can_approve_quotes, quote_approver_changed_by, quote_approver_changed_at, can_rfq")
+        .order("created_at", { ascending: true });
+      // DB bez migrace 20261031160000 (can_rfq) → bez příznaku poptávek
+      if (!withRfq.error || !/can_rfq/.test(withRfq.error.message ?? "")) return withRfq;
       const res = await db.from("profiles")
         .select(`${base}, quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at, `
           + "can_approve_quotes, quote_approver_changed_by, quote_approver_changed_at")
@@ -59,6 +65,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       canApproveQuotes: p.role === "super_admin" || p.can_approve_quotes === true,
       quoteApproverChangedBy: p.quote_approver_changed_by ? nameOf.get(p.quote_approver_changed_by) ?? null : null,
       quoteApproverChangedAt: p.quote_approver_changed_at ?? null,
+      canRfq: p.role !== "zamestnanec" || (p as Profile & { can_rfq?: boolean | null }).can_rfq === true,
     }));
 
     const mailboxes: MailboxOption[] = ((mailboxesRes.data ?? []) as Mailbox[]).map((m) => ({

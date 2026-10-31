@@ -43,13 +43,17 @@ async function guard(): Promise<{ user: CurrentUser; db: AdminDb } | { error: st
 }
 
 type Target = GuardTarget & {
-  email: string | null; full_name: string; quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null;
+  email: string | null; full_name: string; quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null; can_rfq?: boolean | null;
 };
 
 async function loadTarget(db: AdminDb, id: string): Promise<Target | null> {
   if (!id || typeof id !== "string") return null;
   const base = "id, role, active, email, full_name";
-  let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", id).maybeSingle();
+  let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq`).eq("id", id).maybeSingle();
+  // DB bez migrace 20261031160000 (can_rfq)
+  if (res.error && /can_rfq/.test(res.error.message ?? "")) {
+    res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", id).maybeSingle() as typeof res;
+  }
   // DB bez migrace 20261030200000 (schvalování nabídek per uživatel)
   if (res.error && /quote_needs_approval|can_approve_quotes/.test(res.error.message ?? "")) {
     res = await db.from("profiles").select(base).eq("id", id).maybeSingle() as typeof res;
@@ -219,6 +223,8 @@ export interface UpdateUserChanges {
   quoteNeedsApproval?: boolean;
   /** „Smí schvalovat nabídky ostatních" (31. 10.; u super admina se nemění — smí vždy). Nezávislé na quoteNeedsApproval. */
   canApproveQuotes?: boolean;
+  /** „Smí poptávat dodavatele" (31. 10.; jen zaměstnanec — obchodník a super admin smí vždy). Vidí ceny dodavatelů v poptávkovém kole. */
+  canRfq?: boolean;
 }
 
 /** Neodeslané nabídky autora, které čekají na schválení (přepočet po změně schvalování dělá DB trigger). */
@@ -285,6 +291,12 @@ export async function updateUser(
       if (finalRole !== "super_admin" && changes.canApproveQuotes !== (target.can_approve_quotes === true)) {
         update.can_approve_quotes = changes.canApproveQuotes;
       }
+    }
+    if (changes.canRfq !== undefined) {
+      if (typeof changes.canRfq !== "boolean") return { ok: false, error: "Neplatné nastavení poptávek dodavatelům." };
+      // obchodník a super admin poptávají vždy — příznak se ukládá jen u zaměstnance
+      const finalRole = (update.role as UserRole | undefined) ?? (target.role as UserRole);
+      if (finalRole === "zamestnanec" && changes.canRfq !== (target.can_rfq === true)) update.can_rfq = changes.canRfq;
     }
     if (Object.keys(update).length === 0) return { ok: true };
 

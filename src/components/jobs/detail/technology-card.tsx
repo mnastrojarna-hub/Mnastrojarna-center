@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import {
-  AlertTriangle, ArrowRight, Banknote, ChevronDown, ClipboardList, FileText, Flag, Home, Hourglass, MapPin, PackageCheck, StickyNote, Truck,
+  AlertTriangle, ArrowRight, Banknote, ChevronDown, ClipboardList, FileText, Flag, Home, Hourglass, MapPin, PackageCheck, Send, StickyNote, Truck,
   Wrench, Factory, type LucideIcon,
 } from "lucide-react";
+import { useRfq } from "@/components/rfq/rfq-context";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OPERATION_KINDS } from "@/lib/jobs/operations";
@@ -20,7 +21,7 @@ import { useFlowActions } from "./flow-actions";
 import { JobField } from "./inline-field";
 import { formatMoney, formatQty } from "./detail-helpers";
 import {
-  buildTechCard, techNextAction, techSummary, type StepTone, type TechGroupView, type TechNext, type TechStepView,
+  buildTechCard, rfqTargetOf, techNextAction, techSummary, type StepTone, type TechGroupView, type TechNext, type TechStepView,
 } from "./technology-overview";
 
 /**
@@ -45,7 +46,10 @@ function money(amount: number | null, currency: string): string {
   return amount === null ? "cena zatím nepřišla" : formatMoney(amount, currency);
 }
 
-function StepRow({ step, open }: { step: TechStepView; open: boolean }) {
+/** Krok, u kterého dává smysl poptat dodavatele (nabídka chybí nebo ještě nepřišla). */
+const RFQ_PHASES = new Set(["bez_firmy", "ceka_na_nabidku", "k_objednani"]);
+
+function StepRow({ step, open, onRfq }: { step: TechStepView; open: boolean; onRfq?: (() => void) | null }) {
   const kind = OPERATION_KINDS[step.kind];
   const KindIcon = kind.icon;
   const WhoIcon: LucideIcon = step.who.type === "u_nas" ? Home : step.who.type !== "none" ? Factory : step.quotePending ? Hourglass : AlertTriangle;
@@ -82,6 +86,11 @@ function StepRow({ step, open }: { step: TechStepView; open: boolean }) {
               {step.endsAtCustomerDate && <Flag className="h-3 w-3 shrink-0" aria-hidden />}
               <span className="min-w-0 truncate">{step.deadline.text}</span>
             </span>
+          )}
+          {onRfq && step.who.type !== "u_nas" && RFQ_PHASES.has(step.phase) && !step.cost && (
+            <button type="button" onClick={onRfq} className={cn(CHIP, "border border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100 dark:border-orange-500/40 dark:bg-orange-500/10 dark:text-orange-200")} data-testid="tech-step-rfq">
+              <Send className="h-3 w-3 shrink-0" aria-hidden /> Poptat
+            </button>
           )}
         </div>
         {details && (
@@ -151,7 +160,7 @@ function GroupItems({ group, open }: { group: TechGroupView; open: boolean }) {
   );
 }
 
-function Group({ group }: { group: TechGroupView }) {
+function Group({ group, onRfq }: { group: TechGroupView; onRfq?: ((s: TechStepView, g: TechGroupView) => void) | null }) {
   const [open, setOpen] = React.useState(false);
   const one = group.items.length === 1 ? group.items[0] : null;
   const qty = one ? `${formatQty(one.quantity)} ${one.unit}${one.material ? ` · ${one.material}` : ""}` : null;
@@ -180,7 +189,7 @@ function Group({ group }: { group: TechGroupView }) {
       </div>
       {group.steps.length ? (
         <ol className="divide-y divide-border/60" aria-label={`Kroky: ${group.title}`}>
-          {group.steps.map((s) => <StepRow key={s.id} step={s} open={open} />)}
+          {group.steps.map((s) => <StepRow key={s.id} step={s} open={open} onRfq={onRfq ? () => onRfq(s, group) : null} />)}
         </ol>
       ) : (
         <p className="text-xs text-muted-foreground">Kroky výroby zatím nenaplánované.</p>
@@ -241,12 +250,19 @@ export function TechnologyCard({ job, production, purchasing, className }: {
     today, canSeePrices, currency: job.currency,
   }), [job.stage, job.items, production?.operations, purchasing?.supplierQuotes, purchasing?.purchaseOrders, handoffFinal, job.dueDate, job.customerRequiredDate, today, canSeePrices, job.currency]);
 
-  const can = flow ? flow.ctx.can : (f: string) => f !== "margins" || perms.margins;
+  const rfq = useRfq();
+  const can = flow ? flow.ctx.can : (f: string) => (f === "rfq" ? Boolean(rfq?.canRfq) : f !== "margins" || perms.margins);
   const next = techNextAction(view, { stage: job.stage, flowNext: flow?.next ?? null, can });
   const run = (n: TechNext) => {
-    if (flow) flow.run(n.key);
+    // 31. 10.: „Poptat dodavatele" = poptávkové kolo pro krok (operace) a jeho položky
+    if (n.key === "rfq.create" && rfq?.canRfq) rfq.open({ kinds: n.rfq?.kinds ?? null, itemIds: n.rfq?.itemIds ?? null });
+    else if (flow) flow.run(n.key);
     else window.location.search = "?tab=vyroba";
   };
+  const early = job.stage === "poptavka" || job.stage === "naceneni" || job.stage === "nabidka";
+  const onRfq = rfq?.canRfq && early
+    ? (s: TechStepView, g: TechGroupView) => { const t = rfqTargetOf(s, g); rfq.open({ kinds: t.kinds, itemIds: t.itemIds }); }
+    : null;
 
   return (
     <section className={cn("rounded-xl border bg-card shadow-sm", className)} aria-label="Technologie" data-testid="tech-card">
@@ -258,6 +274,11 @@ export function TechnologyCard({ job, production, purchasing, className }: {
           <h3 className="text-sm font-semibold leading-tight">Technologie</h3>
           <p className="break-words text-xs text-muted-foreground" data-testid="tech-summary">{techSummary(view)}</p>
         </div>
+        {rfq?.summary && (
+          <span className={cn(CHIP, STEP_TONE.orange)} title={`Poptávka ${rfq.summary.number}`} data-testid="tech-rfq">
+            <Send className="h-3 w-3 shrink-0" aria-hidden /> {rfq.summary.text}
+          </span>
+        )}
         {view.final && (
           <span className={cn(CHIP, PILL_TONE[view.final.tone])} title={view.final.title} data-testid="tech-final">
             <Flag className="h-3 w-3 shrink-0" aria-hidden /> {view.final.text}
@@ -278,7 +299,7 @@ export function TechnologyCard({ job, production, purchasing, className }: {
               </p>
             )}
             <ul className="grid gap-2">
-              {view.groups.map((g) => <Group key={g.key} group={g} />)}
+              {view.groups.map((g) => <Group key={g.key} group={g} onRfq={onRfq} />)}
             </ul>
             {(view.cost || view.skipped > 0) && (
               <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
