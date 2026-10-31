@@ -6,7 +6,7 @@ import { SITE } from "@/content/site";
 export const metadata: Metadata = {
   title: "Mnástrojárna CAD – online 3D/2D CAD zdarma",
   description:
-    "Plnohodnotný parametrický 3D/2D CAD v prohlížeči zdarma: skici, vysunutí, rotace, díry, zaoblení, skořepiny, pole. Export STEP, STL a 2D výkresů DXF/PDF. Jádro OpenCascade, bez instalace.",
+    "Profesionální parametrický 3D CAD v prohlížeči zdarma: díly, sestavy, rámy forem, výkresy s kusovníkem (PDF/DXF), proměnné a stavy. Import a export STEP, IGES, BREP, STL, 3MF, glTF, OBJ, DXF. Jádro OpenCascade, bez instalace.",
   alternates: { canonical: "/cad" },
   openGraph: { url: `${SITE.url}/cad`, title: "Mnástrojárna CAD – online 3D/2D CAD zdarma", siteName: SITE.name, locale: "cs_CZ", type: "website" },
 };
@@ -26,7 +26,7 @@ export default function CadPage() {
           operatingSystem: "Webový prohlížeč",
           inLanguage: "cs",
           offers: { "@type": "Offer", price: "0", priceCurrency: "CZK" },
-          featureList: ["Parametrické 3D modelování", "2D skici", "Export STEP a STL", "2D výkresy DXF a PDF", "Import STEP"],
+          featureList: ["Parametrické 3D modelování", "Sestavy a vazby", "Generátor rámu vstřikovací formy", "Výkresy s kusovníkem PDF/DXF", "Proměnné a stavy (konfigurace)", "Import a export STEP, IGES, BREP, STL, 3MF, glTF, OBJ, DXF"],
           provider: { "@type": "Organization", name: SITE.name, url: SITE.url },
         }}
       />
