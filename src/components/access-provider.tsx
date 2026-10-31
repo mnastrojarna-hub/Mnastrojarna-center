@@ -13,6 +13,10 @@ export interface ClientAccess {
   features: Feature[];
   role: UserRole | null;
   userId: string | null;
+  /** Nabídky přihlášeného musí schválit super admin (profil, 31. 10.). Neuvedeno = ano (kromě super admina). */
+  quoteNeedsApproval?: boolean;
+  /** 31. 10.: schvalovatelé nabídek, kteří nejsou super admin (texty „čeká na schválení (V. Volný nebo super admin)“). */
+  quoteApprovers?: { id: string; name: string }[];
 }
 
 const EMPTY: ClientAccess = { features: [], role: null, userId: null };
@@ -31,9 +35,13 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
 /** Vloží oprávnění ze serveru (renderuje se v layoutu aplikace). */
 export function AccessBridge(props: ClientAccess) {
   const { setAccess } = React.useContext(AccessContext);
-  const key = props.features.join(",") + "|" + props.role + "|" + props.userId;
+  const key = props.features.join(",") + "|" + props.role + "|" + props.userId + "|" + props.quoteNeedsApproval
+    + "|" + (props.quoteApprovers ?? []).map((a) => `${a.id}:${a.name}`).join(",");
   React.useEffect(() => {
-    setAccess({ features: props.features, role: props.role, userId: props.userId });
+    setAccess({
+      features: props.features, role: props.role, userId: props.userId, quoteNeedsApproval: props.quoteNeedsApproval,
+      quoteApprovers: props.quoteApprovers ?? [],
+    });
     // klíč pokrývá všechny vstupy
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, setAccess]);

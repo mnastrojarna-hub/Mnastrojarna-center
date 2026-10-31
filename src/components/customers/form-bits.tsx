@@ -64,7 +64,8 @@ export function FormSection({
           {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+      {/* grid-cols-1 = minmax(0, 1fr): dlouhý obsah (e-mail v řádku) sloupec na mobilu nerozšíří */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
     </section>
   );
 }

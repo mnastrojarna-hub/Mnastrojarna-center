@@ -81,6 +81,14 @@ async function startFromHeader(page, label = "Zapsat dodání a dodací list") {
   return dlg;
 }
 
+/** Je zakázka v záložce Knihy (hledání podle čísla; "" = výchozí Objednávky v běhu)? */
+async function inBook(page, j, segment = "") {
+  await page.goto(`${BASE}/orders?${segment ? `segment=${segment}&` : ""}q=${encodeURIComponent(j.number)}`);
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.locator('main [aria-busy="false"]').first().waitFor({ timeout: 15_000 }).catch(() => {});
+  return (await page.locator(`main a[href^="/orders/${j.id}"]`).count()) > 0;
+}
+
 async function submitAndResult(page, dlg) {
   await dlg.getByRole("button", { name: /^Zapsat dodání a dodací list/ }).click();
   const res = dlg.locator('[data-testid="delivery-note-result"]');
@@ -146,6 +154,10 @@ await test("Dodáno k nám: další krok „Zapsat dodání a dodací list“ �
   await chip.waitFor({ timeout: 20_000 });
   expect(norm(await chip.innerText()).includes(number), "chip dodání ukazuje číslo DL");
   expect(/\/api\/jobs\/files\/[0-9a-f-]{36}$/.test(await chip.getAttribute("href")), "chip vede na PDF dodacího listu");
+
+  // 31. 10.: dílčí DL → zakázka zůstává v Objednávkách (v běhu), v Dokončených ještě není
+  await eventually(async () => expect(await inBook(page, A), "Kniha: po dílčím DL zůstává v Objednávkách"), { timeout: 20_000 });
+  expect(!(await inBook(page, A, "dokoncene")), "Kniha: po dílčím DL ještě není v Dokončených");
 }));
 
 // ═════════════ 2. Doklady → DL na zbývající položky → druhý DL → Dodáno zákazníkovi ═════════════
@@ -179,6 +191,10 @@ await test("Doklady ▾: stáhnout vystavený DL (bez nového čísla) + „DL n
   expect(await page.getByRole("menuitem", { name: /DL na zbývající položky/ }).count() === 0, "nic nezbývá → bez „DL na zbývající“");
   await page.keyboard.press("Escape");
   await shot(page, S("03-delivered"));
+
+  // 31. 10.: DL na vše → Kniha: Dokončené, ne Objednávky v běhu (ani v Hodnotě v běhu — stejný výběr)
+  await eventually(async () => expect(await inBook(page, A, "dokoncene"), "Kniha: po DL na vše je v Dokončených"), { timeout: 20_000 });
+  expect(!(await inBook(page, A)), "Kniha: po DL na vše už není v Objednávkách v běhu");
 }));
 
 // ═════════════ 3. Mobil 390 px ═════════════

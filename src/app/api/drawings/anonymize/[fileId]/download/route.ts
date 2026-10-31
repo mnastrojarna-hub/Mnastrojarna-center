@@ -13,7 +13,7 @@ const INLINE_MAX = 4 * 1024 * 1024;
 
 /**
  * „Stáhnout pro dodavatele": anonymizovaná kopie pod anonymním názvem po ověření prefixu a sha256.
- * U „ke kontrole" vyžaduje ?reviewed=1 (stejné potvrzení jako odeslání). Velké soubory → podepsaná URL.
+ * Hotová kopie (done; starší „ke kontrole" platí také) bez dalšího potvrzení. Velké soubory → podepsaná URL.
  * ?original=1 = „Poslat originál" u formátu, který anonymizovat nejde: jen super admin, audit, bez původního názvu.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ fileId: string }> }) {

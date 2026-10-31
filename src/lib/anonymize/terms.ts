@@ -4,9 +4,10 @@ import { makeTerms, makeWordTerms, type Term } from "./rules";
 import type { AnonSettings } from "./settings";
 
 /**
- * Termíny pro anonymizaci: vlastní ze Nastavení + automaticky zákazník zakázky z CRM (název, web,
- * doména e-mailů, kontaktní osoby) a `customerName` z vytěženého razítka. Tyto zásahy NIKDY neruší
- * výjimky ani AI (M5). Výjimky: naše firma.
+ * Termíny pro anonymizaci: vlastní ze Nastavení + automaticky zákazník zakázky z CRM (název celý, bez
+ * právní formy, výrazná slova názvu) a `customerName` z vytěženého razítka. Kontaktní osoby, doména a
+ * IČO / DIČ jen se zapnutou kategorií (výchozí jen firma). Tyto zásahy NIKDY neruší výjimky ani AI (M5).
+ * Výjimky: naše firma.
  */
 
 interface Db {
@@ -76,9 +77,21 @@ export async function gatherTerms(db: unknown, input: { jobId: string | null; se
       // CRM je bonus — bez něj zůstanou vlastní termíny a pravidla
     }
   }
+  // jen kategorie zapnuté v Nastavení (výchozí: jen název firmy — „Nic víc"): kontaktní osoby jen se
+  // zapnutými osobami, doména / IČO / DIČ jen se zapnutými kontakty. Název firmy zákazníka (a vlastní
+  // termíny) vždy, když je zapnutá firma.
+  const r = input.settings.redact;
+  const persons = r.person_drawn || r.person_checked || r.person_revisions;
+  const crmKept = crm.filter((t) => {
+    if (crmCompanies.includes(t)) return r.company;
+    if (/^[A-Z]{0,2}\d{6,}$/i.test(t) || /\./.test(t) || /^[a-z0-9-]+$/.test(t)) return r.contact; // IČO / DIČ / doména
+    return persons; // kontaktní osoba
+  });
+  crm.splice(0, crm.length, ...crmKept);
+  if (!r.company) crmCompanies.splice(0, crmCompanies.length);
   const ex = input.extracted ?? null;
   const cn = ex && typeof ex === "object" ? (ex.customerName ?? (ex.drawing as Record<string, unknown> | undefined)?.customerName) : null;
-  if (typeof cn === "string" && cn.trim()) drawing.push(cn.trim());
+  if (r.company && typeof cn === "string" && cn.trim()) drawing.push(cn.trim());
   const terms = [
     ...makeTerms(custom, "custom", keep),
     ...makeTerms(crm, "crm", keep),

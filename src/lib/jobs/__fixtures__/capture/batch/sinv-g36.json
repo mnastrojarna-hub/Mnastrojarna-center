@@ -1,0 +1,57 @@
+{
+  "supplier": {
+    "name": "E2E Soustružna Integrace s.r.o.",
+    "ico": "27999936",
+    "dic": "CZ27999936",
+    "street": "Průmyslová 34",
+    "city": "Olomouc",
+    "zip": "77900",
+    "country": "CZ",
+    "email": "fakturace@e2e-27999936.cz",
+    "phone": "+420 585 000 936",
+    "contactPerson": "Eva Testová",
+    "bankAccount": "29009936/2010"
+  },
+  "documentType": "faktura",
+  "number": "FV-36-001",
+  "variableSymbol": "36001",
+  "issueDate": "2026-10-28",
+  "taxableDate": "2026-10-28",
+  "dueDate": "2026-11-10",
+  "currency": "CZK",
+  "totalNet": 2000,
+  "totalVat": 420.0,
+  "totalGross": 2420.0,
+  "vatBreakdown": [
+    {
+      "rate": 21,
+      "base": 2000,
+      "vat": 420.0
+    }
+  ],
+  "items": [
+    {
+      "text": "Soustružení",
+      "code": "",
+      "quantity": 1,
+      "unit": "kpl",
+      "unitPrice": 2000,
+      "amount": 2000,
+      "vatRate": 21,
+      "refs": []
+    }
+  ],
+  "references": {
+    "purchaseOrderNumbers": [],
+    "jobNumbers": [],
+    "customerOrderNumbers": [],
+    "deliveryNoteNumbers": [],
+    "drawingNumbers": []
+  },
+  "isCreditNote": false,
+  "isProforma": false,
+  "exchangeRate": 0,
+  "confidence": 0.94,
+  "summary": "Testovací doklad (E2E).",
+  "needsClarification": []
+}

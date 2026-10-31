@@ -392,13 +392,16 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
     // rozpor, změna) bez pozastavených a reklamací; nabídky: super admin = čekají na jeho schválení,
     // ostatní = moje schválené k odeslání + vrácené k přepracování (flow_badge_counts)
     const mine = can("flow_all") ? null : user.id;
-    const [flow, orders, approvals, inbox] = await Promise.all([
+    // 31. 10.: schvalovatel (ne super admin) = jeho schválené k odeslání + vrácené + cizí nabídky na jeho schválení
+    const peerApprover = can("quote_approval") && user.role !== "super_admin";
+    const [flow, orders, approvals, inbox, toApprove] = await Promise.all([
       db.rpc("flow_badge_counts", { p_mine: mine }),
       db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", `(${CLOSED_STAGES.join(",")})`),
       can("dashboard")
         ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
         : Promise.resolve({ count: 0 }),
       getUnreadCount(),
+      peerApprover ? listPendingQuoteApprovals().then((l) => l.length) : Promise.resolve(0),
     ]);
     warn("badges", flow.error);
     const f = ((flow.data ?? []) as Record<string, number | null>[])[0] ?? {};
@@ -407,7 +410,7 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
       inbox,
       inquiries: n("inquiries"),
       pricing: can("pricing") ? n("pricing") : 0,
-      quotes: can("quote_approval") ? n("quotes_pending") : n("quotes_ready") + n("quotes_returned"),
+      quotes: can("quote_approval") && !peerApprover ? n("quotes_pending") : n("quotes_ready") + n("quotes_returned") + toApprove,
       confirmations: n("confirmations"),
       orders: orders.count ?? 0,
       // AI přehled = fronta AI návrhů + ruční nabídky kolegů ke schválení (panel „Nabídky ke schválení")
@@ -439,27 +442,36 @@ export interface PendingQuoteApproval {
 /**
  * Fronta „Ke schválení" super admina (#25 §8.9) — vždy všichni (i při „Jen moje"): neschválené,
  * nearchivované, nevrácené nabídky otevřených zakázek; bez nabídek, které čekají ve frontě AI
- * (ty schvaluje ApprovalQueue). Jen s právem quote_approval.
+ * (ty schvaluje ApprovalQueue). Jen s právem quote_approval; 31. 10. schvalovatel (ne super admin)
+ * jen cizí nabídky, které schválení potřebují.
  */
 export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[]> {
   if (!(await allowedAccess("quote_approval"))) return [];
   const db = await supa();
   if (!db) return [];
+  // 31. 10.: schvalovatel (ne super admin) vidí jen cizí nabídky, které schválení potřebují kvůli autorovi /
+  // editorovi (= mayManageQuoteApproval / DB quote_user_may_approve) — AI nabídky a vlastní ne
+  const { user } = await getAccess();
+  const restrictTo = user && user.role !== "super_admin" ? user.id : null;
   try {
-    const { data, error } = await fetchPaged<Record<string, unknown>>((from, to) => db.from("quotes")
-      .select([
-        "id, number, job_id, total, currency, updated_at, created_at",
-        "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name))",
-        "customer:customers!customer_id(name)",
-        "creator:profiles!created_by(full_name, email)",
-        "items:quote_items!quote_id(unit_price)",
-      ].join(", "))
-      .eq("state", "ke_schvaleni")
-      .eq("archived", false)
-      .is("approval_returned_at", null)
-      .order("updated_at", { ascending: true })
-      .order("id")
-      .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>, 2000);
+    const { data, error } = await fetchPaged<Record<string, unknown>>((from, to) => {
+      let qb = db.from("quotes")
+        .select([
+          "id, number, job_id, total, currency, updated_at, created_at",
+          "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name))",
+          "customer:customers!customer_id(name)",
+          "creator:profiles!created_by(full_name, email)",
+          "items:quote_items!quote_id(unit_price)",
+        ].join(", "))
+        .eq("state", "ke_schvaleni")
+        .eq("archived", false)
+        .is("approval_returned_at", null);
+      if (restrictTo) qb = qb.eq("admin_approval_required", true).or(`created_by.is.null,created_by.neq.${restrictTo}`);
+      return qb
+        .order("updated_at", { ascending: true })
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+    }, 2000);
     warn("pending-quotes", error);
     if (error) return [];
     const ids = data.map((r) => String(r.id));

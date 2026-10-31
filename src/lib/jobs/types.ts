@@ -390,6 +390,11 @@ export interface JobFilters {
   order?: string[];
   /** Dodání zákazníkovi (k_expedici, castecne, dodano, dl_potvrzen). */
   delivery?: string[];
+  /**
+   * Zboží u zákazníka (isDeliveredToCustomer): true = jen dodané celé (Kniha → Dokončené),
+   * false = jen bez DL na vše (Kniha → Objednávky v běhu). Bez hodnoty = bez ohledu na dodání.
+   */
+  deliveredToCustomer?: boolean;
   /** Kdo naposledy změnil hlavní stav nebo dílčí stav (uuid). */
   changedBy?: string;
   sort?: JobSort;

@@ -223,7 +223,7 @@ function ApprovalRow({
           {editing ? (
             <>
               {isOutbound && (
-                <RecipientInput id={`approval-${item.id}-to`} label="Příjemce" value={target ?? ""} onChange={setTarget} placeholder="adresa@firma.cz" />
+                <RecipientInput id={`approval-${item.id}-to`} label="Příjemce" value={target ?? ""} onChange={setTarget} placeholder="e-mail příjemce" />
               )}
               {isOutbound && target && (
                 <ToneToggle email={tokensOf(target).find(isValidRecipient) ?? null} compact onChange={(c) => c.changed && setBody((b) => applySalutation(b, c.salutation))} />

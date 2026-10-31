@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createJobQuote, updateJobQuote } from "@/app/actions/jobs";
 import { useAccess } from "@/components/access-provider";
+import { quoteApproverWho, quoteAwaitsText, userNeedsQuoteApproval } from "@/lib/jobs/flow-status";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
 import { ItemsEditor } from "./items-editor";
@@ -30,7 +31,7 @@ function Field({ label, icon: Icon, children, hint }: { label: string; icon: typ
  * Ceny doplní člověk; DPH 21 %, platnost +30 dní.
  */
 export function QuoteEditorDialog({
-  open, onOpenChange, initial, quoteId, quoteNumber, approved, currency = "CZK",
+  open, onOpenChange, initial, quoteId, quoteNumber, approved, currency = "CZK", authorId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,9 +41,17 @@ export function QuoteEditorDialog({
   quoteNumber?: string;
   approved?: boolean;
   currency?: string;
+  /** Autor upravované nabídky (kdo ji schválí — vlastní nikdo). Nová nabídka = přihlášený. */
+  authorId?: string | null;
 }) {
   const { jobId, perms, notify, refresh } = useJobDetail();
-  const superAdmin = useAccess().role === "super_admin";
+  const access = useAccess();
+  const superAdmin = access.role === "super_admin";
+  // 31. 10.: uživatel bez schvalování (profil) vystavuje a odesílá jako super admin — jen bez znovuschválení;
+  // nikdy nic neodesílá sám — zákazníkovi nabídku pošle až tlačítkem „Odeslat zákazníkovi"
+  const selfApproves = !userNeedsQuoteApproval(access);
+  // kdo nabídku schválí: schvalovatelé z dat (bez autora) + super admin — „V. Volný nebo super admin"
+  const who = quoteApproverWho(access.quoteApprovers, quoteId ? authorId ?? null : access.userId) ?? "super admin";
   const [form, setForm] = React.useState<QuoteFormState>(initial);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -75,15 +84,18 @@ export function QuoteEditorDialog({
         return;
       }
       const number = "number" in res && typeof res.number === "string" ? res.number : quoteNumber;
-      // #25: nabídku ne-admina schvaluje super admin; jeho vlastní schválení nepotřebují
+      // #25: nabídku uživatele se schvalováním schvaluje super admin / schvalovatel; ostatní schválení nepotřebují
+      // (31. 10.: nic se neodesílá samo — „teď ji odešli“ je jen nápověda k tlačítku Odeslat zákazníkovi)
       const reset = "approvalReset" in res && res.approvalReset === true;
       const pending = "needsApproval" in res && res.needsApproval === true;
+      // (starší server bez needsApproval u úpravy: zrušené schválení = čeká se na nové)
+      const resetPending = reset && (!("needsApproval" in res) || pending);
       notify(
         "success",
         editing
-          ? reset ? "Nabídka upravena — změnu musí super admin znovu schválit." : `Nabídka ${number ?? ""} uložena.`
+          ? resetPending ? `Nabídka upravena — změnu musí znovu schválit ${who}.` : `Nabídka ${number ?? ""} uložena.`
           : pending
-            ? `Nabídka ${number ?? ""} vytvořena — čeká na schválení super admina.`
+            ? `Nabídka ${number ?? ""} vytvořena — ${quoteAwaitsText(who === "super admin" ? null : who)}.`
             : `Nabídka ${number ?? ""} vytvořena — teď ji odešli.`,
       );
       onOpenChange(false);
@@ -104,15 +116,21 @@ export function QuoteEditorDialog({
           title={editing ? `Upravit nabídku ${quoteNumber ?? ""}` : "Nová nabídka"}
           subtitle={
             editing
-              ? superAdmin ? "Úprava schválené nabídky ji rovnou znovu schválí (tvým jménem)." : "Každá změna zruší schválení — nabídku pak znovu schválí super admin."
-              : superAdmin ? "Předvyplněno z položek zakázky. Doplň ceny a ulož." : "Předvyplněno z položek zakázky. Doplň ceny a ulož — před odesláním ji schválí super admin."
+              ? superAdmin ? "Úprava schválené nabídky ji rovnou znovu schválí (tvým jménem)."
+                : selfApproves ? "Tvé nabídky schválení nepotřebují — po uložení ji vystavíš nebo odešleš tlačítkem Odeslat zákazníkovi."
+                : `Každá změna zruší schválení — nabídku pak znovu schválí ${who}.`
+              : superAdmin ? "Předvyplněno z položek zakázky. Doplň ceny a ulož."
+                : selfApproves ? "Předvyplněno z položek zakázky. Doplň ceny a ulož — schválení nepotřebuje, zákazníkovi ji pošleš tlačítkem Odeslat zákazníkovi."
+                : `Předvyplněno z položek zakázky. Doplň ceny a ulož — před odesláním ji schválí ${who}.`
           }
         />
         <form onSubmit={submit} className="space-y-5 p-4 sm:p-5" noValidate>
           <ErrorBox error={error} />
           {editing && approved && !superAdmin && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-              Nabídka je schválená. Když ji změníš, bude zase neschválená a odeslat ji půjde až po novém schválení super adminem.
+              {selfApproves
+                ? `Nabídka je schválená. Když ji změníš, schválení se zruší — nabídku kolegy, který potřebuje schválení, pak znovu schválí ${who}.`
+                : `Nabídka je schválená. Když ji změníš, bude zase neschválená a odeslat ji půjde až po novém schválení ${who === "super admin" ? "super adminem" : `(${who})`}.`}
             </p>
           )}
           <Field label="Název nabídky" icon={Type}>

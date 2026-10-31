@@ -1,7 +1,7 @@
 // „anonymizace stále nefunguje píše to: PDF je poškozené nebo zaheslované — nejde otevřít. Požádej o nový
 // soubor. to je blbost" (majitel 30. 10.). Obchodník nahraje do zakázky výkresy, jak chodí z CAD / ERP:
 // PDF s heslem VLASTNÍKA (zákaz úprav / kopírování) v RC4-40, RC4-128, AES-128, AES-256 a s anotací →
-// každé skončí hotovo / ke kontrole, výstup je čisté NEšifrované PDF bez úniku. PDF s heslem k OTEVŘENÍ →
+// každé skončí hotovo (nic ke kontrole), výstup je čisté NEšifrované PDF bez úniku. PDF s heslem k OTEVŘENÍ →
 // poctivé „zaheslované". Simulovaná porucha prostředí („Path2D is not defined", jako na Vercelu) při prvním
 // pokusu → soubor se zpracuje znovu sám, nikdy „poškozené".
 //   E2E_BASE_URL=http://localhost:3500 ANON_FAKE_DIR=<AI_FAKE_ANON serveru> node tools/e2e/tests/29-anon-pdf-encrypted.mjs
@@ -50,14 +50,15 @@ async function plainPdf() {
   return new Uint8Array(await doc.save());
 }
 
+// plná automatika (majitel 31. 10.): každý výkres skončí hotovo — nic „ke kontrole" (ani s anotací)
 const FILES = [
-  { name: `vlastnik-rc4-40-${STAMP}.pdf`, data: fixture("OWNER_RC4_40"), expect: /^(done|review)$/ },
-  { name: `vlastnik-rc4-128-${STAMP}.pdf`, data: fixture("OWNER_RC4_128"), expect: /^(done|review)$/ },
-  { name: `vlastnik-aes-128-${STAMP}.pdf`, data: fixture("OWNER_AES_128"), expect: /^(done|review)$/ },
-  { name: `vlastnik-aes-256-${STAMP}.pdf`, data: fixture("OWNER_AES_256"), expect: /^(done|review)$/ },
-  { name: `vlastnik-aes-128-anotace-${STAMP}.pdf`, data: fixture("OWNER_AES_128_ANNOT"), expect: /^review$/ },
+  { name: `vlastnik-rc4-40-${STAMP}.pdf`, data: fixture("OWNER_RC4_40"), expect: /^done$/ },
+  { name: `vlastnik-rc4-128-${STAMP}.pdf`, data: fixture("OWNER_RC4_128"), expect: /^done$/ },
+  { name: `vlastnik-aes-128-${STAMP}.pdf`, data: fixture("OWNER_AES_128"), expect: /^done$/ },
+  { name: `vlastnik-aes-256-${STAMP}.pdf`, data: fixture("OWNER_AES_256"), expect: /^done$/ },
+  { name: `vlastnik-aes-128-anotace-${STAMP}.pdf`, data: fixture("OWNER_AES_128_ANNOT"), expect: /^done$/ },
   { name: `heslo-k-otevreni-${STAMP}.pdf`, data: fixture("USER_AES_128"), expect: /^unsupported$/ },
-  { name: `porucha-${STAMP}.pdf`, data: await plainPdf(), expect: /^(done|review)$/, fault: true },
+  { name: `porucha-${STAMP}.pdf`, data: await plainPdf(), expect: /^done$/, fault: true },
 ];
 
 function cleanup() {

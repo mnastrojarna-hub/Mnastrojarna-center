@@ -193,7 +193,7 @@ export function AddUserDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <label htmlFor="nu-name" className="text-sm font-medium">Jméno a příjmení</label>
-                <Input id="nu-name" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} placeholder="Jan Novák" autoFocus />
+                <Input id="nu-name" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} placeholder="jméno a příjmení" className="placeholder:italic" autoFocus />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <label htmlFor="nu-email" className="text-sm font-medium">E-mail (přihlašovací jméno)</label>
@@ -205,7 +205,8 @@ export function AddUserDialog({
                   autoComplete="off"
                   value={form.email}
                   onChange={(e) => set("email", e.target.value)}
-                  placeholder="jan.novak@mnastrojarna.cz"
+                  placeholder="pracovní e-mail kolegy"
+                  className="placeholder:italic"
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
@@ -222,11 +223,11 @@ export function AddUserDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label htmlFor="nu-phone" className="text-sm font-medium">Telefon</label>
-                <Input id="nu-phone" type="tel" inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+420 777 123 456" />
+                <Input id="nu-phone" type="tel" inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="telefon" className="placeholder:italic" />
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="nu-position" className="text-sm font-medium">Funkce</label>
-                <Input id="nu-position" value={form.position} onChange={(e) => set("position", e.target.value)} placeholder="technolog, nákup, obchod…" />
+                <Input id="nu-position" value={form.position} onChange={(e) => set("position", e.target.value)} placeholder="funkce (technolog, nákup, obchod…)" className="placeholder:italic" />
               </div>
               {form.role === "obchodnik" && (
                 <div className="space-y-1.5">

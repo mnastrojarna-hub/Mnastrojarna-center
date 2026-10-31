@@ -333,6 +333,23 @@ export function validateContactForm(v: ContactFormValues): string | null {
   return null;
 }
 
+/**
+ * Adresa vybraná z našeptávače (pošta / adresář) → doplní prázdné jméno, pozici a telefon kontaktu.
+ * Název firmy (návrh „zákazník" / „dodavatel") se za jméno osoby nebere.
+ */
+export function contactFromSuggestion<T extends Pick<ContactFormValues, "name" | "position" | "phone">>(
+  cur: T,
+  s: { name: string; email: string; kind: string; position?: string | null; phone?: string | null; company?: string | null },
+): T {
+  const personName = s.name !== s.email && s.kind !== "zákazník" && s.kind !== "dodavatel" && s.name !== s.company ? s.name : "";
+  return {
+    ...cur,
+    name: cur.name.trim() || personName || cur.name,
+    position: cur.position.trim() || s.position || "",
+    phone: cur.phone.trim() || s.phone || "",
+  };
+}
+
 /** Barevný kroužek s iniciálami — stálá barva podle jména. */
 const AVATAR = [
   "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",

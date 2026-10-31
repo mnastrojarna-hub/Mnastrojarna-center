@@ -110,7 +110,8 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-approval-limit-retired>
-            Nabídky kolegů schvaluje super admin vždy, tvoje nabídky schválení nepotřebují — limit částky se už nepoužívá.
+            Nabídky kolegů se schvalováním schvaluje super admin, nebo kolega se „Smí schvalovat nabídky ostatních“ (Správa
+            uživatelů; vlastní nabídku nikdo neschvaluje sám). Tvoje nabídky schválení nepotřebují — limit částky se už nepoužívá.
           </p>
         </CardContent>
       </Card>

@@ -94,7 +94,7 @@ export async function GET(req: Request, { params }: Ctx) {
 
 /**
  * Ruční úprava (editor): { regions (ruční sada manual:added|removed), expectedAt, confirmKeep? } → vypálit
- * znovu → done. Zásah do chráněného pole bez confirmKeep → review + 422 s varováními (schválení = potvrzení).
+ * znovu → done (uložení = rozhodnutí člověka, i se zásahem do chráněného pole). Jiný výsledek → 422.
  */
 export async function PUT(req: Request, { params }: Ctx) {
   const { fileId } = await params;

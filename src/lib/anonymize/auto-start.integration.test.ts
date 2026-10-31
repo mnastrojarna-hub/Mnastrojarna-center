@@ -242,7 +242,8 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace se spustí sama hned po nahrání (
 
       it("Focení dokladu (capture/apply) → stránky zakázky zpracované po odpovědi", async () => {
         const job = await newJob();
-        const id = await insertFile(job, "foto-objednavka.pdf", { origin: "capture", kind: "objednavka", issuer: "zakaznik" });
+        // vyfocený VÝKRES (objednávka zákazníka se neanonymizuje — viz jen-vykresy.integration)
+        const id = await insertFile(job, "foto-vykres.pdf", { origin: "capture", kind: "vykres", issuer: "zakaznik" });
         h.capture = async () => ({ ok: true, jobId: job, fileId: id, created: false, aiUsed: false, filled: [] });
         const route = await import("@/app/api/jobs/capture/apply/route");
         const res = await route.POST(req("/api/jobs/capture/apply", { captureId: randomUUID(), state: {} }));

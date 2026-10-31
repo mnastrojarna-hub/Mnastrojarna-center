@@ -5,7 +5,7 @@ import type { PersonRef } from "@/lib/jobs/types";
 import type { ChangeVia, DocIssuerKey, JobFileOrigin, OrderRevisionDecision } from "@/lib/supabase/database.types";
 import {
   FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, deriveFlow, flowFactsFromRow, isLostReason, menuActions, nextAction,
-  pragueToday, quoteDisplayState, quoteFactsFromRow, stampFromRow, transitionFeature, type ActionCtx, type ChangeStamp,
+  pragueToday, quoteDisplayState, quoteFactsFromRow, stampFromRow, transitionFeature, userNeedsQuoteApproval, type ActionCtx, type ChangeStamp,
   type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import {
@@ -40,6 +40,7 @@ async function session() {
       can: access.can, userId: access.user.id, isSuperAdmin: access.user.role === "super_admin", assigneeId: null,
       // stránky toku umí dialog „Vrátit k přepracování…“ (FlowActionBar, #25)
       withReturn: true,
+      quoteNeedsApproval: userNeedsQuoteApproval(access.user),
     };
     return { db, access, ctx };
   } catch (err) {
@@ -231,16 +232,17 @@ export async function getFlowQuoteInfo(quoteIds: string[]): Promise<Record<strin
       // obchodník a řešitel zakázky — smí odeslat schválenou nabídku (quoteSendBlock jako server / karta)
       const jobPeople = new Map<string, { ownerId: string | null; assigneeId: string | null }>();
       if (jobIds.length) {
-        const { data: people, error: pErr } = await s.db.from("orders").select("id, owner_id, assignee_id").in("id", jobIds);
+        // lidé zakázek a návrhy změn najednou (dřív dva dotazy za sebou)
+        const [{ data: people, error: pErr }, { data: jobs, error: jErr }] = await Promise.all([
+          s.db.from("orders").select("id, owner_id, assignee_id").in("id", jobIds),
+          s.db.from("orders")
+            .select(`id, flow_proposal, flow_proposal_at, flow_proposal_by, prop_by:profiles!flow_proposal_by${P}`)
+            .in("id", jobIds).not("flow_proposal", "is", null),
+        ]);
         warn("quote-job-people", pErr);
         for (const j of (people ?? []) as { id: string; owner_id: string | null; assignee_id: string | null }[]) {
           jobPeople.set(j.id, { ownerId: j.owner_id ?? null, assigneeId: j.assignee_id ?? null });
         }
-      }
-      if (jobIds.length) {
-        const { data: jobs, error: jErr } = await s.db.from("orders")
-          .select(`id, flow_proposal, flow_proposal_at, flow_proposal_by, prop_by:profiles!flow_proposal_by${P}`)
-          .in("id", jobIds).not("flow_proposal", "is", null);
         warn("quote-proposals", jErr);
         for (const j of (jobs ?? []) as Row[]) {
           const value = j.flow_proposal as FlowProposal;

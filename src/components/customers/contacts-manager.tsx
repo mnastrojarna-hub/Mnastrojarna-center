@@ -11,7 +11,7 @@ import { ContactToneChip } from "@/components/contacts/contact-tone-chip";
 import { deleteCustomerContact, saveCustomerContact } from "@/app/actions/crm";
 import { deleteSupplierContactAction, saveSupplierContactAction } from "@/app/actions/contacts";
 import {
-  EMPTY_CONTACT_FORM, avatarToneFor, contactFormFromView, initialsOf, validateContactForm,
+  EMPTY_CONTACT_FORM, avatarToneFor, contactFormFromView, contactFromSuggestion, initialsOf, validateContactForm,
   type ContactFormValues, type ContactView,
 } from "@/components/customers/model";
 import { ROLE_TEXT, type PartyKind, type RoleEntry } from "@/lib/contacts/roles";
@@ -246,10 +246,10 @@ function ContactForm({
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
         <Field id={`${prefix}-name`} label="Jméno" required>
-          <Input id={`${prefix}-name`} value={values.name} onChange={(e) => set("name", e.target.value)} placeholder="Ing. Petr Svoboda" autoFocus autoComplete="name" />
+          <Input id={`${prefix}-name`} value={values.name} onChange={(e) => set("name", e.target.value)} placeholder="jméno a příjmení" className="placeholder:italic" autoFocus autoComplete="name" />
         </Field>
         <Field id={`${prefix}-position`} label="Pozice">
-          <Input id={`${prefix}-position`} value={values.position} onChange={(e) => set("position", e.target.value)} placeholder="Nákupčí / technik / účetní" />
+          <Input id={`${prefix}-position`} value={values.position} onChange={(e) => set("position", e.target.value)} placeholder="pozice (nákup, technik, účetní…)" className="placeholder:italic" />
         </Field>
         <Field id={`${prefix}-email`} label="E-mail">
           <EmailSuggestInput
@@ -257,20 +257,13 @@ function ContactForm({
             value={values.email}
             onChange={(v) => set("email", v)}
             context={kind === "supplier" ? { supplierId: customerId } : { customerId }}
-            placeholder="petr.svoboda@firma.cz"
-            onPicked={(s) => {
-              // adresa z pošty / adresáře → doplní prázdné jméno, pozici a telefon
-              setValues((cur) => ({
-                ...cur,
-                name: cur.name.trim() || (s.name !== s.email && s.kind !== "zákazník" && s.kind !== "dodavatel" ? s.name : cur.name),
-                position: cur.position.trim() || s.position || "",
-                phone: cur.phone.trim() || s.phone || "",
-              }));
-            }}
+            placeholder="e-mail osoby"
+            // adresa z pošty / adresáře → doplní prázdné jméno, pozici a telefon
+            onPicked={(s) => setValues((cur) => contactFromSuggestion(cur, s))}
           />
         </Field>
         <Field id={`${prefix}-phone`} label="Telefon">
-          <Input id={`${prefix}-phone`} type="tel" inputMode="tel" value={values.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+420 777 123 456" autoComplete="tel" />
+          <Input id={`${prefix}-phone`} type="tel" inputMode="tel" value={values.phone} onChange={(e) => set("phone", e.target.value)} placeholder="telefon" className="placeholder:italic" autoComplete="tel" />
         </Field>
       </div>
       {missing.length > 0 && values.name.trim() && (

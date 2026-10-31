@@ -17,6 +17,10 @@ vi.mock("@/components/access-provider", () => ({
   }),
 }));
 vi.mock("@/app/actions/crm", () => ({ createCustomer: vi.fn(), updateCustomer: vi.fn() }));
+vi.mock("@/app/actions/contacts", () => ({
+  getPartyBookAction: vi.fn(async () => ({ ok: true, book: { contacts: [], roles: [], partyEmail: null, tones: {} } })),
+  saveRoleEmailAction: vi.fn(), deleteRoleEmailAction: vi.fn(), setRoleDefaultAction: vi.fn(),
+}));
 vi.mock("@/app/actions/jobs", () => ({ setJobStage: vi.fn(), createJob: vi.fn() }));
 vi.mock("@/components/ui/dialog", () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => <div data-dialog>{children}</div>,
@@ -66,6 +70,26 @@ describe("#25 Nový zákazník — Obchodník podle role", () => {
     const ro = ownerReadonly(out) ?? "";
     expect(ro).toContain("— bez obchodníka —");
     expect(ro).not.toContain("Jana Zaměstnanec");
+  });
+});
+
+describe("Dialog zákazníka — kontakty a „Kam posílat“ přímo v okně (majitel 31. 10.)", () => {
+  it("nový zákazník: řádek kontaktní osoby, Přidat kontaktní osobu a pět účelů; vzory jen jako nápověda", () => {
+    who.role = "obchodnik";
+    who.userId = "u1";
+    const out = html(<CustomerDialog owners={OWNERS} defaultOwnerId="u1" />);
+    expect(out).not.toContain("Další kontaktní osoby přidáš na kartě zákazníka");
+    expect(out).toContain('aria-label="1. kontakt — jméno"');
+    expect(out).toContain('aria-label="1. kontakt — e-mail"');
+    expect(out).toContain("Přidat kontaktní osobu");
+    expect(out).toContain("Kam posílat");
+    for (const label of ["Faktury", "Dodací listy", "Nabídky", "Objednávky / potvrzení", "Běžná komunikace"]) {
+      expect(out).toContain(`Přidat e-mail: ${label}`);
+    }
+    const placeholders = [...out.matchAll(/placeholder="([^"]*)"/g)].map((m) => m[1]);
+    expect(placeholders).toContain("adresa skladu, jen když se liší od sídla");
+    expect(placeholders).toContain("web");
+    for (const p of placeholders) expect(p, `vzor „${p}“ vypadá jako data`).not.toMatch(/@|\+420|\d{3}|s\.r\.o|a\.s\.|firma\.cz|Hala|Brno|Nov[aá]k/);
   });
 });
 

@@ -304,7 +304,7 @@ export const QUOTE_STATES: Record<QuoteDisplayState, FlowStateMeta<QuoteDisplayS
   }),
   ke_schvaleni: meta({
     key: "ke_schvaleni", phase: "quote", label: "Neschválená", short: "Neschválená",
-    description: "Neschválená — čeká na schválení super admina. Odeslat ji půjde až po schválení.",
+    description: "Neschválená — čeká na schválení (super admin nebo schvalovatel nabídek). Odeslat ji půjde až po schválení.",
     icon: ShieldQuestion, tone: "action", palette: "violet.action", source: "both", terminal: false,
   }),
   schvalena: meta({
@@ -1715,6 +1715,8 @@ export interface ActionCtx {
    * aby v menu nebyla položka bez dialogu. Server (returnQuoteToAuthor) je hotový.
    */
   withReturn?: boolean;
+  /** Nabídky přihlášeného musí schválit super admin (profil; 31. 10. per uživatel). Neuvedeno = ano (kromě super admina). */
+  quoteNeedsApproval?: boolean;
 }
 
 // ── Schvalování nabídek super adminem (#25) ─────────────────
@@ -1723,9 +1725,59 @@ export const QUOTE_AWAITS_APPROVAL = "Nabídka čeká na schválení — odeslat
 /** = text výjimky DB (R7 / přijetí). */
 export const QUOTE_ACCEPT_BLOCKED = "Nabídka čeká na schválení — přijmout ji lze až po schválení a odeslání.";
 export const QUOTE_SEND_NO_RIGHT = "Nabídku zákazníkovi odesílá obchodník, super admin, nebo autor schválené nabídky.";
-export const QUOTE_ADMIN_ONLY = "Nabídku schvaluje jen super admin.";
+/** = text výjimky DB (R3, 31. 10.). */
+export const QUOTE_ADMIN_ONLY = "Nabídku schvaluje jen super admin nebo kolega s právem schvalovat nabídky — vlastní nabídku nikdo neschvaluje sám.";
 export const QUOTE_ARCHIVED_SEND = "Archivovanou verzi nabídky neposíláme — platí novější verze.";
 export const QUOTE_PENDING_LABEL = "Neschválená — čeká na schválení super admina";
+
+/** Schvalovatel nabídek, který není super admin (31. 10. — „Smí schvalovat nabídky ostatních"). */
+export interface QuoteApprover { id: string; name: string }
+
+/**
+ * Kdo nabídku autora schválí (texty „čeká na schválení …"): „V. Volný nebo super admin" — schvalovatelé
+ * z dat (bez autora — vlastní nabídku nikdo neschvaluje), super admin vždy. null = jen super admin.
+ */
+export function quoteApproverWho(approvers: readonly QuoteApprover[] | null | undefined, authorId?: string | null): string | null {
+  const names = (approvers ?? []).filter((a) => a.id && a.id !== authorId).map((a) => shortPersonName(a.name || "")).filter(Boolean);
+  if (!names.length) return null;
+  const all = [...names, "super admin"];
+  return `${all.slice(0, -1).join(", ")} nebo ${all[all.length - 1]}`;
+}
+
+/** „čeká na schválení (V. Volný nebo super admin)“ / „čeká na schválení super admina“. */
+export function quoteAwaitsText(who: string | null | undefined): string {
+  return who ? `čeká na schválení (${who})` : "čeká na schválení super admina";
+}
+
+/** „Odeslat půjde po schválení (V. Volný nebo super admin).“ / „Odeslat půjde po schválení super adminem.“ */
+export function quoteSendAfterText(who: string | null | undefined): string {
+  return who ? `Odeslat půjde po schválení (${who}).` : "Odeslat půjde po schválení super adminem.";
+}
+
+/** Kdo schválí TUTO nabídku: schvalovatelé jen u nabídky, která schválení potřebuje kvůli autorovi / editorovi
+ *  (AI nabídku schvaluje jen super admin). */
+export function quoteApproverWhoFor(
+  q: { adminApprovalRequired?: boolean | null; createdBy?: string | null } | null | undefined,
+  approvers: readonly QuoteApprover[] | null | undefined,
+): string | null {
+  return q?.adminApprovalRequired ? quoteApproverWho(approvers, q.createdBy ?? null) : null;
+}
+
+/** Štítek čekající nabídky: „Neschválená — čeká na schválení (…)“. */
+export function quotePendingLabel(who: string | null | undefined): string {
+  return who ? `Neschválená — ${quoteAwaitsText(who)}` : QUOTE_PENDING_LABEL;
+}
+
+/**
+ * Musí nabídky tohoto uživatele před odesláním schválit super admin? (31. 10. per uživatel)
+ * Super admin nikdy; ostatní podle profilu „Nabídky musí schválit super admin" (výchozí ano).
+ * TS dvojče DB funkce quote_author_needs_admin (20261030200000).
+ */
+export function userNeedsQuoteApproval(u: { role?: string | null; quoteNeedsApproval?: boolean | null } | null | undefined): boolean {
+  if (!u) return true;
+  if (u.role === "super_admin") return false;
+  return u.quoteNeedsApproval !== false;
+}
 
 /** Důvody schválení (#25): AI nabídka v režimu se schválením, nebo ji připravil ne-admin.
  *  `limit` a `requested` (limit částky, žádost) #25 ruší — zůstávají jen kvůli starším volajícím (vždy false). */
@@ -1734,10 +1786,27 @@ export function approvalReasons(q: QuoteFacts, aiApprovalMode = true): { ai: boo
   return { ai, author: q.adminApprovalRequired === true, limit: false, requested: false };
 }
 
-/** Schvaluje jen super admin (quote_approval), jen neschválenou, nearchivovanou nabídku s cenou.
- *  (Třetí parametr je pozůstatek — důvody už o schvalovateli nerozhodují.) */
-export function canApproveQuote(q: QuoteFacts, ctx: Pick<ActionCtx, "can">, _reasons?: unknown): boolean {
-  return ctx.can("quote_approval") && q.state === "ke_schvaleni" && !q.archived && !quoteUnpriced(q);
+/** Kontext schvalovatele: právo quote_approval + kdo je přihlášený (super admin / schvalovatel). */
+export type QuoteApproverCtx = Pick<ActionCtx, "can" | "userId" | "isSuperAdmin">;
+
+/**
+ * Smí přihlášený spravovat schválení TÉTO nabídky (Schválit, Schválit a odeslat, Vrátit k úpravě,
+ * Vrátit k přepracování)? Super admin vždy (i AI nabídky); kolega se „Smí schvalovat nabídky ostatních"
+ * (quote_approval bez super admina) jen cizí nabídku, která schválení potřebuje kvůli autorovi / editorovi
+ * (adminApprovalRequired) — vlastní nikdy. TS dvojče DB quote_user_may_approve (20261030200000).
+ */
+export function mayManageQuoteApproval(
+  q: Pick<QuoteFacts, "createdBy" | "adminApprovalRequired">, ctx: QuoteApproverCtx,
+): boolean {
+  if (!ctx.can("quote_approval")) return false;
+  if (ctx.isSuperAdmin) return true;
+  return q.adminApprovalRequired === true && Boolean(ctx.userId) && q.createdBy !== ctx.userId;
+}
+
+/** Schválit jde neschválenou, nearchivovanou nabídku s cenou — super admin, nebo schvalovatel cizí nabídky
+ *  (mayManageQuoteApproval). (Třetí parametr je pozůstatek — důvody už o schvalovateli nerozhodují.) */
+export function canApproveQuote(q: QuoteFacts, ctx: QuoteApproverCtx, _reasons?: unknown): boolean {
+  return mayManageQuoteApproval(q, ctx) && q.state === "ke_schvaleni" && !q.archived && !quoteUnpriced(q);
 }
 
 /** Odešla už nabídka zákazníkovi? Podle stavu (sent_at sám nestačí — u neodeslané ho stav přebíjí);
@@ -1764,6 +1833,8 @@ export interface QuoteSendViewer {
   jobOwnerId?: string | null;
   jobAssigneeId?: string | null;
   isSuperAdmin?: boolean;
+  /** Nabídky odesílatele musí schválit super admin (profil). Neuvedeno = ano (kromě super admina). */
+  quoteNeedsApproval?: boolean;
 }
 
 /** Smí tento uživatel nabídku odeslat zákazníkovi? null = ano, jinak důvod (stejná pravidla jako DB). */
@@ -1778,6 +1849,12 @@ export function quoteSendBlock(
   if (viewer.can("margins")) return null;
   const me = viewer.userId;
   if (q.adminApprovalRequired && q.approvedBy && me && (me === q.createdBy || me === viewer.jobOwnerId || me === viewer.jobAssigneeId)) {
+    return null;
+  }
+  // 31. 10.: autor bez schvalování (např. zaměstnanec s vypnutým „Nabídky musí schválit super admin")
+  // odešle svou nabídku, která schválení nepotřebuje — DB: quotes_flow_before (20261030200000)
+  if (!q.adminApprovalRequired && me && me === q.createdBy && !q.archived
+      && !userNeedsQuoteApproval({ role: viewer.isSuperAdmin ? "super_admin" : null, quoteNeedsApproval: viewer.quoteNeedsApproval })) {
     return null;
   }
   return QUOTE_SEND_NO_RIGHT;
@@ -1821,24 +1898,28 @@ export function approvedStampText(author: string | null, approver: string | null
 export function quoteApprovalFlag(
   quotes: readonly QuoteFacts[],
   people?: { author: string | null; approver: string | null; at: string | null } | null,
+  /** 31. 10.: schvalovatelé (ne super admin) — text „čeká na schválení (V. Volný nebo super admin)“. */
+  approvers?: readonly QuoteApprover[] | null,
 ): QuoteApprovalFlag | null {
   const open = quotes.filter((q) => quoteAwaitsApproval(q));
   const pending = open.find((q) => !q.returnedAt);
   if (pending) {
     const n = pending.number?.trim() || null;
+    const who = quoteApproverWhoFor(pending, approvers);
     return {
-      kind: "pending", quoteId: pending.id, number: n, label: QUOTE_PENDING_LABEL, short: "Neschválená",
-      title: `${n ? `Nabídka ${n}` : "Nabídka"} čeká na schválení super admina — do té doby ji nejde odeslat zákazníkovi.`,
+      kind: "pending", quoteId: pending.id, number: n, label: quotePendingLabel(who), short: "Neschválená",
+      title: `${n ? `Nabídka ${n}` : "Nabídka"} ${quoteAwaitsText(who)} — do té doby ji nejde odeslat zákazníkovi.`,
     };
   }
   const returned = open[0];
   if (returned) {
     const n = returned.number?.trim() || null;
     const note = returned.returnNote?.trim() || null;
+    const who = quoteApproverWhoFor(returned, approvers);
     return {
       kind: "returned", quoteId: returned.id, number: n, note,
       label: note ? `Vráceno k přepracování: ${note}` : "Vráceno k přepracování", short: "Vráceno",
-      title: `${n ? `Nabídka ${n}` : "Nabídka"} je vrácená autorovi k přepracování${note ? ` — ${note}` : ""}. Odeslat ji půjde po schválení super adminem.`,
+      title: `${n ? `Nabídka ${n}` : "Nabídka"} je vrácená autorovi k přepracování${note ? ` — ${note}` : ""}. ${quoteSendAfterText(who)}`,
     };
   }
   const active = activeQuote([...quotes]);
@@ -1868,7 +1949,10 @@ export function quoteUnpriced(q: Pick<QuoteFacts, "total" | "state"> | null | un
 
 /** Odesílatel pro quoteSendBlock z kontextu akcí (obchodník / řešitel zakázky). */
 export function sendViewerOf(ctx: ActionCtx): QuoteSendViewer {
-  return { can: ctx.can, userId: ctx.userId, jobOwnerId: ctx.ownerId ?? null, jobAssigneeId: ctx.assigneeId, isSuperAdmin: ctx.isSuperAdmin };
+  return {
+    can: ctx.can, userId: ctx.userId, jobOwnerId: ctx.ownerId ?? null, jobAssigneeId: ctx.assigneeId, isSuperAdmin: ctx.isSuperAdmin,
+    quoteNeedsApproval: ctx.quoteNeedsApproval,
+  };
 }
 
 function quoteNext(s: FlowSnapshot, ctx: ActionCtx): Next | undefined {
@@ -1986,13 +2070,14 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
   if (q && s.quote) {
     const st = q.state;
     if (st === "rozpracovana" || st === "ke_schvaleni" || st === "schvalena") add("quote.edit");
-    // #25: neschválenou schválí jen super admin („Předat ke schválení“ už není potřeba — děje se samo)
-    if (st === "ke_schvaleni" && canApproveQuote(q, ctx)) { add("quote.approve"); add("quote.approveSend"); }
-    if (st === "ke_schvaleni" && ctx.withReturn && ctx.can("quote_approval") && !q.returnedAt && !q.archived) add("quote.returnToAuthor");
+    // #25: neschválenou schválí super admin, 31. 10. i schvalovatel cizí nabídky („Předat ke schválení“ už není
+    // potřeba — děje se samo); „Schválit a odeslat“ jen ten, kdo smí i odesílat (marže)
+    if (st === "ke_schvaleni" && canApproveQuote(q, ctx)) { add("quote.approve"); if (ctx.can("margins")) add("quote.approveSend"); }
+    if (st === "ke_schvaleni" && ctx.withReturn && mayManageQuoteApproval(q, ctx) && !q.returnedAt && !q.archived) add("quote.returnToAuthor");
     if ((st === "schvalena" || st === "rozpracovana") && !quoteUnpriced(q) && quoteSendBlock(q, sendViewerOf(ctx)) === null) {
       add("quote.send"); add("quote.markSent");
     }
-    if (st === "schvalena") add("quote.unapprove");
+    if (st === "schvalena" && mayManageQuoteApproval(q, ctx)) add("quote.unapprove");
     if (st === "odeslana" || st === "pripominky") {
       add("quote.accept");
       if (st === "odeslana") add("quote.feedback");

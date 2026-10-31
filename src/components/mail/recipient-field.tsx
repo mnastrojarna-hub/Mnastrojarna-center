@@ -273,7 +273,7 @@ export function RecipientField({
             setOpen(false);
             if (text.trim()) commit(text);
           }}
-          className="min-w-[8rem] flex-1 bg-transparent py-1.5 text-sm outline-none"
+          className="min-w-[8rem] flex-1 bg-transparent py-1.5 text-sm outline-none placeholder:italic placeholder:text-muted-foreground"
           placeholder={showPlaceholder ? placeholder ?? "e-mail nebo jméno…" : ""}
           autoComplete="off"
           autoCapitalize="none"
@@ -352,7 +352,7 @@ export function EmailSuggestInput({
         aria-expanded={open}
         aria-controls={`${id}-list`}
         className={cn(
-          "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:italic placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
       />

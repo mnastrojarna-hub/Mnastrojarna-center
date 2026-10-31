@@ -71,13 +71,8 @@ export function ForSupplierLink({ file, onReviewDownload, wrapClassName }: { fil
   if (!file.archived && file.anon?.status === "unsupported" && canAnonymize(file)) return superAdmin ? wrap(<OriginalForSupplier file={file} />) : null;
   if (!supplierReady(file)) return null;
   const cls = "inline-flex min-h-8 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200";
-  if (file.anon?.status === "review") {
-    return wrap(
-      <button type="button" className={cn(cls, "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100")} onClick={() => onReviewDownload(file)} data-testid="anon-for-supplier">
-        <Download className="h-3.5 w-3.5" /> Pro dodavatele…
-      </button>,
-    );
-  }
+  // „Ke kontrole" už nevzniká (plná automatika) — hotová kopie se stahuje bez potvrzování
+  void onReviewDownload;
   return wrap(
     <a href={downloadUrl(file.id)} className={cls} title={`Anonymizovaná kopie: ${file.anon?.filename ?? ""}`} data-testid="anon-for-supplier">
       <Download className="h-3.5 w-3.5" /> Pro dodavatele
@@ -143,6 +138,7 @@ export function AnonMenuItems({
   onReviewDownload: (f: JobFile) => void;
 }) {
   const a = anonOf(file);
+  void onReviewDownload; // „Ke kontrole" už nevzniká — stažení bez potvrzování
   if (!canAnonymize(file)) return null;
   const ready = a.status === "done" || a.status === "review";
   const waiting = a.status === "pending" || a.status === "processing";
@@ -151,24 +147,14 @@ export function AnonMenuItems({
       <DropdownMenuLabel className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
         <EyeOff className="h-3.5 w-3.5" /> Pro dodavatele
       </DropdownMenuLabel>
-      {a.status === "done" && (
+      {ready && (
         <DropdownMenuItem asChild>
           <a href={downloadUrl(file.id)} data-testid="anon-download"><Download /> Stáhnout anonymizovaný</a>
-        </DropdownMenuItem>
-      )}
-      {a.status === "review" && (
-        <DropdownMenuItem onSelect={() => onReviewDownload(file)}>
-          <Download /> Stáhnout anonymizovaný…
         </DropdownMenuItem>
       )}
       {(ready || a.status === "failed") && EDITABLE.test(file.filename) && (
         <DropdownMenuItem onSelect={() => onEdit(file)} data-testid="anon-edit">
           <Pencil /> Upravit oblasti…
-        </DropdownMenuItem>
-      )}
-      {a.status === "review" && (
-        <DropdownMenuItem onSelect={() => (a.total === 0 ? onEdit(file) : onAction(file, "approve"))}>
-          <CheckCircle2 /> {a.total === 0 ? "Zkontrolovat a schválit…" : "Schválit anonymizaci"}
         </DropdownMenuItem>
       )}
       {a.status === "pending" && (
@@ -232,12 +218,10 @@ export function ReviewDownloadDialog({ file, onClose, onEdit }: { file: JobFile;
 export function supplierSummary(files: JobFile[]): string | null {
   const cands = files.filter((f) => !f.archived && canAnonymize(f) && f.anon && f.anon.status !== "skipped");
   if (!cands.length) return null;
-  const ready = cands.filter((f) => f.anon!.status === "done").length;
-  const review = cands.filter((f) => f.anon!.status === "review").length;
+  const ready = cands.filter((f) => f.anon!.status === "done" || f.anon!.status === "review").length;
   const waiting = cands.filter((f) => f.anon!.status === "pending" || f.anon!.status === "processing").length;
   const failed = cands.filter((f) => f.anon!.status === "failed").length;
   const parts = [`Pro dodavatele: ${ready} z ${cands.length} připraveno`];
-  if (review) parts.push(`${review} ke kontrole`);
   if (waiting) parts.push(`${waiting} čeká`);
   if (failed) parts.push(`${failed} selhalo`);
   return parts.join(" · ");
@@ -248,7 +232,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   const candidates = files.filter((f) => !f.archived && canAnonymize(f) && f.anon && f.anon.status !== "skipped");
   const [open, setOpen] = React.useState(false);
   const [sel, setSel] = React.useState<Set<string>>(new Set());
-  const [reviewed, setReviewed] = React.useState<Set<string>>(new Set());
+  void onEdit;
   /** Super admin výslovně potvrdil originál bez anonymizace (formát, který anonymizovat nejde). */
   const [originals, setOriginals] = React.useState<Set<string>>(new Set());
   const superAdmin = useAccess().role === "super_admin";
@@ -258,8 +242,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   if (!candidates.length) return null;
 
   function openDialog() {
-    setSel(new Set(candidates.filter((f) => f.anon?.status === "done").map((f) => f.id)));
-    setReviewed(new Set());
+    setSel(new Set(candidates.filter((f) => f.anon?.status === "done" || f.anon?.status === "review").map((f) => f.id)));
     setOriginals(new Set());
     setResult(null);
     setError(null);
@@ -269,7 +252,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
   async function build() {
     setBusy(true);
     setError(null);
-    const r = await anonApi.supplierPack(jobId, [...sel], [...reviewed].filter((id) => sel.has(id)), [...originals].filter((id) => sel.has(id)));
+    const r = await anonApi.supplierPack(jobId, [...sel], [], [...originals].filter((id) => sel.has(id)));
     setBusy(false);
     if (!r.ok) {
       const d = r.data as { missing?: { filename: string; reason: string }[] } | undefined;
@@ -290,7 +273,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
           <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg">
             <div className="space-y-3 p-5">
               <DialogTitle>Balíček pro kooperanta (ZIP)</DialogTitle>
-              <p className="text-sm text-muted-foreground">Jen anonymizované kopie s anonymními názvy — bez firmy, jmen, loga a cest. Co nejde přiložit, vypíše CHYBI.txt.</p>
+              <p className="text-sm text-muted-foreground">Jen anonymizované kopie výkresů s anonymními názvy — bez názvu firmy zákazníka. Co nejde přiložit, vypíše CHYBI.txt.</p>
               <ul className="divide-y rounded-lg border">
                 {candidates.map((f) => {
                   const st = f.anon!.status;
@@ -326,20 +309,6 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
                               {ORIGINAL_CONFIRM}
                             </label>
                           )}
-                        </div>
-                      )}
-                      {st === "review" && sel.has(f.id) && (
-                        <div className="ml-7 flex flex-wrap items-center gap-x-3 gap-y-1">
-                          {onEdit && EDITABLE.test(f.filename) && (
-                            <button type="button" className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300" onClick={() => { setOpen(false); onEdit(f); }}>
-                              <ScanSearch className="h-3.5 w-3.5" /> Náhled
-                            </button>
-                          )}
-                          <label className="flex min-h-9 items-center gap-2 text-xs text-amber-900 dark:text-amber-200">
-                            <input type="checkbox" className="h-4 w-4" checked={reviewed.has(f.id)}
-                              onChange={(e) => setReviewed((s) => { const n = new Set(s); if (e.target.checked) n.add(f.id); else n.delete(f.id); return n; })} />
-                            Zkontroloval jsem náhled
-                          </label>
                         </div>
                       )}
                     </li>
@@ -390,9 +359,8 @@ export function AnonSummaryLine({ file, onRetry, stalled }: { file: JobFile; onR
   const c = describeCounts(a.counts);
   return (
     <>
-      {a.status === "review" && reason && <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300">{reason}</p>}
       {!c && a.total === 0 ? (
-        <p className="mt-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-300">{NOTHING_REMOVED}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">{NOTHING_REMOVED}</p>
       ) : (c || a.excludedPages.length > 0) && (
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {c && <>Pro dodavatele smazáno: {c}</>}
@@ -478,7 +446,7 @@ export function SendQueueNotice({ jobId, refreshKey, files = [], onEdit }: { job
               <span className="flex flex-wrap gap-2">
                 {blocked && blocking && onEdit && (
                   <Button size="sm" variant="outline" className="min-h-11 sm:min-h-8" onClick={() => onEdit(blocking)} data-testid="send-queue-review">
-                    <ScanSearch className="h-4 w-4" /> Zkontrolovat výkres
+                    <ScanSearch className="h-4 w-4" /> Otevřít výkres
                   </Button>
                 )}
                 {q.canSendOriginal && (

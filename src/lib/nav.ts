@@ -75,7 +75,7 @@ export const navSections: NavSection[] = [
       { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "workflow", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
       // faktury dodavatelů: zatím jen super admin (přepínač viditelnosti); nahrát smí každý
       { title: "Faktury dodavatelů", href: "/supplier-invoices", icon: Receipt, feature: "supplier_invoices", color: "text-emerald-600", description: "Přijaté faktury, rozdělení na zakázky, zaplaceno" },
-      { title: "Nahrát fakturu", href: "/supplier-invoices/upload", icon: FileUp, feature: "supplier_invoices_upload", hideWith: "supplier_invoices", color: "text-emerald-600", description: "Vyfoť nebo nahraj fakturu od dodavatele" },
+      { title: "Zanést fakturu", href: "/supplier-invoices/upload", icon: FileUp, feature: "supplier_invoices_upload", hideWith: "supplier_invoices", color: "text-emerald-600", description: "Fakturu od dodavatele (PDF nebo fotka) přečte a zapíše AI" },
       { title: "Dokumenty", href: "/documents", icon: ReceiptText, feature: "documents", description: "Faktury, nabídky, dodací listy, výkresy", color: "text-emerald-500" },
     ],
   },

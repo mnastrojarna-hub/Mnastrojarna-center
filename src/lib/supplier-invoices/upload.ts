@@ -15,6 +15,9 @@ import {
   createSupplierInvoiceFromFile, processSupplierInvoice, upsertSupplierFromParty, type InvoiceFileInput,
 } from "@/lib/supplier-invoices/service";
 import { THANKS_TEXT, type SupplierInvoiceSource } from "@/lib/supplier-invoices/types";
+import { recordInvoiceDocument } from "@/lib/supplier-invoices/record";
+import { ONLY_ONE_FILE, recordResultMessage, type RecordInvoiceResult } from "@/lib/supplier-invoices/record-types";
+import { dateText, formatMoney } from "@/components/supplier-invoices/format";
 import { getAiConfig, getSetting } from "@/lib/settings";
 
 /**
@@ -57,28 +60,33 @@ async function removeCapture(db: JobsDb, paths: string[]): Promise<void> {
   try { await db.storage.from(CAPTURE_BUCKET).remove(paths); } catch { /* úklid je best-effort */ }
 }
 
-export async function uploadSupplierInvoice(input: { files: unknown; source?: unknown }): Promise<UploadInvoiceResult | Fail> {
+/**
+ * „Zanést fakturu" (31. 10., všichni): JEDEN soubor = jedna faktura (PDF / obrázek). AI ji hned přečte a zapíše;
+ * odpověď nese potvrzení s hlavičkou (dodavatel, číslo, částka, splatnost), duplicitu, nebo „tohle není faktura"
+ * (soubor zůstává v capture/ pro „Přesto zapsat" — force). Id faktury jen kdo smí Faktury dodavatelů.
+ */
+export async function uploadSupplierInvoice(input: { files: unknown; source?: unknown; force?: unknown }): Promise<(RecordInvoiceResult & { message: string }) | Fail> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   const user = await getSessionUser();
   if (!user || !user.active) return { ok: false, error: "Nejsi přihlášen — přihlas se znovu." };
   const access = await getAccess();
   const perms = supplierInvoicePerms(access.can);
   if (!perms.upload) return { ok: false, error: "K této akci nemáš oprávnění." };
+  if (Array.isArray(input?.files) && input.files.length > 1) return { ok: false, error: ONLY_ONE_FILE };
   const actor = userActor(user, "foto");
   const db = createAdminClient({ actor }) as unknown as JobsDb;
   const got = await captureFiles(db, user.id, input?.files);
   if ("error" in got) return got;
-  const res = await createSupplierInvoiceFromFile(got.files, sourceOf(input?.source, got.files), actor, {
-    db, process: "background", fakeGroup: fakeGroupFor("faktura_dodavatel", got.names),
+  if (got.files.length !== 1) return { ok: false, error: ONLY_ONE_FILE };
+  const res = await recordInvoiceDocument({
+    file: got.files[0], source: sourceOf(input?.source, got.files), actor: { ...actor, id: user.id }, db,
+    canOpen: perms.view && perms.amounts, force: input?.force === true,
+    fakeGroup: fakeGroupFor("faktura_dodavatel", got.names),
   });
+  // nevhodný soubor / hotovo → stránka v capture/ pryč; „není faktura" čeká na rozhodnutí (Přesto zapsat / Zrušit)
+  if (!(res.ok && res.kind === "not_invoice")) await removeCapture(db, got.paths);
   if (!res.ok) return res;
-  await removeCapture(db, got.paths);
-  await logAudit({ action: "supplier_invoice_uploaded", entity: "supplier_invoices", entityId: res.id, diff: { created: res.created, files: got.files.length }, actor });
-  if (!perms.view || !perms.amounts) return { ok: true, message: THANKS_TEXT };
-  return {
-    ok: true, id: res.id, duplicate: !res.created,
-    message: res.created ? "Faktura nahraná — AI ji čte a navrhne rozdělení na zakázky." : "Tahle faktura už je nahraná.",
-  };
+  return { ...res, message: recordResultMessage(res, { money: (n, c) => formatMoney(n, c), date: (d) => dateText(d) }) };
 }
 
 export async function reprocessSupplierInvoice(id: string): Promise<{ ok: true; status: string } | Fail> {

@@ -210,7 +210,7 @@ export function SignatureEditor({
             <Field id={id("name")} label="Jméno a příjmení" className="sm:col-span-2">
               <Input
                 id={id("name")} value={value.fullName} autoComplete="name" maxLength={SIGNATURE_LIMITS.fullName} disabled={disabled}
-                placeholder="Jan Novák" onChange={(e) => patch({ fullName: e.target.value })} className={INPUT}
+                placeholder="jméno a příjmení" onChange={(e) => patch({ fullName: e.target.value })} className={INPUT}
               />
             </Field>
             <Field id={id("role")} label="Pozice" hint="nepovinné">
@@ -222,7 +222,7 @@ export function SignatureEditor({
             <Field id={id("phone")} label="Telefon">
               <Input
                 id={id("phone")} type="tel" inputMode="tel" autoComplete="tel" value={value.phone} maxLength={SIGNATURE_LIMITS.phone} disabled={disabled}
-                placeholder="+420 777 123 456" onChange={(e) => patch({ phone: e.target.value })}
+                placeholder="mobil" onChange={(e) => patch({ phone: e.target.value })}
                 onBlur={() => value.phone && formatPhone(value.phone) !== value.phone && patch({ phone: formatPhone(value.phone) })}
                 className={INPUT}
               />
@@ -282,14 +282,14 @@ export function SignatureEditor({
                   <Field id={id("email")} label="E-mail v podpisu" error={emailBad ? "Neplatný e-mail — v podpisu se neukáže." : undefined}>
                     <Input
                       id={id("email")} type="email" inputMode="email" autoComplete="email" value={value.email} maxLength={SIGNATURE_LIMITS.email}
-                      disabled={disabled} placeholder="jmeno@mnastrojarna.cz" onChange={(e) => patch({ email: e.target.value })} className={INPUT}
+                      disabled={disabled} placeholder="e-mail do podpisu" onChange={(e) => patch({ email: e.target.value })} className={INPUT}
                       aria-invalid={emailBad || undefined}
                     />
                   </Field>
                   <Field id={id("web")} label="Web" error={webBad ? "Neplatná adresa webu." : undefined}>
                     <Input
                       id={id("web")} inputMode="url" value={value.web} maxLength={SIGNATURE_LIMITS.web} disabled={disabled}
-                      placeholder={company.web || "www.mnastrojarna.cz"} onChange={(e) => patch({ web: e.target.value })} className={INPUT}
+                      placeholder={company.web || "web"} onChange={(e) => patch({ web: e.target.value })} className={INPUT}
                       aria-invalid={webBad || undefined}
                     />
                   </Field>
@@ -302,7 +302,7 @@ export function SignatureEditor({
                       <div key={i} className="space-y-1">
                         <Input
                           value={l} inputMode="url" maxLength={SIGNATURE_LIMITS.link} disabled={disabled}
-                          aria-label={`Odkaz ${i + 1}`} placeholder="https://www.linkedin.com/in/…"
+                          aria-label={`Odkaz ${i + 1}`} placeholder="odkaz (LinkedIn, katalog…)"
                           onChange={(e) => setLink(i, e.target.value)} className={INPUT} aria-invalid={bad || undefined}
                         />
                         {bad && <p className="text-xs text-destructive">Neplatný odkaz — v podpisu se neukáže.</p>}
@@ -364,7 +364,7 @@ export function SignatureEditor({
 }
 
 /** 16 px na mobilu (iOS jinak při psaní přibližuje), kompaktní od sm. */
-const INPUT = "h-10 text-base sm:h-9 sm:text-sm";
+const INPUT = "h-10 text-base sm:h-9 sm:text-sm placeholder:italic";
 
 function Field({ id, label, hint, error, className, children }: {
   id: string; label: string; hint?: string; error?: string; className?: string; children: React.ReactNode;

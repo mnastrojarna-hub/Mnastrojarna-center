@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { guessFileKind } from "@/lib/jobs/file-kinds";
-import { CANDIDATE_KINDS, UNSUPPORTED_PREFIX } from "./candidate";
+import { UNKNOWN_KINDS, UNSUPPORTED_PREFIX } from "./candidate";
 import type { AnonDb, Subject } from "./queue";
 
 /**
@@ -86,9 +86,10 @@ export async function explodeContainer(db: AnonDb, s: Subject, bytes: Uint8Array
     const { error: upErr } = await db.storage.from("job-files").upload(path, e.data, { contentType: e.mime || "application/octet-stream", upsert: true });
     if (upErr) throw new Error(`Rozbalení ${what}u selhalo: ${upErr.message}`);
     const guessed = guessFileKind(e.name, e.mime);
-    // položka z podkladů zákazníka zůstává podkladem zákazníka (faktura v ZIPu od zákazníka = ostatní)
-    const kind = (CANDIDATE_KINDS as readonly string[]).includes(guessed) || guessed === "korespondence" ? guessed
-      : (CANDIDATE_KINDS as readonly string[]).includes(parentKind) && parentKind !== "poptavka" && parentKind !== "objednavka" ? parentKind : "ostatni";
+    // druh položky podle názvu (objednávka v ZIPu zůstane objednávkou — neanonymizuje se, 3D model je 3D
+    // model); PDF / obrázek bez rozpoznaného druhu z archivu VÝKRESŮ je výkres, jinak „Ostatní"
+    // (anonymizuje se jen, když ho klasifikace pozná jako výkres — needsDrawingCheck)
+    const kind = (UNKNOWN_KINDS as readonly string[]).includes(guessed) && parentKind === "vykres" ? "vykres" : guessed;
     const { data: ins, error } = await db.from("job_files").insert({
       job_id: jobId, kind, filename: e.name.slice(0, 200), mime_type: e.mime || null, size_bytes: e.data.length, storage_path: path,
       origin: s.origin ?? "upload", issuer: s.issuer, uploaded_by: s.uploadedBy, note: `Z ${fmt === "zip" ? "archivu" : "e-mailu"} ${s.filename}`.slice(0, 500),

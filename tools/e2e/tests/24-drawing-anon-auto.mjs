@@ -78,7 +78,7 @@ async function uploadAndWait(page, f, tag) {
     await page.screenshot({ path: path.join(SHOTS, `24-${tag}-chyba.png`), fullPage: true });
     throw e;
   });
-  // odznak se objeví „Anonymizuje se…" a během čekání se sám změní na hotovo / ke kontrole
+  // odznak se objeví „Anonymizuje se…" a během čekání se sám změní na hotovo (nic ke kontrole)
   await page.waitForFunction((name) => {
     const li = [...document.querySelectorAll("li")].find((x) => x.offsetParent !== null && (x.textContent ?? "").includes(name));
     const st = li?.querySelector("[data-anon-status]")?.getAttribute("data-anon-status");
@@ -86,11 +86,12 @@ async function uploadAndWait(page, f, tag) {
   }, f.name, { timeout: 150_000 });
   const st = await row.locator("[data-anon-status]").first().getAttribute("data-anon-status");
   console.log(`    ${tag}: ${f.name} → ${st} za ${Math.round((Date.now() - t0) / 1000)} s (šťouchnutí: ${nudges.length})`);
-  expect(st === "done" || st === "review", `${tag}: výkres anonymizován (${st})`);
+  expect(st === "done", `${tag}: výkres anonymizován (${st})`);
+  expect(!/ke kontrole/i.test(await row.innerText()), `${tag}: žádné „Ke kontrole“ u výkresu`);
   expect(manual.length === 0, `${tag}: bez ručního „Anonymizovat" (${manual.length})`);
   expect(nudges.length >= 1, `${tag}: prohlížeč šťouchl do fronty po nahrání`);
   const db = sql(`select anon_status || '|' || coalesce(anon_via, '') || '|' || coalesce(anon_actor_kind, '') from job_files where job_id='${jobId}' and filename='${f.name}' and not archived`);
-  expect(/^(done|review)\|automaticky\|(ai|system)$/.test(db), `${tag}: DB stav automatiky (${db})`);
+  expect(/^done\|automaticky\|(ai|system)$/.test(db), `${tag}: DB stav automatiky (${db})`);
   await row.evaluate((el) => el.scrollIntoView({ block: "center" }));
   await page.screenshot({ path: path.join(SHOTS, `24-${tag}.png`) });
 }

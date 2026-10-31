@@ -66,6 +66,20 @@ describe("oprávnění dle rolí", () => {
     expect(FEATURE_HINTS.pricing).toContain("Nacenění zatím dělá jen super admin");
   });
 
+  it("31. 10.: „Smí schvalovat nabídky ostatních“ → quote_approval (nic dalšího z adminských funkcí); neaktivní ne", () => {
+    const volny: AccessSubject = { ...sales, canApproveQuotes: true };
+    const workerApprover: AccessSubject = { ...staff, canApproveQuotes: true };
+    expect(can(volny, "quote_approval", ctx())).toBe(true);
+    expect(can(workerApprover, "quote_approval", ctx())).toBe(true);
+    expect(can({ ...volny, active: false }, "quote_approval", ctx())).toBe(false);
+    expect(can({ ...sales, canApproveQuotes: false }, "quote_approval", ctx())).toBe(false);
+    for (const f of ["pricing", "flow_all", "dashboard", "users", "settings", "delete"] as const) {
+      expect(can(volny, f, ctx())).toBe(false);
+    }
+    expect(allowedFeatures(volny, ctx())).toContain("quote_approval");
+    expect(allowedFeatures(workerApprover, ctx())).not.toContain("margins");
+  });
+
   it("#25: AI focení pro všechny je výchozí — s klíčem ho má obchodník i zaměstnanec", () => {
     expect(DEFAULT_ACCESS_CONTEXT.aiCaptureForAll).toBe(true);
     const withKey = { ...DEFAULT_ACCESS_CONTEXT, aiConfigured: true };

@@ -72,7 +72,7 @@ export function MailFields({ mail, onChange, disabled, context, idPrefix = "doc-
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <RecipientInput id={`${idPrefix}-to`} label="Komu" value={mail.to} disabled={disabled} context={context} onChange={(to) => onChange({ ...mail, to, reason: undefined })} placeholder="nakup@zakaznik.cz" />
+        <RecipientInput id={`${idPrefix}-to`} label="Komu" value={mail.to} disabled={disabled} context={context} onChange={(to) => onChange({ ...mail, to, reason: undefined })} placeholder="e-mail příjemce" />
         {mail.reason && (
           <p className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground" data-testid="recipient-reason">
             <Info className="h-3.5 w-3.5 shrink-0 text-sky-500" /> {mail.reason}

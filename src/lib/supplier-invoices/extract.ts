@@ -1,11 +1,34 @@
 // Normalizace vytěžení faktury dodavatele (výstup AI / fixture / převod z obchodního dokladu).
 import type { ExtractedBusinessDoc } from "@/lib/jobs/capture-types";
 import type {
-  InvoiceSupplierParty, SupplierInvoiceExtract, SupplierInvoiceExtractItem, SupplierInvoiceRefs,
+  InvoiceDocumentType, InvoiceSupplierParty, SupplierInvoiceExtract, SupplierInvoiceExtractItem, SupplierInvoiceRefs, VatBreakdownRow,
 } from "@/lib/supplier-invoices/types";
 import { round2 } from "@/lib/supplier-invoices/money";
 
 type Raw = Record<string, unknown>;
+
+export const INVOICE_DOCUMENT_TYPES: readonly InvoiceDocumentType[] = [
+  "faktura", "zalohova_faktura", "dobropis", "dodaci_list", "nabidka", "objednavka", "potvrzeni_objednavky", "upominka", "jiny",
+];
+
+/** Druh dokladu z AI; neznámý / chybějící = faktura (starší vytěžení, fixture). */
+export function normalizeDocumentType(v: unknown): InvoiceDocumentType {
+  const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return (INVOICE_DOCUMENT_TYPES as readonly string[]).includes(s) ? (s as InvoiceDocumentType) : "faktura";
+}
+
+function vatRows(v: unknown): VatBreakdownRow[] {
+  const out: VatBreakdownRow[] = [];
+  for (const r of Array.isArray(v) ? v.slice(0, 10) : []) {
+    const o = r && typeof r === "object" && !Array.isArray(r) ? (r as Raw) : {};
+    const rate = num(o.rate);
+    const base = num(o.base);
+    const vat = num(o.vat);
+    if (rate < 0 || rate > 100 || !within(base, MAX_INVOICE_AMOUNT) || !within(vat, MAX_INVOICE_AMOUNT) || (!base && !vat)) continue;
+    out.push({ rate, base: round2(base), vat: round2(vat) });
+  }
+  return out;
+}
 
 const obj = (v: unknown): Raw => (v && typeof v === "object" && !Array.isArray(v) ? (v as Raw) : {});
 const str = (v: unknown, max = 300): string => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, max) : typeof v === "number" ? String(v) : "");
@@ -113,6 +136,7 @@ export function normalizeSupplierInvoice(raw: unknown): SupplierInvoiceExtract {
   const rate = num(o.exchangeRate);
   return {
     supplier: party(o.supplier),
+    documentType: normalizeDocumentType(o.documentType),
     number: str(o.number, 60),
     variableSymbol: str(o.variableSymbol, 20).replace(/\D+/g, ""),
     issueDate: isoDate(o.issueDate),
@@ -120,6 +144,7 @@ export function normalizeSupplierInvoice(raw: unknown): SupplierInvoiceExtract {
     dueDate: isoDate(o.dueDate),
     currency: normalizeCurrency(o.currency),
     totalNet, totalVat, totalGross,
+    vatBreakdown: vatRows(o.vatBreakdown),
     items,
     references: refs(o.references),
     isCreditNote: o.isCreditNote === true || totalNet < 0,

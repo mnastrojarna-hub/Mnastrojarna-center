@@ -13,8 +13,10 @@ import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { CountChips, type CountChip } from "@/components/flow-status/count-chips";
 import { setJobQuoteArchived } from "@/app/actions/jobs";
 import {
-  FLOW_PALETTE, OPEN_QUOTE, QUOTE_ORDER, QUOTE_STATES, VIA_META, approvalReasons, lostReasonLabel, type ChangeStamp, type QuoteDisplayState,
+  FLOW_PALETTE, OPEN_QUOTE, QUOTE_ORDER, QUOTE_STATES, VIA_META, approvalReasons, lostReasonLabel, mayManageQuoteApproval,
+  quoteApproverWhoFor, quoteAwaitsText, type ChangeStamp, type QuoteDisplayState,
 } from "@/lib/jobs/flow-status";
+import { useAccess } from "@/components/access-provider";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { FlowEmpty } from "./flow-header";
@@ -42,6 +44,10 @@ export interface FlowQuote extends Omit<FlowQuoteInfo, "id"> {
   /** Jediná otevřená nabídka zakázky (zamítnutí zakázku uzavře). */
   onlyOpen: boolean;
 }
+
+/** Kolik řádků vykreslit napoprvé a o kolik přidat tlačítkem „Zobrazit další". */
+const QUOTE_PAGE = 50;
+const QUOTE_STEP = 100;
 
 function money(value: number | null, currency: string): string {
   if (value === null || value === undefined) return "bez ceny";
@@ -90,6 +96,10 @@ function Board({
   const [q, setQ] = React.useState("");
   const chips = React.useMemo(() => chipsOf(quotes, counts), [quotes, counts]);
   const shown = React.useMemo(() => filterQuotes(quotes, { states, q }), [quotes, states, q]);
+  // vykreslit po dávkách (stovky řádků = pomalé první zobrazení hlavně na mobilu); nový filtr = od začátku
+  const [limit, setLimit] = React.useState(QUOTE_PAGE);
+  React.useEffect(() => setLimit(QUOTE_PAGE), [states, q]);
+  const visible = shown.length > limit ? shown.slice(0, limit) : shown;
 
   function change(keys: string[]) {
     const next = keys.length ? keys : [...OPEN_QUOTE];
@@ -143,9 +153,18 @@ function Board({
           )}
         </FlowEmpty>
       ) : (
-        <ul className="space-y-2">
-          {shown.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} canPrice={canPrice} approver={approver} />)}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {visible.map((quote) => <QuoteRow key={quote.id} quote={quote} today={today} canPrice={canPrice} approver={approver} />)}
+          </ul>
+          {shown.length > visible.length && (
+            <div className="flex justify-center pt-1">
+              <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => setLimit((n) => n + QUOTE_STEP)}>
+                Zobrazit další {Math.min(QUOTE_STEP, shown.length - visible.length)} z {shown.length - visible.length}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -190,6 +209,12 @@ function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; toda
   const jobHref = quote.job ? `/orders/${quote.job.id}?tab=nabidky` : null;
   const awaiting = display === "ke_schvaleni";
   const stamps = stampsOf(quote);
+  // 31. 10.: „na tvé schválení“ jen u nabídky, kterou přihlášený smí schválit (super admin; schvalovatel
+  // cizí nabídku se schvalováním — vlastní ne); jinak kdo ji schválí (schvalovatelé z dat + super admin)
+  const access = useAccess();
+  const mine = approver && (access.role === null || access.role === "super_admin"
+    || mayManageQuoteApproval(quote.facts, { can: () => true, userId: access.userId ?? "", isSuperAdmin: false }));
+  const who = quoteApproverWhoFor(quote.facts, access.quoteApprovers);
 
   async function toggleArchive() {
     try {
@@ -246,7 +271,7 @@ function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; toda
             {quote.facts.sentAt && !quote.stamps.sent && <span>odesláno {czDay(quote.facts.sentAt.slice(0, 10), { short: true, today })}</span>}
             {awaiting && !quote.facts.returnedAt && (
               <span className="font-medium text-amber-800 dark:text-amber-300">
-                {approver ? "čeká na tvé schválení — odeslat půjde po schválení" : "čeká na schválení super admina — odeslat ji zatím nejde"}
+                {mine ? "čeká na tvé schválení — odeslat půjde po schválení" : `${quoteAwaitsText(who)} — odeslat ji zatím nejde`}
               </span>
             )}
           </div>

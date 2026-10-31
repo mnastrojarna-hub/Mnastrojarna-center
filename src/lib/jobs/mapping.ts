@@ -7,7 +7,7 @@ import type {
   JobQuote, JobQuoteItem, JobFile, JobFileAnon, JobFileAnonStatus, JobEvent, JobEventType, JobFilters, JobCustomerDetail,
   JobCustomerRef, PersonRef, JobSort, JobPaymentFilter,
 } from "@/lib/jobs/types";
-import { STAGE_ORDER, CLOSED_STAGES, isJobStage, stageGroup, STAGES } from "@/lib/jobs/stages";
+import { STAGE_ORDER, CLOSED_STAGES, DELIVERED_STAGES, isJobStage, stageGroup, STAGES, isDeliveredToCustomer } from "@/lib/jobs/stages";
 import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { isOperationKind } from "@/lib/jobs/operations";
 import { effectiveDeadline, deadlineInfo, pragueToday, type DeadlineInput } from "@/lib/jobs/deadlines";
@@ -597,7 +597,8 @@ export const JOB_FILE_LIST_SELECT = [
 export const JOB_EVENT_SELECT =
   `id, job_id, type, message, data, actor_id, actor_kind, actor_name, via, agent, entity, created_at, actor:profiles!actor_id(${PERSON})`;
 
-export const JOB_COUNT_SELECT = "id, status, due_date, customer_required_date, max_tolerated_date, supplier_promised_date";
+/** Počty Knihy: stav, termíny a dodané položky (zakázka dodaná celá, i když se stav neposunul → Dokončené). */
+export const JOB_COUNT_SELECT = "id, status, due_date, customer_required_date, max_tolerated_date, supplier_promised_date, items_count, items_delivered";
 
 export const MATCH_JOB_SELECT = [
   "id, number, title, status, created_at, customer_id, customer_order_number, customer_inquiry_number, customer_contact_email",
@@ -1407,6 +1408,20 @@ export function paymentStateOf(
   return key === "zaplaceno" || key === "po_splatnosti" ? key : "nezaplaceno";
 }
 
+/** Lehký řádek pro počet faktur po splatnosti (KPI Knihy — přes celou knihu, bez ohledu na záložku). */
+export const OVERDUE_INVOICE_SELECT = "id, status, paid_at, paid_so_far, invoice_number, invoice_due_date";
+
+/** Faktura zakázky je po splatnosti (= filtr Platba „Po splatnosti", paymentKey) z lehkého řádku. */
+export function isOverdueInvoiceRow(
+  r: { status: string; paid_at?: string | null; paid_so_far?: number | string | null; invoice_number?: string | null; invoice_due_date?: string | null },
+  today: string = todayIso(),
+): boolean {
+  const facts = paymentFacts({
+    stage: stageOf(r.status), paidAt: r.paid_at ?? null, invoiceDueDate: r.invoice_due_date ?? null, invoiceNumber: r.invoice_number ?? null,
+  });
+  return paymentKey({ ...facts, paidSoFar: num(r.paid_so_far) ?? 0 }, today) === "po_splatnosti";
+}
+
 /** Splňuje zakázka filtr platby? „nezaplaceno" zahrnuje částečně zaplacené i po splatnosti. */
 export function matchesPayment(j: JobListItem, filter: JobPaymentFilter | undefined, today: string = todayIso()): boolean {
   if (!filter) return true;
@@ -1436,14 +1451,16 @@ export function matchesFlow(
 /** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
 export function filterJobs(
   items: JobListItem[],
-  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery">,
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer">,
   today: Date = pragueToday(),
 ): JobListItem[] {
   const tokens = searchNormalize(filters.q ?? "").split(/\s+/).filter(Boolean);
   const step = (filters.step ?? "").trim();
   const location = searchNormalize((filters.location ?? "").trim());
   const todayDay = todayIso(today);
+  const delivered = filters.deliveredToCustomer;
   return items.filter((j) => {
+    if (typeof delivered === "boolean" && isDeliveredToCustomer(j) !== delivered) return false;
     if (tokens.length) {
       const h = haystack(j);
       if (!tokens.every((t) => h.includes(t))) return false;
@@ -1496,6 +1513,11 @@ export function sortJobs(items: JobListItem[], sort: JobSort = "created", dir: "
 
 export interface JobStageCounts {
   byStage: Record<JobStage, number>;
+  /**
+   * Z toho zakázky ve stavu před dodáním, které mají dodané všechny položky (stav se neposunul) —
+   * v Knize patří do Dokončených, ne do Objednávek v běhu (isDeliveredToCustomer).
+   */
+  deliveredByStage: Partial<Record<JobStage, number>>;
   active: number;
   overdue: number;
   dueThisWeek: number;
@@ -1504,12 +1526,15 @@ export interface JobStageCounts {
 
 export function emptyStageCounts(): JobStageCounts {
   const byStage = Object.fromEntries(STAGE_ORDER.map((s) => [s, 0])) as Record<JobStage, number>;
-  return { byStage, active: 0, overdue: 0, dueThisWeek: 0, total: 0 };
+  return { byStage, deliveredByStage: {}, active: 0, overdue: 0, dueThisWeek: 0, total: 0 };
 }
 
 /** Počty pro chipy filtrů a přehled. */
 export function countJobStages(
-  rows: { status: string; due_date?: string | null; customer_required_date?: string | null; max_tolerated_date?: string | null; supplier_promised_date?: string | null }[],
+  rows: {
+    status: string; due_date?: string | null; customer_required_date?: string | null; max_tolerated_date?: string | null;
+    supplier_promised_date?: string | null; items_count?: number | string | null; items_delivered?: number | string | null;
+  }[],
   today: Date = pragueToday(),
 ): JobStageCounts {
   const out = emptyStageCounts();
@@ -1517,6 +1542,11 @@ export function countJobStages(
     const stage = stageOf(r.status);
     out.total++;
     out.byStage[stage]++;
+    // jen „opožděný" stav (před dodáním, dodáno vše); Dodáno zákazníkovi a dál se počítá podle stavu
+    if (!DELIVERED_STAGES.includes(stage)
+        && isDeliveredToCustomer({ stage, flow: { itemsCount: num(r.items_count), itemsDelivered: num(r.items_delivered) } })) {
+      out.deliveredByStage[stage] = (out.deliveredByStage[stage] ?? 0) + 1;
+    }
     if (!CLOSED_STAGES.includes(stage)) out.active++;
     const info = deadlineInfo({
       stage,

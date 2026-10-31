@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv, isSupabaseConfigured } from "./config";
+import { getVerifiedAuthUser } from "./verified-claims";
 
 /** Veřejné stránky — dostupné bez přihlášení (přihlášení, obnova hesla, průvodce nastavením). */
 const PUBLIC_PATHS = ["/login", "/setup", "/forgot-password", "/reset-password", "/auth"];
@@ -54,13 +55,9 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  let user: { id: string } | null = null;
-  try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
-  } catch {
-    user = null;
-  }
+  // podpis access tokenu se ověří lokálně (JWKS / SUPABASE_JWT_SECRET) — bez síťového volání na Auth;
+  // jen bez klíče k ověření rozhodne Supabase Auth (getUser), viz verified-claims.ts
+  const user = await getVerifiedAuthUser(supabase);
 
   if (!user && !isPublicPath(pathname)) {
     if (isApi) {

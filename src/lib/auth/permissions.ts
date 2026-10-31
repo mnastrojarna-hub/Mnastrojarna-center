@@ -13,8 +13,10 @@ import type { UserRole } from "@/lib/supabase/database.types";
  *  4. Vyfotit doklad → AI čtení pro všechny (výchozí zapnuto, super admin může vypnout);
  *     ručně jen bez API klíče nebo po vypnutí.
  *  5. Nacenění → zatím jen super admin (pricing); ostatní připraví nabídku ručně.
- *  6. Nabídku kohokoli jiného než super admina schvaluje před odesláním super admin
- *     (quote_approval); po schválení ji odešle obchodník nebo její autor.
+ *  6. Nabídku uživatele se „Nabídky musí schválit super admin" schvaluje před odesláním super admin,
+ *     nebo kolega se „Smí schvalovat nabídky ostatních" (31. 10., quote_approval; vlastní nabídku nikdo
+ *     neschvaluje sám — per nabídka rozhoduje mayManageQuoteApproval); po schválení ji odešle obchodník
+ *     nebo její autor.
  *  AI asistent, ladění AI, znalostní DB, archiv výkresů, AI nacenění, nastavení a správa
  *  uživatelů → jen super admin.
  */
@@ -59,6 +61,8 @@ export interface AccessSubject {
   /** Super admin povolil tomuto uživateli AI (profiles.ai_access). */
   aiAccess: boolean;
   active: boolean;
+  /** 31. 10.: super admin povolil „Smí schvalovat nabídky ostatních" (profiles.can_approve_quotes) → quote_approval. */
+  canApproveQuotes?: boolean;
 }
 
 export interface AccessContext {
@@ -101,6 +105,8 @@ export function can(subject: AccessSubject | null | undefined, feature: Feature,
   if (subject.role === "super_admin") return true;
 
   if (EVERYONE.includes(feature)) return true;
+  // 31. 10.: schvalovatel nabídek ostatních (které nabídky smí schválit, řeší mayManageQuoteApproval / DB)
+  if (feature === "quote_approval") return subject.canApproveQuotes === true;
   if (ADMIN_ONLY.includes(feature)) return false;
   // faktury dodavatelů: jeden přepínač (Nastavení faktur) — zatím jen super admin
   if (feature === "supplier_invoices") return ctx.supplierInvoicesForAll === true;
@@ -126,8 +132,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 /** Krátké vysvětlení role pro správu uživatelů. */
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Vidí a nastavuje vše — obchodní tok všech, Nacenění, schvalování nabídek, AI, poštu všech schránek a uživatele.",
-  obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem.",
-  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem odešle sám.",
+  obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem nebo schvalovatelem (schvalování lze uživateli vypnout).",
+  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem nebo schvalovatelem odešle sám (schvalování lze uživateli vypnout).",
 };
 
 /** Lidský popis, proč funkce není dostupná (pro stránku „bez přístupu"). */
@@ -162,6 +168,6 @@ export const FEATURE_LABELS: Record<Feature, string> = {
 
 /** Doplňující vysvětlení u odepřené funkce (AccessBanner) — co dělat místo toho. */
 export const FEATURE_HINTS: Partial<Record<Feature, string>> = {
-  pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin.",
+  pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin nebo schvalovatel nabídek (pokud ti schvalování nevypnul).",
   supplier_invoices: "Faktury dodavatelů zatím zpracovává super admin. Fakturu nahraješ přes „Nahrát fakturu“ nebo vyfocením dokladu.",
 };

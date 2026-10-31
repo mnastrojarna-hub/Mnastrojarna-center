@@ -135,7 +135,7 @@ describe.skipIf(!LOCAL_ENABLED)("#25 role a viditelnost — pravidla v DB", () =
     // obchodník schválit nesmí (REST i server)
     const own = await sales.from("quotes").update({ approved_by: salesId }).eq("id", rest).select("id");
     expect(own.error?.code).toBe("42501");
-    expect(own.error?.message).toContain("Nabídku schvaluje jen super admin.");
+    expect(own.error?.message).toContain("Nabídku schvaluje jen super admin nebo kolega s právem schvalovat nabídky");
     expect((await app(salesId).from("quotes").update({ approved_by: salesId }).eq("id", viaApp).select("id")).error?.code).toBe("42501");
     // ani odeslat (R7)
     const send = await sales.from("quotes").update({ status: "odeslano" }).eq("id", rest).select("id");
@@ -385,6 +385,180 @@ describe.skipIf(!LOCAL_ENABLED)("#25 role a viditelnost — pravidla v DB", () =
     expect((await worker.from("quotes").update({ status: "odeslano" }).eq("id", bySales).select("id")).error).toBeNull();
   });
 
+  it("31. 10. per uživatel (REST): obchodník / zaměstnanec bez schvalování odešle svou nabídku rovnou; se schvalováním ne; příznak mění jen super admin a atribuce nejde podvrhnout", async () => {
+    const mk = async (key: string, role: "obchodnik" | "zamestnanec", needs: boolean) => {
+      const email = `e2e-role-pu-${key}-${TAG}@local.test`;
+      const password = "Docasne123!";
+      const { data, error } = await svc.auth.admin.createUser({ email, password, email_confirm: true });
+      if (error || !data.user) throw new Error(error?.message ?? "createUser");
+      const { error: pErr } = await svc.from("profiles").update({ role, active: true, full_name: `PU ${key}`, quote_needs_approval: needs }).eq("id", data.user.id);
+      if (pErr) throw new Error(pErr.message);
+      return { id: data.user.id, db: await localSession(email, password) };
+    };
+    const made: string[] = [];
+    try {
+      const free = await mk("free", "obchodnik", false);
+      const freeW = await mk("freew", "zamestnanec", false);
+      made.push(free.id, freeW.id);
+      const job = await newJob({ owner_id: free.id });
+
+      // obchodník bez schvalování: vložená nabídka rovnou rozpracovaná, odešle ji
+      const fq = await newQuote(free.db, job);
+      expect(await q(fq)).toMatchObject({ state: "rozpracovana", admin_approval_required: false, approval_required: false, created_by: free.id });
+      // podvržený příznak / atribuce přes REST nic nezmění (R0)
+      await free.db.from("quotes").update({ admin_approval_required: true }).eq("id", fq);
+      expect((await q(fq)).admin_approval_required).toBe(false);
+      expect((await free.db.from("quotes").update({ status: "odeslano" }).eq("id", fq).select("id")).error).toBeNull();
+      expect(await q(fq)).toMatchObject({ state: "odeslana", sent_by: free.id });
+
+      // obchodník se schvalováním (demo): jeho nabídka čeká; úprava cizí nabídky uživatele bez schvalování ji zamkne
+      const sq = await newQuote(sales, job);
+      expect(await q(sq)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+      expect((await sales.from("quotes").update({ status: "odeslano" }).eq("id", sq).select("id")).error?.message)
+        .toContain("Nabídka čeká na schválení");
+      const fq2 = await newQuote(free.db, job);
+      expect((await app(salesId).from("quotes").update({ title: "upravil kolega" }).eq("id", fq2).select("id")).error).toBeNull();
+      expect(await q(fq2)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+      // položka od uživatele se schvalováním zamkne, od uživatele bez schvalování (autor bez) uvolní
+      const fq3 = await newQuote(free.db, job);
+      await app(salesId).from("quote_items").insert({ quote_id: fq3, position: 0, name: "Díl", quantity: 1, unit: "ks", unit_price: 10 });
+      expect((await q(fq3)).admin_approval_required).toBe(true);
+      await app(free.id).from("quote_items").insert({ quote_id: fq3, position: 1, name: "Díl 2", quantity: 1, unit: "ks", unit_price: 10 });
+      expect(await q(fq3)).toMatchObject({ state: "rozpracovana", admin_approval_required: false });
+
+      // zaměstnanec bez schvalování: svou nabídku odešle, cizí rozpracovanou (super admina) ne
+      // (server s autorem — RLS „moje" tu nerozhoduje, jen pravidla triggeru)
+      const wq = await newQuote(app(freeW.id), job);
+      expect(await q(wq)).toMatchObject({ state: "rozpracovana", created_by: freeW.id });
+      const aq = await newQuote(admin, job);
+      expect((await app(freeW.id).from("quotes").update({ status: "odeslano" }).eq("id", aq).select("id")).error?.code).toBe("42501");
+      expect((await app(workerId).from("quotes").update({ status: "odeslano" }).eq("id", wq).select("id")).error?.code).toBe("42501");
+      expect((await app(freeW.id).from("quotes").update({ status: "odeslano" }).eq("id", wq).select("id")).error).toBeNull();
+      expect(await q(wq)).toMatchObject({ state: "odeslana", sent_by: freeW.id });
+
+      // příznak si přes REST nikdo nezmění sám (ani obchodník bez schvalování zpět); atribuci píše DB
+      expect((await sales.from("profiles").update({ quote_needs_approval: false }).eq("id", salesId)).error?.message).toContain("jen super admin");
+      expect((await free.db.from("profiles").update({ quote_needs_approval: true }).eq("id", free.id)).error?.message).toContain("jen super admin");
+      const spoof = await admin.from("profiles").update({ quote_needs_approval: true, quote_approval_changed_by: salesId }).eq("id", free.id).select("id");
+      expect(spoof.error).toBeNull();
+      const { data: prof } = await svc.from("profiles").select("quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at").eq("id", free.id).single();
+      expect(prof).toMatchObject({ quote_needs_approval: true, quote_approval_changed_by: adminId });
+      // přepočet: neodeslaná rozpracovaná nabídka uživatele (fq3) teď čeká na schválení; odeslaná ne
+      expect(await q(fq3)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+      expect((await q(fq)).state).toBe("odeslana");
+      expect((await free.db.from("quotes").update({ status: "odeslano" }).eq("id", fq3).select("id")).error?.message).toContain("Nabídka čeká na schválení");
+    } finally {
+      if (jobs.length) await svc.from("quotes").delete().in("job_id", jobs);
+      for (const uid of made) await svc.auth.admin.deleteUser(uid);
+    }
+  }, 60_000);
+
+  it("31. 10. schvalovatel (REST + server): Volný schválí / vrátí nabídku Šponera, vlastní ne, AI ne; Šponer ani zaměstnanec bez práva nikoho; „Schválil“ u zakázky jen schvalovatel nabídky; právo mění jen super admin", async () => {
+    const mk = async (key: string, role: "obchodnik" | "zamestnanec", needs: boolean, approver: boolean) => {
+      const email = `e2e-role-ap-${key}-${TAG}@local.test`;
+      const password = "Docasne123!";
+      const { data, error } = await svc.auth.admin.createUser({ email, password, email_confirm: true });
+      if (error || !data.user) throw new Error(error?.message ?? "createUser");
+      const { error: pErr } = await svc.from("profiles")
+        .update({ role, active: true, full_name: `AP ${key}`, quote_needs_approval: needs, can_approve_quotes: approver }).eq("id", data.user.id);
+      if (pErr) throw new Error(pErr.message);
+      return { id: data.user.id, db: await localSession(email, password) };
+    };
+    const made: string[] = [];
+    try {
+      const volny = await mk("volny", "obchodnik", false, true);
+      const sponer = await mk("sponer", "zamestnanec", true, false);
+      const workerApprover = await mk("wa", "zamestnanec", true, true);
+      made.push(volny.id, sponer.id, workerApprover.id);
+      const job = await newJob({ owner_id: salesId });
+
+      // Šponer: nabídka čeká; schválit nesmí nikoho (ani svou), ani demo zaměstnanec / obchodník bez práva
+      const s1 = await newQuote(sponer.db, job);
+      await addItem(s1);
+      expect(await q(s1)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true, created_by: sponer.id });
+      for (const db of [sponer.db, worker, sales]) {
+        const r = await db.from("quotes").update({ approved_by: sponer.id }).eq("id", s1).select("id");
+        expect(r.error?.code).toBe("42501");
+        expect(r.error?.message).toContain("Nabídku schvaluje jen super admin nebo kolega s právem schvalovat nabídky");
+      }
+      // vrácení k přepracování bez práva se tiše nezapíše (R0)
+      await sponer.db.from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: "x" }).eq("id", s1);
+      expect((await q(s1)).approval_returned_at).toBeNull();
+
+      // Volný (REST): schválí — autor schválení = on, čas DB, otisk z REST ne
+      const ok = await volny.db.from("quotes").update({ approved_by: volny.id }).eq("id", s1).select("id");
+      expect(ok.error).toBeNull();
+      expect(await q(s1)).toMatchObject({ state: "schvalena", approved_by: volny.id, approved_snapshot_sha: null });
+      expect((await q(s1)).approved_at).toBeTruthy();
+      // „Schválil" u zakázky: Volný smí zapsat sebe (schválil nabídku zakázky), cizí jméno ne; Šponer vůbec
+      expect((await volny.db.from("orders").update({ approved_by: volny.id, approved_at: new Date().toISOString() }).eq("id", job).select("id")).error).toBeNull();
+      expect((await volny.db.from("orders").update({ approved_by: adminId }).eq("id", job).select("id")).error?.code).toBe("42501");
+      expect((await sponer.db.from("orders").update({ approved_by: sponer.id }).eq("id", job).select("id")).error?.code).toBe("42501");
+      // Šponer (autor) schválenou odešle
+      expect((await sponer.db.from("quotes").update({ status: "odeslano" }).eq("id", s1).select("id")).error).toBeNull();
+      expect(await q(s1)).toMatchObject({ state: "odeslana", sent_by: sponer.id, approved_by: volny.id });
+
+      // Volný (server s autorem): vrátí k přepracování a pak schválí s otiskem
+      const s2 = await newQuote(sponer.db, job);
+      await addItem(s2);
+      expect((await app(volny.id).from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: "doplň termín" }).eq("id", s2).select("id")).error).toBeNull();
+      expect(await q(s2)).toMatchObject({ approval_returned_by: volny.id, approval_return_note: "doplň termín", state: "ke_schvaleni" });
+      expect((await app(volny.id).from("quotes").update({ approved_by: volny.id, approved_snapshot_sha: "f".repeat(64) }).eq("id", s2).select("id")).error).toBeNull();
+      expect(await q(s2)).toMatchObject({ state: "schvalena", approved_by: volny.id, approved_snapshot_sha: "f".repeat(64), approval_returned_at: null });
+
+      // zaměstnanec se schvalovacím právem schválí cizí (stráž rozhodnutí ho pustí), vlastní ne
+      const s3 = await newQuote(sponer.db, job);
+      expect((await workerApprover.db.from("quotes").update({ approved_by: workerApprover.id }).eq("id", s3).select("id")).error).toBeNull();
+      expect((await q(s3)).approved_by).toBe(workerApprover.id);
+      const own = await newQuote(workerApprover.db, job);
+      expect((await q(own)).admin_approval_required).toBe(true);
+      expect((await workerApprover.db.from("quotes").update({ approved_by: workerApprover.id }).eq("id", own).select("id")).error?.code).toBe("42501");
+
+      // Volný: vlastní nabídka, která schválení potřebuje (upravil ji Šponer), ani se zapnutým schvalováním — ne
+      const v1 = await newQuote(volny.db, job);
+      expect((await q(v1)).state).toBe("rozpracovana");
+      await app(sponer.id).from("quotes").update({ title: "upravil Šponer" }).eq("id", v1);
+      expect(await q(v1)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true, created_by: volny.id });
+      expect((await volny.db.from("quotes").update({ approved_by: volny.id }).eq("id", v1).select("id")).error?.code).toBe("42501");
+      expect((await app(volny.id).from("quotes").update({ approved_by: volny.id }).eq("id", v1).select("id")).error?.code).toBe("42501");
+      await volny.db.from("quotes").update({ approval_returned_at: new Date().toISOString(), approval_return_note: "x" }).eq("id", v1);
+      expect((await q(v1)).approval_returned_at).toBeNull();
+      // super admin ji schválí
+      expect((await admin.from("quotes").update({ approved_by: adminId }).eq("id", v1).select("id")).error).toBeNull();
+
+      // AI nabídka (režim se schválením, bez autora) — schvaluje jen super admin
+      const ai = await newQuote(svc, job, { ai_generated: true, created_by: null });
+      const aiRow = await q(ai);
+      if (aiRow.approval_required) {
+        expect(aiRow.admin_approval_required).toBe(false);
+        expect((await volny.db.from("quotes").update({ approved_by: volny.id }).eq("id", ai).select("id")).error?.code).toBe("42501");
+      }
+
+      // neaktivní schvalovatel nic
+      const s4 = await newQuote(sponer.db, job);
+      await svc.from("profiles").update({ active: false }).eq("id", workerApprover.id);
+      expect((await app(workerApprover.id).from("quotes").update({ approved_by: workerApprover.id }).eq("id", s4).select("id")).error?.code).toBe("42501");
+
+      // právo si nikdo nezmění sám (REST); super admin ano — atribuci píše DB
+      expect((await sponer.db.from("profiles").update({ can_approve_quotes: true }).eq("id", sponer.id)).error?.message).toContain("jen super admin");
+      expect((await volny.db.from("profiles").update({ can_approve_quotes: false }).eq("id", volny.id)).error?.message).toContain("jen super admin");
+      const grant = await admin.from("profiles").update({ can_approve_quotes: true, quote_approver_changed_by: salesId }).eq("id", sponer.id).select("id");
+      expect(grant.error).toBeNull();
+      const { data: prof } = await svc.from("profiles").select("can_approve_quotes, quote_approver_changed_by, quote_approver_changed_at, quote_needs_approval")
+        .eq("id", sponer.id).single();
+      expect(prof).toMatchObject({ can_approve_quotes: true, quote_approver_changed_by: adminId, quote_needs_approval: true });
+      expect((prof as Row).quote_approver_changed_at).toBeTruthy();
+      // záchranná síť auditu mimo náš server (REST super admina)
+      const { data: audit } = await svc.from("audit_log").select("diff").eq("action", "profile_changed").eq("entity_id", sponer.id)
+        .order("created_at", { ascending: false }).limit(1);
+      expect(((audit ?? [])[0] as Row | undefined)?.diff).toMatchObject({ canApproveQuotes: [false, true] });
+    } finally {
+      if (jobs.length) await svc.from("quotes").delete().in("job_id", jobs);
+      await svc.from("audit_log").delete().in("entity_id", made);
+      for (const uid of made) await svc.auth.admin.deleteUser(uid);
+    }
+  }, 60_000);
+
   // ── 5) Backfill + idempotence ──────────────────────────────
   it("backfill: neschválené nabídky ne-adminů (obchodní fáze) označí, schválení ne-adminem zruší, žádost už nevyžaduje schválení; 2. běh nic", async () => {
     const job = await newJob({ approved_by: salesId, approved_at: new Date().toISOString() });
@@ -629,6 +803,12 @@ describe.skipIf(!LOCAL_ENABLED)("#25 role a viditelnost — pravidla v DB", () =
     for (const marker of ["R0 (#25)", "R1 (#25)", "R2 (#25)", "R3 (#25)", "R5 (#25)", "R6 (#25)", "R7 (#25)", "R4"]) {
       expect(src, marker).toContain(marker);
     }
+    // 20261030200000 (schvalování per uživatel) — novější definice postavená na 155000
+    expect(src).toContain("quote_author_needs_admin(app_actor())");
+    expect(localSql("select prosrc from pg_proc where proname = 'quote_author_needs_admin'")).toContain("quote_needs_approval");
+    // 31. 10.: schvalovatel nabídek (R3 / R0 / stráž rozhodnutí) a „Schválil" u zakázky
+    expect(src).toContain("quote_user_may_approve(app_actor(), old.created_by, old.admin_approval_required)");
+    expect(localSql("select prosrc from pg_proc where proname = 'orders_approval_guard'")).toContain("quote_user_is_approver(app_actor())");
     expect(localSql("select prosrc from pg_proc where proname = 'is_super_admin'")).toContain("active");
     expect(localSql("select prosrc from pg_proc where proname = 'is_obchodnik_or_admin'")).toContain("active");
     expect(localSql("select flow_state_label('quote_state', 'ke_schvaleni')")).toBe("Neschválená");
@@ -993,7 +1173,7 @@ describe.skipIf(!LOCAL_ENABLED)("#25 „moje“ obchodního toku a pojistky 2026
     const jobId = await job({ owner_id: salesId });
     const s = await sales.from("orders").update({ approved_by: salesId, approved_at: new Date().toISOString() }).eq("id", jobId).select("id");
     expect(s.error?.code).toBe("42501");
-    expect(s.error?.message).toBe("Schválení nabídky u zakázky zapisuje jen super admin.");
+    expect(s.error?.message).toBe("Schválení nabídky u zakázky zapisuje jen ten, kdo nabídku schválil (super admin nebo schvalovatel).");
     expect((await worker.from("orders").update({ approved_at: "2026-01-01T00:00:00Z" }).eq("id", jobId).select("id")).error?.code).toBe("42501");
     expect((await app(salesId).from("orders").update({ approved_by: adminId }).eq("id", jobId).select("id")).error?.code).toBe("42501");
     // jiné sloupce dál smí

@@ -289,8 +289,16 @@ await T("vlákna a hlavní akce: dvě „Poptávka Brisk“ = dvě vlákna; popt
   await view.getByTestId("category-picker").first().click();
   await page.getByTestId("category-option-faktura").click();
   await eventually(async () => (await view.getByTestId("mail-primary-action").getAttribute("data-action")) === "invoice.record", "zpět Faktura: Zapsat fakturu", 10_000);
+  // od f1c9a18 vede „Zapsat fakturu dodavatele" na Zanést fakturu s předvybranou přílohou e-mailu
   await view.getByTestId("mail-primary-action").click();
-  await view.getByTestId("thread-notice").filter({ hasText: /Faktur/ }).waitFor({ timeout: 60_000 });
+  await page.waitForURL(/\/supplier-invoices\/upload\?email=/, { timeout: 30_000 });
+  await page.getByTestId("invoice-email-submit").click();
+  const done = page.getByTestId("invoice-upload-done");
+  const notInvoice = page.getByTestId("invoice-not-invoice");
+  await done.or(notInvoice).first().waitFor({ timeout: 60_000 });
+  // AI_FAKE_CAPTURE může doklad přečíst jako jiný druh → „Přesto zapsat jako fakturu"
+  if (await notInvoice.isVisible()) await page.getByTestId("invoice-force").click();
+  await done.waitFor({ timeout: 60_000 });
   const invEmail = sql(`select id from emails where subject = 'Faktura ${TAG}' limit 1`);
   expect(Number(sql(`select count(*) from supplier_invoices where email_id = '${invEmail}'`)) >= 1, "faktura ve Fakturách dodavatelů");
   expect(sql(`select coalesce(order_id::text, '') from emails where id = '${invEmail}'`) === "", "faktura nezaložila zakázku");

@@ -10,7 +10,7 @@ import { NativeSelect } from "@/components/jobs/book/native-select";
 import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { useBookNav } from "@/components/jobs/book/book-nav";
 import {
-  BOOK_SORTS, DEADLINE_FILTERS, DELIVERY_FILTERS, PAYMENT_FILTERS, RESET_FILTERS, activeFilterCount, deliveryLabel, MAX_QUERY,
+  BOOK_SORTS, DEADLINE_FILTERS, PAYMENT_FILTERS, RESET_FILTERS, activeFilterCount, deliveryFiltersFor, deliveryLabel, MAX_QUERY,
   type BookView,
 } from "@/components/jobs/book/book-params";
 import { useAccess } from "@/components/access-provider";
@@ -212,7 +212,7 @@ export function BookToolbar({ options, production }: { options: JobFormOptions; 
           wrapperClassName="lg:w-40"
         >
           <option value="">Dodání: vše</option>
-          {DELIVERY_FILTERS.map((d) => (
+          {deliveryFiltersFor(params.segment).map((d) => (
             <option key={d} value={d}>{deliveryLabel(d)}</option>
           ))}
         </NativeSelect>

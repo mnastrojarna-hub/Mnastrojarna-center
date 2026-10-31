@@ -29,7 +29,8 @@ import { KpiStrip } from "@/components/jobs/book/kpi-strip";
 import { SegmentTabs, StageChips } from "@/components/jobs/book/segment-tabs";
 import { BookToolbar } from "@/components/jobs/book/book-toolbar";
 import { JobForm } from "@/components/jobs/job-form";
-import { DEFAULT_PARAMS, segmentCounts, bookKpis, type BookParams } from "@/components/jobs/book/book-params";
+import { FlowFilterChips } from "@/components/jobs/book/flow-filter-chips";
+import { DEFAULT_PARAMS, segmentCounts, segmentStageCounts, bookKpis, type BookParams } from "@/components/jobs/book/book-params";
 import { STAGE_ORDER } from "@/lib/jobs/stages";
 import type { JobListItem, JobFormOptions } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
@@ -127,6 +128,46 @@ describe("Kniha zakázek — vykreslení", () => {
     expect(html).toContain("stages=ve_vyrobe"); // odkazy nesou aktuální výběr
     expect(html).toContain("Všichni obchodníci");
     expect(html).toContain("Jak číst barvy");
+  });
+
+  it("31. 10.: Objednávky v běhu = do dodacího listu; Dokončené = od DL; filtr Dodání a chipy podle záložky", () => {
+    const delivered = { montaz: 2 };
+    const counts = { byStage, deliveredByStage: delivered, overdue: 0, dueThisWeek: 0, active: 13, total: 16 };
+    const seg = segmentCounts(byStage, delivered);
+    const html = render(
+      <>
+        <KpiStrip kpis={bookKpis(counts)} runningValue={1000} />
+        <SegmentTabs counts={seg} />
+        <StageChips byStage={segmentStageCounts(byStage, delivered, "objednavky")} />
+        <FlowFilterChips counts={{ "order.dorucena": 3, "fulfilment.dokoncena": 9 }} />
+        <BookToolbar options={OPTIONS} />
+      </>,
+    );
+    expect(html).toContain("objednávka → dodací list");
+    expect(html).toContain("objednávky bez DL, bez DPH");
+    expect(html).toContain("Objednané zakázky bez dodacího listu — v běhu.");
+    expect(html).toContain("Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené.");
+    // v Objednávkách nejsou chipy Dodáno zákazníkovi / Vyfakturováno ani „Vše dodáno"
+    expect(html).not.toContain("stages=dodano_zakaznikovi");
+    expect(html).not.toContain("stages=fakturovano");
+    expect(html).not.toContain("Vše dodáno");
+    expect(html).toContain("Doručená");
+    // Dodání: jen K expedici / Částečně dodáno
+    expect(html).toContain('value="castecne"');
+    expect(html).not.toContain('value="dodano"');
+    const done = render(
+      <>
+        <StageChips byStage={segmentStageCounts(byStage, delivered, "dokoncene")} />
+        <BookToolbar options={OPTIONS} />
+      </>,
+      { ...DEFAULT_PARAMS, segment: "dokoncene" },
+    );
+    expect(done).toContain("stages=dodano_zakaznikovi");
+    expect(done).toContain("stages=fakturovano");
+    expect(done).toContain('value="dl_potvrzen"');
+    expect(done).not.toContain('value="k_expedici"');
+    const empty = render(<BookEmpty segment="dokoncene" filtered={false} options={OPTIONS} defaultStage="objednavka" userId="u1" />);
+    expect(empty).toContain("vystavíš dodací list na celou dodávku");
   });
 
   it("výroba, platba a domluvy v řádku i na kartě tabule", () => {

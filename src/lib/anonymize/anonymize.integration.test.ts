@@ -176,6 +176,14 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
       ["ostatni", "12-345.pdf", "application/pdf", "upload", null], ["foto", "a.JPG", null, "capture", null], ["vykres", "x.dwg", null, "email", null],
       ["nabidka", "x.pdf", "application/pdf", "generated", "my"], ["faktura", "x.pdf", "application/pdf", "email", null], ["vykres", "x.step", null, null, null],
       ["poptavka", "x.heic", "image/heic", "email", "zakaznik"], ["vykres", "x.docx", null, "upload", null], ["objednavka", "o.pdf", null, "upload", "my"],
+      // jen 2D výkresy (31. 10.)
+      ["objednavka", "PO-E2E-4471.pdf", "application/pdf", "capture", "zakaznik"], ["poptavka", "rfq.pdf", "application/pdf", "email", "zakaznik"],
+      ["vykres", "a.pdf", "application/pdf", "email", "zakaznik"], ["vykres", "a.pdf", "application/pdf", "email", "dodavatel"],
+      ["model_3d", "a.step", null, "email", "zakaznik"], ["model_3d", "a.pdf", "application/pdf", "upload", null], ["ostatni", "a.STL", null, "upload", null],
+      ["ostatni", "a.igs", null, "upload", null], ["ostatni", "a.sldprt", null, "upload", null], ["objednavka", "a.dwg", null, "email", "zakaznik"],
+      ["ostatni", "a.dxf", null, "upload", null], ["vykres", "a.bmp", null, "upload", null], ["foto", "a.bmp", null, "upload", null],
+      ["ostatni", "p.zip", "application/zip", "email", "zakaznik"], ["korespondence", "m.eml", null, "upload", null], ["faktura", "f.zip", null, "email", null],
+      ["nabidka", "n.pdf", "application/pdf", "email", "dodavatel"], ["dodaci_list", "d.pdf", "application/pdf", "email", "zakaznik"], ["ostatni", "k.xlsx", null, "upload", null],
     ];
     for (const c of cases) {
       const { data, error } = await svc.rpc("anon_is_candidate", { p_kind: c[0], p_filename: c[1], p_mime: c[2], p_origin: c[3], p_issuer: c[4] });
@@ -260,14 +268,17 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     expect(fake.fakeAnonCalls()).toBe(0);
   }, 120_000);
 
-  it("fallback modelu → review; faktura → skipped (Není výkres); smíšené PDF → jen stránky výkresů", async () => {
+  it("fallback modelu → done s poznámkou v historii (nic ke kontrole); faktura → skipped (Není výkres); smíšené PDF → jen stránky výkresů", async () => {
     const job = await newJob();
     const other = await makeVectorDrawing({ company: "FALLBACK GmbH" });
     const f = await addFile(job, "fb.pdf", other.pdf, "application/pdf");
     fake.setFakeAnonHandler((req) => req.call === "vector" ? { data: { pages: [{ index: 1, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] }], confidence: 0.96 }, model: "claude-sonnet-5-5" } : null);
     const r = await run(f.id as string);
-    expect(r.status).toBe("review");
-    expect(r.reason).toMatch(/záložní model/);
+    expect(r.status).toBe("done");
+    expect(r.reason).toBeNull();
+    expect((r.summary?.warnings ?? []).map((w) => w.code)).toContain("model_fallback");
+    const { data: fev } = await svc.from("job_events").select("message").eq("job_id", job).ilike("message", "%anonymizova%záložní model%");
+    expect((fev ?? []).length).toBe(1);
 
     const inv = await addFile(job, "faktura-scan.pdf", await makeInvoicePdf(), "application/pdf");
     fake.setFakeAnonHandler((req) => req.call === "vector" ? { pages: [{ index: 1, isDrawing: false, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] }], confidence: 0.97 } : null);
@@ -276,50 +287,53 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     expect((await row(inv.id as string)).anon_reason).toBe("Není výkres");
 
     const mixed = await makeVectorDrawing({ extraPages: ["letter", "drawing"], company: "MIXED a.s." });
-    const fm = await addFile(job, "poptavka-mix.pdf", mixed.pdf, "application/pdf", { kind: "poptavka", origin: "email" });
+    // poptávka zákazníka (druh) se neanonymizuje vůbec — jen výkresy
+    const fp = await addFile(job, "poptavka-mix.pdf", mixed.pdf, "application/pdf", { kind: "poptavka", origin: "email" });
+    expect(fp.anon_status).toBeNull();
+    // příloha bez druhu (Ostatní) s výkresy i dopisem → klasifikace stránek
+    const fm = await addFile(job, "priloha-mix.pdf", mixed.pdf, "application/pdf", { kind: "ostatni", origin: "email" });
     fake.setFakeAnonHandler((req) => req.call === "vector" ? { pages: [1, 2, 3].map((i) => ({ index: i, isDrawing: i !== 1, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] })), confidence: 0.95 } : null);
     const rm = await run(fm.id as string);
-    expect(["done", "review"]).toContain(rm.status);
+    expect(rm.status).toBe("done");
     const rowm = await row(fm.id as string);
     expect((rowm.anon_pages as { included: number[]; excluded: { page: number }[] }).included).toEqual([2, 3]);
     expect((rowm.anon_pages as { excluded: { page: number }[] }).excluded.map((e) => e.page)).toEqual([1]);
   }, 180_000);
 
-  it("DXF → review (v1), STEP se zákazníkem → done, STEP bez zákazníka → review, DWG zůstane unsupported", async () => {
-    // bez zákazníka (bez termínů) pravidla nepoznají firmu v názvu dílu → STEP ke kontrole
-    const bare = await newJob();
-    const stepBare = new TextEncoder().encode("ISO-10303-21;\nHEADER;\nFILE_NAME('a.step','2026',(''),(''),'','','');\nENDSEC;\nDATA;\n#1=PRODUCT('D-1','STROJMETAL hridel','',(#2));\nENDSEC;\nEND-ISO-10303-21;\n");
-    const fb = await addFile(bare, "dil.step", stepBare, null, { kind: "model_3d" });
-    const rb = await run(fb.id as string);
-    expect(rb.status).toBe("review");
-    expect(rb.reason).toMatch(/bez známého zákazníka/);
+  it("DXF → done (jen firma pryč, jméno zůstane), 3D model (STEP / STL) se neanonymizuje vůbec, DWG zůstane unsupported", async () => {
     const job = await newJob(await newCustomer("Strojmetal Aluminium Forging s.r.o.", "nakup@strojmetal-af.cz"));
-    const dxf = new TextEncoder().encode("  0\nSECTION\n  2\nENTITIES\n  0\nTEXT\n  8\n0\n 10\n1.0\n  1\nKreslil: J. Novák\n  0\nTEXT\n  1\nACME s.r.o.\n  0\nENDSEC\n  0\nEOF\n");
+    const dxf = new TextEncoder().encode("  0\nSECTION\n  2\nENTITIES\n  0\nTEXT\n  8\n0\n 10\n1.0\n  1\nKreslil: J. Novak\n  0\nTEXT\n  1\nACME s.r.o.\n  0\nTEXT\n  1\nVyrobeno pro STROJMETAL\n  0\nENDSEC\n  0\nEOF\n");
     const fd = await addFile(job, "dil.dxf", dxf, null, { kind: "vykres" });
     expect(fd.anon_status).toBe("pending");
-    expect((await run(fd.id as string)).status).toBe("review");
-    const step = new TextEncoder().encode("ISO-10303-21;\nHEADER;\nFILE_NAME('C:\\\\x\\\\a.step','2026',('Jan Novak'),('ACME s.r.o.'),'','','');\nENDSEC;\nDATA;\n#1=PRODUCT('D-1','STROJMETAL Hridel','Vyrobeno pro STROJMETAL',(#2));\n#2=PERSON('JN','Novak','Jan',$,$,$);\nENDSEC;\nEND-ISO-10303-21;\n");
+    const rd = await run(fd.id as string);
+    expect(rd.status, rd.reason ?? "").toBe("done");
+    const rdr = await row(fd.id as string);
+    const { data: dxfOut } = await svc.storage.from("job-files").download(String(rdr.anon_path));
+    const dtext = await dxfOut!.text();
+    expect(dtext).not.toMatch(/STROJMETAL|ACME/i);
+    expect(dtext).toContain("Kreslil: J. Novak"); // osoby výchozí nemazat („nic víc")
+    expect(dtext).toContain("Vyrobeno pro");
+    // 3D modely nemají razítko ani název firmy (majitel 31. 10.) — žádný stav, žádná fronta
+    const step = new TextEncoder().encode("ISO-10303-21;\nHEADER;\nFILE_NAME('a.step','2026',(''),(''),'','','');\nENDSEC;\nDATA;\n#1=PRODUCT('D-1','STROJMETAL hridel','',(#2));\nENDSEC;\nEND-ISO-10303-21;\n");
     const fs = await addFile(job, "dil.step", step, null, { kind: "model_3d" });
-    const rs = await run(fs.id as string);
-    expect(rs.status, rs.reason ?? "").toBe("done");
-    const rr = await row(fs.id as string);
-    const { data } = await svc.storage.from("job-files").download(String(rr.anon_path));
-    const text = await data!.text();
-    // jméno zákazníka z CRM (slovo „STROJMETAL" z celého názvu) i z hlavičky pryč
-    expect(text).not.toMatch(/Novak|ACME|STROJMETAL/i);
-    expect(text).toContain("Hridel");
-    expect(rr.anon_filename).toMatch(/\.step$/);
+    expect(fs.anon_status).toBeNull();
+    const fl = await addFile(job, "dil.stl", new TextEncoder().encode("solid STROJMETAL\nendsolid\n"), null, { kind: "ostatni" });
+    expect(fl.anon_status).toBeNull();
+    expect(await run(fs.id as string)).toBeUndefined(); // claim nic nevezme
+    const dwg = await addFile(job, "sestava.dwg", new Uint8Array([1, 2, 3]), null, { kind: "ostatni" });
+    expect(dwg.anon_status).toBe("unsupported");
   }, 60_000);
 
-  it("fotka bez masteru → review (nízké rozlišení), výstup bez EXIF", async () => {
+  it("fotka výkresu bez masteru → done (nízké rozlišení jen poznámka), výstup bez EXIF", async () => {
     const job = await newJob();
     const sharp = (await import("sharp")).default;
     const jpg = new Uint8Array(await sharp({ create: { width: 1600, height: 1200, channels: 3, background: "#ffffff" } }).jpeg().withMetadata({ exif: { IFD0: { Artist: "Jan Novak" } } }).toBuffer());
-    const f = await addFile(job, "IMG_0001.jpg", jpg, "image/jpeg", { kind: "foto", origin: "capture" });
+    const f = await addFile(job, "IMG_0001.jpg", jpg, "image/jpeg", { kind: "vykres", origin: "capture" });
     const r = await run(f.id as string);
-    expect(r.status).toBe("review");
+    expect(r.status).toBe("done");
     const rr = await row(f.id as string);
-    expect(rr.anon_reason).toMatch(/nízkém rozlišení/);
+    expect(rr.anon_reason).toBeNull();
+    expect(JSON.stringify((rr.anon_summary as { warnings: unknown[] }).warnings)).toMatch(/nízkém rozlišení/);
     const { data } = await svc.storage.from("job-files").download(String(rr.anon_path));
     const m = await sharp(Buffer.from(await data!.arrayBuffer())).metadata();
     expect(m.exif).toBeUndefined();
@@ -409,13 +423,13 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     await svc.from("job_files").update({ anon_status: "skipped" }).in("id", ids);
   });
 
-  it("ruční úprava (editor): přidaná oblast → done + reviewed_by, událost +1; schválení review → done", async () => {
+  it("ruční úprava (editor): přidaná oblast → done + reviewed_by, událost +1; starší „ke kontrole“ jde schválit", async () => {
     const job = await newJob();
     const other = await makeVectorDrawing({ company: "MANUAL a.s." });
     const f = await addFile(job, "m.pdf", other.pdf, "application/pdf");
     fake.setFakeAnonHandler((req) => req.call === "vector" ? { data: { pages: [{ index: 1, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] }], confidence: 0.95 }, model: "claude-x" } : null);
     const first = await run(f.id as string);
-    expect(first.status, JSON.stringify(first)).toBe("review");
+    expect(first.status, JSON.stringify(first)).toBe("done");
     const r0 = await row(f.id as string);
     const actor = userActor({ id: adminId });
     const res = await s.saveManualRegions(localAdmin(actor), "job_files", f.id as string, [{ id: "m-1", page: 1, x: 0.4, y: 0.4, w: 0.1, h: 0.05, category: "other", source: "manual", zone: "body", manual: "added" }], String(r0.anon_at), actor, Date.now() + 200_000);
@@ -432,13 +446,15 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     // jiný obsah (stejné bajty by převzaly hotový schválený výstup z cache)
     const f2 = await addFile(job, "m2.pdf", (await makeVectorDrawing({ company: "MANUAL2 a.s." })).pdf, "application/pdf");
     await run(f2.id as string);
-    expect((await row(f2.id as string)).anon_status).toBe("review");
+    expect((await row(f2.id as string)).anon_status).toBe("done");
+    // řádek „ke kontrole" z doby před migrací 20261031140000 (simulace) jde pořád schválit
+    await svc.from("job_files").update({ anon_status: "review" }).eq("id", f2.id as string);
     const ap = await s.approve(localAdmin(actor), "job_files", f2.id as string, actor);
     expect(ap.ok).toBe(true);
     expect((await row(f2.id as string)).anon_status).toBe("done");
   }, 180_000);
 
-  it("ruční obdélník přes číslo výkresu: bez potvrzení ke kontrole, s potvrzením done", async () => {
+  it("ruční obdélník přes číslo výkresu: uložení = rozhodnutí člověka → done (nic ke kontrole)", async () => {
     const { A3 } = await import("./__fixtures__/samples");
     const job = await newJob();
     const f = await addFile(job, "k.pdf", (await makeVectorDrawing({ company: "KEEP a.s." })).pdf, "application/pdf");
@@ -450,18 +466,18 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     const actor = userActor({ id: adminId });
     const r0 = await row(f.id as string);
     const res = await s.saveManualRegions(localAdmin(actor), "job_files", f.id as string, [overNumber], String(r0.anon_at), actor, Date.now() + 200_000);
-    expect("status" in res && res.status).toBe("review");
+    expect("status" in res && res.status).toBe("done");
     const r1 = await row(f.id as string);
-    expect(r1.anon_status).toBe("review");
-    expect(String(r1.anon_reason)).toMatch(/chráněného údaje/);
-    expect(r1.anon_reviewed_by).toBeNull();
-    // potvrzení zásahu (editor: „Přesto smazat") → done + reviewed
+    expect(r1.anon_status).toBe("done");
+    expect(r1.anon_reason).toBeNull();
+    expect(r1.anon_reviewed_by).toBe(adminId);
+    // potvrzení zásahu (editor: „Přesto smazat") → také done
     const res2 = await s.saveManualRegions(localAdmin(actor), "job_files", f.id as string, [overNumber], String(r1.anon_at), actor, Date.now() + 200_000, { confirmKeep: true });
     expect("status" in res2 && res2.status).toBe("done");
     expect((await row(f.id as string)).anon_reviewed_by).toBe(adminId);
   }, 180_000);
 
-  it("fronta odeslání: pending → čeká; po done odejde s anonymní kopií (sha); review → blocked → schválit → odesláno; podvržený objekt → selže", async () => {
+  it("fronta odeslání: pending → čeká; po done odejde s anonymní kopií (sha); nejistá AI → done → odejde sama; objednávka zákazníka nikdy; podvržený objekt → selže", async () => {
     const { enqueueSend, flushSendQueue } = await import("./send-queue");
     const job = await newJob();
     const other = await makeVectorDrawing({ company: "QUEUE s.r.o." });
@@ -485,16 +501,23 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     expect((qev as { actor_id: string }[])[0]?.actor_id).toBe(salesId);
     expect(sent).toHaveLength(0);
 
-    // review → blocked → schválit → odesláno
+    // dřív „ke kontrole" (záložní model) → teď done → odejde sama, bez schvalování
     const f2 = await addFile(job, "q2.pdf", (await makeVectorDrawing({ company: "QUEUE2 s.r.o." })).pdf, "application/pdf");
-    fake.setFakeAnonHandler((req) => req.call === "vector" ? { data: { pages: [{ index: 1, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] }], confidence: 0.95 }, model: "claude-x" } : null);
+    fake.setFakeAnonHandler((req) => req.call === "vector" ? { data: { pages: [{ index: 1, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] }], confidence: 0.6 }, model: "claude-x" } : null);
     const q2 = await enqueueSend(svc, { kind: "job_document", jobId: job, payload: { to: ["dodavatel@example.com"], subject: "P2", body: "x" }, fileIds: [f2.id as string], createdBy: salesId });
     await run(f2.id as string);
-    await flushSendQueue(svc, { ids: [(q2 as { id: string }).id], sender });
-    expect((await row((q2 as { id: string }).id, "anon_send_queue")).status).toBe("blocked");
-    // schválení → onAnonSettled → odesláno
-    await s.approve(svc, "job_files", f2.id as string, userActor({ id: adminId }));
+    expect((await row(f2.id as string)).anon_status).toBe("done");
     expect((await row((q2 as { id: string }).id, "anon_send_queue")).status).toBe("sent");
+
+    // objednávka zákazníka: neanonymizuje se a dodavateli neodejde (fronta ji zablokuje)
+    const po = await addFile(job, "Objednavka PO-4471.pdf", vector.pdf, "application/pdf", { kind: "objednavka", issuer: "zakaznik", origin: "email" });
+    expect(po.anon_status).toBeNull();
+    const q3 = await enqueueSend(svc, { kind: "job_document", jobId: job, payload: { to: ["dodavatel@example.com"], subject: "P3", body: "x" }, fileIds: [po.id as string], createdBy: salesId });
+    await flushSendQueue(svc, { ids: [(q3 as { id: string }).id], sender });
+    const q3r = await row((q3 as { id: string }).id, "anon_send_queue");
+    expect(q3r.status).toBe("blocked");
+    expect(String(q3r.reason)).toMatch(/objednávku zákazníka/i);
+    expect((await row(po.id as string)).anon_status).toBeNull();
 
     // podvržení: přepsaný anon objekt → sha nesedí
     const { pickShareFile, verifyShareBytes } = await import("./share");
@@ -539,13 +562,15 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     const font = await doc.embedFont(StandardFonts.Helvetica);
     for (let i = 1; i <= 12; i++) {
       const pg = doc.addPage([420, 297]);
+      pg.drawText("STROJMETAL", { x: 200, y: 52, size: 8, font });
       pg.drawText(`Kreslil: J. Novák   Cislo vykresu: P-${i}`, { x: 200, y: 40, size: 7, font });
       pg.drawText("Material: 1.4301   Revize: A", { x: 200, y: 28, size: 7, font });
     }
-    const job = await newJob();
+    // výchozí: maže se jen název firmy zákazníka (z CRM) — na každé ze 12 stran
+    const job = await newJob(await newCustomer("Strojmetal Paging a.s.", "nakup@strojmetal-paging.cz"));
     const pdf12 = await doc.save();
     const f = await addFile(job, "sada.pdf", pdf12, "application/pdf");
-    // 1. dávka: odpověděl záložní model → výsledek musí zůstat „ke kontrole" i po 2. dávce
+    // 1. dávka: odpověděl záložní model → poznámka se přes dávky neztratí (výsledek hotový)
     let vectorCalls = 0;
     fake.setFakeAnonHandler((req) => {
       if (req.call !== "vector") return null;
@@ -563,10 +588,10 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     const r2 = await run(f.id as string);
     // 2. dávka zavolala AI pro stránky 11–12 (cache je po stránkách)
     expect(vectorCalls).toBe(2);
-    expect(r2.status).toBe("review");
-    expect(r2.reason).toMatch(/záložní model/);
+    expect(r2.status).toBe("done");
+    expect((r2.summary?.warnings ?? []).map((w) => w.code)).toContain("model_fallback");
     const fin = await row(f.id as string);
-    // texty smazaných jmen z obou dávek (12 stran)
+    // texty smazaného názvu firmy z obou dávek (12 stran)
     const { data: texts } = await svc.from("drawing_anon_texts").select("region_id").eq("job_file_id", f.id as string);
     expect(new Set((texts ?? []).map((t) => String((t as { region_id: string }).region_id).split("-")[0])).size).toBe(12);
     // útrata sečtená přes dávky

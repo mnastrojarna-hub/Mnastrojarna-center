@@ -20,7 +20,7 @@ import {
 } from "@/lib/data/queries";
 import { FlowStateTiles, MoversPanel } from "@/components/dashboard/flow-overview";
 import { getJobStageCounts, listJobs } from "@/lib/data/jobs";
-import { getSetupStatus } from "@/lib/setup/status";
+import { getSetupChecklist } from "@/lib/setup/status";
 import { getAnonReviewCount } from "@/lib/data/anonymize";
 import { EyeOff } from "lucide-react";
 import { cn, formatCZK, relativeTime } from "@/lib/utils";
@@ -33,7 +33,7 @@ import { cn, formatCZK, relativeTime } from "@/lib/utils";
 export default async function DashboardPage() {
   await requireFeature("dashboard");
   const { can } = await getAccess();
-  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved] = await Promise.all([
+  const [emails, approvals, counts, recent, overdue, quotes, commissions, setup, flow, resolved, anonReview] = await Promise.all([
     getEmails(),
     getApprovalQueue(),
     getJobStageCounts(),
@@ -41,11 +41,12 @@ export default async function DashboardPage() {
     listJobs({ group: "aktivni", deadline: "overdue", sort: "deadline", dir: "asc", limit: 5 }),
     listPendingQuoteApprovals(),
     can("commissions") ? getCommissions("month") : Promise.resolve([]),
-    getSetupStatus(),
+    getSetupChecklist(),
     getFlowDashboard(),
     getResolvedApprovals(5),
+    // dřív až po všem ostatním (o round-trip později)
+    getAnonReviewCount(),
   ]);
-  const anonReview = await getAnonReviewCount();
   // #25: dlaždice = fronta AI + ruční nabídky kolegů (oba panely níže je vypíšou)
   const waitingApproval = approvals.length + quotes.length;
   // chip „Ke schválení“ = stejné nabídky jako panel níže (ruční kolegů + AI ve frontě), ne vrácené autorovi
@@ -61,7 +62,8 @@ export default async function DashboardPage() {
   const commissionTotal = commissions.reduce((s, c) => s + c.commission, 0);
 
   const tiles: Tile[] = [
-    { label: "Objednávky v běhu", value: kpis.ordersRunning, hint: "objednávka → faktura", icon: ShoppingCart, href: "/orders", tone: TONE.orange },
+    // = záložka Objednávky v Knize (bez vystaveného DL na vše) — bookKpis z getJobStageCounts
+    { label: "Objednávky v běhu", value: kpis.ordersRunning, hint: "objednávka → dodací list", icon: ShoppingCart, href: "/orders", tone: TONE.orange },
     {
       label: "Po termínu", value: kpis.overdue, hint: kpis.overdue ? "hoří — řeš hned" : "vše v termínu", icon: AlarmClock,
       href: "/orders?segment=vse&deadline=overdue", tone: kpis.overdue ? TONE.red : TONE.green,
@@ -127,8 +129,8 @@ export default async function DashboardPage() {
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"><EyeOff className="h-4 w-4" /></span>
           <span className="min-w-0 flex-1">
-            <strong className="text-rose-800 dark:text-rose-200">{anonReview} {anonReview === 1 ? "výkres" : anonReview < 5 ? "výkresy" : "výkresů"} ke kontrole anonymizace</strong>
-            <span className="block text-xs text-muted-foreground">Před odesláním dodavateli zkontroluj, že je smazaná firma, jména, logo a cesty.</span>
+            <strong className="text-rose-800 dark:text-rose-200">{anonReview} {anonReview === 1 ? "výkres" : anonReview < 5 ? "výkresy" : "výkresů"} — anonymizace se nepovedla</strong>
+            <span className="block text-xs text-muted-foreground">Dodavateli zatím nepůjdou. Otevři a zkus „Anonymizovat znovu“, nebo nahraj výkres jako PDF.</span>
           </span>
           <ArrowRight className="h-4 w-4 text-muted-foreground" />
         </Link>

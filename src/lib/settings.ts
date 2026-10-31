@@ -44,20 +44,40 @@ async function loadFromDb(): Promise<Record<string, string>> {
   }
 }
 
+/** Rozběhnuté načtení — souběžná čtení (stránka volá getSetting z více míst najednou) sdílí jeden dotaz. */
+let loading: Promise<Record<string, string>> | null = null;
+let generation = 0;
+
 /** Po uložení nastavení — další čtení jde rovnou do DB. */
 export function invalidateSettingsCache(): void {
   cache = null;
   cacheAt = 0;
+  loading = null;
+  generation++;
+}
+
+async function currentSettings(): Promise<Record<string, string>> {
+  if (cache && Date.now() - cacheAt <= TTL) return cache;
+  if (!loading) {
+    const gen = generation;
+    const startedAt = Date.now();
+    loading = loadFromDb().then((map) => {
+      // načtení rozběhnuté před uložením nastavení nesmí přepsat čerstvá data
+      if (gen === generation) {
+        cache = map;
+        cacheAt = startedAt;
+        loading = null;
+      }
+      return map;
+    });
+  }
+  return loading;
 }
 
 /** Vrátí hodnotu nastavení (DB má přednost před env). */
 export async function getSetting(key: string): Promise<string | undefined> {
-  const now = Date.now();
-  if (!cache || now - cacheAt > TTL) {
-    cache = await loadFromDb();
-    cacheAt = now;
-  }
-  const fromDb = cache[key];
+  const settings = await currentSettings();
+  const fromDb = settings[key];
   if (fromDb) return fromDb;
   const envName = ENV_FALLBACK[key];
   const fromEnv = envName ? process.env[envName] : undefined;

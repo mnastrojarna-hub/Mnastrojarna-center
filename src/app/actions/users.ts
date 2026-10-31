@@ -42,14 +42,19 @@ async function guard(): Promise<{ user: CurrentUser; db: AdminDb } | { error: st
   return { user: access.user, db: createAdminClient({ actor: userActor(access.user) }) };
 }
 
-async function loadTarget(db: AdminDb, id: string): Promise<(GuardTarget & { email: string | null; full_name: string }) | null> {
+type Target = GuardTarget & {
+  email: string | null; full_name: string; quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null;
+};
+
+async function loadTarget(db: AdminDb, id: string): Promise<Target | null> {
   if (!id || typeof id !== "string") return null;
-  const { data } = await db
-    .from("profiles")
-    .select("id, role, active, email, full_name")
-    .eq("id", id)
-    .maybeSingle();
-  return (data as (GuardTarget & { email: string | null; full_name: string }) | null) ?? null;
+  const base = "id, role, active, email, full_name";
+  let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", id).maybeSingle();
+  // DB bez migrace 20261030200000 (schvalování nabídek per uživatel)
+  if (res.error && /quote_needs_approval|can_approve_quotes/.test(res.error.message ?? "")) {
+    res = await db.from("profiles").select(base).eq("id", id).maybeSingle() as typeof res;
+  }
+  return (res.data as Target | null) ?? null;
 }
 
 async function countActiveSuperAdmins(db: AdminDb): Promise<number> {
@@ -210,10 +215,23 @@ export interface UpdateUserChanges {
   phone?: string | null;
   position?: string | null;
   aiAccess?: boolean;
+  /** „Nabídky musí schválit super admin" (31. 10.; u super admina se nemění — schválení nepotřebuje nikdy). */
+  quoteNeedsApproval?: boolean;
+  /** „Smí schvalovat nabídky ostatních" (31. 10.; u super admina se nemění — smí vždy). Nezávislé na quoteNeedsApproval. */
+  canApproveQuotes?: boolean;
+}
+
+/** Neodeslané nabídky autora, které čekají na schválení (přepočet po změně schvalování dělá DB trigger). */
+async function pendingQuoteCount(db: AdminDb, authorId: string): Promise<number> {
+  const { count } = await db.from("quotes").select("id", { count: "exact", head: true })
+    .eq("created_by", authorId).eq("state", "ke_schvaleni").eq("archived", false);
+  return count ?? 0;
 }
 
 /** Úprava uživatele. Nelze odebrat sám sobě super admina ani se deaktivovat; poslední aktivní super admin zůstává. */
-export async function updateUser(id: string, changes: UpdateUserChanges): Promise<Result> {
+export async function updateUser(
+  id: string, changes: UpdateUserChanges,
+): Promise<Result & { pendingQuotes?: { before: number; after: number } }> {
   const g = await guard();
   if ("error" in g) return { ok: false, error: g.error };
   const { db, user: actor } = g;
@@ -252,6 +270,22 @@ export async function updateUser(id: string, changes: UpdateUserChanges): Promis
       update.commission_rate = c.rate;
     }
     if (changes.aiAccess !== undefined) update.ai_access = Boolean(changes.aiAccess);
+    if (changes.quoteNeedsApproval !== undefined) {
+      if (typeof changes.quoteNeedsApproval !== "boolean") return { ok: false, error: "Neplatné nastavení schvalování nabídek." };
+      // super admin schválení nepotřebuje nikdy — u něj se nastavení neukládá
+      const finalRole = (update.role as UserRole | undefined) ?? (target.role as UserRole);
+      if (finalRole !== "super_admin" && changes.quoteNeedsApproval !== (target.quote_needs_approval !== false)) {
+        update.quote_needs_approval = changes.quoteNeedsApproval;
+      }
+    }
+    if (changes.canApproveQuotes !== undefined) {
+      if (typeof changes.canApproveQuotes !== "boolean") return { ok: false, error: "Neplatné nastavení schvalování nabídek ostatních." };
+      // super admin schvaluje vždy — u něj se nastavení neukládá
+      const finalRole = (update.role as UserRole | undefined) ?? (target.role as UserRole);
+      if (finalRole !== "super_admin" && changes.canApproveQuotes !== (target.can_approve_quotes === true)) {
+        update.can_approve_quotes = changes.canApproveQuotes;
+      }
+    }
     if (Object.keys(update).length === 0) return { ok: true };
 
     if (update.role !== undefined || update.active !== undefined) {
@@ -264,8 +298,12 @@ export async function updateUser(id: string, changes: UpdateUserChanges): Promis
       if (problem) return { ok: false, error: problem };
     }
 
+    // změna schvalování (nebo role) → DB přepočte jeho neodeslané čekající nabídky (trg_profiles_quote_approval_after)
+    const approvalChange = update.quote_needs_approval !== undefined || update.role !== undefined;
+    const pendingBefore = approvalChange ? await pendingQuoteCount(db, id) : 0;
     const { error } = await db.from("profiles").update(update).eq("id", id);
     if (error) return { ok: false, error: error.message };
+    const pendingQuotes = approvalChange ? { before: pendingBefore, after: await pendingQuoteCount(db, id) } : undefined;
 
     // Metadata v Auth držíme v souladu (role jen v app_metadata — nastavuje ji pouze server)
     if (update.role !== undefined || update.full_name !== undefined) {
@@ -275,9 +313,17 @@ export async function updateUser(id: string, changes: UpdateUserChanges): Promis
       await db.auth.admin.updateUserById(id, attrs).catch(() => undefined);
     }
 
-    await logAudit({ action: "user_updated", entity: "profiles", entityId: id, diff: update });
+    await logAudit({
+      action: "user_updated", entity: "profiles", entityId: id,
+      diff: pendingQuotes && pendingQuotes.before !== pendingQuotes.after ? { ...update, pending_quotes: pendingQuotes } : update,
+    });
     revalidateUsers();
-    return { ok: true };
+    if (approvalChange || update.can_approve_quotes !== undefined) {
+      // čekající nabídky se uvolnily / zamkly, nebo se změnilo, kdo je schvaluje — tok, nabídky a karty zakázek
+      revalidatePath("/quotes");
+      revalidatePath("/orders", "layout");
+    }
+    return { ok: true, pendingQuotes };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
   }

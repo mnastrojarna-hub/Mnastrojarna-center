@@ -2,7 +2,7 @@ import { BadgeCheck, Mail, PackageCheck, ShoppingCart } from "lucide-react";
 import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
 import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { requireFeature, getAccess } from "@/lib/auth/session";
-import { getJob, listJobOrderRefs, listJobs } from "@/lib/data/jobs";
+import { getJobsForPanels, listJobOrderRefs, listJobs } from "@/lib/data/jobs";
 import { getEmails } from "@/lib/data/queries";
 import { getFlowCounts } from "@/lib/data/flow-status";
 import { getFlowJobStates, getLatestOrderRevisions, listFlowStateJobIds } from "@/lib/data/flow-pages";
@@ -70,7 +70,8 @@ export default async function ConfirmationsPage({
     return !s || (s.order && s.order !== "stornovana" && s.confirmation !== "odeslano");
   }).slice(0, MAX_DETAILS);
   const [details, revisions] = await Promise.all([
-    Promise.all(needDialog.map((j) => getJob(j.id))),
+    // jedním dávkovým dotazem (dřív getJob na každou zakázku = 5–8 dotazů × 40)
+    getJobsForPanels(needDialog.map((j) => j.id)),
     getLatestOrderRevisions(jobs.filter((j) => (states[j.id]?.facts.orderRevision ?? 0) > 1).map((j) => j.id)),
   ]);
   const confirmById = new Map((details.filter(Boolean) as JobDetail[]).map((d) => [d.id, toConfirmJob(d)]));

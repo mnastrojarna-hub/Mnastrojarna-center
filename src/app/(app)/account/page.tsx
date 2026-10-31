@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { requireUser, getAccess } from "@/lib/auth/session";
+import { listQuoteApprovers } from "@/lib/data/current-user";
+import { quoteApproverWho } from "@/lib/jobs/flow-status";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, FEATURE_LABELS, can, type Feature } from "@/lib/auth/permissions";
 import { loadAccountData } from "@/components/account/data";
 import { ProfileForm } from "@/components/account/profile-form";
@@ -33,11 +35,23 @@ const SHOWN_FEATURES: Feature[] = [
 ];
 
 /** Karta „Co vidím“ (#25, pravidlo 7): Kniha zakázek vs. Obchodní tok, schvalování, Nacenění, focení, provize. */
-function whatISee(hasAi: boolean): React.ReactNode[] {
+function whatISee(
+  hasAi: boolean, quotes: "admin" | "needs" | "free",
+  /** 31. 10.: smí schvalovat nabídky ostatních (ne super admin); kdo schvaluje jeho nabídky (z dat). */
+  approval: { approver: boolean; who: string | null } = { approver: false, who: null },
+): React.ReactNode[] {
   return [
   <><strong>Kniha zakázek</strong> = výroba a celý život zakázky. Vidí ji každý — všechny zakázky a vše v nich (nákupní ceny, marže a nákupní doklady jen obchodník a super admin).</>,
   <><strong>Obchodní tok</strong> (Poptávky, Nabídky, Potvrzení objednávek, Objednávky dodavatelům, Dokumenty) = tvoje práce z pošty: zakázky, kde jsi obchodník nebo je zpracováváš, které jsi založil(a), a doklady z tvé schránky. Super admin vidí tok všech.</>,
-  <><strong>Nabídky</strong> od kohokoli kromě super admina musí před odesláním schválit super admin. Po schválení je odešleš sám.</>,
+  // 31. 10.: schvalování nabídek per uživatel (Správa uživatelů → „Nabídky musí schválit super admin")
+  quotes === "admin"
+    ? <><strong>Nabídky</strong> kolegů, kterým je schvalování zapnuté (Správa uživatelů), musí před odesláním schválit super admin{approval.who ? " nebo schvalovatel" : ""}. Tvoje schválení nepotřebují.</>
+    : quotes === "free"
+      ? <><strong>Nabídky</strong>: tvoje schválení nepotřebují — vystavíš je a zákazníkovi odešleš sám tlačítkem Odeslat zákazníkovi (nic neodchází automaticky).</>
+      : <><strong>Nabídky</strong>: tvoje musí před odesláním schválit {approval.who ?? "super admin"}. Po schválení je odešleš sám.</>,
+  ...(approval.approver
+    ? [<><strong>Schvalování</strong>: smíš schvalovat nabídky kolegů, kteří schválení potřebují (vlastní ne) — najdeš je v Nabídkách → Ke schválení.</>]
+    : []),
   <><strong>Nacenění</strong> zatím dělá jen super admin.</>,
   hasAi
     ? <><strong>Vyfotit doklad</strong> může každý — AI fotku přečte a zařadí.</>
@@ -65,7 +79,9 @@ function SectionIcon({ icon: Icon, tone }: { icon: React.ComponentType<{ classNa
 /** Můj účet — jméno, telefon, heslo, role a co role vidí, vlastní schránky. */
 export default async function AccountPage() {
   const user = await requireUser();
-  const [data, access, myBoxes] = await Promise.all([loadAccountData(user.id), getAccess(), listMyMailboxes(user.id).catch(() => [])]);
+  const [data, access, myBoxes, quoteApprovers] = await Promise.all([
+    loadAccountData(user.id), getAccess(), listMyMailboxes(user.id).catch(() => []), listQuoteApprovers(),
+  ]);
   const RoleIcon = ROLE_ICONS[user.role];
   const style = ROLE_STYLES[user.role];
   const features = SHOWN_FEATURES.filter((f) => access.features.includes(f));
@@ -179,7 +195,10 @@ export default async function AccountPage() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground [&_strong]:text-foreground">
-                {whatISee(hasAi).map((line, i) => (
+                {whatISee(hasAi, user.role === "super_admin" ? "admin" : user.quoteNeedsApproval === false ? "free" : "needs", {
+                  approver: user.role !== "super_admin" && user.canApproveQuotes === true,
+                  who: quoteApproverWho(quoteApprovers, user.id),
+                }).map((line, i) => (
                   <li key={i} className="flex gap-2">
                     <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
                     <span className="min-w-0">{line}</span>

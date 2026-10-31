@@ -659,18 +659,17 @@ describe.skipIf(!ENABLED)("Faktury dodavatelů ↔ lokální Supabase", () => {
     invoiceIds.delete(other.id);
   }, 60_000);
 
-  it("Nahrát fakturu (stránka): zaměstnanec dostane jen poděkování, zpracování proběhne po odpovědi", async () => {
+  it("Zanést fakturu (stránka, 31. 10.): stejná faktura (dodavatel + číslo) jiným souborem = „už je zapsaná“, nic nového", async () => {
     h.user = worker;
-    h.after = [];
+    const before = localSql(`select count(*) from supplier_invoices where created_at >= '${startedAt}'`);
     const file = await upload(`${TAG}-stranka__faktura_dodavatel.png`, png(88));
     const res = await up.uploadSupplierInvoice({ files: [file] });
-    expect(res).toEqual({ ok: true, message: "Děkujeme, nahráno — fakturu zpracuje super admin." });
-    await Promise.all(h.after);
-    const row = localSql(`select id || '|' || (duplicate_of_id = '${invoiceId}')::text || '|' || source from supplier_invoices where uploaded_by = '${worker.id}' and created_at >= '${startedAt}' and id <> '${invoiceId}' order by created_at desc limit 1`);
-    const [id, dup, source] = row.split("|");
-    invoiceIds.add(id);
-    expect(dup).toBe("true");
-    expect(source).toBe("photo");
+    expect(res).toMatchObject({ ok: true, kind: "duplicate", head: { number: "FA-2026-0815" } });
+    if (!res.ok) return;
+    expect(res.message).toMatch(/^Tahle faktura už je zapsaná \(\d{1,2}\. \d{1,2}\. 2026/);
+    // zaměstnanec nedostane id (Faktury dodavatelů nevidí)
+    expect("id" in res).toBe(false);
+    expect(localSql(`select count(*) from supplier_invoices where created_at >= '${startedAt}'`)).toBe(before);
     // stránka v capture/ smazaná
     const { data: left } = await db.storage.from("job-files").list(file.path.slice(0, file.path.lastIndexOf("/")), { search: file.path.split("/").pop() });
     expect((left ?? []).length).toBe(0);

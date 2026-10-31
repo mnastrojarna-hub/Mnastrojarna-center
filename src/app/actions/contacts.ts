@@ -7,7 +7,10 @@ import { checkFeature } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
 import { isUuid, translateDbError } from "@/lib/jobs/mapping";
 import type { ActionResult } from "@/lib/jobs/types";
-import { isContactRole, normEmail, type BookContact, type ContactRole, type PartyKind, type RoleEntry } from "@/lib/contacts/roles";
+import {
+  CONTACTS_SCHEMA_MISSING, ROLES_FOR, isContactRole, isMissingSchemaError, normEmail,
+  type BookContact, type ContactRole, type PartyKind, type RoleEntry,
+} from "@/lib/contacts/roles";
 import {
   isAddressForm, isToneStyle, salutationFor, toneSummary, type ToneSetting, type ToneSuggestion,
 } from "@/lib/contacts/tone";
@@ -56,7 +59,7 @@ export interface SaveRoleEmailInput {
 export async function saveRoleEmailAction(input: SaveRoleEmailInput): Promise<ActionResult<{ id: string }>> {
   if (!input || (input.kind !== "customer" && input.kind !== "supplier")) return { ok: false, error: "Neplatný záznam." };
   if (!isUuid(input.partyId)) return { ok: false, error: "Neplatná firma." };
-  if (!isContactRole(input.role)) return { ok: false, error: "Neplatný účel e-mailu." };
+  if (!isContactRole(input.role) || !ROLES_FOR[input.kind].includes(input.role)) return { ok: false, error: "Neplatný účel e-mailu." };
   const contactId = input.contactId && isUuid(input.contactId) ? input.contactId : null;
   const email = contactId ? null : normEmail(input.email);
   if (!contactId && !email) return { ok: false, error: "Vyber kontaktní osobu nebo zadej platný e-mail." };
@@ -76,6 +79,7 @@ export async function saveRoleEmailAction(input: SaveRoleEmailInput): Promise<Ac
     };
     const { data, error } = await c.db.from("party_role_emails").insert(row as never).select("id").single();
     if (error || !data) {
+      if (isMissingSchemaError(error)) return { ok: false, error: CONTACTS_SCHEMA_MISSING };
       if (error && /duplicate|unique/i.test(error.message)) return { ok: false, error: "Tahle adresa už v tomto účelu je." };
       return { ok: false, error: translateDbError(error?.message ?? "Uložení se nepovedlo.") };
     }
@@ -129,22 +133,35 @@ export async function setRoleDefaultAction(kind: PartyKind, id: string): Promise
   return { ok: true };
 }
 
-// ── Dodavatel: kontaktní osoby a role (karta dodavatele je dialog) ──
-export interface SupplierBook {
+// ── Adresář firmy pro dialog (kontaktní osoby + e-maily podle účelu) ──
+export interface PartyBook {
   contacts: BookContact[];
   roles: RoleEntry[];
   partyEmail: string | null;
   tones: Record<string, { address: ToneSetting["address"]; summary: string }>;
+  /** V DB chybí tabulky kontaktů / účelů (neaplikovaná migrace) → dialog ukáže zprávu místo editoru. */
+  schemaMissing?: boolean;
+}
+/** @deprecated název z doby, kdy adresář načítal jen dialog dodavatele */
+export type SupplierBook = PartyBook;
+
+/** Adresář zákazníka / dodavatele pro dialog „Upravit…" (načte se při otevření). */
+export async function getPartyBookAction(kind: PartyKind, partyId: string): Promise<ActionResult<{ book: PartyBook }>> {
+  if (kind !== "customer" && kind !== "supplier") return { ok: false, error: "Neplatný záznam." };
+  if (!isUuid(partyId)) return { ok: false, error: kind === "customer" ? "Neplatný zákazník." : "Neplatný dodavatel." };
+  const c = await party(kind);
+  if ("error" in c) return { ok: false, error: c.error };
+  const book = await loadAddressBook(c.db, kind === "customer" ? { customerId: partyId } : { supplierId: partyId });
+  if (!book) return { ok: false, error: kind === "customer" ? "Zákazník nenalezen." : "Dodavatel nenalezen." };
+  const tones = await myTones(c.db, c.user.id, book.contacts);
+  return {
+    ok: true,
+    book: { contacts: book.contacts, roles: book.roles, partyEmail: book.partyEmail, tones, ...(book.schemaMissing ? { schemaMissing: true } : {}) },
+  };
 }
 
-export async function getSupplierBookAction(supplierId: string): Promise<ActionResult<{ book: SupplierBook }>> {
-  if (!isUuid(supplierId)) return { ok: false, error: "Neplatný dodavatel." };
-  const c = await party("supplier");
-  if ("error" in c) return { ok: false, error: c.error };
-  const book = await loadAddressBook(c.db, { supplierId });
-  if (!book) return { ok: false, error: "Dodavatel nenalezen." };
-  const tones = await myTones(c.db, c.user.id, book.contacts);
-  return { ok: true, book: { contacts: book.contacts, roles: book.roles, partyEmail: book.partyEmail, tones } };
+export async function getSupplierBookAction(supplierId: string): Promise<ActionResult<{ book: PartyBook }>> {
+  return getPartyBookAction("supplier", supplierId);
 }
 
 /** Moje tykání ke kontaktům (pro štítek u osoby). */

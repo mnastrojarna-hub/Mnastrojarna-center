@@ -8,7 +8,7 @@ import { openPdf } from "./pdf-node";
 import { extractPage, computeZonesOriented, dominantRotation } from "./pdf-text";
 import { preparePdf } from "./pdf-prepare";
 import { burnGraphic, burnRectKeepLines, inkFraction, renderPageRaster, renderRegion, type Raster } from "./pdf-raster";
-import { DEFAULT_REDACT, containsTerm, makeTerms, makeWordTerms, ruleLine, type RuleContext } from "./rules";
+import { ALL_REDACT, containsTerm, makeTerms, makeWordTerms, ruleLine, type RuleContext } from "./rules";
 import { fakeAnonCalls, resetFakeAnonCalls, setFakeAnonHandler, type FakeAnonRequest } from "./detect-ai";
 import { accToDecide, decideAnonStatus, mergeBatch, type PdfBatchFacts } from "./decide";
 import { checkTranscript, graphicLeaks } from "./verify";
@@ -37,7 +37,7 @@ const SHOTS = process.env.ANON_SHOTS || "";
 const AI ={ apiKey: "x", model: "claude-opus-5-5", deadline: Date.now() + 20 * 60_000, sha: "e".repeat(64) };
 const ctx = (terms: string[] = [], words = false): RuleContext => ({
   terms: [...makeTerms(terms, "crm", ["Mnástrojárna"]), ...(words ? makeWordTerms(terms, "crm", ["Mnástrojárna"]) : [])],
-  keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT },
+  keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT },
 });
 function input(bytes: Uint8Array, over: Partial<PdfAnonInput> = {}): PdfAnonInput {
   return { bytes, ctx: ctx(), ai: null, verifyPhotos: true, fillPdf: "white", fillPhoto: "white", maxDpi: 150, maxMpx: 40, pageFrom: 1, deadline: Date.now() + 250_000, ...over };
@@ -103,7 +103,7 @@ describe("1) PDF po dávkách: AI po stránkách, sloučené rozhodnutí", () =>
     };
   };
   // CRM název jako celek (bez slov) — firmu na stránce najde jen AI
-  const terms = () => ({ terms: makeTerms(["Strojmetal Aluminium Forging s.r.o."], "crm", ["Mnástrojárna"]), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } });
+  const terms = () => ({ terms: makeTerms(["Strojmetal Aluminium Forging s.r.o."], "crm", ["Mnástrojárna"]), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } });
 
   it("2. dávka s cache 1. dávky volá AI pro stránky 11–12; firma je pryč i na straně 12", async () => {
     const pdf = await twelvePages();
@@ -147,7 +147,9 @@ describe("1) PDF po dávkách: AI po stránkách, sloučené rozhodnutí", () =>
     expect(a2.allAi).toBe(false);
     expect(a2.usage).toMatchObject({ usd: 0.75, calls: 2 });
     const d = decideAnonStatus({ ...accToDecide(a2, { method: "raster_pdf" }), mode: "full" });
-    expect(d.status).toBe("review");
+    // plná automatika: zbytky / bez AI = poznámky, výsledek hotový
+    expect(d.status).toBe("done");
+    expect(d.warnings.map((w) => w.code)).toEqual(expect.arrayContaining(["keep_overlap"]));
     // dávka bez zahrnutých stran (dopis) nepokazí „AI u všech"
     const a3 = mergeBatch(mergeBatch(null, b({})), b({ aiUsed: false, hasIncluded: false }));
     expect(decideAnonStatus({ ...accToDecide(a3, { method: "raster_pdf" }), mode: "full" }).status).toBe("done");
@@ -304,7 +306,8 @@ describe("2/6/7) adversariální PDF", () => {
       outputChecksPassed: res.outputProblems.length === 0, verifyClean: null, verifyKeepPresent: null, pxPerMm: null, isPhoto: false, hasMaster: false,
       warnings: res.warnings, customerStandard: res.customerStandard, termInKeep: res.termInKeep, titleBlockFound: res.pages[0].titleBlockFound,
     });
-    expect(d.status).toBe("review");
+    expect(d.status).toBe("done");
+    expect(d.warnings.map((w) => w.code)).toContain("ai_removed_text");
     // poznámka „custom" bez termínu = „other" (ne nevypínatelný termín)
     expect(res.pages[0].regions.some((x) => x.category === "custom")).toBe(false);
   });

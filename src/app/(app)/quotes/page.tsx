@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, BrainCircuit, FileText, ShieldAlert } from "lucide-react";
 import { listPendingQuoteApprovals } from "@/lib/data/queries";
+import { listQuoteApprovers } from "@/lib/data/current-user";
+import { quoteApproverWho } from "@/lib/jobs/flow-status";
 import { FlowScopeBar } from "@/components/flow/flow-scope-bar";
 import { scopeBarData } from "@/components/flow/flow-scope-copy";
 import { QuoteApprovalList } from "@/components/flow/quote-approval-list";
@@ -32,17 +34,21 @@ export default async function QuotesPage({
 }) {
   await requireFeature("workflow");
   const sp = (await searchParams) ?? {};
-  const { can } = await getAccess();
+  const { can, user } = await getAccess();
   // #25: nabídky jen „moje" (super admin všichni, nebo „Jen moje"); fronta „Ke schválení" vždy všech
   const scope = await getFlowScope(await flowWhoFrom(sp));
   const canPrice = can("pricing");
   const approver = can("quote_approval");
+  // 31. 10.: schvalovatel, který není super admin (schvaluje cizí nabídky se schvalováním; své odesílá sám)
+  const peerApprover = approver && user?.role !== "super_admin";
+  // počty, fronta schvalování a schvalovatelé na seznamu nezávisí — běží souběžně s ním (o round-trip dřív)
+  const countsP = getFlowCounts({ mine: mineParam(scope) });
+  const pendingP = approver ? listPendingQuoteApprovals() : Promise.resolve([]);
+  const approversP = listQuoteApprovers();
   const list = await listQuotes({ includeArchived: true }, { scope });
-  const [info, counts, pending] = await Promise.all([
-    getFlowQuoteInfo(list.map((q) => q.id)),
-    getFlowCounts({ mine: mineParam(scope) }),
-    approver ? listPendingQuoteApprovals() : Promise.resolve([]),
-  ]);
+  const [info, counts, pending, approvers] = await Promise.all([getFlowQuoteInfo(list.map((q) => q.id)), countsP, pendingP, approversP]);
+  // kdo schvaluje nabídky přihlášeného (schvalovatelé kromě něj + super admin)
+  const myWho = quoteApproverWho(approvers, user?.id ?? null);
   const today = todayPrague();
   const openByJob = new Map<string, number>();
   for (const q of list) {
@@ -56,7 +62,7 @@ export default async function QuotesPage({
   // #25: „čeká na schválení“ = stejné číslo jako sekce „Ke schválení“ a odznak (vrácené autorovi se nepočítají)
   const pendingMine = quotes.filter((q) => q.display === "ke_schvaleni" && !q.archived);
   const toApprove = approver ? pending.length : pendingMine.filter((q) => !q.facts.returnedAt).length;
-  const returned = approver ? 0 : pendingMine.filter((q) => q.facts.returnedAt).length;
+  const returned = approver && !peerApprover ? 0 : pendingMine.filter((q) => q.facts.returnedAt && q.facts.createdBy === user?.id).length;
   const waiting = n("odeslana");
   const expired = n("vyprsela");
   const active = quotes.filter((q) => !q.archived && q.display !== "prijata" && q.display !== "zamitnuta").length;
@@ -74,7 +80,7 @@ export default async function QuotesPage({
           <>
             Každá nabídka zákazníkovi na jednom místě — kdo ji připravil, kdo schválil, kdy a jak odešla a do kdy platí.
             {toApprove || returned || waiting || expired ? " " : ""}
-            {toApprove ? <><strong>{toApprove}</strong> {czWaits(toApprove)} {approver ? "na tvé schválení" : "na schválení super admina"}. </> : null}
+            {toApprove ? <><strong>{toApprove}</strong> {czWaits(toApprove)} {approver ? "na tvé schválení" : myWho ? `na schválení (${myWho})` : "na schválení super admina"}. </> : null}
             {returned ? <><strong>{returned}</strong> {returned === 1 ? "vrácena" : returned <= 4 ? "vráceny" : "vráceno"} k přepracování. </> : null}
             {waiting ? <><strong>{waiting}</strong> čeká na odpověď zákazníka. </> : null}
             {expired ? <><strong className="text-rose-700 dark:text-rose-300">{expired}</strong> už po platnosti.</> : null}
@@ -101,28 +107,39 @@ export default async function QuotesPage({
         <FlowScopeBar scope={scopeBarData(scope)} />
       </FlowHeader>
 
-      {approver ? (
+      {approver && !peerApprover ? (
         <FlowHint>
           <strong>Postup:</strong> nabídky od kolegů a od AI čekají na tvé schválení — <em>Schválit</em>, rovnou{" "}
           <em>Schválit a odeslat</em>, nebo <em>Vrátit k přepracování</em>. Tvoje vlastní nabídky schválení nepotřebují.
         </FlowHint>
+      ) : peerApprover ? (
+        <FlowHint>
+          <strong>Postup:</strong> nabídky kolegů, kteří potřebují schválení, čekají na tvé schválení — <em>Schválit</em>,
+          {can("margins") ? <> rovnou <em>Schválit a odeslat</em>,</> : null} nebo <em>Vrátit k přepracování</em>. Vlastní nabídku neschvaluješ —{" "}
+          {user?.quoteNeedsApproval === false
+            ? <>tvoje schválení nepotřebují; zákazníkovi je pošleš tlačítkem <em>Odeslat zákazníkovi</em>.</>
+            : <>tvoje {myWho ? `schválí ${myWho}` : "schválí super admin"}.</>}
+        </FlowHint>
       ) : (
         <FlowHint>
-          <strong>Postup:</strong> nabídku vytvoříš v kartě zakázky (záložka Nabídky). Než odejde zákazníkovi, schválí ji super admin —
-          do té doby je označená „Neschválená“ a odeslat ji nejde. Po schválení ji odešleš tlačítkem <em>Odeslat nabídku</em>.
+          <strong>Postup:</strong> nabídku vytvoříš v kartě zakázky (záložka Nabídky). Než odejde zákazníkovi, schválí ji{" "}
+          {myWho ?? "super admin"} — do té doby je označená „Neschválená“ a odeslat ji nejde. Po schválení ji odešleš tlačítkem{" "}
+          <em>Odeslat nabídku</em>.
         </FlowHint>
       )}
 
       {approver && (
-        // #25: fronta super admina — vždy všech (i při „Jen moje“)
+        // #25: fronta super admina — vždy všech (i při „Jen moje“); 31. 10. schvalovatel jen cizí nabídky se schvalováním
         <FlowSection
           id="ke-schvaleni"
           icon={ShieldAlert}
           iconClass="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
           title={`Ke schválení (${pending.length})`}
-          description="Nabídky od kolegů a od AI. Bez schválení je nejde odeslat."
+          description={peerApprover
+            ? "Nabídky kolegů, které potřebují schválení. Bez schválení je nejde odeslat."
+            : "Nabídky od kolegů a od AI. Bez schválení je nejde odeslat."}
         >
-          <QuoteApprovalList items={pending} />
+          <QuoteApprovalList items={pending} canSend={can("margins")} />
         </FlowSection>
       )}
 

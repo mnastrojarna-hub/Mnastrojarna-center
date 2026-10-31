@@ -20,6 +20,7 @@ const ROLE_WORDS: { role: ContactRole; re: RegExp }[] = [
   { role: "fakturace", re: /(faktur|fakturač|fakturac|účetn|ucetn|účtárn|uctarn|invoice|invoicing|billing|accounts? payable|rechnung|buchhaltung|daňov[ýé] doklad)/gi },
   { role: "nakup", re: /(objednáv|objednav|nákup|nakup|purchas|einkauf|bestellung|purchase order|\bPO\b)/gi },
   { role: "nabidky", re: /(poptáv|poptav|nabíd|nabid|\bRFQ\b|quotation|request for quot|angebot|anfrage|cenov[éá] nabídk)/gi },
+  { role: "dodaci_listy", re: /(dodac[íi]\w* list|delivery notes?|lieferschein|p[řr][íi]jem zbo[žz][íi]|goods receipt)/gi },
 ];
 
 const CUE = /(zas[ií]l|pos[ií]l|zasla|posla|po[sš]le|za[sš]le|adres|e-?mail|kontakt|send|sent to|schick|senden|richten|mailto|směr|smer)/i;

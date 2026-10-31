@@ -9,7 +9,7 @@ import { fakeBatchDir, fakeExtractRaw, isFakeCapture, safeBatchFile } from "@/li
 import { AI_NOT_CONFIGURED, fileBlock, type ReadDocumentFile } from "@/lib/ai/document-reader";
 import { normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
-import { invoiceFromBusinessDoc, normalizeSupplierInvoice } from "@/lib/supplier-invoices/extract";
+import { INVOICE_DOCUMENT_TYPES, invoiceFromBusinessDoc, normalizeSupplierInvoice } from "@/lib/supplier-invoices/extract";
 import type { SupplierInvoiceExtract } from "@/lib/supplier-invoices/types";
 
 /**
@@ -52,6 +52,12 @@ export const SUPPLIER_INVOICE_SCHEMA = {
       },
       required: SUPPLIER_FIELDS,
     },
+    documentType: {
+      type: "string",
+      enum: [...INVOICE_DOCUMENT_TYPES],
+      description: "Druh dokladu: faktura (daňový doklad), zalohova_faktura, dobropis; NE faktura: dodaci_list, nabidka, objednavka, " +
+        "potvrzeni_objednavky, upominka, jiny",
+    },
     number: str("Číslo faktury (daňového dokladu) přesně"),
     variableSymbol: str("Variabilní symbol (jen číslice)"),
     issueDate: str("Datum vystavení RRRR-MM-DD"),
@@ -61,6 +67,16 @@ export const SUPPLIER_INVOICE_SCHEMA = {
     totalNet: num("Celkem bez DPH"),
     totalVat: num("DPH celkem"),
     totalGross: num("Celkem k úhradě s DPH"),
+    vatBreakdown: {
+      type: "array",
+      description: "Rekapitulace DPH po sazbách, je-li na faktuře (jinak prázdné pole)",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: { rate: num("Sazba DPH v % (21, 12, 0)"), base: num("Základ bez DPH"), vat: num("DPH") },
+        required: ["rate", "base", "vat"],
+      },
+    },
     items: {
       type: "array",
       description: "VŠECHNY řádky faktury v pořadí, přesně jak jsou na dokladu (i doprava, balné, sleva)",
@@ -101,8 +117,8 @@ export const SUPPLIER_INVOICE_SCHEMA = {
     needsClarification: list("Co ověřit (česky)"),
   },
   required: [
-    "supplier", "number", "variableSymbol", "issueDate", "taxableDate", "dueDate", "currency", "totalNet", "totalVat",
-    "totalGross", "items", "references", "isCreditNote", "isProforma", "exchangeRate", "confidence", "summary", "needsClarification",
+    "supplier", "documentType", "number", "variableSymbol", "issueDate", "taxableDate", "dueDate", "currency", "totalNet", "totalVat",
+    "totalGross", "vatBreakdown", "items", "references", "isCreditNote", "isProforma", "exchangeRate", "confidence", "summary", "needsClarification",
   ],
 };
 
@@ -111,6 +127,10 @@ export function supplierInvoicePrompt(): string {
     `Jsi účetní back-office firmy ${COMPANY.name} (IČO ${COMPANY.ico}, DIČ ${COMPANY.dic}) — nástrojárna a kooperace (CNC).`,
     "Přečti FAKTURU OD DODAVATELE (přijatou fakturu) a vrať data dle schématu. My jsme ODBĚRATEL — údaje odběratele " +
       `(${COMPANY.name}, IČO ${COMPANY.ico}) NIKDY nepiš do supplier.`,
+    "documentType = co doklad SKUTEČNĚ je: faktura / zalohova_faktura / dobropis jsou účetní doklady; dodací list, nabídka, " +
+      "objednávka, potvrzení objednávky, upomínka nebo cokoli jiného (výkres, ceník, dopis) faktura NENÍ — vrať jejich druh " +
+      "a údaje vyplň, jen co na dokladu je.",
+    "vatBreakdown = rekapitulace DPH po sazbách (sazba, základ, DPH), je-li na faktuře; jinak prázdné pole.",
     "supplier = vystavitel faktury: název, IČO (jen číslice), DIČ, adresa, e-mail, telefon a BANKOVNÍ ÚČET (číslo účtu / kód banky " +
       "nebo IBAN) přesně, jak jsou v hlavičce faktury.",
     "number = číslo faktury přesně znak po znaku; variableSymbol = variabilní symbol (jen číslice). Data ve formátu RRRR-MM-DD: " +

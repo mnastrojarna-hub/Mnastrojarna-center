@@ -1,7 +1,8 @@
 // „Vždycky tam musí být anonymizace" — nahrání reprezentativní sady formátů do zakázky přes Dokumenty
 // (vektorové PDF, skenované PDF, fotka JPG s EXIF GPS a autorem, HEIC z iPhonu, TIFF, DXF, STEP, DWG, ZIP)
-// a pro každý soubor konečný stav bez točícího se kolečka: hotovo / ke kontrole / „Nelze anonymizovat
-// automaticky" s návodem, ZIP rozbalený do souborů. Výstupy bez úniku (text, EXIF / GPS, PDF Info).
+// a pro každý soubor konečný stav bez točícího se kolečka: hotovo (nic ke kontrole) / „Nelze anonymizovat
+// automaticky" s návodem / 3D model bez anonymizace, ZIP rozbalený do souborů. Výstupy bez úniku
+// (text, EXIF / GPS, PDF Info).
 // DWG originál: obchodník ho dodavateli nepošle (ZIP pro dodavatele ani výslovný originál), super admin
 // jen s výslovným potvrzením (audit).
 //   E2E_BASE_URL=http://localhost:3500 ANON_SHOTS=<adresář> node tools/e2e/tests/27-anon-formats.mjs
@@ -21,7 +22,8 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const STAMP = Date.now().toString(36).toUpperCase();
 const NUMBER = `Z-E2E-ANONFMT27-${STAMP}`;
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), "anon-fmt-"));
-const LEAK = /strojmetal|dvo[rř][aá]k|jdvorak|777 ?123 ?456/i;
+// výchozí jen název firmy („Nic víc", majitel 31. 10.) — jméno a telefon smí v textu výkresu zůstat
+const LEAK = /strojmetal/i;
 
 // ── vzorky (zákazník „Strojmetal a.s.", „Ing. Jan Dvořák") ─────
 async function vectorPdf() {
@@ -88,14 +90,15 @@ function dxf() {
 const step = () => strToU8(`ISO-10303-21;\nHEADER;\n/* jdvorak@strojmetal.cz */\nFILE_DESCRIPTION(('Strojmetal a.s.'),'2;1');\nFILE_NAME('C:\\\\Users\\\\jdvorak\\\\D-4711-02.stp','2026-10-29T10:12:00',('Ing. Jan Dvorak'),('Strojmetal a.s.'),'SwSTEP 2.0','SolidWorks 2024','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\n#1=PRODUCT('D-4711-02','Hridel Strojmetal','Strojmetal a.s. dil',(#2));\n#7=PERSON('jdvorak','Dvorak','Jan',(),(),());\n#8=ORGANIZATION('SM','Strojmetal a.s.','Kladno');\n#16=CARTESIAN_POINT('',(0.,0.,0.));\nENDSEC;\nEND-ISO-10303-21;\n`);
 const dwg = () => new Uint8Array([...strToU8("AC1032"), 0, 0, 0, 0, 0, 0, 0, ...Buffer.from("Strojmetal a.s. Jan Dvořák", "utf16le")]);
 
+// plná automatika (majitel 31. 10.): žádné „ke kontrole"; 3D model (STEP) se neanonymizuje vůbec
 const FILES = [
-  { name: `vykres-vektor-${STAMP}.pdf`, make: vectorPdf, expect: /^(done|review)$/ },
-  { name: `sken-${STAMP}.pdf`, make: scanPdf, expect: /^review$/ },
-  { name: `foto-${STAMP}.jpg`, make: photoJpg, expect: /^review$/ },
-  { name: `IMG_${STAMP}.HEIC`, make: heic, expect: /^review$/ },
-  { name: `sken-${STAMP}.tif`, make: tiff, expect: /^review$/ },
-  { name: `vykres-${STAMP}.dxf`, make: dxf, expect: /^review$/ },
-  { name: `model-${STAMP}.step`, make: step, expect: /^done$/ },
+  { name: `vykres-vektor-${STAMP}.pdf`, make: vectorPdf, expect: /^done$/ },
+  { name: `sken-${STAMP}.pdf`, make: scanPdf, expect: /^done$/ },
+  { name: `foto-${STAMP}.jpg`, make: photoJpg, expect: /^done$/ },
+  { name: `IMG_${STAMP}.HEIC`, make: heic, expect: /^done$/ },
+  { name: `sken-${STAMP}.tif`, make: tiff, expect: /^done$/ },
+  { name: `vykres-${STAMP}.dxf`, make: dxf, expect: /^done$/ },
+  { name: `model-${STAMP}.step`, make: step, expect: /^$/ },
   { name: `sestava-${STAMP}.dwg`, make: dwg, expect: /^unsupported$/ },
 ];
 
@@ -174,7 +177,8 @@ await test("obchodník nahraje 9 formátů najednou → každý skončí v kone�
     expect(zst === "unsupported" && /^Rozbaleno do 3 souborů/.test(zreason), `ZIP rozbalený (${zst}: ${zreason})`);
     const kids = sql(`select filename || ':' || anon_status from job_files where job_id='${jobId}' and note like 'Z archivu ${ZIP.name}%' order by filename`);
     console.log(`    ZIP → ${kids.replace(/\n/g, ", ")}`);
-    expect(/D-4711-02\.dwg:unsupported/.test(kids) && /D-4711-02\.dxf:review/.test(kids) && /D-4711-02\.pdf:(done|review)/.test(kids), `soubory ze ZIPu zpracované (${kids})`);
+    expect(/D-4711-02\.dwg:unsupported/.test(kids) && /D-4711-02\.dxf:done/.test(kids) && /D-4711-02\.pdf:done/.test(kids), `soubory ze ZIPu zpracované (${kids})`);
+    expect(sql(`select count(*) from job_files where job_id='${jobId}' and anon_status='review'`) === "0", "nic „ke kontrole“");
     // UI: po obnovení žádné kolečko, DWG s návodem
     await page.reload();
     await page.getByText(FILES[7].name).first().waitFor({ timeout: 30_000 });
@@ -183,6 +187,10 @@ await test("obchodník nahraje 9 formátů najednou → každý skončí v kone�
     const dwgLi = page.locator("li", { hasText: FILES[7].name }).locator("visible=true").first();
     const dwgText = await dwgLi.innerText();
     expect(/Nelze anonymizovat automaticky/.test(dwgText) && /DXF/.test(dwgText), `DWG: štítek a návod (${dwgText.slice(0, 160)})`);
+    // 3D model: žádný odznak anonymizace (nemá razítko ani název firmy)
+    const stepLi = page.locator("li", { hasText: FILES[6].name }).locator("visible=true").first();
+    expect(await stepLi.locator("[data-anon-status]").count() === 0 && !/Nelze anonymizovat|Anonymiz/.test(await stepLi.innerText()), "STEP bez anonymizace");
+    expect(!/Ke kontrole/.test(await page.locator("main").innerText()), "žádné „Ke kontrole“ v dokumentech");
     await dwgLi.evaluate((el) => el.scrollIntoView({ block: "center" }));
     await page.screenshot({ path: path.join(SHOTS, "27-dokumenty.png"), fullPage: true });
   } finally {
@@ -191,7 +199,7 @@ await test("obchodník nahraje 9 formátů najednou → každý skončí v kone�
 });
 
 await test("výstupy bez úniku: text, EXIF / GPS, PDF Info, STEP hlavička, DXF $LASTSAVEDBY a názvy hladin", async () => {
-  const outs = [...FILES.filter((f) => !/\.dwg$/.test(f.name)).map((f) => f.name),
+  const outs = [...FILES.filter((f) => !/\.(dwg|step)$/.test(f.name)).map((f) => f.name),
     ...sql(`select filename from job_files where job_id='${jobId}' and note like 'Z archivu %' and anon_path is not null`).split("\n").filter(Boolean)];
   for (const name of outs) {
     const [, status, , p, mime] = row(name);
@@ -207,9 +215,11 @@ await test("výstupy bez úniku: text, EXIF / GPS, PDF Info, STEP hlavička, DXF
     }
     if (mime === "application/pdf") expect(!/\/Author|\/Title \(C:|Strojmetal/i.test(txt), `${name}: PDF Info bez autora / cesty`);
     if (/\.dxf$/.test(name)) expect(!/jdvorak|RAZITKO_STROJMETAL/i.test(txt) && /D-4711-02/.test(txt), `${name}: DXF bez autora a firmy v názvech, číslo výkresu zůstalo`);
-    if (/\.step$/.test(name)) expect(/D-4711-02/.test(txt) && !/jdvorak|\/\*/.test(txt), `${name}: STEP bez autora a komentářů, číslo dílu zůstalo`);
   }
   console.log(`    zkontrolováno ${outs.length} výstupů`);
+  // 3D model: žádná kopie, žádný stav
+  const [, stStatus, , stPath] = row(FILES[6].name);
+  expect(stStatus === "" && stPath === "", `STEP bez anonymizace (${stStatus}|${stPath})`);
 });
 
 await test("DWG originál: obchodník ho dodavateli nepošle, super admin jen s výslovným potvrzením", async () => {
@@ -246,14 +256,18 @@ await test("DWG originál: obchodník ho dodavateli nepošle, super admin jen s 
     const opt = ap.getByTestId("supplier-pack-original").locator("visible=true").first();
     await opt.waitFor({ timeout: 15_000 });
     await ap.screenshot({ path: path.join(SHOTS, "27-zip-admin.png") });
-    const files = vecStatus === "done" ? `${dwgId},${vecId}` : dwgId;
-    const r = await ap.request.get(`${BASE}/api/jobs/${jobId}/supplier-pack?files=${files}&original=${dwgId}${vecStatus === "review" ? `&reviewed=${vecId}` : ""}`);
+    expect(vecStatus === "done", `vektorový výkres hotový (${vecStatus})`);
+    // 3D model jde dodavateli bez anonymizace i bez potvrzování (nemá razítko ani název firmy)
+    const [stepId] = row(FILES[6].name);
+    const r = await ap.request.get(`${BASE}/api/jobs/${jobId}/supplier-pack?files=${dwgId},${vecId},${stepId}&original=${dwgId}`);
     const j = await r.json();
     expect(r.ok() && j.url, `super admin: ZIP s originálem (${r.status()} ${JSON.stringify(j).slice(0, 160)})`);
+    expect((j.missing ?? []).length === 0, `nic nechybí (${JSON.stringify(j.missing)})`);
     const zip = unzipSync(new Uint8Array(await (await fetch(j.url)).arrayBuffer()));
     const names = Object.keys(zip);
     console.log(`    ZIP super admina: ${names.join(", ")}`);
     expect(names.some((n) => /^original-\d+\.dwg$/.test(n)) && !names.some((n) => /sestava|strojmetal/i.test(n)), `originál DWG bez původního názvu (${names.join(", ")})`);
+    expect(names.some((n) => /\.step$/.test(n)), `STEP v balíčku (${names.join(", ")})`);
     const audit = sql(`select count(*) from audit_log where action='supplier_pack' and entity_id='${jobId}' and diff->'originals' ? '${dwgId}'`);
     expect(audit === "1", `audit originálu (${audit})`);
   } finally {

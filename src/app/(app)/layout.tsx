@@ -5,6 +5,7 @@ import { AccessBridge } from "@/components/access-provider";
 import { PasswordChangeGate } from "@/components/password-change-gate";
 import { requireUser, getAccess } from "@/lib/auth/session";
 import { getBadgeCounts } from "@/lib/data/queries";
+import { listQuoteApprovers } from "@/lib/data/current-user";
 import { MailLiveProvider } from "@/components/mail/mail-live-provider";
 import { FileViewerProvider } from "@/components/file-viewer/file-viewer-provider";
 
@@ -15,13 +16,16 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Login-first: bez aktivního účtu se do aplikace nedostane nikdo.
   const user = await requireUser();
-  const [{ features }, counts] = await Promise.all([getAccess(), getBadgeCounts()]);
+  const [{ features }, counts, quoteApprovers] = await Promise.all([getAccess(), getBadgeCounts(), listQuoteApprovers()]);
 
   return (
     <MailLiveProvider enabled={features.includes("mail")} initialUnread={counts?.inbox}>
       <FileViewerProvider>
         <div className="flex h-screen overflow-hidden">
-          <AccessBridge features={features} role={user.role} userId={user.id} />
+          <AccessBridge
+            features={features} role={user.role} userId={user.id} quoteNeedsApproval={user.quoteNeedsApproval !== false}
+            quoteApprovers={quoteApprovers}
+          />
           <Sidebar counts={counts} features={features} userName={user.fullName} roleLabel={user.roleLabel} />
           <div className="flex flex-1 flex-col overflow-hidden">
             <Topbar user={user} features={features} />

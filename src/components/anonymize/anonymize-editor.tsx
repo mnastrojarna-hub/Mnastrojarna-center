@@ -491,7 +491,7 @@ export function AnonymizeEditor({ open, onOpenChange, fileId, table, sourceName,
             <p className="text-xs text-muted-foreground">{help}</p>
             {nothing && (
               <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-100" data-testid="anon-nothing-removed">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {NOTHING_REMOVED} Označ je ťuknutím nebo obdélníkem.
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {NOTHING_REMOVED} Kdyby tam byl, označ ho ťuknutím nebo obdélníkem.
               </p>
             )}
             {counts && <p className="text-sm"><strong>Smaže se:</strong> {counts}</p>}

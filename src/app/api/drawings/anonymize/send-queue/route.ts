@@ -35,9 +35,10 @@ export async function GET(req: Request) {
     const mine = r.created_by === guard.user.id || admin;
     const to = Array.isArray(r.payload?.to) ? (r.payload.to as unknown[]).filter((x) => typeof x === "string").join(", ") : null;
     const label = typeof r.payload?.recipientLabel === "string" ? r.payload.recipientLabel : null;
-    const pendingIds = (r.file_ids ?? []).filter((id) => { const s = statuses.get(id) ?? null; return s !== "done"; });
-    // výkres, který odeslání blokuje (ke kontrole / selhal) → „Zkontrolovat výkres"
-    const blockingFileId = pendingIds.find((id) => { const s = statuses.get(id); return s === "review" || s === "failed"; }) ?? null;
+    // „Ke kontrole" už nevzniká — starší řádek s kopií platí jako hotový
+    const pendingIds = (r.file_ids ?? []).filter((id) => { const s = statuses.get(id) ?? null; return s !== "done" && s !== "review"; });
+    // výkres, který odeslání blokuje (anonymizace selhala) → „Otevřít výkres"
+    const blockingFileId = pendingIds.find((id) => statuses.get(id) === "failed") ?? null;
     // soubor, který anonymizovat nejde (DWG, Word…) → super admin smí „Poslat originál…" (s potvrzením a auditem)
     const unsupportedCount = (r.file_ids ?? []).filter((id) => statuses.get(id) === "unsupported").length;
     return {

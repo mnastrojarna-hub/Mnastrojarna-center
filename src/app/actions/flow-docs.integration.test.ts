@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { QUOTE_ADMIN_ONLY } from "@/lib/jobs/flow-status";
 
 /**
  * Stránky toku a doklady proti lokálnímu Supabase (Balík 2): náš doklad (origin/issuer/revize),
@@ -234,7 +235,7 @@ describe.skipIf(!ENABLED)("stránky toku a doklady ↔ lokální Supabase", () =
     expect(refused).toMatchObject({ ok: false, code: "approval" });
     expect((await svc.from("emails").select("id").eq("order_id", jobId)).data).toHaveLength(0);
     // obchodník neschválí; schválí super admin
-    expect((await flow.setQuoteState(quoteId, "schvalena")).error).toBe("Nabídku schvaluje jen super admin.");
+    expect((await flow.setQuoteState(quoteId, "schvalena")).error).toBe(QUOTE_ADMIN_ONLY);
     as("admin");
     expect(await flow.setQuoteState(quoteId, "schvalena")).toMatchObject({ ok: true, quoteState: "schvalena" });
     as("sales");

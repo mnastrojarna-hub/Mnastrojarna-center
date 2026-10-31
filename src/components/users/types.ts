@@ -17,6 +17,16 @@ export interface ManagedUser {
   createdAt: string;
   /** Smlouvy o provizi (historie, nejnovější první); prázdné = sazba z profilu. */
   commissionRules?: CommissionRuleView[];
+  /** Nabídky musí před odesláním schválit super admin (profil; u super admina se ignoruje). Výchozí ano. */
+  quoteNeedsApproval?: boolean;
+  /** Kdo a kdy nastavení schvalování naposledy změnil. */
+  quoteApprovalChangedBy?: string | null;
+  quoteApprovalChangedAt?: string | null;
+  /** 31. 10.: smí schvalovat nabídky ostatních (profil can_approve_quotes; super admin vždy). Výchozí ne. */
+  canApproveQuotes?: boolean;
+  /** Kdo a kdy právo schvalovat naposledy změnil. */
+  quoteApproverChangedBy?: string | null;
+  quoteApproverChangedAt?: string | null;
 }
 
 /** Schránka k přiřazení uživateli. */

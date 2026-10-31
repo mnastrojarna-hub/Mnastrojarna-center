@@ -60,8 +60,11 @@ export function SegmentTabs({ counts }: { counts: Record<BookSegmentKey, number>
   );
 }
 
-/** Barevné chipy stavů uvnitř záložky (vícenásobný výběr, „Vše" ruší výběr). */
-export function StageChips({ byStage }: { byStage: Record<JobStage, number> }) {
+/**
+ * Barevné chipy stavů uvnitř záložky (vícenásobný výběr, „Vše" ruší výběr). Počty = segmentStageCounts
+ * (v Objednávkách bez zakázek s dodaným vším — ty jsou v Dokončených).
+ */
+export function StageChips({ byStage }: { byStage: Partial<Record<JobStage, number>> }) {
   const { params } = useBookNav();
   const seg = bookSegment(params.segment);
   if (seg.stages.length < 2) return null;

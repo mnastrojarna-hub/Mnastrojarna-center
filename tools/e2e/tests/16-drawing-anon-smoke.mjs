@@ -1,7 +1,8 @@
 // Smoke nového UI anonymizace výkresů (ne plné E2E 12): Poptávky (tlačítko „Anonymizovat výkres",
-// odznak, sekce „Ke kontrole anonymizace"), samostatný nástroj před/po, editor na PDF (ťuknutí na řádek,
-// Uložit) a na fotce (obdélník), menu Dokumentů (Stáhnout anonymizovaný / Upravit / ZIP pro dodavatele),
-// karta Nastavení. Screenshoty desktop 1280 + mobil 390, světlý + tmavý režim → ANON_SHOTS.
+// odznak — žádné „Ke kontrole" (plná automatika, majitel 31. 10.)), samostatný nástroj před/po, editor na
+// PDF (ťuknutí na řádek, Uložit) a na fotce (obdélník), menu Dokumentů (Stáhnout anonymizovaný / Upravit /
+// ZIP pro dodavatele), karta Nastavení (výchozí jen název firmy). Screenshoty desktop 1280 + mobil 390,
+// světlý + tmavý režim → ANON_SHOTS.
 //   E2E_BASE_URL=http://localhost:3500 CRON_SECRET=… ANON_SHOTS=<adresář> node tools/e2e/tests/16-drawing-anon-smoke.mjs
 import fs from "node:fs";
 import os from "node:os";
@@ -105,7 +106,12 @@ await test("příprava: zakázka v poptávce s PDF výkresem (e-mail) a fotkou v
   await storagePut(pp, pdfBytes, "application/pdf");
   await storagePut(fp, await photoJpeg(), "image/jpeg");
   pdfId = sql(`insert into job_files (job_id, kind, filename, mime_type, size_bytes, storage_path, origin, issuer, uploaded_by) values ('${jobId}', 'ostatni', 'D-1234-01.pdf', 'application/pdf', ${pdfBytes.length}, '${q(pp)}', 'email', 'zakaznik', '${adminId}') returning id`).split("\n")[0];
-  photoId = sql(`insert into job_files (job_id, kind, filename, mime_type, size_bytes, storage_path, origin, issuer, uploaded_by) values ('${jobId}', 'foto', 'foto-vykresu.jpg', 'image/jpeg', 1000, '${q(fp)}', 'capture', 'zakaznik', '${adminId}') returning id`).split("\n")[0];
+  photoId = sql(`insert into job_files (job_id, kind, filename, mime_type, size_bytes, storage_path, origin, issuer, uploaded_by) values ('${jobId}', 'vykres', 'foto-vykresu.jpg', 'image/jpeg', 1000, '${q(fp)}', 'capture', 'zakaznik', '${adminId}') returning id`).split("\n")[0];
+  // objednávka zákazníka ve stejné zakázce se neanonymizuje (jen výkresy)
+  const op = `zakazky/${jobId}/${randomUUID()}-objednavka.pdf`;
+  await storagePut(op, pdfBytes, "application/pdf");
+  const orderId = sql(`insert into job_files (job_id, kind, filename, mime_type, size_bytes, storage_path, origin, issuer, uploaded_by) values ('${jobId}', 'objednavka', 'Objednavka-PO-77.pdf', 'application/pdf', ${pdfBytes.length}, '${q(op)}', 'email', 'zakaznik', '${adminId}') returning id`).split("\n")[0];
+  expect(sql(`select coalesce(anon_status, 'null') from job_files where id='${orderId}'`) === "null", "objednávka zákazníka bez anonymizace");
   expect(sql(`select anon_status from job_files where id='${pdfId}'`) === "pending", "trigger zařadil PDF (pending)");
   const a = await runAnon(pdfId);
   const b = await runAnon(photoId);
@@ -115,8 +121,10 @@ await test("příprava: zakázka v poptávce s PDF výkresem (e-mail) a fotkou v
   }
   const st = sql(`select string_agg(anon_status, ',' order by filename) from job_files where job_id='${jobId}'`);
   console.log(`    stavy: ${st} · ${JSON.stringify(a.results?.[0]?.status)} ${JSON.stringify(b.results?.[0]?.status)}`);
-  expect(/done|review/.test(sql(`select anon_status from job_files where id='${pdfId}'`)), "PDF hotové / ke kontrole");
-  expect(sql(`select anon_status from job_files where id='${photoId}'`) === "review", "fotka bez masteru → ke kontrole");
+  expect(sql(`select anon_status from job_files where id='${pdfId}'`) === "done", "PDF hotové (nic ke kontrole)");
+  expect(sql(`select anon_status from job_files where id='${photoId}'`) === "done", "fotka bez masteru → hotovo (jen poznámka)");
+  expect(sql(`select count(*) from job_files where job_id='${jobId}' and anon_status='review'`) === "0", "žádné „ke kontrole“");
+  expect(sql(`select coalesce(anon_status, 'null') from job_files where kind='objednavka' and job_id='${jobId}'`) === "null", "objednávka po běhu fronty pořád bez anonymizace");
 });
 
 const CONFIGS = [
@@ -144,7 +152,7 @@ const shotPath = (name, c) => path.join(SHOTS, `${name}-${c.tag}.png`);
 
 for (const c of CONFIGS) {
   const first = c.tag === "desktop-light";
-  await test(`${c.tag}: Poptávky — tlačítko, odznak, Ke kontrole; nástroj před/po; editor; dokumenty; nastavení`, async () => {
+  await test(`${c.tag}: Poptávky — tlačítko, odznak bez „Ke kontrole“; nástroj před/po; editor; dokumenty; nastavení`, async () => {
     const context = await ctxFor(c);
     const page = await context.newPage();
     try {
@@ -160,29 +168,17 @@ for (const c of CONFIGS) {
       const badge = row.locator("[data-anon-badge]");
       expect(await badge.count() === 1, "odznak anonymizace u poptávky");
       const badgeText = await badge.innerText();
-      expect(/ke kontrole/.test(badgeText) && (/Výkresy \d\/2/.test(badgeText) || /\+\d/.test(badgeText)), `text odznaku: ${badgeText}`);
+      // 2 výkresy hotové (objednávka se nepočítá), nic „ke kontrole"
+      expect(!/ke kontrole/i.test(badgeText) && /Výkresy 2\/2/.test(badgeText), `text odznaku: ${badgeText}`);
       await row.scrollIntoViewIfNeeded();
       await page.screenshot({ path: shotPath("01-poptavky-tlacitko-odznak", c) });
       await page.locator("h1").first().scrollIntoViewIfNeeded();
       await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector("main")?.scrollTo?.(0, 0); });
       await page.screenshot({ path: shotPath("01b-poptavky-hlavicka", c) });
 
-      const review = vis(page, "anon-review");
-      await review.waitFor({ timeout: 10_000 });
-      const photoItem = review.locator("[data-testid=anon-review-item]", { hasText: "foto-vykresu.jpg" }).first();
-      expect(await photoItem.count() === 1, "fotka v sekci Ke kontrole (pod původním názvem)");
-      // fotka / nic nesmazáno → „Schválit" otevře editor (žádné tiché schválení)
-      expect(await photoItem.getByTestId("anon-review-approve").getAttribute("data-approve") === "editor", "fotka se schvaluje přes editor");
-      // sekce je nad seznamem poptávek + čip v hlavičce
-      const order = await page.evaluate(() => {
-        const s = [...document.querySelectorAll("#anonymizace")].find((e) => e.offsetParent !== null);
-        const list = [...document.querySelectorAll("li")].find((e) => e.offsetParent !== null && /Z-E2E-ANONUI-/.test(e.textContent ?? ""));
-        return s && list ? s.getBoundingClientRect().top < list.getBoundingClientRect().top : null;
-      });
-      expect(order === true, "Ke kontrole anonymizace je nad seznamem poptávek");
-      expect(await vis(page, "anon-review-chip").count() === 1, "čip „ke kontrole anonymizace“ v hlavičce");
-      await review.scrollIntoViewIfNeeded();
-      await page.screenshot({ path: shotPath("02-ke-kontrole", c) });
+      // plná automatika (majitel 31. 10.): žádná fronta „Ke kontrole" — naše výkresy v ní nejsou
+      expect(await page.locator("[data-testid=anon-review-item]", { hasText: NUMBER }).locator("visible=true").count() === 0, "výkresy zakázky nejsou v žádné frontě ke kontrole");
+      expect(await page.getByText(/ke kontrole anonymizace/i).locator("visible=true").count() === 0, "žádné „ke kontrole anonymizace“ na stránce");
 
       // samostatný nástroj
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -201,7 +197,8 @@ for (const c of CONFIGS) {
         return el && ["done", "review", "failed"].includes(el.getAttribute("data-status") ?? "");
       }, null, { timeout: 120_000 });
       const st = await item.getAttribute("data-status");
-      expect(st === "done" || st === "review", `nástroj: výsledek ${st}`);
+      expect(st === "done", `nástroj: výsledek ${st} (nic ke kontrole)`);
+      expect(await item.getByText("Zkontroloval jsem náhled").count() === 0, "nástroj bez potvrzování náhledu");
       // náhledy Před / Po (výřez razítka) dorazí ze serveru
       await page.waitForFunction(() => {
         const imgs = [...document.querySelectorAll("[data-testid=anon-tool-item] [data-testid^=anon-tool-thumb] img")].slice(0, 2);
@@ -215,13 +212,19 @@ for (const c of CONFIGS) {
         const fp = path.join(os.tmpdir(), `anon-dl-${STAMP}.pdf`);
         await dl.saveAs(fp);
         const txt = fs.readFileSync(fp).toString("latin1");
-        expect(!/STROJMETAL|Nov.k|Projekty/.test(txt), "stažený soubor bez firmy, jména a cesty (bez textové vrstvy)");
+        expect(!/STROJMETAL|Nov.k|Projekty/.test(txt), "stažený soubor bez textové vrstvy a metadat");
         expect(!/^tmp|D-1234-STAMP/i.test(name), `anonymní název: ${name}`);
       }
       await page.keyboard.press("Escape");
 
-      // editor na fotce (z Ke kontrole)
-      await review.locator("[data-testid=anon-review-item]", { hasText: NUMBER }).first().getByTestId("anon-review-open").click();
+      // editor na fotce (z Dokumentů zakázky → Upravit oblasti)
+      await page.goto(`${BASE}/orders/${jobId}?tab=dokumenty`);
+      const photoRow0 = page.locator("li", { hasText: "foto-vykresu.jpg" }).locator("visible=true").first();
+      await photoRow0.waitFor({ timeout: 30_000 });
+      await page.waitForLoadState("networkidle").catch(() => undefined);
+      await photoRow0.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await photoRow0.getByRole("button", { name: "Další akce dokumentu" }).click();
+      await vis(page, "anon-edit").click();
       const editor = vis(page, "anon-editor");
       await editor.waitFor();
       await waitImg(page);
@@ -265,13 +268,14 @@ for (const c of CONFIGS) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await fileRow.evaluate((el) => el.scrollIntoView({ block: "center" }));
       await page.screenshot({ path: shotPath("06a-dokumenty-radek", c) });
-      // fotka ke kontrole: stažení pro dodavatele s náhledem „Po"
+      // fotka: „Pro dodavatele" je rovnou odkaz ke stažení (žádný dialog „Zkontroloval jsem náhled")
       const photoRow = page.locator("li", { hasText: "foto-vykresu.jpg" }).locator("visible=true").first();
-      await photoRow.getByTestId("anon-for-supplier").click();
-      await vis(page, "anon-review-preview").waitFor({ timeout: 20_000 });
-      await page.waitForTimeout(1500);
-      await page.screenshot({ path: shotPath("10-stazeni-ke-kontrole", c) });
-      await page.keyboard.press("Escape");
+      const href = await photoRow.getByTestId("anon-for-supplier").getAttribute("href");
+      expect(Boolean(href && /\/api\/drawings\/anonymize\/[0-9a-f-]+\/download$/.test(href)), `fotka: přímé stažení pro dodavatele (${href})`);
+      // objednávka zákazníka: žádný odznak anonymizace ani „Pro dodavatele"
+      const orderRow = page.locator("li", { hasText: "Objednavka-PO-77.pdf" }).locator("visible=true").first();
+      await orderRow.waitFor({ timeout: 10_000 });
+      expect(await orderRow.locator("[data-anon-status]").count() === 0 && await orderRow.getByTestId("anon-for-supplier").count() === 0, "objednávka bez anonymizace");
       await fileRow.evaluate((el) => el.scrollIntoView({ block: "center" }));
       await fileRow.getByRole("button", { name: "Další akce dokumentu" }).click();
       await vis(page, "anon-edit").waitFor();
@@ -314,6 +318,8 @@ for (const c of CONFIGS) {
       const card = vis(page, "anon-settings");
       await card.waitFor({ timeout: 30_000 });
       await card.scrollIntoViewIfNeeded();
+      const cardText = await card.innerText();
+      expect(/Výchozí je jen název firmy/.test(cardText) && /plná automatika/i.test(cardText) && !/Se schválením/.test(cardText), "nastavení: jen název firmy, plná automatika");
       const dup = await page.evaluate(() => [...document.querySelectorAll("#anonymizace")].map((e) => { const c = []; let x = e.parentElement; while (x && c.length < 8) { c.push(x.tagName + (x.id ? "#" + x.id : "") + (x.hidden ? "[hidden]" : "")); x = x.parentElement; } return c.join("<"); }));
       if (dup.length > 1) console.log(`    pozor: #anonymizace ${dup.length}×: ${dup.join(" | ")}`);
       await page.evaluate(() => document.querySelector("main #anonymizace")?.scrollIntoView({ block: "start" }));

@@ -56,10 +56,10 @@ describe("pdf.js z bundlu bez dosažitelného @napi-rs/canvas (jako funkce na Ve
 
   it("běžné vektorové PDF se v tomto prostředí vykreslí a anonymizuje (žádné „poškozené“)", async () => {
     const { anonymizePdf } = await import("./pdf-pipeline");
-    const { DEFAULT_REDACT, makeTerms } = await import("./rules");
+    const { ALL_REDACT, makeTerms } = await import("./rules");
     const s = await makeVectorDrawing({ withForm: false, withAttachment: false });
     const res = await anonymizePdf({
-      bytes: s.pdf, ctx: { terms: makeTerms(["ACME Forge GmbH"], "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } }, ai: null,
+      bytes: s.pdf, ctx: { terms: makeTerms(["ACME Forge GmbH"], "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } }, ai: null,
       verifyPhotos: true, fillPdf: "white", fillPhoto: "white", maxDpi: 150, maxMpx: 40, pageFrom: 1, deadline: Date.now() + 240_000,
     });
     expect(res.failure).toBeNull();

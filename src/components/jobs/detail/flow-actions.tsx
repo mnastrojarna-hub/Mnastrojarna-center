@@ -53,6 +53,8 @@ export interface FlowAccess {
   features: Feature[];
   userId: string | null;
   role: UserRole | null;
+  /** Nabídky uživatele musí schválit super admin (profil, 31. 10.). */
+  quoteNeedsApproval?: boolean;
 }
 
 type Next = { key: FlowActionKey; label: string } | null;
@@ -73,6 +75,12 @@ interface FlowActionsValue {
   canUndo: (key: FlowActionKey) => boolean;
   /** Počítadlo pokynů „Vytvořit nabídku" (záložka Nabídky otevře editor). */
   newQuoteSignal: number;
+  /**
+   * Poslední pokyn, který záložka Nabídky už vyřídila (drží karta, ne záložka) — záložka se načítá líně
+   * (next/dynamic), takže pokyn z ?nova=1 může přijít dřív, než se připojí; po připojení ho pak nepromešká
+   * a při návratu na záložku editor znovu neotevře.
+   */
+  newQuoteSeen?: { current: number };
   /** Toast po „Schválit“ aktivní nabídky (§13: „Nabídka {č.} schválena — {autor} ji teď může odeslat.“). */
   approveToast: string;
 }
@@ -147,6 +155,7 @@ export function FlowActionsProvider({
   const [dialog, setDialog] = React.useState<DialogState>(null);
   const [confirmTake, setConfirmTake] = React.useState<string | null>(null);
   const [newQuoteSignal, setNewQuoteSignal] = React.useState(0);
+  const newQuoteSeen = React.useRef(0);
 
   const features = access?.features?.length ? access.features : client.features;
   const userId = access?.userId ?? client.userId ?? "";
@@ -160,7 +169,8 @@ export function FlowActionsProvider({
     ownerId: job.owner?.id ?? null,
     // karta umí dialog „Vrátit k přepracování…“ (#25)
     withReturn: true,
-  }), [features, userId, role, job.assignee, job.owner]);
+    quoteNeedsApproval: access?.quoteNeedsApproval ?? client.quoteNeedsApproval,
+  }), [features, userId, role, job.assignee, job.owner, access?.quoteNeedsApproval, client.quoteNeedsApproval]);
 
   const facts = React.useMemo(
     () => (job.flow ? { ...job.flow, stage: job.stage, ...(productionRunning === undefined ? {} : { productionRunning }) } : null),
@@ -257,7 +267,8 @@ export function FlowActionsProvider({
 
   const approveToast = approvedToastOf(job.quotes.find((q) => q.id === activeQuoteId) ?? null);
   const value = React.useMemo<FlowActionsValue>(() => ({
-    facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal, approveToast,
+    facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, canUndo: canUndoDirect, newQuoteSignal, newQuoteSeen,
+    approveToast,
   }), [facts, snapshot, quotes, ctx, next, menu, stamps, run, runDirect, undo, newQuoteSignal, approveToast]);
 
   const close = (o: boolean) => !o && setDialog(null);

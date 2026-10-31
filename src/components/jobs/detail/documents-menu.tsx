@@ -256,7 +256,7 @@ export function DocumentsMenu({
             <DropdownMenuItem
               key={d.kind}
               disabled={needsQuote || unapproved}
-              title={unapproved ? "Odeslat půjde po schválení super adminem." : undefined}
+              title={unapproved ? "Odeslat půjde po schválení." : undefined}
               onSelect={() => void generate(d.kind)}
               className="items-center gap-2.5 py-2"
             >
@@ -268,7 +268,7 @@ export function DocumentsMenu({
                 <span className="block truncate text-[11px] text-muted-foreground">
                   {needsQuote
                     ? "Nejdřív vytvoř nabídku (záložka Nabídky)"
-                    : unapproved ? "Neschválená — vystavíš po schválení super adminem"
+                    : unapproved ? "Neschválená — vystavíš po schválení"
                     : d.kind === "nabidka" && quote ? `z nabídky ${quote.number}` : d.hint}
                 </span>
               </span>

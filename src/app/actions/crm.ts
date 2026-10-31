@@ -5,7 +5,9 @@ import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/serve
 import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
-import { ensureContactPerson, moveToneEmail } from "@/lib/contacts/server";
+import { ensureContactPerson, moveToneEmail, savePartyBook } from "@/lib/contacts/server";
+import { bookContactPerson, validatePartyBookInput, type PartyBookInput } from "@/lib/contacts/book-draft";
+import type { PartyKind } from "@/lib/contacts/roles";
 import { fetchPaged, isUuid, translateDbError } from "@/lib/jobs/mapping";
 import {
   matchCustomer, normalizeCountry, normalizeDic, normalizeIco, composeAddress, type CustomerLookupRow,
@@ -46,6 +48,23 @@ function dbError(message: string, customerNumber?: string | null): string {
     return `Číslo zákazníka ${customerNumber ? `${customerNumber} ` : ""}už má jiný zákazník.`;
   }
   return translateDbError(message);
+}
+
+/**
+ * Adresář z dialogu (kontaktní osoby + „Kam posílat") — kontrola PŘED zápisem firmy, ať chyba v kontaktech
+ * nezpůsobí napůl uložený dialog. undefined = dialog adresář neposlal (starý klient / bez migrace).
+ */
+function checkBook(kind: PartyKind, book: unknown): { book: PartyBookInput | null } | { error: string } {
+  if (book === undefined || book === null) return { book: null };
+  const v = validatePartyBookInput(kind, book);
+  return "error" in v ? { error: v.error } : { book: v.input };
+}
+
+/** Uloží adresář po zápisu firmy; chyba = firma uložená, kontakty ne (dialog zůstane otevřený). */
+async function saveBookAfter(db: unknown, kind: PartyKind, partyId: string, book: PartyBookInput | null): Promise<string | null> {
+  if (!book) return null;
+  const res = await savePartyBook(db, kind, partyId, book).catch((e) => ({ ok: false as const, error: e instanceof Error ? e.message : "Chyba ukládání" }));
+  return res.ok ? null : `Údaje firmy jsou uložené, ale kontakty a e-maily ne: ${res.error}`;
 }
 
 function revalidateCustomer(id?: string) {
@@ -117,14 +136,22 @@ async function findDuplicate(
   return { id: hit.id, by: hit.by, label: `${row?.customer_number ? `${row.customer_number} ` : ""}${row?.name ?? ""} (${why})` };
 }
 
+/**
+ * `book` = kontaktní osoby a e-maily podle účelu z dialogu (uloží se hned po firmě, v jedné transakci);
+ * bez něj starý údaj „Kontaktní osoba" založí první kontakt. `partySaved` = firma uložená, kontakty ne.
+ */
 export async function createCustomer(
   input: CustomerFormValues,
-): Promise<ActionResult<{ id: string; customerNumber: string | null; duplicateId: string }>> {
+  book?: PartyBookInput | null,
+): Promise<ActionResult<{ id: string; customerNumber: string | null; duplicateId: string; partySaved: boolean }>> {
   const auth = await checkFeature("customers");
   if ("error" in auth) return { ok: false, error: auth.error };
   if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
   const mapped = customerColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
+  const checked = checkBook("customer", book);
+  if ("error" in checked) return { ok: false, error: checked.error };
+  if (checked.book) mapped.cols.contact_person = bookContactPerson(checked.book);
   // #25: obchodník zákazníka určuje, komu připadnou jeho další zakázky (a provize) → cizího vybírá jen super admin
   if (auth.user.role !== "super_admin" && mapped.cols.owner_id && mapped.cols.owner_id !== auth.user.id) {
     return { ok: false, error: CUSTOMER_OWNER_ADMIN_ONLY };
@@ -142,10 +169,13 @@ export async function createCustomer(
     const { data, error } = await db.from("customers").insert(row as never).select("id, customer_number").single();
     if (error || !data) return { ok: false, error: dbError(error?.message ?? "Zákazníka se nepodařilo uložit.", number) };
     const created = data as { id: string; customer_number: string | null };
-    // „Kontaktní osoba" z formuláře = první kontaktní osoba (jméno, e-mail, telefon) — maily se pak řídí jí
-    await ensureContactPerson(db, { customerId: created.id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     await logAudit({ action: "customer_created", entity: "customers", entityId: created.id, diff: { name: row.name } });
+    let bookError: string | null = null;
+    if (checked.book) bookError = await saveBookAfter(db, "customer", created.id, checked.book);
+    // „Kontaktní osoba" z formuláře = první kontaktní osoba (jméno, e-mail, telefon) — maily se pak řídí jí
+    else await ensureContactPerson(db, { customerId: created.id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     revalidateCustomer(created.id);
+    if (bookError) return { ok: false, error: bookError, id: created.id, customerNumber: created.customer_number, partySaved: true };
     return { ok: true, id: created.id, customerNumber: created.customer_number };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
@@ -155,13 +185,17 @@ export async function createCustomer(
 export async function updateCustomer(
   id: string,
   input: CustomerFormValues,
-): Promise<ActionResult<{ customerNumber: string | null; duplicateId: string }>> {
+  book?: PartyBookInput | null,
+): Promise<ActionResult<{ customerNumber: string | null; duplicateId: string; partySaved: boolean }>> {
   const auth = await checkFeature("customers");
   if ("error" in auth) return { ok: false, error: auth.error };
   if (!isUuid(id)) return { ok: false, error: "Neplatný zákazník." };
   if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
   const mapped = customerColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
+  const checked = checkBook("customer", book);
+  if ("error" in checked) return { ok: false, error: checked.error };
+  if (checked.book) mapped.cols.contact_person = bookContactPerson(checked.book);
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data: current } = await db.from("customers").select("id, customer_number, owner_id").eq("id", id).maybeSingle();
@@ -183,10 +217,14 @@ export async function updateCustomer(
     if (number) row.customer_number = number; // prázdné = ponechat stávající číslo
     const { data, error } = await db.from("customers").update(row as never).eq("id", id).select("id, customer_number").maybeSingle();
     if (error || !data) return { ok: false, error: dbError(error?.message ?? "Zákazníka se nepodařilo uložit.", number) };
-    await ensureContactPerson(db, { customerId: id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     await logAudit({ action: "customer_updated", entity: "customers", entityId: id, diff: { name: row.name } });
+    let bookError: string | null = null;
+    if (checked.book) bookError = await saveBookAfter(db, "customer", id, checked.book);
+    else await ensureContactPerson(db, { customerId: id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     revalidateCustomer(id);
-    return { ok: true, customerNumber: (data as { customer_number: string | null }).customer_number };
+    const customerNumber = (data as { customer_number: string | null }).customer_number;
+    if (bookError) return { ok: false, error: bookError, customerNumber, partySaved: true };
+    return { ok: true, customerNumber };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
   }
@@ -292,12 +330,18 @@ function revalidateSuppliers() {
   revalidatePath("/orders");
 }
 
-export async function createSupplier(input: SupplierFormValues): Promise<ActionResult<{ id: string; duplicateId: string }>> {
+export async function createSupplier(
+  input: SupplierFormValues,
+  book?: PartyBookInput | null,
+): Promise<ActionResult<{ id: string; duplicateId: string; partySaved: boolean }>> {
   const auth = await checkFeature("suppliers");
   if ("error" in auth) return { ok: false, error: auth.error };
   if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
   const mapped = supplierColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
+  const checked = checkBook("supplier", book);
+  if ("error" in checked) return { ok: false, error: checked.error };
+  if (checked.book) mapped.cols.contact_person = bookContactPerson(checked.book);
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data: existing } = await db.from("suppliers").select("id, name, ico, dic");
@@ -313,34 +357,47 @@ export async function createSupplier(input: SupplierFormValues): Promise<ActionR
     const { data, error } = await db.from("suppliers").insert(mapped.cols as never).select("id").single();
     if (error || !data) return { ok: false, error: translateDbError(error?.message ?? "Dodavatele se nepodařilo uložit.") };
     const id = (data as { id: string }).id;
-    await ensureContactPerson(db, { supplierId: id }, {
-      name: mapped.cols.contact_person as string | null, email: mapped.cols.email as string | null, phone: mapped.cols.phone as string | null,
-    }).catch(() => null);
     await logAudit({ action: "supplier_created", entity: "suppliers", entityId: id, diff: { name: mapped.cols.name } });
+    let bookError: string | null = null;
+    if (checked.book) bookError = await saveBookAfter(db, "supplier", id, checked.book);
+    else {
+      await ensureContactPerson(db, { supplierId: id }, {
+        name: mapped.cols.contact_person as string | null, email: mapped.cols.email as string | null, phone: mapped.cols.phone as string | null,
+      }).catch(() => null);
+    }
     revalidateSuppliers();
+    if (bookError) return { ok: false, error: bookError, id, partySaved: true };
     return { ok: true, id };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
   }
 }
 
-export async function updateSupplier(id: string, input: SupplierFormValues): Promise<ActionResult> {
+export async function updateSupplier(id: string, input: SupplierFormValues, book?: PartyBookInput | null): Promise<ActionResult<{ partySaved: boolean }>> {
   const auth = await checkFeature("suppliers");
   if ("error" in auth) return { ok: false, error: auth.error };
   if (!isUuid(id)) return { ok: false, error: "Neplatný dodavatel." };
   if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
   const mapped = supplierColumns(input);
   if ("error" in mapped) return { ok: false, error: mapped.error };
+  const checked = checkBook("supplier", book);
+  if ("error" in checked) return { ok: false, error: checked.error };
+  if (checked.book) mapped.cols.contact_person = bookContactPerson(checked.book);
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
     const { data, error } = await db.from("suppliers").update(mapped.cols as never).eq("id", id).select("id").maybeSingle();
     if (error) return { ok: false, error: translateDbError(error.message) };
     if (!data) return { ok: false, error: "Dodavatel neexistuje (možná ho někdo smazal)." };
-    await ensureContactPerson(db, { supplierId: id }, {
-      name: mapped.cols.contact_person as string | null, email: mapped.cols.email as string | null, phone: mapped.cols.phone as string | null,
-    }).catch(() => null);
     await logAudit({ action: "supplier_updated", entity: "suppliers", entityId: id, diff: { name: mapped.cols.name } });
+    let bookError: string | null = null;
+    if (checked.book) bookError = await saveBookAfter(db, "supplier", id, checked.book);
+    else {
+      await ensureContactPerson(db, { supplierId: id }, {
+        name: mapped.cols.contact_person as string | null, email: mapped.cols.email as string | null, phone: mapped.cols.phone as string | null,
+      }).catch(() => null);
+    }
     revalidateSuppliers();
+    if (bookError) return { ok: false, error: bookError, partySaved: true };
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };

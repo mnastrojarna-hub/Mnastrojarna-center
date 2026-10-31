@@ -115,7 +115,7 @@ await test("fotka 4032 px z Dokumentů: master v plném rozlišení, anonymizace
     }
     const [, status, main, master, anonPath, summaryJson] = r;
     console.log(`    stav ${status}, hlavní ${main.split("/").pop()}, master ${master.replace(/^zakazky\/[^/]+\//, "")}`);
-    expect(/^(done|review)$/.test(status), `anonymizace doběhla (${status})`);
+    expect(status === "done", `anonymizace doběhla — hotovo, nic ke kontrole (${status})`);
     expect(master === `zakazky/${jobId}/master/${main.split("/").pop().slice(0, 36)}`, `master u dokumentu (${master})`);
     const mainMeta = await sharp(await storage("job-files", main)).metadata();
     expect(Math.max(mainMeta.width, mainMeta.height) <= 2400, `hlavní kopie zmenšená (${mainMeta.width}×${mainMeta.height})`);
@@ -159,7 +159,7 @@ await test("archiv Výkresy: 6 MB PDF přímo do úložiště → zapsáno a hne
     const [status, stored, anonPath] = st.split("|");
     console.log(`    archiv: ${stored} → ${status}`);
     expect(/^vykresy\/E2E28-/.test(stored), `uložen v archivu (${stored})`);
-    expect(/^(done|review)$/.test(status), `anonymizace doběhla sama (${status})`);
+    expect(status === "done", `anonymizace doběhla sama — hotovo (${status})`);
     expect((await storage("documents", stored)).length === fs.statSync(PDF).size, "originál v archivu celý");
     expect(/^vykresy\/anon\//.test(anonPath), `kopie pro dodavatele (${anonPath})`);
     const left = sql(`select count(*) from storage.objects where bucket_id = 'documents' and name like 'vykresy/upload/%' and created_at > now() - interval '10 minutes' and metadata->>'size' = '${fs.statSync(PDF).size}'`);

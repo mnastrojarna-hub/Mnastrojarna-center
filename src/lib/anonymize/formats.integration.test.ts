@@ -110,6 +110,11 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
       ["korespondence", "a.msg", null, "email", "dodavatel"], ["model_3d", "a.stl", null, "upload", null], ["vykres", "a.IGS", null, "upload", null],
       ["foto", "a.gif", "image/gif", "capture", null], ["ostatni", "a.txt", "text/plain", "upload", null], ["faktura", "a.xlsx", null, "email", null],
       ["vykres", "a.svg", null, "upload", "my"], ["korespondence", "a.pdf", null, "upload", null],
+      // jen 2D výkresy (31. 10.)
+      ["vykres", "a.svg", null, "upload", null], ["vykres", "a.dwfx", null, "upload", null], ["ostatni", "a.catdrawing", null, "upload", null],
+      ["model_3d", "a.3mf", null, "upload", null], ["ostatni", "a.obj", null, "upload", null], ["vykres", "a.x_t", null, "upload", null],
+      ["objednavka", "a.zip", null, "email", "zakaznik"], ["objednavka", "a.pdf", "application/pdf", "email", "zakaznik"], ["foto", "a.heic", "image/heic", "capture", null],
+      ["ostatni", "a.rar", null, "email", "zakaznik"], ["potvrzeni", "a.jpg", "image/jpeg", "email", "zakaznik"], ["vykres", "a.tiff", null, "email", "dodavatel"],
     ];
     for (const c of cases) {
       const { data, error } = await svc.rpc("anon_is_candidate", { p_kind: c[0], p_filename: c[1], p_mime: c[2], p_origin: c[3], p_issuer: c[4] });
@@ -122,10 +127,14 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
     }
   });
 
-  it("trigger: Word / DWG hned „nelze automaticky“ s návodem, e-mail .eml a ZIP do fronty", async () => {
+  it("trigger: DWG hned „nelze automaticky“ s návodem; Word poptávky a 3D model se neanonymizují vůbec", async () => {
+    // jen výkresy (31. 10.): poptávka ve Wordu ani 3D model nejsou výkres — žádný stav, žádné „nelze"
     const docx = await addFile("poptavka.docx", strToU8("PK"), null, { kind: "poptavka" });
-    expect(docx.anon_status).toBe("unsupported");
-    expect(String(docx.anon_reason)).toMatch(/^Nelze anonymizovat automaticky \(dokument Word\)/);
+    expect(docx.anon_status).toBeNull();
+    expect(share.pickShareFile(docx as never)).toMatchObject({ ok: false, reason: "excluded" });
+    const model = await addFile("D-1.step", strToU8("ISO-10303-21;\nEND-ISO-10303-21;\n"), null, { kind: "model_3d" });
+    expect(model.anon_status).toBeNull();
+    expect(share.pickShareFile(model as never)).toMatchObject({ ok: true, source: "original" });
     const dwg = await addFile("sestava.dwg", new Uint8Array([0x41, 0x43, 0x31, 0x30]), null);
     expect(String(dwg.anon_reason)).toMatch(/\(DWG\).*DXF/);
     // DWG k dodavateli: výchozí blok, originál jen super admin
@@ -137,7 +146,7 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
     expect(coll.blocked[0]?.message).toMatch(/DWG/);
   });
 
-  it("ZIP: rozbalí se do souborů zakázky, ty se anonymizují ve stejném běhu; DWG uvnitř „nelze“; opakování nic nezdvojí", async () => {
+  it("ZIP: rozbalí se do souborů zakázky, výkresy se anonymizují ve stejném běhu; 3D model ne; DWG uvnitř „nelze“; opakování nic nezdvojí", async () => {
     const step = strToU8("ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('D-1.stp','2026-10-29',('Jan Dvorak'),('Strojmetal a.s.'),'x','y','');\nFILE_SCHEMA(('AP214'));\nENDSEC;\nDATA;\n#1=PRODUCT('D-1','Strojmetal hridel','',(#2));\nENDSEC;\nEND-ISO-10303-21;\n");
     const zip = zipSync({ "Strojmetal/D-1.pdf": pdf, "Strojmetal/D-1.step": step, "Strojmetal/D-1.dwg": new Uint8Array([0x41, 0x43, 1, 2]), "__MACOSX/._D-1.pdf": new Uint8Array([1]) });
     const z = await addFile("vykresy-strojmetal.zip", zip, "application/zip", { kind: "ostatni" });
@@ -150,15 +159,17 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
     // děti zpracované v tomtéž běhu
     const kids = await Promise.all(parent.spawned!.map(row));
     const by = (n: string) => kids.find((k) => String(k.filename).endsWith(n))!;
-    expect(by(".pdf").anon_status).toMatch(/^(done|review)$/);
-    expect(by(".step").anon_status).toBe("done");
+    expect(by(".pdf").anon_status).toBe("done");
+    // 3D model z archivu: druh 3D model, žádná anonymizace, k dodavateli jako originál
+    expect(by(".step").kind).toBe("model_3d");
+    expect(by(".step").anon_status).toBeNull();
+    expect(share.pickShareFile(by(".step") as never)).toMatchObject({ ok: true, source: "original" });
     expect(by(".dwg").anon_status).toBe("unsupported");
     for (const k of kids) {
       expect(k.origin).toBe("email");
       expect(k.issuer).toBe("zakaznik");
       expect(String(k.note)).toContain("vykresy-strojmetal.zip");
     }
-    expect(latin(await output(by(".step")))).not.toMatch(/strojmetal|dvorak/i);
     // archiv sám nikdy k dodavateli
     expect(share.pickShareFile((await row(z.id as string)) as never)).toMatchObject({ ok: false, reason: "unsupported" });
     // nové spuštění (Anonymizovat znovu) → stejné soubory, žádné duplicity
@@ -186,11 +197,11 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
     expect(parent.reason).toMatch(/^Rozbaleno do 1 souboru/);
     const kid = await row(parent.spawned![0]);
     expect(kid.filename).toBe("D-2.pdf");
-    expect(kid.anon_status).toMatch(/^(done|review)$/);
+    expect(kid.anon_status).toBe("done");
   }, 240_000);
 
-  it("HEIC z iPhonu: dekóduje se na serveru, výstup JPEG bez EXIF / GPS; STL a IGES bez jmen; binární DXF projde", async () => {
-    const heic = await addFile("IMG_0042.HEIC", new Uint8Array(Buffer.from(HEIC_SAMPLE_B64, "base64")), "image/heic", { kind: "foto" });
+  it("HEIC z iPhonu: dekóduje se na serveru, výstup JPEG bez EXIF / GPS; STL a IGES (3D) se neanonymizují; binární DXF projde", async () => {
+    const heic = await addFile("IMG_0042.HEIC", new Uint8Array(Buffer.from(HEIC_SAMPLE_B64, "base64")), "image/heic", { kind: "vykres" });
     const stl = await addFile("Strojmetal_D-1.stl", strToU8("solid Strojmetal_D-1_JDvorak\n facet normal 0 0 1\n  outer loop\n   vertex 0 0 0\n   vertex 1 0 0\n   vertex 0 1 0\n  endloop\n endfacet\nendsolid Strojmetal_D-1_JDvorak\n"), "model/stl", { kind: "model_3d" });
     const line = (d: string, s: string, n: number) => `${d.padEnd(72).slice(0, 72)}${s}${String(n).padStart(7)}`;
     const iges = [line("Strojmetal a.s. - Jan Dvorak", "S", 1), line("1H,,1H;,4HD-1 ,7HD-1.igs,2HSW,2HSW,32,38,6,308,15,3HD-1,1.,2,2HMM,1,", "G", 1),
@@ -201,10 +212,15 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
     const binDxf = new Uint8Array([...strToU8("AutoCAD Binary DXF\r\n\x1a\0"), 0, 0, ...strToU8("SECTION"), 0, 2, 0, ...strToU8("ENTITIES"), 0,
       0, 0, ...strToU8("TEXT"), 0, 1, 0, ...strToU8("Strojmetal a.s."), 0, 0, 0, ...strToU8("ENDSEC"), 0, 0, 0, ...strToU8("EOF"), 0]);
     const dxf = await addFile("D-1.dxf", binDxf, null);
-    await runQueue([heic.id, stl.id, igs.id, dxf.id] as string[]);
+    // 3D modely (STL, IGES) nejsou kandidáti — žádný stav
+    expect(stl.anon_status).toBeNull();
+    expect(igs.anon_status).toBeNull();
+    await runQueue([heic.id, dxf.id] as string[]);
 
     const h = await row(heic.id as string);
-    expect(h.anon_status, String(h.anon_reason)).toBe("review"); // testovací AI nic nenašla → ke kontrole, ne „hotovo"
+    // testovací AI nic nenašla → hotovo s poznámkou (plná automatika, nic ke kontrole)
+    expect(h.anon_status, String(h.anon_reason)).toBe("done");
+    expect(JSON.stringify(h.anon_summary)).toMatch(/nothing_found/);
     expect(h.anon_mime).toBe("image/jpeg");
     const sharp = (await import("sharp")).default;
     const hb = await output(h);
@@ -212,19 +228,11 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — všechny formáty ↔ lokální
     expect([m.width, m.height, m.exif, m.xmp]).toEqual([320, 240, undefined, undefined]);
     expect(latin(hb)).not.toMatch(/Dvorak/);
 
-    const s = await row(stl.id as string);
-    expect(s.anon_status).toBe("done");
-    expect(s.anon_method).toBe("stl");
-    expect(latin(await output(s))).not.toMatch(/strojmetal|dvorak/i);
-    expect(String(s.anon_filename)).not.toMatch(/strojmetal/i);
-
-    const g = await row(igs.id as string);
-    expect(g.anon_status).toBe("done");
-    expect(g.anon_method).toBe("iges");
-    expect(latin(await output(g))).not.toMatch(/strojmetal|dvorak/i);
+    expect((await row(stl.id as string)).anon_status).toBeNull();
+    expect((await row(igs.id as string)).anon_status).toBeNull();
 
     const d = await row(dxf.id as string);
-    expect(d.anon_status).toBe("review");
+    expect(d.anon_status).toBe("done");
     expect(latin(await output(d))).not.toMatch(/strojmetal/i);
   }, 240_000);
 
