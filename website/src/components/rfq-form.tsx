@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TEAM } from "@/content/site";
+import type { Dict } from "@/content/cs";
+import type { Locale } from "@/i18n/config";
 import { cn } from "@/lib/cn";
 import { takeHandoffFiles } from "@/lib/file-handoff";
-import { ALLOWED_EXT, BUDGETS, DEADLINES, MAX_UPLOAD_BYTES, NEEDS, QUANTITIES, isValidCzIco, validateLead, type LeadInput } from "@/lib/lead";
+import { ALLOWED_EXT, BUDGET_IDS, DEADLINE_IDS, MAX_UPLOAD_BYTES, NEED_IDS, QUANTITY_IDS, isValidCzIco, validateLead, type LeadInput } from "@/lib/lead";
 import { fmtNum, type Metrics } from "@/lib/mesh-metrics";
 import { CAD_EXT, extOf } from "@/lib/occt";
 import { track } from "./analytics";
@@ -16,7 +17,6 @@ import { Icon } from "./icons";
 
 const CadViewer = dynamic(() => import("./cad-viewer").then((m) => m.CadViewer), { ssr: false });
 
-const STEPS = ["Zakázka", "Dokumentace", "Firma a kontakt"] as const;
 const STEP_FIELDS: (keyof LeadInput | "files")[][] = [
   ["needs", "budget", "description"],
   ["dataLink", "files"],
@@ -25,7 +25,14 @@ const STEP_FIELDS: (keyof LeadInput | "files")[][] = [
 
 type Company = { name: string; address?: string };
 
-export function RfqForm() {
+type Sales = { name: string; role: string; email: string; phone?: string; phoneHref?: string };
+
+export function RfqForm({ locale, t, v, sales, privacyHref, homeHref }: { locale: Locale; t: Dict["rfq"]; v: Dict["viewer"]; sales: Sales; privacyHref: string; homeHref: string }) {
+  const STEPS = t.steps;
+  const NEEDS = NEED_IDS.map((id) => ({ id, label: t.needs[id] }));
+  const BUDGETS = BUDGET_IDS.map((id) => ({ id, label: t.budgets[id] }));
+  const QUANTITIES = QUANTITY_IDS.map((id) => ({ id, label: t.quantities[id] }));
+  const DEADLINES = DEADLINE_IDS.map((id) => ({ id, label: t.deadlines[id] }));
   const params = useSearchParams();
   const [step, setStep] = useState(0);
   const [startedAt] = useState(() => Date.now());
@@ -58,7 +65,7 @@ export function RfqForm() {
   // předvyplnění služby z URL a souborů z 3D prohlížeče
   useEffect(() => {
     const s = params.get("sluzba");
-    if (s && NEEDS.some((n) => n.id === s)) setLead((l) => (l.needs.includes(s) ? l : { ...l, needs: [s] }));
+    if (s && (NEED_IDS as string[]).includes(s)) setLead((l) => (l.needs.includes(s) ? l : { ...l, needs: [s] }));
     const handed = takeHandoffFiles();
     if (handed.length) setFiles(handed);
   }, [params]);
@@ -98,14 +105,14 @@ export function RfqForm() {
   const cadSummary = metrics && cadFile ? `${cadFile.name}: ${metrics.size.map((x) => fmtNum(x, 1)).join(" × ")} mm, objem ${fmtNum(metrics.volume / 1000, 1)} cm³` : "";
 
   const fileErrors = (): Record<string, string> => {
-    if (totalSize > MAX_UPLOAD_BYTES) return { files: "Přílohy přesahují 4 MB. Odeberte část souborů a vložte odkaz na úložiště (OneDrive, WeTransfer…)." };
+    if (totalSize > MAX_UPLOAD_BYTES) return { files: t.fileTooBig };
     const bad = files.find((f) => !ALLOWED_EXT.includes(extOf(f.name)));
-    if (bad) return { files: `Soubor ${bad.name} má nepodporovaný formát.` };
+    if (bad) return { files: t.fileBadType.replace("{name}", bad.name) };
     return {};
   };
 
   const validateStep = (s: number) => {
-    const all = { ...validateLead(lead), ...fileErrors() };
+    const all = { ...validateLead(lead, t.errors), ...fileErrors() };
     const relevant = Object.fromEntries(Object.entries(all).filter(([k]) => STEP_FIELDS[s].includes(k as keyof LeadInput)));
     setErrors(relevant);
     return Object.keys(relevant).length === 0;
@@ -121,7 +128,7 @@ export function RfqForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step < STEPS.length - 1) return next();
-    const all = { ...validateLead(lead), ...fileErrors() };
+    const all = { ...validateLead(lead, t.errors), ...fileErrors() };
     if (Object.keys(all).length) {
       setErrors(all);
       const first = STEP_FIELDS.findIndex((f) => f.some((k) => all[k]));
@@ -142,7 +149,8 @@ export function RfqForm() {
     fd.append("_t", String(startedAt));
     fd.append("website", (document.getElementById("rfq-website") as HTMLInputElement | null)?.value ?? "");
     try {
-      const res = await fetch("/api/poptavka", { method: "POST", body: fd });
+      fd.append("locale", locale);
+      const res = await fetch(`/api/poptavka?lang=${locale}`, { method: "POST", body: fd });
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; errors?: Record<string, string> };
       if (res.ok && j.ok) {
         setStatus("done");
@@ -150,25 +158,25 @@ export function RfqForm() {
         topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
         if (j.errors) setErrors(j.errors);
-        setServerError(j.error ?? "Odeslání se nezdařilo. Zkontrolujte prosím zvýrazněná pole.");
+        setServerError(j.error ?? t.serverError);
         setStatus("error");
       }
     } catch {
-      setServerError(`Odeslání se nezdařilo (síť). Napište nám prosím na ${TEAM[1].email}.`);
+      setServerError(`${t.networkError} ${sales.email}.`);
       setStatus("error");
     }
   };
 
   if (status === "done") {
-    const c = TEAM[1];
+    const c = sales;
     return (
       <div ref={topRef} className="scroll-mt-28 rounded-3xl border border-ink-700/10 bg-white p-8 text-center shadow-[0_40px_80px_-40px_rgba(39,36,37,.35)] md:p-14">
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand text-white shadow-[0_0_40px_rgba(224,57,48,.6)]">
           <Icon name="check" className="h-8 w-8" strokeWidth={2.4} />
         </span>
-        <h2 className="h-display mt-6 text-4xl text-ink-700 md:text-5xl">Poptávka odeslána</h2>
+        <h2 className="h-display mt-6 text-4xl text-ink-700 md:text-5xl">{t.doneTitle}</h2>
         <p className="mx-auto mt-4 max-w-lg text-lg text-ink-700/70">
-          Děkujeme. Technolog nyní posoudí vaši dokumentaci a {c.name} se vám ozve s dalším postupem. Potvrzení jsme poslali na{" "}
+          {t.done1} {c.name} {t.done2}{" "}
           <strong>{lead.email}</strong>.
         </p>
         <div className="mx-auto mt-8 max-w-sm rounded-2xl bg-steel-100 p-5 text-left text-[14px]">
@@ -182,8 +190,8 @@ export function RfqForm() {
             {c.email}
           </a>
         </div>
-        <Link href="/" className="btn-ghost mt-8">
-          Zpět na úvod
+        <Link href={homeHref} className="btn-ghost mt-8">
+          {t.doneHome}
         </Link>
       </div>
     );
@@ -217,7 +225,7 @@ export function RfqForm() {
       {step === 0 && (
         <div className="animate-fade-up space-y-8">
           <fieldset>
-            <legend className="label">Co potřebujete vyrobit? *</legend>
+            <legend className="label">{t.needsLabel} *</legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {NEEDS.map((n) => {
                 const on = lead.needs.includes(n.id);
@@ -242,7 +250,7 @@ export function RfqForm() {
           </fieldset>
 
           <fieldset>
-            <legend className="label">Odhadovaná hodnota zakázky (bez DPH) *</legend>
+            <legend className="label">{t.budgetLabel} *</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {BUDGETS.map((b) => (
                 <label
@@ -259,8 +267,7 @@ export function RfqForm() {
             </div>
             {lead.budget === "pod-50k" ? (
               <p className="mt-3 rounded-xl bg-steel-100 p-4 text-[14px] text-ink-700/80">
-                Děkujeme za zájem. Naše kapacita je vyhrazena pro B2B projekty od 50 000 Kč, proto menší zakázky a opravy bohužel
-                nepřijímáme.
+                {t.tooSmall}
               </p>
             ) : (
               <Err m={errors.budget} />
@@ -268,25 +275,25 @@ export function RfqForm() {
           </fieldset>
 
           <div className="grid gap-5 sm:grid-cols-3">
-            <Select label="Množství" value={lead.quantity} onChange={(v) => set("quantity", v)} options={QUANTITIES} />
-            <Select label="Termín" value={lead.deadline} onChange={(v) => set("deadline", v)} options={DEADLINES} />
+            <Select choose={t.choose} label={t.quantity} value={lead.quantity} onChange={(v) => set("quantity", v)} options={QUANTITIES} />
+            <Select choose={t.choose} label={t.deadline} value={lead.deadline} onChange={(v) => set("deadline", v)} options={DEADLINES} />
             <div>
               <label className="label" htmlFor="material">
-                Materiál
+                {t.material}
               </label>
-              <input id="material" className="input" placeholder="např. 1.4301, 42CrMo4, AlMg3" value={lead.material} onChange={(e) => set("material", e.target.value)} />
+              <input id="material" className="input" placeholder={t.materialPh} value={lead.material} onChange={(e) => set("material", e.target.value)} />
             </div>
           </div>
 
           <div>
             <label className="label" htmlFor="description">
-              Popis zakázky *
+              {t.description} *
             </label>
             <textarea
               id="description"
               rows={5}
               className="input resize-y"
-              placeholder="Co je to za díl / stroj, k čemu slouží, požadované tolerance, povrchové úpravy, opakovanost…"
+              placeholder={t.descriptionPh}
               value={lead.description}
               onChange={(e) => set("description", e.target.value)}
             />
@@ -299,8 +306,8 @@ export function RfqForm() {
         <div className="animate-fade-up space-y-6">
           <Dropzone
             accept={ALLOWED_EXT.map((e) => "." + e).join(",")}
-            title="Přetáhněte výkresy a 3D modely"
-            hint="PDF, STEP, IGES, DXF, DWG, STL, obrázky nebo ZIP – celkem do 4 MB. Větší data vložte jako odkaz níže."
+            title={t.dropTitle}
+            hint={t.dropHint}
             onFiles={(f) => {
               setFiles((prev) => [...prev, ...f].slice(0, 15));
               setErrors((e) => ({ ...e, files: "" }));
@@ -315,13 +322,13 @@ export function RfqForm() {
                     <span className="truncate">{f.name}</span>
                     <span className="shrink-0 text-ink-700/40">{(f.size / 1024).toFixed(0)} kB</span>
                   </span>
-                  <button type="button" onClick={() => setFiles((p) => p.filter((_, k) => k !== i))} className="rounded-full p-1 text-ink-700/50 hover:bg-steel-100 hover:text-brand" aria-label={`Odebrat ${f.name}`}>
+                  <button type="button" onClick={() => setFiles((p) => p.filter((_, k) => k !== i))} className="rounded-full p-1 text-ink-700/50 hover:bg-steel-100 hover:text-brand" aria-label={`${t.remove} ${f.name}`}>
                     <Icon name="x" className="h-4 w-4" />
                   </button>
                 </li>
               ))}
               <li className={cn("px-4 py-2 text-right font-mono text-[12px]", totalSize > MAX_UPLOAD_BYTES ? "text-brand" : "text-ink-700/40")}>
-                celkem {(totalSize / 1024 / 1024).toFixed(2)} / 4 MB
+                {t.total} {(totalSize / 1024 / 1024).toFixed(2)} / 4 MB
               </li>
             </ul>
           )}
@@ -329,27 +336,27 @@ export function RfqForm() {
 
           {cadFile && (
             <div>
-              <p className="label">3D náhled: {cadFile.name}</p>
-              <CadViewer file={cadFile} compact onMetrics={setMetrics} />
+              <p className="label">{t.preview}: {cadFile.name}</p>
+              <CadViewer file={cadFile} compact onMetrics={setMetrics} t={v} lang={locale} />
             </div>
           )}
 
           <div>
             <label className="label" htmlFor="dataLink">
-              Odkaz na větší data (volitelné)
+              {t.link}
             </label>
-            <input id="dataLink" className="input" placeholder="https://… (OneDrive, SharePoint, WeTransfer, Google Drive)" value={lead.dataLink} onChange={(e) => set("dataLink", e.target.value)} />
+            <input id="dataLink" className="input" placeholder={t.linkPh} value={lead.dataLink} onChange={(e) => set("dataLink", e.target.value)} />
             <Err m={errors.dataLink} />
           </div>
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-steel-100 p-4 text-[14px] text-ink-700/80">
             <input type="checkbox" checked={lead.nda} onChange={(e) => set("nda", e.target.checked)} className="mt-0.5 accent-[#E03930]" />
             <span>
-              <strong className="text-ink-700">Požaduji NDA.</strong> Dokumentaci pošlu až po podpisu dohody o mlčenlivosti – ozveme se s ní.
+              <strong className="text-ink-700">{t.ndaStrong}</strong> {t.ndaText}
             </span>
           </label>
           <p className="flex items-center gap-2 text-[13px] text-ink-700/50">
-            <Icon name="lock" className="h-4 w-4" /> Dokumentaci zpracováváme důvěrně a používáme ji výhradně pro přípravu nabídky.
+            <Icon name="lock" className="h-4 w-4" /> {t.confidential}
           </p>
         </div>
       )}
@@ -358,30 +365,30 @@ export function RfqForm() {
         <div className="animate-fade-up grid gap-5 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="ico">
-              IČO / VAT ID *
+              {t.ico} *
             </label>
             <div className="relative">
-              <input id="ico" inputMode="text" autoComplete="off" className="input pr-10" placeholder="12345678" value={lead.ico} onChange={(e) => set("ico", e.target.value)} />
+              <input id="ico" inputMode="text" autoComplete="off" className="input pr-10" placeholder={t.icoPh} value={lead.ico} onChange={(e) => set("ico", e.target.value)} />
               <span className="absolute right-3 top-1/2 -translate-y-1/2">
                 {ares.state === "loading" && <span className="block h-4 w-4 animate-spin rounded-full border-2 border-ink-700/15 border-t-brand" />}
                 {ares.state === "ok" && <Icon name="check" className="h-5 w-5 text-emerald-600" strokeWidth={2.4} />}
               </span>
             </div>
             {ares.state === "ok" && ares.company && <p className="mt-1.5 text-[12px] text-emerald-700">ARES: {ares.company.name}{ares.company.address ? `, ${ares.company.address}` : ""}</p>}
-            {ares.state === "missing" && <p className="mt-1.5 text-[12px] text-ink-700/50">Firmu se nepodařilo ověřit v ARES – vyplňte název ručně.</p>}
+            {ares.state === "missing" && <p className="mt-1.5 text-[12px] text-ink-700/50">{t.aresMissing}</p>}
             <Err m={errors.ico} />
           </div>
-          <Field id="company" label="Název firmy *" value={lead.company} onChange={(v) => set("company", v)} err={errors.company} autoComplete="organization" />
-          <Field id="name" label="Jméno a příjmení *" value={lead.name} onChange={(v) => set("name", v)} err={errors.name} autoComplete="name" />
-          <Field id="position" label="Pozice" value={lead.position ?? ""} onChange={(v) => set("position", v)} placeholder="např. nákup, údržba, vývoj" autoComplete="organization-title" />
-          <Field id="email" type="email" label="Pracovní e-mail *" value={lead.email} onChange={(v) => set("email", v)} err={errors.email} autoComplete="email" />
-          <Field id="phone" type="tel" label="Telefon" value={lead.phone ?? ""} onChange={(v) => set("phone", v)} err={errors.phone} autoComplete="tel" placeholder="+420" />
+          <Field id="company" label={`${t.company} *`} value={lead.company} onChange={(v) => set("company", v)} err={errors.company} autoComplete="organization" />
+          <Field id="name" label={`${t.name} *`} value={lead.name} onChange={(v) => set("name", v)} err={errors.name} autoComplete="name" />
+          <Field id="position" label={t.position} value={lead.position ?? ""} onChange={(v) => set("position", v)} placeholder={t.positionPh} autoComplete="organization-title" />
+          <Field id="email" type="email" label={`${t.email} *`} value={lead.email} onChange={(v) => set("email", v)} err={errors.email} autoComplete="email" />
+          <Field id="phone" type="tel" label={t.phone} value={lead.phone ?? ""} onChange={(v) => set("phone", v)} err={errors.phone} autoComplete="tel" placeholder={t.phonePh} />
           <label className="flex cursor-pointer items-start gap-3 text-[14px] text-ink-700/80 sm:col-span-2">
             <input type="checkbox" checked={lead.gdpr} onChange={(e) => set("gdpr", e.target.checked)} className="mt-1 accent-[#E03930]" />
             <span>
-              Souhlasím se zpracováním osobních údajů za účelem vyřízení poptávky dle{" "}
-              <Link href="/ochrana-osobnich-udaju" target="_blank" className="text-brand underline">
-                zásad ochrany osobních údajů
+              {t.gdpr1}{" "}
+              <Link href={privacyHref} target="_blank" className="text-brand underline">
+                {t.gdprLink}
               </Link>
               . *
             </span>
@@ -397,23 +404,23 @@ export function RfqForm() {
       <div className="mt-10 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-ink-700/10 pt-6 sm:flex-row sm:items-center">
         {step > 0 ? (
           <button type="button" onClick={() => setStep((s) => s - 1)} className="btn-ghost">
-            Zpět
+            {t.back}
           </button>
         ) : (
-          <p className="text-[13px] text-ink-700/50">Zabere to cca 2 minuty.</p>
+          <p className="text-[13px] text-ink-700/50">{t.duration}</p>
         )}
         <button type="submit" disabled={status === "sending" || lead.budget === "pod-50k"} className="btn-primary !px-8 !py-3.5 disabled:opacity-50">
           {status === "sending" ? (
             <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Odesílám…
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> {t.sending}
             </>
           ) : step < STEPS.length - 1 ? (
             <>
-              Pokračovat <Icon name="arrow" className="h-4 w-4" />
+              {t.next} <Icon name="arrow" className="h-4 w-4" />
             </>
           ) : (
             <>
-              Odeslat poptávku <Icon name="arrow" className="h-4 w-4" />
+              {t.send} <Icon name="arrow" className="h-4 w-4" />
             </>
           )}
         </button>
@@ -462,7 +469,7 @@ function Field({
   );
 }
 
-function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: readonly { id: string; label: string }[] }) {
+function Select({ label, value, onChange, options, choose }: { label: string; value: string; onChange: (v: string) => void; options: readonly { id: string; label: string }[]; choose: string }) {
   const id = "sel-" + label;
   return (
     <div>
@@ -470,7 +477,7 @@ function Select({ label, value, onChange, options }: { label: string; value: str
         {label}
       </label>
       <select id={id} className="input" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— vyberte —</option>
+        <option value="">{choose}</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}

@@ -17,6 +17,14 @@
     @apply bg-[#fbfbfa] text-ink-700 antialiased;
     font-feature-settings: "ss01", "cv11";
   }
+  /* dlouhá složená slova (němčina) — dělení dle jazyka stránky */
+  h1,
+  h2,
+  h3,
+  .h-display {
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
   ::selection {
     background: rgb(var(--brand) / 0.85);
     color: white;

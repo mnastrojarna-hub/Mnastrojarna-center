@@ -3,42 +3,14 @@
  * E-mail míří do firemní schránky, odkud ho CNC Sales OS (IMAP) automaticky převezme jako poptávku.
  */
 
-export const BUDGETS = [
-  { id: "pod-50k", label: "Méně než 50 000 Kč", points: -100 },
-  { id: "50-200k", label: "50 – 200 tis. Kč", points: 15 },
-  { id: "200k-1m", label: "200 tis. – 1 mil. Kč", points: 30 },
-  { id: "1-5m", label: "1 – 5 mil. Kč", points: 40 },
-  { id: "5m+", label: "Více než 5 mil. Kč", points: 45 },
-  { id: "opakovane", label: "Opakované dodávky / rámcová smlouva", points: 40 },
-  { id: "nevim", label: "Zatím nevím", points: 5 },
-] as const;
+import { cs, type Dict } from "@/content/cs";
 
-export const NEEDS = [
-  { id: "cnc-obrabeni", label: "CNC obrábění" },
-  { id: "petiose-cnc-obrabeni", label: "5osé obrábění" },
-  { id: "elektroerozivni-obrabeni", label: "Drátové řezání" },
-  { id: "nahradni-dily-pro-vyrobni-linky", label: "Náhradní díly linek" },
-  { id: "nastrojarstvi", label: "Nástroje / přípravky" },
-  { id: "jednoucelove-stroje", label: "Jednoúčelový stroj" },
-  { id: "vyroba-prototypu", label: "Prototyp" },
-  { id: "programovani-a-konstrukce", label: "Konstrukce / programování" },
-  { id: "konsignacni-skladovani", label: "Konsignační sklad" },
-] as const;
-
-export const DEADLINES = [
-  { id: "urgent", label: "Urgentně (do 2 týdnů)" },
-  { id: "1m", label: "Do 1 měsíce" },
-  { id: "3m", label: "1 – 3 měsíce" },
-  { id: "plan", label: "Plánovaný projekt / bez spěchu" },
-] as const;
-
-export const QUANTITIES = [
-  { id: "1-5", label: "1 – 5 ks (prototyp / kusovka)" },
-  { id: "6-50", label: "6 – 50 ks" },
-  { id: "51-500", label: "51 – 500 ks" },
-  { id: "500+", label: "500+ ks / série" },
-  { id: "projekt", label: "Celý stroj / projekt" },
-] as const;
+/** Body kvalifikace podle odhadu hodnoty (popisky jsou ve slovníku rfq.budgets). */
+export const BUDGET_POINTS = { "pod-50k": -100, "50-200k": 15, "200k-1m": 30, "1-5m": 40, "5m+": 45, opakovane: 40, nevim: 5 } as const;
+export const BUDGET_IDS = Object.keys(BUDGET_POINTS) as (keyof typeof BUDGET_POINTS)[];
+export const NEED_IDS = Object.keys(cs.rfq.needs) as (keyof Dict["rfq"]["needs"])[];
+export const DEADLINE_IDS = Object.keys(cs.rfq.deadlines) as (keyof Dict["rfq"]["deadlines"])[];
+export const QUANTITY_IDS = Object.keys(cs.rfq.quantities) as (keyof Dict["rfq"]["quantities"])[];
 
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // limit těla requestu na Vercelu je 4,5 MB
 export const ALLOWED_EXT = ["pdf", "step", "stp", "igs", "iges", "dxf", "dwg", "stl", "jpg", "jpeg", "png", "zip"];
@@ -65,7 +37,8 @@ export type LeadInput = {
   gdpr: boolean;
   nda?: boolean;
   source?: string;
-  cad?: string; // souhrn z 3D prohlížeče (gabarit, objem)
+  cad?: string; // souhrn 3D modelu (gabarit, objem)
+  locale?: string; // jazyk webu, ze kterého poptávka přišla
 };
 
 export type CompanyInfo = { ico: string; name: string; address?: string; dic?: string; legalForm?: string; selfEmployed?: boolean };
@@ -94,22 +67,22 @@ export function isFreeMail(email: string) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-export function validateLead(l: LeadInput): Record<string, string> {
+export function validateLead(l: LeadInput, m: Dict["rfq"]["errors"] = cs.rfq.errors): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!l.needs.length) e.needs = "Vyberte alespoň jednu oblast.";
-  if (!BUDGETS.some((b) => b.id === l.budget)) e.budget = "Vyberte odhad hodnoty zakázky.";
-  if (l.budget === "pod-50k") e.budget = "Zakázky pod 50 000 Kč bohužel nepřijímáme.";
-  if (!l.description || l.description.trim().length < 10) e.description = "Popište prosím krátce, co potřebujete (min. 10 znaků).";
-  if (l.description && l.description.length > 5000) e.description = "Popis je příliš dlouhý (max. 5 000 znaků).";
+  if (!l.needs.length) e.needs = m.needs;
+  if (!(l.budget in BUDGET_POINTS)) e.budget = m.budget;
+  if (l.budget === "pod-50k") e.budget = m.tooSmall;
+  if (!l.description || l.description.trim().length < 10) e.description = m.description;
+  if (l.description && l.description.length > 5000) e.description = m.descriptionLong;
   const ico = l.ico.replace(/\s/g, "");
-  if (!ico) e.ico = "Vyplňte IČO (nebo VAT ID u zahraniční firmy).";
-  else if (/^\d+$/.test(ico) ? !isValidCzIco(ico) : !isForeignVat(ico)) e.ico = "Neplatné IČO / VAT ID.";
-  if (!l.company || l.company.trim().length < 2) e.company = "Vyplňte název firmy.";
-  if (!l.name || l.name.trim().length < 3) e.name = "Vyplňte jméno a příjmení.";
-  if (!EMAIL_RE.test(l.email.trim())) e.email = "Zadejte platný e-mail.";
-  if (l.phone && !/^[+\d][\d\s()-]{7,19}$/.test(l.phone.trim())) e.phone = "Neplatné telefonní číslo.";
-  if (l.dataLink && !/^https?:\/\/\S+$/i.test(l.dataLink.trim())) e.dataLink = "Odkaz musí začínat http(s)://";
-  if (!l.gdpr) e.gdpr = "Bez souhlasu nemůžeme poptávku zpracovat.";
+  if (!ico) e.ico = m.icoMissing;
+  else if (/^\d+$/.test(ico) ? !isValidCzIco(ico) : !isForeignVat(ico)) e.ico = m.icoInvalid;
+  if (!l.company || l.company.trim().length < 2) e.company = m.company;
+  if (!l.name || l.name.trim().length < 3) e.name = m.name;
+  if (!EMAIL_RE.test(l.email.trim())) e.email = m.email;
+  if (l.phone && !/^[+\d][\d\s()-]{7,19}$/.test(l.phone.trim())) e.phone = m.phone;
+  if (l.dataLink && !/^https?:\/\/\S+$/i.test(l.dataLink.trim())) e.dataLink = m.link;
+  if (!l.gdpr) e.gdpr = m.gdpr;
   return e;
 }
 
@@ -118,10 +91,9 @@ export type LeadScore = { score: number; grade: "A" | "B" | "C"; reasons: string
 export function scoreLead(l: LeadInput, opts: { company?: CompanyInfo | null; attachments: number }): LeadScore {
   const reasons: string[] = [];
   let s = 0;
-  const b = BUDGETS.find((x) => x.id === l.budget);
-  if (b) {
-    s += b.points;
-    reasons.push(`Hodnota: ${b.label}`);
+  if (l.budget in BUDGET_POINTS) {
+    s += BUDGET_POINTS[l.budget as keyof typeof BUDGET_POINTS];
+    reasons.push(`Hodnota: ${cs.rfq.budgets[l.budget as keyof typeof BUDGET_POINTS]}`);
   }
   if (opts.company) {
     if (opts.company.selfEmployed) {
@@ -155,28 +127,29 @@ export function scoreLead(l: LeadInput, opts: { company?: CompanyInfo | null; at
   return { score: s, grade: s >= 65 ? "A" : s >= 40 ? "B" : "C", reasons };
 }
 
-const label = <T extends readonly { id: string; label: string }[]>(list: T, id: string) => list.find((x) => x.id === id)?.label ?? id;
+const label = (map: Record<string, string>, id: string) => map[id] ?? id;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 export function formatLeadEmail(l: LeadInput, score: LeadScore, company: CompanyInfo | null, files: { name: string; size: number }[]) {
-  const subject = `Poptávka z webu [${score.grade}] – ${l.company.trim()} – ${l.needs.map((n) => label(NEEDS, n)).join(", ")}`;
+  const subject = `Poptávka z webu [${score.grade}] – ${l.company.trim()} – ${l.needs.map((n) => label(cs.rfq.needs, n)).join(", ")}`;
   const rows: [string, string][] = [
     ["Firma", l.company],
     ["IČO / VAT", l.ico + (company ? ` (ARES: ${company.name}${company.address ? ", " + company.address : ""})` : "")],
     ["Kontakt", `${l.name}${l.position ? `, ${l.position}` : ""}`],
     ["E-mail", l.email],
     ["Telefon", l.phone || "—"],
-    ["Oblast", l.needs.map((n) => label(NEEDS, n)).join(", ")],
-    ["Hodnota zakázky", label(BUDGETS, l.budget)],
-    ["Množství", label(QUANTITIES, l.quantity) || "—"],
-    ["Termín", label(DEADLINES, l.deadline) || "—"],
+    ["Oblast", l.needs.map((n) => label(cs.rfq.needs, n)).join(", ")],
+    ["Hodnota zakázky", label(cs.rfq.budgets, l.budget)],
+    ["Množství", label(cs.rfq.quantities, l.quantity) || "—"],
+    ["Termín", label(cs.rfq.deadlines, l.deadline) || "—"],
     ["Materiál", l.material || "—"],
     ["Odkaz na data", l.dataLink || "—"],
     ["3D model (náhled)", l.cad || "—"],
     ["Přílohy", files.length ? files.map((f) => `${f.name} (${(f.size / 1024).toFixed(0)} kB)`).join(", ") : "—"],
     ["NDA", l.nda ? "Požaduje NDA před sdílením dat" : "Ne"],
     ["Zdroj", l.source || "web"],
+    ["Jazyk webu", (l.locale || "cs").toUpperCase()],
   ];
   const text =
     `Nová poptávka z webu mnastrojarna.cz\n` +
@@ -198,13 +171,13 @@ export function formatLeadEmail(l: LeadInput, score: LeadScore, company: Company
   return { subject, text, html };
 }
 
-export function formatConfirmationEmail(l: LeadInput, contact: { name: string; role: string; email: string; phone?: string }) {
-  const subject = "Potvrzení přijetí poptávky – Mnástrojárna s.r.o.";
+export function formatConfirmationEmail(l: LeadInput, contact: { name: string; role: string; email: string; phone?: string }, t: Dict = cs) {
+  const c = t.rfq.confirm;
+  const subject = c.subject;
   const text =
-    `Dobrý den,\n\nděkujeme za Vaši poptávku. Přijali jsme ji a technolog ji nyní posoudí. ` +
-    `Ozveme se Vám s dalším postupem nebo cenovou nabídkou.\n\n` +
-    `Souhrn: ${l.needs.map((n) => label(NEEDS, n)).join(", ")} · ${label(BUDGETS, l.budget)}\n\n` +
-    `Váš kontakt: ${contact.name}, ${contact.role.toLowerCase()}\n${contact.email}${contact.phone ? `\n${contact.phone}` : ""}\n\n` +
-    `S pozdravem\nMnástrojárna s.r.o. – Váš partner ve strojírenství\nwww.mnastrojarna.cz`;
+    `${c.hello}\n\n${c.body}\n\n` +
+    `${c.summary}: ${l.needs.map((n) => label(t.rfq.needs, n)).join(", ")} · ${label(t.rfq.budgets, l.budget)}\n\n` +
+    `${c.contact}: ${contact.name}, ${contact.role}\n${contact.email}${contact.phone ? `\n${contact.phone}` : ""}\n\n` +
+    `${c.bye}\nMnástrojárna s.r.o. – ${t.slogan}\nwww.mnastrojarna.cz`;
   return { subject, text };
 }

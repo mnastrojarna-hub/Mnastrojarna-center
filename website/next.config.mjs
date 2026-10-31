@@ -6,7 +6,7 @@ const legacy = [
   ["/cz", "/"],
   ["/cz/o-nas/o-nas", "/o-nas"],
   ["/cz/o-nas/certifikaty", "/kvalita"],
-  ["/cz/o-nas/reference", "/o-nas"],
+  ["/cz/o-nas/reference", "/reference"],
   ["/cz/o-nas/galerie", "/strojovy-park"],
   ["/cz/o-nas/akce", "/poptavka"],
   ["/cz/sluzby/oblasti-cinnosti", "/sluzby"],

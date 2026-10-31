@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { TEAM } from "@/content/site";
+import { fill, getDict } from "@/content";
+import { SALES, TEAM } from "@/content/site";
+import { LOCALES, type Locale } from "@/i18n/config";
 import { aresLookup } from "@/lib/ares";
 import {
   ALLOWED_EXT,
@@ -30,13 +32,15 @@ const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (limited(ip)) return NextResponse.json({ ok: false, error: "Příliš mnoho požadavků. Zkuste to prosím později." }, { status: 429 });
+  const qLocale = new URL(req.url).searchParams.get("lang");
+  let t = getDict(LOCALES.includes(qLocale as Locale) ? (qLocale as Locale) : "cs");
+  if (limited(ip)) return NextResponse.json({ ok: false, error: t.rfq.errors.rate }, { status: 429 });
 
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ ok: false, error: "Neplatný požadavek nebo příliš velké přílohy." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: t.rfq.errors.bad }, { status: 400 });
   }
 
   // Antispam: honeypot + minimální doba vyplnění
@@ -45,6 +49,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true }); // tiché zahození botů
   }
 
+  const formLocale = str(form, "locale") as Locale;
+  const locale: Locale = LOCALES.includes(formLocale) ? formLocale : "cs";
+  t = getDict(locale);
   const lead: LeadInput = {
     needs: form.getAll("needs").map(String).slice(0, 12),
     budget: str(form, "budget"),
@@ -63,13 +70,14 @@ export async function POST(req: Request) {
     nda: str(form, "nda") === "on" || str(form, "nda") === "true",
     source: str(form, "source").slice(0, 200),
     cad: str(form, "cad").slice(0, 300),
+    locale,
   };
 
-  const errors = validateLead(lead);
+  const errors = validateLead(lead, t.rfq.errors);
   const files = form.getAll("files").filter((x): x is File => typeof x === "object" && x !== null && "arrayBuffer" in x && (x as File).size > 0);
   const total = files.reduce((a, f) => a + f.size, 0);
-  if (total > MAX_UPLOAD_BYTES) errors.files = "Přílohy jsou větší než 4 MB – vložte prosím odkaz na úložiště.";
-  if (files.some((f) => !ALLOWED_EXT.includes(f.name.split(".").pop()?.toLowerCase() ?? ""))) errors.files = "Nepodporovaný typ souboru.";
+  if (total > MAX_UPLOAD_BYTES) errors.files = t.rfq.fileTooBig;
+  if (files.some((f) => !ALLOWED_EXT.includes(f.name.split(".").pop()?.toLowerCase() ?? ""))) errors.files = fill(t.rfq.fileBadType, { name: "" }).replace(/\s+/g, " ");
   if (Object.keys(errors).length) return NextResponse.json({ ok: false, errors }, { status: 422 });
 
   const company = isValidCzIco(lead.ico) ? await aresLookup(lead.ico) : null;
@@ -79,8 +87,8 @@ export async function POST(req: Request) {
 
   const smtpHost = process.env.SMTP_HOST;
   const webhook = process.env.LEAD_WEBHOOK_URL;
-  const to = process.env.LEAD_TO || TEAM.map((t) => t.email).slice(0, 2).join(",");
-  const contact = TEAM[1];
+  const to = process.env.LEAD_TO || TEAM.map((p) => p.email).slice(0, 2).join(",");
+  const contact = { name: SALES.name, role: t.team.volny.role, email: SALES.email, phone: SALES.phone };
   let delivered = false;
   const problems: string[] = [];
 
@@ -97,7 +105,7 @@ export async function POST(req: Request) {
       await transport.sendMail({ from, to, replyTo: `${lead.name} <${lead.email}>`, subject: mail.subject, text: mail.text, html: mail.html, attachments });
       delivered = true;
       // potvrzení zákazníkovi (neblokující chyba)
-      const conf = formatConfirmationEmail(lead, contact);
+      const conf = formatConfirmationEmail(lead, contact, t);
       await transport.sendMail({ from, to: lead.email, replyTo: contact.email, subject: conf.subject, text: conf.text }).catch(() => undefined);
     } catch (e) {
       problems.push(`smtp: ${(e as Error).message}`);
@@ -130,7 +138,7 @@ export async function POST(req: Request) {
   if (!delivered) {
     console.error("[poptavka] doručení selhalo:", problems.join(" | "));
     return NextResponse.json(
-      { ok: false, error: `Poptávku se nepodařilo odeslat. Napište nám prosím přímo na ${contact.email}.` },
+      { ok: false, error: fill(t.rfq.errors.delivery, { email: contact.email }) },
       { status: 502 },
     );
   }

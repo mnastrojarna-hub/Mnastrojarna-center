@@ -1,18 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { Dict } from "@/content/cs";
 import { HeroCanvas } from "./hero-canvas";
 
-const CALLOUTS = [
-  { x1: 60, y1: 30, x2: 78, y2: 13, label: "5 os simultánně", sub: "AXILE G8" },
-  { x1: 37, y1: 62, x2: 17, y2: 80, label: "Ø 1 000 mm", sub: "max. obrobek" },
-  { x1: 40, y1: 38, x2: 15, y2: 26, label: "± 0,002 mm", sub: "3D měření" },
+const POS = [
+  { x1: 58, y1: 30, x2: 70, y2: 13 },
+  { x1: 37, y1: 62, x2: 17, y2: 80 },
+  { x1: 40, y1: 38, x2: 15, y2: 26 },
 ];
 
 /**
  * Hero jako technický výkresový list: 3D díl, odkazové kóty, rohové razítko a CAD kurzor se souřadnicemi.
  */
-export function HeroSheet() {
+export function HeroSheet({ t, slogan }: { t: Dict["heroSheet"]; slogan: string }) {
+  const CALLOUTS = POS.map((p, i) => ({ ...p, ...t.callouts[i] }));
   const ref = useRef<HTMLDivElement>(null);
   const [cur, setCur] = useState<{ x: number; y: number; mx: number; my: number } | null>(null);
 
@@ -57,7 +59,7 @@ export function HeroSheet() {
         <div
           key={c.label}
           className="callout-label pointer-events-none absolute rounded-lg border border-ink-700/10 bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur"
-          style={{ left: `${c.x2}%`, top: `${c.y2}%`, transform: `translate(${c.x2 > 50 ? "-40%" : "-50%"}, -50%)`, ["--i" as string]: i }}
+          style={{ left: `${c.x2}%`, top: `${c.y2}%`, transform: `translate(${c.x2 > 50 ? "-55%" : "-50%"}, -50%)`, ["--i" as string]: i }}
         >
           <p className="whitespace-nowrap font-mono text-[12px] font-medium text-ink-700">{c.label}</p>
           <p className="font-mono text-[9px] uppercase tracking-widest text-ink-700/45">{c.sub}</p>
@@ -67,17 +69,17 @@ export function HeroSheet() {
       {/* rohové razítko */}
       <div className="pointer-events-none absolute bottom-6 right-6 hidden w-64 grid-cols-3 border border-ink-700/40 bg-white/90 font-mono text-[9px] uppercase text-ink-700/70 backdrop-blur sm:grid">
         <div className="col-span-3 border-b border-ink-700/40 px-2 py-1.5">
-          <span className="block text-[8px] text-ink-700/40">Název</span>
-          <span className="text-[11px] font-semibold text-ink-700">Váš partner ve strojírenství</span>
+          <span className="block text-[8px] text-ink-700/40">{t.tbName}</span>
+          <span className="text-[11px] font-semibold text-ink-700">{slogan}</span>
         </div>
         <div className="border-r border-ink-700/40 px-2 py-1">
-          <span className="block text-[8px] text-ink-700/40">Měřítko</span>1:1
+          <span className="block text-[8px] text-ink-700/40">{t.tbScale}</span>1:1
         </div>
         <div className="border-r border-ink-700/40 px-2 py-1">
-          <span className="block text-[8px] text-ink-700/40">Tolerance</span>2768-mK
+          <span className="block text-[8px] text-ink-700/40">{t.tbTolerance}</span>2768-mK
         </div>
         <div className="px-2 py-1">
-          <span className="block text-[8px] text-ink-700/40">Kvalita</span>ISO 9001
+          <span className="block text-[8px] text-ink-700/40">{t.tbQuality}</span>ISO 9001
         </div>
       </div>
 

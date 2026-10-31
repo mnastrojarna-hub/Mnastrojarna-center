@@ -1,28 +1,53 @@
 import type { Metadata } from "next";
+import { getDict } from "@/content";
 import { SITE } from "@/content/site";
+import { LOCALES, LOCALE_META, alternates, href, type Locale, type PageKey, type ServiceId } from "@/i18n/config";
 
-export function pageMeta({ title, description, path, image }: { title: string; description: string; path: string; image?: string }): Metadata {
-  const url = `${SITE.url}${path}`;
+/** Metadata stránky vč. canonical a hreflang (cs, en, de, x-default). */
+export function pageMeta({
+  locale,
+  page,
+  serviceId,
+  title,
+  description,
+  keywords,
+  noindex,
+}: {
+  locale: Locale;
+  page: PageKey;
+  serviceId?: ServiceId;
+  title: string;
+  description: string;
+  keywords?: string[];
+  noindex?: boolean;
+}): Metadata {
+  const path = href(locale, page, serviceId);
+  const alt = alternates(page, serviceId);
+  const languages: Record<string, string> = Object.fromEntries(LOCALES.map((l) => [LOCALE_META[l].hreflang, alt[l]]));
+  languages["x-default"] = alt.cs;
   return {
     title,
     description,
-    alternates: { canonical: path },
+    keywords,
+    alternates: { canonical: path, languages },
     openGraph: {
       type: "website",
-      url,
+      url: `${SITE.url}${path}`,
       title: `${title} | ${SITE.shortName}`,
       description,
       siteName: SITE.name,
-      locale: "cs_CZ",
-      ...(image ? { images: [{ url: image }] } : {}),
+      locale: LOCALE_META[locale].og,
+      alternateLocale: LOCALES.filter((l) => l !== locale).map((l) => LOCALE_META[l].og),
     },
     twitter: { card: "summary_large_image", title: `${title} | ${SITE.shortName}`, description },
+    ...(noindex ? { robots: { index: false, follow: true } } : {}),
   };
 }
 
 export const ORG_ID = `${SITE.url}/#organization`;
 
-export function organizationJsonLd() {
+export function organizationJsonLd(locale: Locale) {
+  const t = getDict(locale);
   return {
     "@context": "https://schema.org",
     "@type": ["Organization", "LocalBusiness"],
@@ -32,20 +57,21 @@ export function organizationJsonLd() {
     url: SITE.url,
     logo: `${SITE.url}/brand/logo.svg`,
     image: `${SITE.url}/opengraph-image`,
-    slogan: SITE.slogan,
-    description: SITE.description,
+    slogan: t.slogan,
+    description: t.meta.description,
     foundingDate: String(SITE.founded),
     vatID: SITE.dic,
     taxID: SITE.ico,
     email: SITE.email,
     telephone: SITE.phone,
-    priceRange: "od 50 000 Kč",
+    priceRange: "CZK 50,000+",
+    knowsLanguage: ["cs", "en", "de"],
     address: {
       "@type": "PostalAddress",
       streetAddress: SITE.workshop.street,
       postalCode: SITE.workshop.zip,
       addressLocality: SITE.workshop.city,
-      addressRegion: SITE.workshop.region,
+      addressRegion: t.addresses.region,
       addressCountry: "CZ",
     },
     geo: { "@type": "GeoCoordinates", latitude: SITE.workshop.lat, longitude: SITE.workshop.lng },
@@ -55,12 +81,12 @@ export function organizationJsonLd() {
       opens: "07:00",
       closes: "20:00",
     },
-    areaServed: [{ "@type": "Country", name: "Česká republika" }, { "@type": "Place", name: "Evropa" }],
+    areaServed: [{ "@type": "Country", name: "Czech Republic" }, { "@type": "Place", name: "Europe" }],
     hasCredential: [
       { "@type": "EducationalOccupationalCredential", credentialCategory: "certificate", name: "ISO 9001" },
       { "@type": "EducationalOccupationalCredential", credentialCategory: "certificate", name: "ISO 14001" },
     ],
-    knowsAbout: ["CNC obrábění", "Pětiosé obrábění", "Drátové řezání", "Nástrojářství", "Jednoúčelové stroje", "Výroba prototypů"],
+    knowsAbout: Object.values(t.services).map((s) => s.title),
   };
 }
 

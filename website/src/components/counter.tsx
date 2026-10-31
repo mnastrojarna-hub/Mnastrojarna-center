@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const fmt = (n: number, decimals = 0) =>
-  n.toLocaleString("cs-CZ", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+const LOC: Record<string, string> = { cs: "cs-CZ", en: "en-GB", de: "de-DE" };
+const fmt = (n: number, decimals = 0, locale = "cs") =>
+  n.toLocaleString(LOC[locale] ?? "cs-CZ", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 /** Číslo, které se „dotočí“ ve chvíli, kdy se objeví na obrazovce. */
-export function Counter({ value, prefix = "", suffix = "", decimals = 0 }: { value: number; prefix?: string; suffix?: string; decimals?: number }) {
+export function Counter({ value, prefix = "", suffix = "", decimals = 0, locale = "cs" }: { value: number; prefix?: string; suffix?: string; decimals?: number; locale?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [shown, setShown] = useState(value);
 
@@ -42,7 +43,7 @@ export function Counter({ value, prefix = "", suffix = "", decimals = 0 }: { val
   return (
     <span ref={ref} className="tabular-nums">
       {prefix}
-      {fmt(shown, decimals)}
+      {fmt(shown, decimals, locale)}
       {suffix}
     </span>
   );

@@ -18,7 +18,47 @@ Nový web Mnástrojárny s.r.o. — **„Váš partner ve strojírenství“**. 
 - **SEO**: metadata a canonical, JSON-LD (Organization/LocalBusiness, Service, FAQPage, BreadcrumbList, WebApplication), sitemap, robots, OG obrázek, 301 ze všech starých URL.
 - **Měření konverzí**: GA4 / Google Ads s Consent Mode (`rfq_start`, `rfq_step`, `generate_lead`, `cad_open`, `cad_feature`, `cad_export`, `cad_to_rfq`).
 
-Veškerý obsah (služby, stroje, tým, FAQ, kontakty) je v jednom souboru: **`src/content/site.ts`**.
+## Jazykové verze (CZ / EN / DE)
+
+| Jazyk | Adresy | Příklad |
+| --- | --- | --- |
+| Čeština (výchozí) | bez prefixu | `/sluzby/nastrojarstvi` |
+| Angličtina | `/en/…` | `/en/services/toolmaking` |
+| Němčina | `/de/…` | `/de/leistungen/werkzeugbau` |
+
+- Každý jazyk má **vlastní SEO adresy**, vlastní `<html lang>`, `hreflang` alternativy (cs-CZ, en, de, x-default) a sitemapu.
+- Přepínač jazyků v hlavičce vede na **stejnou stránku** v jiném jazyce.
+- Poptávka v EN/DE: hlášky v daném jazyce, rozpočty v CZK s přepočtem na EUR, zahraniční VAT ID, potvrzovací e-mail zákazníkovi v jeho jazyce. Interní e-mail obchodníkovi zůstává česky (s údajem „Jazyk webu“).
+- Online CAD (`/cad`) má zatím jen české rozhraní (EN/DE stránky na to upozorňují).
+
+**Kde jsou texty:**
+- `src/content/cs.ts` – český slovník (zdroj), `en.ts`, `de.ts` – překlady se stejnou strukturou (hlídá TypeScript i test). Text v `*hvězdičkách*` se v nadpisech zobrazí červeně.
+- `src/content/site.ts` – jazykově nezávislá fakta: kontakty, IČO, tým, stroje, **reference**.
+- `src/i18n/config.ts` – tabulka lokalizovaných adres. Při změně adresy přejmenujte i odpovídající složku v `src/app/(en|de|cs)` – test `routes.test.ts` nesoulad odhalí.
+
+## Reference
+
+Stránka Reference (`/reference`, `/en/references`, `/de/referenzen`) a sekce na úvodní stránce zobrazují:
+- loga a případové studie z pole `REFERENCES` v `src/content/site.ts` – **doplňte jen se souhlasem klienta**:
+
+```ts
+export const REFERENCES: Reference[] = [
+  {
+    id: "firma-x",
+    client: "Firma X a.s.",
+    logo: "/references/firma-x.svg",      // soubor do public/references/
+    country: "CZ",
+    services: ["nahradni-dily-pro-vyrobni-linky", "cnc-obrabeni"],
+    text: {
+      cs: { title: "Náhradní válce pro balicí linku", summary: "…", result: "…" },
+      en: { title: "Spare rollers for a packaging line", summary: "…" },
+      de: { title: "Ersatzwalzen für eine Verpackungslinie", summary: "…" },
+    },
+  },
+];
+```
+
+- dokud je pole prázdné: obory, ve kterých pracujeme, a blok „Reference na vyžádání“ (žádné vymyšlené údaje).
 
 ## Vývoj
 
@@ -38,6 +78,7 @@ node e2e/hook-server.cjs /tmp/hook.json &
 LEAD_WEBHOOK_URL=http://localhost:3999/ npm run build && LEAD_WEBHOOK_URL=http://localhost:3999/ npm start &
 mkdir -p /tmp/e2e/shots && HOOK_FILE=/tmp/hook.json node e2e/rfq.e2e.cjs /tmp/e2e src/lib/__fixtures__/cube.stp
 node e2e/cad.e2e.cjs /tmp/e2e   # CAD: skica → vysunutí → zaoblení → díra → STEP/DXF/SVG → poptávka
+node e2e/i18n.e2e.cjs /tmp/e2e  # jazyky: přepínač, anglická poptávka (VAT ID), mobil
 ```
 
 ## Nasazení na Vercel

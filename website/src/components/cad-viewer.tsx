@@ -7,6 +7,18 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { MATERIALS, fmtNum, massKg, meshMetrics, type Metrics } from "@/lib/mesh-metrics";
 import { loadCad, type LoadedMesh } from "@/lib/occt";
 import { cn } from "@/lib/cn";
+import type { Dict } from "@/content/cs";
+import { cs } from "@/content/cs";
+
+const MAT_I18N: Record<string, [string, string]> = {
+  ocel: ["Steel", "Stahl"],
+  nerez: ["Stainless steel", "Edelstahl"],
+  hlinik: ["Aluminium", "Aluminium"],
+  mosaz: ["Brass", "Messing"],
+  med: ["Copper", "Kupfer"],
+  titan: ["Titanium", "Titan"],
+  pom: ["POM (plastic)", "POM (Kunststoff)"],
+};
 
 type State = { status: "idle" } | { status: "loading" } | { status: "error"; error: string } | { status: "ready"; metrics: Metrics };
 
@@ -19,17 +31,22 @@ export function CadViewer({
   className,
   compact,
   onMetrics,
+  t = cs.viewer,
+  lang = "cs",
 }: {
   file: File | null;
   className?: string;
   compact?: boolean;
   onMetrics?: (m: Metrics | null) => void;
+  t?: Dict["viewer"];
+  lang?: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const api = useRef<{ show: (m: LoadedMesh[]) => void; dispose: () => void; view: (v: "iso" | "top" | "front") => void; wire: (on: boolean) => void } | null>(null);
   const [state, setState] = useState<State>({ status: "idle" });
   const [material, setMaterial] = useState<string>("ocel");
   const [wire, setWire] = useState(false);
+  const noWebgl = useRef(t.noWebgl);
   const onMetricsRef = useRef(onMetrics);
   onMetricsRef.current = onMetrics;
 
@@ -41,7 +58,7 @@ export function CadViewer({
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
     } catch {
-      setState({ status: "error", error: "Váš prohlížeč nepodporuje WebGL." });
+      setState({ status: "error", error: noWebgl.current });
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -206,11 +223,11 @@ export function CadViewer({
           {state.status === "loading" && (
             <div className="flex flex-col items-center gap-3 text-white/70">
               <span className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-brand" />
-              <p className="text-sm">Načítám 3D jádro a zpracovávám model…</p>
+              <p className="text-sm">{t.loading}</p>
             </div>
           )}
           {state.status === "error" && <p className="max-w-sm text-sm text-red-300">{state.error}</p>}
-          {state.status === "idle" && <p className="text-sm text-white/40">Zde se zobrazí 3D náhled modelu</p>}
+          {state.status === "idle" && <p className="text-sm text-white/40">{t.empty}</p>}
         </div>
       )}
 
@@ -219,24 +236,24 @@ export function CadViewer({
           <div className="absolute right-3 top-3 flex gap-1 rounded-full border border-white/10 bg-black/50 p-1 backdrop-blur">
             {(["iso", "top", "front"] as const).map((v) => (
               <button key={v} type="button" onClick={() => api.current?.view(v)} className="rounded-full px-3 py-1 font-mono text-[11px] uppercase text-white/70 hover:bg-white/10 hover:text-white">
-                {v === "iso" ? "Izo" : v === "top" ? "Shora" : "Zepředu"}
+                {t.views[v]}
               </button>
             ))}
             <button type="button" onClick={() => setWire((w) => !w)} className={cn("rounded-full px-3 py-1 font-mono text-[11px] uppercase hover:bg-white/10", wire ? "text-brand" : "text-white/70")}>
-              Drát
+              {t.views.wire}
             </button>
           </div>
           <div className="relative grid grid-cols-2 gap-px border-t border-white/10 bg-white/10 font-mono text-[12px] sm:grid-cols-4">
-            <Cell k="Gabarit (mm)" v={state.metrics.size.map((x) => fmtNum(x, 1)).join(" × ")} />
-            <Cell k="Objem" v={`${fmtNum(state.metrics.volume / 1000, 1)} cm³`} />
-            <Cell k="Povrch" v={`${fmtNum(state.metrics.area / 100, 1)} cm²`} />
+            <Cell k={t.size} v={state.metrics.size.map((x) => fmtNum(x, 1)).join(" × ")} />
+            <Cell k={t.volume} v={`${fmtNum(state.metrics.volume / 1000, 1)} cm³`} />
+            <Cell k={t.area} v={`${fmtNum(state.metrics.area / 100, 1)} cm²`} />
             <div className="bg-ink-900 p-3">
               <label className="flex items-center gap-1 text-white/40">
-                Hmotnost –
-                <select value={material} onChange={(e) => setMaterial(e.target.value)} className="bg-transparent text-white/70 outline-none" aria-label="Materiál">
+                {t.mass} –
+                <select value={material} onChange={(e) => setMaterial(e.target.value)} className="bg-transparent text-white/70 outline-none" aria-label={t.material}>
                   {MATERIALS.map((m) => (
                     <option key={m.id} value={m.id} className="bg-ink">
-                      {m.label}
+                      {lang === "en" ? MAT_I18N[m.id][0] : lang === "de" ? MAT_I18N[m.id][1] : m.label}
                     </option>
                   ))}
                 </select>

@@ -1,9 +1,23 @@
 import Link from "next/link";
-import { SERVICES, SITE, TEAM } from "@/content/site";
+import { getDict } from "@/content";
+import { SALES, SERVICE_ORDER, SITE } from "@/content/site";
+import { href, type Locale } from "@/i18n/config";
 import { Icon } from "./icons";
 import { Logo } from "./logo";
 
-export function Footer() {
+export function Footer({ locale }: { locale: Locale }) {
+  const t = getDict(locale);
+  const f = t.footer;
+  const links: [string, string][] = [
+    [href(locale, "about"), f.links.about],
+    [href(locale, "machinery"), f.links.machinery],
+    [href(locale, "quality"), f.links.quality],
+    [href(locale, "references"), f.links.references],
+    ["/cad", f.links.cad],
+    [href(locale, "careers"), f.links.careers],
+    [href(locale, "contact"), f.links.contact],
+    [href(locale, "rfq"), f.links.rfq],
+  ];
   return (
     <footer className="relative overflow-hidden border-t border-ink-700/10 bg-white text-ink-700/70">
       <div className="bg-grid-light absolute inset-0 opacity-60" />
@@ -11,23 +25,22 @@ export function Footer() {
         <div className="md:col-span-4">
           <Logo tone="dark" className="h-9 w-auto" />
           <p className="mt-5 max-w-sm text-[15px] leading-relaxed">
-            {SITE.slogan}. Moderní nástrojárna s tradicí od roku {SITE.founded}. Přesné obrábění, nástroje a stroje pro výrobní
-            firmy v Česku i v zahraničí.
+            {t.slogan}. {f.about}
           </p>
           <div className="mt-6 flex flex-wrap gap-2 font-mono text-[11px] uppercase tracking-widest">
             <span className="rounded-full border border-ink-700/15 px-3 py-1.5">ISO 9001</span>
             <span className="rounded-full border border-ink-700/15 px-3 py-1.5">ISO 14001</span>
-            <span className="rounded-full border border-ink-700/15 px-3 py-1.5">B2B od 50 000 Kč</span>
+            <span className="rounded-full border border-ink-700/15 px-3 py-1.5">{t.minOrderShort}</span>
           </div>
         </div>
 
         <div className="md:col-span-3">
-          <h3 className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-700/40">Služby</h3>
+          <h3 className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-700/40">{f.services}</h3>
           <ul className="space-y-2 text-[14px]">
-            {SERVICES.map((s) => (
-              <li key={s.slug}>
-                <Link className="transition hover:text-brand" href={`/sluzby/${s.slug}`}>
-                  {s.title}
+            {SERVICE_ORDER.map((id) => (
+              <li key={id}>
+                <Link className="transition hover:text-brand" href={href(locale, "service", id)}>
+                  {t.services[id].title}
                 </Link>
               </li>
             ))}
@@ -35,17 +48,9 @@ export function Footer() {
         </div>
 
         <div className="md:col-span-2">
-          <h3 className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-700/40">Firma</h3>
+          <h3 className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-700/40">{f.company}</h3>
           <ul className="space-y-2 text-[14px]">
-            {[
-              ["/o-nas", "O nás"],
-              ["/strojovy-park", "Strojový park"],
-              ["/kvalita", "Kvalita a certifikáty"],
-              ["/cad", "Online CAD zdarma"],
-              ["/kariera", "Kariéra"],
-              ["/kontakt", "Kontakt"],
-              ["/poptavka", "Poptávka"],
-            ].map(([h, l]) => (
+            {links.map(([h, l]) => (
               <li key={h}>
                 <Link className="transition hover:text-brand" href={h}>
                   {l}
@@ -56,7 +61,7 @@ export function Footer() {
         </div>
 
         <div className="md:col-span-3">
-          <h3 className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-700/40">Kontakt</h3>
+          <h3 className="mb-4 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-700/40">{f.contact}</h3>
           <address className="space-y-3 text-[14px] not-italic">
             <p className="flex gap-2">
               <Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
@@ -64,23 +69,37 @@ export function Footer() {
                 {SITE.name}
                 <br />
                 {SITE.workshop.street}, {SITE.workshop.zip} {SITE.workshop.city}
+                {locale !== "cs" && (
+                  <>
+                    <br />
+                    {t.country}
+                  </>
+                )}
               </span>
             </p>
             <p className="flex gap-2">
               <Icon name="mail" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-              <a className="hover:text-brand" href={`mailto:${TEAM[1].email}`}>
-                {TEAM[1].email}
+              <a className="hover:text-brand" href={`mailto:${SALES.email}`}>
+                {SALES.email}
               </a>
             </p>
+            {SALES.phone && (
+              <p className="flex gap-2">
+                <Icon name="phone" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                <a className="hover:text-brand" href={SALES.phoneHref}>
+                  {SALES.phone}
+                </a>
+              </p>
+            )}
             <p className="flex gap-2">
               <Icon name="clock" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-              <span>{SITE.hours}</span>
+              <span>{t.hours}</span>
             </p>
           </address>
           <p className="mt-5 text-[12px] leading-relaxed text-ink-700/45">
-            IČO {SITE.ico} · DIČ {SITE.dic} · Datová schránka {SITE.dataBox}
+            {f.id} {SITE.ico} · {f.vat} {SITE.dic} · {f.dataBox} {SITE.dataBox}
             <br />
-            Fakturační adresa: {SITE.billing.street}, {SITE.billing.zip} {SITE.billing.city}
+            {f.billing}: {SITE.billing.street}, {SITE.billing.zip} {t.addresses.billingCity}
           </p>
         </div>
       </div>
@@ -90,14 +109,14 @@ export function Footer() {
       <div className="relative border-t border-ink-700/10">
         <div className="container flex flex-col gap-3 py-6 text-[12px] text-ink-700/40 md:flex-row md:items-center md:justify-between">
           <p>
-            © {new Date().getFullYear()} {SITE.name} · {SITE.registry}
+            © {new Date().getFullYear()} {SITE.name} · {t.registry}
           </p>
           <div className="flex gap-5">
-            <Link href="/ochrana-osobnich-udaju" className="hover:text-brand">
-              Ochrana osobních údajů
+            <Link href={href(locale, "privacy")} className="hover:text-brand">
+              {f.privacy}
             </Link>
-            <Link href="/o-nas#eu-projekty" className="hover:text-brand">
-              Projekty EU
+            <Link href={`${href(locale, "about")}#eu-projekty`} className="hover:text-brand">
+              {f.eu}
             </Link>
           </div>
         </div>
