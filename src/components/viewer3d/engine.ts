@@ -72,6 +72,8 @@ const DEFAULT_COLOR = new THREE.Color(0.72, 0.75, 0.79);
 const SELECT_COLOR = 0xff9f1a;
 const EDGE_COLOR = 0x1d2127;
 const MEASURE_COLOR = 0x1f6feb;
+/** Větší plochy se při měření nezvýrazňují celé (jen bod) — kopie sítě by zdržovala. */
+const FACE_HIGHLIGHT_MAX_TRIS = 60_000;
 
 const VIEW_DIRS: Record<StdView, { dir: Vec3; up: Vec3 }> = {
   front: { dir: [0, -1, 0], up: [0, 0, 1] },
@@ -136,6 +138,8 @@ export class ViewerEngine {
   private snap: SnapPoint | null = null;
   private snapText = "";
   private snapHighlight: THREE.Object3D | null = null;
+  private snapShapeKey = "";
+  private snapPointObj: THREE.Points | null = null;
   private hoverQueued: { x: number; y: number; alt: boolean } | null = null;
   private lastPointer: { x: number; y: number } | null = null;
   private touchMode = false;
@@ -376,7 +380,8 @@ export class ViewerEngine {
 
   private ensureBvh(p: PartView) {
     // díl jen z čar (drátová geometrie z 3D PDF) nemá trojúhelníky → BVH ani výběr plochou
-    if (!p.mesh.geometry.boundsTree && this.triCount(p.index) > 0) p.mesh.geometry.computeBoundsTree();
+    // indirect: BVH nepřeskládá index sítě → číslo trojúhelníku z výběru sedí na plochy z topologie
+    if (!p.mesh.geometry.boundsTree && this.triCount(p.index) > 0) p.mesh.geometry.computeBoundsTree({ indirect: true });
   }
 
   getTree(): ModelNode {
@@ -1099,8 +1104,30 @@ export class ViewerEngine {
   private updateSnap(s: SnapPoint | null) {
     this.snap = s;
     this.snapText = s ? this.describeSnap(s) : "";
-    this.clearSnapHighlight();
-    if (s) this.highlightSnap(s);
+    // zvýraznění hrany / plochy jen při změně (ne při každém pohybu myši — velké plochy by se sekaly)
+    const curve = s && this.parts[s.part] ? this.curveAt(this.parts[s.part], s) : -1;
+    const key = s ? `${s.part}|${curve}|${s.kind === "face" ? (s.geometry?.faceIndex ?? -1) : -1}` : "";
+    if (key !== this.snapShapeKey) {
+      this.clearSnapShape();
+      if (s) this.highlightSnap(s, curve);
+      this.snapShapeKey = key;
+    }
+    if (s) {
+      if (!this.snapPointObj) {
+        const pg = new THREE.BufferGeometry();
+        pg.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0], 3));
+        this.snapPointObj = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xff3b00, size: 9, sizeAttenuation: false, depthTest: false }));
+        this.snapPointObj.renderOrder = 11;
+        this.overlayGroup.add(this.snapPointObj);
+      }
+      const attr = this.snapPointObj.geometry.getAttribute("position") as THREE.BufferAttribute;
+      attr.setXYZ(0, s.point[0], s.point[1], s.point[2]);
+      attr.needsUpdate = true;
+      this.snapPointObj.geometry.computeBoundingSphere();
+      this.snapPointObj.visible = true;
+    } else if (this.snapPointObj) {
+      this.snapPointObj.visible = false;
+    }
     this.requestRender();
     this.onChange("snap");
   }
@@ -1119,26 +1146,27 @@ export class ViewerEngine {
     return "Na ploše";
   }
 
-  private clearSnapHighlight() {
+  private clearSnapShape() {
     if (this.snapHighlight) {
       this.overlayGroup.remove(this.snapHighlight);
-      this.snapHighlight.traverse((o) => {
-        const x = o as THREE.Mesh;
-        if (x.geometry) x.geometry.dispose();
-        if (x.material) (x.material as THREE.Material).dispose();
-      });
+      disposeObject(this.snapHighlight);
       this.snapHighlight = null;
     }
+    this.snapShapeKey = "";
+  }
+
+  private clearSnapHighlight() {
+    this.clearSnapShape();
+    if (this.snapPointObj) this.snapPointObj.visible = false;
   }
 
   /** Zvýraznit hranu / plochu, na kterou se uchopuje. */
-  private highlightSnap(s: SnapPoint) {
+  private highlightSnap(s: SnapPoint, curveIdx: number) {
     const p = this.parts[s.part];
     if (!p) return;
     const group = new THREE.Group();
     group.renderOrder = 10;
     // křivka
-    const curveIdx = this.curveAt(p, s);
     if (curveIdx >= 0) {
       const c = p.topo.curves[curveIdx];
       const arr = p.topo.edgeSegments.slice(c.segStart * 6, (c.segStart + c.segCount) * 6);
@@ -1151,7 +1179,7 @@ export class ViewerEngine {
       const fi = s.geometry?.faceIndex;
       if (fi !== undefined) {
         const tris = this.faceTriangles(p, fi);
-        if (tris.length && tris.length < 400000) {
+        if (tris.length && tris.length <= FACE_HIGHLIGHT_MAX_TRIS) {
           const src = p.mesh.geometry;
           const pos = src.getAttribute("position").array as Float32Array;
           const idx = src.index ? (src.index.array as Uint32Array) : null;
@@ -1176,12 +1204,6 @@ export class ViewerEngine {
         }
       }
     }
-    // bod
-    const pg = new THREE.BufferGeometry();
-    pg.setAttribute("position", new THREE.Float32BufferAttribute(s.point, 3));
-    const pts = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xff3b00, size: 9, sizeAttenuation: false, depthTest: false }));
-    pts.renderOrder = 11;
-    group.add(pts);
     this.snapHighlight = group;
     this.overlayGroup.add(group);
   }
