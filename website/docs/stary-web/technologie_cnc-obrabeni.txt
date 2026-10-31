@@ -1,0 +1,105 @@
+
++420 774 534 513
+ Vždy v termínu.
+ Ručíme za výsledek.
+ Férový a profesionální přístup.
+ ISO 9001 a 14001.
+ Přebíráme odpovědnost za výrobu.
+ Nástrojárna uprostřed ČR.
+CNC obrábění
+TECHNOLOGIE
+CNC obrábění
+CNC obrábění
+	Náš tým zajišťuje širokou škálu výroby v oblasti 
+CNC obrábění
+ i 
+komplexních dodávek dílů
+ včetně 
+povrchových a tepelných úprav
+. Máme 
+moderní CNC strojový park 
+se 
+stářím strojů maximálně 5 let
+. Klademe vysoký důraz na přesnost a kvalitu našich výrobků. Soustředíme se na 
+kusovou a malosériovou výrobu
+.
+CNC soustružení
+ - vyrábíme vše od jednodušších soustružnických dílů, až po ty nejnáročnější hřídele, ozubená kola, ale i soustružené a současně pětiosé frézované díly. Vše díky kombinaci běžného dvouvřetenového soustruhu a pětiosého obráběcího centra v jednom stroji.
+CNC frézování
+ - disponujeme několika obráběcími centry, včetně dvou 
+pětiosých
+, které programujeme přes CAD/CAM software ZW3D, Esprit či NCG CAM. Vyrábíme a dodáváme veškeré tvarově složité i rozměrově přesné díly až do průměru 900 mm.
+Elektroerozivní obrábění
+ – mimo třískové metody obrábění nabízíme drátové řezání velkých dílců. Drátořez FANUC ROBOCUT programujeme přes software Cami a řežeme obrobky až do výšky 500 mm.
+VMCA 760
+	Toto malé, spolehlivé, 
+tříosé
+, 
+frézovací centrum
+ umožňuje 
+frézování, vrtání, vyvrtávání, i přímé řezání závitů
+. Stroj pracuje s operačním systémem Fagor vynikajícím pro produktivní kusovou výrobu.
+	Svou snadnou programovatelností stroj výrazně urychluje výrobní cyklus a snižuje výrobní náklady, čímž zvyšuje celkovou efektivitu výroby, a umožňuje tak dosáhnout uspokojivých ekonomických výsledků.
+Technické údaje
+		t-drážky (šířka × rozteč × počet): 16 × 100 × 4 mm
+		přejezdy X / Y / Z:  760 / 440 / 460 mm
+		kužel vřetena: ISO 40
+		otáčky vřetena: 8 000 ot./min
+		zatížení stolu: 350 kg
+		plocha stolu: 900 x 410 mm
+MCV 754Q
+	Další z našich malých 
+obráběcích center
+ s vysokou tuhostí i přesností díky pravítkům zpětného odměřování HEIDENHAIN. Stroj je postaven na nosném litinovém rámu ve tvaru C a disponuje řídicím systémem HEIDENHAIN iTNC530 HSCI a zásobníkem na 24 nástrojů s mechanickou rukou pro rychlou výměnu nástrojů.
+Technické údaje
+		otáčky vřetena: 10 000 ot./min.
+		počet nástrojů: 24
+		přejezdy X / Y / Z: 754 / 500 / 550 mm
+		plocha stolu: 1 000 x 500 mm
+		zatížení stolu: 400 kg
+		kužel vřetena: ISO 40
+AXILE G8
+Pětiosé obráběcí centrum AXILE G8
+ patří mezi velká frézovací centra určená pro kontinuální 
+pětiosá obrábění velkých obrobků
+ až do průměru 1 000 mm. Centrum se vyznačuje vysokou tuhostí díky uložení kolébky v litinovém rámu stroje na obou stranách a dvěma motory v ose Y.
+	Centrum je postaveno na řídicím systému HEIDENHAIN iTNC640 s pravítky pro zpětné odměřování. Programuje se přes CAD/CAM software NCG a ESPRIT. Je vybaveno automatickými sondami pro měření obrobků a laserové měření nástrojů.
+Technické údaje
+		otáčky vřetena: 15 000 ot./min.
+		maximální průměr obrobku: 1 000mm
+		počet nástrojů: 120
+		přejezdy X / Y / Z/: 800 / 850 / 550 mm
+		osy A/C: (+-120°)/ 380°
+		průměr stolu: 800 mm
+		zatížení stolu: 3000 kg
+		kužel vřetena: HSK 63A
+Vybavení
+		HSK 63A na kleštiny ER32 délky 100 mm – 70 ks
+		HSK 63A na kleštiny ER32 délky 150 mm – 40 ks
+		HSK 63A na kleštiny ER32 délky 50 mm – 30 ks
+	Tento stroj a vybavení byly pořízeny z projektu 
+„Vybavení nového prototypového centra společnosti MNástrojárna s.r.o., reg. č.
+ CZ.01.1.02/0.0/0.0/17_093/0012410".
+Na stroji nabízíme provádění zkoušek externím subjektům za tržních podmínek.
+Soupis nabízených zkoušek
+		ověření konstrukce (výroba prototypů)
+		měření složitých tvarů
+		ověření technologické obrobitelnosti
+HYPERTUN 65 Powermill
+Dvouvřetenový soustruh a pětiosé frézovací centrum
+ v jednom - to je HYPERTUN 65 Powermill vybavený řídicím systémem Sinumerik 840D a CAD/CAM systémem Esprit. Zapojením tohoto stroje do pracovního procesu odpadají zdlouhavé a nákladné operace v několika výrobních cyklech tím, že se sloučí do jednoho.
+Soustružíme
+ rovněž na vysokoproduktivním stroji 
+SAB 50 CNC
+ se šikmým nožem a lineárními vedeními. 
+Soustruh 
+charakterizuje jeho vysoká spolehlivost, přesnost a jednoduchá obsluha operačního systému Fagor.
+Technické údaje
+		maximální točná délka: 1150 mm
+		točný průměr nad lóžem: 500 mm
+		otáčky vřeten 5 000 ot./min.
+		otáčky frézovacího vřetena: 12 000/ot./min
+		počet nástrojů v zásobníku: 104
+		velikost sklíčidla: 250 mm
+		vzdálenost mezi hroty: 1 300 mm
+		průchod vřetena: 64 mm

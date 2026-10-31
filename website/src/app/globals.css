@@ -1,0 +1,208 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: 224 57 48;
+  --ink: 15 14 14;
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-white text-ink-700 antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  ::selection {
+    background: rgb(var(--brand) / 0.85);
+    color: white;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-[15px] font-semibold tracking-tight transition-all duration-300 will-change-transform;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white shadow-[0_10px_30px_-10px_rgba(224,57,48,.8)] hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-[0_18px_40px_-12px_rgba(224,57,48,.9)];
+  }
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.8s ease;
+  }
+  .btn-primary:hover::after {
+    transform: translateX(120%);
+  }
+  .btn-ghost-dark {
+    @apply btn border border-white/15 bg-white/5 text-white backdrop-blur hover:border-white/40 hover:bg-white/10;
+  }
+  .btn-ghost {
+    @apply btn border border-ink-700/15 bg-white text-ink-700 hover:border-ink-700/40;
+  }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-brand;
+  }
+  .eyebrow::before {
+    content: "";
+    @apply inline-block h-px w-6 bg-brand;
+  }
+  .h-display {
+    @apply font-display font-bold uppercase leading-[0.95] tracking-tight;
+  }
+  .section {
+    @apply py-20 md:py-28;
+  }
+  .card {
+    @apply rounded-2xl border border-ink-700/10 bg-white p-6 transition-all duration-300;
+  }
+  .card-dark {
+    @apply rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all duration-300;
+  }
+  .input {
+    @apply w-full rounded-xl border border-ink-700/15 bg-white px-4 py-3 text-[15px] text-ink-700 outline-none transition placeholder:text-steel-400 focus:border-brand focus:ring-4 focus:ring-brand/15;
+  }
+  .label {
+    @apply mb-1.5 block text-[13px] font-semibold text-ink-700;
+  }
+  .prose-mn p {
+    @apply mb-4 text-[17px] leading-relaxed text-ink-700/80;
+  }
+}
+
+/* Technický rastr (blueprint) */
+.bg-grid {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.bg-grid-light {
+  background-image: linear-gradient(rgba(39, 36, 37, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 36, 37, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.mask-fade {
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+.text-glow {
+  text-shadow: 0 0 28px rgba(224, 57, 48, 0.55);
+}
+.noise::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Reveal při scrollu — třídu .is-visible přidává <RevealObserver/>; bez JS je vše vidět. */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.js [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Karta se září sledující kurzor */
+.spot {
+  position: relative;
+  isolation: isolate;
+}
+.spot::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(224, 57, 48, 0.75), transparent 45%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s;
+  z-index: -1;
+}
+.spot:hover::before {
+  opacity: 1;
+}
+
+/* Logo — animace */
+.mn-logo .band {
+  transform-box: fill-box;
+}
+.mn-logo.animate .band {
+  animation: band-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.mn-logo.animate .band:nth-child(1) { animation-delay: 0.05s; }
+.mn-logo.animate .band:nth-child(2) { animation-delay: 0.15s; }
+.mn-logo.animate .band:nth-child(3) { animation-delay: 0.25s; }
+.mn-logo.animate .band:nth-child(4) { animation-delay: 0.35s; }
+.mn-logo.animate .chip {
+  transform-box: fill-box;
+  animation: chip-out 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: 0.55s;
+}
+.mn-logo .chip {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-box: fill-box;
+}
+.mn-logo:hover .chip:nth-child(odd) { transform: translate(-3px, 2px); }
+.mn-logo:hover .chip:nth-child(even) { transform: translate(-2px, 3px); }
+.mn-logo .glow {
+  transition: opacity 0.4s;
+}
+.mn-logo:hover .glow {
+  opacity: 0.9 !important;
+}
+
+@keyframes band-in {
+  0% { transform: translateX(-30%); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes chip-out {
+  0% { transform: translate(40%, -40%) scale(0.2); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .js [data-reveal] { opacity: 1; transform: none; }
+}
+
+.scanx {
+  animation: scanx 5s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+@keyframes scanx {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.marquee-track {
+  animation: marquee 45s linear infinite;
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
