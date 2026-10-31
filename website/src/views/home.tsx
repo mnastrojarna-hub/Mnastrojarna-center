@@ -82,7 +82,7 @@ export function HomeView({ locale }: { locale: Locale }) {
           <div className="marquee-track flex w-max gap-3">
             {[...WALL.slice(0, 8), ...WALL.slice(0, 8)].map((p, i) => (
               <div key={i} className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl">
-                <Image src={p.src} alt="" fill sizes="128px" className="object-cover" />
+                <Image src={p.src} alt="" fill sizes="128px" className="object-cover" priority={i < 3} loading={i < 3 ? "eager" : "lazy"} />
               </div>
             ))}
           </div>
@@ -93,8 +93,11 @@ export function HomeView({ locale }: { locale: Locale }) {
       <section className="py-28 md:py-44">
         <div className="container max-w-6xl">
           <p className="eyebrow mb-10">Manifest</p>
-          <p data-scrub-text className="font-display text-[clamp(1.9rem,4.4vw,4.4rem)] font-bold leading-[1.08] tracking-tight text-ink-700">
-            {h.manifesto}
+          <p className="font-display text-[clamp(1.9rem,4.4vw,4.4rem)] font-bold leading-[1.08] tracking-tight text-ink-700">
+            <span className="sr-only">{h.manifesto}</span>
+            <span data-scrub-text aria-hidden className="block">
+              {h.manifesto}
+            </span>
           </p>
         </div>
       </section>
@@ -179,7 +182,7 @@ export function HomeView({ locale }: { locale: Locale }) {
             <div key={r} className={`logo-row flex w-max gap-4 ${r ? "rev" : ""}`}>
               {[...row, ...row, ...row].map((c, i) => (
                 <div key={c.id + i} className="group relative h-24 w-52 shrink-0 rounded-2xl border border-ink-700/10 bg-white" title={c.client}>
-                  <Image src={c.logo!} alt={c.client} fill sizes="208px" className="object-contain p-6 opacity-60 grayscale transition duration-500 group-hover:opacity-100 group-hover:grayscale-0" />
+                  <Image src={c.logo!} alt={c.client} fill sizes="(min-width:768px) 260px, 45vw" className="object-contain p-6 opacity-60 grayscale transition duration-500 group-hover:opacity-100 group-hover:grayscale-0" />
                 </div>
               ))}
             </div>

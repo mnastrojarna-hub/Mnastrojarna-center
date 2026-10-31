@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Interference } from "@/cad/asm-kernel";
-import { alignFaces, apply3, bomCsv, computeBom, emptyAssembly, ejectorPin, explodeOffset, guideBush, guidePillar, locatingRing, moldBase, partComponent, placementMatrix, rotMatrix, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
+import { alignFaces, apply3, bomCsv, emptyAssembly, ejectorPin, explodeOffset, guideBush, guidePillar, locatingRing, moldBase, partComponent, placementMatrix, rotMatrix, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import { cad } from "@/cad/client";
 import { EXAMPLES, FEATURE_LABEL, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
@@ -24,7 +24,7 @@ import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, typ
 import { FEATURE_TONE, Manager } from "./manager";
 import { EntityProps, FeatureProps, ParamContext } from "./props";
 import { ContextMenu, Dropdown, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
-import { Sketcher, type SketchTool } from "./sketcher";
+import { Sketcher, sketchRibbon, type SketchPatch, type SketchTool } from "./sketcher";
 import { Viewport, type AsmView, type Datum, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
@@ -608,7 +608,7 @@ export function CadApp() {
   // ---------- kontextové nabídky podle entity ----------
   const COLOR_MENU = (apply: (c: string | null) => void, label: string): RMenuEntry[] => [
     { divider: true, label },
-    ...COLORS.slice(4).concat(COLORS.slice(0, 4)).map((c) => ({ id: `c${c.c}`, label: `● ${c.l}`, icon: "palette" as CadIconName, onClick: () => apply(c.c) })),
+    ...[COLORS[6], COLORS[4], COLORS[5], COLORS[0], COLORS[7]].map((c) => ({ id: `c${c.c}`, label: `● ${c.l}`, icon: "palette" as CadIconName, onClick: () => apply(c.c) })),
     { id: "c-reset", label: "Výchozí barva", icon: "palette", onClick: () => apply(null) },
   ];
   const entityMenu = (it: SelItem | null): RMenuEntry[] => {
@@ -622,12 +622,12 @@ export function CadApp() {
       return [
         head,
         { id: "sk", label: "Nová skica na ploše", icon: "sketch", tone: "sketch", onClick: () => sketchOnFace(it.index) },
-        { id: "pp", label: "Vytáhnout / Zatlačit", icon: "extrude", tone: "create", onClick: () => addWithFaces("pushPull", faces) },
-        { id: "of", label: "Odsadit plochu", icon: "shell", tone: "feature", onClick: () => addWithFaces("offsetFace", faces) },
-        { id: "df", label: "Odstranit plochu", icon: "trash", tone: "cut", kbd: "Del", onClick: () => addWithFaces("deleteFace", faces) },
+        { id: "pp", label: "Vytáhnout / Zatlačit", icon: "pushPull", tone: "create", onClick: () => addWithFaces("pushPull", faces) },
+        { id: "of", label: "Odsadit plochu", icon: "offsetFace", tone: "feature", onClick: () => addWithFaces("offsetFace", faces) },
+        { id: "df", label: "Odstranit plochu", icon: "deleteFace", tone: "cut", kbd: "Del", onClick: () => addWithFaces("deleteFace", faces) },
         { id: "dr", label: "Úkos", icon: "draft", tone: "feature", onClick: () => addWithFaces("draft", faces) },
         { id: "sh", label: "Skořepina (otevřít plochu)", icon: "shell", tone: "feature", onClick: () => addWithFaces("shell", faces) },
-        { id: "th", label: "Zesílit", icon: "thicken" as CadIconName, tone: "feature", onClick: () => addWithFaces("thicken", faces) },
+        { id: "th", label: "Zesílit", icon: "thicken", tone: "feature", onClick: () => addWithFaces("thicken", faces) },
         meas,
         props,
         ...COLOR_MENU((c) => setFaceColor(faces, c), "Barva plochy"),
@@ -804,7 +804,7 @@ export function CadApp() {
   };
   const onPickFace = async (i: number, point?: [number, number, number]) => {
     if (planePick) return sketchOnFace(i);
-    if (active && "faces" in active && active.type !== "hole" && FACE_PICK.has(active.type)) {
+    if (active && "faces" in active && FACE_PICK.has(active.type)) {
       const faces = active.faces.includes(i) ? active.faces.filter((x) => x !== i) : [...active.faces, i];
       updateFeature(active.id, { faces } as Partial<Feature>);
     }
@@ -1029,6 +1029,15 @@ export function CadApp() {
     },
     [doc, sketchId, commit, live],
   );
+  /** změna skici z editoru: entity + vazby + kóty najednou */
+  const setSketchPatch = useCallback(
+    (patch: SketchPatch, record = true) => {
+      if (!sketchId) return;
+      const next = { ...doc, features: doc.features.map((f) => (f.id === sketchId ? ({ ...f, ...patch } as Feature) : f)) };
+      (record ? commit : live)(next);
+    },
+    [doc, sketchId, commit, live],
+  );
 
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];
   const m = result?.metrics;
@@ -1079,16 +1088,29 @@ export function CadApp() {
           { id: "hole", label: "Díra", icon: "hole", tone: "cut", kbd: "H", onClick: () => addFeature("hole"), hint: "vrtaná, zahloubená, se závitem" },
           { id: "thread", label: "Závit", icon: "thread", tone: "cut", onClick: () => addFeature("thread") },
           { id: "split", label: "Rozříznout", icon: "split", tone: "cut", onClick: () => addFeature("split") },
+          { id: "rib", label: "Žebro", icon: "rib", tone: "create", onClick: () => addFeature("rib"), hint: "z otevřené skici" },
+          { id: "spring", label: "Pružina", icon: "spring", tone: "create", onClick: () => addFeature("spring"), hint: "šroubovice s průřezem" },
         ],
       },
       {
         label: "Úpravy",
         big: 1,
         items: [
-          { id: "fillet", label: "Zaoblit", icon: "fillet", tone: "feature", onClick: () => addFeature("fillet") },
-          { id: "chamfer", label: "Srazit", icon: "chamfer", tone: "feature", onClick: () => addFeature("chamfer") },
-          { id: "draft", label: "Úkos", icon: "draft", tone: "feature", onClick: () => addFeature("draft") },
-          { id: "shell", label: "Skořepina", icon: "shell", tone: "feature", onClick: () => addFeature("shell") },
+          { id: "fillet", label: "Zaoblit", icon: "fillet", tone: "feature", onClick: () => (selEdges.length ? addWithEdges("fillet") : addFeature("fillet")) },
+          { id: "chamfer", label: "Srazit", icon: "chamfer", tone: "feature", onClick: () => (selEdges.length ? addWithEdges("chamfer") : addFeature("chamfer")) },
+          { id: "draft", label: "Úkos", icon: "draft", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("draft") : addFeature("draft")) },
+          { id: "shell", label: "Skořepina", icon: "shell", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("shell") : addFeature("shell")) },
+        ],
+      },
+      {
+        label: "Přímé úpravy",
+        big: 1,
+        items: [
+          { id: "pushPull", label: "Vytáhnout / Zatlačit", icon: "pushPull", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("pushPull") : addFeature("pushPull")), hint: "posun vybraných ploch" },
+          { id: "offsetFace", label: "Odsadit plochu", icon: "offsetFace", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("offsetFace") : addFeature("offsetFace")) },
+          { id: "deleteFace", label: "Odstranit plochu", icon: "deleteFace", tone: "cut", onClick: () => (selFaces.length ? addWithFaces("deleteFace") : addFeature("deleteFace")), hint: "odebere zaoblení, díry… a zacelí těleso" },
+          { id: "thicken", label: "Zesílit", icon: "thicken", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("thicken") : addFeature("thicken")) },
+          { id: "faceColor", label: "Barva plochy", icon: "palette", tone: "view", disabled: !selFaces.length, menu: [COLORS[6], COLORS[4], COLORS[5], COLORS[0], COLORS[7]].map((c) => ({ id: c.c, label: `● ${c.l}`, icon: "palette" as CadIconName, onClick: () => setFaceColor(selFaces, c.c) })).concat([{ id: "reset", label: "Výchozí barva", icon: "palette" as CadIconName, onClick: () => setFaceColor(selFaces, null) }]) },
         ],
       },
       {
@@ -1097,7 +1119,7 @@ export function CadApp() {
         items: [
           { id: "pattern", label: "Pole", icon: "pattern", tone: "pattern", onClick: addPattern },
           { id: "mirror", label: "Zrcadlit", icon: "mirror", tone: "pattern", onClick: () => addFeature("mirror") },
-          { id: "transform", label: "Přesunout", icon: "transform", tone: "pattern", onClick: () => addFeature("transform") },
+          { id: "transform", label: "Přesunout / otočit", icon: "transform", tone: "pattern", onClick: startBodyGizmo, hint: "gizmo – posun 1 mm, otočení 15°" },
         ],
       },
       { label: "Reference", items: [{ id: "datum", label: "Rovina", icon: "datum", tone: "ref", onClick: () => addFeature("datum"), hint: "pomocná rovina pro skici" }] },
@@ -1122,6 +1144,34 @@ export function CadApp() {
           { id: "ring", label: "Středicí kroužek", icon: "tube", tone: "pattern", onClick: () => insertPart(locatingRing(100, 10)) },
         ],
       },
+      {
+        label: "Přesun",
+        big: 1,
+        items: [
+          { id: "gz", label: "Přesunout / otočit", icon: "transform", tone: "pattern", kbd: "G", disabled: !asmSel, active: gizmoOn?.target === "component", onClick: () => (gizmoOn ? setGizmoOn(null) : asmSel && startCompGizmo(asmSel)) },
+          {
+            id: "sub",
+            label: "Podsestava",
+            icon: "layers",
+            tone: "create",
+            menu: [
+              {
+                id: "mk",
+                label: "Vytvořit z vybraných (Ctrl+klik)",
+                icon: "layers",
+                onClick: () => {
+                  const tops = [...new Set(selection.flatMap((x) => (x.kind === "component" || x.kind === "body" || x.kind === "face" ? [((x.topId ?? x.compId) ?? "").split("/")[0]] : [])).filter(Boolean))];
+                  if (tops.length < 1) return flash("Vyberte komponenty (filtr Komponenta, Ctrl+klik).");
+                  commit(makeSubassembly(doc, tops, `Podsestava ${(doc.components ?? []).filter((x) => x.source.kind === "asm").length + 1}`));
+                  setSelection([]);
+                },
+              },
+              { id: "dis", label: "Rozpustit vybranou", icon: "layers", disabled: doc.components?.find((c) => c.id === asmSel)?.source.kind !== "asm", onClick: () => asmSel && commit(dissolveSubassembly(doc, asmSel)) },
+              { id: "open", label: "Otevřít vybranou", icon: "edit", disabled: doc.components?.find((c) => c.id === asmSel)?.source.kind !== "asm", onClick: () => { const c = doc.components?.find((x) => x.id === asmSel); if (c) editPartInContext(c); } },
+            ],
+          },
+        ],
+      },
       { label: "Formy", items: [{ id: "mold", label: "Rám formy", icon: "layers", tone: "create", onClick: () => setMoldOpen(true), hint: "kompletní rám vstřikovací formy" }] },
       {
         label: "Vazby",
@@ -1142,38 +1192,28 @@ export function CadApp() {
         ],
       },
     ],
-    sketch: [
-      {
-        label: "Kreslení",
-        big: 7,
-        items: (
-          [
-            ["select", "Výběr", "select", "V"],
-            ["line", "Úsečka", "line", "L"],
-            ["rect", "Obdélník", "rect", "R"],
-            ["circle", "Kružnice", "circle", "C"],
-            ["arc", "Oblouk", "arc", "A"],
-            ["polygon", "Mnohoúhelník", "polygon", "P"],
-            ["slot", "Drážka", "slot", "S"],
-          ] as [SketchTool, string, CadIconName, string][]
-        ).map(([t, l, i, k]) => ({ id: t, label: l, icon: i, tone: "sketch" as const, kbd: k, active: tool === t, onClick: () => setTool(t) })),
-      },
-      {
-        label: "Nastavení",
-        big: 0,
-        items: [
-          { id: "snap", label: "Přichytit k mřížce", icon: "grid", tone: "view", active: snapGrid, onClick: () => setSnapGrid((v) => !v) },
-          { id: "dxf", label: "Export skici DXF", icon: "export", tone: "file", onClick: () => sketch && download(`${safeName(sketch.name)}.dxf`, sketchToDxf(sketch.entities), "application/dxf") },
-          { id: "imp", label: "Import DXF…", icon: "open", tone: "file", onClick: () => fileInput.current?.click() },
-        ],
-      },
-    ],
+    sketch: sketchRibbon({
+      tool,
+      setTool,
+      snapGrid,
+      setSnapGrid: (v) => setSnapGrid(v),
+      onExportDxf: () => sketch && download(`${safeName(sketch.name)}.dxf`, sketchToDxf(sketch.entities), "application/dxf"),
+      onImportDxf: () => fileInput.current?.click(),
+    }),
     tools: [
       {
         label: "Analýza",
         big: 2,
         items: [
-          { id: "measure", label: "Měřit", icon: "measure", tone: "tool", kbd: "M", active: measure, disabled: !hasBody, onClick: toggleMeasure, hint: "vzdálenost dvou bodů" },
+          { id: "measure", label: "Měřit", icon: "measure", tone: "tool", kbd: "M", active: measure, disabled: !hasBody, onClick: toggleMeasure, hint: "vzdálenost, úhel, poloměr mezi body, hranami, plochami" },
+          { id: "inspect", label: "Vlastnosti", icon: "info", tone: "tool", active: inspectOpen, onClick: () => setInspectOpen((v) => !v), hint: "informace o vybrané entitě" },
+          {
+            id: "filter",
+            label: `Filtr: ${FILTER_LABEL[selFilter]}`,
+            icon: "select",
+            tone: "tool",
+            menu: (Object.keys(FILTER_LABEL) as SelFilter[]).filter((f) => isAsm || (f !== "component" && f !== "subasm")).map((f) => ({ id: f, label: FILTER_LABEL[f], icon: "select" as CadIconName, active: selFilter === f, onClick: () => setSelFilter(f) })),
+          },
           { id: "mass", label: "Hmotnost", icon: "mass", tone: "tool", disabled: !hasBody, onClick: () => setMassOpen(true), hint: "objem, plocha, hmotnost" },
           { id: "section", label: "Řez", icon: "section", tone: "tool", kbd: "X", active: !!section, disabled: !hasBody, onClick: toggleSection },
         ],
@@ -1294,22 +1334,24 @@ export function CadApp() {
         ? "Vazba: klikněte na rovinnou plochu vybrané (pohyblivé) komponenty · Esc zruší"
         : "Vazba: klikněte na rovinnou plochu cílové komponenty"
       : measure
-        ? measurePts.length < 2
-          ? "Měření: klikněte na body modelu"
-          : "Měření hotovo – kliknutím začnete nové"
+        ? measureSel.length < 2
+          ? `Měření (${FILTER_LABEL[selFilter]}): klikněte na ${measureSel.length ? "druhou" : "první"} entitu`
+          : "Měření hotovo – kliknutím začnete nové · Esc ukončí"
+        : gizmoOn
+          ? "Táhněte šipkami gizma (posun) nebo oblouky (otočení) · R přepne režim · Esc ukončí"
         : asmLoading
           ? "Stavím komponenty…"
           : asmSel
-            ? "Komponenta vybrána: upravte polohu vpravo, vazbu nastavte tlačítky Kontakt/Zarovnat/Vystředit · pravé tlačítko = nabídka"
-            : `Sestava · ${doc.components?.length ?? 0} komponent · klikněte na komponentu pro výběr`
+            ? "Komponenta vybrána: G = gizmo přesunu, vazby Kontakt/Zarovnat/Vystředit · pravé tlačítko = nabídka · Ctrl+klik = více"
+            : `Sestava · ${doc.components?.length ?? 0} komponent · filtr výběru: ${FILTER_LABEL[selFilter]} · pravé tlačítko = nabídka`
     : planePick
     ? "Vyberte rovinnou plochu, na které se založí skica · Esc zruší"
     : measure
-      ? measurePts.length === 0
-        ? "Měření: klikněte na první bod (přichytává se k vrcholům)"
-        : measurePts.length === 1
-          ? "Měření: klikněte na druhý bod"
-          : "Měření hotovo – kliknutím začnete nové · Esc ukončí"
+      ? measureSel.length < 2
+        ? `Měření (${FILTER_LABEL[selFilter]}): klikněte na ${measureSel.length ? "druhou" : "první"} entitu – bod, hranu, plochu nebo těleso`
+        : "Měření hotovo – kliknutím začnete nové · Esc ukončí"
+      : gizmoOn
+        ? "Táhněte šipkami gizma (posun 1 mm) nebo oblouky (otočení 15°) · R přepne režim · Hotovo potvrdí"
       : sketch
         ? `Skica na rovině ${planeLabel(sketch.plane)} · kreslete myší, rozměry upravíte v panelu vpravo`
         : active
@@ -1324,27 +1366,44 @@ export function CadApp() {
                 : active.type === "hole"
                   ? "Klikněte na plochu, kam se má vrtat · Enter = OK"
                   : `${FEATURE_LABEL[active.type]}: upravte parametry · Enter = OK, Esc = Storno`
-          : "Vyberte příkaz na pásu karet nebo prvek v historii · pravé tlačítko = nabídka";
+          : selection.length
+            ? `Vybráno: ${selection.length}× ${KIND_LABEL[selection[0].kind].toLowerCase()} · pravé tlačítko = příkazy pro výběr · Esc zruší`
+            : `Filtr výběru: ${FILTER_LABEL[selFilter]} · klikněte na entitu · pravé tlačítko = nabídka`;
 
-  const vpContext = (x: number, y: number, face: number) => {
-    const selComp = isAsm ? doc.components?.find((c) => c.id === asmSel) : undefined;
+  const vpContext = (x: number, y: number, item: SelItem | null) => {
+    if (item && !mate && !measure && !selection.some((x2) => sameSel(x2, item))) {
+      setSelection([item]);
+      if (isAsm && item.kind !== "feature") {
+        const top = item.topId ?? item.compId;
+        if (top) setAsmSel(top.split("/")[0]);
+      }
+    }
+    const ent = entityMenu(item);
     const entries: RMenuEntry[] = [
-      ...(selComp ? ([{ divider: true, label: selComp.name }, ...compMenu(selComp), { divider: true }] as RMenuEntry[]) : []),
-      { id: "fit", label: "Přizpůsobit", icon: "fit", kbd: "F", onClick: () => vp.current?.fit() },
-      { id: "iso", label: "Izometrie", icon: "iso", kbd: "0", onClick: () => view("iso") },
-      { divider: true, label: "Pohledy" },
-      { id: "front", label: "Přední", icon: "front", kbd: "1", onClick: () => view("front") },
-      { id: "top", label: "Horní", icon: "top", kbd: "2", onClick: () => view("top") },
-      { id: "right", label: "Pravý", icon: "right", kbd: "3", onClick: () => view("right") },
-      { divider: true, label: "Styl" },
-      { id: "se", label: "Stínovaný s hranami", icon: "shadedEdges", active: prefs.display === "shadedEdges", onClick: () => setPref("display", "shadedEdges") },
-      { id: "wf", label: "Drátový", icon: "wireframe", active: prefs.display === "wireframe", onClick: () => setPref("display", "wireframe") },
-      { id: "xr", label: "Průhledný", icon: "xray", active: prefs.display === "xray", onClick: () => setPref("display", "xray") },
+      ...ent,
+      ...(ent.length ? ([{ divider: true, label: "Zobrazení" }] as RMenuEntry[]) : []),
+      { id: "v-fit", label: "Přizpůsobit", icon: "fit", kbd: "F", onClick: () => vp.current?.fit() },
+      { id: "v-iso", label: "Izometrie", icon: "iso", kbd: "0", onClick: () => view("iso") },
+      ...(!item
+        ? ([
+            { id: "v-front", label: "Přední", icon: "front", kbd: "1", onClick: () => view("front") },
+            { id: "v-top", label: "Horní", icon: "top", kbd: "2", onClick: () => view("top") },
+            { id: "v-right", label: "Pravý", icon: "right", kbd: "3", onClick: () => view("right") },
+            { divider: true, label: "Styl" },
+            { id: "v-se", label: "Stínovaný s hranami", icon: "shadedEdges", active: prefs.display === "shadedEdges", onClick: () => setPref("display", "shadedEdges") },
+            { id: "v-wf", label: "Drátový", icon: "wireframe", active: prefs.display === "wireframe", onClick: () => setPref("display", "wireframe") },
+            { id: "v-xr", label: "Průhledný", icon: "xray", active: prefs.display === "xray", onClick: () => setPref("display", "xray") },
+            { divider: true, label: "Filtr výběru" },
+            ...(Object.keys(FILTER_LABEL) as SelFilter[])
+              .filter((f) => isAsm || (f !== "component" && f !== "subasm"))
+              .map((f) => ({ id: `flt-${f}`, label: FILTER_LABEL[f], icon: "select" as CadIconName, active: selFilter === f, onClick: () => setSelFilter(f) })),
+          ] as RMenuEntry[])
+        : []),
       { divider: true },
-      ...(face >= 0 ? ([{ id: "sk", label: "Nová skica na této ploše", icon: "sketch", tone: "sketch", onClick: () => sketchOnFace(face) }] as RMenuEntry[]) : []),
-      { id: "ms", label: measure ? "Ukončit měření" : "Měřit", icon: "measure", tone: "tool", kbd: "M", disabled: !hasBody, onClick: toggleMeasure },
-      { id: "sec", label: section ? "Zrušit řez" : "Řez", icon: "section", tone: "tool", kbd: "X", disabled: !hasBody, onClick: toggleSection },
-      ...(active ? ([{ divider: true }, { id: "ok", label: "OK – potvrdit prvek", icon: "check", onClick: okEdit }, { id: "cancel", label: "Storno", icon: "x", onClick: cancelEdit }] as RMenuEntry[]) : []),
+      { id: "v-ms", label: measure ? "Ukončit měření" : "Měřit", icon: "measure", tone: "tool", kbd: "M", disabled: !hasBody, onClick: toggleMeasure },
+      { id: "v-sec", label: section ? "Zrušit řez" : "Řez", icon: "section", tone: "tool", kbd: "X", disabled: !hasBody, onClick: toggleSection },
+      ...(selection.length ? ([{ id: "v-clr", label: `Zrušit výběr (${selection.length})`, icon: "x", kbd: "Esc", onClick: () => { setSelection([]); setInspect(null); } }] as RMenuEntry[]) : []),
+      ...(active ? ([{ divider: true }, { id: "v-ok", label: "OK – potvrdit prvek", icon: "check", onClick: okEdit }, { id: "v-cancel", label: "Storno", icon: "x", onClick: cancelEdit }] as RMenuEntry[]) : []),
     ];
     setCtx({ x, y, entries });
   };
@@ -1363,7 +1422,7 @@ export function CadApp() {
     [doc, resolved.values, commit],
   );
 
-  const dist = measurePts.length === 2 ? Math.hypot(measurePts[1][0] - measurePts[0][0], measurePts[1][1] - measurePts[0][1], measurePts[1][2] - measurePts[0][2]) : null;
+  const measureGfx: MeasureGfx | null = measure && measureRes ? measureRes.gfx : null;
   const bb = m ? m.bbox : null;
 
   // ---------- UI ----------
@@ -1503,11 +1562,19 @@ export function CadApp() {
                 datums={datums}
                 pickMode={pickMode}
                 selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : []}
-                selectedFaces={active?.type === "shell" || active?.type === "draft" ? active.faces : []}
+                selectedFaces={active && "faces" in active ? active.faces : []}
                 onPickEdge={onPickEdge}
                 onPickFace={onPickFace}
-                onMeasurePoint={(p) => setMeasurePts((pts) => (pts.length >= 2 ? [p] : [...pts, p]))}
-                measurePts={measurePts}
+                selFilter={selFilter}
+                selection={measure ? measureSel : selection}
+                onPick={onPick}
+                measure={measureGfx}
+                vertices={result?.vertices ?? null}
+                faceColors={doc.faceColors}
+                bodyHidden={bodyHidden}
+                bodyOpacity={bodyOpacity}
+                gizmo={gizmo}
+                onGizmo={onGizmo}
                 onContext={vpContext}
                 onCursor={setCursor}
                 display={prefs.display}
@@ -1517,40 +1584,82 @@ export function CadApp() {
                 mouse={prefs.mouse}
                 showGrid={showGrid}
                 assembly={isAsm ? asmViews : undefined}
-                onPickComponent={onPickComponent}
               />
             </div>
             {sketch && (
               <>
-                <Sketcher key={sketch.id} entities={sketch.entities} onChange={setSketchEntities} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} />
+                <Sketcher key={sketch.id} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} />
                 <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-[#2563eb] px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-white shadow-lg">Skica · {planeLabel(sketch.plane)}</div>
               </>
             )}
 
             {/* Měření */}
             {measure && (
-              <FloatPanel title="Měření vzdálenosti" icon="measure" onClose={toggleMeasure}>
-                {measurePts.map((p, i) => (
-                  <Row key={i} k={`Bod ${i + 1}`} v={p.map((x) => fmtNum(x, 2)).join(" ; ")} />
+              <FloatPanel
+                title="Měření"
+                icon="measure"
+                onClose={toggleMeasure}
+                extra={
+                  measureRes ? (
+                    <button
+                      type="button"
+                      title="Kopírovat výsledky"
+                      onClick={() => navigator.clipboard?.writeText(measureRes.rows.map(([k, v]) => `${k}\t${v}`).join("\n")).then(() => flash("Zkopírováno do schránky."))}
+                      className="rounded p-0.5 text-[#6b7785] hover:bg-[#eef2f6]"
+                    >
+                      <CadIcon name="copy" className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null
+                }
+              >
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {(["all", "vertex", "edge", "face", "body"] as SelFilter[]).map((f) => (
+                    <button key={f} type="button" onClick={() => setSelFilter(f)} className={cn("rounded px-1.5 py-0.5 text-[11px]", selFilter === f ? "bg-[#1f2933] text-white" : "bg-[#eef2f6] hover:bg-[#e3e9f0]")}>
+                      {FILTER_LABEL[f]}
+                    </button>
+                  ))}
+                </div>
+                {measureSel.map((it, i) => (
+                  <Row key={i} k={`${i + 1}.`} v={`${KIND_LABEL[it.kind]}${it.kind === "face" || it.kind === "edge" || it.kind === "vertex" ? ` ${it.index + 1}` : ""}`} />
                 ))}
-                {dist != null && (
-                  <>
-                    <Row k="Vzdálenost" v={`${fmtNum(dist, 3)} mm`} strong />
-                    <Row k="ΔX / ΔY / ΔZ" v={[0, 1, 2].map((k) => fmtNum(Math.abs(measurePts[1][k] - measurePts[0][k]), 3)).join(" / ")} />
-                  </>
-                )}
-                {measurePts.length === 0 && <p className="text-[11.5px] text-[#6b7785]">Klikněte na dva body modelu.</p>}
-                {measurePts.length > 0 && (
-                  <button type="button" onClick={() => setMeasurePts([])} className="mt-2 w-full rounded border border-[#cfd6de] py-1 text-[12px] hover:bg-[#f3f6f9]">
+                {measureRes?.rows.map(([k, v], i) => <Row key={`r${i}`} k={k} v={v} strong={i === 0 && measureSel.length === 2} />)}
+                {measureSel.length === 0 && <p className="text-[11.5px] leading-relaxed text-[#6b7785]">Klikněte na bod, hranu, plochu nebo těleso. Druhá entita změří vzdálenost a úhel mezi nimi.</p>}
+                {measureSel.length > 0 && (
+                  <button type="button" onClick={() => { setMeasureSel([]); setMeasureRes(null); }} className="mt-2 w-full rounded border border-[#cfd6de] py-1 text-[12px] hover:bg-[#f3f6f9]">
                     Nové měření
                   </button>
                 )}
               </FloatPanel>
             )}
 
+            {/* Inspektor entity */}
+            {inspect && inspectOpen && !measure && !sketch && (
+              <FloatPanel title={inspect.info.title} icon="info" onClose={() => setInspectOpen(false)} pos="right-3 bottom-12">
+                {inspect.info.rows.map(([k, v], i) => (
+                  <Row key={i} k={k} v={v} />
+                ))}
+                {selection.length > 1 && <p className="mt-1.5 text-[11px] text-[#6b7785]">Vybráno {selection.length} entit · Ctrl/Shift+klik přidá/odebere</p>}
+              </FloatPanel>
+            )}
+
+            {/* Gizmo */}
+            {gizmo && (
+              <div className="absolute left-1/2 top-12 z-20 flex -translate-x-1/2 items-center gap-1 rounded-md border border-[#cfd6de] bg-white/95 p-1 text-[12px] shadow-lg">
+                <span className="px-2 font-semibold">{gizmoOn?.target === "component" ? "Přesun komponenty" : "Přesun tělesa"}</span>
+                {(["translate", "rotate"] as const).map((md) => (
+                  <button key={md} type="button" onClick={() => gizmoOn && setGizmoOn({ ...gizmoOn, mode: md })} className={cn("rounded px-2 py-1", gizmoOn?.mode === md ? "bg-[#1f2933] text-white" : "hover:bg-[#eef2f6]")}>
+                    {md === "translate" ? "Posun (1 mm)" : "Otočení (15°)"}
+                  </button>
+                ))}
+                <button type="button" onClick={() => { setGizmoOn(null); if (gizmoOn?.target === "body") okEdit(); }} className="rounded bg-[#16a34a] px-2.5 py-1 font-semibold text-white hover:bg-[#15803d]">
+                  Hotovo
+                </button>
+              </div>
+            )}
+
             {/* Řez */}
             {section && !sketch && (
-              <FloatPanel title="Řez modelem" icon="section" onClose={() => setSection(null)} className={measure ? "top-[190px]" : undefined}>
+              <FloatPanel title="Řez modelem" icon="section" onClose={() => setSection(null)} pos={measure ? "left-3 top-[300px]" : "left-3 top-3"}>
                 <div className="mb-2 flex gap-1">
                   {(["X", "Y", "Z"] as const).map((a) => (
                     <button key={a} type="button" onClick={() => setSection({ ...section, axis: a, offset: bb ? Math.round(((bb[0]["XYZ".indexOf(a)] + bb[1]["XYZ".indexOf(a)]) / 2) * 100) / 100 : 0 })} className={cn("flex-1 rounded py-1 text-[12px] font-semibold", section.axis === a ? "bg-[#1f2933] text-white" : "bg-[#eef2f6] hover:bg-[#e3e9f0]")}>
@@ -1612,7 +1721,7 @@ export function CadApp() {
               </FloatPanel>
             )}
             {isAsm && clashes && clashes.length > 0 && (
-              <FloatPanel title={`Kolize (${clashes.length})`} icon="section" onClose={() => setClashes(null)} className={explode > 0 ? "top-[150px]" : undefined}>
+              <FloatPanel title={`Kolize (${clashes.length})`} icon="section" onClose={() => setClashes(null)} pos={explode > 0 ? "left-3 top-[150px]" : "left-3 top-3"}>
                 <div className="max-h-56 space-y-1 overflow-y-auto">
                   {clashes.map((x, i) => {
                     const a = doc.components?.find((c) => c.id === x.a);
@@ -1745,6 +1854,21 @@ export function CadApp() {
         <footer className="flex h-7 shrink-0 items-center gap-3 border-t border-[#c9d1da] bg-[#eef2f6] px-3 text-[11.5px] text-[#3c4856]">
           <span className="font-semibold text-brand">»</span>
           <span className="min-w-0 flex-1 truncate">{prompt}</span>
+          {!sketch && (
+            <label className="flex items-center gap-1 text-[10.5px] text-[#5b6776]" title="Filtr výběru (co se vybírá kliknutím)">
+              Filtr
+              <select value={selFilter} onChange={(e) => setSelFilter(e.target.value as SelFilter)} className="rounded border border-[#c9d1da] bg-white px-1 py-0 text-[11px] text-[#1f2933]">
+                {(Object.keys(FILTER_LABEL) as SelFilter[])
+                  .filter((f) => isAsm || (f !== "component" && f !== "subasm"))
+                  .map((f) => (
+                    <option key={f} value={f}>
+                      {FILTER_LABEL[f]}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
+          {selection.length > 0 && <span className="rounded bg-brand/10 px-1.5 font-mono text-[10.5px] text-brand-600">vybráno {selection.length}</span>}
           {cursor && !sketch && <span className="hidden font-mono text-[10.5px] text-[#5b6776] md:inline">X {fmtNum(cursor[0], 2)} · Y {fmtNum(cursor[1], 2)} · Z {fmtNum(cursor[2], 2)}</span>}
           <span className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">mm · {prefs.ortho ? "pravoúhlá" : "perspektiva"}</span>
           <span className="hidden text-[10.5px] text-[#5b6776] lg:inline">{prefs.mouse === "zw3d" ? "Otáčení: pravé tl. · Posun: prostřední" : prefs.mouse === "solidworks" ? "Otáčení: prostřední · Posun: Ctrl+prostřední" : "Otáčení: levé · Posun: pravé"}</span>
@@ -1778,6 +1902,16 @@ export function CadApp() {
 
         {bomOpen && (
           <Modal title={`Kusovník – ${doc.name}`} icon="table" onClose={() => setBomOpen(false)}>
+            <div className="mb-3 flex gap-1 rounded bg-[#eef2f6] p-0.5 text-[12px]">
+              {[
+                [true, "Plochý (všechny díly)"],
+                [false, "Strukturovaný (podsestavy)"],
+              ].map(([v, l]) => (
+                <button key={String(v)} type="button" onClick={() => setBomFlat(v as boolean)} className={cn("flex-1 rounded py-1", bomFlat === v ? "bg-white font-semibold shadow-sm" : "text-[#5b6776]")}>
+                  {l as string}
+                </button>
+              ))}
+            </div>
             <BomTable
               rows={bom}
               onCsv={() => download(`${safeName(doc.name)}_kusovnik.csv`, bomCsv(bom), "text/csv;charset=utf-8")}
@@ -1867,12 +2001,13 @@ function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   );
 }
 
-function FloatPanel({ title, icon, onClose, children, className }: { title: string; icon: CadIconName; onClose: () => void; children: React.ReactNode; className?: string }) {
+function FloatPanel({ title, icon, onClose, children, className, pos = "left-3 top-3", extra }: { title: string; icon: CadIconName; onClose: () => void; children: React.ReactNode; className?: string; pos?: string; extra?: React.ReactNode }) {
   return (
-    <div className={cn("absolute left-3 top-3 z-20 w-[260px] rounded-md border border-[#cfd6de] bg-white/95 shadow-xl backdrop-blur", className)}>
+    <div className={cn("absolute z-20 w-[270px] rounded-md border border-[#cfd6de] bg-white/95 shadow-xl backdrop-blur", pos, className)}>
       <div className="flex items-center gap-2 border-b border-[#e3e8ee] px-3 py-1.5">
         <CadIcon name={icon} tone="tool" className="h-4 w-4" />
-        <p className="flex-1 text-[12.5px] font-semibold">{title}</p>
+        <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{title}</p>
+        {extra}
         <button type="button" onClick={onClose} className="rounded p-0.5 text-[#6b7785] hover:bg-[#eef2f6]" aria-label="Zavřít">
           <CadIcon name="x" className="h-3.5 w-3.5" />
         </button>

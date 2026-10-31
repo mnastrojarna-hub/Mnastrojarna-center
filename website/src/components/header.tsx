@@ -24,7 +24,7 @@ function LangSwitch({ locale, label, className }: { locale: Locale; label: strin
           lang={l}
           aria-current={l === locale ? "true" : undefined}
           title={LOCALE_META[l].label}
-          className={cn("rounded-full px-2.5 py-1 font-mono text-[11px] font-medium transition", l === locale ? "bg-ink-700 text-white" : "text-ink-700/55 hover:text-ink-700")}
+          className={cn("inline-flex min-h-[26px] min-w-[32px] items-center justify-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium transition", l === locale ? "bg-ink-700 text-white" : "text-ink-700/55 hover:text-ink-700")}
         >
           {LOCALE_META[l].short}
         </a>
@@ -99,7 +99,7 @@ export function Header({ locale, t, note, mailHref, phone, phoneHref }: { locale
             <a href={mailHref} className="btn-primary hidden !px-5 !py-2.5 !text-[14px] md:inline-flex">
               {t.rfq} <Icon name="arrow" className="h-4 w-4" />
             </a>
-            <button type="button" className="rounded-full p-2.5 text-ink-700 xl:hidden" aria-label={open ? t.closeMenu : t.openMenu} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            <button type="button" className="grid h-11 w-11 place-items-center rounded-full text-ink-700 xl:hidden" aria-label={open ? t.closeMenu : t.openMenu} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
               <Icon name={open ? "x" : "menu"} />
             </button>
           </div>

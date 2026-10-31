@@ -32,6 +32,12 @@ export const FEATURE_TONE: Record<string, Tone> = {
   transform: "pattern",
   datum: "ref",
   import: "file",
+  pushPull: "feature",
+  deleteFace: "cut",
+  offsetFace: "feature",
+  thicken: "feature",
+  rib: "create",
+  spring: "create",
 };
 
 type Tab = "history" | "vars" | "configs";

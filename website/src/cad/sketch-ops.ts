@@ -368,7 +368,7 @@ export function offsetEntity(e: SketchEntity, d: number): SketchEntity | null {
       return e.rx + d > 0 && e.ry + d > 0 ? { ...e, id, rx: r6(e.rx + d), ry: r6(e.ry + d) } : null;
     case "polyline":
     case "spline": {
-      const pts = offsetPolyline(e.points, e.closed, d, e.type === "polyline" ? 1 : signedAreaSign(e.points));
+      const pts = offsetPolyline(e.points, e.closed, d);
       return pts ? { ...e, id, points: pts } : null;
     }
     case "point":
@@ -376,10 +376,8 @@ export function offsetEntity(e: SketchEntity, d: number): SketchEntity | null {
   }
 }
 
-const signedAreaSign = (_p: Vec2[]) => 1;
-
 /** Odsazení lomené čáry s ostrými rohy (průsečíky posunutých segmentů). U uzavřené: kladně ven. */
-function offsetPolyline(pts: Vec2[], closed: boolean, d: number, _s: number): Vec2[] | null {
+function offsetPolyline(pts: Vec2[], closed: boolean, d: number): Vec2[] | null {
   const n = pts.length;
   if (n < 2) return null;
   let dd = d;

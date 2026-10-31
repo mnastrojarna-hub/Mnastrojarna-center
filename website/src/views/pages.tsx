@@ -134,14 +134,14 @@ export function ServiceView({ locale, id }: P & { id: ServiceId }) {
           <aside className="lg:col-span-5">
             <div className="sticky top-28 rounded-2xl border border-ink-700/10 bg-white p-8 shadow-[0_30px_60px_-40px_rgba(39,36,37,.35)]" data-reveal>
               <p className="eyebrow">{p.paramsTitle}</p>
-              <dl className="mt-6 divide-y divide-ink-700/10 border-y border-ink-700/10">
+              <ul className="mt-6 divide-y divide-ink-700/10 border-y border-ink-700/10">
                 {s.bullets.map((b) => (
-                  <div key={b} className="flex gap-3 py-3 text-[15px] text-ink-700">
+                  <li key={b} className="flex gap-3 py-3 text-[15px] text-ink-700">
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-brand" />
                     {b}
-                  </div>
+                  </li>
                 ))}
-              </dl>
+              </ul>
               <div className="mt-6 rounded-xl bg-steel-100 p-5">
                 <p className="text-[13px] text-ink-700/60">{p.assessedBy}</p>
                 <p className="mt-1 font-semibold text-ink-700">

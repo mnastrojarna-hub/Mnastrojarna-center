@@ -24,11 +24,11 @@ type ServiceText = {
 export const cs = {
   locale: "cs" as Locale,
   meta: {
-    title: "Mnástrojárna – CNC obrábění, nástrojárna a výroba strojů | Váš partner ve strojírenství",
+    title: "Mnástrojárna – náhradní díly, prototypy, přípravky a nástroje na zakázku",
     template: "%s | Mnástrojárna",
     description:
-      "Přesné CNC obrábění, pětiosé frézování, drátové řezání, nástroje, jednoúčelové stroje a náhradní díly pro výrobní linky. B2B partner pro výrobní firmy. ISO 9001 a 14001, Pelhřimov.",
-    keywords: ["CNC obrábění", "nástrojárna", "pětiosé obrábění", "drátové řezání", "výroba náhradních dílů", "jednoúčelové stroje", "výroba prototypů", "strojírenská výroba na zakázku", "Pelhřimov", "Vysočina"],
+      "Kusová a malosériová výroba 1–99 ks pro údržbu, vývoj a konsignaci: náhradní díly do jednoúčelových strojů, prototypy, přípravky, nástroje a formy. B2B zakázky 50 tis.–5 mil. Kč. Pelhřimov, ISO 9001.",
+    keywords: ["náhradní díly do jednoúčelových strojů", "výroba náhradních dílů pro údržbu", "výroba prototypů", "výroba přípravků", "kusová výroba CNC", "malosériová výroba", "konsignační sklad náhradních dílů", "výroba dílu podle vzorku", "nástrojárna", "pětiosé obrábění", "drátové řezání", "jednoúčelové stroje", "Pelhřimov", "Vysočina"],
     ogTagline: "Nástrojárna · CNC obrábění · Stroje",
     ogFooter: "ISO 9001 & 14001 · 5osé obrábění do Ø 1 000 mm · Pelhřimov",
   },
@@ -58,7 +58,7 @@ export const cs = {
     mobile: "Mobilní navigace",
     skip: "Přeskočit na obsah",
     home: "Úvod",
-    homeAria: "Mnástrojárna – úvod",
+    homeAria: "Mnástrojárna s.r.o. – úvodní stránka",
     breadcrumb: "Drobečková navigace",
     sheet: "List",
     language: "Jazyk",
@@ -84,8 +84,8 @@ export const cs = {
     ctaFoot: "B2B zakázky od 50 000 Kč · ISO 9001 & 14001 · Pelhřimov, střed ČR",
     fitYesTitle: "Pro koho jsme",
     fitNoTitle: "Co neděláme",
-    fitYes: ["Výrobní firmy a korporace s vlastní výrobou", "Opakované dodávky, rámcové smlouvy, náhradní díly linek", "Projekty od 50 000 Kč – ideálně stovky tisíc až miliony", "Prototypy a jednoúčelové stroje pro průmysl"],
-    fitNo: ["Zakázky pro soukromé osoby", "Drobné opravy a jednorázové kusy za pár stovek", "Nabídky reklamy, leasingu a obchodních služeb"],
+    fitYes: ["Výrobní firmy a korporace, jejichž hlavní obor není strojírenství", "Údržba: náhradní díly do jednoúčelových strojů a linek – i podle vzorku bez výkresu", "Vývoj: prototypy, přípravky, nástroje a jednoúčelové stroje", "Zakázky 50 000 – 5 000 000 Kč · 1–99 ks · klidně opakovaně · konsignační sklad"],
+    fitNo: ["Levné sériové a produktivní obrábění tisíců kusů – nesoutěžíme cenou za kus", "Zakázky pro soukromé osoby a kusy za pár stovek", "Nabídky reklamy, leasingu a obchodních služeb"],
     fitNote: "Soustředíme kapacitu tam, kde přinášíme největší hodnotu – díky tomu držíme termíny i kvalitu.",
     euFrom: "Pořízeno z projektu",
     yearsExperience: "let zkušeností",
@@ -152,7 +152,9 @@ export const cs = {
   ],
 
   faq: [
-    { q: "Jaká je minimální velikost zakázky?", a: "Zaměřujeme se výhradně na B2B projekty od 50 000 Kč bez DPH. Nejlépe nám sedí dlouhodobá spolupráce, rámcové smlouvy a projekty v řádu stovek tisíc až milionů korun. Zakázky pro soukromé osoby a drobné opravy nepřijímáme." },
+    { q: "Jaká je minimální velikost zakázky?", a: "Zaměřujeme se výhradně na B2B projekty od 50 000 Kč bez DPH, typicky do 5 milionů Kč. Nejlépe nám sedí dlouhodobá spolupráce, rámcové smlouvy a projekty v řádu stovek tisíc až milionů korun. Zakázky pro soukromé osoby a drobné opravy nepřijímáme." },
+    { q: "Děláte sériovou výrobu?", a: "Ne. Soustředíme se na kusovou a malosériovou výrobu 1–99 ks, kde rozhoduje přesnost, termín a technické řešení, ne cena za kus. Opakované díly rádi dodáváme dlouhodobě – držíme je pro vás v konsignačním skladu a odebíráte je, až když je potřebujete." },
+    { q: "Vyrobíte náhradní díl bez výkresu, jen podle vzorku?", a: "Ano. Opotřebený nebo zlomený díl změříme (3D sondy, přesnost až 2 µm), vymodelujeme, navrhneme vhodnější materiál či tepelné zpracování a vyrobíme. Výkres a 3D model dostanete k dílu, takže příští objednávka je otázkou jednoho e-mailu." },
     { q: "Co potřebujete k vypracování nabídky?", a: "Ideálně výkres (PDF) a 3D model (STEP), požadovaný materiál, počet kusů a termín. Pokud dokumentaci nemáte kompletní, náš technolog s vámi zbytek dořeší." },
     { q: "Jak rychle dostanu cenovou nabídku?", a: "Poptávku po přijetí posoudí technolog a ozve se vám obchodní zástupce. U běžných dílů máte nabídku zpravidla do několika pracovních dnů, u komplexních projektů vás předem informujeme o termínu." },
     { q: "Jak velké díly dokážete vyrobit?", a: "Na pětiosém centru AXILE G8 obrábíme obrobky až do průměru 1 000 mm a hmotnosti 3 000 kg, drátem řežeme obrobky až 1 250 × 975 × 500 mm, soustružíme do délky 1 150 mm." },

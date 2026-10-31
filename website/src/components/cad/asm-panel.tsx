@@ -50,8 +50,8 @@ export function AsmTree({
           </button>
           {!closed[g] &&
             list.map((c) => (
+              <div key={c.id}>
               <div
-                key={c.id}
                 onClick={() => onSelect(c.id === selected ? null : c.id)}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -60,8 +60,22 @@ export function AsmTree({
                 }}
                 className={cn("group ml-3 flex cursor-default items-center gap-2 rounded px-2 py-[3px]", c.id === selected ? "bg-[#dbe7f5]" : "hover:bg-[#edf2f7]", c.hidden && "opacity-45")}
               >
-                <span className="h-3 w-3 shrink-0 rounded-sm border border-black/20" style={{ background: c.color ?? "#b9c2cc" }} />
+                {c.source.kind === "asm" ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setClosed((x) => ({ ...x, [c.id]: !x[c.id] }));
+                    }}
+                    className="text-[#6b7785]"
+                    title="Rozbalit podsestavu"
+                  >
+                    <CadIcon name={closed[c.id] ? "chevronRight" : "chevronDown"} className="h-3 w-3" />
+                  </button>
+                ) : null}
+                {c.source.kind === "asm" ? <CadIcon name="layers" tone="create" className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3 w-3 shrink-0 rounded-sm border border-black/20" style={{ background: c.color ?? "#b9c2cc" }} />}
                 <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                {c.source.kind === "asm" && <span className="font-mono text-[10px] text-[#8a95a3]">{c.source.doc.components?.length ?? 0}</span>}
                 {c.fixed && <CadIcon name="lock" className="h-3 w-3 text-[#8a95a3]" />}
                 <button
                   type="button"
@@ -75,7 +89,26 @@ export function AsmTree({
                   <CadIcon name="eye" className="h-3.5 w-3.5" />
                 </button>
               </div>
+              {c.source.kind === "asm" && !closed[c.id] && <SubTree comps={c.source.doc.components ?? []} depth={1} />}
+              </div>
             ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Vnořené komponenty podsestavy (jen pro čtení – úpravy přes „Otevřít podsestavu“). */
+function SubTree({ comps, depth }: { comps: AsmComponent[]; depth: number }) {
+  return (
+    <div className="ml-4 border-l border-dotted border-[#cdd5de]">
+      {comps.map((c) => (
+        <div key={c.id}>
+          <div className={cn("flex items-center gap-2 px-2 py-[2px] text-[12px] text-[#4a5664]", c.hidden && "opacity-45")} style={{ paddingLeft: 8 + depth * 2 }}>
+            {c.source.kind === "asm" ? <CadIcon name="layers" tone="create" className="h-3.5 w-3.5 shrink-0" /> : <span className="h-2.5 w-2.5 shrink-0 rounded-sm border border-black/20" style={{ background: c.color ?? "#b9c2cc" }} />}
+            <span className="min-w-0 flex-1 truncate">{c.name}</span>
+          </div>
+          {c.source.kind === "asm" && <SubTree comps={c.source.doc.components ?? []} depth={depth + 1} />}
         </div>
       ))}
     </div>

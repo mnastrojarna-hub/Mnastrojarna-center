@@ -116,6 +116,14 @@ const P: Record<string, React.ReactNode> = {
   cSymmetric: (<><path d="M12 3v18" strokeDasharray="2 1.5" /><circle cx="6" cy="12" r="2" /><circle cx="18" cy="12" r="2" /></>),
   cCollinear: (<><path d="M3 18L9 12M12 9l9-6" /><path d="M9 12l3-3" strokeDasharray="1.5 1.5" /></>),
   magnet: (<><path d="M6 4v8a6 6 0 0 0 12 0V4" /><path d="M6 8h4M14 8h4" /><path d="M10 4v8a2 2 0 0 0 4 0V4" /></>),
+  pushPull: (<><path d="M4 17l8 4 8-4-8-4z" /><path d="M12 13V3M8 7l4-4 4 4" /></>),
+  deleteFace: (<><path d="M4 8l8-4 8 4v8l-8 4-8-4z" strokeDasharray="2 1.5" /><path d="M9 10l6 6M15 10l-6 6" /></>),
+  offsetFace: (<><path d="M3 15l6-8h12l-6 8z" /><path d="M3 11l6-8h12" strokeDasharray="2 1.5" /></>),
+  thicken: (<><path d="M3 12c4-6 14-6 18 0" /><path d="M3 17c4-6 14-6 18 0" /><path d="M3 12v5M21 12v5" /></>),
+  rib: (<><path d="M3 20h18M4 20V6" /><path d="M4 9l13 11" /><path d="M6 10l9 8" strokeDasharray="1.5 1.5" /></>),
+  spring: (<><path d="M12 2v2M12 20v2" /><path d="M7 4h10l-10 4h10l-10 4h10l-10 4h10l-10 4h10" /></>),
+  gizmo: (<><path d="M12 12V3M12 12l8 5M12 12l-8 5" /><path d="M9 5l3-2 3 2M18 14l2 3-3 1M6 14l-2 3 3 1" /></>),
+  filterSel: (<><path d="M3 5h18l-7 8v6l-4 2v-8z" /></>),
 };
 
 export type CadIconName = keyof typeof P;

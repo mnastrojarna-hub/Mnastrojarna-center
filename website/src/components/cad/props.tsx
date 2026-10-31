@@ -757,7 +757,8 @@ function PickInfo({ n, what, hint, onClear }: { n: number; what: string; hint?: 
 
 export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: SketchEntity) => void }) {
   const set = (p: Partial<SketchEntity>) => onChange({ ...e, ...p } as SketchEntity);
-  const title = { line: "Úsečka", arc: "Oblouk", rect: "Obdélník", circle: "Kružnice", polygon: "Mnohoúhelník", slot: "Drážka", polyline: "Lomená čára" }[e.type];
+  const title = { line: "Úsečka", arc: "Oblouk", rect: "Obdélník", circle: "Kružnice", polygon: "Mnohoúhelník", slot: "Drážka", polyline: "Lomená čára", point: "Bod", ellipse: "Elipsa", spline: "Spline" }[e.type];
+  const arcInfo = e.type === "arc" ? arcGeomInfo(e.a, e.b, e.c) : null;
   return (
     <div className="space-y-3">
       <p className="text-[12px] font-semibold uppercase tracking-wider text-brand">{title}</p>
@@ -766,7 +767,27 @@ export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: Sk
           <Vec label="Počátek" value={e.a} onChange={(v) => set({ a: v })} />
           <Vec label="Konec" value={e.b} onChange={(v) => set({ b: v })} />
           <LineLength e={e} onChange={onChange} />
-          <Check label="Konstrukční čára" value={!!e.construction} onChange={(v) => set({ construction: v })} />
+        </>
+      )}
+      {e.type === "point" && <Vec label="Poloha" value={e.p} onChange={(v) => set({ p: v })} />}
+      {e.type === "ellipse" && (
+        <>
+          <Vec label="Střed" value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
+          <div className="grid grid-cols-2 gap-2">
+            <Num label="Hlavní poloosa" value={e.rx} min={0.001} onChange={(v) => set({ rx: v })} />
+            <Num label="Vedlejší poloosa" value={e.ry} min={0.001} onChange={(v) => set({ ry: v })} />
+          </div>
+          <Num label="Natočení" value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
+        </>
+      )}
+      {(e.type === "spline" || e.type === "polyline") && (
+        <>
+          <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
+            {e.points.map((pt, i) => (
+              <Vec key={i} label={`Bod ${i + 1}`} value={pt} onChange={(v: Vec2) => set({ points: e.points.map((q, k) => (k === i ? v : q)) } as Partial<SketchEntity>)} />
+            ))}
+          </div>
+          <Check label="Uzavřená" value={e.closed} onChange={(v) => set({ closed: v } as Partial<SketchEntity>)} />
         </>
       )}
       {e.type === "arc" && (
@@ -774,6 +795,11 @@ export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: Sk
           <Vec label="Počátek" value={e.a} onChange={(v) => set({ a: v })} />
           <Vec label="Bod na oblouku" value={e.b} onChange={(v) => set({ b: v })} />
           <Vec label="Konec" value={e.c} onChange={(v) => set({ c: v })} />
+          {arcInfo && (
+            <p className="font-mono text-[11.5px] text-ink-700/60">
+              R {Math.round(arcInfo.r * 1000) / 1000} · střed {Math.round(arcInfo.c[0] * 100) / 100} ; {Math.round(arcInfo.c[1] * 100) / 100}
+            </p>
+          )}
         </>
       )}
       {e.type === "circle" && (
@@ -816,9 +842,18 @@ export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: Sk
           <Num label="Natočení" value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
         </>
       )}
-      {e.type === "polyline" && <p className="text-[12px] text-ink-700/60">{e.points.length} bodů · {e.closed ? "uzavřená" : "otevřená"}. Body upravíte tažením.</p>}
+      <Check label="Pomocná geometrie (netvoří profil)" value={!!e.construction} onChange={(v) => set({ construction: v })} />
     </div>
   );
+}
+
+function arcGeomInfo(a: Vec2, b: Vec2, c: Vec2): { c: Vec2; r: number } | null {
+  const d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]));
+  if (Math.abs(d) < 1e-12) return null;
+  const s = (p: Vec2) => p[0] * p[0] + p[1] * p[1];
+  const ux = (s(a) * (b[1] - c[1]) + s(b) * (c[1] - a[1]) + s(c) * (a[1] - b[1])) / d;
+  const uy = (s(a) * (c[0] - b[0]) + s(b) * (a[0] - c[0]) + s(c) * (b[0] - a[0])) / d;
+  return { c: [ux, uy], r: Math.hypot(a[0] - ux, a[1] - uy) };
 }
 
 function LineLength({ e, onChange }: { e: Extract<SketchEntity, { type: "line" }>; onChange: (n: SketchEntity) => void }) {

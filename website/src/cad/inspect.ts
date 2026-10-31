@@ -155,11 +155,15 @@ export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInf
     const type = face.geomType as string;
     const area = r.measureArea(face);
     const c = vt(face.center);
-    const n = vt(face.normalAt(face.center));
     const info: EntityInfo = { title: `Plocha ${ref.index + 1}`, rows: [["Typ", SURF[type] ?? type], ["Plocha", `${f(area, 2)} mm²`], ["Střed", fv(c, 2)]], center: c, area, surface: type };
     if (type === "PLANE") {
-      info.normal = n;
-      info.rows.push(["Normála", fv(n, 4)]);
+      try {
+        const n = vt(face.normalAt(face.center));
+        info.normal = n;
+        info.rows.push(["Normála", fv(n, 4)]);
+      } catch {
+        /* normálu nelze určit */
+      }
     }
     try {
       const ad = new oc.BRepAdaptor_Surface(face.wrapped);
@@ -266,8 +270,8 @@ export function measureEntities(sa: Shape, ra: EntRef, sb: Shape | null, rb: Ent
     (tool as unknown as { delete(): void }).delete();
   }
   // vzdálenost středů (kružnice/válce)
-  const ca = ia.axis?.origin ?? ia.center ?? ia.point;
-  const cb = ib.axis?.origin ?? ib.center ?? ib.point;
+  const ca = ia.center ?? ia.point ?? ia.axis?.origin;
+  const cb = ib.center ?? ib.point ?? ib.axis?.origin;
   if ((ia.radius != null || ib.radius != null) && ca && cb) {
     res.rows.push(["Vzdálenost středů", `${f(len(sub(cb, ca)))} mm`]);
     if (ia.axis && ib.axis && Math.abs(Math.abs(dot(norm(ia.axis.dir), norm(ib.axis.dir))) - 1) < 1e-6) {

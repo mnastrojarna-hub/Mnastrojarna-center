@@ -23,7 +23,7 @@ export function VideoShowcase({ videos, locale, play, note }: { videos: Video[];
               aria-pressed={k === i}
               className={cn("group relative block aspect-video w-full overflow-hidden rounded-2xl ring-2 transition", k === i ? "ring-brand" : "ring-transparent hover:ring-ink-700/20")}
             >
-              <Image src={`/img/video/${x.id}.jpg`} alt={x.title[locale]} fill sizes="(min-width:1024px) 20vw, 50vw" className="object-cover" />
+              <Image src={`/img/video/${x.id}.jpg`} alt="" fill sizes="(min-width:1024px) 20vw, 50vw" className="object-cover" />
               <span className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
               <span className="absolute inset-x-3 bottom-2 text-left text-[12px] font-medium leading-tight text-white">{x.title[locale]}</span>
             </button>

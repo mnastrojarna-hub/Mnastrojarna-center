@@ -61,7 +61,7 @@
     @apply btn border border-ink-700/15 bg-white text-ink-700 hover:border-ink-700/40;
   }
   .eyebrow {
-    @apply inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-brand;
+    @apply inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-brand-600;
   }
   .eyebrow::before {
     content: "";

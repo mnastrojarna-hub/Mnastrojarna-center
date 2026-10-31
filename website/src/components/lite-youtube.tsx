@@ -20,8 +20,8 @@ export function LiteYouTube({ id, title, play, note, className, sizes = "100vw",
           allowFullScreen
         />
       ) : (
-        <button type="button" onClick={() => setOn(true)} className="absolute inset-0 h-full w-full text-left" aria-label={`${play}: ${title}`} data-cursor={play}>
-          <Image src={`/img/video/${id}.jpg`} alt={title} fill sizes={sizes} priority={priority} className="object-cover transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]" />
+        <button type="button" onClick={() => setOn(true)} className="absolute inset-0 h-full w-full text-left" aria-label={`${title} – ${play}`} data-cursor={play}>
+          <Image src={`/img/video/${id}.jpg`} alt="" fill sizes={sizes} priority={priority} className="object-cover transition-transform duration-[1.4s] ease-out group-hover:scale-[1.04]" />
           <span className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           <span className="absolute left-1/2 top-1/2 grid h-20 w-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-brand text-white shadow-[0_20px_50px_-10px_rgba(224,57,48,.9)] transition-transform duration-500 group-hover:scale-110 md:h-24 md:w-24">
             <span className="absolute inset-0 animate-ping rounded-full bg-brand/40 [animation-duration:2.2s]" />
