@@ -20,6 +20,7 @@ import { track } from "../analytics";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName } from "./cad-icons";
 import { CommandPalette, type Command } from "./command-palette";
+import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup } from "./mold-panel";
 import { SettingsDialog } from "./settings-dialog";
 import { StartScreen } from "./start-screen";
@@ -135,6 +136,7 @@ export function CadApp() {
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState<null | { query?: string }>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [moldTools, setMoldTools] = useState(false);
@@ -1007,6 +1009,11 @@ export function CadApp() {
         setSettingsOpen(true);
         return;
       }
+      if (mod && k === "l") {
+        e.preventDefault();
+        setLibraryOpen((v) => (v ? null : {}));
+        return;
+      }
       if (sketchId || mod || e.altKey) return;
       if (e.key === "Escape") {
         if (mate) setMate(null);
@@ -1205,13 +1212,15 @@ export function CadApp() {
         ],
       },
       { label: "Reference", items: [{ id: "datum", label: "Rovina", icon: "datum", tone: "ref", onClick: () => addFeature("datum"), hint: "pomocná rovina pro skici" }] },
+      { label: "Knihovna", items: [{ id: "library", label: "Normálie", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}), hint: "šrouby, ložiska, ozubená kola, profily… – stačí napsat „M8x30“" }] },
     ],
     asm: [
       {
         label: "Vložit",
-        big: 2,
+        big: 3,
         items: [
           { id: "ins", label: "Vložit díl / model", icon: "open", tone: "file", onClick: () => fileInput.current?.click(), hint: ".mncad díl nebo STEP/IGES/STL… jako komponenta" },
+          { id: "library", label: "Knihovna normálií", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}), hint: "šrouby, ložiska, ozubená kola, profily… – stačí napsat" },
           { id: "newpart", label: "Nový díl", icon: "new", tone: "create", onClick: () => { const d = { ...emptyDoc("Nový díl"), kind: "part" as const }; const c = partComponent(d, {}, { group: "Díly" }); commit({ ...doc, components: [...(doc.components ?? []), c] }); setTimeout(() => editPartInContext(c), 0); } },
         ],
       },
@@ -1529,6 +1538,7 @@ export function CadApp() {
         }
     });
     out.push(
+      { id: "p.library", label: "Knihovna normálií (šrouby, ložiska, ozubená kola, profily…)", group: "Program", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => setLibraryOpen({}) },
       { id: "p.settings", label: "Nastavení", group: "Program", icon: "settings", kbd: "Ctrl+,", run: () => setSettingsOpen(true) },
       { id: "p.start", label: "Úvodní obrazovka", group: "Program", icon: "home", run: () => setStartOpen(true) },
       { id: "p.help", label: "Klávesové zkratky a ovládání", group: "Program", icon: "help", run: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
@@ -1618,6 +1628,7 @@ export function CadApp() {
                     { divider: true, label: "Ukázky" },
                     ...EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, icon: "cube" as CadIconName, onClick: () => loadExample(ex.make) })),
                     { divider: true },
+                    { id: "library", label: "Knihovna normálií…", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { id: "help", label: "Klávesové zkratky a ovládání", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
                   ]}
@@ -2081,6 +2092,30 @@ export function CadApp() {
             />
           </Modal>
         )}
+        {libraryOpen && (
+          <LibraryDialog
+            isAssembly={isAsm}
+            initialQuery={libraryOpen.query}
+            onClose={() => setLibraryOpen(null)}
+            onInsertPart={(d) => {
+              setLibraryOpen(null);
+              docId.current = uid();
+              commit({ ...d, kind: "part" });
+              setActiveId(null);
+              setSketchId(null);
+              setAsmSel(null);
+              setAsmStack([]);
+              setTab("create");
+              flash(`${d.name} otevřen jako nový díl.`);
+              setTimeout(() => vp.current?.setView("iso"), 900);
+            }}
+            onInsertComponent={(d, group) => {
+              setLibraryOpen(null);
+              insertPart(d, group || "Normálie");
+              flash(`${d.name} vložen do sestavy.`);
+            }}
+          />
+        )}
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
         {paletteOpen && <CommandPalette commands={buildCommands()} onClose={() => setPaletteOpen(false)} />}
         {startOpen && (
@@ -2090,6 +2125,7 @@ export function CadApp() {
               { id: "asm", label: "Nová sestava", desc: "Komponenty, vazby, podsestavy, kusovník.", icon: "layers", tone: "create", run: () => { setStartOpen(false); newAssembly(false); } },
               { id: "mold", label: "Rám vstřikovací formy", desc: "Kompletní rám z desek, vedení a normálií během minuty.", icon: "layers", tone: "pattern", run: () => { setStartOpen(false); setMoldOpen(true); } },
               { id: "open", label: "Otevřít / importovat", desc: "STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad", icon: "open", tone: "file", kbd: "Ctrl+O", run: () => { setStartOpen(false); fileInput.current?.click(); } },
+              { id: "lib", label: "Knihovna normálií", desc: "46 rodin: šrouby, matice, kolíky, ložiska, ozubená a řetězová kola, IPE/HEB/U/L, jäkly, pružiny… Stačí napsat „M8x30“.", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
               { id: "palette", label: "Paleta příkazů", desc: "Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…", icon: "measure", tone: "tool", kbd: "Ctrl+K", run: () => { setStartOpen(false); setPaletteOpen(true); } },
               { id: "settings", label: "Nastavení", desc: "Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.", icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },
             ]}

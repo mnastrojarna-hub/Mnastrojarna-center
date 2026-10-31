@@ -8,11 +8,15 @@ Nový web Mnástrojárny s.r.o. — **„Váš partner ve strojírenství“**. 
 - **Scrollovací 3D příběh „Od polotovaru k protokolu“** – při scrollu se polotovar reálně soustruží (nůž ubírá materiál), 5osé frézování vyvrtá díry, 3D sonda změří body a objeví se měřicí protokol.
 - **Kalkulačka prostoje linky** – B2B argument „prostoj stojí víc než díl“ → CTA na náhradní díly / konsignační sklad.
 - **Oživené logo** z originálního vektoru logomanuálu (pásy štítu se sestaví, třísky odletí).
-- **Mnástrojárna CAD (`/cad`)** – plnohodnotný parametrický 3D/2D CAD v prohlížeči nad jádrem **OpenCascade** (replicad, WebAssembly ve web workeru):
-  - skicář (úsečka, obdélník se zaoblením, kružnice, oblouk 3 body, mnohoúhelník, drážka), přichytávání, přesné rozměry číslem, výrazy (`25/2`),
-  - prvky: vysunutí (symetrické, opačně), rotace, kvádr/válec/trubka/kužel/koule, díra se zahloubením (kliknutím na plochu), zaoblení a sražení vybraných hran, skořepina, lineární/kruhové pole, zrcadlení, import STEP,
-  - strom prvků (úpravy, potlačení, mazání), zpět/vpřed, automatické ukládání, projekt `.mncad`,
-  - export **STEP**, **STL**, **2D výkres** (pohledy ISO E, izometrie, kóty, razítko) do **PDF / DXF / SVG**, DXF přímo ze skici,
+- **Mnástrojárna CAD (`/cad`)** – profesionální parametrický 3D/2D CAD v prohlížeči nad jádrem **OpenCascade** (replicad, WebAssembly ve web workeru), UI a ovládání po vzoru ZW3D (pás karet, správce historie, formulář prvku OK/Storno, řádek výzev, ViewCube, kontextové nabídky podle entity, schémata myši ZW3D/SolidWorks). Podrobný stav a plán: **`CAD-ROADMAP.md`**.
+  - **Skica:** úsečka, lomená čára, obdélník, kružnice, oblouk, elipsa, spline, mnohoúhelník, drážka, bod, osa; přichytávání (koncový bod, střed, kvadrant, průsečík, kolmo, tečně, mřížka), 13 geometrických vazeb a řídicí kóty s řešičem, oříznout/prodloužit/odsadit/zaoblit/srazit/zrcadlit/pole/rozložit, měření, DXF import/export,
+  - **díl:** vysunutí (+úkos), rotace, tažení, šablonování, primitiva, díra (průvodce: zahloubení, kuželové, závit ISO), zaoblení, sražení, skořepina, úkos, rozříznutí, žebro, pružina, text, závit, pole, zrcadlení, přesun, pomocná rovina; přímé úpravy ploch (vytáhnout/zatlačit, odsadit, odstranit, zesílit), proměnné/rovnice, vazby parametrů, stavy (konfigurace),
+  - **sestava:** komponenty, vazby Kontakt/Zarovnat/Vystředit, podsestavy, gizmo, úprava dílu v kontextu, rozložený pohled, kontrola kolizí, kusovník (plochý/strukturovaný) + CSV, generátor rámu vstřikovací formy,
+  - **knihovna normálií (Ctrl+L):** 46 rodin – šrouby, matice, podložky, kolíky, pera, pojistné kroužky, ložiska, evolventní ozubená kola, řetězová kola ISO 606, řemenice, IPE/HEA/HEB/UPN/L/jäkly/trubky/tyče, O-kroužky, pružiny, normálie forem – stačí napsat „M8x30“, „ložisko 6205“, „kolo m2 z24“, „IPE 200 L=1500“,
+  - **formy:** barevná analýza úkosů, smrštění, návrh dělicí roviny, vyhazovačů a chladicích kanálů,
+  - **výkresy:** listy A4–A0, ISO E/A, řez A–A se šrafováním, osy, kóty, razítko, kusovník ISO 7573 → **PDF** (vektorové, čeština), **DXF**, **DWG R2000–R2018**, SVG,
+  - **formáty:** import STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML, DWG; nativní formáty (SLDPRT, IPT, Z3, CATPart…) → návod na STEP,
+  - **nástroje:** výběrový filtr entit, inspektor, měření mezi entitami, řez, hmotnostní vlastnosti, paleta příkazů (Ctrl+K), nastavení (jednotky, myš, zkratky, výkres), úvodní obrazovka s nedávnými soubory, projekt `.mncad`,
   - „Poptat výrobu“ uloží model jako STEP a otevře e-mail obchodníkovi (Vít Volný) – soubor stačí přiložit.
 - **Kontakt bez formuláře** – všechna CTA („Poptat výrobu“, kalkulačky, služby, CAD) otevírají e-mail s předvyplněným předmětem přímo primárnímu kontaktu **Vítu Volnému** (`SALES` v `src/content/site.ts`); technolog Dominik Šponer je uveden jako druhý kontakt. Staré URL poptávky (`/poptavka`, `/en/request-a-quote`, `/de/anfrage`) přesměrují 301 na kontakt.
 - **SEO**: metadata a canonical, JSON-LD (Organization/LocalBusiness, Service, FAQPage, BreadcrumbList, WebApplication), sitemap, robots, OG obrázek, 301 ze všech starých URL.
@@ -88,7 +92,7 @@ E2E testy (běžící server na :3100):
 ```bash
 npm run build && npm start &
 mkdir -p /tmp/e2e/shots
-node e2e/cad.e2e.cjs /tmp/e2e   # CAD: skica → vysunutí → zaoblení → díra → STEP/DXF/SVG → poptávka (STEP + e-mail)
+node e2e/cad.e2e.cjs /tmp/e2e   # CAD: úvod → ukázka → skica+vysunutí → paleta → měření → knihovna → výkres PDF/DXF/DWG/SVG → rám formy → kusovník → STEP
 node e2e/i18n.e2e.cjs /tmp/e2e  # jazyky: přepínač, přesměrování poptávky, kontakt V. Volný, mobil
 ```
 

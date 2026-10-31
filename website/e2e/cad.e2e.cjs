@@ -1,83 +1,106 @@
-// E2E: Mnástrojárna CAD — skica, vysunutí, zaoblení, díra, export STEP/DXF/SVG, předání do poptávky.
-// Spuštění (běžící server na :3100): node e2e/cad.e2e.cjs <výstupní složka>
+// E2E Mnástrojárna CAD (nové UI): úvodní obrazovka → ukázka → skica + vysunutí → díra z palety → měření →
+// knihovna normálií → výkres (PDF/DXF/DWG/SVG) → sestava (rám formy) → kusovník → export STEP → poptávka.
+// Spuštění (produkční server na :3100): node e2e/cad.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
-const S = process.argv[2];
+const S = process.argv[2] || '/tmp/e2e';
+fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
+const dl = async (page, trigger) => { const [d] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), trigger()]); return d; };
+
 (async () => {
-  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
-  const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
-  const page = await ctx.newPage();
-  const errs = [];
-  page.on('pageerror', e => errs.push(e.message));
+  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+  const page = await b.newPage({ viewport: { width: 1600, height: 950 }, acceptDownloads: true });
+  const errs = []; page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:3100/cad', { waitUntil: 'networkidle' });
-  await page.getByText(/Jádro připraveno/).waitFor({ timeout: 60000 });
-  await page.getByRole('button', { name: 'Soubor' }).click();
-  await page.getByRole('button', { name: 'Nový díl' }).click();
-  await page.getByRole('button', { name: 'Nová skica' }).click();
+  // úvodní obrazovka
+  const cont = page.getByText('Pokračovat v práci');
+  if (await cont.isVisible({ timeout: 5000 }).catch(() => false)) { await cont.click(); ok(true, 'úvodní obrazovka zavřena'); }
+  await page.waitForFunction(() => document.body.innerText.includes('OCCT') && !document.body.innerText.includes('Načítám jádro'), null, { timeout: 120000 });
+  ok(true, 'jádro OpenCascade připraveno');
+
+  // ukázka: Soubor → Příruba DN50
+  await page.getByRole('button', { name: 'Soubor', exact: true }).click();
+  await page.getByRole('button', { name: /Příruba DN50/ }).click();
+  await page.waitForTimeout(3000);
+  ok((await page.locator('text=Díra 1').count()) > 0, 'ukázka načtena (historie obsahuje Díra 1)');
+
+  // skica na XY + obdélník + dokončit → vysunutí (automaticky) → OK
+  await page.getByRole('button', { name: 'Tvorba', exact: true }).click();
+  await page.getByRole('button', { name: /^Skica/ }).first().click();
   await page.getByRole('button', { name: /Rovina XY/ }).click();
-  const box = await page.locator('main svg').first().boundingBox();
-  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-  await page.keyboard.press('r');
-  await page.mouse.click(cx - 200, cy - 120);
-  await page.mouse.click(cx + 200, cy + 120);
-  await page.keyboard.press('c');
-  // po vytvoření obdélníku se otevře panel vlastností → plátno se zúží, střed přepočítat
-  const box2 = await page.locator('main svg').first().boundingBox();
-  const cx2 = box2.x + box2.width / 2, cy2 = box2.y + box2.height / 2;
-  await page.mouse.click(cx2, cy2);
-  await page.mouse.click(cx2 + 40, cy2);
-  await page.keyboard.press('Escape');
-  await page.screenshot({ path: S + '/cad-sketch.png' });
-  ok(await page.getByText(/2 uzavř/).isVisible(), 'skica má 2 uzavřené profily');
-  await page.getByRole('button', { name: /Dokončit skicu/ }).click();
-  await page.getByText('Vzdálenost').waitFor();
-  const dist = page.locator('label:has-text("Vzdálenost") input');
-  await dist.fill('15'); await dist.press('Enter');
-  await page.waitForTimeout(1500);
-  await page.getByRole('button', { name: 'Hotovo' }).click();
   await page.waitForTimeout(800);
-  const status = await page.locator('main').innerText();
-  ok(/cm³/.test(status), 'vysunutí vytvořilo těleso: ' + status.split('\n').slice(0, 2).join(' | '));
-  // zaoblení všech hran
-  await page.getByRole('button', { name: 'Zaoblit' }).click();
-  await page.getByRole('button', { name: 'Všechny' }).click();
+  await page.keyboard.press('r');
+  await page.mouse.click(700, 420);
+  await page.mouse.click(760, 480);
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: /Dokončit skicu/ }).click();
   await page.waitForTimeout(1500);
-  const tree = await page.locator('aside').first().innerText();
-  ok(/Zaoblení 1/.test(tree), 'zaoblení ve stromu');
-  await page.getByRole('button', { name: 'Hotovo' }).click();
-  // díra kliknutím na plochu
-  await page.getByRole('button', { name: 'Díra', exact: true }).click();
+  ok((await page.locator('text=/Vysunutí \\d/').count()) > 0, 'po skice vzniklo vysunutí');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
-  const vp = await page.locator('main canvas').boundingBox();
-  for (const [dx, dy] of [[-0.22, -0.02], [0.2, 0.05], [-0.1, 0.1], [0.1, -0.1]]) {
-    await page.mouse.click(vp.x + vp.width * (0.5 + dx), vp.y + vp.height * (0.5 + dy));
-    await page.waitForTimeout(500);
-  }
-  const posX = await page.locator('aside:last-of-type input').nth(5).inputValue().catch(() => '?');
-  ok(true, 'díra – pozice X: ' + posX);
-  await page.getByRole('button', { name: 'Hotovo' }).click();
+
+  // paleta příkazů → Díra
+  await page.keyboard.press('Control+k');
+  await page.keyboard.type('díra');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1200);
+  ok((await page.locator('text=/Díra \\d/').count()) >= 2, 'paleta příkazů přidala díru');
+  await page.keyboard.press('Escape');
+
+  // měření (M) – dva kliky na model
+  await page.keyboard.press('m');
+  await page.mouse.click(900, 620);
+  await page.waitForTimeout(500);
+  await page.mouse.click(760, 480);
   await page.waitForTimeout(1500);
-  await page.screenshot({ path: S + '/cad-model.png' });
-  // export STEP
-  await page.getByRole('button', { name: 'Export' }).click();
-  let [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('button', { name: /STEP \(\.step\)/ }).click()]);
-  const step = fs.readFileSync(await dl.path(), 'utf8');
-  ok(step.includes('ISO-10303-21'), 'STEP export ' + step.length + ' B');
-  await page.getByRole('button', { name: 'Export' }).click();
-  [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('button', { name: /Výkres DXF/ }).click()]);
-  const dxf = fs.readFileSync(await dl.path(), 'utf8');
-  ok(dxf.includes('OBRYS') && dxf.includes('EOF'), 'DXF výkres ' + dxf.length + ' B');
-  await page.getByRole('button', { name: 'Export' }).click();
-  [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('button', { name: /Výkres SVG/ }).click()]);
-  fs.copyFileSync(await dl.path(), S + '/vykres.svg');
-  ok(true, 'SVG výkres uložen');
-  // uložit projekt
-  await page.keyboard.press('Control+s').catch(() => {});
-  // poptávka
-  // poptávka = stažení STEP + e-mail obchodníkovi (mailto)
-  [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('button', { name: 'Poptat výrobu' }).click()]);
-  ok(/\.step$/i.test(dl.suggestedFilename()), 'poptávka: STEP stažen ' + dl.suggestedFilename());
+  ok(await page.getByText(/Měření/).first().isVisible(), 'panel měření otevřen');
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+
+  // knihovna normálií: M8x30 → nový díl
+  await page.keyboard.press('Control+l');
+  await page.waitForTimeout(500);
+  await page.keyboard.type('M8x30');
+  await page.waitForTimeout(2500);
+  ok(await page.getByText(/ISO 4762/).first().isVisible(), 'knihovna rozpoznala ISO 4762 M8×30');
+  await page.getByRole('button', { name: /Vložit jako nový díl|Otevřít jako nový díl/ }).click();
+  await page.waitForTimeout(3000);
+  ok(/Šroub/.test(await page.locator('header').innerText()), 'šroub otevřen jako nový díl');
+
+  // výkres: PDF, DXF, DWG, SVG
+  await page.getByRole('button', { name: 'Výkres', exact: true }).click();
+  await page.getByRole('button', { name: /Nový výkres/ }).click();
+  await page.waitForTimeout(6000);
+  let d = await dl(page, () => page.getByRole('button', { name: 'DXF', exact: true }).click());
+  ok(/\.dxf$/.test(d.suggestedFilename()), 'výkres DXF ' + d.suggestedFilename());
+  d = await dl(page, () => page.getByRole('button', { name: 'DWG', exact: true }).click());
+  const dwg = fs.readFileSync(await d.path());
+  ok(dwg.slice(0, 6).toString() === 'AC1032', 'výkres DWG R2018 (' + dwg.length + ' B)');
+  d = await dl(page, () => page.getByRole('button', { name: 'SVG', exact: true }).click());
+  ok(/\.svg$/.test(d.suggestedFilename()), 'výkres SVG');
+  d = await dl(page, () => page.getByRole('button', { name: 'PDF', exact: true }).click());
+  const pdf = fs.readFileSync(await d.path());
+  ok(pdf.slice(0, 5).toString() === '%PDF-', 'výkres PDF (' + pdf.length + ' B)');
+  await page.getByRole('button', { name: 'Zavřít', exact: true }).click();
+
+  // sestava: rám formy → kusovník → export STEP
+  await page.getByRole('button', { name: 'Soubor', exact: true }).click();
+  await page.getByRole('button', { name: /Rám vstřikovací formy/ }).click();
+  await page.getByRole('button', { name: 'Vytvořit rám formy' }).click();
+  await page.waitForFunction(() => !document.body.innerText.includes('Stavím komponenty'), null, { timeout: 180000 });
+  await page.waitForTimeout(3000);
+  ok(/komponent/.test(await page.locator('footer').innerText()), 'rám formy postaven');
+  await page.getByRole('button', { name: /Kusovník/ }).first().click();
+  await page.waitForTimeout(800);
+  ok((await page.locator('table tbody tr').count()) >= 8, 'kusovník má řádky');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('button', { name: /^Export/ }).first().click();
+  d = await dl(page, () => page.getByRole('button', { name: /STEP AP214/ }).click());
+  ok(/\.step$/.test(d.suggestedFilename()), 'sestava exportována do STEP');
+
+  await page.screenshot({ path: S + '/cad-final.png' });
   ok(errs.length === 0, 'bez JS chyb ' + errs.join(' | '));
   await b.close();
-})().catch(e => { console.error('ERR', e.message); process.exit(1); });
+})().catch((e) => { console.error('ERR', e.message); process.exit(1); });

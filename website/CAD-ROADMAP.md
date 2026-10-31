@@ -38,18 +38,18 @@ Testy: `src/cad/**/*.test.ts` (vitest, OCCT se inicializuje v Node). E2E: `e2e/c
 - Import/export formátů (viz výše).
 - UI: ribbon, správce (historie/proměnné/stavy), formulář prvku OK/Storno, ViewCube, osový kříž, styly zobrazení, perspektiva/pravoúhlá, řez s barevnou řeznou plochou, měření 2 bodů, hmotnostní vlastnosti, schémata myši ZW3D/SolidWorks/touchpad, kontextové menu, klávesové zkratky.
 
-### Rozpracováno (paralelní pracovníci, listopad 2026)
-- **S – skicář**: přichytávání (koncový bod, střed, kvadrant, průsečík, kolmo, tečně…), inference, vazby (13 typů) a kóty s řešičem, nástroje Oříznout/Prodloužit/Odsadit/Zaoblit/Srazit/Zrcadlit/Přesunout/Otočit/Měřítko/Pole/Rozložit, elipsa, spline, bod, pomocná geometrie, kontextové menu skici.
-- **M – 3D interakce**: výběrový filtr (vše/prvek/plocha/hrana/bod/těleso/komponenta/podsestava), inspektor entit, měření mezi entitami (bod–plocha, plocha–plocha, úhel…), kontextové nabídky podle entity, TransformControls gizmo, barvy ploch, podsestavy v UI, strukturovaný kusovník.
-- **F – jádro 2**: pushPull, offsetFace, deleteFace, žebro, pružina, zesílení; `BuildResult.vertices`; `flattenAssembly`, `makeSubassembly`, `dissolveSubassembly`, strukturovaný kusovník; další normálie (ISO 7089, ISO 4032, ISO 8734).
-- **L – knihovna normálií**: registr rodin + textový parser + dialog knihovny s 3D náhledem.
-- **Vedoucí**: formařské nástroje, nastavení, paleta příkazů, úvodní obrazovka – **zapojeno** (commit 3e0050a). SEO analýza `SEO-ANALYZA.md` + úpravy textů hotovo.
+### Dokončeno v 2. vlně (listopad 2026) – vše zapojeno, 196 testů
+- **S – skicář**: ✅ přichytávání (10 druhů + inference), 13 vazeb a řídicí kóty s řešičem LM, nástroje Oříznout/Prodloužit/Odsadit/Zaoblit/Srazit/Zrcadlit/Přesunout/Kopírovat/Otočit/Měřítko/Pole/Rozložit, elipsa, spline, bod, pomocná geometrie, box-select, kontextová menu, stav určenosti skici.
+- **M – 3D interakce**: ✅ výběrový filtr, inspektor entit, měření mezi entitami, kontextové nabídky podle entity, gizmo (G/R), barvy ploch, podsestavy (vytvořit/rozpustit/otevřít v kontextu), strukturovaný kusovník.
+- **F – jádro 2**: ✅ pushPull, offsetFace, deleteFace, žebro, pružina, zesílení; `BuildResult.vertices`; podsestavy v jádře; normálie ISO 7089/4032/8734, pružina.
+- **L – knihovna normálií**: ✅ 46 rodin v 9 skupinách (ISO 4762/4017/4014/7380/10642/4026/4029/4032/4035/7089, DIN 9021/975, ISO 8734/2338/8752, DIN 6885, DIN 471/472, ložiska 60xx/62xx/63xx/608, evolventní ozubená kola + věnec + hřeben, řetězová kola ISO 606, řemenice HTD a klínové, IPE/HEA/HEB/UPN/L/RHS/SHS/CHS/tyče, O-kroužky, pružiny, normálie forem), textový parser („M8x30“, „IPE 200 L=1500“, „ložisko 6205“, „kolo m2 z24“, „řetězka 08B z19“, „jäkl 40x40x3“), dialog s 3D náhledem, oblíbené a nedávné; Ctrl+L. TODO seznam v `cad/library/index.ts`.
+- **Vedoucí**: ✅ formařské nástroje, nastavení, paleta příkazů, úvodní obrazovka s náhledy, knihovna zapojena; SEO analýza `SEO-ANALYZA.md`, nová služba Výroba přípravků, Lighthouse (mobil úvod 54→72, desktop 99, SEO 100); e2e `e2e/cad.e2e.cjs` přepsán na nové UI.
 - **M – 3D interakce**: **hotovo** (filtr výběru, inspektor, měření entit, kontextová menu, gizmo, barvy ploch, podsestavy, 127 testů).
 - **F – jádro 2**: **hotovo** (pushPull/offsetFace/deleteFace/rib/spring/thicken, podsestavy, normálie).
-- **D – DWG export**: probíhá (`cad/formats/dwg.ts` přes acad-ts).
+- **D – DWG export**: ✅ `cad/formats/dwg.ts` (acad-ts, R2000–R2018, vrstvy/typy čar ISO 128, round-trip testy); tlačítko DWG + volba verze ve výkresu. **Ověřit v reálném AutoCAD/ZWCAD** (knihovna je mladá).
 
 ### Zapojení po dokončení pracovníků (checklist pro vedoucího / další relaci)
-1. ~~Settings/Palette/Start/MoldPanel~~ zapojeno. **Zbývá:** `LibraryDialog` (po dokončení L: karta Tvorba/Sestava → „Knihovna normálií“ + Ctrl+L + úvodní obrazovka + paleta), tlačítko DWG (D), náhledy (thumbnail) nedávných souborů z `vp.current.snapshot()`.
+1. ~~Settings/Palette/Start/MoldPanel/LibraryDialog/DWG/náhledy~~ – vše zapojeno.
 2. Používat `ui.tsx` (Modal/FloatPanel/Row/Btn/Toggle/Segmented/Kbd) místo lokálních kopií v `cad-app.tsx` (kosmetika).
 3. Jednotky: `fmtLen` ve stavových štítcích, inspektoru a formulářích podle `settings.units` (dnes jen uloženo v nastavení, UI stále mm).
 4. E2E `e2e/cad.e2e.cjs`: doplnit kroky vazby skici + kóty, výběr plochy → pushPull, knihovna „M8x30“ → vložit, formařská analýza.
@@ -79,7 +79,7 @@ Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · �
 | 4 | Obsah fakticky z původního webu, ale NE kopírovat (strojový park, služby přepsat) | ✅ | přepsáno; fráze „od polotovaru k protokolu“ se v textech už nevyskytuje (0×) |
 | 5 | Noví kolegové Šponer (technolog) a Volný (obchod) | ✅ | Volný = primární kontakt, Semorád odstraněn |
 | 6 | Jen B2B, min. 50 000 Kč, bez telefonátů obchodníků/důchodců | ✅ | štítek min. zakázky, texty cílí na firmy; formulář zrušen (e-mail Volnému) |
-| 7 | Top SEO | 🟡 | metadata, JSON-LD, sitemap, hreflang hotovo. **Chybí změřit Lighthouse/Core Web Vitals a doladit** (úkol níže) |
+| 7 | Top SEO | 🟡 | metadata, JSON-LD, sitemap, hreflang ✅; SEO analýza + zacílení (údržba/vývoj/konsignace) ✅; Lighthouse: SEO 100, desktop 99, mobil úvod 72 (LCP = obrázek fotostěny přes `/_next/image` bez CDN – na Vercelu rychlejší). Zbývá: Google Business Profile, Search Console po nasazení, případovky s čísly |
 | 8 | Ambice „největší nástrojárna v ČR“ v tónu webu | ✅ | manifest, claim „Vyrobíme, co ostatní odmítli“ – **čeká na vaše potvrzení claimu** |
 | 9 | Fáze 2: online 3D/2D CAD | ✅→🚧 | existuje a rozšiřuje se na profesionální CAD (viz níže) |
 | 10 | Navrhnout víc přidané hodnoty | ✅ | kalkulačka prostoje, kontrola obálky strojů, archiv zakázek, video dílna, CAD |
@@ -100,20 +100,20 @@ Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · �
 | 21 | Plnohodnotný CAD jako ZW3D/Inventor, „nakreslit cokoli“, uložit do počítače | 🟡 | historie prvků 30+ typů, uložení .mncad/STEP; **chybí plošné modelování (surfacing), více těles v dílu, proměnné zaoblení** |
 | 22 | Dramaticky lepší UI, barevné ikony, 1:1 ZW3D (UX, UI, grafika, ovládání) | 🟡 | ribbon, správce, formulář OK/Storno, ViewCube, schéma myši ZW3D hotovo; **dokončují se: výběrový filtr entit, kontextové nabídky dle entity, gizmo, inspektor** (pracovník M) |
 | 23 | Import/export všech formátů, nejnovější i historické verze | 🟡/⛔ | STEP/IGES/BREP/STL/OBJ/3MF/glTF/PLY/OFF/DXF ✅. **⛔ nativní SLDPRT/IPT/Z3/CATPart/PRT/X_T – uzavřené formáty, bez licence ODA/Spatial nečitelné** → návod na STEP. **❌ JT (ISO 14306) a 3D PDF – otevřené, lze doplnit později** |
-| 24 | Výkresy PDF, DXF, **DWG** | 🚧 | PDF/DXF ✅. **DWG**: libredwg-web umí jen číst; zvolena MIT knihovna `@node-projects/acad-ts` (zápis R2000–R2018 v prohlížeči) – pracovník D implementuje `cad/formats/dwg.ts` + tlačítko DWG ve výkresu |
+| 24 | Výkresy PDF, DXF, **DWG** | ✅ | PDF/DXF/SVG/**DWG R2000–R2018** (acad-ts, MIT). Ověřit otevření v reálném AutoCAD/ZWCAD |
 | 25 | Stavy (konfigurace) | ✅ | |
 | 26 | Složité sestavy forem obrovské velikosti, rychlost | 🟡 | sestavy, podsestavy, rám formy ✅; **výkon pro tisíce dílů ❌ (progresivní síť, IndexedDB cache, více workerů)** |
 | 27 | Hlavičky (razítka) a kusovníky ve výkresech | ✅ | |
-| 28 | Skica: práce s rovinami, zjištěné vzdálenosti, pravé tlačítko, uchopení rohu/hrany/křivky/středu | 🚧 | pracovník S (přichytávání, vazby, kóty, řešič, nástroje úprav) |
-| 29 | Entity: prvek/plocha/hrana/bod/sestava/podsestava/tvar – otáčet, barvy, mazat, posouvat jednotlivé prvky/plochy/tvary | 🚧 | jádro ✅ (pushPull, offsetFace, deleteFace, barvy ploch, transform), UI pracovník M |
+| 28 | Skica: práce s rovinami, zjištěné vzdálenosti, pravé tlačítko, uchopení rohu/hrany/křivky/středu | ✅ | přichytávání 10 druhů, vazby, kóty, řešič, měření, kontextová menu |
+| 29 | Entity: prvek/plocha/hrana/bod/sestava/podsestava/tvar – otáčet, barvy, mazat, posouvat jednotlivé prvky/plochy/tvary | ✅ | filtr výběru, kontextová menu dle entity, pushPull/offset/delete plochy, barvy ploch, gizmo, podsestavy. Filtr „Prvek“ vybírá ve stromu (jádro neposílá původ ploch) |
 | 30 | Snímky všech nástrojů + počet nástrojů vs. ZW3D | ❌ | udělat po zapojení (viz checklist); do zprávy uvést poctivé srovnání počtu příkazů |
 | 31 | Top UI/UX vč. ikon, **nastavení** a používání | ✅ | Nastavení (7 karet, zkratky, jednotky, export/import), paleta příkazů Ctrl+K, úvodní obrazovka s nedávnými soubory – zapojeno |
-| 32 | Obrovský adresář normalizovaných dílů „stačí napsat“: ozubená kola, řetězová kola, normálie, ocelové profily… | 🚧 | pracovník L (`cad/library`, parser, dialog s náhledem) |
+| 32 | Obrovský adresář normalizovaných dílů „stačí napsat“: ozubená kola, řetězová kola, normálie, ocelové profily… | ✅ | 46 rodin, textový parser, dialog s 3D náhledem (Ctrl+L). Rozšiřování: TODO v `cad/library/index.ts` |
 | 33 | Pracovat až do limitu, nic neztratit, předat dál | ✅ | WIP commity po každém kroku, tento dokument |
 | 34 | AI vrstva (21. století) – zadání textem, kontrola vyrobitelnosti | ❌ | etapa 7 níže |
 
 ### Úkoly z auditu (doplnit do nejbližší etapy)
-- [ ] Lighthouse (mobil + desktop) pro `/`, `/sluzby/cnc-obrabeni`, `/zakazky`, `/en` → cíl ≥ 90 Performance/SEO/Best practices; opravit nálezy (velikost fotek `public/img/zakazky` → WebP/AVIF přes `next/image`, lazy video).
+- [x] Lighthouse změřeno a opraveno (odložená inicializace animací, priorita fotek, kontrast, cíle dotyku, ARIA): mobil `/` 54→72, `/zakazky` 76, `/sluzby/*` 87, desktop 99, SEO 100. Zbývá: LCP mobilní úvodní stránky (hero fotky → menší WebP, text jako LCP), `td-has-header` v tabulce strojů, `color-contrast` u dekorativních slov manifestu.
 - [x] DWG export – rozhodnuto: `@node-projects/acad-ts` (MIT, DwgWriter AC1015–AC1032). LibreDWG zapisuje spolehlivě jen R2000/R2004 a wasm balíček je bez zápisu; ODA File Converter nelze redistribuovat ani komerčně automatizovat (členství ODA od 3 000 USD/rok). Po dodání ověřit výstup v AutoCAD/ZWCAD (audit) – mladá knihovna.
 - [ ] JT a 3D PDF export (otevřené formáty) – nízká priorita.
 - [ ] Snímky všech nástrojů CAD + tabulka počtu příkazů (náš CAD vs. ZW3D Standard) do zprávy zadavateli.
