@@ -53,6 +53,8 @@ export interface FlowAccess {
   features: Feature[];
   userId: string | null;
   role: UserRole | null;
+  /** Nabídky uživatele musí schválit super admin (profil, 31. 10.). */
+  quoteNeedsApproval?: boolean;
 }
 
 type Next = { key: FlowActionKey; label: string } | null;
@@ -160,7 +162,8 @@ export function FlowActionsProvider({
     ownerId: job.owner?.id ?? null,
     // karta umí dialog „Vrátit k přepracování…“ (#25)
     withReturn: true,
-  }), [features, userId, role, job.assignee, job.owner]);
+    quoteNeedsApproval: access?.quoteNeedsApproval ?? client.quoteNeedsApproval,
+  }), [features, userId, role, job.assignee, job.owner, access?.quoteNeedsApproval, client.quoteNeedsApproval]);
 
   const facts = React.useMemo(
     () => (job.flow ? { ...job.flow, stage: job.stage, ...(productionRunning === undefined ? {} : { productionRunning }) } : null),

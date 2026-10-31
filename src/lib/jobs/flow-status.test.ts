@@ -11,7 +11,7 @@ import {
   quoteDisplayState, quoteStateOf, reasonRequired, relativeStampTime, stageEffect, stageEffectText, stampFromRow,
   stampText, stampTitle, transitionFeature, approvalReasons, quoteLabel, flowFactsFromRow, quoteFactsFromRow,
   QUOTE_ACCEPT_BLOCKED, QUOTE_ARCHIVED_SEND, QUOTE_AWAITS_APPROVAL, QUOTE_SEND_NO_RIGHT, approvedStampText,
-  quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent,
+  quoteApprovalBlock, quoteApprovalFlag, quoteAwaitsApproval, quoteSendBlock, quoteWasSent, sendViewerOf, userNeedsQuoteApproval,
   UNPLANNED_META, NEXT_STEP_META, ROUTE_LATE_META, FINAL_CHANGED_META, canIssueInvoice, invoiceDeliveryOf,
   type ActionCtx, type ChangeStamp, type FlowFacts, type FlowStateMeta, type JobStamps, type QuoteFacts,
 } from "./flow-status";
@@ -550,6 +550,41 @@ describe("schvalování nabídek super adminem (#25)", () => {
     expect(quoteSendBlock({ ...base, archived: true }, viewer([...W, "margins"], "x", { isSuperAdmin: true }))).toBeNull();
   });
 
+  it("31. 10. per uživatel: userNeedsQuoteApproval (= DB quote_author_needs_admin) a odeslání autorem bez schvalování", () => {
+    // super admin nikdy; ostatní podle profilu, výchozí (neuvedeno / null) = ano
+    expect(userNeedsQuoteApproval({ role: "super_admin", quoteNeedsApproval: true })).toBe(false);
+    expect(userNeedsQuoteApproval({ role: "obchodnik", quoteNeedsApproval: false })).toBe(false);
+    expect(userNeedsQuoteApproval({ role: "obchodnik", quoteNeedsApproval: true })).toBe(true);
+    expect(userNeedsQuoteApproval({ role: "zamestnanec" })).toBe(true);
+    expect(userNeedsQuoteApproval({ role: "zamestnanec", quoteNeedsApproval: null })).toBe(true);
+    expect(userNeedsQuoteApproval(null)).toBe(true);
+
+    const viewer = (features: Feature[], userId: string, p: Record<string, unknown> = {}) =>
+      ({ can: (f: Feature) => features.includes(f), userId, ...p });
+    const W: Feature[] = ["orders", "workflow", "documents"];
+    // nabídka uživatele bez schvalování: rozpracovaná, bez příznaku → obchodník (Volný) odešle rovnou
+    const free = quote({ state: "rozpracovana", approvalRequired: false, adminApprovalRequired: false, createdBy: "volny" });
+    expect(quoteSendBlock(free, viewer([...W, "margins"], "volny", { quoteNeedsApproval: false }))).toBeNull();
+    // zaměstnanec bez schvalování odešle jen SVOU nabídku, která schválení nepotřebuje
+    const own = quote({ state: "rozpracovana", approvalRequired: false, adminApprovalRequired: false, createdBy: "dilna" });
+    expect(quoteSendBlock(own, viewer(W, "dilna", { quoteNeedsApproval: false }))).toBeNull();
+    expect(quoteSendBlock(own, viewer(W, "dilna", { quoteNeedsApproval: true }))).toBe(QUOTE_SEND_NO_RIGHT);
+    expect(quoteSendBlock(own, viewer(W, "dilna"))).toBe(QUOTE_SEND_NO_RIGHT);          // neuvedeno = se schvalováním
+    expect(quoteSendBlock(own, viewer(W, "jiny", { quoteNeedsApproval: false }))).toBe(QUOTE_SEND_NO_RIGHT);
+    expect(quoteSendBlock({ ...own, archived: true }, viewer(W, "dilna", { quoteNeedsApproval: false }))).toBe(QUOTE_ARCHIVED_SEND);
+    // AI nabídka ke schválení / nabídka s příznakem (Šponer) zůstává zamčená i pro uživatele bez schvalování
+    expect(quoteSendBlock(quote({ ...own, state: "ke_schvaleni", approvalRequired: true, aiGenerated: true }), viewer(W, "dilna", { quoteNeedsApproval: false })))
+      .toBe(QUOTE_AWAITS_APPROVAL);
+    const sponer = quote({ state: "ke_schvaleni", approvalRequired: true, adminApprovalRequired: true, createdBy: "sponer" });
+    expect(quoteSendBlock(sponer, viewer([...W, "margins"], "volny", { quoteNeedsApproval: false }))).toBe(QUOTE_AWAITS_APPROVAL);
+    expect(quoteSendBlock(sponer, viewer(W, "sponer", { quoteNeedsApproval: true }))).toBe(QUOTE_AWAITS_APPROVAL);
+    // akce karty: zaměstnanec bez schvalování má u své rozpracované nabídky „Odeslat nabídku"
+    const ctx = (needs: boolean): ActionCtx => ({ can: (f) => W.includes(f), userId: "dilna", isSuperAdmin: false, assigneeId: null, quoteNeedsApproval: needs });
+    expect(sendViewerOf(ctx(false)).quoteNeedsApproval).toBe(false);
+    expect(quoteSendBlock(own, sendViewerOf(ctx(false)))).toBeNull();
+    expect(quoteSendBlock(own, sendViewerOf(ctx(true)))).toBe(QUOTE_SEND_NO_RIGHT);
+  });
+
   it("quoteAwaitsApproval, quoteApprovalFlag a approvedStampText", () => {
     expect(quoteAwaitsApproval({ state: "ke_schvaleni" })).toBe(true);
     expect(quoteAwaitsApproval({ state: "ke_schvaleni", archived: true })).toBe(false);
@@ -855,6 +890,14 @@ describe("parita TS ↔ SQL migrace", () => {
     for (const [k, m] of Object.entries(LOST_REASONS)) expect(lost[k], k).toBe(m.label);
     const cause = labelBlock("flow_cause_label");
     expect(cause).toEqual(CAUSE_LABELS);
+  });
+
+  it("quote_author_needs_admin (poslední definice) = userNeedsQuoteApproval: ne super admin a příznak profilu (výchozí ano)", () => {
+    const start = sql.lastIndexOf("create or replace function quote_author_needs_admin(");
+    expect(start).toBeGreaterThan(-1);
+    const body = sql.slice(start, sql.indexOf("$$;", sql.indexOf("$$", start) + 2));
+    expect(body).toContain("p.role <> 'super_admin'");
+    expect(body).toContain("coalesce(p.quote_needs_approval, true)");
   });
 
   it("job_stage_label a job_stage_rank = stages.ts", () => {

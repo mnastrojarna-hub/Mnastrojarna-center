@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, AlertTriangle, KeyRound, Loader2, Pencil, Trash2, UserX } from "lucide-react";
+import { AlertCircle, AlertTriangle, FileCheck2, KeyRound, Loader2, Pencil, Trash2, UserX } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { updateUser, setUserPassword, deleteUser } from "@/app/actions/users";
 import { RolePicker } from "@/components/users/role-picker";
 import { PasswordField } from "@/components/users/password-field";
@@ -12,9 +13,78 @@ import { initialPasswordProblem } from "@/components/users/password-tools";
 import { UserAvatar } from "@/components/users/user-avatar";
 import type { ManagedUser } from "@/components/users/types";
 import type { UserRole } from "@/lib/supabase/database.types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 type Notify = (tone: "success" | "error", text: string) => void;
+
+/** „1 nabídka" / „2 nabídky" / „5 nabídek". */
+function quotesCz(n: number): string {
+  return `${n} ${n === 1 ? "nabídka" : n >= 2 && n <= 4 ? "nabídky" : "nabídek"}`;
+}
+
+/** Doplněk zprávy po uložení: kolik neodeslaných nabídek se uvolnilo / čeká na schválení (přepočet DB). */
+export function pendingQuotesNote(p: { before: number; after: number } | undefined): string {
+  if (!p || p.before === p.after) return "";
+  if (p.after < p.before) {
+    const n = p.before - p.after;
+    return ` ${quotesCz(n)} už schválení nepotřebuje — ${n === 1 ? "jde" : "jdou"} odeslat hned.`;
+  }
+  const n = p.after - p.before;
+  return ` ${quotesCz(n)} ${n === 1 ? "teď čeká" : "teď čekají"} na schválení super admina.`;
+}
+
+/**
+ * Přepínač „Nabídky musí schválit super admin" (31. 10. per uživatel). Super admin schválení nepotřebuje
+ * nikdy → u něj vypnutý a zamčený. Rozhoduje DB (quote_author_needs_admin); tady jen nastavení profilu.
+ */
+export function QuoteApprovalToggle({
+  id, checked, onChange, superAdmin, disabled, changedBy, changedAt,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  superAdmin: boolean;
+  disabled?: boolean;
+  changedBy?: string | null;
+  changedAt?: string | null;
+}) {
+  const on = !superAdmin && checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-quote-approval={superAdmin ? "admin" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+        )}>
+          <FileCheck2 className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Nabídky musí schválit super admin</label>
+          <p className="text-xs text-muted-foreground">
+            {superAdmin
+              ? "Super admin schválení nepotřebuje — nabídky vystavuje i odesílá rovnou."
+              : on
+                ? "Nabídky vystaví, ale zákazníkovi je odešle až po schválení super adminem."
+                : "Nabídky vystavuje i odesílá zákazníkovi sám, bez schválení."}
+          </p>
+          {!superAdmin && changedAt && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground" suppressHydrationWarning>
+              Naposledy změnil(a) {changedBy ?? "systém"} · {formatDate(changedAt)}
+            </p>
+          )}
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={superAdmin || disabled}
+        aria-label="Nabídky musí schválit super admin"
+        className="mt-1 data-[state=checked]:bg-amber-500"
+      />
+    </div>
+  );
+}
 
 function DialogHeader({
   icon: Icon,
@@ -72,6 +142,7 @@ export function EditUserDialog({
   const [position, setPosition] = React.useState(user.position ?? "");
   const [role, setRole] = React.useState<UserRole>(user.role);
   const [commission, setCommission] = React.useState(String(user.commissionPercent).replace(".", ","));
+  const [quoteApproval, setQuoteApproval] = React.useState(user.quoteNeedsApproval !== false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -82,6 +153,7 @@ export function EditUserDialog({
     setPosition(user.position ?? "");
     setRole(user.role);
     setCommission(String(user.commissionPercent).replace(".", ","));
+    setQuoteApproval(user.quoteNeedsApproval !== false);
     setError(null);
   }, [open, user]);
 
@@ -97,12 +169,13 @@ export function EditUserDialog({
         position,
         role: isSelf ? undefined : role,
         commissionRate: role === "obchodnik" || user.commissionPercent > 0 ? commission : undefined,
+        quoteNeedsApproval: role === "super_admin" ? undefined : quoteApproval,
       });
       if (!res.ok) {
         setError(res.error ?? "Uložení se nepovedlo.");
         return;
       }
-      notify("success", `Uživatel ${fullName.trim()} uložen.`);
+      notify("success", `Uživatel ${fullName.trim()} uložen.${pendingQuotesNote(res.pendingQuotes)}`);
       onOpenChange(false);
       onSaved();
     } catch {
@@ -138,6 +211,15 @@ export function EditUserDialog({
             <RolePicker value={role} onChange={setRole} disabled={isSelf} name={`eu-role-${user.id}`} />
             {isSelf && <p className="text-xs text-muted-foreground">Svou vlastní roli změnit nemůžeš.</p>}
           </div>
+
+          <QuoteApprovalToggle
+            id={`eu-quote-approval-${user.id}`}
+            checked={quoteApproval}
+            onChange={setQuoteApproval}
+            superAdmin={role === "super_admin"}
+            changedBy={user.quoteApprovalChangedBy}
+            changedAt={user.quoteApprovalChangedAt}
+          />
 
           {(role === "obchodnik" || user.commissionPercent > 0) && (
             <div className="space-y-1.5">

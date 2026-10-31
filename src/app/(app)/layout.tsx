@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <MailLiveProvider enabled={features.includes("mail")} initialUnread={counts?.inbox}>
       <div className="flex h-screen overflow-hidden">
-        <AccessBridge features={features} role={user.role} userId={user.id} />
+        <AccessBridge features={features} role={user.role} userId={user.id} quoteNeedsApproval={user.quoteNeedsApproval !== false} />
         <Sidebar counts={counts} features={features} userName={user.fullName} roleLabel={user.roleLabel} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Topbar user={user} features={features} />

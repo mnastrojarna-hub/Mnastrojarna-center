@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
-  KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature,
+  KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature, FileCheck2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -412,6 +412,26 @@ function UserRow({
           >
             <FileSignature className="h-3 w-3 shrink-0" />
             <span className="truncate">{hasContract ? contractShort : contract ? `${contract} · bez smlouvy` : "Nastavit provizi"}</span>
+          </button>
+        )}
+        {/* 31. 10.: schvalování nabídek per uživatel (přepínač v „Upravit") */}
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-quote-approval={user.quoteNeedsApproval !== false ? "on" : "off"}
+            className={cn(
+              "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition hover:shadow-sm",
+              user.quoteNeedsApproval !== false
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300",
+            )}
+            title={user.quoteNeedsApproval !== false
+              ? "Nabídky musí před odesláním schválit super admin — změnit v Upravit"
+              : "Nabídky vystavuje i odesílá bez schválení — změnit v Upravit"}
+          >
+            <FileCheck2 className="h-3 w-3 shrink-0" />
+            <span className="truncate">{user.quoteNeedsApproval !== false ? "schvaluje admin" : "nabídky bez schválení"}</span>
           </button>
         )}
         {/* relativní čas se mezi serverem a prohlížečem může lišit o minutu */}

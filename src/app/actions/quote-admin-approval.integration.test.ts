@@ -19,9 +19,13 @@ const CUSTOMER = "d2000000-0000-0000-0000-000000000001";
 const OTHER_CUSTOMER = "d2000000-0000-0000-0000-000000000002";
 const MAIL_TO = `e2e-qappr-${TAG}@local.test`;
 
+// free / freeWorker / toggle = vlastní účty testu „schvalování per uživatel" (31. 10.)
+type Who = "sales" | "worker" | "admin" | "free" | "freeWorker" | "toggle";
 const who = vi.hoisted(() => ({
-  users: {} as Record<string, { id: string; email: string; fullName: string; role: "super_admin" | "obchodnik" | "zamestnanec" }>,
-  current: "sales" as "sales" | "worker" | "admin",
+  users: {} as Record<string, {
+    id: string; email: string; fullName: string; role: "super_admin" | "obchodnik" | "zamestnanec"; quoteNeedsApproval?: boolean;
+  }>,
+  current: "sales" as string,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
@@ -76,8 +80,8 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
   let n = 0;
   const startedAt = new Date(Date.now() - 1000).toISOString();
 
-  const as = (u: "sales" | "worker" | "admin") => { who.current = u; };
-  const id = (u: "sales" | "worker" | "admin") => who.users[u].id;
+  const as = (u: Who) => { who.current = u; };
+  const id = (u: Who) => who.users[u].id;
 
   async function newJob(patch: Row = {}): Promise<string> {
     n += 1;
@@ -880,4 +884,204 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
       await svc.from("emails").delete().in("id", [fromSales, fromWorker]);
     }
   }, 60_000);
+
+  // ── 31. 10.: schvalování nabídek PER UŽIVATEL (profiles.quote_needs_approval) ──
+  // Vlastní účty (demo účty sdílené DB se nemění): free = obchodník bez schvalování (Volný),
+  // freeWorker = zaměstnanec bez schvalování, toggle = obchodník, kterému super admin nastavení přepíná.
+  describe("schvalování per uživatel (31. 10.)", () => {
+    type Users = typeof import("@/app/actions/users");
+    let users: Users;
+    const created: string[] = [];
+    const QUOTE_SEND_NO_RIGHT = "Nabídku zákazníkovi odesílá obchodník, super admin, nebo autor schválené nabídky.";
+    const AWAITS = "Nabídka čeká na schválení — odeslat ji lze až po schválení.";
+
+    async function makeUser(key: Who, role: "obchodnik" | "zamestnanec", needs: boolean): Promise<void> {
+      const email = `e2e-qappr-${TAG}-${key.toLowerCase()}@local.test`;
+      const { data, error } = await svc.auth.admin.createUser({
+        email, password: `Qappr-${TAG}-1!`, email_confirm: true, user_metadata: { full_name: `QAPPR ${key} ${TAG}` },
+      });
+      if (error || !data.user) throw new Error(error?.message ?? "createUser");
+      created.push(data.user.id);
+      const { error: pErr } = await svc.from("profiles").update({
+        role, full_name: `QAPPR ${key} ${TAG}`, active: true, quote_needs_approval: needs,
+      } as never).eq("id", data.user.id);
+      if (pErr) throw new Error(pErr.message);
+      who.users[key] = { id: data.user.id, email, fullName: `QAPPR ${key} ${TAG}`, role, quoteNeedsApproval: needs };
+    }
+    async function notices(quoteId: string): Promise<number> {
+      const { data } = await svc.from("audit_log").select("id").eq("action", "quote_approval_notice")
+        .gte("created_at", startedAt).eq("diff->>quoteId", quoteId);
+      return (data ?? []).length;
+    }
+
+    beforeAll(async () => {
+      users = await import("@/app/actions/users");
+      await makeUser("free", "obchodnik", false);
+      await makeUser("freeWorker", "zamestnanec", false);
+      await makeUser("toggle", "obchodnik", true);
+    }, 60_000);
+
+    afterAll(async () => {
+      // nabídky a zakázky uklidí vnější afterAll (jobIds); účty až po nich — FK jsou „set null"
+      if (!svc) return;
+      if (jobIds.length) await svc.from("quotes").delete().in("job_id", jobIds);
+      await svc.from("audit_log").delete().in("entity_id", created);
+      for (const uid of created) await svc.auth.admin.deleteUser(uid);
+      for (const k of ["free", "freeWorker", "toggle"]) delete who.users[k];
+    }, 60_000);
+
+    it("DB: quote_author_needs_admin podle profilu; super admin nikdy (i s příznakem)", async () => {
+      const needs = async (uid: string) => {
+        const { data, error } = await svc.rpc("quote_author_needs_admin", { p_author: uid });
+        if (error) throw new Error(error.message);
+        return data as boolean;
+      };
+      expect(await needs(id("free"))).toBe(false);
+      expect(await needs(id("freeWorker"))).toBe(false);
+      expect(await needs(id("toggle"))).toBe(true);
+      expect(await needs(id("sales"))).toBe(true);
+      const { data: adm } = await svc.from("profiles").select("quote_needs_approval").eq("id", id("admin")).single();
+      expect((adm as { quote_needs_approval: boolean }).quote_needs_approval).toBe(true);
+      expect(await needs(id("admin"))).toBe(false);
+    });
+
+    it("obchodník bez schvalování: nabídka rovnou k odeslání (bez upozornění adminům), vystaví PDF a odešle ji e-mailem; úprava nic nezamkne", async () => {
+      const jobId = await newJob({ owner_id: id("free") });
+      as("free");
+      const quote = await createQuote(jobId);
+      expect(quote.needsApproval).toBe(false);
+      expect(await q(quote.id)).toMatchObject({ state: "rozpracovana", admin_approval_required: false, approval_required: false, approved_by: null });
+      expect(await events(jobId)).toContain(`Nabídka ${quote.number} vytvořena`);
+      const upd = await jobs.updateJobQuote(quote.id, await quoteInput(quote.id, { title: "Hřídel (Volný upravil)" }));
+      expect(upd).toMatchObject({ ok: true, approvalReset: false, needsApproval: false });
+      expect(await q(quote.id)).toMatchObject({ state: "rozpracovana", admin_approval_required: false });
+      const pdf = await docs.generateJobDocument(jobId, "nabidka", { quoteId: quote.id });
+      expect(pdf.ok, pdf.error).toBe(true);
+      const sent = await draftAndSend(jobId, pdf.fileId!);
+      expect(sent.ok, sent.error).toBe(true);
+      expect(await q(quote.id)).toMatchObject({ state: "odeslana", sent_via: "email", sent_by: id("free"), approved_by: null });
+      expect(await notices(quote.id)).toBe(0);
+    }, 120_000);
+
+    it("obchodník se schvalováním (Šponer) dál čeká; uživatel bez schvalování cizí čekající nabídku neodešle a úpravou ji neuvolní", async () => {
+      const jobId = await newJob();
+      as("sales");
+      const pending = await createQuote(jobId);
+      expect(pending.needsApproval).toBe(true);
+      expect(await q(pending.id)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+      expect((await jobs.markJobQuoteSent(pending.id)).error).toBe(AWAITS);
+      as("free");
+      expect((await jobs.markJobQuoteSent(pending.id)).error).toBe(AWAITS);
+      expect((await flow.setQuoteState(pending.id, "odeslana", { note: "osobně" })).ok).toBe(false);
+      const edit = await jobs.updateJobQuote(pending.id, await quoteInput(pending.id, { title: "Hřídel (upravil Volný)" }));
+      expect(edit.ok, edit.error).toBe(true);
+      expect(await q(pending.id)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true, approved_by: null });
+      // DB pojistka (server s autorem): ani přímý zápis „odesláno" neprojde
+      const asFree = (await import("@/test/local-supabase")).localAdmin({ id: id("free"), kind: "user", via: "rucne" });
+      const { error } = await asFree.from("quotes").update({ status: "odeslano" } as never).eq("id", pending.id);
+      expect(error?.message).toContain("Nabídka čeká na schválení");
+
+      // naopak: uživatel se schvalováním upraví nabídku uživatele bez schvalování → čeká na super admina
+      as("free");
+      const freeQuote = await createQuote(jobId);
+      as("sales");
+      const salesEdit = await jobs.updateJobQuote(freeQuote.id, await quoteInput(freeQuote.id, { title: "Hřídel (upravil kolega)" }));
+      expect(salesEdit).toMatchObject({ ok: true, needsApproval: true });
+      expect(await q(freeQuote.id)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+      // … a když ji pak upraví zase autor bez schvalování, převezme ji (schválení podle autora)
+      as("free");
+      expect((await jobs.updateJobQuote(freeQuote.id, await quoteInput(freeQuote.id, { title: "Hřídel (zase Volný)" }))).ok).toBe(true);
+      expect(await q(freeQuote.id)).toMatchObject({ state: "rozpracovana", admin_approval_required: false });
+    }, 120_000);
+
+    it("zaměstnanec bez schvalování odešle svou nabídku sám; cizí (ani rozpracovanou super admina) ne — server i DB", async () => {
+      const jobId = await newJob({ owner_id: id("admin") });
+      as("freeWorker");
+      const own = await createQuote(jobId);
+      expect(own.needsApproval).toBe(false);
+      expect((await q(own.id)).state).toBe("rozpracovana");
+      as("admin");
+      const adminQuote = await createQuote(jobId);
+      as("freeWorker");
+      expect((await jobs.markJobQuoteSent(adminQuote.id)).error).toBe(QUOTE_SEND_NO_RIGHT);
+      const asWorker = (await import("@/test/local-supabase")).localAdmin({ id: id("freeWorker"), kind: "user", via: "rucne" });
+      const { error } = await asWorker.from("quotes").update({ status: "odeslano" } as never).eq("id", adminQuote.id);
+      expect(error?.message).toBe("Schválit, odeslat nebo zamítnout nabídku smí obchodník nebo admin.");
+      expect(await flow.setQuoteState(own.id, "odeslana", { note: "předáno osobně" })).toMatchObject({ ok: true, quoteState: "odeslana" });
+      expect(await q(own.id)).toMatchObject({ state: "odeslana", sent_by: id("freeWorker") });
+      // zaměstnanec se schvalováním (demo dílna) svou nabídku bez schválení dál neodešle
+      as("worker");
+      const wq = await createQuote(jobId);
+      expect(wq.needsApproval).toBe(true);
+      expect((await jobs.markJobQuoteSent(wq.id)).error).toBe(AWAITS);
+    }, 120_000);
+
+    it("super admin přepne „Nabídky musí schválit super admin“ → přepočet čekajících nabídek (schválené beze změny), audit a atribuce; jiný ho nezmění", async () => {
+      const jobId = await newJob({ owner_id: id("toggle") });
+      as("toggle");
+      const p1 = await createQuote(jobId);
+      const p2 = await createQuote(jobId);
+      expect(p1.needsApproval && p2.needsApproval).toBe(true);
+      as("admin");
+      expect((await flow.setQuoteState(p2.id, "schvalena")).ok).toBe(true);
+
+      // obchodník si ho nezmění — ani akcí, ani přímo přes REST (profiles_guard)
+      as("sales");
+      expect((await users.updateUser(id("toggle"), { quoteNeedsApproval: false })).ok).toBe(false);
+      const local = await import("@/test/local-supabase");
+      const session = await local.localSession(local.DEMO.sales.email, local.DEMO.sales.password);
+      const { error: selfErr } = await session.from("profiles").update({ quote_needs_approval: false } as never).eq("id", id("sales"));
+      expect(selfErr?.message).toContain("jen super admin");
+      expect((await svc.from("profiles").select("quote_needs_approval").eq("id", id("sales")).single()).data)
+        .toMatchObject({ quote_needs_approval: true });
+
+      as("admin");
+      const off = await users.updateUser(id("toggle"), { quoteNeedsApproval: false });
+      expect(off).toMatchObject({ ok: true, pendingQuotes: { before: 1, after: 0 } });
+      who.users.toggle.quoteNeedsApproval = false;
+      expect(await q(p1.id)).toMatchObject({ state: "rozpracovana", admin_approval_required: false, approval_required: false });
+      expect(await q(p2.id)).toMatchObject({ state: "schvalena", admin_approval_required: true, approved_by: id("admin") });
+      const { data: prof } = await svc.from("profiles").select("quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at")
+        .eq("id", id("toggle")).single();
+      expect(prof).toMatchObject({ quote_needs_approval: false, quote_approval_changed_by: id("admin") });
+      expect((prof as { quote_approval_changed_at: string | null }).quote_approval_changed_at).toBeTruthy();
+      const { data: audit } = await svc.from("audit_log").select("actor_id, diff").eq("action", "user_updated").eq("entity_id", id("toggle"))
+        .order("created_at", { ascending: false }).limit(1);
+      expect((audit ?? [])[0]).toMatchObject({ actor_id: id("admin"), diff: { quote_needs_approval: false, pending_quotes: { before: 1, after: 0 } } });
+      // historie stavu nabídky nese super admina (přepočet je jeho změna)
+      expect((await q(p1.id)).state_changed_by).toBe(id("admin"));
+
+      as("toggle");
+      expect((await jobs.markJobQuoteSent(p1.id)).ok).toBe(true);
+      expect((await q(p1.id)).state).toBe("odeslana");
+      const p3 = await createQuote(jobId);
+      expect(p3.needsApproval).toBe(false);
+
+      // zpět na schvalování: neodeslaná rozpracovaná znovu čeká; odeslaná a schválená beze změny
+      as("admin");
+      const on = await users.updateUser(id("toggle"), { quoteNeedsApproval: true });
+      expect(on).toMatchObject({ ok: true, pendingQuotes: { before: 0, after: 1 } });
+      who.users.toggle.quoteNeedsApproval = true;
+      expect(await q(p3.id)).toMatchObject({ state: "ke_schvaleni", admin_approval_required: true });
+      expect((await q(p1.id)).state).toBe("odeslana");
+      expect((await q(p2.id)).state).toBe("schvalena");
+      as("toggle");
+      expect((await jobs.markJobQuoteSent(p3.id)).error).toBe(AWAITS);
+      // beze změny = žádný zápis ani přepočet
+      as("admin");
+      expect(await users.updateUser(id("toggle"), { quoteNeedsApproval: true })).toEqual({ ok: true });
+    }, 120_000);
+
+    it("super admin: nastavení se u něj neukládá a jeho nabídky schválení nepotřebují", async () => {
+      as("admin");
+      const r = await users.updateUser(id("admin"), { quoteNeedsApproval: false });
+      expect(r).toEqual({ ok: true });
+      expect((await svc.from("profiles").select("quote_needs_approval").eq("id", id("admin")).single()).data)
+        .toMatchObject({ quote_needs_approval: true });
+      const jobId = await newJob();
+      const own = await createQuote(jobId);
+      expect(own.needsApproval).toBe(false);
+      expect((await q(own.id)).state).toBe("rozpracovana");
+    }, 60_000);
+  });
 });

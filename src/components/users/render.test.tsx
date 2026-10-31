@@ -24,6 +24,7 @@ import { UserManagement } from "./user-management";
 import { AddUserDialog } from "./add-user-dialog";
 import { AiAccessCard } from "./ai-access-card";
 import { RolePicker } from "./role-picker";
+import { QuoteApprovalToggle, pendingQuotesNote } from "./user-dialogs";
 import { ProfileForm } from "@/components/account/profile-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { AuthShell } from "@/components/account/auth-shell";
@@ -82,6 +83,40 @@ describe("správa uživatelů — render", () => {
     expect(html).toContain("Pásmová provize · 0/10/15/20 %");
     expect(html).toContain("8,5 % ze zisku · bez smlouvy");
     expect(html).toContain("Smlouva a provize");
+  });
+  it("31. 10.: schvalování nabídek per uživatel — štítek v seznamu, přepínač, zpráva o přepočtu", () => {
+    const list: ManagedUser[] = [
+      users[0],
+      { ...users[1], id: "u-vit", fullName: "Vít Volný", quoteNeedsApproval: false },
+      { ...users[2], id: "u-dom", fullName: "Dominik Šponer", active: true },   // neuvedeno = se schvalováním
+    ];
+    const html = render(<UserManagement users={list} mailboxes={mailboxes} currentUserId="u-admin" aiForAll={false} />);
+    // super admin štítek nemá; Volný bez schválení; Šponer „schvaluje admin"
+    expect(html.match(/data-quote-approval="/g) ?? []).toHaveLength(2);
+    expect(html).toContain('data-quote-approval="off"');
+    expect(html).toContain("nabídky bez schválení");
+    expect(html).toContain('data-quote-approval="on"');
+    expect(html).toContain("schvaluje admin");
+
+    const on = render(<QuoteApprovalToggle id="t1" checked onChange={() => {}} superAdmin={false} changedBy="Jan Šéf" changedAt="2026-10-31T09:00:00Z" />);
+    expect(on).toContain("Nabídky musí schválit super admin");
+    expect(on).toContain("odešle až po schválení super adminem");
+    expect(on).toContain('aria-checked="true"');
+    expect(on).toContain("Naposledy změnil(a) Jan Šéf");
+    const off = render(<QuoteApprovalToggle id="t2" checked={false} onChange={() => {}} superAdmin={false} />);
+    expect(off).toContain("vystavuje i odesílá zákazníkovi sám, bez schválení");
+    expect(off).toContain('aria-checked="false"');
+    expect(off).not.toContain("Naposledy změnil");
+    const admin = render(<QuoteApprovalToggle id="t3" checked onChange={() => {}} superAdmin />);
+    expect(admin).toContain("Super admin schválení nepotřebuje");
+    expect(admin).toContain('aria-checked="false"');
+    expect(admin).toMatch(/<button[^>]*disabled=""/);
+
+    expect(pendingQuotesNote(undefined)).toBe("");
+    expect(pendingQuotesNote({ before: 2, after: 2 })).toBe("");
+    expect(pendingQuotesNote({ before: 2, after: 0 })).toBe(" 2 nabídky už schválení nepotřebuje — jdou odeslat hned.");
+    expect(pendingQuotesNote({ before: 1, after: 0 })).toBe(" 1 nabídka už schválení nepotřebuje — jde odeslat hned.");
+    expect(pendingQuotesNote({ before: 0, after: 5 })).toBe(" 5 nabídek teď čekají na schválení super admina.");
   });
   it("prázdný seznam", () => {
     const html = render(<UserManagement users={[]} mailboxes={[]} currentUserId="x" aiForAll />);

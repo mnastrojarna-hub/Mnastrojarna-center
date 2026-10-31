@@ -33,11 +33,16 @@ const SHOWN_FEATURES: Feature[] = [
 ];
 
 /** Karta „Co vidím“ (#25, pravidlo 7): Kniha zakázek vs. Obchodní tok, schvalování, Nacenění, focení, provize. */
-function whatISee(hasAi: boolean): React.ReactNode[] {
+function whatISee(hasAi: boolean, quotes: "admin" | "needs" | "free"): React.ReactNode[] {
   return [
   <><strong>Kniha zakázek</strong> = výroba a celý život zakázky. Vidí ji každý — všechny zakázky a vše v nich (nákupní ceny, marže a nákupní doklady jen obchodník a super admin).</>,
   <><strong>Obchodní tok</strong> (Poptávky, Nabídky, Potvrzení objednávek, Objednávky dodavatelům, Dokumenty) = tvoje práce z pošty: zakázky, kde jsi obchodník nebo je zpracováváš, které jsi založil(a), a doklady z tvé schránky. Super admin vidí tok všech.</>,
-  <><strong>Nabídky</strong> od kohokoli kromě super admina musí před odesláním schválit super admin. Po schválení je odešleš sám.</>,
+  // 31. 10.: schvalování nabídek per uživatel (Správa uživatelů → „Nabídky musí schválit super admin")
+  quotes === "admin"
+    ? <><strong>Nabídky</strong> kolegů, kterým je schvalování zapnuté (Správa uživatelů), musí před odesláním schválit super admin. Tvoje schválení nepotřebují.</>
+    : quotes === "free"
+      ? <><strong>Nabídky</strong>: tvoje schválení super adminem nepotřebují — vystavíš a odešleš je sám.</>
+      : <><strong>Nabídky</strong>: tvoje musí před odesláním schválit super admin. Po schválení je odešleš sám.</>,
   <><strong>Nacenění</strong> zatím dělá jen super admin.</>,
   hasAi
     ? <><strong>Vyfotit doklad</strong> může každý — AI fotku přečte a zařadí.</>
@@ -179,7 +184,7 @@ export default async function AccountPage() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground [&_strong]:text-foreground">
-                {whatISee(hasAi).map((line, i) => (
+                {whatISee(hasAi, user.role === "super_admin" ? "admin" : user.quoteNeedsApproval === false ? "free" : "needs").map((line, i) => (
                   <li key={i} className="flex gap-2">
                     <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
                     <span className="min-w-0">{line}</span>

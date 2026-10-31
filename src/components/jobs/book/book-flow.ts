@@ -17,6 +17,8 @@ export interface BookAccess {
   features: Feature[];
   userId: string | null;
   role: UserRole | null;
+  /** Nabídky uživatele musí schválit super admin (profil, 31. 10.). */
+  quoteNeedsApproval?: boolean;
 }
 
 export function actionCtxOf(access: BookAccess | null | undefined, job?: Pick<JobListItem, "assignee"> & Partial<Pick<JobListItem, "owner">>): ActionCtx {
@@ -28,6 +30,7 @@ export function actionCtxOf(access: BookAccess | null | undefined, job?: Pick<Jo
     assigneeId: job?.assignee?.id ?? null,
     assigneeName: job?.assignee?.name ?? null,
     ownerId: job?.owner?.id ?? null,
+    quoteNeedsApproval: access?.quoteNeedsApproval,
   };
 }
 

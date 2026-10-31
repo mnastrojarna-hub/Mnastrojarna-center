@@ -1715,6 +1715,8 @@ export interface ActionCtx {
    * aby v menu nebyla položka bez dialogu. Server (returnQuoteToAuthor) je hotový.
    */
   withReturn?: boolean;
+  /** Nabídky přihlášeného musí schválit super admin (profil; 31. 10. per uživatel). Neuvedeno = ano (kromě super admina). */
+  quoteNeedsApproval?: boolean;
 }
 
 // ── Schvalování nabídek super adminem (#25) ─────────────────
@@ -1726,6 +1728,17 @@ export const QUOTE_SEND_NO_RIGHT = "Nabídku zákazníkovi odesílá obchodník,
 export const QUOTE_ADMIN_ONLY = "Nabídku schvaluje jen super admin.";
 export const QUOTE_ARCHIVED_SEND = "Archivovanou verzi nabídky neposíláme — platí novější verze.";
 export const QUOTE_PENDING_LABEL = "Neschválená — čeká na schválení super admina";
+
+/**
+ * Musí nabídky tohoto uživatele před odesláním schválit super admin? (31. 10. per uživatel)
+ * Super admin nikdy; ostatní podle profilu „Nabídky musí schválit super admin" (výchozí ano).
+ * TS dvojče DB funkce quote_author_needs_admin (20261030200000).
+ */
+export function userNeedsQuoteApproval(u: { role?: string | null; quoteNeedsApproval?: boolean | null } | null | undefined): boolean {
+  if (!u) return true;
+  if (u.role === "super_admin") return false;
+  return u.quoteNeedsApproval !== false;
+}
 
 /** Důvody schválení (#25): AI nabídka v režimu se schválením, nebo ji připravil ne-admin.
  *  `limit` a `requested` (limit částky, žádost) #25 ruší — zůstávají jen kvůli starším volajícím (vždy false). */
@@ -1764,6 +1777,8 @@ export interface QuoteSendViewer {
   jobOwnerId?: string | null;
   jobAssigneeId?: string | null;
   isSuperAdmin?: boolean;
+  /** Nabídky odesílatele musí schválit super admin (profil). Neuvedeno = ano (kromě super admina). */
+  quoteNeedsApproval?: boolean;
 }
 
 /** Smí tento uživatel nabídku odeslat zákazníkovi? null = ano, jinak důvod (stejná pravidla jako DB). */
@@ -1778,6 +1793,12 @@ export function quoteSendBlock(
   if (viewer.can("margins")) return null;
   const me = viewer.userId;
   if (q.adminApprovalRequired && q.approvedBy && me && (me === q.createdBy || me === viewer.jobOwnerId || me === viewer.jobAssigneeId)) {
+    return null;
+  }
+  // 31. 10.: autor bez schvalování (např. zaměstnanec s vypnutým „Nabídky musí schválit super admin")
+  // odešle svou nabídku, která schválení nepotřebuje — DB: quotes_flow_before (20261030200000)
+  if (!q.adminApprovalRequired && me && me === q.createdBy && !q.archived
+      && !userNeedsQuoteApproval({ role: viewer.isSuperAdmin ? "super_admin" : null, quoteNeedsApproval: viewer.quoteNeedsApproval })) {
     return null;
   }
   return QUOTE_SEND_NO_RIGHT;
@@ -1868,7 +1889,10 @@ export function quoteUnpriced(q: Pick<QuoteFacts, "total" | "state"> | null | un
 
 /** Odesílatel pro quoteSendBlock z kontextu akcí (obchodník / řešitel zakázky). */
 export function sendViewerOf(ctx: ActionCtx): QuoteSendViewer {
-  return { can: ctx.can, userId: ctx.userId, jobOwnerId: ctx.ownerId ?? null, jobAssigneeId: ctx.assigneeId, isSuperAdmin: ctx.isSuperAdmin };
+  return {
+    can: ctx.can, userId: ctx.userId, jobOwnerId: ctx.ownerId ?? null, jobAssigneeId: ctx.assigneeId, isSuperAdmin: ctx.isSuperAdmin,
+    quoteNeedsApproval: ctx.quoteNeedsApproval,
+  };
 }
 
 function quoteNext(s: FlowSnapshot, ctx: ActionCtx): Next | undefined {

@@ -231,6 +231,7 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
   const canSend = quoteSendBlock(q, {
     can: ctx.can, userId: ctx.userId, isSuperAdmin: ctx.isSuperAdmin,
     jobOwnerId: r.jobOwnerId ?? ctx.ownerId ?? null, jobAssigneeId: r.jobAssigneeId ?? ctx.assigneeId,
+    quoteNeedsApproval: ctx.quoteNeedsApproval,
   }) === null;
   const ok = (k: FlowActionKey) => ctx.can(FLOW_ACTIONS[k].feature);
   const step = (k: FlowActionKey): NextStep => (ok(k) ? { key: k, label: FLOW_ACTIONS[k].label } : null);

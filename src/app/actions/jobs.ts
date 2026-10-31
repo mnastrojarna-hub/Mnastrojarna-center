@@ -22,6 +22,7 @@ import type { JobStage, JobSource } from "@/lib/supabase/database.types";
 import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
 import {
   FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
+  userNeedsQuoteApproval,
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
 import { supersedeEditedMailChanges } from "@/lib/email/job-link-store";
@@ -707,7 +708,8 @@ export async function createJobQuote(
       await db.from("orders").update({ priced_by: user.id } as never).eq("id", jobId);
     }
 
-    // #25: nabídku ne-admina označí DB „Neschválená“ — odeslat ji půjde až po schválení super adminem
+    // #25 / 31. 10.: nabídku uživatele se schvalováním (profil) označí DB „Neschválená“ — odeslat ji půjde až
+    // po schválení super adminem; uživatel bez schvalování (a super admin) ji odešle rovnou
     const after = await quoteApprovalState(db, quoteId);
     const needsApproval = after.adminApprovalRequired && !after.approvedBy;
     await logJobEvent(db, {
@@ -724,7 +726,9 @@ export async function createJobQuote(
   }
 }
 
-export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Promise<ActionResult<{ approvalReset: boolean }>> {
+export async function updateJobQuote(
+  quoteId: string, input: JobQuoteInput,
+): Promise<ActionResult<{ approvalReset: boolean; needsApproval?: boolean }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
@@ -796,8 +800,10 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
       if (error) console.error(`[jobs] Otisk schválené nabídky se nepodařilo uložit: ${error.message}`);
     }
 
+    // 31. 10.: schválení po změně je nutné jen u nabídky, která ho potřebuje (autor / editor se schvalováním, AI)
+    const pendingNow = now.state === "ke_schvaleni" && !now.approvedBy;
     if (quote.job_id) {
-      const suffix = resetApproval ? " (schválení zrušeno — nutno znovu schválit)"
+      const suffix = resetApproval ? (pendingNow ? " (schválení zrušeno — nutno znovu schválit)" : " (schválení zrušeno)")
         : reapproved && wasApproved ? " a znovu schválena" : "";
       await logJobEvent(db, {
         jobId: quote.job_id, type: "quote",
@@ -806,11 +812,11 @@ export async function updateJobQuote(quoteId: string, input: JobQuoteInput): Pro
         actorId: user.id,
       });
     }
-    if (resetApproval || (!isAdmin && now.adminApprovalRequired && !now.approvedBy && quote.approval_returned_at)) {
+    if (pendingNow && (resetApproval || (!isAdmin && now.adminApprovalRequired && quote.approval_returned_at))) {
       await scheduleQuoteApprovalNotice({ quoteId, jobId: quote.job_id, authorId: user.id });
     }
     revalidateQuote(quote.job_id);
-    return { ok: true, approvalReset: resetApproval };
+    return { ok: true, approvalReset: resetApproval, needsApproval: pendingNow };
   } catch (err) {
     return fail(err);
   }
@@ -842,6 +848,7 @@ async function sendCheck(c: Ctx, quoteId: string): Promise<string | null> {
     can: c.can, userId: c.user.id, isSuperAdmin: c.user.role === "super_admin",
     jobOwnerId: typeof job?.owner_id === "string" ? job.owner_id : null,
     jobAssigneeId: typeof job?.assignee_id === "string" ? job.assignee_id : null,
+    quoteNeedsApproval: userNeedsQuoteApproval(c.user),
   });
 }
 

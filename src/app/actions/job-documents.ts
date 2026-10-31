@@ -32,6 +32,7 @@ import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
 import {
   FLOW_QUOTE_COLUMNS, invoiceDeliveryOf, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, quoteWasSent,
+  userNeedsQuoteApproval,
 } from "@/lib/jobs/flow-status";
 import { FV_SERIES, invoiceDeliveryError, isOwnInvoiceFile } from "@/lib/jobs/invoice-file";
 import { recipientsFor, toneFor } from "@/lib/contacts/server";
@@ -709,6 +710,7 @@ export async function sendJobDocument(
           const facts = quoteFactsFromRow(qd as Record<string, unknown>);
           const block = quoteSendBlock(facts, {
             can, userId: user.id, isSuperAdmin: isAdmin, jobOwnerId: job.owner_id, jobAssigneeId: job.assignee_id,
+            quoteNeedsApproval: userNeedsQuoteApproval(user),
           });
           if (block) return fail(block);
           const approvedAt = (qd as { approved_at?: string | null }).approved_at ?? null;

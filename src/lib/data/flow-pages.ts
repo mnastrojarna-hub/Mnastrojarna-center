@@ -5,7 +5,7 @@ import type { PersonRef } from "@/lib/jobs/types";
 import type { ChangeVia, DocIssuerKey, JobFileOrigin, OrderRevisionDecision } from "@/lib/supabase/database.types";
 import {
   FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, deriveFlow, flowFactsFromRow, isLostReason, menuActions, nextAction,
-  pragueToday, quoteDisplayState, quoteFactsFromRow, stampFromRow, transitionFeature, type ActionCtx, type ChangeStamp,
+  pragueToday, quoteDisplayState, quoteFactsFromRow, stampFromRow, transitionFeature, userNeedsQuoteApproval, type ActionCtx, type ChangeStamp,
   type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import {
@@ -40,6 +40,7 @@ async function session() {
       can: access.can, userId: access.user.id, isSuperAdmin: access.user.role === "super_admin", assigneeId: null,
       // stránky toku umí dialog „Vrátit k přepracování…“ (FlowActionBar, #25)
       withReturn: true,
+      quoteNeedsApproval: userNeedsQuoteApproval(access.user),
     };
     return { db, access, ctx };
   } catch (err) {

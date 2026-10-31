@@ -46,7 +46,7 @@ export default async function OrdersPage({
 
   const { can, features } = await getAccess();
   const margins = can("margins");
-  const access: BookAccess = { features, userId: user.id, role: user.role };
+  const access: BookAccess = { features, userId: user.id, role: user.role, quoteNeedsApproval: user.quoteNeedsApproval !== false };
   const chipSegment = params.segment === "objednavky" || params.segment === "poptavky";
   // objednávky v běhu: hodnota (jen s právem na marže) a faktury po splatnosti
   const [jobs, counts, options, running, production, flowCounts] = await Promise.all([

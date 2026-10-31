@@ -18,6 +18,11 @@ export interface CurrentUser {
   hasProfile: boolean;
   /** Počáteční heslo od admina — musí si nastavit vlastní. */
   mustChangePassword: boolean;
+  /**
+   * Nabídky uživatele musí před odesláním schválit super admin (profil, 31. 10.; super admin nikdy).
+   * Neuvedeno = ano. Rozhoduje DB (quote_author_needs_admin) — tady jen pro texty a nabídku akcí.
+   */
+  quoteNeedsApproval?: boolean;
 }
 
 export function initialsOf(name: string, email: string): string {
@@ -43,16 +48,19 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     let active = false;
     let hasProfile = false;
     let mustChangePassword = false;
+    let quoteNeedsApproval = true;
 
     // Profil: servisním klíčem, jinak vlastní session (RLS povoluje číst sám sebe).
     const db = hasServiceKey() ? createAdminClient() : supabase;
-    const { data } = await db
-      .from("profiles")
-      .select("full_name, role, ai_access, active, password_change_required")
-      .eq("id", user.id)
-      .maybeSingle();
-    const profile = data as {
+    const base = "full_name, role, ai_access, active, password_change_required";
+    let res = await db.from("profiles").select(`${base}, quote_needs_approval`).eq("id", user.id).maybeSingle();
+    // DB bez migrace 20261030200000 (nasazení kódu před migrací) — přihlášení nesmí spadnout
+    if (res.error && /quote_needs_approval/.test(res.error.message ?? "")) {
+      res = await db.from("profiles").select(base).eq("id", user.id).maybeSingle() as typeof res;
+    }
+    const profile = res.data as {
       full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean; password_change_required?: boolean;
+      quote_needs_approval?: boolean | null;
     } | null;
     if (profile) {
       hasProfile = true;
@@ -61,6 +69,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       aiAccess = Boolean(profile.ai_access);
       active = profile.active !== false;
       mustChangePassword = Boolean(profile.password_change_required);
+      quoteNeedsApproval = role !== "super_admin" && profile.quote_needs_approval !== false;
     }
 
     const email = user.email ?? "";
@@ -75,6 +84,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       active: hasProfile && active,
       hasProfile,
       mustChangePassword,
+      quoteNeedsApproval: role !== "super_admin" && quoteNeedsApproval,
     };
   } catch {
     return null;

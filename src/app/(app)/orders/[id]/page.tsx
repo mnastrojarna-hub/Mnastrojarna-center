@@ -67,7 +67,7 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
       initialAction={typeof sp.akce === "string" ? sp.akce : sp.nova === "1" ? "quote.create" : null}
       flow={{
         stamps, fieldStamps, payments, revisions,
-        access: { features: access.features, userId: user.id, role: user.role },
+        access: { features: access.features, userId: user.id, role: user.role, quoteNeedsApproval: user.quoteNeedsApproval !== false },
       }}
       production={production}
       purchasing={purchasing}

@@ -102,7 +102,7 @@ const ACTION_LABELS: Record<string, string> = {
   user_password_set: "Nastaveno heslo",
   user_reset_code_sent: "Odeslán kód pro obnovu hesla",
   profile_updated: "Upraven profil",
-  profile_changed: "Změna role / aktivity / sazby",
+  profile_changed: "Změna role / aktivity / sazby / schvalování nabídek",
   password_changed: "Změna hesla",
   password_reset: "Obnova hesla",
   password_reset_requested: "Žádost o obnovu hesla",

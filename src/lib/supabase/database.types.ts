@@ -50,6 +50,11 @@ export interface Profile {
   last_seen_at: string | null;
   /** Počáteční heslo od admina → při prvním přihlášení vynutit změnu (migrace 0021). */
   password_change_required: boolean;
+  /** Nabídky uživatele musí před odesláním schválit super admin (u super admina se ignoruje; 20261030200000). */
+  quote_needs_approval?: boolean;
+  /** Kdo a kdy naposledy změnil quote_needs_approval (píše trigger). */
+  quote_approval_changed_by?: string | null;
+  quote_approval_changed_at?: string | null;
   created_at: string;
   updated_at: string;
 }

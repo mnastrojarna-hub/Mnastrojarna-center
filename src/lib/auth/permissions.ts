@@ -126,8 +126,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 /** Krátké vysvětlení role pro správu uživatelů. */
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Vidí a nastavuje vše — obchodní tok všech, Nacenění, schvalování nabídek, AI, poštu všech schránek a uživatele.",
-  obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem.",
-  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem odešle sám.",
+  obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem (schvalování lze uživateli vypnout).",
+  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem odešle sám (schvalování lze uživateli vypnout).",
 };
 
 /** Lidský popis, proč funkce není dostupná (pro stránku „bez přístupu"). */
@@ -162,6 +162,6 @@ export const FEATURE_LABELS: Record<Feature, string> = {
 
 /** Doplňující vysvětlení u odepřené funkce (AccessBanner) — co dělat místo toho. */
 export const FEATURE_HINTS: Partial<Record<Feature, string>> = {
-  pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin.",
+  pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin (pokud ti schvalování nevypnul).",
   supplier_invoices: "Faktury dodavatelů zatím zpracovává super admin. Fakturu nahraješ přes „Nahrát fakturu“ nebo vyfocením dokladu.",
 };

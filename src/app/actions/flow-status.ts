@@ -17,7 +17,7 @@ import {
   FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, INQUIRY_STATES, ORDER_STATES, QUOTE_ADMIN_ONLY, QUOTE_STATES, actorName,
   canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
   isQuoteState, lostReasonLabel, lostReasonsFor, paymentKey, quoteFactsFromRow, quoteLabel, quoteSendBlock, reasonRequired,
-  relativeStampTime, stageEffect, transitionFeature, type ActionCtx, type PaymentState, type StageEffect,
+  relativeStampTime, stageEffect, transitionFeature, userNeedsQuoteApproval, type ActionCtx, type PaymentState, type StageEffect,
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore } from "@/lib/jobs/quote-approval-store";
 
@@ -72,7 +72,10 @@ function note(v: unknown): string | null {
 }
 
 function actionCtx(c: Ctx): ActionCtx {
-  return { can: c.can, userId: c.user.id, isSuperAdmin: c.user.role === "super_admin", assigneeId: null };
+  return {
+    can: c.can, userId: c.user.id, isSuperAdmin: c.user.role === "super_admin", assigneeId: null,
+    quoteNeedsApproval: userNeedsQuoteApproval(c.user),
+  };
 }
 
 async function loadJob(db: JobsDb, id: string, columns: string): Promise<Row | null> {
@@ -350,6 +353,7 @@ async function applyQuote(
       can: c.can, userId: c.user.id, isSuperAdmin: c.user.role === "super_admin",
       jobOwnerId: typeof job?.owner_id === "string" ? job.owner_id : null,
       jobAssigneeId: typeof job?.assignee_id === "string" ? job.assignee_id : null,
+      quoteNeedsApproval: userNeedsQuoteApproval(c.user),
     });
     if (block) return fail(block);
   }
