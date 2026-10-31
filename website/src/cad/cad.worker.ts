@@ -2,12 +2,15 @@
 /* CAD jádro ve web workeru: OpenCascade (WASM) + replicad. UI zůstává plynulé i při složitých operacích. */
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
-import { buildDoc, buildShape, faceInfo } from "./build";
-import { makeDrawing, type DrawingMeta } from "./drawing";
-import type { CadDoc } from "./types";
+import { buildDoc, faceInfo } from "./build";
+import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
+import { cachedBody, interference, partEntry, shapeOfDoc } from "./asm-kernel";
+import { exportShape } from "./formats/export";
+import type { CadDoc, ComponentSource, ExportFormat, MeshData } from "./types";
 
 let ready: Promise<void> | null = null;
 let body: r.Shape3D | null = null;
+let drawCache: { key: string; body: r.Shape3D } | null = null;
 
 function init() {
   if (!ready) {
@@ -26,8 +29,11 @@ type Req =
   | { id: number; op: "init" }
   | { id: number; op: "build"; doc: CadDoc }
   | { id: number; op: "face"; index: number }
-  | { id: number; op: "export"; format: "step" | "stl"; doc: CadDoc }
-  | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta };
+  | { id: number; op: "export"; format: ExportFormat; doc: CadDoc }
+  | { id: number; op: "asmParts"; parts: { key: string; source: ComponentSource }[] }
+  | { id: number; op: "asmFace"; key: string; index: number }
+  | { id: number; op: "interference"; doc: CadDoc }
+  | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -52,18 +58,43 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       case "face":
         ctx.postMessage({ id: m.id, ok: true, result: body ? faceInfo(body, m.index) : null });
         break;
+      case "asmParts": {
+        const out = [];
+        const t: Transferable[] = [];
+        for (const p of m.parts) {
+          const e = await partEntry(p.key, p.source);
+          const res = { ...e.result, mesh: e.result.mesh ? copyMesh(e.result.mesh) : null };
+          if (res.mesh) t.push(res.mesh.vertices.buffer, res.mesh.normals.buffer, res.mesh.triangles.buffer, res.mesh.faceGroups.buffer, res.mesh.lines.buffer, res.mesh.edgeGroups.buffer);
+          out.push({ key: p.key, result: res });
+        }
+        ctx.postMessage({ id: m.id, ok: true, result: out }, t);
+        break;
+      }
+      case "asmFace": {
+        const b = cachedBody(m.key);
+        ctx.postMessage({ id: m.id, ok: true, result: b ? faceInfo(b, m.index) : null });
+        break;
+      }
+      case "interference":
+        ctx.postMessage({ id: m.id, ok: true, result: await interference(m.doc) });
+        break;
       case "export": {
-        const { body: b } = await buildShape(m.doc);
+        const b = await shapeOfDoc(m.doc);
         if (!b) throw new Error("Model je prázdný.");
-        const blob = m.format === "step" ? b.blobSTEP() : b.blobSTL({ tolerance: 0.01, angularTolerance: 0.1 });
-        const buf = await blob.arrayBuffer();
+        const buf = await exportShape(b, m.format, m.doc.name);
         ctx.postMessage({ id: m.id, ok: true, result: buf }, [buf]);
         break;
       }
       case "drawing": {
-        const { body: b } = await buildShape(m.doc);
-        if (!b) throw new Error("Model je prázdný.");
-        ctx.postMessage({ id: m.id, ok: true, result: makeDrawing(b, m.meta) });
+        // těleso se přestaví jen při změně modelu (změny voleb výkresu jsou rychlé)
+        const key = JSON.stringify(m.doc);
+        if (drawCache?.key !== key) {
+          const b = await shapeOfDoc(m.doc);
+          if (!b) throw new Error("Model je prázdný.");
+          drawCache?.body.delete?.();
+          drawCache = { key, body: b };
+        }
+        ctx.postMessage({ id: m.id, ok: true, result: makeDrawing(drawCache.body, m.meta, m.opts) });
         break;
       }
     }
@@ -71,3 +102,15 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
     ctx.postMessage({ id: m.id, ok: false, error: err instanceof Error ? err.message : "Chyba CAD jádra." });
   }
 };
+
+/** kopie sítě – originál zůstává v mezipaměti workeru, kopie se předá (transfer) do UI */
+function copyMesh(m: MeshData): MeshData {
+  return {
+    vertices: m.vertices.slice(),
+    normals: m.normals.slice(),
+    triangles: m.triangles.slice(),
+    faceGroups: m.faceGroups.slice(),
+    lines: m.lines.slice(),
+    edgeGroups: m.edgeGroups.slice(),
+  };
+}

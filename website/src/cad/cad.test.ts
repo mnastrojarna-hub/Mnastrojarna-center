@@ -1,8 +1,9 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
-import { buildDoc, buildShape, faceInfo } from "./build";
+import { buildDoc, buildShape, chainSegs, faceInfo, registerTextFont } from "./build";
 import { makeDrawing, pathToPolylines } from "./drawing";
 import { findLoops, nestLoops, sketchToDxf } from "./sketch";
 import { emptyDoc, type CadDoc, type Feature } from "./types";
@@ -14,6 +15,8 @@ beforeAll(async () => {
     printErr: () => undefined,
   });
   r.setOC(oc as never);
+  const font = readFileSync(path.resolve(__dirname, "../../public/fonts/Roboto-Bold.ttf"));
+  await registerTextFont(font.buffer.slice(font.byteOffset, font.byteOffset + font.byteLength) as ArrayBuffer);
 }, 60_000);
 
 const doc = (features: Feature[]): CadDoc => ({ ...emptyDoc("Test"), features });
@@ -129,7 +132,7 @@ describe("modelování (OpenCascade)", () => {
     expect(d.svg).toContain("Mnástrojárna");
     expect(d.svg).toContain("80");
     expect(d.dxf).toContain("OBRYS");
-    expect(d.sheet).toBe("A4");
+    expect(JSON.stringify(d.sheet)).toContain("A4");
   });
 
   it("parser SVG path zvládne oblouky", () => {
@@ -147,4 +150,176 @@ describe("ukázkové modely", () => {
       expect(res.metrics!.volume, ex.label).toBeGreaterThan(0);
     }
   }, 60_000);
+});
+
+const box = (id = "b", size: [number, number, number] = [100, 60, 40]): Feature => ({ id, name: "Kvádr", type: "box", size, position: [0, 0, 0], centered: false, mode: "new" });
+const vol = async (features: Feature[], extra: Partial<CadDoc> = {}) => {
+  const res = await buildDoc({ ...doc(features), ...extra });
+  return { res, v: res.metrics?.volume ?? 0, bad: res.status.filter((s) => !s.ok) };
+};
+
+describe("nové prvky", () => {
+  it("tažení kruhu po křivce (úsečka + oblouk + úsečka)", async () => {
+    const { v, bad } = await vol([
+      { id: "p", name: "Dráha", type: "sketch", plane: { kind: "base", name: "XZ", offset: 0 }, entities: [
+        { id: "l1", type: "line", a: [0, 0], b: [0, 50] },
+        { id: "a1", type: "arc", a: [0, 50], b: [8.7868, 71.2132], c: [30, 80] },
+        { id: "l2", type: "line", a: [80, 80], b: [30, 80] }, // opačná orientace
+      ] },
+      { id: "s", name: "Průřez", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [{ id: "c", type: "circle", cx: 0, cy: 0, r: 5 }] },
+      { id: "sw", name: "Tažení", type: "sweep", profileId: "s", pathId: "p", mode: "new", frenet: true },
+    ]);
+    expect(bad).toEqual([]);
+    const len = 50 + (Math.PI / 2) * 30 + 50;
+    expect(v).toBeCloseTo(Math.PI * 25 * len, -1);
+  });
+
+  it("tažení profilu s otvorem (trubka)", async () => {
+    const { v, bad } = await vol([
+      { id: "p", name: "Dráha", type: "sketch", plane: { kind: "base", name: "XZ", offset: 0 }, entities: [{ id: "l", type: "polyline", closed: false, points: [[0, 0], [0, 100]] }] },
+      { id: "s", name: "Průřez", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [{ id: "c", type: "circle", cx: 0, cy: 0, r: 10 }, { id: "c2", type: "circle", cx: 0, cy: 0, r: 6 }] },
+      { id: "sw", name: "Tažení", type: "sweep", profileId: "s", pathId: "p", mode: "new", frenet: false },
+    ]);
+    expect(bad).toEqual([]);
+    expect(v).toBeCloseTo(Math.PI * (100 - 36) * 100, -1);
+  });
+
+  it("šablonování čtverec → kruh a s dutinou", async () => {
+    const { v, bad } = await vol([
+      { id: "a", name: "A", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [{ id: "r", type: "rect", cx: 0, cy: 0, w: 40, h: 40, r: 0, angle: 0 }] },
+      { id: "b", name: "B", type: "sketch", plane: { kind: "base", name: "XY", offset: 50 }, entities: [{ id: "c", type: "rect", cx: 0, cy: 0, w: 20, h: 20, r: 0, angle: 0 }] },
+      { id: "l", name: "Loft", type: "loft", sketchIds: ["a", "b"], ruled: true, mode: "new" },
+    ]);
+    expect(bad).toEqual([]);
+    // komolý jehlan: h/3 (A1 + A2 + sqrt(A1 A2))
+    expect(v).toBeCloseTo((50 / 3) * (1600 + 400 + 800), 0);
+    const { EXAMPLES } = await import("./defaults");
+    const funnel = await buildDoc(EXAMPLES.find((e) => e.id === "funnel")!.make());
+    expect(funnel.status.filter((s) => !s.ok)).toEqual([]);
+  }, 30_000);
+
+  it("rozříznutí rovinou a transformace", async () => {
+    const half = await vol([box(), { id: "sp", name: "Řez", type: "split", plane: "YZ", offset: 30, keep: "negative" }]);
+    expect(half.bad).toEqual([]);
+    expect(half.v).toBeCloseTo(30 * 60 * 40, 0);
+    const pos = await vol([box(), { id: "sp", name: "Řez", type: "split", plane: "XY", offset: 10, keep: "positive" }]);
+    expect(pos.v).toBeCloseTo(100 * 60 * 30, 0);
+    const t = await vol([box(), { id: "t", name: "T", type: "transform", translate: [10, 0, 5], rotateAxis: "Z", rotateAngle: 90, scale: 2 }]);
+    expect(t.bad).toEqual([]);
+    expect(t.v).toBeCloseTo(100 * 60 * 40 * 8, -1);
+    expect(t.res.metrics!.bbox[1][2]).toBeCloseTo(85, 3);
+    const none = await vol([box(), { id: "sp", name: "Řez", type: "split", plane: "XY", offset: 100, keep: "positive" }]);
+    expect(none.bad[0]?.error).toMatch(/nezůstane/);
+  });
+
+  it("úkos vybrané plochy a vysunutí s úkosem", async () => {
+    const { body } = await buildShape(doc([box()]));
+    const side = body!.faces.findIndex((f) => f.geomType === "PLANE" && Math.abs(f.center.x - 100) < 1e-6);
+    const d = await vol([box(), { id: "d", name: "Úkos", type: "draft", angle: 5, faces: [side], plane: "XY", offset: 0 }]);
+    expect(d.bad).toEqual([]);
+    expect(Math.abs(d.v - 100 * 60 * 40)).toBeGreaterThan(1000);
+    const ex = await vol([
+      { id: "s", name: "S", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [{ id: "r", type: "rect", cx: 0, cy: 0, w: 40, h: 40, r: 0, angle: 0 }] },
+      { id: "x", name: "X", type: "extrude", sketchId: "s", distance: 20, symmetric: false, reverse: false, mode: "new", draftAngle: 10 },
+    ]);
+    expect(ex.bad).toEqual([]);
+    const top = 40 - 2 * 20 * Math.tan((10 * Math.PI) / 180);
+    expect(ex.v).toBeCloseTo((20 / 3) * (1600 + top * top + 40 * top), 0);
+    expect(ex.res.metrics!.bbox[1][2]).toBeCloseTo(20, 3);
+    // otvor se s úkosem rozšiřuje (stěna otvoru se odklání stejně jako vnější obrys)
+    const holed = await vol([
+      { id: "s", name: "S", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [{ id: "r", type: "rect", cx: 0, cy: 0, w: 40, h: 40, r: 0, angle: 0 }, { id: "c", type: "circle", cx: 0, cy: 0, r: 5 }] },
+      { id: "x", name: "X", type: "extrude", sketchId: "s", distance: 20, symmetric: false, reverse: false, mode: "new", draftAngle: 10 },
+    ]);
+    expect(holed.bad).toEqual([]);
+    const r2 = 5 + 20 * Math.tan((10 * Math.PI) / 180);
+    const hole = ((Math.PI * 20) / 3) * (25 + r2 * r2 + 5 * r2);
+    expect(holed.v).toBeCloseTo(ex.v - hole, -1);
+  });
+
+  it("díry: závitová, kuželové zahloubení, válcové zahloubení, slepá se špičkou", async () => {
+    const H = (id: string, extra: Partial<Extract<Feature, { type: "hole" }>>): Feature => ({ id, name: id, type: "hole", position: [20, 20, 40], axis: "Z", flip: false, diameter: 10, depth: 0, cbDiameter: 0, cbDepth: 0, ...extra });
+    const base = 100 * 60 * 40;
+    const tapped = await vol([box(), H("t", { kind: "tapped", thread: "M10" })]);
+    expect(tapped.bad).toEqual([]);
+    expect(base - tapped.v).toBeCloseTo(Math.PI * 4.25 * 4.25 * 40, 0);
+    const cs = await vol([box(), H("c", { kind: "countersink", csDiameter: 20, csAngle: 90 })]);
+    expect(cs.bad).toEqual([]);
+    const coneV = (Math.PI * 5 / 3) * (100 + 25 + 50);
+    expect(base - cs.v).toBeCloseTo(Math.PI * 25 * 35 + coneV, 0);
+    const cb = await vol([box(), H("b", { kind: "counterbore", cbDiameter: 18, cbDepth: 6 })]);
+    expect(base - cb.v).toBeCloseTo(Math.PI * 81 * 6 + Math.PI * 25 * 34, 0);
+    const blind = await vol([box(), H("s", { depth: 15 })]);
+    const tip = 5 / Math.tan((59 * Math.PI) / 180);
+    expect(base - blind.v).toBeCloseTo(Math.PI * 25 * 15 + (Math.PI * 25 * tip) / 3, 0);
+    const bad = await vol([box(), H("x", { kind: "tapped", thread: "M99" })]);
+    expect(bad.bad[0].error).toMatch(/závit/);
+  });
+
+  it("pole v mřížce 3 × 2", async () => {
+    const { v, bad } = await vol([
+      box(),
+      { id: "h", name: "D", type: "hole", position: [20, 15, 40], axis: "Z", flip: false, diameter: 6, depth: 0, cbDiameter: 0, cbDepth: 0 },
+      { id: "p", name: "P", type: "pattern", featureId: "h", kind: "linear", count: 3, spacing: 30, direction: [1, 0, 0], count2: 2, spacing2: 30, direction2: [0, 1, 0] },
+    ]);
+    expect(bad).toEqual([]);
+    expect(100 * 60 * 40 - v).toBeCloseTo(6 * Math.PI * 9 * 40, 0);
+  });
+
+  it("závit: kosmetický bez geometrie, modelovaný ubere materiál", async () => {
+    const shaft: Feature = { id: "c", name: "Dřík", type: "cylinder", radius: 10, height: 60, position: [0, 0, 0], axis: "Z", mode: "new" };
+    const full = Math.PI * 100 * 60;
+    const cos = await vol([shaft, { id: "t", name: "Z", type: "thread", designation: "M20", position: [0, 0, 30], axis: "Z", length: 30, modeled: false }]);
+    expect(cos.bad).toEqual([]);
+    expect(cos.v).toBeCloseTo(full, 0);
+    const mod = await vol([shaft, { id: "t", name: "Z", type: "thread", designation: "M20", position: [0, 0, 30], axis: "Z", length: 30, modeled: true }]);
+    expect(mod.bad).toEqual([]);
+    expect(mod.v).toBeLessThan(full - 500);
+    expect(mod.v).toBeGreaterThan(full - 3000);
+  });
+
+  it("gravírovaný text a pomocná rovina", async () => {
+    const t = await vol([
+      box(),
+      { id: "dt", name: "Rovina", type: "datum", origin: [0, 0, 40], normal: [0, 0, 1], xDir: [1, 0, 0], size: 100 },
+      { id: "tx", name: "Text", type: "text", text: "MNÁ 2026", height: 10, depth: 1, plane: { kind: "base", name: "XY", offset: 40 }, position: [50, 30], angle: 0, mode: "cut" },
+    ]);
+    expect(t.bad).toEqual([]);
+    expect(t.v).toBeLessThan(100 * 60 * 40 - 50);
+    expect(t.res.metrics!.bbox[1][2]).toBeCloseTo(40, 3);
+    const add = await vol([box(), { id: "tx", name: "Text", type: "text", text: "A", height: 10, depth: 2, plane: { kind: "base", name: "XY", offset: 40 }, position: [50, 30], angle: 30, mode: "add" }]);
+    expect(add.res.metrics!.bbox[1][2]).toBeCloseTo(42, 3);
+  });
+
+  it("řetězení dráhy odhalí větvení", () => {
+    expect(() =>
+      chainSegs([
+        { kind: "line", a: [0, 0], b: [10, 0] },
+        { kind: "line", a: [20, 0], b: [30, 0] },
+      ]),
+    ).toThrow(/souvislá/);
+  });
+});
+
+describe("proměnné, vazby a stavy", () => {
+  it("vazby parametrů na proměnné a přepnutí stavu", async () => {
+    const features: Feature[] = [box()];
+    const base: Partial<CadDoc> = {
+      variables: [{ name: "L", expr: "50" }, { name: "B", expr: "L/2 + 5" }],
+      bindings: { "b:size.0": "L", "b:size.1": "B", "b:size.2": "=10" },
+      configs: [{ id: "k", name: "Velký", values: { L: 100 }, suppressed: [] }],
+    };
+    const a = await vol(features, base);
+    expect(a.v).toBeCloseTo(50 * 30 * 10, 3);
+    const b = await vol(features, { ...base, activeConfig: "k" });
+    expect(b.v).toBeCloseTo(100 * 55 * 10, 3);
+    const c = await vol([box(), { id: "h", name: "D", type: "hole", position: [20, 20, 10], axis: "Z", flip: false, diameter: 6, depth: 0, cbDiameter: 0, cbDepth: 0 }], {
+      ...base,
+      configs: [{ id: "k", name: "Bez díry", values: {}, suppressed: ["h"] }],
+      activeConfig: "k",
+    });
+    expect(c.v).toBeCloseTo(50 * 30 * 10, 3);
+    const err = await buildDoc({ ...doc(features), ...base, bindings: { "b:size.0": "neznama*2" } });
+    expect(err.paramErrors?.[0]).toMatch(/neznama/);
+  });
 });

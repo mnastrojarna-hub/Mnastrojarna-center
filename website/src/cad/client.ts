@@ -1,6 +1,7 @@
 "use client";
-import type { DrawingMeta } from "./drawing";
-import type { BuildResult, CadDoc, FaceInfo } from "./types";
+import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
+import type { Interference } from "./asm-kernel";
+import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo } from "./types";
 
 let worker: Worker | null = null;
 let seq = 0;
@@ -38,6 +39,9 @@ export const cad = {
   init: () => call<void>({ op: "init" }),
   build: (doc: CadDoc) => call<BuildResult>({ op: "build", doc }),
   face: (index: number) => call<FaceInfo | null>({ op: "face", index }),
-  exportFile: (doc: CadDoc, format: "step" | "stl") => call<ArrayBuffer>({ op: "export", doc, format }),
-  drawing: (doc: CadDoc, meta: DrawingMeta) => call<{ svg: string; dxf: string; scale: string; sheet: string }>({ op: "drawing", doc, meta }),
+  exportFile: (doc: CadDoc, format: ExportFormat) => call<ArrayBuffer>({ op: "export", doc, format }),
+  asmParts: (parts: { key: string; source: ComponentSource }[]) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts }),
+  asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),
+  interference: (doc: CadDoc) => call<Interference[]>({ op: "interference", doc }),
+  drawing: (doc: CadDoc, meta: DrawingMeta, opts?: Partial<DrawingOptions>) => call<DrawingResult>({ op: "drawing", doc, meta, opts }),
 };

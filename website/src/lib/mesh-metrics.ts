@@ -71,6 +71,12 @@ export const MATERIALS = [
   { id: "med", label: "Měď", density: 8.96 },
   { id: "titan", label: "Titan", density: 4.43 },
   { id: "pom", label: "POM (plast)", density: 1.41 },
+  { id: "1.2311", label: "1.2311 (40CrMnMo7) – formy", density: 7.85 },
+  { id: "1.2343", label: "1.2343 (X38CrMoV5-1) – kalená", density: 7.8 },
+  { id: "1.2738", label: "1.2738 (40CrMnNiMo8-6-4)", density: 7.85 },
+  { id: "1.1730", label: "1.1730 (C45U) – desky", density: 7.85 },
+  { id: "1.7131", label: "1.7131 (16MnCr5) – vedení", density: 7.85 },
+  { id: "1.2516", label: "1.2516 – vyhazovače", density: 7.85 },
 ] as const;
 
 /** Hmotnost v kg z objemu v mm³ a hustoty v g/cm³. */
