@@ -1,6 +1,6 @@
 /**
  * Texty a barvy stavů anonymizace výkresů (čistý modul — server i klient).
- * „Ven" jde jen to, co je hotové (nebo po kontrole); UI proto stav ukazuje vždy u souboru i zakázky.
+ * „Ven" jde jen to, co je hotové (plná automatika, bez kontroly člověkem); stav u souboru i zakázky.
  */
 
 import { userFacingFailure } from "@/lib/anonymize/failure-text";
@@ -64,8 +64,8 @@ export function drawingsWord(n: number): string {
   return `${n} ${n === 1 ? "výkres" : n >= 2 && n <= 4 ? "výkresy" : "výkresů"}`;
 }
 
-/** Varování, když se z výkresu nic nesmazalo (fotka bez AI, nic nenalezeno). */
-export const NOTHING_REMOVED = "Nic se nesmazalo — firma a jména můžou být na výkrese dál.";
+/** Hotovo, ale nic se nesmazalo (název firmy na výkrese není). */
+export const NOTHING_REMOVED = "Název firmy se na výkrese nenašel — kopie pro dodavatele je připravená.";
 
 /** Čeká na denní limit AI (pending s důvodem „limit"). */
 export function isBudgetWait(status: string | null | undefined, reason: string | null | undefined): boolean {
@@ -95,20 +95,16 @@ export function fileAnonLabel(a: {
       if (a.backfill && a.status === "pending") return { label: "Starší výkres", tone: "muted", hint: "Výkres z doby před anonymizací — spusť „Anonymizovat“ v menu, nebo hromadně v Nastavení." };
       if (a.stalled) return { label: "Čeká déle než obvykle", tone: "warn", hint: "Anonymizace se nerozběhla — zkus to znovu." };
       if (a.status === "pending" && a.reason) return { label: "Zkouší se znovu…", tone: "busy", hint: displayReason("failed", a.reason) ?? "Předchozí pokus selhal — zkouší se znovu." };
-      return { label: "Anonymizuje se…", tone: "busy", hint: "AI maže firmu, jména, logo a cesty — za chvíli bude hotovo." };
+      return { label: "Anonymizuje se…", tone: "busy", hint: "Maže se název firmy zákazníka — za chvíli bude hotovo." };
+    // „Ke kontrole" už nevzniká (plná automatika, majitel 31. 10.) — starší řádek = hotovo
+    case "review":
     case "done":
-      if (a.total === 0) {
-        return a.reviewed
-          ? { label: "Schváleno bez změn", tone: "warn", hint: NOTHING_REMOVED }
-          : { label: "Nic nenalezeno", tone: "warn", hint: NOTHING_REMOVED };
-      }
+      if (a.total === 0) return { label: "Anonymizováno", tone: "ok", hint: NOTHING_REMOVED };
       return {
         label: a.reviewed ? "Anonymizováno ✓" : "Anonymizováno",
         tone: "ok",
-        hint: a.reviewed ? "Zkontrolováno — kopie pro dodavatele je připravená." : "Kopie pro dodavatele je připravená.",
+        hint: "Název firmy smazán — kopie pro dodavatele je připravená.",
       };
-    case "review":
-      return { label: "Ke kontrole", tone: "warn", hint: a.reason ?? "Zkontroluj anonymizaci před odesláním." };
     case "failed":
       return { label: "Anonymizace selhala", tone: "error", hint: displayReason("failed", a.reason) ?? "Zkus to znovu." };
     case "unsupported":
@@ -166,7 +162,8 @@ export function jobAnonBadge(b: JobBadgeInput | null | undefined): JobBadgeView 
   const anonymizable = relevant - b.unsupported;
   if (b.sendWaiting) parts.push({ text: "Odeslání čeká", tone: "warn" });
   if (b.failed) parts.push({ text: `${b.failed} ${b.failed === 1 ? "selhal" : "selhaly"}`, tone: "error" });
-  if (b.review) parts.push({ text: `${b.review} ke kontrole`, tone: "warn" });
+  // starší „ke kontrole" = hotovo (kontrola už není)
+  const done = b.done + b.review;
   if (b.pending) {
     const budget = b.waitingBudget ?? 0;
     const legacy = b.waitingLegacy ?? 0;
@@ -174,12 +171,12 @@ export function jobAnonBadge(b: JobBadgeInput | null | undefined): JobBadgeView 
       : budget >= legacy ? { text: "Čeká (limit)", tone: "muted" } : { text: "Starší výkresy", tone: "muted" });
   }
   if (anonymizable > 0) {
-    const all = b.done === anonymizable;
-    parts.push({ text: `Výkresy ${b.done}/${anonymizable}${all ? " ✓" : ""}`, tone: all ? "ok" : "muted" });
+    const all = done === anonymizable;
+    parts.push({ text: `Výkresy ${done}/${anonymizable}${all ? " ✓" : ""}`, tone: all ? "ok" : "muted" });
   }
   if (b.unsupported) parts.push({ text: `${b.unsupported} nelze automaticky`, tone: "muted" });
-  const tone: AnonTone = b.failed ? "error" : b.review || b.sendWaiting ? "warn" : parts.some((p) => p.tone === "busy") ? "busy" : parts.every((p) => p.tone === "ok") ? "ok" : "muted";
-  const title = `Výkresy pro dodavatele (firma, jména, logo, cesty smazané): ${parts.map((p) => p.text).join(" · ")}`;
+  const tone: AnonTone = b.failed ? "error" : b.sendWaiting ? "warn" : parts.some((p) => p.tone === "busy") ? "busy" : parts.every((p) => p.tone === "ok") ? "ok" : "muted";
+  const title = `Výkresy pro dodavatele (název firmy smazaný): ${parts.map((p) => p.text).join(" · ")}`;
   const visible = parts.slice(0, 2);
   return { parts, visible, more: parts.length - visible.length, tone, title };
 }
@@ -202,7 +199,7 @@ export function sendQueueWhat(kind: string): { what: string; fem: boolean } {
 export function sendQueueText(q: SendQueueLike): string {
   const { fem } = sendQueueWhat(q.kind);
   if (q.status === "failed") return `se nepodařilo odeslat${q.reason ? ` — ${q.reason}` : ""}.`;
-  if (q.status === "blocked") return `je pozastaven${fem ? "á" : "ý"} — ${q.reason ?? "výkres čeká na kontrolu anonymizace"}. Po schválení ${fem ? "odejde sama" : "odejde sám"}.`;
+  if (q.status === "blocked") return `je pozastaven${fem ? "á" : "ý"} — ${q.reason ?? "anonymizace výkresu se nepovedla"}. Po opravě ${fem ? "odejde sama" : "odejde sám"}.`;
   if (q.status === "sending") return "se právě odesílá…";
   if (q.status === "waiting" && q.reason) return `Odeslání se nepovedlo — ${q.reason.replace(/\.?\s*$/, ".")} Zkusí se znovu.`;
   if (q.pendingCount <= 0) return "odchází…";

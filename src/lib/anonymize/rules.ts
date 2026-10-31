@@ -61,10 +61,26 @@ export interface RedactToggles {
   filename: boolean;
 }
 
+/**
+ * Výchozí: JEN název firmy (majitel 31. 10.: „Vlastně stačí, když to smaže název firmy. Nic víc.").
+ * Osoby, podpisy, logo, cesty, kontakty, kódy a doložka jsou volitelné přepínače v Nastavení.
+ * (Logo s názvem jako TEXT zmizí i tak — jako text s názvem firmy.)
+ */
 export const DEFAULT_REDACT: RedactToggles = {
+  company: true, logo: false, person_drawn: false, person_checked: false, person_revisions: false, signature: false,
+  path: false, contact: false, code: false, copyright_owner: false, copyright_whole: false, filename: false,
+};
+
+/** Všechny skupiny zapnuté (dřívější výchozí; doložka celá ne) — volitelné v Nastavení, testy pravidel. */
+export const ALL_REDACT: RedactToggles = {
   company: true, logo: true, person_drawn: true, person_checked: true, person_revisions: true, signature: true,
   path: true, contact: true, code: true, copyright_owner: true, copyright_whole: false, filename: true,
 };
+
+/** Jen název firmy (výchozí stav) — pro migraci / test. */
+export function isCompanyOnly(t: RedactToggles): boolean {
+  return (Object.keys(DEFAULT_REDACT) as (keyof RedactToggles)[]).every((k) => t[k] === DEFAULT_REDACT[k]);
+}
 
 export interface Term {
   raw: string;
@@ -170,6 +186,15 @@ const TERM_WORD_STOP = new Set([
   "magyar", "austria", "osterreich", "limited", "corporation", "incorporated", "verwaltungs", "beteiligungs", "spol", "firma", "projekt",
   "drawing", "vykres", "vykresy", "material", "materialy", "zakaznik", "customer", "group", "team", "studio", "atelier", "bureau", "office",
 ]);
+
+const TRAILING_LEGAL_DOTTED_RE = new RegExp(String.raw`^[\s,]*(?:${LEGAL_DOTTED.join("|")})(?![\p{L}\p{N}])`, "iu");
+const TRAILING_LEGAL_CAPS_RE = new RegExp(String.raw`^[\s,]*(?:${LEGAL_CAPS.join("|")})(?![\p{L}\p{N}])`, "u");
+
+/** Délka právní formy na začátku `rest` (za názvem firmy), jinak 0. */
+export function trailingLegalForm(rest: string): number {
+  const m = TRAILING_LEGAL_DOTTED_RE.exec(rest) ?? TRAILING_LEGAL_CAPS_RE.exec(rest);
+  return m ? m[0].length : 0;
+}
 
 /** Odstraní právní formu z názvu firmy (pro termíny z CRM). */
 export function stripLegalForm(name: string): string {
@@ -585,10 +610,11 @@ export function ruleLine(text: string, zone: Zone, ctx: RuleContext): LineRuleRe
     hits.push({ start: 0, end: text.length, category: "contact", rule: "address" });
   }
 
-  // 3) vlastní termíny a CRM (kdekoli; výjimky je NIKDY neruší)
+  // 3) vlastní termíny a CRM (kdekoli; výjimky je NIKDY neruší) — i s právní formou hned za názvem
+  //    („STROJMETAL a.s." → celé), aby po názvu nezůstala osamělá „s.r.o."
   const norm = normalizeWithMap(text);
   for (const t of ctx.terms) {
-    for (const r of findTermRanges(text, t, norm)) hits.push({ start: r.start, end: r.end, category: "custom", rule: `term_${t.source}` });
+    for (const r of findTermRanges(text, t, norm)) hits.push({ start: r.start, end: r.end + trailingLegalForm(text.slice(r.end)), category: "custom", rule: `term_${t.source}` });
   }
 
   // 4) právní forma (jen razítko / rám / revize; jinde kandidát pro AI)
@@ -882,6 +908,83 @@ export function plotStampSiblings(
   return out;
 }
 
+/** Řádek přímo pod (stejná stránka a natočení, překryv vodorovně, mezera ≤ 1,2 em, podobné písmo). */
+export function lineBelow(lines: readonly TextLine[], from: TextLine): TextLine | null {
+  const em = Math.max(from.fontSize, from.box.h, 0.5);
+  let best: { l: TextLine; d: number } | null = null;
+  for (const l of lines) {
+    if (l.id === from.id || l.page !== from.page || l.rot !== from.rot || !l.text.trim()) continue;
+    if (Math.abs(from.rot) > 0.5) continue;
+    if (l.fontSize < 0.6 * from.fontSize || l.fontSize > 1.6 * from.fontSize) continue;
+    const gap = l.box.y - (from.box.y + from.box.h);
+    if (gap < -0.35 * em || gap > 1.2 * em) continue;
+    if (overlapX(l.box, from.box) <= 0) continue;
+    if (!best || gap < best.d) best = { l, d: gap };
+  }
+  return best?.l ?? null;
+}
+
+interface CompactMap {
+  flat: string;
+  /** Index znaku v normalizovaném textu pro každý znak `flat`. */
+  at: number[];
+  n: NormText;
+}
+
+function compactMap(text: string): CompactMap {
+  const n = normalizeWithMap(text);
+  let flat = "";
+  const at: number[] = [];
+  for (let i = 0; i < n.text.length; i++) {
+    if (/[\p{L}\p{N}]/u.test(n.text[i])) { flat += n.text[i]; at.push(i); }
+  }
+  return { flat, at, n };
+}
+
+/**
+ * Termín rozdělený zalomením řádku: konec řádku + začátek řádku pod ním (bez ohledu na mezery,
+ * spojovník, diakritiku a velikost písmen). Začátek na hranici slova v horním řádku, konec na hranici
+ * slova v dolním; zásah v obou řádcích. Jen termíny, které se v žádném z řádků nenašly celé.
+ */
+export function crossLineTermHits(lines: readonly TextLine[], terms: readonly Term[]): { lineId: string; start: number; end: number }[] {
+  const out: { lineId: string; start: number; end: number }[] = [];
+  if (!terms.length) return out;
+  const maps = new Map<string, CompactMap>();
+  const mapOf = (l: TextLine) => {
+    let m = maps.get(l.id);
+    if (!m) { m = compactMap(l.text); maps.set(l.id, m); }
+    return m;
+  };
+  for (const line of lines) {
+    const below = lineBelow(lines, line);
+    if (!below) continue;
+    const a = mapOf(line), b = mapOf(below);
+    if (!a.flat || !b.flat) continue;
+    const joined = a.flat + b.flat;
+    for (const t of terms) {
+      if (t.compact.length < 4) continue;
+      let from = Math.max(0, a.flat.length - t.compact.length + 1);
+      for (;;) {
+        const pos = joined.indexOf(t.compact, from);
+        if (pos < 0 || pos >= a.flat.length) break;
+        from = pos + 1;
+        const end = pos + t.compact.length;
+        if (end <= a.flat.length) continue; // celé v horním řádku — řeší ruleLine
+        const ns = a.at[pos];
+        const ne = b.at[end - a.flat.length - 1] + 1;
+        const before = ns > 0 ? a.n.text[ns - 1] : " ";
+        const after = ne < b.n.text.length ? b.n.text[ne] : " ";
+        if (/[\p{L}\p{N}]/u.test(before) || /[\p{L}\p{N}]/u.test(after)) continue;
+        const [s1] = mapRangeBack(a.n, line.text, ns, a.n.text.length);
+        const [, e2] = mapRangeBack(b.n, below.text, 0, ne);
+        out.push({ lineId: line.id, start: s1, end: line.text.length });
+        out.push({ lineId: below.id, start: 0, end: e2 + trailingLegalForm(below.text.slice(e2)) });
+      }
+    }
+  }
+  return out;
+}
+
 export function rulePage(lines: readonly TextLine[], ctx: RuleContext, opts: { keepValues?: Partial<Record<KeepField, string>> } = {}): PageRuleResult {
   const out: PageRuleResult = { hits: [], keep: [], customerStandardLines: [], candidateLines: [], termInKeep: false, warnings: [] };
   const byId = new Map(lines.map((l) => [l.id, l]));
@@ -929,6 +1032,9 @@ export function rulePage(lines: readonly TextLine[], ctx: RuleContext, opts: { k
       }
     }
   }
+
+  // název firmy zalomený na dva řádky (buňka razítka „STROJ-" / „METAL", „Strojmetal Aluminium" / „Forging")
+  for (const x of crossLineTermHits(lines, ctx.terms)) push(x.lineId, { start: x.start, end: x.end, category: "custom", rule: "term_xline" });
 
   // plot stamp složený z oddělených položek („cesta   datum   uživatel") → celý (mimo razítko a revize);
   // jen datum/čas, login a tiskárna — poznámky a technický text na stejném účaří zůstanou

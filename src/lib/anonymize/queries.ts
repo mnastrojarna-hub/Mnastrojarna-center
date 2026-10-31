@@ -3,7 +3,7 @@ import type { AnonDb } from "./queue";
 import type { AnonStatus, AnonSummary } from "./types";
 
 /**
- * Čtení pro UI (odznaky v Poptávkách, sekce „Ke kontrole anonymizace", Dashboard). Viditelnost
+ * Čtení pro UI (odznaky v Poptávkách, sekce „Anonymizace výkresů" se selháními, Dashboard). Viditelnost
  * zakázek řeší volající (předá jen id zakázek, které uživatel smí vidět).
  *
  * Seznamy id jdou do `.in()` po dávkách ≤ 200 (URL PostgRESTu nad ~300 uuid přeteče hlavičky — HTTP 431),
@@ -118,10 +118,13 @@ function toItem(r: Record<string, unknown>): AnonReviewItem {
   };
 }
 
-/** Výkresy ke kontrole / se selháním napříč zakázkami (volitelně jen v daných zakázkách). */
+/**
+ * Výkresy, jejichž anonymizace selhala (technická chyba po automatických pokusech), napříč zakázkami.
+ * „Ke kontrole" už nevzniká (plná automatika, majitel 31. 10.).
+ */
 export async function listAnonReview(db: AnonDb, opts: { limit?: number; jobIds?: string[] | null } = {}): Promise<AnonReviewItem[]> {
   const limit = Math.min(200, opts.limit ?? 50);
-  const base = () => db.from("job_files").select(REVIEW_SELECT).in("anon_status", ["review", "failed"]).eq("archived", false)
+  const base = () => db.from("job_files").select(REVIEW_SELECT).eq("anon_status", "failed").eq("archived", false)
     .order("anon_at", { ascending: false }).limit(limit);
   if (!opts.jobIds) {
     const { data, error } = await base();
@@ -138,9 +141,9 @@ export async function listAnonReview(db: AnonDb, opts: { limit?: number; jobIds?
   return all.sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? ""))).slice(0, limit);
 }
 
-/** Počet „ke kontrole" (Dashboard). */
+/** Počet výkresů se selhanou anonymizací (Dashboard, Nastavení). */
 export async function countAnonReview(db: AnonDb, jobIds?: string[] | null): Promise<number> {
-  const base = () => db.from("job_files").select("id", { count: "exact", head: true }).in("anon_status", ["review", "failed"]).eq("archived", false);
+  const base = () => db.from("job_files").select("id", { count: "exact", head: true }).eq("anon_status", "failed").eq("archived", false);
   if (!jobIds) {
     const { count, error } = await base();
     logErr("count", error);

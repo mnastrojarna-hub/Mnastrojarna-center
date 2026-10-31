@@ -4,7 +4,7 @@
  * kopii (prefix cesty + sha256 proti anon_sha256 — chytí podvržený objekt v úložišti).
  */
 
-import { isAnonCandidate, unsupportedHowTo } from "./candidate";
+import { isAnonCandidate, isModel3d, unsupportedHowTo } from "./candidate";
 import type { AnonStatus } from "./types";
 
 export interface FileRowWithAnon {
@@ -87,6 +87,13 @@ export function pickShareFile(row: FileRowWithAnon, opts: ShareOptions = {}): Sh
   if (opts.priceDocument && status !== null && status !== "skipped") {
     return { ok: false, reason: "excluded", message: "Nákupní doklad s cenou dodavatele — anonymizovaná kopie se nesdílí." };
   }
+  // poptávka / objednávka zákazníka není výkres (neanonymizuje se) — dodavatel ji nikdy nedostane,
+  // jen výslovný originál od super admina (výše)
+  if (!candidate && customerDoc) {
+    return { ok: false, reason: "excluded", message: "Poptávku / objednávku zákazníka nelze poslat dodavateli — přilož výkresy (anonymizují se samy)." };
+  }
+  // 3D model (STEP, IGES, STL, nativní CAD) nemá razítko ani název firmy → posílá se originál, nic se neblokuje
+  if (!candidate && isModel3d(row.kind, row.filename)) return original(row, false);
   if (!candidate && status !== null && status !== "skipped") {
     return { ok: false, reason: "excluded", message: "Soubor už není výkres zákazníka — anonymizovaná kopie neplatí." };
   }
@@ -98,10 +105,9 @@ export function pickShareFile(row: FileRowWithAnon, opts: ShareOptions = {}): Sh
   }
   switch (status) {
     case "done":
-      return anon(row);
+    // „Ke kontrole" už nevzniká (majitel 31. 10.: plná automatika) — starší řádek s kopií platí jako hotový
     case "review":
-      if (opts.reviewedByCaller) return anon(row, "Anonymizace byla ke kontrole — odesláno po potvrzení.");
-      return { ok: false, reason: "review", message: "Anonymizace čeká na kontrolu — zkontroluj náhled a potvrď." };
+      return anon(row);
     case "pending":
     case "processing":
     case null:

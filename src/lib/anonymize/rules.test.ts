@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
-  DEFAULT_REDACT, isTechnicalText, makeTerms, ruleLine, rulePage, stripLegalForm, findTermRanges, makeTerm,
+  ALL_REDACT, isTechnicalText, makeTerms, ruleLine, rulePage, stripLegalForm, findTermRanges, makeTerm,
   isSuspiciousLiteral, type RuleContext,
 } from "./rules";
 import type { TextLine, Zone } from "./types";
 
 const ctx = (over: Partial<RuleContext> = {}): RuleContext => ({
-  terms: [], keepTerms: ["Mnástrojárna", "Mnastrojarna"], redact: { ...DEFAULT_REDACT }, ...over,
+  terms: [], keepTerms: ["Mnástrojárna", "Mnastrojarna"], redact: { ...ALL_REDACT }, ...over,
 });
 
 const hitTexts = (text: string, zone: Zone = "title_block", c: RuleContext = ctx()) =>
@@ -133,7 +133,7 @@ describe("osoby (kotvy v 10 jazycích)", () => {
   });
 
   it("přepínač kontroloval/schválil", () => {
-    const c = ctx({ redact: { ...DEFAULT_REDACT, person_checked: false } });
+    const c = ctx({ redact: { ...ALL_REDACT, person_checked: false } });
     expect(hitTexts("Schválil: Dvořák", "title_block", c)).toEqual([]);
     expect(hitTexts("Kreslil: Novák", "title_block", c).length).toBe(1);
   });

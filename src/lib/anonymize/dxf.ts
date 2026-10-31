@@ -2,8 +2,8 @@
  * Anonymizace DXF (ASCII) — spec §3.4. Tokenizer párů (kód, hodnota) nad bajty (kódová stránka
  * $DWGCODEPAGE, od R2007 UTF-8), projdou se VŠECHNY řetězcové kódy v HEADER, TABLES, BLOCKS, ENTITIES
  * a OBJECTS. Hodnoty textů / atributů / vlastností se zásahem se smažou (podřetězec, u formátovaného
- * textu celá hodnota), entity IMAGE se odstraní, názvy (hladiny, bloky, styly) se NEpřejmenovávají
- * (termín v názvu → review). Výchozí stav DXF ve v1 je vždy `review` (grafika v razítku).
+ * textu celá hodnota), entity IMAGE se odstraní, názvy (hladiny, bloky, styly) s názvem firmy se
+ * jednotně přejmenují. Výsledek je deterministický a ověřený novým přečtením (bez kontroly člověkem).
  * Čistý modul (bez nativních závislostí).
  */
 
@@ -350,8 +350,8 @@ export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
     const hit = r.hits.length > 0;
     if (!hit) continue;
     if (!blankable || (NAME_CODES.has(p.code) && !inPlot)) {
-      // název hladiny / bloku / stylu s termínem → v1 nepřejmenováváme (rozbilo by odkazy) → review
-      res.warnings.push({ code: "dxf_layer_term", message: "Název hladiny, bloku nebo stylu obsahuje údaj o firmě — v1 se nepřejmenovává, zkontroluj." });
+      // název hladiny / bloku / stylu: termín firmy se přejmenoval výše (renames); jiný zásah jen poznámka
+      res.warnings.push({ code: "dxf_layer_term", message: "Název hladiny, bloku nebo stylu obsahuje údaj podle pravidel (nepřejmenován)." });
       continue;
     }
     res.redacted++;
@@ -406,12 +406,11 @@ export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
         break;
       }
       if (isSuspiciousLiteral(t, ctx.keepTerms)) {
-        res.warnings.push({ code: "step_suspicious", message: "V DXF zůstal podezřelý text (e-mail, doména, právní forma) — zkontroluj." });
+        res.warnings.push({ code: "step_suspicious", message: "V DXF zůstal text s právní formou, e-mailem nebo doménou (není to známý zákazník)." });
       }
     }
   }
-  if (binaryLeft) res.warnings.push({ code: "dxf_graphics", message: "DXF obsahuje binární data (proxy grafika, XDATA) — zkontroluj." });
-  res.warnings.push({ code: "dxf_graphics", message: "DXF: zkontroluj logo a grafiku v razítku (v1 vždy ke kontrole)." });
+  if (binaryLeft) res.warnings.push({ code: "dxf_graphics", message: "DXF obsahuje binární data (proxy grafika, XDATA)." });
   res.verified = res.problems.length === 0;
   res.ok = true;
   return res;

@@ -7,7 +7,7 @@ import { setFakeAnonHandler, resetFakeAnonCalls, fakeAnonCalls, type FakeAnonReq
 import { decodeImage } from "./image";
 import { anonymizeImage } from "./photo-pipeline";
 import { inkFraction, type Raster } from "./pdf-raster";
-import { DEFAULT_REDACT, makeTerms, type RuleContext } from "./rules";
+import { ALL_REDACT, makeTerms, type RuleContext } from "./rules";
 import { runVision } from "./vision";
 import { decideAnonStatus } from "./decide";
 
@@ -17,7 +17,7 @@ import { decideAnonStatus } from "./decide";
  */
 
 const SHOTS = process.env.ANON_SHOTS || "";
-const ctx = (): RuleContext => ({ terms: makeTerms(["Strojmetal"], "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } });
+const ctx = (): RuleContext => ({ terms: makeTerms(["Strojmetal"], "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } });
 const AI = { apiKey: "x", model: "claude-opus-5-5", deadline: Date.now() + 10 * 60_000, sha: "a".repeat(64) };
 
 const CATEGORY: Record<string, string> = {
@@ -186,7 +186,7 @@ describe("anonymizace fotky výkresu", () => {
     expect(v.verifyClean).toBe(true);
   }, 120_000);
 
-  it("ověření: únik i ve 2. kole → review; chybějící číslo výkresu → review", async () => {
+  it("ověření: únik i ve 2. kole / chybějící číslo výkresu → poznámka, výsledek hotový (nic ke kontrole)", async () => {
     setFakeAnonHandler(handler(s, p, "leak-always"));
     const src = await decodeImage(p.jpeg);
     const v = await runVision({ raster: src, mode: "photo", page: 1, ctx: ctx(), ai: AI, verify: true, fill: "white" });
@@ -197,13 +197,14 @@ describe("anonymizace fotky výkresu", () => {
     expect(v2.verifyKeepPresent).toBe(false);
     const d = decideAnonStatus({
       mode: "full", method: "image", aiUsed: true, modelFallback: false, confidence: 0.95, ruleHitsCovered: true, outputChecksPassed: true,
-      verifyClean: v2.verifyClean, verifyKeepPresent: v2.verifyKeepPresent, pxPerMm: 8, isPhoto: true, hasMaster: true, warnings: [],
+      verifyClean: v.verifyClean, verifyKeepPresent: v2.verifyKeepPresent, pxPerMm: 8, isPhoto: true, hasMaster: true, warnings: [],
       customerStandard: false, termInKeep: false, titleBlockFound: true,
     });
-    expect(d.status).toBe("review");
+    expect(d.status).toBe("done");
+    expect(d.warnings.some((w) => w.code === "verify_leak")).toBe(true);
   }, 120_000);
 
-  it("fallback modelu → review; fotka 4032 px bez masteru = originál (prohlížeč ji nezmenšil)", async () => {
+  it("fallback modelu → poznámka (hotovo); fotka 4032 px bez masteru = originál (prohlížeč ji nezmenšil)", async () => {
     setFakeAnonHandler(handler(s, p, "fallback"));
     const r = await anonymizeImage({ bytes: p.jpeg, hasMaster: false, ctx: ctx(), ai: AI, verify: false, fill: "white" });
     expect(r.fallback).toBe(true);
@@ -214,7 +215,7 @@ describe("anonymizace fotky výkresu", () => {
       verifyClean: r.verifyClean, verifyKeepPresent: r.verifyKeepPresent, pxPerMm: r.pxPerMm, isPhoto: true, hasMaster: r.hasMaster, warnings: r.warnings,
       customerStandard: false, termInKeep: false, titleBlockFound: true,
     });
-    expect(d.status).toBe("review");
+    expect(d.status).toBe("done");
     expect(d.warnings.map((w) => w.code)).toEqual(expect.arrayContaining(["model_fallback"]));
   }, 120_000);
 

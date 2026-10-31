@@ -333,7 +333,10 @@ async function guardShareRow(
 ): Promise<Guarded> {
   if ((row.origin ?? "upload") === "generated" || row.issuer === "my") return { kind: "plain" };
   const candidate = isAnonCandidate(row.kind, row.filename, row.mime_type, row.origin, row.issuer);
-  if (!candidate && (row.anon_status === null || row.anon_status === "skipped")) return { kind: "plain" };
+  // poptávka / objednávka zákazníka se neanonymizuje (není výkres), ale komukoli mimo zákazníka a kolegy
+  // ji nepustíme (dodavatel ji nikdy nedostane — jen výslovný originál od super admina)
+  const customerDoc = !candidate && (row.kind === "poptavka" || row.kind === "objednavka");
+  if (!candidate && !customerDoc && (row.anon_status === null || row.anon_status === "skipped")) return { kind: "plain" };
   if (await originalsAllowed(c, { ...scope, jobId: scope.jobId ?? row.job_id }, recipients)) return { kind: "plain" };
   const price = await sharePriceDocIds(c as never, [row.id]);
   const d = pickShareFile(row, { original: at.original, isSuperAdmin: user.role === "super_admin", priceDocument: price.has(row.id.toLowerCase()) });
@@ -387,7 +390,8 @@ async function guardMailAttachment(
   if (isInlineImage(att.mime_type, att.size_bytes)) return { kind: "plain" }; // logo / podpis v těle zprávy
   const outbound = mail.direction === "outbound";
   const issuer = outbound ? null : attachmentIssuer({ category: mail.category, supplierId: mail.supplier_id, customerId: mail.customer_id });
-  const candidate = isAnonCandidate(guessFileKind(name, att.mime_type ?? undefined), name, att.mime_type, "email", issuer);
+  const guessedKind = guessFileKind(name, att.mime_type ?? undefined);
+  const candidate = isAnonCandidate(guessedKind, name, att.mime_type, "email", issuer);
   const scope: OriginalScope = { jobId: mail.order_id, customerId: mail.customer_id, customerEmails: !outbound && mail.from_email ? [mail.from_email] : [] };
 
   // uložená v dokumentech zakázky → stav anonymizace toho souboru (stejně jako dokument zakázky)
@@ -396,11 +400,17 @@ async function guardMailAttachment(
     const row = data as FileRowWithAnon | null;
     if (row) return guardShareRow(c, row, { kind: "original", ref: a.ref, filename: name, original: a.original === true }, scope, recipients, user);
   }
-  if (!candidate) return { kind: "plain" };
+  // poptávka / objednávka zákazníka (podle názvu) — ne výkres, ale dodavateli ani nikomu cizímu ne
+  const customerDoc = !candidate && !outbound && issuer !== "dodavatel" && (guessedKind === "poptavka" || guessedKind === "objednavka");
+  if (!candidate && !customerDoc) return { kind: "plain" };
   if (await originalsAllowed(c, scope, recipients)) return { kind: "plain" };
   const block = (reason: BlockReason, detail?: string): Guarded => ({
     kind: "blocked", blocked: { kind: "original", ref: a.ref, filename: name, reason, message: blockedAttachmentMessage(name, reason, detail, "mail") },
   });
+  if (customerDoc) {
+    if (a.original === true && user.role === "super_admin") return { kind: "plain", original: true };
+    return block(a.original === true ? "forbidden" : "excluded", "Poptávku / objednávku zákazníka dodavateli neposíláme — přilož výkresy (anonymizují se samy).");
+  }
   if (a.original === true) {
     if (user.role !== "super_admin") return block("forbidden");
     return { kind: "plain", original: true }; // originál výslovně (super admin) — audit u odeslání
@@ -441,6 +451,8 @@ async function guardMailAttachment(
     return block("pending");
   }
   switch (row.anon_status) {
+    // „Ke kontrole" už nevzniká (plná automatika) — starší řádek s kopií platí jako hotový
+    case "review":
     case "done": {
       try {
         const path = row.anon_path ?? "";
@@ -454,8 +466,6 @@ async function guardMailAttachment(
         return block("failed", err instanceof Error ? err.message : undefined);
       }
     }
-    case "review":
-      return block("review");
     case "pending":
     case "processing":
       if (row.anon_status === "pending" || (row.anon_lock_until && Date.parse(row.anon_lock_until) < Date.now())) {

@@ -49,7 +49,7 @@ export async function getJobAnonBadges(jobIds: string[]): Promise<Record<string,
   }
 }
 
-/** Výkresy ke kontrole / se selháním (sekce „Ke kontrole anonymizace") s číslem zakázky. */
+/** Výkresy se selhanou anonymizací (sekce „Anonymizace výkresů"; „ke kontrole" už nevzniká) s číslem zakázky. */
 export async function getAnonReviewList(opts: { scope?: FlowScope | null; limit?: number } = {}): Promise<AnonReviewRow[]> {
   const c = await db();
   if (!c) return [];
@@ -124,8 +124,8 @@ export interface AnonSettingsPanelData {
   reviewCount: number;
 }
 
-export const AI_KEY_MISSING = "AI klíč chybí — fotky a skeny čekají na ruční kontrolu. Doplň Claude API klíč v Nastavení → Integrace (stejný klíč čte doklady i poštu).";
-export const AI_SWITCHED_OFF = "AI je vypnutá hlavním vypínačem — fotky a skeny čekají na ruční kontrolu.";
+export const AI_KEY_MISSING = "Bez AI klíče se na skenech název firmy nehledá — PDF z CADu a DXF se anonymizují i tak (podle pravidel). Doplň Claude API klíč v Nastavení → Integrace (stejný klíč čte doklady i poštu).";
+export const AI_SWITCHED_OFF = "AI je vypnutá hlavním vypínačem — bez AI se na skenech název firmy nehledá (PDF z CADu a DXF se anonymizují i tak).";
 
 /**
  * Stav AI pro anonymizaci fotek a skenů — stejný zdroj klíče jako zbytek aplikace (getAiConfig:

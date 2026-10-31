@@ -8,12 +8,12 @@ import { decideAnonStatus, type DecideInput } from "./decide";
 import { pickShareFile, verifyShareBytes, type FileRowWithAnon } from "./share";
 import { checkTranscript, keepPresent, lineHasToken } from "./verify";
 import { isAnonCandidate, isUnsupportedExt, sourceFormat } from "./candidate";
-import { DEFAULT_REDACT, makeTerms, rulePage, findTermRanges, makeTerm, type RuleContext } from "./rules";
+import { ALL_REDACT, makeTerms, rulePage, findTermRanges, makeTerm, type RuleContext } from "./rules";
 import { levenshtein, normalizeWithMap, mapRangeBack } from "./text";
 import { settingsFromRow, settingsToRow, configHash, termsHash, DEFAULT_ANON_SETTINGS } from "./settings";
 import type { AnonRegion, TextItem } from "./types";
 
-const ctx = (terms: string[] = []): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } });
+const ctx = (terms: string[] = []): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } });
 
 describe("fitForClaude", () => {
   const cases: [number, number][] = [[4032, 3024], [4961, 3508], [2576, 1932], [4032, 240], [300, 200], [20000, 100], [100, 20000], [2576, 2576]];
@@ -165,24 +165,39 @@ const base: DecideInput = {
 
 describe("decideAnonStatus", () => {
   it("vše splněno → done", () => expect(decideAnonStatus(base).status).toBe("done"));
+  // majitel 31. 10.: „Žádný nic ke kontrole nepůjde" — nejistota je jen tichá poznámka, stav done
   it.each<[string, Partial<DecideInput>]>([
     ["approval", { mode: "approval" }],
     ["bez AI", { aiUsed: false }],
     ["fallback modelu", { modelFallback: true }],
     ["nízká jistota", { confidence: 0.6 }],
     ["zbytky", { ruleHitsCovered: false }],
-    ["kontrola výstupu", { outputChecksPassed: false }],
     ["podniková norma", { customerStandard: true }],
     ["termín v keep", { termInKeep: true }],
     ["bez razítka", { titleBlockFound: false, confidence: 0.86 }],
-    ["DXF v1", { method: "dxf" }],
+    ["DXF", { method: "dxf" }],
     ["fotka bez masteru", { isPhoto: true, hasMaster: false, verifyClean: true, verifyKeepPresent: true, pxPerMm: 9 }],
     ["fotka: únik", { isPhoto: true, hasMaster: true, verifyClean: false, verifyKeepPresent: true, pxPerMm: 9 }],
     ["fotka: chybí keep", { isPhoto: true, hasMaster: true, verifyClean: true, verifyKeepPresent: false, pxPerMm: 9 }],
     ["fotka: px/mm < 6", { isPhoto: true, hasMaster: true, verifyClean: true, verifyKeepPresent: true, pxPerMm: 4.8 }],
     ["fotka neověřená", { isPhoto: true, hasMaster: true, verifyClean: null, pxPerMm: 9 }],
     ["souřadnice mimo", { warnings: [{ code: "coords_out_of_image", message: "x" }] }],
-  ])("%s → review", (_n, over) => expect(decideAnonStatus({ ...base, ...over }).status).toBe("review"));
+    ["osoby / logo / cesta (vypnuté kategorie)", { warnings: [{ code: "cut_uncertain", message: "x" }, { code: "plot_stamp", message: "y" }, { code: "nothing_found", message: "z" }] }],
+  ])("%s → done (nic ke kontrole)", (_n, over) => {
+    const d = decideAnonStatus({ ...base, ...over });
+    expect(d.status).toBe("done");
+    expect(d.reason).toBeNull();
+  });
+  it("nikdy review — ani při všech varováních najednou", () => {
+    const d = decideAnonStatus({ ...base, mode: "approval", aiUsed: false, modelFallback: true, confidence: 0.1, ruleHitsCovered: false, customerStandard: true, termInKeep: true, titleBlockFound: false, isPhoto: true, hasMaster: false, verifyClean: false, verifyKeepPresent: false, pxPerMm: 2 });
+    expect(d.status).toBe("done");
+    expect(d.warnings.map((w) => w.code)).toEqual(expect.arrayContaining(["no_ai", "verify_leak", "low_px_per_mm"]));
+  });
+  it("kontrola výstupu neprošla (v kopii zůstal text) → failed, kopie se nepoužije", () => {
+    const d = decideAnonStatus({ ...base, outputChecksPassed: false });
+    expect(d.status).toBe("failed");
+    expect(d.reason).toMatch(/Kontrola anonymizované kopie neprošla/);
+  });
   it("bez razítka s jistotou ≥ 0,9 → done", () => expect(decideAnonStatus({ ...base, titleBlockFound: false, confidence: 0.92 }).status).toBe("done"));
   it("fotka v pořádku → done", () => expect(decideAnonStatus({ ...base, method: "image", isPhoto: true, hasMaster: true, verifyClean: true, verifyKeepPresent: true, pxPerMm: 8 }).status).toBe("done"));
   it("unsupported / failed / limit / není výkres", () => {
@@ -204,9 +219,15 @@ describe("pickShareFile (matice)", () => {
     expect(pickShareFile(row({ issuer: "my", anon_status: null }))).toMatchObject({ ok: true, source: "original" });
   });
   it("done → anon", () => expect(pickShareFile(row())).toMatchObject({ ok: true, source: "anon", filename: "12-345.pdf" }));
-  it("review jen s potvrzením", () => {
-    expect(pickShareFile(row({ anon_status: "review" }))).toMatchObject({ ok: false, reason: "review" });
-    expect(pickShareFile(row({ anon_status: "review" }), { reviewedByCaller: true })).toMatchObject({ ok: true, source: "anon" });
+  it("starší „ke kontrole“ = hotová kopie (bez potvrzení)", () => {
+    expect(pickShareFile(row({ anon_status: "review" }))).toMatchObject({ ok: true, source: "anon" });
+  });
+  it("ne-výkres: objednávka zákazníka dodavateli nikdy, 3D model jako originál bez blokování", () => {
+    expect(pickShareFile(row({ kind: "objednavka", filename: "PO-4471.pdf", anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: false, reason: "excluded" });
+    expect(pickShareFile(row({ kind: "poptavka", filename: "RFQ.pdf", anon_status: null }))).toMatchObject({ ok: false, reason: "excluded" });
+    expect(pickShareFile(row({ kind: "objednavka", filename: "PO-4471.pdf", anon_status: null }), { original: true, isSuperAdmin: true })).toMatchObject({ ok: true, source: "original", audit: true });
+    expect(pickShareFile(row({ kind: "model_3d", filename: "dil.step", mime_type: null, anon_status: null }))).toMatchObject({ ok: true, source: "original" });
+    expect(pickShareFile(row({ kind: "ostatni", filename: "dil.stl", mime_type: null, anon_status: null }))).toMatchObject({ ok: true, source: "original" });
   });
   it.each(["pending", "processing", null] as const)("%s → pending (fronta)", (st) => {
     expect(pickShareFile(row({ anon_status: st }))).toMatchObject({ ok: false, reason: "pending" });
@@ -234,9 +255,10 @@ describe("pickShareFile (matice)", () => {
   });
   it("externí ne-kandidát bez stavu (faktura, ZIP z e-mailu) → jen po potvrzení a s auditem", () => {
     expect(pickShareFile(row({ kind: "faktura", anon_status: null }))).toMatchObject({ ok: false, reason: "needs_confirm" });
-    // ZIP / Word / Excel zákazníka je kandidát (rozbalí se / „nelze automaticky") — bez stavu čeká, nikdy potvrzením
+    // ZIP zákazníka je kandidát (rozbalí se) — bez stavu čeká, nikdy potvrzením; Word / Excel už výkres není
     expect(pickShareFile(row({ kind: "ostatni", filename: "podklady.zip", mime_type: "application/zip", anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: false, reason: "pending" });
-    expect(pickShareFile(row({ kind: "ostatni", filename: "kusovnik.xlsx", mime_type: null, anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: false, reason: "pending" });
+    expect(pickShareFile(row({ kind: "ostatni", filename: "kusovnik.xlsx", mime_type: null, anon_status: null }))).toMatchObject({ ok: false, reason: "needs_confirm" });
+    expect(pickShareFile(row({ kind: "ostatni", filename: "kusovnik.xlsx", mime_type: null, anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: true, source: "original", audit: true });
     expect(pickShareFile(row({ kind: "ostatni", filename: "poznamky.txt", mime_type: "text/plain", anon_status: null }))).toMatchObject({ ok: false, reason: "needs_confirm" });
     expect(pickShareFile(row({ kind: "faktura", anon_status: null }), { confirmNotCustomerMaterial: true })).toMatchObject({ ok: true, source: "original", audit: true });
     // skipped + potvrzení → originál s auditem
@@ -297,22 +319,47 @@ describe("ověření přepisem", () => {
 
 describe("kandidát (TS zrcadlo SQL)", () => {
   it.each<[string, string, string | null, string | null, string | null, boolean]>([
+    // druh neznámý (Ostatní / Fotka) → kandidát, výkres musí potvrdit klasifikace
     ["ostatni", "12-345.pdf", "application/pdf", "upload", null, true],
     ["foto", "IMG_1.jpg", "image/jpeg", "capture", null, true],
+    // 2D výkres
+    ["vykres", "x.pdf", "application/pdf", "email", "zakaznik", true],
     ["vykres", "x.dwg", null, "email", null, true],
     ["vykres", "x.dxf", null, "email", null, true],
-    ["poptavka", "x.pdf", "application/pdf", "email", "zakaznik", true],
+    ["ostatni", "rez.dxf", null, "email", null, true],
+    ["objednavka", "sestava.dwg", null, "email", "zakaznik", true],
+    ["vykres", "sken.bmp", null, "upload", null, true],
+    ["vykres", "x.pdf", "application/pdf", "email", "dodavatel", true],
+    // NIKDY: obchodní doklady zákazníka, naše / dodavatelské doklady
+    ["poptavka", "x.pdf", "application/pdf", "email", "zakaznik", false],
+    ["objednavka", "PO-E2E-4471.pdf", "application/pdf", "capture", "zakaznik", false],
+    ["objednavka", "PO-foto.jpg", "image/jpeg", "capture", "zakaznik", false],
+    ["nabidka", "x.pdf", "application/pdf", "email", "dodavatel", false],
+    ["potvrzeni", "x.pdf", "application/pdf", "email", "zakaznik", false],
+    ["dodaci_list", "x.pdf", "application/pdf", "email", "zakaznik", false],
+    ["naceneni", "x.pdf", "application/pdf", "upload", null, false],
     ["nabidka", "x.pdf", "application/pdf", "generated", "my", false],
+    ["objednavka_vydana", "x.pdf", "application/pdf", "generated", "my", false],
     ["vykres", "x.pdf", "application/pdf", "generated", null, false],
     ["faktura", "x.pdf", "application/pdf", "email", null, false],
-    ["vykres", "x.docx", null, "upload", null, true],
+    ["korespondence", "zapis.pdf", null, "upload", null, false],
+    ["ostatni", "poznamky.txt", "text/plain", "upload", null, false],
+    ["vykres", "x.docx", null, "upload", null, false],
+    ["ostatni", "kusovnik.xlsx", null, "upload", null, false],
+    // NIKDY: 3D modely (druh i přípona)
+    ["model_3d", "dil.stl", null, "upload", null, false],
+    ["model_3d", "dil.step", null, "email", "zakaznik", false],
+    ["vykres", "dil.stp", null, "upload", null, false],
+    ["ostatni", "dil.igs", null, "upload", null, false],
+    ["ostatni", "Sestava.SLDASM", null, "upload", null, false],
+    ["model_3d", "dil.pdf", "application/pdf", "upload", null, false],
+    // kontejner z podkladů zákazníka → rozbalí se (anonymizují se jen výkresy uvnitř)
     ["ostatni", "podklady.zip", "application/zip", "email", "zakaznik", true],
+    ["poptavka", "podklady.zip", null, "email", "zakaznik", true],
     ["korespondence", "poptavka.eml", null, "upload", null, true],
     ["korespondence", "poptavka.msg", null, "upload", null, true],
     ["korespondence", "poptavka.eml", null, "upload", "dodavatel", false],
-    ["korespondence", "zapis.pdf", null, "upload", null, false],
-    ["model_3d", "dil.stl", null, "upload", null, true],
-    ["ostatni", "poznamky.txt", "text/plain", "upload", null, false],
+    ["faktura", "faktury.zip", null, "email", null, false],
   ])("%s %s %s %s %s → %s", (kind, fn, mime, origin, issuer, exp) => {
     expect(isAnonCandidate(kind, fn, mime, origin, issuer)).toBe(exp);
   });
@@ -346,7 +393,13 @@ describe("nastavení", () => {
     const s = settingsFromRow({ enabled: false, redact: { company: false }, extra_terms: [" STM ", "x", "STM"], max_dpi: 5000, fill_photo: "nonsense" });
     expect(s.enabled).toBe(false);
     expect(s.redact.company).toBe(false);
-    expect(s.redact.path).toBe(true);
+    // výchozí jen název firmy („Nic víc") — ostatní skupiny vypnuté
+    expect(s.redact.path).toBe(false);
+    expect(settingsFromRow({ redact: { path: true } }).redact).toMatchObject({ company: true, path: true, person_drawn: false, logo: false });
+    expect(DEFAULT_ANON_SETTINGS.redact).toEqual({
+      company: true, logo: false, person_drawn: false, person_checked: false, person_revisions: false, signature: false,
+      path: false, contact: false, code: false, copyright_owner: false, copyright_whole: false, filename: false,
+    });
     expect(s.extraTerms).toEqual(["STM"]);
     expect(s.maxDpi).toBe(600);
     expect(s.fillPhoto).toBe("background");

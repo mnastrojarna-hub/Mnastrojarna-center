@@ -76,14 +76,15 @@ export default async function InquiriesPage({
     status: r.status as AnonUiStatus, reason: r.reason, counts: (r.summary?.counts ?? {}) as Record<string, number>, at: r.at,
     total: typeof r.summary?.total === "number" ? r.summary.total : null, crop: r.crop, page: r.page,
   }));
-  // „Ke kontrole anonymizace": s položkami nahoře (nad seznamem poptávek), jen čekající → dole
+  // „Anonymizace se nepovedla" (technická chyba po automatických pokusech): s položkami nahoře, jen
+  // čekající → dole. „Ke kontrole" už nevzniká (plná automatika, majitel 31. 10.).
   const anonSection = (reviewRows.length > 0 || anonPending.count > 0) ? (
     <FlowSection
       id="anonymizace"
       icon={EyeOff}
       iconClass="bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
-      title="Ke kontrole anonymizace"
-      description="Výkresy pro dodavatele, u kterých si AI nebyla jistá (nebo se anonymizace nepovedla). Zkontroluj náhled a schval."
+      title="Anonymizace výkresů"
+      description="Výkresy se anonymizují samy (smaže se název firmy zákazníka). Tady jsou jen ty, u kterých se to technicky nepovedlo."
       count={reviewRows.length}
     >
       <AnonReviewList items={reviewRows} pendingFileIds={anonPending.fileIds} pendingCount={anonPending.count} />

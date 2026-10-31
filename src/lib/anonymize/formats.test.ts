@@ -3,7 +3,7 @@ import { isAnonCandidate, sourceFormat, unsupportedHowTo, UNSUPPORTED_PREFIX } f
 import { anonymizeStl } from "./stl";
 import { anonymizeIges } from "./iges";
 import { anonymizeDxf, binaryDxfToAscii, parseDxfPairs } from "./dxf";
-import { DEFAULT_REDACT, isSuspiciousLiteral, makeTerms, makeWordTerms, ruleLine, type RuleContext } from "./rules";
+import { ALL_REDACT, isSuspiciousLiteral, makeTerms, makeWordTerms, ruleLine, type RuleContext } from "./rules";
 import { fileAnonLabel, jobAnonBadge } from "@/components/anonymize/anon-status";
 
 /**
@@ -14,7 +14,7 @@ import { fileAnonLabel, jobAnonBadge } from "@/components/anonymize/anon-status"
 const KEEP = ["Mnástrojárna"];
 const ctx = (): RuleContext => ({
   terms: [...makeTerms(["Strojmetal a.s.", "Ing. Jan Dvořák", "strojmetal.cz"], "crm", KEEP), ...makeWordTerms(["Strojmetal a.s."], "crm", KEEP)],
-  keepTerms: KEEP, redact: { ...DEFAULT_REDACT },
+  keepTerms: KEEP, redact: { ...ALL_REDACT },
 });
 const enc = (s: string) => new TextEncoder().encode(s);
 const latin = (b: Uint8Array | null) => Buffer.from(b ?? new Uint8Array()).toString("latin1");

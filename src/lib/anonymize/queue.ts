@@ -129,7 +129,6 @@ export interface EnqueueResult {
 /** Priorita backfillu starých výkresů (migrace / „Zpracovat staré výkresy"). */
 export const BACKFILL_PRIORITY = 9;
 
-/** Ruční / hromadné zařazení (force = i done/review/skipped). */
 /** Nákupní doklady (#25) mezi soubory — DB pravidlo job_file_price_ids; chyba DB = všechny (fail closed). */
 export async function priceDocIds(db: AnonDb, ids: string[]): Promise<Set<string>> {
   if (!ids.length) return new Set();
@@ -169,8 +168,9 @@ export async function enqueue(db: AnonDb, input: {
       out.skipped.push({ id: r.id, reason: "Soubor nemáš oprávnění otevřít." });
       continue;
     }
-    if (table === "job_files" && !isAnonCandidate(s.kind, s.filename, s.mime, s.origin, s.issuer)) {
-      out.skipped.push({ id: r.id, reason: "Není externí výkres (náš doklad nebo jiný druh)." });
+    // jen výkresy (archiv výkresů: 2D formát — 3D model ne)
+    if (table !== "drawing_anon_adhoc" && !isAnonCandidate(s.kind, s.filename, s.mime, s.origin, s.issuer)) {
+      out.skipped.push({ id: r.id, reason: "Není výkres zákazníka (objednávka, doklad, 3D model…) — neanonymizuje se." });
       out.statuses[r.id] = r.anon_status;
       continue;
     }

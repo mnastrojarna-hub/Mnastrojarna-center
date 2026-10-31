@@ -4,7 +4,7 @@ import { PDFDocument } from "pdf-lib";
 import { anonymizePdf, type PdfAnonInput } from "./pdf-pipeline";
 import { checkPdfOutput } from "./pdf-raster";
 import { PDF_INVALID_TEXT, PDF_PASSWORD_TEXT } from "./failure-text";
-import { DEFAULT_REDACT, makeTerms } from "./rules";
+import { ALL_REDACT, makeTerms } from "./rules";
 import { decideAnonStatus } from "./decide";
 import * as F from "./__fixtures__/encrypted-pdf";
 
@@ -17,7 +17,7 @@ import * as F from "./__fixtures__/encrypted-pdf";
 
 const b64 = (s: string) => new Uint8Array(Buffer.from(s, "base64"));
 const input = (bytes: Uint8Array): PdfAnonInput => ({
-  bytes, ctx: { terms: makeTerms(["Strojmetal a.s."], "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } }, ai: null,
+  bytes, ctx: { terms: makeTerms(["Strojmetal a.s."], "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } }, ai: null,
   verifyPhotos: true, fillPdf: "white", fillPhoto: "white", maxDpi: 150, maxMpx: 40, pageFrom: 1, deadline: Date.now() + 240_000,
 });
 
@@ -63,7 +63,7 @@ describe("PDF s heslem vlastníka (CAD / ERP) se anonymizuje normálně", () => 
       const chk = await checkPdfOutput(out, [{ widthPt: res.pages[0].out!.widthPt, heightPt: res.pages[0].out!.heightPt }]);
       expect(chk.problems).toEqual([]);
       expect(F.ENCRYPTED_LEAK.test(grepText(out))).toBe(false);
-      // anotace u šifrovaného PDF nejde zploštit (pdf-lib) → ke kontrole, nikdy selhání
+      // anotace u šifrovaného PDF nejde zploštit (pdf-lib) → poznámka, nikdy selhání
       if (cipher.includes("anotace")) {
         expect(res.warnings.some((w) => w.code === "text_layer_untrusted")).toBe(true);
         // jméno v anotaci (Rect 700–870 × 300–316 b zdola) se smaže i bez zploštění (text z hodnoty anotace);
@@ -75,7 +75,8 @@ describe("PDF s heslem vlastníka (CAD / ERP) se anonymizuje normálně", () => 
           verifyClean: null, verifyKeepPresent: null, pxPerMm: null, isPhoto: false, hasMaster: false, warnings: res.warnings,
           customerStandard: false, termInKeep: false, titleBlockFound: true,
         });
-        expect(d.status).toBe("review");
+        // plná automatika (majitel 31. 10.): poznámka v historii, nic ke kontrole
+        expect(d.status).toBe("done");
       }
     }, 60_000);
   }

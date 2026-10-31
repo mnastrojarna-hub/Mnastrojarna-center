@@ -280,6 +280,12 @@ await T("desktop — plná dávka: objednávka, výkres PNG, STEP, nabídka doda
   const anonOk = (e) => e.agent === "drawing-anon" && ((e.actor_kind === "ai" && e.actor_id === ADMIN_ID) || (e.actor_kind === "system" && e.actor_id === null));
   expect(ev.length > 0 && ev.every((e) => e.actor_id === ADMIN_ID || anonOk(e)), `všechny události s autorem admin (anonymizace: AI za admina / systém) (${JSON.stringify(ev.filter((e) => e.actor_id !== ADMIN_ID && !anonOk(e)))})`);
   expect(ev.some((e) => e.actor_id === ADMIN_ID && e.actor_kind === "user"), "zápis dávky s autorem admin");
+  // jen výkresy (majitel 31. 10.): objednávka zákazníka, DL, faktura, nabídka dodavatele ani 3D model se neanonymizují
+  expect(!ev.some((e) => e.agent === "drawing-anon" && /objedn|PO-E2E|faktur|dodac|nabid|model|\.step/i.test(e.message ?? "")),
+    `anonymizace jen výkresu (${JSON.stringify(ev.filter((e) => e.agent === "drawing-anon").map((e) => e.message))})`);
+  const anonSt = Object.fromEntries(f.map((x) => [x.kind, sql(`select coalesce(anon_status, 'null') from job_files where id = ${q(x.id)}`)]));
+  expect(["objednavka", "dodaci_list", "faktura", "naceneni", "model_3d"].every((k) => anonSt[k] === "null") && anonSt.vykres !== "null" && anonSt.vykres !== "review",
+    `stav anonymizace jen u výkresu, nic ke kontrole (${JSON.stringify(anonSt)})`);
   const tr = sqlJson(`select json_agg(t) from (select kind, source from ai_training_examples where job_id = ${q(jobId)} or created_at >= ${q(since)} and created_by = ${q(ADMIN_ID)}) t`) ?? [];
   expect(tr.some((t) => t.kind === "capture_drawing") && tr.some((t) => t.kind === "capture_sort" && t.source === "corrected"), `učení výkresu i opraveného roztřídění (${JSON.stringify(tr)})`);
   expect(sortPreviews(since).length === 0, `náhledy roztřídění uklizené (${sortPreviews(since).join(", ")})`);
@@ -541,8 +547,16 @@ await T("obchodník bez AI: 2 fotky + STEP → ruční roztřídění „Každá
   expect(f.find((x) => x.kind === "model_3d")?.ai_extracted?.format === "STEP", "model s formátem STEP");
   const owner = sql(`select owner_id from orders where id = ${q(jobId)}`);
   expect(owner === OBCHOD_ID, `zakázka obchodníka (${owner})`);
-  const ev = sqlJson(`select json_agg(e) from (select actor_id from job_events where job_id = ${q(jobId)}) e`) ?? [];
-  expect(ev.length > 0 && ev.every((e) => e.actor_id === OBCHOD_ID), "historie: autor obchodník");
+  // automatická anonymizace výkresu doběhne na pozadí kdykoli (AI za nahrávajícího / systém) — do autorství
+  // zápisu dávky se nepočítá (stejně jako v desktopovém scénáři); objednávka ani model se neanonymizují
+  const ev = sqlJson(`select json_agg(e) from (select actor_id, actor_kind, agent, left(message, 120) as message from job_events where job_id = ${q(jobId)}) e`) ?? [];
+  const own = ev.filter((e) => e.agent !== "drawing-anon");
+  const anonOk = (e) => e.agent === "drawing-anon" && ((e.actor_kind === "ai" && e.actor_id === OBCHOD_ID) || (e.actor_kind === "system" && e.actor_id === null));
+  expect(own.length > 0 && own.every((e) => e.actor_id === OBCHOD_ID), `historie: autor obchodník (${JSON.stringify(own.filter((e) => e.actor_id !== OBCHOD_ID))})`);
+  expect(ev.every((e) => e.agent !== "drawing-anon" || anonOk(e)), `anonymizace: AI za obchodníka / systém (${JSON.stringify(ev.filter((e) => e.agent === "drawing-anon" && !anonOk(e)))})`);
+  expect(!ev.some((e) => e.agent === "drawing-anon" && /objedn|\.step|model/i.test(e.message ?? "")), `objednávka ani model se neanonymizují (${JSON.stringify(ev.filter((e) => e.agent === "drawing-anon").map((e) => e.message))})`);
+  const anonKinds = sqlJson(`select json_agg(k) from (select kind::text as kind, coalesce(anon_status, 'null') as st from job_files where job_id = ${q(jobId)}) k`) ?? [];
+  expect(anonKinds.filter((k) => k.kind !== "vykres").every((k) => k.st === "null"), `stav anonymizace jen u výkresu (${JSON.stringify(anonKinds)})`);
   const tr = sqlJson(`select json_agg(t) from (select kind, source from ai_training_examples where created_by = ${q(OBCHOD_ID)} and created_at >= ${q(since)}) t`) ?? [];
   expect(tr.length > 0 && tr.every((t) => t.source === "manual"), `učení manual (${JSON.stringify(tr)})`);
   await page.close();

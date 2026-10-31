@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { anonymizeDxf, dxfPlainText, parseDxfPairs } from "./dxf";
 import { anonymizeStep, decodeStepString, encodeStepString } from "./step";
-import { DEFAULT_REDACT, makeTerms, type RuleContext } from "./rules";
+import { ALL_REDACT, makeTerms, type RuleContext } from "./rules";
 
-const ctx = (terms: string[] = ["STROJMETAL"]): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } });
+const ctx = (terms: string[] = ["STROJMETAL"]): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } });
 const enc = (s: string) => new TextEncoder().encode(s);
 const dec = (b: Uint8Array | null) => new TextDecoder().decode(b ?? new Uint8Array());
 
@@ -41,7 +41,7 @@ const SAMPLE = dxf([
 ]);
 
 describe("DXF", () => {
-  it("smaže texty, komentáře, vlastnosti, cesty a IMAGE; geometrie a technické texty zůstanou; v1 review", () => {
+  it("smaže texty, komentáře, vlastnosti, cesty a IMAGE; geometrie a technické texty zůstanou; ověřeno", () => {
     const r = anonymizeDxf(enc(SAMPLE), ctx());
     expect(r.ok).toBe(true);
     const out = dec(r.bytes);
@@ -58,9 +58,9 @@ describe("DXF", () => {
     expect(out).toContain("100.0");
     expect(out).not.toMatch(/^\s*0\nIMAGE$/m);
     expect(r.removedImages).toBe(1);
-    // název hladiny přejmenovaný → žádné varování o názvu; DXF v1 stejně ke kontrole (grafika)
+    // název hladiny přejmenovaný → žádné varování o názvu; DXF bez binárních dat → žádná poznámka (nic ke kontrole)
     expect(r.warnings.some((w) => w.code === "dxf_layer_term")).toBe(false);
-    expect(r.warnings.some((w) => w.code === "dxf_graphics")).toBe(true);
+    expect(r.warnings.some((w) => w.code === "dxf_graphics")).toBe(false);
     expect(r.verified).toBe(true);
     expect(parseDxfPairs(out)).not.toBeNull();
   });

@@ -4,7 +4,7 @@ import { getAiConfig, getSetting } from "@/lib/settings";
 import { aiActor, SYSTEM_ACTOR, userActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { logUsage, spentToday } from "./budget";
-import { isAnonCandidate, isUnsupportedExt, sourceFormat, unsupportedHowTo, UNSUPPORTED_PREFIX } from "./candidate";
+import { isAnonCandidate, isUnsupportedExt, needsDrawingCheck, sourceFormat, unsupportedHowTo, UNSUPPORTED_PREFIX } from "./candidate";
 import { accToDecide, decideAnonStatus, mergeBatch, type DecideInput } from "./decide";
 import { consumeFakeFault, isFakeAnon, termsPrompt, usageUsd, type AiCallConfig } from "./detect-ai";
 import { anonFilename, outputExt, rebaseTwinFilename } from "./filename";
@@ -175,6 +175,8 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
   manual: AnonRegion[]; cache: unknown; deadline: number;
   /** Ruční uložení editoru — přenese se do navazujících dávek. */
   manualBy?: string | null;
+  /** Druh neznámý (Ostatní / Fotka): výkres musí potvrdit klasifikace, jinak „Není výkres". */
+  drawingCheck?: boolean;
 }): Promise<PipelineOut | { unsupported: string }> {
   if (fmt === "pdf") {
     const { anonymizePdf } = await import("./pdf-pipeline");
@@ -183,7 +185,7 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
     const r = await anonymizePdf({
       bytes, ctx: opts.ctx, ai: opts.ai, systemExtra: opts.systemExtra, keepValues: opts.keepValues, verifyPhotos: opts.settings.verifyPhotos,
       fillPdf: opts.settings.fillPdf, fillPhoto: opts.settings.fillPhoto, maxDpi: opts.settings.maxDpi, maxMpx: opts.settings.maxMpx,
-      pageFrom, deadline: opts.deadline, manual: opts.manual, cache: (opts.cache as never) ?? null,
+      pageFrom, deadline: opts.deadline, manual: opts.manual, cache: (opts.cache as never) ?? null, requireDrawing: Boolean(opts.drawingCheck),
     });
     if (r.failure && !r.pages.length) {
       // vada souboru (heslo k otevření, nečitelné PDF, XFA, moc stran, obří sken) → „nelze"; jinak opakovat
@@ -254,7 +256,8 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
         ...BASE_DECIDE, method: r.method, aiUsed: r.aiUsed, modelFallback: r.fallback, confidence: r.confidence, outputChecksPassed: r.outputProblems.length === 0,
         verifyClean: r.verifyClean, verifyKeepPresent: r.verifyKeepPresent, pxPerMm: r.pxPerMm, isPhoto: true, hasMaster: r.hasMaster,
         warnings: r.warnings, customerStandard: r.customerStandard, termInKeep: r.termInKeep, titleBlockFound: r.titleBlockFound,
-        notDrawing: r.isDrawing === false,
+        // neznámý druh: bez potvrzení klasifikací (AI) to výkres není
+        notDrawing: r.isDrawing === false || (Boolean(opts.drawingCheck) && r.isDrawing !== true),
       },
       usage: r.usage, calls: r.calls, aiCache: r.cache, detected: r.keepValues,
     };
@@ -373,6 +376,12 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
   try {
     const settings = await loadSettings(db);
     const mode = ctx.manualSave ? "full" : await moduleMode(db);
+    // jen výkresy: soubor, který mezitím přestal být kandidátem (druh změněn na objednávku, 3D model…),
+    // se neanonymizuje — stav se vynuluje (originál i dřívější kopie zůstávají, kopie se nesdílí)
+    if (table !== "drawing_anon_adhoc" && !isAnonCandidate(s.kind, s.filename, s.mime, s.origin, s.issuer)) {
+      await finish(db, s, { anon_status: null, anon_reason: null, anon_attempts: 0 });
+      return { id: s.id, table, status: "skipped", reason: "Není výkres" };
+    }
     let fmt = sourceFormat(s.filename, s.mime);
     if (fmt === "unsupported" || isUnsupportedExt(s.filename)) {
       const reason = unsupportedHowTo(s.filename);
@@ -435,13 +444,14 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
         const { error: cpErr } = await db.storage.from("job-files").copy(String(tw.anon_path), newPath);
         if (!cpErr) {
           const regions = ((tw.anon_regions ?? []) as AnonRegion[]).map((r) => ({ ...r, source: "cache" as const }));
-          const st = (mode === "approval" ? "review" : tw.anon_status) as AnonStatus;
+          // plná automatika (majitel 31. 10.): převzatá kopie je hotová, nic ke kontrole
+          const st: AnonStatus = "done";
           const summary = { ...((tw.anon_summary ?? {}) as AnonSummary), srcSha: sha, cachedFrom: tw.id } as AnonSummary;
           const actor = runActor(s, ctx, true);
           await finish(db, s, {
             anon_status: st, anon_path: newPath, anon_filename: twinName, anon_mime: tw.anon_mime, anon_size: tw.anon_size, anon_sha256: tw.anon_sha256,
             anon_method: tw.anon_method, anon_pages: tw.anon_pages, anon_regions: regions, anon_summary: summary, anon_confidence: tw.anon_confidence,
-            anon_reason: st === "review" ? (tw.anon_reason ?? "Režim se schválením — zkontroluj anonymizaci.") : null, anon_config_hash: cfgHash, anon_terms_hash: tHash,
+            anon_reason: null, anon_config_hash: cfgHash, anon_terms_hash: tHash,
             anon_ai_cache: { ref: sha }, anon_at: new Date().toISOString(), anon_by: actor.id, anon_actor_kind: actor.kind, anon_via: baseVia, anon_usage: asUsage(null, 0),
           });
           const { data: tt } = await db.from("drawing_anon_texts").select("region_id, category, text").eq("job_file_id", tw.id);
@@ -477,13 +487,23 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     let out: PipelineOut | { unsupported: string };
     const aiFailWarnings: AnonWarning[] = [];
     const manualBy = ctx.manualSave ? ctx.actor.id : null;
+    // neznámý druh (Ostatní / Fotka): anonymizuje se jen to, co klasifikace pozná jako výkres
+    const drawingCheck = table === "job_files" && needsDrawingCheck(s.kind, s.filename);
     try {
-      out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai, settings, systemExtra, keepValues, manual, cache: aiCache, deadline: ctx.deadline, manualBy });
+      out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai, settings, systemExtra, keepValues, manual, cache: aiCache, deadline: ctx.deadline, manualBy, drawingCheck });
     } catch (err) {
       if (!(err instanceof AiCallError) || !ai) throw err;
-      // AI selhala → jen pravidla (výsledek ke kontrole)
+      // AI selhala → jen pravidla (u vektoru deterministicky; sken / neznámý druh níže zopakuje běh)
       aiFailWarnings.push({ code: "ai_failed", message: `AI detekce selhala (${err.message}) — použita jen pravidla.` });
-      out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai: null, settings, systemExtra, keepValues, manual, cache: null, deadline: ctx.deadline, manualBy });
+      out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai: null, settings, systemExtra, keepValues, manual, cache: null, deadline: ctx.deadline, manualBy, drawingCheck });
+    }
+    // AI je nastavená, ale teď selhala (výpadek, přetížení): sken / fotka by bez ní zůstala s názvem firmy
+    // a neznámý druh by se nepoznal jako výkres → přechodná chyba, běh se zopakuje sám (ne tiché „hotovo")
+    if (ai && !ctx.manualSave && !("unsupported" in out)) {
+      const aiFailed = aiFailWarnings.length > 0 || out.decide.warnings.some((w) => w.code === "ai_failed");
+      const rasterOut = out.method === "image" || out.method === "image_pdf"
+        || (out.method === "raster_pdf" && out.decide.warnings.some((w) => w.code === "scan_page" || w.code === "text_layer_untrusted"));
+      if (aiFailed && (rasterOut || drawingCheck)) throw new Error("AI detection failed: fetch failed (retry)");
     }
     if ("unsupported" in out) {
       await finish(db, s, { anon_status: "unsupported", anon_reason: out.unsupported, anon_at: new Date().toISOString(), anon_actor_kind: "system", anon_via: baseVia });
@@ -521,12 +541,11 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     const idx = await drawingIndex(db, s);
     const name = anonFilename({ drawingNumber, revision, ext: outputExt(out.method, out.ext), jobNumber: idx.jobNumber, index: idx.index, terms: ruleCtx.terms });
     if (name.review) out.decide.warnings.push({ code: "term_in_keep", message: name.review });
-    // sken / fotka, na které se nic nenašlo: výkres zákazníka skoro vždy nese firmu nebo jméno →
-    // bez zásahu ke kontrole (u vektorového PDF rozhoduje textová vrstva, tam „nic" může platit)
+    // sken / fotka, na které se nic nenašlo → tichá poznámka do historie (výsledek je i tak hotový)
     const raster = out.method === "image" || out.method === "image_pdf"
       || (out.method === "raster_pdf" && out.decide.warnings.some((w) => w.code === "scan_page" || w.code === "text_layer_untrusted"));
     if (raster && !ctx.manualSave && !regions.some((r) => r.manual !== "removed")) {
-      out.decide.warnings.push({ code: "nothing_found", message: "Na skenu / fotce se nic nenašlo — zkontroluj náhled, jestli tam není firma, jméno nebo logo." });
+      out.decide.warnings.push({ code: "nothing_found", message: "Na skenu / fotce se název firmy nenašel." });
     }
     // stejné varování z mnoha stran (plot stamp na 100 listech) jen jednou
     const seenWarn = new Set<string>();
@@ -537,21 +556,11 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
 
     const decideIn: DecideInput = { ...out.decide, mode };
     const decision = decideAnonStatus(decideIn);
-    let status = decision.status;
-    let reason = decision.reason;
+    const status = decision.status;
+    const reason = decision.reason;
     let reviewed: Record<string, unknown> = {};
-    if (ctx.manualSave && (status === "review" || status === "done")) {
-      const touchesKeep = decision.warnings.some((w) => KEEP_TOUCH_CODES.has(w.code));
-      if (touchesKeep && !ctx.confirmKeep) {
-        // zásah do chráněného pole bez potvrzení → ke kontrole (schválení = potvrzení člověkem)
-        status = "review";
-        reason = KEEP_TOUCH_REASON;
-      } else {
-        status = "done";
-        reason = null;
-        reviewed = { anon_reviewed_at: new Date().toISOString(), anon_reviewed_by: ctx.actor.id };
-      }
-    }
+    // ruční uložení editoru = rozhodnutí člověka (i zásah do chráněného údaje) → hotovo
+    if (ctx.manualSave && status === "done") reviewed = { anon_reviewed_at: new Date().toISOString(), anon_reviewed_by: ctx.actor.id };
     if (status === "skipped") {
       await finish(db, s, {
         anon_status: "skipped", anon_reason: "Není výkres", anon_at: new Date().toISOString(), anon_by: actor.id, anon_actor_kind: out.decide.aiUsed ? "ai" : "system",
@@ -594,10 +603,11 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     await writeTexts(db, s, out.texts, out.appendTexts);
     if (out.aiCache) await writeAiCache(db, sha, cfgHash, out.method, out.aiCache, null);
     const who = actor.kind === "ai" ? "AI anonymizovala" : actor.kind === "user" ? "Anonymizováno ručně —" : "Systém anonymizoval";
-    const msg = status === "review"
-      ? `${who} výkres ${label(s, drawingNumber)} — ke kontrole: ${reason ?? "zkontroluj"} (${describeSummary(summary)})`
-      : `${who} výkres ${label(s, drawingNumber)} — ${describeSummary(summary)}`;
-    await event(db, s, actor, msg, { anonStatus: status, counts: summary.counts, total: summary.total });
+    // tichá poznámka (jistota AI, bez AI na skenu…) jen do historie — nic se nekontroluje
+    const notes = decision.warnings.filter((w) => w.code !== "excluded_pages" && w.code !== "scan_page").map((w) => w.message);
+    const note = notes.length ? ` (pozn.: ${[...new Set(notes)].slice(0, 2).join(" ")})` : "";
+    const msg = `${who} výkres ${label(s, drawingNumber)} — ${describeSummary(summary)}${note}`;
+    await event(db, s, actor, msg, { anonStatus: status, counts: summary.counts, total: summary.total, ...(notes.length ? { notes: [...new Set(notes)].slice(0, 5) } : {}) });
     await removeOld(db, s, row, outPath);
     await afterSettled(db, s);
     return { id: s.id, table, status, reason, summary };
@@ -693,13 +703,13 @@ export async function saveManualRegions(
   const res = await anonymizeOne(db, table, nextRow, { actor, deadline, manual: true, manualSave: true, confirmKeep: opts.confirmKeep === true });
   const added = regions.filter((r) => r.manual === "added" && !prevManual.some((p) => p.id === r.id)).length;
   const removed = regions.filter((r) => r.manual === "removed" && !prevManual.some((p) => p.id === r.id)).length;
-  if (res.status === "done" || res.status === "review") {
+  if (res.status === "done") {
     const s = subjectOf(table, row);
     // seznam ručních zásahů zůstává (manual:*) — při přepočtu se nepřepočítávají
     const { data: cur } = await db.from(table).select("anon_regions").eq("id", id).maybeSingle();
     const curRegions = ((cur as { anon_regions: AnonRegion[] | null } | null)?.anon_regions ?? []).filter((r) => !r.manual);
     await db.from(table).update({ anon_regions: [...curRegions, ...regions] }).eq("id", id);
-    const note = res.status === "review" ? " — ke kontrole: zasahuje do chráněného údaje" : opts.confirmKeep ? " (potvrzen zásah do chráněného údaje)" : "";
+    const note = opts.confirmKeep ? " (potvrzen zásah do chráněného údaje)" : "";
     await event(db, s, actor, `Anonymizace upravena ručně (+${added}, −${removed})${note}`, { added, removed, anonStatus: res.status, ...(opts.confirmKeep ? { confirmKeep: true } : {}) });
   }
   return res;

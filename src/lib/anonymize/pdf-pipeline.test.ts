@@ -6,7 +6,7 @@ import { makeInvoicePdf, makeVectorDrawing, type SampleDrawing } from "./__fixtu
 import { anonymizePdf, type PdfAnonInput } from "./pdf-pipeline";
 import { openPdf } from "./pdf-node";
 import { checkPdfOutput, inkFraction, renderPageRaster, type Raster } from "./pdf-raster";
-import { DEFAULT_REDACT, makeTerms, type RuleContext } from "./rules";
+import { ALL_REDACT, makeTerms, type RuleContext } from "./rules";
 import { setFakeAnonHandler, resetFakeAnonCalls, fakeAnonCalls } from "./detect-ai";
 import { applyManual } from "./regions";
 
@@ -18,7 +18,7 @@ import { applyManual } from "./regions";
 
 const SHOTS = process.env.ANON_SHOTS || "";
 
-const ctx = (terms: string[] = []): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } });
+const ctx = (terms: string[] = []): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } });
 
 function input(bytes: Uint8Array, over: Partial<PdfAnonInput> = {}): PdfAnonInput {
   return {

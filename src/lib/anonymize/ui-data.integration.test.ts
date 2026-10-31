@@ -163,17 +163,18 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — data UI ↔ lokální Supabase"
     expect(badges[a]).toMatchObject({ total: 3, done: 1, review: 1, pending: 1, sendWaiting: 1 });
     expect(badges[b]).toMatchObject({ total: 2, failed: 1, skipped: 1 });
 
+    // „Ke kontrole" už nevzniká — seznam ukazuje jen selhané anonymizace (starší „review" ne)
     const all = await d.getAnonReviewList({ limit: 200 });
     const mine = all.filter((r) => r.jobId === a || r.jobId === b);
-    expect(mine.map((r) => r.id).sort()).toEqual([ids.review, ids.failed].sort());
-    expect(mine.find((r) => r.id === ids.review)!.jobNumber).toBe(`Z-E2E-ANONUI-${STAMP}-3`);
+    expect(mine.map((r) => r.id)).toEqual([ids.failed]);
+    expect(mine.find((r) => r.id === ids.failed)!.jobNumber).toBe(`Z-E2E-ANONUI-${STAMP}-4`);
     // rozsah „moje" jen se zakázkou b
     const scoped = await d.getAnonReviewList({ scope: { all: false, userId: adminId, jobIds: new Set([b]), error: false } as never });
     expect(scoped.map((r) => r.id)).toEqual([ids.failed]);
     expect(await d.getAnonReviewList({ scope: null })).toEqual([]);
 
-    expect(await d.getAnonReviewCount({ all: false, userId: adminId, jobIds: new Set([a, b]), error: false } as never)).toBe(2);
-    expect(await d.getAnonReviewCount()).toBeGreaterThanOrEqual(2);
+    expect(await d.getAnonReviewCount({ all: false, userId: adminId, jobIds: new Set([a, b]), error: false } as never)).toBe(1);
+    expect(await d.getAnonReviewCount()).toBeGreaterThanOrEqual(1);
     // čekající = jen pending (selhané mají vlastní tlačítko), bez starých výkresů (backfill, priorita 9)
     const legacy = await mk(b, "6.pdf", "pending");
     await op.from("job_files").update({ anon_priority: 9, anon_via: "backfill" }).eq("id", legacy);
@@ -183,9 +184,9 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — data UI ↔ lokální Supabase"
     // dlouhý rozsah (> 300 zakázek) nepřeteče URL — dávky po 200
     const many = new Set([a, b, ...Array.from({ length: 450 }, () => randomUUID())]);
     expect((await d.getAnonPending({ all: false, userId: adminId, jobIds: many, error: false } as never)).count).toBe(1);
-    expect(await d.getAnonReviewCount({ all: false, userId: adminId, jobIds: many, error: false } as never)).toBe(2);
-    expect((await d.getAnonReviewList({ scope: { all: false, userId: adminId, jobIds: many, error: false } as never })).map((r) => r.id).sort())
-      .toEqual([ids.review, ids.failed].sort());
+    expect(await d.getAnonReviewCount({ all: false, userId: adminId, jobIds: many, error: false } as never)).toBe(1);
+    expect((await d.getAnonReviewList({ scope: { all: false, userId: adminId, jobIds: many, error: false } as never })).map((r) => r.id))
+      .toEqual([ids.failed]);
     const manyBadges = await d.getJobAnonBadges([...many]);
     expect(manyBadges[a]).toMatchObject({ done: 1, review: 1 });
 
@@ -196,7 +197,7 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — data UI ↔ lokální Supabase"
     expect(panel).not.toBeNull();
     expect(panel!.settings.redact.company).toBe(true);
     expect(["full", "approval"]).toContain(panel!.mode);
-    expect(panel!.reviewCount).toBeGreaterThanOrEqual(2);
+    expect(panel!.reviewCount).toBeGreaterThanOrEqual(1);
 
     // routa fronty odeslání: příjemce a kolik výkresů ještě čeká
     const { GET } = await import("@/app/api/drawings/anonymize/send-queue/route");
@@ -221,7 +222,7 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — data UI ↔ lokální Supabase"
     }
   }, 60_000);
 
-  it("routy: cizí samostatná anonymizace 404, nákupní doklad 403 bez marží, ke kontrole bez potvrzení 409", async () => {
+  it("routy: cizí samostatná anonymizace 404, nákupní doklad 403 bez marží, starší „ke kontrole“ se stáhne bez potvrzení", async () => {
     const op = localAdmin(userActor({ id: adminId }));
     const jobId = await newJob(6);
     // samostatný nástroj super admina
@@ -237,7 +238,13 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — data UI ↔ lokální Supabase"
     const pRev = await upload(jobId, "rev.pdf");
     const { data: rf } = await svc.from("job_files").insert({ job_id: jobId, kind: "vykres", filename: "rev.pdf", mime_type: "application/pdf", storage_path: pRev, origin: "email" }).select("id").single();
     const revId = (rf as { id: string }).id;
-    await op.from("job_files").update({ anon_status: "review", anon_path: `zakazky/${jobId}/anon/y.pdf`, anon_sha256: "b".repeat(64), anon_at: new Date().toISOString() }).eq("id", revId);
+    // skutečná anonymní kopie (sha sedí) — stažení „Pro dodavatele" bez potvrzování náhledu
+    const yBytes = new TextEncoder().encode("%PDF-1.4 anon y");
+    const yPath = `zakazky/${jobId}/anon/${randomUUID()}-y.pdf`;
+    await svc.storage.from("job-files").upload(yPath, yBytes, { contentType: "application/pdf" });
+    paths.push(yPath);
+    const { createHash } = await import("node:crypto");
+    await op.from("job_files").update({ anon_status: "review", anon_path: yPath, anon_filename: "y.pdf", anon_mime: "application/pdf", anon_sha256: createHash("sha256").update(yBytes).digest("hex"), anon_at: new Date().toISOString() }).eq("id", revId);
 
     const state = await import("@/app/api/drawings/anonymize/[fileId]/route");
     const preview = await import("@/app/api/drawings/anonymize/[fileId]/preview/route");
@@ -258,8 +265,8 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace — data UI ↔ lokální Supabase"
       expect((await approveR.POST(ap, ctx(priceId))).status).toBe(403);
 
       const dl = await download.GET(new Request("http://localhost/x"), ctx(revId));
-      expect(dl.status).toBe(409);
-      expect(((await dl.json()) as { reason: string }).reason).toBe("review");
+      expect(dl.status).toBe(200);
+      expect(new TextDecoder().decode(new Uint8Array(await dl.arrayBuffer()))).toBe("%PDF-1.4 anon y");
     } finally {
       who.id = adminId; who.role = "super_admin"; who.margins = true;
       await svc.from("drawing_anon_adhoc").delete().eq("id", adhocId);

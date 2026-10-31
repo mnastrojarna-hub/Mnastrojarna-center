@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { queueLegacyDrawings, requeueChangedConfig, saveAnonSettings, setAnonMode } from "@/app/actions/drawing-anon";
+import { queueLegacyDrawings, requeueChangedConfig, saveAnonSettings } from "@/app/actions/drawing-anon";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import type { AnonSettings } from "@/lib/anonymize/settings";
 import type { RedactToggles } from "@/lib/anonymize/rules";
@@ -41,7 +41,7 @@ const USD = new Intl.NumberFormat("cs-CZ", { style: "currency", currency: "USD" 
 export const usd = (n: number) => USD.format(Number.isFinite(n) ? n : 0);
 
 const GROUPS: { key: keyof RedactToggles; label: string; hint: string }[] = [
-  { key: "company", label: "Název firmy", hint: "v razítku, rámu a tabulce revizí (+ zákazník z CRM kdekoli)" },
+  { key: "company", label: "Název firmy", hint: "zákazník z CRM kdekoli na výkresu (všechny varianty názvu) + název u „Zákazník:“ v razítku — výchozí jediné zapnuté" },
   { key: "logo", label: "Logo a otisk razítka", hint: "obrázky a vektorová loga v razítku a rámu" },
   { key: "person_drawn", label: "Kreslil / konstruoval", hint: "jména a iniciály autora výkresu" },
   { key: "person_checked", label: "Kontroloval / schválil", hint: "jména kontrolora a schvalovatele" },
@@ -75,7 +75,6 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
   const [s, setS] = React.useState<AnonSettings>(p.settings);
   const [terms, setTerms] = React.useState(p.settings.extraTerms.join("\n"));
   const [keep, setKeep] = React.useState(p.settings.keepTerms.join("\n"));
-  const [mode, setMode] = React.useState(p.mode);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [msg, setMsg] = React.useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const dis = !p.canEdit || busy !== null;
@@ -134,24 +133,9 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
           <Row id="anon-capture" label="Vyfocené výkresy" hint="dávka i jednotlivá fotka" checked={s.autoCapture} onChange={(v) => set("autoCapture", v)} disabled={dis || !s.enabled} />
           <Row id="anon-upload" label="Ručně nahrané soubory" hint="dokumenty zakázky" checked={s.autoUpload} onChange={(v) => set("autoUpload", v)} disabled={dis || !s.enabled} />
           <Row id="anon-hires" label="Fotky v plném rozlišení (master)" hint="ostřejší anonymizace, víc mobilních dat" checked={s.hiresCapture} onChange={(v) => set("hiresCapture", v)} disabled={dis} />
-          <div className="pt-2">
-            <span className="mb-1 block text-sm font-medium">Režim</span>
-            <div className="inline-flex rounded-lg border p-0.5" role="radiogroup" aria-label="Režim anonymizace">
-              {(["full", "approval"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={mode === m}
-                  disabled={dis}
-                  onClick={() => run("mode", async () => { const r = await setAnonMode(m); if (r.ok) setMode(m); return r; }, () => (m === "full" ? "Plná automatika: jisté výsledky jdou rovnou ven." : "Se schválením: každý výkres zkontroluje člověk."))}
-                  className={cn("min-h-10 rounded-md px-3 text-xs font-semibold", mode === m ? "bg-foreground text-background" : "text-muted-foreground")}
-                >
-                  {m === "full" ? "Plná automatika" : "Se schválením"}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">Při jakékoli nejistotě jde výkres vždy „Ke kontrole“ — ven jen to, co prošlo.</p>
+          <div className="pt-2" data-testid="anon-mode-full">
+            <span className="mb-1 block text-sm font-medium">Režim: plná automatika</span>
+            <p className="text-xs text-muted-foreground">Výkresy se anonymizují vždy automaticky — nic nejde „Ke kontrole“. Nejistota AI se jen zapíše do historie výkresu.</p>
           </div>
         </section>
 
@@ -162,7 +146,7 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
               <Row key={g.key} id={`anon-r-${g.key}`} label={g.label} hint={g.hint} checked={s.redact[g.key]} onChange={(v) => setRedact(g.key, v)} disabled={dis} />
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">Vždy zůstává: číslo výkresu, revize, název dílu, materiál, kóty, tolerance, drsnosti, poznámky, normy, data.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Výchozí je jen název firmy (ostatní volitelně). Anonymizují se jen 2D výkresy — objednávky, doklady ani 3D modely ne. Vždy zůstává: číslo výkresu, revize, název dílu, materiál, kóty, tolerance, drsnosti, poznámky, normy, data.</p>
         </section>
       </div>
 
@@ -236,7 +220,7 @@ export function DrawingAnonSettings(p: DrawingAnonSettingsProps) {
           onClick={() => void run("legacy", queueLegacyDrawings as never, (r) => `Zpracuje se ${(r as { queued?: number }).queued ?? 0} starých výkresů (v rámci denního limitu).`)}>
           {busy === "legacy" ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />} Zpracovat staré výkresy ({p.legacyCount})
         </Button>
-        {p.reviewCount > 0 && <a href="/inquiries#anonymizace" className="text-sm font-medium text-amber-700 underline-offset-2 hover:underline dark:text-amber-300">{p.reviewCount} ke kontrole →</a>}
+        {p.reviewCount > 0 && <a href="/inquiries#anonymizace" className="text-sm font-medium text-amber-700 underline-offset-2 hover:underline dark:text-amber-300">{p.reviewCount} — anonymizace se nepovedla →</a>}
       </div>
     </div>
   );

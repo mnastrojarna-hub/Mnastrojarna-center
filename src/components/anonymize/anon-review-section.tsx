@@ -12,10 +12,9 @@ import { describeCounts, displayReason, drawingsWord, NOTHING_REMOVED, type Anon
 import { AnonymizeEditor } from "./anonymize-editor";
 
 /**
- * Sekce „Ke kontrole anonymizace" (Poptávky): výkresy ve stavu „ke kontrole" / „selhalo" napříč
- * zakázkami s miniaturou „Po" (výřez kolem smazaného), důvodem a kategoriemi; Zkontrolovat (editor)
- * a Schválit. Když se nic nesmazalo (nebo jde o fotku), „Schválit" otevře editor — žádné tiché schválení
- * výkresu, na kterém může firma zůstat. Hromadně „Anonymizovat vše, co čeká (n)".
+ * Sekce „Anonymizace výkresů" (Poptávky): výkresy, jejichž anonymizace se technicky nepovedla, s důvodem
+ * a „Anonymizovat znovu"; hromadně „Anonymizovat vše, co čeká (n)". „Ke kontrole" už nevzniká (plná
+ * automatika, majitel 31. 10.) — starší řádek „ke kontrole" (před migrací) ukáže Zkontrolovat / Schválit.
  */
 
 export interface AnonReviewRowView {
@@ -61,7 +60,7 @@ export function AnonReviewChip({ count }: { count: number }) {
       className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
       data-testid="anon-review-chip"
     >
-      <AlertTriangle className="h-3.5 w-3.5" /> {drawingsWord(count)} ke kontrole anonymizace <ArrowDown className="h-3.5 w-3.5" />
+      <AlertTriangle className="h-3.5 w-3.5" /> {drawingsWord(count)} — anonymizace se nepovedla <ArrowDown className="h-3.5 w-3.5" />
     </a>
   );
 }

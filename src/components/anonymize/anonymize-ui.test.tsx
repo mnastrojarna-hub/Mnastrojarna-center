@@ -32,22 +32,24 @@ const badge = (over: Partial<Parameters<typeof jobAnonBadge>[0] & object> = {}) 
 describe("stavy anonymizace — texty", () => {
   it("odznak zakázky: čipy podle naléhavosti, každý s vlastní barvou, nejvýš 2 + „+N“", () => {
     expect(jobAnonBadge(badge({ total: 3, done: 3 }))!.parts.map((p) => p.text)).toEqual(["Výkresy 3/3 ✓"]);
+    // starší „ke kontrole" se počítá jako hotovo (žádný čip „ke kontrole")
     const b = jobAnonBadge(badge({ total: 6, done: 1, review: 1, failed: 1, pending: 1, unsupported: 1, skipped: 1, sendWaiting: 1 }))!;
-    expect(b.parts.map((p) => p.text)).toEqual(["Odeslání čeká", "1 selhal", "1 ke kontrole", "Čeká…", "Výkresy 1/4", "1 nelze automaticky"]);
-    expect(b.parts.map((p) => p.tone)).toEqual(["warn", "error", "warn", "busy", "muted", "muted"]);
+    expect(b.parts.map((p) => p.text)).toEqual(["Odeslání čeká", "1 selhal", "Čeká…", "Výkresy 2/4", "1 nelze automaticky"]);
+    expect(b.parts.map((p) => p.tone)).toEqual(["warn", "error", "busy", "muted", "muted"]);
     expect(b.visible.map((p) => p.text)).toEqual(["Odeslání čeká", "1 selhal"]);
-    expect(b.more).toBe(4);
+    expect(b.more).toBe(3);
     expect(b.title).toContain("1 nelze automaticky");
     expect(b.tone).toBe("error");
     expect(jobAnonBadge(badge({ total: 2, skipped: 2 }))).toBeNull();
     expect(jobAnonBadge(badge({ total: 2, pending: 2, waitingBudget: 2 }))!.parts[0].text).toBe("Čeká (limit)");
   });
 
-  it("soubor: nic nesmazáno → žádné zelené „✓“; denní limit bez spinneru; surová chyba se nezobrazí", () => {
+  it("soubor: nic nesmazáno = hotovo (název firmy na výkrese není); denní limit bez spinneru; surová chyba se nezobrazí", () => {
     const empty = fileAnonLabel({ status: "done", reviewed: true, total: 0 });
-    expect(empty.label).toBe("Schváleno bez změn");
-    expect(empty.tone).toBe("warn");
-    expect(fileAnonLabel({ status: "done", reviewed: false, total: 0 }).tone).toBe("warn");
+    expect(empty.label).toBe("Anonymizováno");
+    expect(empty.tone).toBe("ok");
+    expect(empty.hint).toMatch(/Název firmy se na výkrese nenašel/);
+    expect(fileAnonLabel({ status: "done", reviewed: false, total: 0 }).tone).toBe("ok");
     expect(fileAnonLabel({ status: "done", reviewed: true, total: 3 }).label).toBe("Anonymizováno ✓");
     const lim = fileAnonLabel({ status: "pending", reason: "Denní limit AI pro automatiku je vyčerpán — pokračuje zítra (nebo spusť ručně)." });
     expect(lim.label).toBe("Čeká (denní limit)");
@@ -68,9 +70,12 @@ describe("stavy anonymizace — texty", () => {
     expect(sendQueueText({ ...q, kind: "purchase_order", status: "blocked", reason: null })).toMatch(/^je pozastavená/);
   });
 
-  it("soubor: hotovo / ke kontrole / přeskočeno s důvodem", () => {
+  it("soubor: hotovo / starší „ke kontrole“ = hotovo / přeskočeno s důvodem", () => {
     expect(fileAnonLabel({ status: "done", reviewed: true }).label).toBe("Anonymizováno ✓");
-    expect(fileAnonLabel({ status: "review", reason: "AI si není jistá" }).hint).toBe("AI si není jistá");
+    const legacy = fileAnonLabel({ status: "review", reason: "AI si není jistá" });
+    expect(legacy.label).toBe("Anonymizováno");
+    expect(legacy.tone).toBe("ok");
+    expect(legacy.label).not.toMatch(/kontrol/i);
     expect(fileAnonLabel({ status: "skipped", reason: "Není výkres" }).label).toBe("Není výkres");
     expect(fileAnonLabel({ status: "skipped", reason: "Náš výkres — neanonymizovat" }).label).toBe("Náš výkres");
     expect(describeCounts({ company: 1, person: 2, path: 1 })).toBe("firma, 2 jména, cesta na disk");
@@ -85,13 +90,14 @@ describe("stavy anonymizace — texty", () => {
 describe("render komponent anonymizace", () => {
   it("odznaky", () => {
     const a = html(<JobAnonBadge badge={badge({ total: 2, done: 1, review: 1 })} />);
-    expect(a).toContain("1 ke kontrole");
-    expect(a).toContain("Výkresy 1/2");
-    expect(a).toContain('data-anon-badge="warn"');
+    expect(a).not.toContain("ke kontrole");
+    expect(a).toContain("Výkresy 2/2 ✓");
+    expect(a).toContain('data-anon-badge="ok"');
     const many = html(<JobAnonBadge badge={badge({ total: 6, done: 1, review: 1, failed: 1, pending: 1, unsupported: 1, sendWaiting: 1 })} />);
-    expect(many).toContain("+4");
+    expect(many).toContain("+3");
     expect(many).not.toContain("1 nejde (DWG)</span>");
-    expect(html(<FileAnonBadge status="done" reviewed total={0} />)).toContain("Schváleno bez změn");
+    expect(html(<FileAnonBadge status="done" reviewed total={0} />)).toContain("Anonymizováno");
+    expect(html(<FileAnonBadge status="review" />)).not.toContain("Ke kontrole");
     expect(html(<FileAnonBadge status="pending" />)).toContain("Anonymizuje se…");
     expect(html(<FileAnonBadge status={null} />)).toBe("");
   });
@@ -127,8 +133,8 @@ describe("render komponent anonymizace", () => {
     // miniatura: malý výřez (w=320), ne plný render
     expect(out).toContain("/api/drawings/anonymize/f1/preview?variant=anon");
     expect(out).toContain("w=320");
-    // nic nesmazáno → varování a „Schválit" otevře editor (ne tiché schválení jedním klepnutím)
-    expect(out).toContain("Nic se nesmazalo");
+    // starší řádek „ke kontrole" (před migrací): nic nesmazáno → „Schválit" otevře editor
+    expect(out).toContain("Název firmy se na výkrese nenašel");
     expect(out).toMatch(/data-approve="editor"[^>]*>|data-approve="editor"/);
     expect(out).toContain('data-approve="direct"');
   });
@@ -159,9 +165,12 @@ describe("render komponent anonymizace", () => {
     expect(html(<AnonSummaryLine file={file()} />)).toContain("Pro dodavatele smazáno: firma, cesta na disk · vyřazené strany 1");
     expect(canAnonymize(file({ origin: "generated" }))).toBe(false);
     expect(canAnonymize(file({ issuer: "my" }))).toBe(false);
-    // Word zákazníka je kandidát (stav „Nelze anonymizovat automaticky" + návod), text ne
-    expect(canAnonymize(file({ filename: "x.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }))).toBe(true);
+    // jen 2D výkresy: Word, text, 3D model ani objednávka zákazníka nekandidují; DWG ano („nelze automaticky")
+    expect(canAnonymize(file({ filename: "x.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }))).toBe(false);
     expect(canAnonymize(file({ filename: "x.txt", mimeType: "text/plain" }))).toBe(false);
+    expect(canAnonymize(file({ kind: "model_3d", filename: "dil.step", mimeType: null }))).toBe(false);
+    expect(canAnonymize(file({ kind: "objednavka", filename: "PO-4471.pdf" }))).toBe(false);
+    expect(canAnonymize(file({ filename: "sestava.dwg", mimeType: null }))).toBe(true);
     expect(canAnonymize(file())).toBe(true);
     // stejné pravidlo jako server (isAnonCandidate): faktura / nabídka bez vystavitele ani zamčený soubor ne
     expect(canAnonymize(file({ kind: "faktura", issuer: null }))).toBe(false);
@@ -178,7 +187,12 @@ describe("render komponent anonymizace", () => {
     const unsup = file({ anon: { ...file().anon!, status: "unsupported", reason: "Formát nelze anonymizovat — pošli PDF." } });
     expect(html(<AnonSummaryLine file={unsup} />)).toContain("Formát nelze anonymizovat");
     const empty = file({ anon: { ...file().anon!, reviewed: true, counts: {}, total: 0, excludedPages: [] } });
-    expect(html(<AnonSummaryLine file={empty} />)).toContain("Nic se nesmazalo");
+    expect(html(<AnonSummaryLine file={empty} />)).toContain("Název firmy se na výkrese nenašel");
+    // starší „ke kontrole" = přímé stažení „Pro dodavatele" (bez potvrzování náhledu)
+    const legacy = html(<ForSupplierLink file={file({ anon: { ...file().anon!, status: "review", reason: "AI si není jistá" } })} onReviewDownload={() => undefined} />);
+    expect(legacy).toContain("/api/drawings/anonymize/f1/download");
+    expect(legacy).not.toContain("Pro dodavatele…");
+    expect(html(<AnonSummaryLine file={file({ anon: { ...file().anon!, status: "review", reason: "AI si není jistá" } })} />)).not.toContain("AI si není jistá");
   });
 
   it("„Poslat originál…“ u formátu, který anonymizovat nejde: jen super admin, stažení přes ?original=1", () => {
@@ -200,7 +214,11 @@ describe("render komponent anonymizace", () => {
     const props = { settings: DEFAULT_ANON_SETTINGS, mode: "full" as const, runnerWarning: "Chybí CRON_SECRET — …", spentTodayUsd: 1.234, legacyCount: 7, changedCount: 2, reviewCount: 3 };
     const out = html(<DrawingAnonSettings {...props} canEdit />);
     for (const t of ["Anonymizace výkresů zapnutá", "Kreslil / konstruoval", "Cesty na disk", "Vždy smazat", "Nikdy nemazat", "Dnes utraceno",
-      "Přepočítat po změně pravidel (2)", "Zpracovat staré výkresy (7)", "3 ke kontrole", "Chybí CRON_SECRET", "Plná automatika"]) expect(out, t).toContain(t);
+      "Přepočítat po změně pravidel (2)", "Zpracovat staré výkresy (7)", "3 — anonymizace se nepovedla", "Chybí CRON_SECRET", "plná automatika",
+      "nic nejde „Ke kontrole“", "Výchozí je jen název firmy"]) expect(out, t).toContain(t);
+    expect(out).not.toContain("Se schválením");
+    // výchozí přepínače: jen název firmy zapnutý
+    expect((out.match(/role="switch"[^>]*aria-checked="true"|aria-checked="true"[^>]*role="switch"/g) ?? []).length).toBeGreaterThan(0);
     // jednotný český formát částek (ne „$0.00" vedle „$0,40")
     expect(out).toMatch(/1,23\s?US\$/u);
     expect(out).not.toContain("$1.23");

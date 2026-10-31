@@ -223,13 +223,13 @@ function useCrop(item: Item, ready: boolean): { box: NBox | null; regions: NBox[
 }
 
 function ToolItem({ item, onEdit, onRetry }: { item: Item; onEdit: () => void; onRetry: () => void }) {
-  const [reviewed, setReviewed] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
   const [shareErr, setShareErr] = React.useState<string | null>(null);
   const status = item.status as AnonUiStatus;
+  // „Ke kontrole" už nevzniká (plná automatika) — hotová kopie bez potvrzování náhledu
   const ready = status === "done" || status === "review";
-  const needsConfirm = status === "review" && !reviewed;
-  const dl = downloadUrl(item.id, { table: "adhoc", reviewed: status === "review" });
+  const needsConfirm = false;
+  const dl = downloadUrl(item.id, { table: "adhoc" });
   const counts = describeCounts(item.counts);
   const empty = ready && !counts && (item.total ?? 0) === 0;
   const v = item.at;
@@ -311,12 +311,6 @@ function ToolItem({ item, onEdit, onRetry }: { item: Item; onEdit: () => void; o
       )}
       {ready && (
         <div className="mt-3 space-y-2">
-          {status === "review" && (
-            <label className="flex min-h-11 items-center gap-2 rounded-lg bg-amber-50 px-3 text-sm text-amber-950 dark:bg-amber-500/10 dark:text-amber-100">
-              <input type="checkbox" className="h-5 w-5" checked={reviewed} onChange={(e) => setReviewed(e.target.checked)} />
-              Zkontroloval jsem náhled „Po“
-            </label>
-          )}
           <div className="flex flex-wrap gap-2">
             <Button asChild={!needsConfirm} variant="send" size="sm" className="min-h-11 flex-1 sm:min-h-9 sm:flex-none" disabled={needsConfirm}>
               {needsConfirm ? <span className="inline-flex items-center gap-2"><Download className="h-4 w-4" /> Stáhnout</span> : <a href={dl} data-testid="anon-tool-download"><Download className="h-4 w-4" /> Stáhnout</a>}

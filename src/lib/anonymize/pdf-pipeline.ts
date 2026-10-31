@@ -60,6 +60,8 @@ export interface PdfAnonInput {
   cache?: PdfAiCache | null;
   /** Mez pixelů renderu na dávku (testy). */
   pixelBudget?: number;
+  /** Druh neznámý (Ostatní / Fotka): stránka je výkres jen s potvrzením (AI, kotvy razítka, CAD producent). */
+  requireDrawing?: boolean;
 }
 
 export interface PdfRegionText {
@@ -376,7 +378,7 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     verifyKeepPresent: null, titleBlockFound: Boolean(info.titleBlock), aiUsed: Boolean(aiPage),
     aiConfidence: aiPage ? (cache.pageConf?.[info.page] ?? cache.confidence) : 1,
   };
-  const isDrawing = p.rulesDrawing ? true : aiPage ? Boolean(aiPage.isDrawing) : null;
+  const isDrawing = p.rulesDrawing ? true : aiPage ? Boolean(aiPage.isDrawing) : input.requireDrawing ? false : null;
   if (isDrawing === false) return { ...result, included: false, why: "not_drawing" };
   const aiSource = p.cachedBefore ? "cache" as const : "ai" as const;
 
@@ -631,13 +633,21 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
         const residue = ringResidue(raster, r.box, ring, excludeBoxes, Math.max(4, 0.5 * r.em), bg);
         const ringArea = (r.box.w + 2 * ring) * (r.box.h + 2 * ring) - r.box.w * r.box.h;
         if (residue <= Math.max(3, 0.002 * ringArea)) break;
-        if (k === 2) { result.residue = true; break; }
+        if (k === 2) {
+          // „s jistotou": zbytek po dvou rozšířeních → plná výplň o další 0,3 em (i přes linky tabulky);
+          // co je mimo, není smazaný text (linka, sousední grafika) — jen poznámka
+          const d2 = 0.3 * r.em;
+          r.box = { x: r.box.x - d2, y: r.box.y - d2, w: r.box.w + 2 * d2, h: r.box.h + 2 * d2 };
+          fillRect(raster, r.box, fill);
+          result.residue = true;
+          break;
+        }
         const d = 0.15 * r.em;
         r.box = { x: r.box.x - d, y: r.box.y - d, w: r.box.w + 2 * d, h: r.box.h + 2 * d };
         burnRectKeepLines(raster, r.box, fill, 255, r.em);
       }
     }
-    if (result.residue) res.warnings.push({ code: "residue", message: "Kolem smazaného místa zůstaly zbytky — zkontroluj.", page: info.page });
+    if (result.residue) res.warnings.push({ code: "residue", message: "Kolem smazaného místa byly zbytky — vyplněno celé okolí.", page: info.page });
 
     // kódování v rozpočtu 2,5 MB / strana; barva jen když po vypálení zůstala (červené logo zmizelo → šedá)
     const enc = raster.channels === 3 ? maybeGray(raster, { minPixels: 40 }) : raster;
@@ -705,8 +715,8 @@ async function visionPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
   if (v.termInKeep) res.termInKeep = true;
   result.aiUsed = v.aiUsed;
   result.aiConfidence = v.aiUsed ? v.confidence : 1;
-  if (!v.aiUsed && !p.rulesDrawing) res.warnings.push({ code: "no_ai", message: "Bez AI nelze sken anonymizovat — zkontroluj ručně.", page: info.page });
-  const isDrawing = p.rulesDrawing ? true : v.isDrawing;
+  if (!v.aiUsed && !p.rulesDrawing) res.warnings.push({ code: "no_ai", message: "Bez AI klíče se na skenu název firmy nehledá (smazán jen text podle pravidel).", page: info.page });
+  const isDrawing = p.rulesDrawing ? true : v.isDrawing ?? (input.requireDrawing ? false : null);
   if (isDrawing === false) return { ...result, included: false, why: "not_drawing" };
   result.verifyClean = v.verifyClean;
   result.verifyKeepPresent = v.verifyKeepPresent;

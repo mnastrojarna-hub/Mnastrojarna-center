@@ -5,7 +5,7 @@ import { anonymizePdf, type PdfAnonInput } from "./pdf-pipeline";
 import { openPdf } from "./pdf-node";
 import { contrastInkFraction, inkFraction, renderPageRaster, type Raster } from "./pdf-raster";
 import { computeZones } from "./pdf-text";
-import { DEFAULT_REDACT, makeTerms, ruleLine, type RuleContext } from "./rules";
+import { ALL_REDACT, makeTerms, ruleLine, type RuleContext } from "./rules";
 import { decideAnonStatus } from "./decide";
 
 /**
@@ -17,7 +17,7 @@ import { decideAnonStatus } from "./decide";
  *  3) řádek firmy nad razítkem výš než popisky + 12 mm („Zákazník: ACME Forge GmbH") se smaže.
  */
 
-const ctx = (terms: string[] = []): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...DEFAULT_REDACT } });
+const ctx = (terms: string[] = []): RuleContext => ({ terms: makeTerms(terms, "crm"), keepTerms: ["Mnástrojárna"], redact: { ...ALL_REDACT } });
 
 function input(bytes: Uint8Array, over: Partial<PdfAnonInput> = {}): PdfAnonInput {
   return {
@@ -63,13 +63,14 @@ describe("kontrola inkoustu: skrytý a světlý text není chybějící písmo",
     const hidden = res.warnings.filter((w) => w.code === "hidden_text");
     expect(hidden.length).toBe(1);
     expect(hidden[0].message).toMatch(/nevykreslil/);
-    // varování znamená „ke kontrole", nikdy tiché done
+    // plná automatika (majitel 31. 10.): varování je tichá poznámka, výsledek hotový
     const d = decideAnonStatus({
       mode: "full", method: "raster_pdf", aiUsed: true, modelFallback: false, confidence: 0.95, ruleHitsCovered: true, outputChecksPassed: true,
       verifyClean: null, verifyKeepPresent: null, pxPerMm: null, isPhoto: false, hasMaster: false, warnings: res.warnings,
       customerStandard: false, termInKeep: false, titleBlockFound: true,
     });
-    expect(d.status).toBe("review");
+    expect(d.status).toBe("done");
+    expect(d.warnings.some((w) => w.code === "hidden_text")).toBe(true);
 
     // žlutý a světle šedý text zůstal ve výstupu viditelný (kontrast proti pozadí)
     const after = await render(res.partPdf!);
