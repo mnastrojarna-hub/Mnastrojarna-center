@@ -2,9 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { CtaBand, FaqList, FitBlock, MachinesGrid, PageHero, ProcessSteps, ReferencesBlock, SectionHeading, ServiceCard, ServicesGrid, TeamGrid } from "@/components/blocks";
 import { Icon, type AnyIcon } from "@/components/icons";
+import { FitChecker } from "@/components/fit-checker";
+import { Gallery } from "@/components/gallery";
 import { JsonLd } from "@/components/json-ld";
 import { fill, getDict } from "@/content";
-import { SALES, SERVICE_FACTS, SERVICE_ORDER, SITE, TEAM, TECH } from "@/content/site";
+import { GALLERY, MACHINES, SALES, SERVICE_FACTS, SERVICE_ORDER, SITE, TEAM, TECH } from "@/content/site";
 import { href, type Locale, type ServiceId } from "@/i18n/config";
 import { ORG_ID, breadcrumbJsonLd, faqJsonLd, pageMeta } from "@/lib/seo";
 
@@ -85,26 +87,60 @@ export function ServiceView({ locale, id }: P & { id: ServiceId }) {
         </div>
       </PageHero>
 
+      {/* výzva → řešení */}
       <section className="section">
         <div className="container grid gap-14 lg:grid-cols-12">
-          <div className="prose-mn lg:col-span-7" data-reveal>
-            <h2 className="h-display mb-8 text-4xl text-ink-700 md:text-5xl">{p.whatTitle}</h2>
-            {s.body.map((x) => (
-              <p key={x.slice(0, 24)}>{x}</p>
-            ))}
+          <div className="lg:col-span-7">
+            <div className="crop rounded-2xl bg-steel-100 p-8 md:p-10" data-reveal>
+              <p className="eyebrow">{p.problemEyebrow}</p>
+              <p className="mt-5 font-display text-2xl font-bold leading-snug text-ink-700 md:text-3xl">{s.problem}</p>
+            </div>
+            <h2 className="h-display mt-14 text-4xl text-ink-700 md:text-5xl" data-reveal>
+              {p.approachTitle}
+            </h2>
+            <ol className="mt-8 space-y-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10">
+              {s.approach.map((x, i) => (
+                <li key={x} data-reveal style={{ ["--d" as string]: `${i * 80}ms` }} className="flex gap-5 bg-white p-6">
+                  <span className="font-mono text-sm text-brand">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="text-[16px] leading-relaxed text-ink-700/85">{x}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-14 grid gap-5 sm:grid-cols-2">
+              <div data-reveal>
+                <h3 className="font-display text-xl font-bold uppercase text-ink-700">{p.deliverablesTitle}</h3>
+                <ul className="mt-4 space-y-3">
+                  {s.deliverables.map((x) => (
+                    <li key={x} className="flex gap-3 text-[15px] text-ink-700">
+                      <Icon name="check" className="mt-0.5 h-5 w-5 shrink-0 text-brand" /> {x}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div data-reveal style={{ ["--d" as string]: "100ms" }}>
+                <h3 className="font-display text-xl font-bold uppercase text-ink-700">{p.typicalTitle}</h3>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {s.typical.map((x) => (
+                    <span key={x} className="rounded-full border border-ink-700/15 bg-white px-3.5 py-1.5 text-[13px] text-ink-700">
+                      {x}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
           <aside className="lg:col-span-5">
-            <div className="sticky top-28 rounded-2xl border border-ink-700/10 bg-steel-100 p-8" data-reveal>
-              <p className="eyebrow">{p.summary}</p>
-              <ul className="mt-6 space-y-4">
+            <div className="sticky top-28 rounded-2xl border border-ink-700/10 bg-white p-8 shadow-[0_30px_60px_-40px_rgba(39,36,37,.35)]" data-reveal>
+              <p className="eyebrow">{p.paramsTitle}</p>
+              <dl className="mt-6 divide-y divide-ink-700/10 border-y border-ink-700/10">
                 {s.bullets.map((b) => (
-                  <li key={b} className="flex gap-3 text-[15px] text-ink-700">
-                    <Icon name="check" className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+                  <div key={b} className="flex gap-3 py-3 text-[15px] text-ink-700">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-brand" />
                     {b}
-                  </li>
+                  </div>
                 ))}
-              </ul>
-              <div className="mt-8 rounded-xl bg-white p-5">
+              </dl>
+              <div className="mt-6 rounded-xl bg-steel-100 p-5">
                 <p className="text-[13px] text-ink-700/60">{p.assessedBy}</p>
                 <p className="mt-1 font-semibold text-ink-700">
                   {TECH.name}, {techRole}
@@ -187,14 +223,46 @@ export function MachineryView({ locale }: P) {
   const t = getDict(locale);
   const p = t.pages.machinery;
   const crumbs = [{ name: t.nav.machinery, path: href(locale, "machinery") }];
+  const names = Object.fromEntries(MACHINES.map((m) => [m.id, t.machineNames[m.id] ?? m.name]));
   return (
     <>
       <PageHero locale={locale} eyebrow={p.eyebrow} crumbs={crumbs} title={p.title} lead={p.lead} sheet="03" />
-      <section className="relative overflow-hidden bg-steel-100 py-20">
-        <div className="container relative">
-          <MachinesGrid locale={locale} />
+
+      <section className="border-y border-ink-700/10 bg-white py-16">
+        <div className="container">
+          <p className="eyebrow">{p.envelopeEyebrow}</p>
+          <h2 className="h-display mt-4 text-3xl text-ink-700 md:text-5xl">{p.envelopeTitle}</h2>
+          <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 md:grid-cols-3 lg:grid-cols-6">
+            {p.envelope.map((x, i) => (
+              <div key={x.l} className="bg-white p-6" data-reveal style={{ ["--d" as string]: `${i * 70}ms` }}>
+                <dt className="font-display text-2xl font-bold text-ink-700 md:text-3xl">{x.v}</dt>
+                <div className="dim mt-3 text-brand" />
+                <dd className="mt-3 text-[13px] leading-snug text-ink-700/55">{x.l}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
+
+      <section className="section paper relative overflow-hidden" id="vejde-se">
+        <div className="bg-grid-light absolute inset-0" />
+        <div className="container relative">
+          <SectionHeading eyebrow={p.fitEyebrow} title={p.fitTitle} lead={p.fitLead} />
+          <div className="mt-12" data-reveal>
+            <FitChecker t={p} names={names} rfqHref={href(locale, "rfq")} />
+          </div>
+        </div>
+      </section>
+
+      <section className="section bg-steel-100">
+        <div className="container">
+          <SectionHeading eyebrow={p.parkEyebrow} title={p.parkTitle} />
+          <div className="mt-12">
+            <MachinesGrid locale={locale} />
+          </div>
+        </div>
+      </section>
+
       <section className="section">
         <div className="container grid gap-12 md:grid-cols-2">
           <div data-reveal>
@@ -280,9 +348,14 @@ export function ReferencesView({ locale }: P) {
       <PageHero locale={locale} eyebrow={p.eyebrow} crumbs={crumbs} title={p.title} lead={p.lead} sheet="05" />
       <section className="section">
         <div className="container">
-          <SectionHeading eyebrow={p.industriesEyebrow} title={p.industriesTitle} />
+          <ReferencesBlock locale={locale} />
+        </div>
+      </section>
+      <section className="section bg-steel-100">
+        <div className="container">
+          <SectionHeading eyebrow={t.home.galleryEyebrow} title={t.home.galleryTitle} lead={t.home.galleryLead} />
           <div className="mt-12">
-            <ReferencesBlock locale={locale} />
+            <Gallery items={GALLERY} alt={t.home.galleryAlt} />
           </div>
         </div>
       </section>

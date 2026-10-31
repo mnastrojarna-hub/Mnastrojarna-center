@@ -66,6 +66,8 @@ export function RfqForm({ locale, t, v, sales, privacyHref, homeHref }: { locale
   useEffect(() => {
     const s = params.get("sluzba");
     if (s && (NEED_IDS as string[]).includes(s)) setLead((l) => (l.needs.includes(s) ? l : { ...l, needs: [s] }));
+    const popis = params.get("popis");
+    if (popis) setLead((l) => (l.description ? l : { ...l, description: popis.slice(0, 500) + "\n" }));
     const handed = takeHandoffFiles();
     if (handed.length) setFiles(handed);
   }, [params]);

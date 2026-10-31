@@ -3,12 +3,13 @@ import Link from "next/link";
 import { CtaBand, FaqList, FitBlock, MachineCard, ProcessSteps, ReferencesBlock, SectionHeading, ServicesGrid, TeamGrid } from "@/components/blocks";
 import { Counter } from "@/components/counter";
 import { DowntimeCalc } from "@/components/downtime-calc";
+import { Gallery } from "@/components/gallery";
 import { HeroSheet } from "@/components/hero-sheet";
 import { Icon } from "@/components/icons";
 import { JsonLd } from "@/components/json-ld";
 import { MachiningStory } from "@/components/machining-story";
 import { getDict } from "@/content";
-import { SITE } from "@/content/site";
+import { GALLERY, SITE } from "@/content/site";
 import { href, type Locale } from "@/i18n/config";
 import { faqJsonLd, pageMeta } from "@/lib/seo";
 
@@ -144,8 +145,18 @@ export function HomeView({ locale }: { locale: Locale }) {
         </div>
       </section>
 
+      {/* ---------- Z NAŠÍ VÝROBY ---------- */}
+      <section className="section bg-steel-100">
+        <div className="container">
+          <SectionHeading eyebrow={h.galleryEyebrow} title={h.galleryTitle} lead={h.galleryLead} />
+          <div className="mt-12">
+            <Gallery items={GALLERY} alt={h.galleryAlt} limit={10} />
+          </div>
+        </div>
+      </section>
+
       {/* ---------- ONLINE CAD ---------- */}
-      <section className="section relative overflow-hidden bg-steel-100">
+      <section className="section relative overflow-hidden">
         <div className="bg-grid-light absolute inset-0 opacity-70" />
         <div className="container relative grid items-center gap-14 lg:grid-cols-12">
           <div className="lg:col-span-5">
@@ -189,7 +200,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- PROCES ---------- */}
-      <section className="section">
+      <section className="section bg-steel-100">
         <div className="container">
           <SectionHeading eyebrow={h.processEyebrow} title={h.processTitle} lead={h.processLead} />
           <div className="mt-16">
@@ -199,7 +210,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- STROJOVÝ PARK ---------- */}
-      <section className="section bg-steel-100">
+      <section className="section">
         <div className="container">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <SectionHeading eyebrow={h.machinesEyebrow} title={h.machinesTitle} lead={h.machinesLead} />
@@ -215,7 +226,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- ODVĚTVÍ ---------- */}
-      <section className="section">
+      <section className="section bg-steel-100">
         <div className="container">
           <SectionHeading eyebrow={h.industriesEyebrow} title={h.industriesTitle} lead={h.industriesLead} />
           <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 md:grid-cols-2 lg:grid-cols-3">
@@ -232,7 +243,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- O FIRMĚ ---------- */}
-      <section className="section bg-steel-100">
+      <section className="section">
         <div className="container grid items-center gap-14 lg:grid-cols-2">
           <div data-reveal className="relative">
             <div className="crop p-4">
@@ -264,7 +275,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- TÝM ---------- */}
-      <section className="section">
+      <section className="section bg-steel-100">
         <div className="container">
           <SectionHeading eyebrow={h.teamEyebrow} title={h.teamTitle} lead={h.teamLead} />
           <div className="mt-14">
@@ -274,7 +285,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- PRO KOHO ---------- */}
-      <section className="section bg-steel-100">
+      <section className="section">
         <div className="container">
           <SectionHeading eyebrow={h.fitEyebrow} title={h.fitTitle} />
           <div className="mt-12">
@@ -284,7 +295,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ---------- FAQ ---------- */}
-      <section className="section">
+      <section className="section bg-steel-100">
         <div className="container grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <SectionHeading eyebrow="FAQ" title={h.faqTitle} lead={h.faqLead} />

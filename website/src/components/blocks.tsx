@@ -291,27 +291,37 @@ export function FitBlock({ locale }: { locale: Locale }) {
   );
 }
 
-/** Reference: loga a případové studie (jen schválené), jinak „reference na vyžádání“ + obory. */
+function LogoTile({ client, logo }: { client: string; logo: string }) {
+  return (
+    <div className="group relative grid h-28 place-items-center bg-white p-5 transition-colors duration-500 hover:bg-[#fffaf9]" title={client}>
+      <Image src={logo} alt={client} fill sizes="(min-width:1024px) 16vw, 45vw" className="object-contain p-7 opacity-60 grayscale transition duration-500 group-hover:opacity-100 group-hover:grayscale-0" />
+    </div>
+  );
+}
+
+/** Reference: logostěna zákazníků, partneři (školy), případové studie, obory a „reference na vyžádání“. */
 export function ReferencesBlock({ locale, compact }: { locale: Locale; compact?: boolean }) {
   const t = getDict(locale);
   const r = t.pages.references;
-  const withLogo = REFERENCES.filter((x) => x.logo);
+  const clients = REFERENCES.filter((x) => x.kind === "client" && x.logo);
+  const partners = REFERENCES.filter((x) => x.kind === "partner" && x.logo);
   const cases = REFERENCES.filter((x) => x.text?.[locale]);
+  const wall = (
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 sm:grid-cols-4 lg:grid-cols-8" data-reveal>
+      {clients.map((x) => (
+        <LogoTile key={x.id} client={x.client} logo={x.logo!} />
+      ))}
+    </div>
+  );
+  if (compact) return wall;
   return (
-    <div className="space-y-12">
-      {withLogo.length > 0 && (
-        <div data-reveal>
-          <p className="eyebrow">{r.clientsTitle}</p>
-          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 sm:grid-cols-3 lg:grid-cols-6">
-            {withLogo.map((x) => (
-              <div key={x.id} className="relative grid h-28 place-items-center bg-white p-6">
-                <Image src={x.logo!} alt={x.client} fill sizes="200px" className="object-contain p-6 opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {!compact && cases.length > 0 && (
+    <div className="space-y-16">
+      <div>
+        <SectionHeading eyebrow={r.clientsEyebrow} title={r.clientsTitle} lead={r.clientsLead} />
+        <div className="mt-10">{wall}</div>
+      </div>
+
+      {cases.length > 0 && (
         <div className="grid gap-5 md:grid-cols-2">
           {cases.map((x, i) => {
             const c = x.text![locale]!;
@@ -325,7 +335,7 @@ export function ReferencesBlock({ locale, compact }: { locale: Locale; compact?:
                 <p className="mt-3 text-[15px] leading-relaxed text-ink-700/65">{c.summary}</p>
                 {c.result && <p className="mt-4 border-t border-ink-700/10 pt-4 text-[14px] font-medium text-ink-700">{c.result}</p>}
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {x.services.map((s) => (
+                  {(x.services ?? []).map((s) => (
                     <Link key={s} href={href(locale, "service", s)} className="rounded-full border border-ink-700/15 px-3 py-1 text-[12px] text-ink-700/70 hover:border-brand hover:text-brand">
                       {t.services[s].title}
                     </Link>
@@ -336,27 +346,45 @@ export function ReferencesBlock({ locale, compact }: { locale: Locale; compact?:
           })}
         </div>
       )}
-      <div className="grid gap-5 lg:grid-cols-5">
-        <div className="grid gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 sm:grid-cols-2 lg:col-span-3" data-reveal>
-          {t.industries.map((x, i) => (
-            <div key={x.t} className="bg-white p-6">
-              <span className="font-mono text-[11px] text-brand">{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="mt-2 font-display text-lg font-bold uppercase text-ink-700">{x.t}</h3>
-              {!compact && <p className="mt-1 text-[14px] leading-relaxed text-ink-700/60">{x.d}</p>}
-            </div>
-          ))}
-        </div>
-        <div className="crop flex flex-col justify-between rounded-2xl bg-white p-8 lg:col-span-2" data-reveal style={{ ["--d" as string]: "120ms" }}>
-          <div>
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand/10 text-brand">
-              <Icon name="lock" />
-            </span>
-            <h3 className="mt-5 font-display text-2xl font-bold uppercase text-ink-700">{r.onRequestTitle}</h3>
-            <p className="mt-3 text-[15px] leading-relaxed text-ink-700/65">{r.onRequestText}</p>
+
+      {partners.length > 0 && (
+        <div className="grid items-center gap-8 rounded-2xl border border-ink-700/10 bg-white p-8 md:grid-cols-5" data-reveal>
+          <div className="md:col-span-3">
+            <h3 className="font-display text-2xl font-bold uppercase text-ink-700">{r.partnersTitle}</h3>
+            <p className="mt-2 text-[15px] text-ink-700/65">{r.partnersLead}</p>
           </div>
-          <a href={`mailto:${SALES.email}?subject=${encodeURIComponent(r.onRequestSubject)}`} className="btn-primary mt-8 self-start">
-            {r.onRequestCta} <Icon name="arrow" className="h-4 w-4" />
-          </a>
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-ink-700/10 bg-ink-700/10 md:col-span-2">
+            {partners.map((x) => (
+              <LogoTile key={x.id} client={x.client} logo={x.logo!} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <SectionHeading eyebrow={r.industriesEyebrow} title={r.industriesTitle} />
+        <div className="mt-10 grid gap-5 lg:grid-cols-5">
+          <div className="grid gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 sm:grid-cols-2 lg:col-span-3" data-reveal>
+            {t.industries.map((x, i) => (
+              <div key={x.t} className="bg-white p-6">
+                <span className="font-mono text-[11px] text-brand">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="mt-2 font-display text-lg font-bold uppercase text-ink-700">{x.t}</h3>
+                <p className="mt-1 text-[14px] leading-relaxed text-ink-700/60">{x.d}</p>
+              </div>
+            ))}
+          </div>
+          <div className="crop flex flex-col justify-between rounded-2xl bg-white p-8 lg:col-span-2" data-reveal style={{ ["--d" as string]: "120ms" }}>
+            <div>
+              <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand/10 text-brand">
+                <Icon name="lock" />
+              </span>
+              <h3 className="mt-5 font-display text-2xl font-bold uppercase text-ink-700">{r.onRequestTitle}</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink-700/65">{r.onRequestText}</p>
+            </div>
+            <a href={`mailto:${SALES.email}?subject=${encodeURIComponent(r.onRequestSubject)}`} className="btn-primary mt-8 self-start">
+              {r.onRequestCta} <Icon name="arrow" className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

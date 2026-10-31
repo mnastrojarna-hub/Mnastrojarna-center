@@ -61,17 +61,59 @@ export const MACHINES: { id: string; name: string; image?: string }[] = [
 ];
 
 /**
- * REFERENCE — doplňte jen se souhlasem klienta. Dokud je pole prázdné, web zobrazí
- * „reference na vyžádání“ a obory, ve kterých pracujeme (žádné vymyšlené údaje).
- * logo: cesta v public/references/*.svg|png (volitelné)
+ * REFERENCE — převzaté ze stávajícího webu mnastrojarna.cz (loga v public/references/).
+ * kind "client" = zákazník, "partner" = spolupráce se školami / výzkumem.
+ * Případovou studii doplňte do `text` (jen se souhlasem klienta) — zobrazí se na stránce Reference.
  */
 export type Reference = {
   id: string;
   client: string;
+  kind: "client" | "partner";
   logo?: string;
   country?: string;
-  services: ServiceId[];
-  /** krátký popis případové studie ve všech jazycích */
+  services?: ServiceId[];
   text?: Partial<Record<Locale, { title: string; summary: string; result?: string }>>;
 };
-export const REFERENCES: Reference[] = [];
+
+const ref = (id: string, client: string, kind: Reference["kind"] = "client"): Reference => ({ id, client, kind, logo: `/references/${id}.jpg` });
+
+export const REFERENCES: Reference[] = [
+  ref("bosch-powertrain", "Bosch Powertrain s.r.o."),
+  ref("rimowa", "RIMOWA GmbH"),
+  ref("valeo-compressors", "Valeo Compressors"),
+  ref("edscha", "Edscha"),
+  ref("kompaflex", "kompaflex ag"),
+  ref("wohler-bohemia", "Wöhler Bohemia s.r.o."),
+  ref("brisk", "BRISK"),
+  ref("hofmeister", "HOFMEISTER s.r.o."),
+  ref("triapex", "Triapex s.r.o."),
+  ref("mp-dims", "MP DIMS a.s."),
+  ref("belis", "BELIS a.s."),
+  ref("modia", "Modia a.s."),
+  ref("fia-proteam", "FIA ProTeam s.r.o."),
+  ref("auttec", "AUTTEC s.r.o."),
+  ref("vsp-kovo", "VSP Kovo"),
+  ref("hranipex", "Hranipex"),
+  ref("vut-brno", "Vysoké učení technické v Brně", "partner"),
+  ref("sps-pelhrimov", "SPŠ a SOU Pelhřimov", "partner"),
+];
+
+/** Fotografie skutečných zakázek — výběr z archivu zakázek (src/content/cases.ts). */
+export const GALLERY: { src: string; w: number; h: number }[] = [
+  ["rotory-s-drazkami/1", 1200, 900],
+  ["paletove-upinaci-pripravky/1", 1200, 900],
+  ["paprskove-kolo-a-pouzdro/1", 1200, 900],
+  ["hrebenova-deska-a-pouzdro/2", 1200, 675],
+  ["presne-male-dily/1", 1200, 675],
+  ["desky-skorepiny-a-mereni/1", 1200, 900],
+  ["presne-male-dily/2", 1200, 675],
+  ["dily-podle-vykresu/1", 1200, 720],
+  ["paprskove-kolo-a-pouzdro/2", 1200, 900],
+  ["paletove-upinaci-pripravky/4", 1200, 900],
+  ["tvarove-slozita-skrin/1", 1200, 900],
+  ["pripravky-s-pneumatikou/2", 1200, 900],
+  ["desky-skorepiny-a-mereni/2", 1200, 900],
+  ["upinaci-pripravek-2015/1", 1200, 720],
+  ["paletove-upinaci-pripravky/6", 1200, 900],
+  ["dily-podle-vykresu/2", 1200, 720],
+].map(([p, w, h]) => ({ src: `/img/zakazky/${p}.jpg`, w: w as number, h: h as number }));
