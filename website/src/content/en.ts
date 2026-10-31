@@ -154,9 +154,9 @@ export const en: Dict = {
   services: {
     "cnc-obrabeni": {
       title: "CNC machining",
-      short: "Milled and turned parts from prototype to repeat series – delivered finished, heat-treated and inspected.",
+      short: "Milled and turned parts from prototype to repeat small batches (1–99 pcs) – delivered finished, heat-treated and inspected.",
       seoTitle: "Contract CNC Machining – Milling and Turning",
-      seoDescription: "Contract CNC milling and turning of one-off and series parts up to Ø 1,000 mm. Finished parts including heat treatment and surface finishing, ISO 9001.",
+      seoDescription: "Contract CNC milling and turning of one-off and small-batch parts (1–99 pcs) up to Ø 1,000 mm. Finished parts including heat treatment and surface finishing, ISO 9001.",
       lead: "Send us a drawing, receive a finished part. Machined, heat-treated, surface-finished and inspected – with no other suppliers to coordinate.",
       problem: "A machined part often travels between the machine shop, the heat-treatment plant and the plating shop. Every transfer adds days, transport costs and the question of who is responsible when something doesn't fit.",
       approach: [
@@ -461,7 +461,7 @@ export const en: Dict = {
     whyLead: "You make nappies, packaging, panels or food – not shafts. Yet every shift you run depends on precision parts. We are the machine shop you don't need to have: design, manufacturing, inspection and stock under one roof.",
     servicesEyebrow: "Services",
     servicesTitle: "From drawing to finished machine",
-    servicesLead: "One-off and series production, tooling, prototypes and complete machines. Everything a manufacturer needs from an engineering partner.",
+    servicesLead: "One-off and small-batch production (1–99 pcs), spare parts, fixtures, tooling, prototypes and complete machines. Everything a manufacturer without its own machine shop needs from a partner for maintenance and development.",
     cadEyebrow: "For design engineers · free",
     cadTitle: "Mnástrojárna *CAD*",
     cadLead: "A fully-fledged parametric 3D/2D CAD right in your browser. Draw a part, edit it in the feature tree, generate a drawing and save STEP or DXF to your computer. No installation, no registration.",

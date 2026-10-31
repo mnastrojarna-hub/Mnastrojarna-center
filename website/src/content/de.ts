@@ -156,7 +156,7 @@ export const de: Dict = {
       title: "CNC-Bearbeitung",
       short: "Gefräste und gedrehte Teile vom Prototyp bis zur Wiederholserie – komplett geliefert, wärmebehandelt und vermessen.",
       seoTitle: "CNC-Bearbeitung in Lohnfertigung – Fräsen und Drehen",
-      seoDescription: "CNC-Fräsen und -Drehen in Lohnfertigung: Einzel- und Serienteile bis Ø 1.000 mm. Fertige Teile inkl. Wärme- und Oberflächenbehandlung, ISO 9001.",
+      seoDescription: "CNC-Fräsen und -Drehen in Lohnfertigung: Einzel- und Kleinserienteile (1–99 Stück) bis Ø 1.000 mm. Fertige Teile inkl. Wärme- und Oberflächenbehandlung, ISO 9001.",
       lead: "Sie senden die Zeichnung, Sie erhalten das fertige Teil. Zerspant, wärmebehandelt, oberflächenbehandelt und geprüft – ohne dass Sie weitere Lieferanten koordinieren müssen.",
       problem: "Ein zerspantes Teil wandert oft zwischen Zerspanungsbetrieb, Härterei und Galvanik hin und her. Jeder Transport kostet Tage und Frachtkosten – und wirft die Frage auf, wer verantwortlich ist, wenn etwas nicht passt.",
       approach: [
@@ -468,7 +468,7 @@ export const de: Dict = {
     whyLead: "Sie produzieren Windeln, Verpackungen, Platten oder Lebensmittel – keine Wellen. Und doch hängt jede Ihrer Schichten von Präzisionsteilen ab. Wir sind der Maschinenbau, den Sie nicht selbst vorhalten müssen: Konstruktion, Fertigung, Prüfung und Lager unter einem Dach.",
     servicesEyebrow: "Leistungen",
     servicesTitle: "Von der Zeichnung bis zur fertigen Maschine",
-    servicesLead: "Einzel- und Serienfertigung, Werkzeuge, Prototypen und komplette Maschinen. Alles, was ein Produktionsunternehmen von seinem Partner im Maschinenbau braucht.",
+    servicesLead: "Einzel- und Kleinserienfertigung (1–99 Stück), Ersatzteile, Vorrichtungen, Werkzeuge, Prototypen und komplette Maschinen. Alles, was ein Produktionsunternehmen ohne eigene Zerspanung von seinem Partner für Instandhaltung und Entwicklung braucht.",
     cadEyebrow: "Für Konstrukteure · kostenlos",
     cadTitle: "Mnástrojárna *CAD*",
     cadLead: "Vollwertiges parametrisches 3D/2D-CAD direkt im Browser. Zeichnen Sie ein Teil, bearbeiten Sie es im Feature-Baum, erzeugen Sie eine Zeichnung und speichern Sie STEP oder DXF auf Ihrem Rechner. Ohne Installation, ohne Registrierung.",

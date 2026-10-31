@@ -166,9 +166,9 @@ export const cs = {
   services: {
     "cnc-obrabeni": {
       title: "CNC obrábění",
-      short: "Frézované a soustružené díly od prototypu po opakované série – dodané hotové, tepelně zpracované a změřené.",
+      short: "Frézované a soustružené díly od prototypu po opakované malé série (1–99 ks) – dodané hotové, tepelně zpracované a změřené.",
       seoTitle: "CNC obrábění na zakázku – frézování a soustružení",
-      seoDescription: "Zakázkové CNC frézování a soustružení kusových i sériových dílů do Ø 1 000 mm. Hotové díly včetně tepelného zpracování a povrchových úprav, ISO 9001.",
+      seoDescription: "Zakázkové CNC frézování a soustružení kusových a malosériových dílů (1–99 ks) do Ø 1 000 mm. Hotové díly včetně tepelného zpracování a povrchových úprav, ISO 9001.",
       lead: "Pošlete výkres, dostanete hotový díl. Obrobený, tepelně zpracovaný, s povrchovou úpravou a zkontrolovaný – bez koordinace dalších dodavatelů.",
       problem: "Obráběný díl často putuje mezi obrobnou, kalírnou a galvanovnou. Každý přesun přidává dny, náklady na dopravu a otázku, kdo nese odpovědnost, když něco nesedí.",
       approach: [
@@ -437,7 +437,7 @@ export const cs = {
     whyLead: "Vyrábíte pleny, obaly, desky nebo potraviny – ne hřídele. Přesto na přesných dílech závisí každá vaše směna. My jsme strojírna, kterou nemusíte mít: konstrukce, výroba, kontrola i sklad pod jednou střechou.",
     servicesEyebrow: "Služby",
     servicesTitle: "Od výkresu po hotový stroj",
-    servicesLead: "Kusová i sériová výroba, nástroje, prototypy a celé stroje. Vše, co výrobní firma potřebuje od strojírenského partnera.",
+    servicesLead: "Kusová a malosériová výroba 1–99 ks, náhradní díly, přípravky, nástroje, prototypy a celé stroje. Vše, co výrobní firma bez vlastní strojírny potřebuje od partnera pro údržbu a vývoj.",
     cadEyebrow: "Pro konstruktéry · zdarma",
     cadTitle: "Mnástrojárna *CAD*",
     cadLead: "Plnohodnotný parametrický 3D/2D CAD přímo v prohlížeči. Nakreslete díl, upravte ho ve stromu prvků, vygenerujte výkres a uložte si STEP nebo DXF do počítače. Bez instalace, bez registrace.",
