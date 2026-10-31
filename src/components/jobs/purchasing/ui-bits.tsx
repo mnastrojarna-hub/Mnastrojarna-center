@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import { PURCHASE_ORDER_STATUS_META } from "@/lib/jobs/purchasing";
 import { cn } from "@/lib/utils";
+import { hasFileViewer, openFileViewer } from "@/components/file-viewer/viewer-bus";
 
 /** Dialog přes celou obrazovku na mobilu, na počítači velký uprostřed. */
 export const FULLSCREEN_DIALOG =
@@ -75,9 +76,13 @@ export function SectionTitle({
   );
 }
 
-/** Otevře PDF z odpovědi (náhled návrhu) v nové záložce; okno se otevře hned kvůli blokování vyskakovacích oken. */
+/**
+ * Otevře PDF z odpovědi (náhled návrhu) v prohlížeči dokumentů aplikace (s tlačítkem Zpět, i na telefonu);
+ * mimo aplikaci v nové záložce — ta se otevře hned kvůli blokování vyskakovacích oken.
+ */
 export async function openPdfPreview(url: string, body: unknown): Promise<string | null> {
-  const win = typeof window !== "undefined" ? window.open("", "_blank") : null;
+  const inApp = hasFileViewer();
+  const win = !inApp && typeof window !== "undefined" ? window.open("", "_blank") : null;
   try {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!res.ok) {
@@ -92,6 +97,7 @@ export async function openPdfPreview(url: string, body: unknown): Promise<string
       return msg;
     }
     const blob = await res.blob();
+    if (inApp && openFileViewer({ href: url, blob: new Blob([blob], { type: "application/pdf" }), filename: "nahled-objednavky.pdf" })) return null;
     const href = URL.createObjectURL(blob);
     if (win) win.location.href = href;
     else {

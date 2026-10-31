@@ -33,3 +33,6 @@ yarn-error.log*
 # runtime konfigurace z průvodce nastavením
 /data/
 .local-supabase/
+
+# OpenCascade pro prohlížeč 3D (kopíruje tools/vendor-occt.mjs)
+/public/vendor/
