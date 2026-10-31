@@ -24,7 +24,7 @@ export type DisplayMode = "shaded-edges" | "shaded" | "wireframe" | "xray";
 export type Tool = "select" | MeasureMode;
 export type StdView = "front" | "back" | "left" | "right" | "top" | "bottom" | "iso";
 export type ChangeKind =
-  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity";
+  | "selection" | "visibility" | "history" | "measures" | "tool" | "display" | "snap" | "pending" | "filter" | "section" | "entity" | "colors";
 
 /** Výběrový filtr jako v ZW3D — co se vybírá / na co se uchopuje. */
 export type PickFilter = "auto" | "shape" | "part" | "assembly" | "face" | "edge" | "vertex" | "center" | "midpoint";
@@ -51,6 +51,8 @@ export interface EntityInfo {
   part: number;
   /** Rovinná plocha → jde z ní udělat řez. */
   plane?: { normal: Vec3; point: Vec3 };
+  /** Index plochy (barva plochy). */
+  face?: number;
 }
 
 /** Stav řezu pro panel. */
@@ -80,6 +82,8 @@ export interface ContextRequest {
   clientY: number;
   /** Rovinná plocha pod kurzorem (nabídka „Řez touto plochou"). */
   facePlane?: { normal: Vec3; point: Vec3; part: number } | null;
+  /** Plocha pod kurzorem (barva plochy). */
+  face?: { part: number; index: number } | null;
 }
 
 export interface SnapState {
@@ -102,12 +106,26 @@ interface PartView {
   sphere: THREE.Sphere;
   faceTris?: { start: Uint32Array; tris: Uint32Array };
   info?: PartInfo;
+  /** Barva ze souboru (lineární) a barvy ploch ze souboru (barvy vrcholů) — pro „Původní barvy". */
+  origColor: THREE.Color | null;
+  origVC: Float32Array | null;
+  opacity: number;
+  /** Uživatelská barva dílu (sRGB hex) a barvy ploch (plocha → hex). */
+  colorOverride: number | null;
+  faceColors: Map<number, number>;
 }
 
 interface Snapshot {
   hidden: Uint8Array;
   measures: Measurement[];
+  colors: { over: (number | null)[]; faces: [number, [number, number][]][] };
 }
+
+/** Paleta pro barvy dílů / ploch (sRGB) — dobře rozlišitelné odstíny jako v CAD. */
+export const COLOR_PALETTE = [
+  0x4f81bd, 0xc0504d, 0x9bbb59, 0xf79646, 0x8064a2, 0x4bacc6, 0xf2c314, 0x2e8b57,
+  0xd16ba5, 0x8c564b, 0x17becf, 0xbcbd22, 0xa9c4e8, 0xe03930, 0x7f7f7f, 0x272425,
+];
 
 const DEFAULT_COLOR = new THREE.Color(0.72, 0.75, 0.79);
 const SELECT_COLOR = 0xff9f1a;
@@ -164,6 +182,7 @@ export class ViewerEngine {
     polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
   private hoverMaterials = new Map<THREE.Material, THREE.Material>();
+  private selMaterials = new Map<THREE.Material, THREE.Material>();
   private raycaster = new THREE.Raycaster();
 
   private display: DisplayMode = "shaded-edges";
@@ -284,6 +303,7 @@ export class ViewerEngine {
     this.cube.dispose();
     for (const m of this.materials.values()) m.dispose();
     for (const m of this.hoverMaterials.values()) m.dispose();
+    for (const m of this.selMaterials.values()) m.dispose();
     this.selMaterial.dispose();
     this.edgeMaterial.dispose();
     this.edgeSelMaterial.dispose();
@@ -360,6 +380,7 @@ export class ViewerEngine {
 
       // barvy ploch (STEP s barevnými plochami) → barvy vrcholů
       let vertexColors = false;
+      let origVC: Float32Array | null = null;
       const base = part.color ? new THREE.Color(part.color[0], part.color[1], part.color[2]) : null;
       const faceColors = part.faces?.filter((f) => f.color) ?? [];
       if (faceColors.length && part.indices) {
@@ -392,6 +413,7 @@ export class ViewerEngine {
             col[i * 3 + 2] = tmp.b;
           }
           g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+          origVC = col.slice();
           vertexColors = true;
         }
       }
@@ -429,6 +451,7 @@ export class ViewerEngine {
         index, name: part.name, mesh, edges, wires,
         topo: topo ?? { edgeSegments: new Float32Array(0), curves: [], segCurve: new Uint32Array(0), corners: new Float32Array(0), triFace: new Uint32Array(0), faces: [] },
         baseMaterial: mat, hidden: false, box, sphere: box.getBoundingSphere(new THREE.Sphere()),
+        origColor: baseColor, origVC, opacity: part.opacity ?? 1, colorOverride: null, faceColors: new Map(),
       });
     });
 
@@ -841,7 +864,7 @@ export class ViewerEngine {
   private applyClipping() {
     const planes = this.clipPlane ? [this.clipPlane] : null;
     const all: THREE.Material[] = [
-      ...this.materials.values(), ...this.hoverMaterials.values(), this.selMaterial, this.edgeMaterial, this.edgeSelMaterial,
+      ...this.materials.values(), ...this.hoverMaterials.values(), ...this.selMaterials.values(), this.selMaterial, this.edgeMaterial, this.edgeSelMaterial,
       this.stencilBack, this.stencilFront,
     ];
     for (const m of all) {
@@ -854,6 +877,7 @@ export class ViewerEngine {
   private applyDisplay() {
     for (const m of this.materials.values()) this.applyDisplayToMaterial(m);
     for (const m of this.hoverMaterials.values()) this.applyDisplayToMaterial(m);
+    for (const m of this.selMaterials.values()) this.applyDisplayToMaterial(m);
     this.selMaterial.userData.baseOpacity = 1;
     this.applyDisplayToMaterial(this.selMaterial);
     for (const p of this.parts) this.applyPartState(p);
@@ -870,21 +894,26 @@ export class ViewerEngine {
     }
     if (p.wires) p.wires.visible = !p.hidden;
     let mat = p.baseMaterial;
-    if (this.selection.has(p.index)) mat = this.selMaterial;
+    // výběr = barva dílu se zvýrazněním (vidět i změnu barvy), ne plná oranžová
+    if (this.selection.has(p.index)) mat = this.tintMaterial(p.baseMaterial, this.selMaterials, 0x8a4600);
     else if (this.hoverPart === p.index && this.tool === "select") mat = this.hoverMaterial(p.baseMaterial);
     p.mesh.material = mat;
   }
 
   private hoverMaterial(base: THREE.Material): THREE.Material {
-    let m = this.hoverMaterials.get(base);
+    return this.tintMaterial(base, this.hoverMaterials, 0x3a2a10);
+  }
+
+  private tintMaterial(base: THREE.Material, cache: Map<THREE.Material, THREE.Material>, emissive: number): THREE.Material {
+    let m = cache.get(base);
     if (!m) {
       const c = (base as THREE.MeshPhongMaterial).clone();
-      c.emissive = new THREE.Color(0x3a2a10);
+      c.emissive = new THREE.Color(emissive);
       c.clippingPlanes = this.clipPlane ? [this.clipPlane] : null;
       c.userData.baseOpacity = base.userData.baseOpacity;
       this.applyDisplayToMaterial(c);
       m = c;
-      this.hoverMaterials.set(base, m);
+      cache.set(base, m);
     }
     return m;
   }
@@ -919,7 +948,14 @@ export class ViewerEngine {
   // ------------------------------------------------------------------ historie (zpět / vpřed)
 
   private snapshot(): Snapshot {
-    return { hidden: Uint8Array.from(this.parts.map((p) => (p.hidden ? 1 : 0))), measures: [...this.measures] };
+    return {
+      hidden: Uint8Array.from(this.parts.map((p) => (p.hidden ? 1 : 0))),
+      measures: [...this.measures],
+      colors: {
+        over: this.parts.map((p) => p.colorOverride),
+        faces: this.parts.filter((p) => p.faceColors.size).map((p) => [p.index, [...p.faceColors.entries()]]),
+      },
+    };
   }
 
   private commit(before: Snapshot) {
@@ -930,15 +966,25 @@ export class ViewerEngine {
   }
 
   private restore(s: Snapshot) {
+    const faces = new Map(s.colors.faces.map(([i, list]) => [i, list]));
     this.parts.forEach((p, i) => {
       p.hidden = !!s.hidden[i];
       if (p.hidden) this.selection.delete(i);
+      const over = s.colors.over[i] ?? null;
+      const fc = faces.get(i) ?? [];
+      const sameFaces = fc.length === p.faceColors.size && fc.every(([f, c]) => p.faceColors.get(f) === c);
+      if (over !== p.colorOverride || !sameFaces) {
+        p.colorOverride = over;
+        p.faceColors = new Map(fc);
+        this.applyColors(p);
+      }
       this.applyPartState(p);
     });
     this.measures = [...s.measures];
     this.syncMeasureObjects();
     if (this.section) this.rebuildSection(true);
     this.requestRender();
+    this.onChange("colors");
     this.onChange("visibility");
     this.onChange("selection");
     this.onChange("measures");
@@ -1552,12 +1598,15 @@ export class ViewerEngine {
       this.select(this.filter === "shape" ? [hit.part] : this.filter === "assembly" ? this.assemblyGroup(hit.part) : this.partGroup(hit.part));
     }
     let facePlane: ContextRequest["facePlane"] = null;
+    let face: ContextRequest["face"] = null;
     if (hit && !hit.cap) {
       const p = this.parts[hit.part];
-      const f = p.topo.faces[p.topo.triFace[hit.tri]];
+      const fi = p.topo.triFace[hit.tri];
+      const f = p.topo.faces[fi];
       if (f?.kind === "plane" && f.normal && f.point) facePlane = { normal: f.normal, point: f.point, part: hit.part };
+      if (f) face = { part: hit.part, index: fi };
     }
-    this.onContext({ part: hit?.part ?? null, clientX, clientY, facePlane });
+    this.onContext({ part: hit?.part ?? null, clientX, clientY, facePlane, face });
   }
 
   // ------------------------------------------------------------------ výběrový filtr a entity
@@ -1649,7 +1698,10 @@ export class ViewerEngine {
     } else if (s.kind === "midpoint") title = "Střed hrany";
     else if (s.kind === "vertex") title = "Roh (bod)";
     rows.push(["X", mm(s.point[0])], ["Y", mm(s.point[1])], ["Z", mm(s.point[2])]);
-    return { kind: s.kind, title, rows, part: s.part, plane: g?.plane && !g.sectionCap ? g.plane : undefined };
+    return {
+      kind: s.kind, title, rows, part: s.part, plane: g?.plane && !g.sectionCap ? g.plane : undefined,
+      face: s.kind === "face" && !g?.sectionCap ? g?.faceIndex : undefined,
+    };
   }
 
   /** Měřit vzdálenost od vybrané entity (první bod hotový). */
@@ -1660,6 +1712,152 @@ export class ViewerEngine {
     this.pending = e;
     this.syncPending();
     this.onChange("pending");
+  }
+
+  // ------------------------------------------------------------------ barvy
+
+  /** Zobrazená barva dílu (lineární) — přepsaná, ze souboru, nebo výchozí. */
+  private displayColor(p: PartView): THREE.Color {
+    if (p.colorOverride !== null) return new THREE.Color().setHex(p.colorOverride, THREE.SRGBColorSpace);
+    return (p.origColor ?? DEFAULT_COLOR).clone();
+  }
+
+  /** Barva dílu jako sRGB hex (pro výběr barvy v kartě). */
+  partColorHex(i: number): number {
+    const p = this.parts[i];
+    return p ? this.displayColor(p).getHex(THREE.SRGBColorSpace) : 0xb8c0ca;
+  }
+
+  hasColorChanges(): boolean {
+    return this.parts.some((p) => p.colorOverride !== null || p.faceColors.size > 0);
+  }
+
+  /** Sestaví materiál / barvy vrcholů dílu podle barvy dílu a barev ploch. */
+  private applyColors(p: PartView) {
+    const g = p.mesh.geometry;
+    const useVC = p.faceColors.size > 0 || (!!p.origVC && p.colorOverride === null);
+    if (!useVC) {
+      if (g.getAttribute("color")) g.deleteAttribute("color");
+      p.baseMaterial = this.material(p.colorOverride !== null ? this.displayColor(p) : p.origColor, false, p.opacity);
+    } else {
+      const n = g.getAttribute("position").count;
+      const arr = new Float32Array(n * 3);
+      if (p.colorOverride === null && p.origVC && p.origVC.length === arr.length) arr.set(p.origVC);
+      else {
+        const c = this.displayColor(p);
+        for (let i = 0; i < n; i++) {
+          arr[i * 3] = c.r;
+          arr[i * 3 + 1] = c.g;
+          arr[i * 3 + 2] = c.b;
+        }
+      }
+      const idx = g.index ? (g.index.array as Uint32Array) : null;
+      const tmp = new THREE.Color();
+      for (const [face, hex] of p.faceColors) {
+        tmp.setHex(hex, THREE.SRGBColorSpace);
+        for (const t of this.faceTriangles(p, face)) {
+          for (let k = 0; k < 3; k++) {
+            const v = idx ? idx[t * 3 + k] : t * 3 + k;
+            arr[v * 3] = tmp.r;
+            arr[v * 3 + 1] = tmp.g;
+            arr[v * 3 + 2] = tmp.b;
+          }
+        }
+      }
+      g.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+      p.baseMaterial = this.material(null, true, p.opacity);
+    }
+    this.applyPartState(p);
+  }
+
+  private colorChange(fn: () => boolean) {
+    const before = this.snapshot();
+    if (!fn()) return;
+    this.commit(before);
+    if (this.section) this.rebuildSection(true);
+    this.requestRender();
+    this.onChange("colors");
+  }
+
+  /** Barva dílů (null = původní). Celý díl přebarví i plochy. */
+  setPartColor(indices: number[], hex: number | null) {
+    this.colorChange(() => {
+      let changed = false;
+      for (const i of indices) {
+        const p = this.parts[i];
+        if (!p) continue;
+        if (p.colorOverride === hex && !p.faceColors.size) continue;
+        p.colorOverride = hex;
+        p.faceColors.clear();
+        this.applyColors(p);
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
+  /** Barva jedné plochy dílu (null = jako díl). */
+  setFaceColor(part: number, face: number, hex: number | null) {
+    this.colorChange(() => {
+      const p = this.parts[part];
+      if (!p || face < 0 || face >= p.topo.faces.length) return false;
+      if (hex === null) {
+        if (!p.faceColors.delete(face)) return false;
+      } else {
+        if (p.faceColors.get(face) === hex) return false;
+        p.faceColors.set(face, hex);
+      }
+      this.applyColors(p);
+      return true;
+    });
+  }
+
+  /** Barevně odlišit díly (vybrané, jinak všechny viditelné). */
+  colorPartsDistinct(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.filter((p) => !p.hidden).map((p) => p.index);
+    this.colorChange(() => {
+      list.forEach((i, k) => {
+        const p = this.parts[i];
+        if (!p) return;
+        p.colorOverride = COLOR_PALETTE[k % (COLOR_PALETTE.length - 2)];
+        p.faceColors.clear();
+        this.applyColors(p);
+      });
+      return list.length > 0;
+    });
+  }
+
+  /** Barevně odlišit plochy dílů (vybraných, jinak všech viditelných). */
+  colorFacesDistinct(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.filter((p) => !p.hidden).map((p) => p.index);
+    this.colorChange(() => {
+      let changed = false;
+      for (const i of list) {
+        const p = this.parts[i];
+        if (!p || !p.topo.faces.length) continue;
+        p.faceColors = new Map(p.topo.faces.map((_, f) => [f, COLOR_PALETTE[f % (COLOR_PALETTE.length - 2)]]));
+        this.applyColors(p);
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
+  /** Původní barvy ze souboru (vybrané díly, jinak všechny). */
+  resetColors(indices?: number[]) {
+    const list = indices?.length ? indices : this.parts.map((p) => p.index);
+    this.colorChange(() => {
+      let changed = false;
+      for (const i of list) {
+        const p = this.parts[i];
+        if (!p || (p.colorOverride === null && !p.faceColors.size)) continue;
+        p.colorOverride = null;
+        p.faceColors.clear();
+        this.applyColors(p);
+        changed = true;
+      }
+      return changed;
+    });
   }
 
   // ------------------------------------------------------------------ řez
@@ -1835,9 +2033,8 @@ export class ViewerEngine {
   }
 
   private capMaterial(p: PartView): THREE.Material {
-    const base = (p.baseMaterial as THREE.MeshPhongMaterial).color ?? DEFAULT_COLOR;
     // světlejší odstín barvy dílu + šrafy → řez je hned poznat od ploch modelu
-    const c = (p.baseMaterial.userData.vc ? DEFAULT_COLOR.clone() : base.clone()).lerp(new THREE.Color(1, 1, 1), 0.35);
+    const c = this.displayColor(p).lerp(new THREE.Color(1, 1, 1), 0.35);
     const key = c.getHexString();
     let m = this.capMaterials.get(key);
     if (!m) {

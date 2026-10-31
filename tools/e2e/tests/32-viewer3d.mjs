@@ -357,6 +357,57 @@ await test("desktop: výběrový filtr (plocha, hrana), řez rovinou i z plochy,
   });
 });
 
+await test("desktop: barvy dílu a plochy (pravé tlačítko bez nabídky prohlížeče), zpět vrátí barvu", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.admin);
+    await page.goto(`${BASE}/view?src=${encodeURIComponent(`/api/jobs/files/${files.step}`)}&name=KOSTKA.step`);
+    await waitModel(page);
+    const box = await canvasBox(page);
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    // pravé tlačítko na díl → naše nabídka; nativní nabídka (contextmenu) je potlačená i nad ní
+    await page.mouse.click(cx, cy, { button: "right" });
+    await page.getByTestId("viewer3d-context").waitFor();
+    const prevented = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      const ev = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y });
+      el.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    }, [cx + 5, cy + 5]);
+    expect(prevented, "nativní nabídka prohlížeče se nad prohlížečem 3D neotevře");
+    await page.getByTestId("context-colors").getByRole("button", { name: "Barva #c0504d" }).first().click();
+    await page.getByTestId("viewer3d-context").waitFor({ state: "detached" });
+    // barva dílu: karta dílu ukáže vybranou barvu, Ctrl+Z ji vrátí
+    await page.mouse.click(cx, cy);
+    await page.getByTestId("viewer3d-part").waitFor();
+    const ring = async (hex) => /ring-2/.test((await page.getByTestId("part-colors").getByRole("button", { name: `Barva ${hex}` }).getAttribute("class")) ?? "");
+    expect(await ring("#c0504d"), "díl má zvolenou barvu");
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-color-part.png") });
+    await page.getByTestId("part-colors").getByRole("button", { name: "Barva #9bbb59" }).click();
+    expect(await ring("#9bbb59"), "nová barva z karty dílu");
+    await page.keyboard.press("Control+z");
+    expect(await ring("#c0504d"), "Ctrl+Z vrátí předchozí barvu");
+    // odlišit plochy barevně
+    await page.getByTestId("viewer3d-part").getByRole("button", { name: /Odlišit plochy/ }).click();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-color-faces.png") });
+    // barva jedné plochy (filtr Plocha → karta plochy)
+    await page.getByTestId("tool-filter").click();
+    await page.getByTestId("filter-items").getByRole("radio", { name: /Plocha/ }).click();
+    await page.mouse.click(cx, cy);
+    await page.getByTestId("face-colors").waitFor();
+    await page.getByTestId("face-colors").getByRole("button", { name: "Barva #f2c314" }).click();
+    // pozadí
+    await page.getByTestId("tool-display").click();
+    await page.getByRole("button", { name: "Pozadí Tmavé" }).click();
+    expect(/from-\[#3b4250\]/.test((await page.getByTestId("viewer3d-root").getAttribute("class")) ?? ""), "tmavé pozadí");
+    await page.getByRole("button", { name: /Původní barvy/ }).click();
+    await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-color-reset.png") });
+  });
+});
+
 if (files.asm) {
   await test("desktop: sestava — strom dílů, izolace, skrytí v stromu", async () => {
     await withContext(browser, errors, async (ctx) => {

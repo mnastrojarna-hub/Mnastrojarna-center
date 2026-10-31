@@ -3,7 +3,8 @@
 import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
-  ListTree, Loader2, Maximize2, MousePointer2, Redo2, Ruler, ScanEye, Scissors, Trash2, TriangleRight, Undo2, X, ZoomIn, ZoomOut,
+  ListTree, Loader2, Maximize2, MousePointer2, PaintBucket, Palette, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
+  Undo2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import type { ModelNode } from "@/lib/viewer3d/types";
 import type { LoadStage } from "@/lib/viewer3d/worker-protocol";
@@ -11,7 +12,7 @@ import { fmtMm, steelMassKg, type Measurement } from "@/lib/viewer3d/measure";
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import { cn } from "@/lib/utils";
 import {
-  PICK_FILTERS, ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
+  COLOR_PALETTE, PICK_FILTERS, ViewerEngine, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
 } from "./engine";
 import { loadModel } from "./load-model";
 
@@ -56,6 +57,24 @@ const TOOL_HINT: Record<Exclude<Tool, "select">, [string, string]> = {
   angle: ["Klikni na 1. hranu nebo rovinnou plochu.", "Klikni na 2. hranu nebo plochu."],
 };
 
+type Background = "light" | "dark" | "white" | "black";
+
+const BACKGROUNDS: { key: Background; label: string; className: string }[] = [
+  { key: "light", label: "Světlé (CAD)", className: "bg-gradient-to-b from-[#d6dee8] to-[#f6f8fa] dark:from-[#2b3139] dark:to-[#121417]" },
+  { key: "dark", label: "Tmavé", className: "bg-gradient-to-b from-[#3b4250] to-[#14171c]" },
+  { key: "white", label: "Bílé", className: "bg-white" },
+  { key: "black", label: "Černé", className: "bg-black" },
+];
+
+function loadBackground(): Background {
+  try {
+    const v = window.localStorage.getItem("viewer3d.bg");
+    return BACKGROUNDS.some((b) => b.key === v) ? (v as Background) : "light";
+  } catch {
+    return "light";
+  }
+}
+
 function fmt1(v: number): string {
   return v.toFixed(v >= 100 ? 1 : 2).replace(".", ",");
 }
@@ -92,6 +111,16 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   const [menu, setMenu] = React.useState<ContextRequest | null>(null);
   const [panel, setPanel] = React.useState<"tree" | "views" | "display" | "filter" | null>(null);
   const [sectionOpen, setSectionOpen] = React.useState(false);
+  const [bg, setBg] = React.useState<Background>("light");
+  React.useEffect(() => setBg(loadBackground()), []);
+  const pickBg = (b: Background) => {
+    setBg(b);
+    try {
+      window.localStorage.setItem("viewer3d.bg", b);
+    } catch {
+      /* soukromé okno — jen pro tuto chvíli */
+    }
+  };
   const [help, setHelp] = React.useState(false);
   const [isWide, setIsWide] = React.useState(true);
 
@@ -187,7 +216,12 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
   };
 
   return (
-    <div className={cn("relative h-full w-full select-none overflow-hidden bg-gradient-to-b from-[#d6dee8] to-[#f6f8fa] dark:from-[#2b3139] dark:to-[#121417]", className)}>
+    <div
+      className={cn("relative h-full w-full select-none overflow-hidden", BACKGROUNDS.find((b) => b.key === bg)?.className, className)}
+      // pravé tlačítko patří prohlížeči 3D — nabídka prohlížeče (Chrome na Windows ji otevírá až po puštění tlačítka) ne
+      onContextMenu={(e) => e.preventDefault()}
+      data-testid="viewer3d-root"
+    >
       <div ref={hostRef} className="absolute inset-0" data-testid="viewer3d-canvas" />
 
       {/* načítání / chyba */}
@@ -254,6 +288,27 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
               {DISPLAYS.map((d) => (
                 <MenuItem key={d.key} active={display === d.key} onClick={() => { eng!.setDisplay(d.key); setPanel(null); }}>{d.label}</MenuItem>
               ))}
+              <div className="my-1 border-t" />
+              <p className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Barvy</p>
+              <MenuItem onClick={() => { eng!.colorPartsDistinct(selection); setPanel(null); }}><Palette className="h-4 w-4" /> {selection.length ? "Odlišit vybrané díly" : "Odlišit díly barevně"}</MenuItem>
+              <MenuItem onClick={() => { eng!.colorFacesDistinct(selection); setPanel(null); }}><PaintBucket className="h-4 w-4" /> {selection.length ? "Odlišit plochy vybraných dílů" : "Odlišit plochy barevně"}</MenuItem>
+              {eng!.hasColorChanges() && (
+                <MenuItem onClick={() => { eng!.resetColors(); setPanel(null); }}><RotateCcw className="h-4 w-4" /> Původní barvy</MenuItem>
+              )}
+              <div className="my-1 border-t" />
+              <p className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pozadí</p>
+              <div className="grid grid-cols-4 gap-1 px-1.5 pb-1">
+                {BACKGROUNDS.map((b) => (
+                  <button
+                    key={b.key}
+                    type="button"
+                    onClick={() => pickBg(b.key)}
+                    title={b.label}
+                    aria-label={`Pozadí ${b.label}`}
+                    className={cn("h-9 rounded-md border-2", b.className, bg === b.key ? "border-primary" : "border-border")}
+                  />
+                ))}
+              </div>
             </Popover>
           )}
           {panel === "filter" && (
@@ -765,6 +820,12 @@ function EntityCard({ engine, onSection }: { engine: ViewerEngine; onSection: ()
         </div>
         <button type="button" onClick={() => engine.setEntity(null)} aria-label="Zrušit výběr" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
       </div>
+      {e.face !== undefined && (
+        <div className="mt-2 space-y-1.5 border-t pt-2">
+          <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><PaintBucket className="h-3.5 w-3.5" /> Barva plochy</p>
+          <ColorSwatches onPick={(c) => engine.setFaceColor(e.part, e.face!, c)} resetLabel="Jako díl" testId="face-colors" />
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5">
         {e.plane && (
           <button type="button" onClick={() => { engine.sectionFromPlane(e.plane!.normal, e.plane!.point, e.part); onSection(); }} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="entity-section"><Scissors className="h-3.5 w-3.5" /> Řez touto plochou</button>
@@ -772,6 +833,60 @@ function EntityCard({ engine, onSection }: { engine: ViewerEngine; onSection: ()
         <button type="button" onClick={() => engine.measureFromEntity()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Ruler className="h-3.5 w-3.5" /> Měřit odsud</button>
         <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat díl</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Vlastní barva: použije se až po potvrzení v systémovém výběru barvy (nativní „change"),
+ * ne při každém pohybu — jinak by vznikly desítky kroků „zpět".
+ */
+function CustomColorInput({ initial, onPick }: { initial: string; onPick: (hex: number) => void }) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const pick = React.useRef(onPick);
+  pick.current = onPick;
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const h = () => pick.current(parseInt(el.value.slice(1), 16));
+    el.addEventListener("change", h);
+    return () => el.removeEventListener("change", h);
+  }, []);
+  return <input ref={ref} type="color" defaultValue={initial} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Vlastní barva" />;
+}
+
+/** Vzorník barev: paleta, vlastní barva a „původní". */
+function ColorSwatches({
+  value, onPick, compact = false, resetLabel = "Původní", testId,
+}: {
+  value?: number | null;
+  onPick: (hex: number | null) => void;
+  compact?: boolean;
+  resetLabel?: string;
+  testId?: string;
+}) {
+  const colors = compact ? COLOR_PALETTE.slice(0, 10) : COLOR_PALETTE;
+  const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
+  return (
+    <div className="flex flex-wrap items-center gap-1" data-testid={testId}>
+      {colors.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onPick(c)}
+          title={hex(c)}
+          aria-label={`Barva ${hex(c)}`}
+          className={cn("h-6 w-6 rounded-full border border-black/15 shadow-sm transition hover:scale-110 md:h-5 md:w-5", value === c && "ring-2 ring-primary ring-offset-1")}
+          style={{ backgroundColor: hex(c) }}
+        />
+      ))}
+      <label className="relative inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-dashed border-muted-foreground/60 text-muted-foreground hover:bg-accent md:h-5 md:w-5" title="Vlastní barva">
+        <Palette className="h-3 w-3" />
+        <CustomColorInput initial={value != null ? hex(value) : "#b8c0ca"} onPick={onPick} />
+      </label>
+      <button type="button" onClick={() => onPick(null)} className="inline-flex h-6 items-center gap-0.5 rounded-md px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground md:h-5" title={resetLabel}>
+        <RotateCcw className="h-3 w-3" /> {resetLabel}
+      </button>
     </div>
   );
 }
@@ -836,6 +951,11 @@ function PartCard({ engine, selection }: { engine: ViewerEngine; selection: numb
           )}
         </div>
         <button type="button" onClick={() => engine.clearSelection()} aria-label="Zrušit výběr" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="mt-2 space-y-1.5 border-t pt-2">
+        <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva {selection.length > 1 ? "dílů" : "dílu"}</p>
+        <ColorSwatches value={engine.partColorHex(selection[0])} onPick={(c) => engine.setPartColor(selection, c)} testId="part-colors" />
+        <button type="button" onClick={() => engine.colorFacesDistinct(selection)} className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><PaintBucket className="h-3.5 w-3.5" /> Odlišit plochy barevně</button>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
@@ -907,6 +1027,16 @@ function ContextMenu({ req, engine, onClose, onSection, hostRect }: { req: Conte
               <Scissors className="h-4 w-4" /> Řez touto plochou
             </MenuItem>
           )}
+          <div className="space-y-1 px-2.5 py-1.5" data-testid="context-colors">
+            <p className="flex items-center gap-1 text-xs text-muted-foreground"><Palette className="h-3.5 w-3.5" /> Barva dílu</p>
+            <ColorSwatches compact value={engine.partColorHex(part)} onPick={(c) => { engine.setPartColor(sel.length ? sel : engine.partGroup(part), c); onClose(); }} />
+            {req.face && (
+              <>
+                <p className="flex items-center gap-1 pt-1 text-xs text-muted-foreground"><PaintBucket className="h-3.5 w-3.5" /> Barva plochy</p>
+                <ColorSwatches compact resetLabel="Jako díl" onPick={(c) => { engine.setFaceColor(req.face!.part, req.face!.index, c); onClose(); }} />
+              </>
+            )}
+          </div>
           <div className="my-1 border-t" />
         </>
       )}
