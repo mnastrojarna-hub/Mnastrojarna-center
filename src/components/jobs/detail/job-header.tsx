@@ -33,6 +33,7 @@ import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag"
 import { approvalHint, jobApprovalFlag } from "./approval";
 import { useAccess } from "@/components/access-provider";
 import { quoteApproverWhoFor } from "@/lib/jobs/flow-status";
+import { ExceptionBanners } from "./exception-banners";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 /** Čip DL v hlavičce: číslo z delivery_notes (jediný zdroj čísla DL); starší data bez řádku → ze souborů. */
@@ -239,6 +240,8 @@ export function JobHeader({ job }: { job: JobDetail }) {
     >
       <div className={cn("h-1.5 w-full", m.bar)} />
       <div className="space-y-4 p-4 sm:p-5">
+        {/* výjimky v toku: nová revize výkresu (výrazně, dokud ji někdo nevezme na vědomí), reklamace, bez objednávky */}
+        <ExceptionBanners job={job} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">

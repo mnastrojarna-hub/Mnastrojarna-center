@@ -9,6 +9,7 @@ import { findDuplicateItems } from "@/lib/jobs/item-pairing";
 import type { JobItem } from "@/lib/jobs/types";
 import { useJobDetail } from "./detail-context";
 import { ItemsEditor } from "./items-editor";
+import { DrawingRevisionStrip } from "./drawing-revision-strip";
 import { MailOverridesPanel } from "@/components/jobs/communication/mail-overrides-panel";
 import { draftToItemInput, draftsSignature, isBlankDraft, itemToDraft, validateDrafts, type ItemDraft } from "./detail-helpers";
 
@@ -177,6 +178,9 @@ export function ItemsTab({ items, currency, value, onDirtyChange }: { items: Job
       <MailOverridesPanel />
 
       {!dirty && <DuplicateItemsBanner items={items} value={value ?? null} currency={currency} />}
+
+      {/* revize výkresů: aktuální revize, „rev. změněna", Nová revize… (Aktualizace výkresu) */}
+      {!dirty && <DrawingRevisionStrip items={items} />}
 
       <ItemsEditor
         drafts={drafts}

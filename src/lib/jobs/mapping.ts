@@ -13,9 +13,10 @@ import { isOperationKind } from "@/lib/jobs/operations";
 import { effectiveDeadline, deadlineInfo, pragueToday, type DeadlineInput } from "@/lib/jobs/deadlines";
 import { fieldLabel, formatFieldValue, SENSITIVE_JOB_COLUMNS } from "@/lib/jobs/field-labels";
 import {
-  deriveFlow, flowFactsFromRow, isQuoteState, paymentKey, quoteFactsFromRow, stampFromRow,
+  FLOW_EXCEPTION_COLUMNS_LIST, deriveFlow, flowFactsFromRow, isQuoteState, paymentKey, quoteFactsFromRow, stampFromRow,
   type FlowFacts, type JobStamps, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
+import { isExceptionFilter, matchesException } from "@/lib/jobs/flow-exceptions";
 
 /**
  * Mapování Knihy zakázek: vstup formuláře → sloupce orders, řádky DB → view-modely,
@@ -499,6 +500,8 @@ const FLOW_LIST_COLUMNS = [
   "stage_changed_by, stage_changed_via, stage_change_cause, stage_change_note",
   "inquiry_status_changed_at, inquiry_status_changed_by, inquiry_status_changed_via",
   "order_status_changed_by, order_status_changed_via, lost_at, lost_by, flow_proposal_at, flow_proposal_by",
+  // výjimky v toku (migrace 20261031150000); číslo objednávky zákazníka je v základním výběru
+  FLOW_EXCEPTION_COLUMNS_LIST.filter((c) => c !== "customer_order_number").join(", "),
 ].join(", ");
 
 /** Souhrn aktuálního kroku výroby (předání do výroby, migrace 20261023150000). */
@@ -1451,9 +1454,11 @@ export function matchesFlow(
 /** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
 export function filterJobs(
   items: JobListItem[],
-  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer">,
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "exception" | "lostReason">,
   today: Date = pragueToday(),
 ): JobListItem[] {
+  const exception = filters.exception && isExceptionFilter(filters.exception) ? filters.exception : null;
+  const lostReason = filters.lostReason ?? null;
   const tokens = searchNormalize(filters.q ?? "").split(/\s+/).filter(Boolean);
   const step = (filters.step ?? "").trim();
   const location = searchNormalize((filters.location ?? "").trim());
@@ -1461,6 +1466,9 @@ export function filterJobs(
   const delivered = filters.deliveredToCustomer;
   return items.filter((j) => {
     if (typeof delivered === "boolean" && isDeliveredToCustomer(j) !== delivered) return false;
+    // výjimky v toku (Bez objednávky, Reklamace, Pozastaveno, Nová revize výkresu, Opraveno) a důvod prohry
+    if (exception && !matchesException(j, exception)) return false;
+    if (lostReason && (j.flow?.lostReason ?? "neuvedeno") !== lostReason) return false;
     if (tokens.length) {
       const h = haystack(j);
       if (!tokens.every((t) => h.includes(t))) return false;

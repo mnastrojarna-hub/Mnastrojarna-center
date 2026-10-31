@@ -28,6 +28,10 @@ export interface ComposeRequest {
   /** Předvyplnění nové zprávy. */
   to?: string[];
   subject?: string;
+  /** Text nové zprávy (nad podpisem) — např. „Změna výkresu…" z karty zakázky. */
+  body?: string;
+  /** Dokumenty zakázky v příloze (výkresy zákazníka dodavateli jdou jako anonymizovaná kopie). */
+  jobAttachments?: { id: string; filename: string }[];
 }
 
 const MODE_TITLE: Record<ComposeMode, string> = { new: "Nová zpráva", reply: "Odpovědět", replyAll: "Odpovědět všem", forward: "Přeposlat" };
@@ -50,7 +54,7 @@ function fmtSize(n: number | null | undefined): string {
 export function initialBody(req: ComposeRequest, signature: string): string {
   const sig = signature.trim() ? `\n\n-- \n${signature.trim()}` : "";
   const src = req.source;
-  if (!src || req.mode === "new") return sig ? `${sig}\n` : "";
+  if (!src || req.mode === "new") return `${req.body ?? ""}${sig ? `${sig}\n` : ""}`;
   const q = { fromName: src.fromName, fromEmail: src.fromEmail, toEmail: src.toEmail, ccEmail: src.ccEmail, subject: src.subject, receivedAt: src.receivedAt, body: src.body };
   return req.mode === "forward" ? `${sig}\n\n${forwardBlock(q)}\n` : `${sig}\n\n${quoteForReply(q)}\n`;
 }
@@ -172,7 +176,7 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
     setAtts(
       request.mode === "forward" && src
         ? src.attachments.map((a) => ({ key: `o-${a.id}`, ref: { kind: "original" as const, ref: a.id, filename: a.filename }, name: a.filename, size: a.sizeBytes, state: "ready" as const }))
-        : [],
+        : (request.jobAttachments ?? []).map((a) => ({ key: `j-${a.id}`, ref: { kind: "job" as const, ref: a.id, filename: a.filename }, name: a.filename, size: null, state: "ready" as const })),
     );
     setBody(initialBody(request, ""));
     let alive = true;

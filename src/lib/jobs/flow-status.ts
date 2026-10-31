@@ -4,7 +4,8 @@ import {
   ShoppingCart, GitCompare, BadgeCheck, RefreshCw, Ban, PackageCheck, CircleDotDashed, Factory, FilePlus, FileCheck,
   MailCheck, FileX, ClipboardCheck, Truck, Package, Banknote, AlarmClock, Sparkles, Hand, Camera, Mail, Cog, Upload,
   Clock, Globe, Database, CircleSlash, Pencil, Undo, CalendarPlus, ThumbsUp, Handshake, ReceiptText, Wrench,
-  ArrowRightCircle, Flag, CalendarClock, CalendarX2, UserRoundX, FileSignature,
+  ArrowRightCircle, Flag, CalendarClock, CalendarX2, UserRoundX, FileSignature, PauseCircle, PlayCircle, PackageX,
+  AlertTriangle, ClipboardPen, FileDiff,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -674,14 +675,21 @@ export const LOST_REASONS: Record<LostReason, {
   projekt_zrusen: { label: "Projekt zrušen", side: "zakaznik", phases: ["inquiry", "quote", "order", "job"] },
   bez_odezvy: { label: "Bez odezvy", side: "zakaznik", phases: ["inquiry", "quote", "job"] },
   zakaznik_stahl: { label: "Zákazník stáhl poptávku", side: "zakaznik", phases: ["inquiry", "order", "job"] },
+  // 31. 10.: zrušení zakázky po zmetku („Výroba se nepovedla")
+  vyroba: { label: "Výroba se nepovedla", side: "my", phases: ["job"] },
   jine: { label: "Jiný důvod", side: "system", phases: ["inquiry", "quote", "order", "job"] },
   neuvedeno: { label: "Důvod neuveden", side: "system", phases: [] },
 };
 
 export const LOST_REASON_ORDER: LostReason[] = [
   "nevyrabime", "kapacita", "nevyplati_se", "duplicita", "cena", "termin", "jiny_dodavatel", "projekt_zrusen",
-  "bez_odezvy", "zakaznik_stahl", "jine", "neuvedeno",
+  "bez_odezvy", "zakaznik_stahl", "vyroba", "jine", "neuvedeno",
 ];
+
+/** „Zákazník neobjednal…" — důvody na straně zákazníka (cena, termín, jiný dodavatel, projekt zrušen, bez odpovědi, jiné). */
+export const NOT_ORDERED_REASONS: LostReason[] = ["cena", "termin", "jiny_dodavatel", "projekt_zrusen", "bez_odezvy", "jine"];
+/** „Nebudeme nabízet…" — odmítáme my. */
+export const DECLINE_REASONS: LostReason[] = ["nevyrabime", "kapacita", "nevyplati_se", "duplicita", "jine"];
 
 export function isLostReason(v: unknown): v is LostReason {
   return typeof v === "string" && v in LOST_REASONS;
@@ -695,6 +703,7 @@ export function lostReasonsFor(phase: ReasonPhase, to?: string): LostReason[] {
     if (phase === "inquiry" && to === "odmitnuta") return m.side !== "zakaznik";
     if (phase === "inquiry" && to === "stazena") return m.side !== "my";
     if (phase === "job" && to === "zruseno") return r !== "nevyrabime" && r !== "nevyplati_se";
+    if (phase === "job" && to === "nerealizovano") return r !== "vyroba";
     return true;
   });
 }
@@ -792,6 +801,33 @@ export interface FlowFacts {
   openPurchaseOrders?: number;
   /** Dodané objednávky (zápis výroby při přeskočení). */
   deliveredPurchaseOrders?: number;
+  // ── Výjimky v toku (migrace 20261031150000; udržuje DB) ──
+  /** Stav před vedlejším stavem (pozastaveno, reklamace, nerealizováno, zrušeno) — „Pokračovat" / „Obnovit" se vrací sem. */
+  sideFromStage?: JobStage | null;
+  /** Proč zakázka stojí (Pozastaveno). */
+  holdReason?: string | null;
+  /** Vyrábí se bez objednávky zákazníka (zákazník napsal „vyrábějte"). */
+  awaitingCustomerPo?: boolean;
+  awaitingPoSince?: string | null;
+  awaitingPoNote?: string | null;
+  /** Objednávka zákazníka dorazila dodatečně (zakázka se vyráběla bez ní) — teď ji potvrdit. */
+  customerPoReceivedAt?: string | null;
+  customerOrderNumber?: string | null;
+  /** Reklamace: otevřená (openedAt bez resolvedAt), důvod, kusy, stav před reklamací, vyřízení. */
+  claimOpenedAt?: string | null;
+  claimReason?: string | null;
+  claimQty?: number | null;
+  claimItemId?: string | null;
+  claimNote?: string | null;
+  claimFromStage?: JobStage | null;
+  claimResolution?: string | null;
+  claimResolutionNote?: string | null;
+  claimResolvedAt?: string | null;
+  /** Oprava zakázky (změna od zákazníka po objednávce). */
+  correctedAt?: string | null;
+  correctedNote?: string | null;
+  /** Nepotvrzené změny revize výkresu („Nová revize"). */
+  drawingChangesOpen?: number;
 }
 
 export interface QuoteFacts {
@@ -1617,7 +1653,11 @@ export type FlowActionKey =
   | "production.advance" | "production.finish" | "production.replan" | "production.sendPo" | "production.undo"
   | "purchasing.notifySuppliers" | "delivery.record"
   | "delivery.closeShort" | "delivery.partialNote" | "delivery.confirmNote" | "payment.invoice" | "payment.invoiceExternal"
-  | "payment.record" | "payment.settle" | "job.correct";
+  | "payment.record" | "payment.settle" | "job.correct"
+  // výjimky v toku (31. 10.) — „Co se stalo?"
+  | "job.notOrdered" | "job.decline" | "job.reopenLost" | "job.pause" | "job.resume" | "production.failed"
+  | "claim.open" | "claim.resolve" | "claim.close" | "order.startWithoutPo" | "order.poArrived" | "order.correct"
+  | "drawing.update";
 
 export interface FlowActionMeta {
   key: FlowActionKey;
@@ -1700,7 +1740,27 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "payment.record": act({ key: "payment.record", label: "Zadat platbu", icon: Banknote, intent: "primary", feature: "margins", kind: "dialog" }),
   "payment.settle": act({ key: "payment.settle", label: "Zaplaceno", icon: CircleCheckBig, intent: "secondary", feature: "margins", kind: "dialog" }),
   "job.correct": act({ key: "job.correct", label: "Korekce stavu…", icon: Cog, intent: "secondary", feature: "orders", kind: "dialog" }),
+  // ── výjimky v toku (31. 10.): jedno srozumitelné tlačítko pro to, co se stalo ──
+  "job.notOrdered": act({ key: "job.notOrdered", label: "Zákazník neobjednal…", icon: CircleSlash, intent: "danger", feature: "margins", needsReason: true, kind: "dialog" }),
+  "job.decline": act({ key: "job.decline", label: "Nebudeme nabízet…", icon: CircleX, intent: "danger", feature: "margins", needsReason: true, kind: "dialog" }),
+  "job.reopenLost": act({ key: "job.reopenLost", label: "Obnovit poptávku", icon: Undo, intent: "secondary", feature: "margins", kind: "dialog" }),
+  "job.pause": act({ key: "job.pause", label: "Pozastavit…", icon: PauseCircle, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "job.resume": act({ key: "job.resume", label: "Pokračovat", icon: PlayCircle, intent: "primary", feature: "orders", kind: "dialog" }),
+  "production.failed": act({ key: "production.failed", label: "Výroba se nepovedla…", icon: PackageX, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "claim.open": act({ key: "claim.open", label: "Reklamace…", icon: AlertTriangle, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "claim.resolve": act({ key: "claim.resolve", label: "Vyřešit reklamaci…", icon: AlertTriangle, intent: "primary", feature: "orders", kind: "dialog" }),
+  "claim.close": act({ key: "claim.close", label: "Reklamace vyřízena", icon: CircleCheckBig, intent: "primary", feature: "orders", kind: "dialog" }),
+  "order.startWithoutPo": act({ key: "order.startWithoutPo", label: "Vyrábět bez objednávky…", icon: Factory, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "order.poArrived": act({ key: "order.poArrived", label: "Objednávka zákazníka dorazila…", icon: ShoppingCart, intent: "primary", feature: "workflow", kind: "dialog" }),
+  "order.correct": act({ key: "order.correct", label: "Oprava zakázky…", icon: ClipboardPen, intent: "secondary", feature: "orders", kind: "dialog" }),
+  "drawing.update": act({ key: "drawing.update", label: "Aktualizace výkresu…", icon: FileDiff, intent: "secondary", feature: "workflow", kind: "dialog" }),
 };
+
+/** Výjimky v toku — v menu „⋯" jako první skupina „Co se stalo?". */
+export const FLOW_EXCEPTION_KEYS: readonly FlowActionKey[] = [
+  "drawing.update", "order.correct", "order.startWithoutPo", "order.poArrived", "production.failed", "claim.open",
+  "claim.resolve", "claim.close", "job.pause", "job.resume", "job.reopenLost", "job.notOrdered", "job.decline",
+];
 
 export interface ActionCtx {
   can: (x: Feature) => boolean;
@@ -1991,6 +2051,14 @@ function productionNext(f: FlowFacts, ctx: ActionCtx): Next {
 export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next {
   if (f.proposal && ctx.can(proposalFeature(f.proposal))) return { key: "proposal.decide", label: FLOW_ACTIONS["proposal.decide"].label };
   const rank = flowRank(f.stage);
+  // reklamace: nejdřív rozhodnout (opravit / dobropis / zamítnout); oprava → předání do výroby
+  if (f.stage === "reklamace") {
+    return f.claimResolution === "oprava" ? allowed(ctx, "production.handoff", "Vyrobit znovu…") : allowed(ctx, "claim.resolve");
+  }
+  // opravené díly jsou zase u zákazníka → reklamaci uzavřít (zakázka se vrátí, kde byla)
+  if (claimOpen(f) && f.claimResolution === "oprava" && rank >= 9) return allowed(ctx, "claim.close");
+  // objednávka zákazníka dorazila k zakázce, která se už vyrábí → potvrdit ji s jejím číslem
+  if (rank >= 4 && rank <= 8 && poArrivedUnconfirmed(f, s)) return allowed(ctx, "order.sendConfirmation", "Potvrdit objednávku");
   if (f.stage === "poptavka" || f.stage === "naceneni") {
     if (s.inquiry === "prijata") {
       const other = ctx.assigneeId && ctx.assigneeId !== ctx.userId;
@@ -2015,6 +2083,8 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
   if (rank >= 3 && rank <= 8) {
     if (s.order === "aktualizovana") return allowed(ctx, "order.decideChange");
     if (s.order === "rozpor") return allowed(ctx, "order.resolveMismatch");
+    // vyrábí se bez objednávky zákazníka: potvrzovat zatím není co — rovnou předat do výroby
+    if (s.order === "dorucena" && f.awaitingCustomerPo) return f.stage === "objednavka" ? allowed(ctx, "production.handoff") : null;
     if (s.order === "dorucena") return allowed(ctx, "order.confirm");
     // ve výrobě má přednost dodání (= chip řádku); chybějící potvrzení je pak jen v menu
     if (rank >= 5) {
@@ -2023,7 +2093,7 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
       if (f.stage === "ve_vyrobe") return productionNext(f, ctx);
       return null;
     }
-    if (s.confirmation === "bez_dokladu") return allowed(ctx, "order.sendConfirmation");
+    if (s.confirmation === "bez_dokladu" && !f.awaitingCustomerPo) return allowed(ctx, "order.sendConfirmation");
     // potvrzená objednávka → předání do výroby (komu a do kdy), i s připraveným postupem / objednávkou
     if (f.stage === "potvrzeno") return allowed(ctx, "production.handoff");
     return null;
@@ -2042,9 +2112,79 @@ export function nextAction(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Next 
     return worker;
   }
   if (f.stage === "fakturovano") return allowed(ctx, "payment.record");
-  // pozastavená zakázka: jediný krok je rozhodnout, kde pokračovat (Korekce stavu s náhledem)
-  if (f.stage === "pozastaveno") return allowed(ctx, "job.correct", "Pokračovat…");
+  // pozastavená zakázka: „Pokračovat" vrátí zakázku tam, kde se zastavila (bez známého stavu → Korekce stavu)
+  if (f.stage === "pozastaveno") return f.sideFromStage ? allowed(ctx, "job.resume") : allowed(ctx, "job.correct", "Pokračovat…");
   return null;
+}
+
+// ── Výjimky v toku (31. 10.) ────────────────────────────────
+/** Po kolika dnech bez objednávky zákazníka ukázat „Chybí objednávka zákazníka". */
+export const AWAITING_PO_REMIND_DAYS = 7;
+
+/** Reklamace je zapsaná a nevyřízená. */
+export function claimOpen(f: Pick<FlowFacts, "claimOpenedAt" | "claimResolvedAt">): boolean {
+  return Boolean(f.claimOpenedAt) && !f.claimResolvedAt;
+}
+
+/** Objednávka zákazníka dorazila dodatečně (zakázka se vyráběla bez ní) a potvrzení s jejím číslem zatím neodešlo. */
+export function poArrivedUnconfirmed(f: FlowFacts, s: Pick<FlowSnapshot, "confirmation">): boolean {
+  return Boolean(f.customerPoReceivedAt) && !f.awaitingCustomerPo
+    && (s.confirmation === "bez_dokladu" || s.confirmation === "k_vystaveni" || s.confirmation === "vystaveno");
+}
+
+/** Kolik dní se vyrábí bez objednávky zákazníka (null = nečeká). */
+export function awaitingPoDays(f: Pick<FlowFacts, "awaitingCustomerPo" | "awaitingPoSince">, today: string = pragueToday()): number | null {
+  if (!f.awaitingCustomerPo) return null;
+  const since = pragueDay(f.awaitingPoSince ?? null);
+  return since ? Math.max(0, dayDiff(since, today)) : 0;
+}
+
+/** Zboží je celé u zákazníka (stav dodání a dál, nebo dodané všechny položky). */
+function deliveredToCustomer(f: FlowFacts): boolean {
+  const rank = flowRank(f.stage);
+  return (rank >= 9 && rank <= 11) || (rank >= 3 && rank <= 8 && deliveredAll(f));
+}
+
+/** Kam „Pokračovat" / „Obnovit" vrátí zakázku z vedlejšího stavu (null = nevíme → Korekce stavu). */
+export function resumeTarget(f: Pick<FlowFacts, "stage" | "sideFromStage">): JobStage | null {
+  const t = f.sideFromStage ?? null;
+  if (!t || t === f.stage || flowRank(t) < 0) return null;
+  return t;
+}
+
+/** Kam „Obnovit poptávku" vrátí nerealizovanou zakázku: stav před prohrou (max. Nabídka), jinak Poptávka. */
+export function reopenLostTarget(f: Pick<FlowFacts, "stage" | "sideFromStage">): JobStage {
+  const t = f.sideFromStage ?? null;
+  const r = t ? flowRank(t) : -1;
+  return t && r >= 0 && r <= 2 ? t : "poptavka";
+}
+
+/**
+ * Výjimky v toku pro menu „⋯" (skupina „Co se stalo?"), Knihu (menu stavu) a stránky toku — v pořadí
+ * FLOW_EXCEPTION_KEYS, jen ty, na které má uživatel právo.
+ */
+export function exceptionActions(f: FlowFacts, ctx: Pick<ActionCtx, "can">): FlowActionKey[] {
+  const rank = flowRank(f.stage);
+  const keys = new Set<FlowActionKey>();
+  const closed = f.stage === "nerealizovano" || f.stage === "zruseno";
+  if (!closed) keys.add("drawing.update");
+  const hasOrder = rank >= 3 || ((f.stage === "pozastaveno" || f.stage === "reklamace") && Boolean(f.orderStatus));
+  if (hasOrder && !closed && f.orderStatus !== "stornovana") keys.add("order.correct");
+  if (rank >= 0 && rank <= 2) keys.add("order.startWithoutPo");
+  if (f.awaitingCustomerPo && !closed) keys.add("order.poArrived");
+  if (rank >= 5 && rank <= 8) keys.add("production.failed");
+  if (f.stage !== "reklamace" && !claimOpen(f) && deliveredToCustomer(f)) keys.add("claim.open");
+  if (f.stage === "reklamace") keys.add("claim.resolve");
+  if (claimOpen(f) && f.claimResolution === "oprava" && f.stage !== "reklamace") keys.add("claim.close");
+  if (rank >= 0 && rank <= 10) keys.add("job.pause");
+  if (f.stage === "pozastaveno" && resumeTarget(f)) keys.add("job.resume");
+  const preOrder = (rank >= 0 && rank <= 2) || (f.stage === "pozastaveno" && f.sideFromStage != null && flowRank(f.sideFromStage) >= 0 && flowRank(f.sideFromStage) <= 2);
+  if (preOrder) {
+    keys.add("job.notOrdered");
+    if (rank <= 1) keys.add("job.decline");
+  }
+  if (f.stage === "nerealizovano") keys.add("job.reopenLost");
+  return FLOW_EXCEPTION_KEYS.filter((k) => keys.has(k) && ctx.can(FLOW_ACTIONS[k].feature));
 }
 
 /** Menu „⋯“: povolené ruční přechody; bez práva „Navrhnout…“; destruktivní dole; na konci „Korekce stavu…“. */
@@ -2093,12 +2233,14 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
 
   // objednávka
   const ord = s.order;
+  // vyrábí se bez objednávky zákazníka: potvrzení až s jejím číslem („Objednávka zákazníka dorazila…")
+  const awaitingPo = f.awaitingCustomerPo === true;
   if (ord && f.stage !== "nerealizovano") {
-    if (ord === "dorucena") { add("order.confirm"); add("order.confirmOther"); add("order.flagMismatch"); }
+    if (ord === "dorucena" && !awaitingPo) { add("order.confirm"); add("order.confirmOther"); add("order.flagMismatch"); }
     if (ord === "rozpor") { add("order.resolveMismatch"); add("order.requestFix"); add("order.confirmOther"); }
     if (ord === "potvrzena") add("order.registerChange");
     if (ord === "aktualizovana") { add("order.decideChange"); add("order.rejectChange"); }
-    if (s.confirmation === "bez_dokladu" || s.confirmation === "k_vystaveni" || s.confirmation === "vystaveno") add("order.sendConfirmation");
+    if (!awaitingPo && (s.confirmation === "bez_dokladu" || s.confirmation === "k_vystaveni" || s.confirmation === "vystaveno")) add("order.sendConfirmation");
     if (ord === "stornovana") add("order.reopen");
     else if (margins) add("order.cancel");
     else add("order.propose");
@@ -2133,12 +2275,21 @@ export function menuActions(f: FlowFacts, s: FlowSnapshot, ctx: ActionCtx): Flow
   const allowedKeys = keys.filter((k) => ctx.can(FLOW_ACTIONS[k].feature));
   const safe = allowedKeys.filter((k) => FLOW_ACTIONS[k].intent !== "danger");
   const danger = allowedKeys.filter((k) => FLOW_ACTIONS[k].intent === "danger");
-  const out = [...safe, ...danger];
+  // výjimky v toku („Co se stalo?") — menu je ukáže jako první skupinu
+  const out = [...safe, ...danger, ...exceptionActions(f, ctx).filter((k) => !allowedKeys.includes(k))];
   if (ctx.can("orders")) out.push("job.correct");
   return out;
 }
 
 // ── Mapování řádků DB → fakta (sdílí datová vrstva i test parity) ──
+/** Sloupce výjimek v toku (migrace 20261031150000) — Kniha, karta, akce. */
+export const FLOW_EXCEPTION_COLUMNS_LIST = [
+  "side_from_stage", "hold_reason", "awaiting_customer_po", "awaiting_po_since", "awaiting_po_note", "customer_po_received_at",
+  "customer_order_number", "claim_opened_at", "claim_reason", "claim_qty", "claim_item_id", "claim_note", "claim_from_stage",
+  "claim_resolution", "claim_resolution_note", "claim_resolved_at", "corrected_at", "corrected_note", "drawing_changes_open",
+];
+export const FLOW_EXCEPTION_COLUMNS = FLOW_EXCEPTION_COLUMNS_LIST.join(", ");
+
 /** Sloupce orders potřebné pro deriveFlow / primaryChip / nextAction. */
 export const FLOW_ORDER_COLUMNS = [
   "id", "status", "inquiry_status", "order_status", "order_revision", "order_confirmed_revision",
@@ -2150,6 +2301,7 @@ export const FLOW_ORDER_COLUMNS = [
   // předání do výroby: aktuální krok, konec výroby, konečný termín (zákazník), objednávky u dodavatelů
   "production_step", "production_location", "production_step_no", "production_due", "production_due_state",
   "production_po_status", "production_end", "production_final_end", "due_date", "customer_required_date",
+  ...FLOW_EXCEPTION_COLUMNS_LIST,
   "pos:purchase_orders!job_id(status)",
 ].join(", ");
 
@@ -2211,7 +2363,45 @@ export function flowFactsFromRow(
     assigneeName: extra.assigneeName ?? null,
     value: numOrNull(r.value),
     ...productionFactsOf(r),
+    ...exceptionFactsOf(r),
   };
+}
+
+const STAGE_KEYS: readonly string[] = [
+  "poptavka", "naceneni", "nabidka", "objednavka", "potvrzeno", "ve_vyrobe", "dodano_k_nam", "na_sklade", "montaz",
+  "dodano_zakaznikovi", "fakturovano", "dokonceno", "pozastaveno", "reklamace", "nerealizovano", "zruseno",
+];
+function stageOrNull(v: unknown): JobStage | null {
+  return typeof v === "string" && STAGE_KEYS.includes(v) ? (v as JobStage) : null;
+}
+
+/** Fakta výjimek v toku (jen sloupce, které řádek má — starší výběry je nemusí číst). */
+function exceptionFactsOf(r: Record<string, unknown>): Partial<FlowFacts> {
+  const out: Partial<FlowFacts> = {};
+  if ("side_from_stage" in r) out.sideFromStage = stageOrNull(r.side_from_stage);
+  if ("hold_reason" in r) out.holdReason = textOrNull(r.hold_reason);
+  if ("awaiting_customer_po" in r) out.awaitingCustomerPo = r.awaiting_customer_po === true;
+  if ("awaiting_po_since" in r) out.awaitingPoSince = textOrNull(r.awaiting_po_since);
+  if ("awaiting_po_note" in r) out.awaitingPoNote = textOrNull(r.awaiting_po_note);
+  if ("customer_po_received_at" in r) out.customerPoReceivedAt = textOrNull(r.customer_po_received_at);
+  if ("customer_order_number" in r) out.customerOrderNumber = textOrNull(r.customer_order_number);
+  if ("claim_opened_at" in r) {
+    out.claimOpenedAt = textOrNull(r.claim_opened_at);
+    out.claimReason = textOrNull(r.claim_reason);
+    out.claimQty = numOrNull(r.claim_qty);
+    out.claimItemId = textOrNull(r.claim_item_id);
+    out.claimNote = textOrNull(r.claim_note);
+    out.claimFromStage = stageOrNull(r.claim_from_stage);
+    out.claimResolution = textOrNull(r.claim_resolution);
+    out.claimResolutionNote = textOrNull(r.claim_resolution_note);
+    out.claimResolvedAt = textOrNull(r.claim_resolved_at);
+  }
+  if ("corrected_at" in r) {
+    out.correctedAt = textOrNull(r.corrected_at);
+    out.correctedNote = textOrNull(r.corrected_note);
+  }
+  if ("drawing_changes_open" in r) out.drawingChangesOpen = Math.max(0, Math.round(num(r.drawing_changes_open)));
+  return out;
 }
 
 const PO_STATUS_KEYS: PurchaseOrderStatus[] = ["navrh", "vystavena", "odeslana", "potvrzena", "dodana", "zrusena"];

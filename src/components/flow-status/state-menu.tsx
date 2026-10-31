@@ -5,9 +5,9 @@ import { Ellipsis } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FLOW_ACTIONS, type FlowActionKey } from "@/lib/jobs/flow-status";
+import { FLOW_ACTIONS, FLOW_EXCEPTION_KEYS, type FlowActionKey } from "@/lib/jobs/flow-status";
 
 /**
  * Menu „⋯" z menuActions(): bezpečné akce nahoře, destruktivní červeně dole, „Korekce stavu…"
@@ -25,9 +25,12 @@ export function StateMenu({
   triggerClassName?: string;
 }) {
   if (!actions.length) return null;
-  const safe = actions.filter((k) => FLOW_ACTIONS[k].intent !== "danger" && k !== "job.correct");
-  const danger = actions.filter((k) => FLOW_ACTIONS[k].intent === "danger");
-  const correct = actions.includes("job.correct");
+  // výjimky v toku („Co se stalo?") jako první skupina — jedno srozumitelné tlačítko pro to, co se stalo
+  const exceptions = actions.filter((k) => FLOW_EXCEPTION_KEYS.includes(k));
+  const rest = actions.filter((k) => !FLOW_EXCEPTION_KEYS.includes(k));
+  const safe = rest.filter((k) => FLOW_ACTIONS[k].intent !== "danger" && k !== "job.correct");
+  const danger = rest.filter((k) => FLOW_ACTIONS[k].intent === "danger");
+  const correct = rest.includes("job.correct");
   const item = (k: FlowActionKey) => {
     const a = FLOW_ACTIONS[k];
     const Icon = a.icon;
@@ -49,7 +52,12 @@ export function StateMenu({
           <Ellipsis aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className={cn("w-64 max-w-[calc(100vw-2rem)]", className)}>
+      <DropdownMenuContent align={align} className={cn("max-h-[min(75vh,var(--radix-dropdown-menu-content-available-height))] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto", className)}>
+        {exceptions.length > 0 && (
+          <DropdownMenuLabel className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Co se stalo?</DropdownMenuLabel>
+        )}
+        {exceptions.map(item)}
+        {exceptions.length > 0 && (safe.length > 0 || danger.length > 0 || correct) && <DropdownMenuSeparator />}
         {safe.map(item)}
         {danger.length > 0 && safe.length > 0 && <DropdownMenuSeparator />}
         {danger.map(item)}

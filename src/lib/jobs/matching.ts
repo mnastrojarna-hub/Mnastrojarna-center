@@ -239,6 +239,8 @@ const DAY_MS = 86_400_000;
 export interface JobMatchCandidateExt extends JobMatchCandidate {
   supplierId?: string | null;
   supplierOrderNumber?: string | null;
+  /** Vyrábí se bez objednávky zákazníka (31. 10.) — objednávka stejného zákazníka k ní patří. */
+  awaitingCustomerPo?: boolean;
 }
 
 export interface JobMatchOptions {
@@ -384,6 +386,11 @@ export function matchJob(
       if (supplierSide && !otherCustomer && waitsForSupplier(job.stage)) {
         offer(Math.min(58, 50 + 4 * (overlap.length - 1)), drawingReason("stejný", overlap) + " (zakázka čeká na dodavatele)");
       }
+    }
+
+    // Vyrábí se bez objednávky: objednávka téhož zákazníka (bez čísla u zakázky) je ta, na kterou se čeká
+    if (job.awaitingCustomerPo && sameCustomer && !supplierSide && doc.docKind === "objednavka" && !job.customerOrderNumber) {
+      offer(overlap.length ? 90 : 70, "zakázka se vyrábí bez objednávky — čeká právě na objednávku zákazníka");
     }
 
     // Slabé: stejný zákazník, stav sedí, nedávno založená

@@ -7,6 +7,7 @@ import { AlertCircle, GripVertical, Inbox, X } from "lucide-react";
 import { StageCorrectionDialog, StageSelect } from "@/components/jobs/stage-select";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import { RowAction, RowStateChip } from "@/components/jobs/book/job-rows";
+import { RowExceptionFlags } from "@/components/flow-status/exception-flag-chip";
 import { rowFlowView, type BookAccess } from "@/components/jobs/book/book-flow";
 import {
   CustomerDocNumber, CustomerNoteMark, DeadlineBlock, JobCounters, JobValue, PaymentMark, PeopleStack, PriorityMark,
@@ -268,6 +269,7 @@ function BoardCard({
       <p className="truncate text-xs text-muted-foreground">{job.title || "Bez názvu"}</p>
       <CustomerDocNumber job={job} className="mt-1.5" />
       <RowStateChip job={job} view={view} shortFlag className="relative z-10 mt-1.5" />
+      <RowExceptionFlags flow={job.flow} stage={job.stage} today={today} short className="relative z-10 mt-1.5" />
       <ProductionLine job={job} compact today={today} className="mt-2" />
       <div className="mt-2 flex items-end justify-between gap-2">
         <DeadlineBlock job={job} today={today} compact />
@@ -279,7 +281,7 @@ function BoardCard({
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
         <div className="relative z-10 flex min-w-0 flex-col items-start gap-0.5">
-          <StageSelect jobId={job.id} stage={job.stage} size="sm" onChanged={onStageChanged} flow={job.flow} quotes={job.flowQuotes} />
+          <StageSelect jobId={job.id} stage={job.stage} size="sm" onChanged={onStageChanged} flow={job.flow} quotes={job.flowQuotes} exceptions />
           <ActorStamp stamp={view.stamp} short className="max-w-[9.5rem]" />
         </div>
         <PeopleStack owner={job.owner} assignee={job.assignee} />

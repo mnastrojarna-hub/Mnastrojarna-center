@@ -14,8 +14,9 @@ import { useAccess } from "@/components/access-provider";
 import { moveJobStage } from "@/app/actions/flow-status";
 import { previewJobStage } from "@/app/actions/job-flow";
 import { STAGE_ORDER, SIDE_STAGES, stageMeta } from "@/lib/jobs/stages";
+import { useRouter } from "next/navigation";
 import {
-  reasonRequired, stageEffect, stageEffectText, transitionFeature, type FlowFacts, type QuoteFacts,
+  FLOW_ACTIONS, exceptionActions, reasonRequired, stageEffect, stageEffectText, transitionFeature, type FlowFacts, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { stageMoveIntent } from "@/lib/jobs/production-handoff";
@@ -185,6 +186,7 @@ export function StageSelect({
   disabled,
   flow,
   quotes,
+  exceptions,
 }: {
   jobId: string;
   stage: JobStage;
@@ -194,12 +196,19 @@ export function StageSelect({
   /** Fakta toku pro okamžitý náhled dopadu (jinak se načte ze serveru). */
   flow?: FlowFacts | null;
   quotes?: QuoteFacts[] | null;
+  /**
+   * Kniha: nahoře skupina „Co se stalo?" (Zákazník neobjednal, Reklamace, Pozastavit, Vyrábět bez objednávky…)
+   * — výběr otevře kartu zakázky rovnou s tím dialogem (?akce=…). Karta má tytéž akce v menu „⋯".
+   */
+  exceptions?: boolean;
 }) {
   const { can, features } = useAccess();
+  const router = useRouter();
   const [target, setTarget] = React.useState<JobStage | null>(null);
   const [open, setOpen] = React.useState(false);
   // oprávnění se na klient dostanou až po načtení layoutu — do té doby nic neskrývat
   const known = features.length > 0;
+  const happened = exceptions && flow && known ? exceptionActions({ ...flow, stage }, { can }) : [];
 
   const item = (s: JobStage) => {
     const allowed = !known || can(transitionFeature("job", s));
@@ -239,6 +248,21 @@ export function StageSelect({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="max-h-[70vh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto">
+          {happened.length > 0 && (
+            <>
+              <DropdownMenuLabel>Co se stalo?</DropdownMenuLabel>
+              {happened.map((k) => {
+                const a = FLOW_ACTIONS[k];
+                const Icon = a.icon;
+                return (
+                  <DropdownMenuItem key={k} className="min-h-10 gap-2.5" onSelect={() => router.push(`/orders/${jobId}?akce=${encodeURIComponent(k)}`)}>
+                    <Icon aria-hidden className="!size-4" /> {a.label}
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuLabel className="space-y-0.5">
             <span className="block">Korekce stavu…</span>
             <span className="block text-[11px] font-normal text-muted-foreground">Bez dokladu — ukážu, co se stane, a zapíšu tvoje jméno.</span>

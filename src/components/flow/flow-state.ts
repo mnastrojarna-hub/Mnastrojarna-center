@@ -1,5 +1,5 @@
 import {
-  CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FULFILMENT_STATES, INQUIRY_STATES, ORDER_STATES, PRICING_STATES,
+  CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FLOW_EXCEPTION_KEYS, FULFILMENT_STATES, INQUIRY_STATES, ORDER_STATES, PRICING_STATES,
   QUOTE_STATES, canApproveQuote, deliveryProgress, lostReasonLabel, mayManageQuoteApproval, productionProgress, quoteLabel,
   quoteSendBlock, quoteUnpriced,
   waitingText, type ActionCtx, type ChangeStamp, type FlowActionKey, type FlowFacts, type FlowPhase, type FlowSnapshot,
@@ -274,6 +274,8 @@ export function quoteRowActions(r: QuoteRowInput, ctx: ActionCtx): { next: NextS
       if (st === "odeslana") add("quote.feedback"); else add("quote.answerNoChange");
       if (r.current) add("quote.newRevision");
       add("quote.extend");
+      // 31. 10.: celá zakázka „Zákazník neobjednal" (i vypršená nabídka) — karta zakázky otevře dialog s důvody
+      if (margins && r.current) add("job.notOrdered");
       add(margins ? "quote.reject" : "quote.propose");
     } else {
       next = null;
@@ -337,6 +339,8 @@ export function flowActionHref(key: FlowActionKey, jobId: string, opts: { canPri
     case "job.correct":
       return `/orders/${jobId}?akce=job.correct`;
     default:
+      // výjimky v toku (Zákazník neobjednal, Reklamace, Pozastavit…): dialog otevře karta zakázky
+      if (FLOW_EXCEPTION_KEYS.includes(key)) return `/orders/${jobId}?akce=${key}`;
       return INLINE_ACTIONS.includes(key) ? null : `/orders/${jobId}`;
   }
 }
@@ -356,5 +360,7 @@ export function actionPalette(key: FlowActionKey): PaletteKey {
   if (key.startsWith("production.")) return "yellow.work";
   if (key.startsWith("delivery.")) return "green.action";
   if (key.startsWith("payment.")) return "emerald.ok";
+  if (key.startsWith("claim.")) return "rose.problem";
+  if (key === "job.resume" || key === "job.reopenLost") return "indigo.action";
   return "ghost.proposal";
 }

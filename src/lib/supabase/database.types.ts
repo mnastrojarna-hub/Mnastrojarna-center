@@ -406,6 +406,52 @@ export interface Order {
   merged_into_id?: string | null;
   merged_at?: string | null;
   merged_by?: string | null;
+  // ── výjimky v toku (migrace 20261031150000) ──
+  /** Stav před vedlejším stavem (pozastaveno, reklamace, nerealizováno, zrušeno). */
+  side_from_stage?: JobStage | null;
+  hold_reason?: string | null;
+  awaiting_customer_po?: boolean;
+  awaiting_po_since?: string | null;
+  awaiting_po_by?: string | null;
+  awaiting_po_note?: string | null;
+  customer_po_received_at?: string | null;
+  claim_opened_at?: string | null;
+  claim_opened_by?: string | null;
+  claim_reason?: ClaimReason | null;
+  claim_qty?: number | null;
+  claim_item_id?: string | null;
+  claim_note?: string | null;
+  claim_from_stage?: JobStage | null;
+  claim_resolution?: ClaimResolution | null;
+  claim_resolution_note?: string | null;
+  claim_resolved_at?: string | null;
+  claim_resolved_by?: string | null;
+  corrected_at?: string | null;
+  corrected_by?: string | null;
+  corrected_note?: string | null;
+  drawing_changes_open?: number;
+}
+
+export type ClaimReason = "rozmery" | "material" | "povrch" | "mnozstvi" | "poskozeni" | "jine";
+export type ClaimResolution = "oprava" | "dobropis" | "zamitnuto";
+
+/** Změna revize výkresu u zakázky (migrace 20261031150000) — banner „Nová revize výkresu", „Beru na vědomí". */
+export interface JobDrawingChangeRow {
+  id: string;
+  job_id: string;
+  order_item_id: string | null;
+  drawing_number: string | null;
+  rev_from: string | null;
+  rev_to: string | null;
+  file_id: string | null;
+  old_file_id: string | null;
+  note: string | null;
+  created_by: string | null;
+  created_via: string | null;
+  created_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  ack_note: string | null;
 }
 
 /** Sloučení zakázek (idempotence RPC merge_jobs, banner přesměrování; migrace 20261023161000). */
@@ -1230,6 +1276,7 @@ export interface Database {
       job_order_revisions: Tbl<JobOrderRevisionRow>;
       production_handoffs: Tbl<ProductionHandoffRow>;
       job_merges: Tbl<JobMergeRow>;
+      job_drawing_changes: Tbl<JobDrawingChangeRow>;
       // anonymizace výkresů (migrace 20261023159000)
       drawing_anon_adhoc: Tbl<DrawingAnonAdhocRow>;
       drawing_anon_texts: Tbl<DrawingAnonTextRow>;
@@ -1326,7 +1373,7 @@ export type OrderDocStatus = "dorucena" | "rozpor" | "potvrzena" | "aktualizovan
 export type QuoteState = "rozpracovana" | "ke_schvaleni" | "schvalena" | "odeslana" | "pripominky"
   | "prijata" | "zamitnuta" | "archivovana";
 export type LostReason = "nevyrabime" | "kapacita" | "nevyplati_se" | "duplicita" | "cena" | "termin"
-  | "jiny_dodavatel" | "projekt_zrusen" | "bez_odezvy" | "zakaznik_stahl" | "jine" | "neuvedeno";
+  | "jiny_dodavatel" | "projekt_zrusen" | "bez_odezvy" | "zakaznik_stahl" | "vyroba" | "jine" | "neuvedeno";
 export type ChangeVia = "rucne" | "ai" | "foto" | "email" | "automaticky" | "import" | "cron" | "rest" | "db";
 export type ActorKind = "user" | "ai" | "system";
 export type FlowCause = "vyroba" | "platba" | "nabidka" | "dodani" | "poptavka" | "objednavka" | "obnoveni"

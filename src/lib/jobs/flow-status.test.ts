@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
-  CAUSE_LABELS, CHIP_BASE, CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FLOW_PALETTE, FULFILMENT_STATES,
+  CAUSE_LABELS, CHIP_BASE, CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FLOW_EXCEPTION_KEYS, FLOW_PALETTE, FULFILMENT_STATES,
   INQUIRY_STATES, INQUIRY_TRANSITIONS, LOST_REASONS, NO_PLAN_META, LOST_JOB_META, CANCELLED_JOB_META, PROPOSAL_META,
   ORDER_STATES, ORDER_TRANSITIONS, PAYMENT_STATES, PILL_FILL, PILL_TRACK, PRICING_STATES, PURCHASE_EXTRA_STATES,
   QUOTE_STATES, QUOTE_TRANSITIONS, VIA_META, actorName, activeQuote, canApproveQuote, canTransition, chipsForTab,
@@ -412,9 +412,13 @@ describe("nextAction (tabulka 1.12)", () => {
     expect(next(dz, [], WORKER)?.key).toBe("delivery.confirmNote");
     expect(next({ ...dz, deliveryNoteConfirmedAt: "2026-10-20" })?.key).toBe("payment.invoice");
     expect(next(o({ stage: "fakturovano", orderStatus: "potvrzena" }))?.key).toBe("payment.record");
-    for (const s of ["dokonceno", "reklamace", "nerealizovano", "zruseno"] as JobStage[]) expect(next(o({ stage: s }))).toBeNull();
-    // pozastavená: jediný krok = rozhodnout, kde pokračovat (Korekce stavu)
+    for (const s of ["dokonceno", "nerealizovano", "zruseno"] as JobStage[]) expect(next(o({ stage: s }))).toBeNull();
+    // reklamace (31. 10.): nejdřív rozhodnout, jak ji vyřešit; oprava → vyrobit znovu (předání)
+    expect(next(o({ stage: "reklamace" }))?.key).toBe("claim.resolve");
+    expect(next(o({ stage: "reklamace", claimOpenedAt: "2026-10-30T10:00:00Z", claimResolution: "oprava" }))).toEqual({ key: "production.handoff", label: "Vyrobit znovu…" });
+    // pozastavená bez známého původu: rozhodnout, kde pokračovat (Korekce stavu); s původem „Pokračovat"
     expect(next(o({ stage: "pozastaveno" }))).toEqual({ key: "job.correct", label: "Pokračovat…" });
+    expect(next(o({ stage: "pozastaveno", sideFromStage: "ve_vyrobe" }))?.key).toBe("job.resume");
   });
 
   it("návrh má přednost pro toho, kdo smí rozhodnout", () => {
@@ -430,8 +434,11 @@ describe("menuActions", () => {
     const sales = menuActions(f, deriveFlow(f, [], TODAY), SALES);
     expect(sales).toContain("inquiry.decline");
     expect(sales.at(-1)).toBe("job.correct");
-    const firstDanger = sales.findIndex((k) => FLOW_ACTIONS[k].intent === "danger");
-    expect(sales.slice(firstDanger, -1).every((k) => FLOW_ACTIONS[k].intent === "danger")).toBe(true);
+    // výjimky v toku jsou vlastní skupina („Co se stalo?" — menu je ukáže první); ostatní: destruktivní dole
+    const plain = sales.filter((k) => !FLOW_EXCEPTION_KEYS.includes(k));
+    const firstDanger = plain.findIndex((k) => FLOW_ACTIONS[k].intent === "danger");
+    expect(plain.slice(firstDanger, -1).every((k) => FLOW_ACTIONS[k].intent === "danger")).toBe(true);
+    expect(sales).toEqual(expect.arrayContaining(["job.notOrdered", "job.decline", "order.startWithoutPo", "job.pause", "drawing.update"]));
     const worker = menuActions(f, deriveFlow(f, [], TODAY), WORKER);
     expect(worker).toContain("inquiry.propose");
     expect(worker).not.toContain("inquiry.decline");

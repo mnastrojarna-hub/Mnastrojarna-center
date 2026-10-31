@@ -357,6 +357,33 @@ export interface JobDetail extends JobListItem {
   deliveryDocumented?: Record<string, number> | null;
   /** Vystavené dodací listy (číslo z delivery_notes, id PDF v Dokumentech) — nejnovější první; chybí = nenačteno. */
   deliveryNotes?: { id: string | null; number: string; createdAt: string }[];
+  /** Změny revize výkresu (nové první) a čeho se týkají — banner „Nová revize výkresu"; chybí = nenačteno. */
+  drawingChanges?: DrawingChangeView[];
+  drawingAffects?: DrawingChangeAffects;
+}
+
+/** Změna revize výkresu (job_drawing_changes, migrace 20261031150000). */
+export interface DrawingChangeView {
+  id: string;
+  itemId: string | null;
+  drawingNumber: string | null;
+  revFrom: string | null;
+  revTo: string | null;
+  fileId: string | null;
+  note: string | null;
+  createdAt: string;
+  createdBy: PersonRef | null;
+  via: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedBy: PersonRef | null;
+}
+
+/** Čeho se nová revize výkresu týká (nabídka, objednávky / poptávky u dodavatelů, výroba). */
+export interface DrawingChangeAffects {
+  /** Otevřené objednávky dodavatelům (s položkou výkresu nebo bez vazby na položky). */
+  purchaseOrders: { id: string; number: string; status: string; supplier: string | null; supplierEmail: string | null; itemIds: string[]; drawingChangedAt: string | null }[];
+  /** Poptávky u dodavatelů bez ceny (RFQ). */
+  pendingSupplierQuotes: number;
 }
 
 /** „krok" = krok výroby po termínu nebo ohrožený konečný termín (zákazník). */
@@ -397,6 +424,10 @@ export interface JobFilters {
   deliveredToCustomer?: boolean;
   /** Kdo naposledy změnil hlavní stav nebo dílčí stav (uuid). */
   changedBy?: string;
+  /** Výjimka v toku (bez_po, reklamace, pozastaveno, vykres, opraveno). */
+  exception?: string;
+  /** Důvod prohry / storna (Nerealizované & zrušené). */
+  lostReason?: string;
   sort?: JobSort;
   dir?: "asc" | "desc";
   limit?: number;
