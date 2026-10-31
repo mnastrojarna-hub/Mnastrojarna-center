@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CtaBand, FaqList, FitBlock, MachinesGrid, PageHero, ProcessSteps, ReferencesBlock, SectionHeading, ServiceCard, ServicesGrid, TeamGrid } from "@/components/blocks";
 import { Icon, type AnyIcon } from "@/components/icons";
+import { DowntimeCalc } from "@/components/downtime-calc";
 import { FitChecker } from "@/components/fit-checker";
 import { Gallery } from "@/components/gallery";
 import { JsonLd } from "@/components/json-ld";
@@ -157,6 +158,14 @@ export function ServiceView({ locale, id }: P & { id: ServiceId }) {
           </aside>
         </div>
       </section>
+
+      {id === "nahradni-dily-pro-vyrobni-linky" && (
+        <section className="section bg-steel-100">
+          <div className="container">
+            <DowntimeCalc t={t.calc} ctaHref={rfq} locale={locale} />
+          </div>
+        </section>
+      )}
 
       {facts.machines && (
         <section className="relative overflow-hidden bg-steel-100 py-24">

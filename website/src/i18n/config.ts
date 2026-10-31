@@ -3,6 +3,8 @@
  * Každá stránka má v každém jazyce vlastní SEO slug; z tabulky se generují odkazy, hreflang i přepínač jazyků.
  */
 
+import { CASES } from "@/content/cases";
+
 export const LOCALES = ["cs", "en", "de"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "cs";
@@ -13,13 +15,14 @@ export const LOCALE_META: Record<Locale, { label: string; short: string; hreflan
   de: { label: "Deutsch", short: "DE", hreflang: "de", og: "de_DE" },
 };
 
-export type PageKey = "home" | "services" | "service" | "machinery" | "quality" | "references" | "about" | "contact" | "rfq" | "careers" | "privacy";
-type StaticKey = Exclude<PageKey, "service">;
+export type PageKey = "home" | "services" | "service" | "cases" | "case" | "machinery" | "quality" | "references" | "about" | "contact" | "rfq" | "careers" | "privacy";
+type StaticKey = Exclude<PageKey, "service" | "case">;
 
 const PATHS: Record<Locale, Record<StaticKey, string>> = {
   cs: {
     home: "/",
     services: "/sluzby",
+    cases: "/zakazky",
     machinery: "/strojovy-park",
     quality: "/kvalita",
     references: "/reference",
@@ -32,6 +35,7 @@ const PATHS: Record<Locale, Record<StaticKey, string>> = {
   en: {
     home: "/en",
     services: "/en/services",
+    cases: "/en/projects",
     machinery: "/en/machinery",
     quality: "/en/quality",
     references: "/en/references",
@@ -44,6 +48,7 @@ const PATHS: Record<Locale, Record<StaticKey, string>> = {
   de: {
     home: "/de",
     services: "/de/leistungen",
+    cases: "/de/projekte",
     machinery: "/de/maschinenpark",
     quality: "/de/qualitaet",
     references: "/de/referenzen",
@@ -83,10 +88,16 @@ const SERVICE_SLUGS: Record<ServiceId, Record<Locale, string>> = {
   "konsignacni-skladovani": { cs: "konsignacni-skladovani", en: "consignment-stock", de: "konsignationslager" },
 };
 
-export function href(locale: Locale, key: PageKey, serviceId?: ServiceId): string {
+/** `id` = ID služby (pro „service“) nebo český slug zakázky (pro „case“). */
+export function href(locale: Locale, key: PageKey, id?: string): string {
   if (key === "service") {
-    if (!serviceId) throw new Error("serviceId chybí");
-    return `${PATHS[locale].services}/${SERVICE_SLUGS[serviceId][locale]}`;
+    if (!id) throw new Error("serviceId chybí");
+    return `${PATHS[locale].services}/${SERVICE_SLUGS[id as ServiceId][locale]}`;
+  }
+  if (key === "case") {
+    const c = CASES.find((x) => x.slug.cs === id);
+    if (!c) throw new Error(`zakázka ${id} neexistuje`);
+    return `${PATHS[locale].cases}/${c.slug[locale]}`;
   }
   return PATHS[locale][key];
 }
@@ -96,11 +107,11 @@ export function serviceSlug(locale: Locale, id: ServiceId) {
 }
 
 /** Adresy téže stránky ve všech jazycích (pro hreflang a přepínač). */
-export function alternates(key: PageKey, serviceId?: ServiceId): Record<Locale, string> {
-  return Object.fromEntries(LOCALES.map((l) => [l, href(l, key, serviceId)])) as Record<Locale, string>;
+export function alternates(key: PageKey, id?: string): Record<Locale, string> {
+  return Object.fromEntries(LOCALES.map((l) => [l, href(l, key, id)])) as Record<Locale, string>;
 }
 
-export type Resolved = { key: PageKey; serviceId?: ServiceId };
+export type Resolved = { key: PageKey; serviceId?: ServiceId; caseId?: string };
 
 /** Najde stránku podle cesty (např. „/de/leistungen/werkzeugbau“). */
 export function resolvePath(pathname: string): (Resolved & { locale: Locale }) | null {
@@ -115,6 +126,11 @@ export function resolvePath(pathname: string): (Resolved & { locale: Locale }) |
       const id = (Object.keys(SERVICE_SLUGS) as ServiceId[]).find((s) => SERVICE_SLUGS[s][locale] === slug);
       if (id) return { locale, key: "service", serviceId: id };
     }
+    const cbase = PATHS[locale].cases + "/";
+    if (clean.startsWith(cbase)) {
+      const c = CASES.find((x) => x.slug[locale] === clean.slice(cbase.length));
+      if (c) return { locale, key: "case", caseId: c.slug.cs };
+    }
   }
   return null;
 }
@@ -125,11 +141,3 @@ export function localeOfPath(pathname: string): Locale {
   return "cs";
 }
 
-/** Cesty pro generateStaticParams catch-all routy daného jazyka (bez prefixu jazyka). */
-export function staticSegments(locale: Exclude<Locale, "cs">): string[][] {
-  const prefix = `/${locale}`;
-  const strip = (p: string) => p.slice(prefix.length).split("/").filter(Boolean);
-  const out = (Object.keys(PATHS[locale]) as StaticKey[]).map((k) => strip(PATHS[locale][k]));
-  for (const id of SERVICE_IDS) out.push(strip(href(locale, "service", id)));
-  return out;
-}

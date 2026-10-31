@@ -315,3 +315,94 @@
   .line-reveal > span > span { transform: none; }
   .dim { transform: none; }
 }
+
+/* ---------- v3: pohybový systém ---------- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 9999px;
+}
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: #e03930;
+}
+.cursor-ring {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1px solid rgba(39, 36, 37, 0.35);
+  display: grid;
+  place-items: center;
+  transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), margin 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 0.3s, border-color 0.3s;
+}
+.cursor-ring.is-link {
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-color: #e03930;
+}
+.cursor-ring.has-label {
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  background: #e03930;
+  border-color: #e03930;
+  color: #fff;
+  font: 500 11px/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+html.has-cursor body,
+html.has-cursor a,
+html.has-cursor button,
+html.has-cursor [data-cursor] {
+  cursor: none;
+}
+
+/* vertikální sloupce fotek v hero */
+.photo-col {
+  animation: col-up var(--dur, 60s) linear infinite;
+}
+.photo-col.down {
+  animation-name: col-down;
+}
+@keyframes col-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes col-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+.logo-row {
+  animation: marquee 50s linear infinite;
+}
+.logo-row.rev {
+  animation-direction: reverse;
+}
+.marquee-pause:hover .logo-row,
+.marquee-pause:hover .photo-col {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-col, .logo-row { animation: none; }
+}

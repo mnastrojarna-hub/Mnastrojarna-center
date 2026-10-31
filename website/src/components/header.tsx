@@ -13,7 +13,7 @@ import { Logo } from "./logo";
 function LangSwitch({ locale, label, className }: { locale: Locale; label: string; className?: string }) {
   const pathname = usePathname() || "/";
   const r = resolvePath(pathname);
-  const alt = r ? alternates(r.key, r.serviceId) : alternates("home");
+  const alt = r ? alternates(r.key, r.serviceId ?? r.caseId) : alternates("home");
   return (
     <div className={cn("flex items-center rounded-full border border-ink-700/10 bg-white p-0.5", className)} role="navigation" aria-label={label}>
       {LOCALES.map((l) => (
@@ -39,8 +39,8 @@ export function Header({ locale, t, note }: { locale: Locale; t: Dict["nav"]; no
   const [open, setOpen] = useState(false);
   const nav = [
     { href: href(locale, "services"), label: t.services },
+    { href: href(locale, "cases"), label: t.cases },
     { href: href(locale, "machinery"), label: t.machinery },
-    { href: href(locale, "quality"), label: t.quality },
     { href: href(locale, "references"), label: t.references },
     { href: href(locale, "about"), label: t.about },
     { href: href(locale, "contact"), label: t.contact },

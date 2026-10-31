@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
+import { CASES } from "@/content/cases";
 import { SITE } from "@/content/site";
-import { LOCALES, LOCALE_META, SERVICE_IDS, alternates, href, type PageKey, type ServiceId } from "@/i18n/config";
+import { LOCALES, LOCALE_META, SERVICE_IDS, alternates, href, type PageKey } from "@/i18n/config";
 
 const PAGES: [PageKey, number, MetadataRoute.Sitemap[number]["changeFrequency"]][] = [
   ["home", 1, "weekly"],
   ["services", 0.9, "monthly"],
+  ["cases", 0.9, "monthly"],
   ["rfq", 0.9, "yearly"],
   ["machinery", 0.8, "monthly"],
   ["references", 0.8, "monthly"],
@@ -17,7 +19,7 @@ const PAGES: [PageKey, number, MetadataRoute.Sitemap[number]["changeFrequency"]]
 /** Sitemapa všech jazykových verzí vč. hreflang alternativ. */
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const entry = (key: PageKey, priority: number, changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"], id?: ServiceId) => {
+  const entry = (key: PageKey, priority: number, changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"], id?: string) => {
     const alt = alternates(key, id);
     const languages = Object.fromEntries(LOCALES.map((l) => [LOCALE_META[l].hreflang, `${SITE.url}${alt[l]}`]));
     return LOCALES.map((l) => ({ url: `${SITE.url}${href(l, key, id)}`, lastModified: now, priority, changeFrequency, alternates: { languages } }));
@@ -25,6 +27,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     ...PAGES.flatMap(([k, p, f]) => entry(k, p, f)),
     ...SERVICE_IDS.flatMap((id) => entry("service", 0.85, "monthly", id)),
+    ...CASES.flatMap((c) => entry("case", 0.75, "yearly", c.slug.cs)),
     { url: `${SITE.url}/cad`, lastModified: now, priority: 0.9, changeFrequency: "monthly" },
   ];
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getDict } from "@/content";
 import { SITE } from "@/content/site";
-import { LOCALES, LOCALE_META, alternates, href, type Locale, type PageKey, type ServiceId } from "@/i18n/config";
+import { LOCALES, LOCALE_META, alternates, href, type Locale, type PageKey } from "@/i18n/config";
 
 /** Metadata stránky vč. canonical a hreflang (cs, en, de, x-default). */
 export function pageMeta({
@@ -15,7 +15,8 @@ export function pageMeta({
 }: {
   locale: Locale;
   page: PageKey;
-  serviceId?: ServiceId;
+  /** ID služby nebo český slug zakázky */
+  serviceId?: string;
   title: string;
   description: string;
   keywords?: string[];

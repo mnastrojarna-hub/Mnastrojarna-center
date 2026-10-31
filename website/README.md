@@ -18,6 +18,20 @@ Nový web Mnástrojárny s.r.o. — **„Váš partner ve strojírenství“**. 
 - **SEO**: metadata a canonical, JSON-LD (Organization/LocalBusiness, Service, FAQPage, BreadcrumbList, WebApplication), sitemap, robots, OG obrázek, 301 ze všech starých URL.
 - **Měření konverzí**: GA4 / Google Ads s Consent Mode (`rfq_start`, `rfq_step`, `generate_lead`, `cad_open`, `cad_feature`, `cad_export`, `cad_to_rfq`).
 
+## Archiv zakázek
+
+`/zakazky` (EN `/en/projects`, DE `/de/projekte`) – skutečné fotografie z dílny, data v **`src/content/cases.ts`**.
+Popisy zatím vycházejí jen z toho, co je na fotkách vidět. U každé zakázky lze doplnit `brief` (zadání), `solution` (řešení),
+`result` (výsledek), rok a technologie ve všech třech jazycích – web je automaticky zobrazí.
+Nová zakázka: fotky do `public/img/zakazky/<slug>/1.jpg, 2.jpg…` a záznam do `CASES`.
+
+## Pohyb a animace
+
+GSAP + ScrollTrigger + SplitText a plynulý scroll Lenis (`src/components/motion.tsx`), řízené data-atributy:
+`data-split` (nadpis po řádcích), `data-img` (odkrytí fotky), `data-speed` (paralaxa), `data-scrub-text` (rozsvěcování slov),
+`data-hscroll` (vodorovný scroll), `data-draw` (kreslení kót), `data-magnetic`, `data-cursor="Popisek"` (vlastní kurzor).
+Vše respektuje `prefers-reduced-motion`.
+
 ## Jazykové verze (CZ / EN / DE)
 
 | Jazyk | Adresy | Příklad |

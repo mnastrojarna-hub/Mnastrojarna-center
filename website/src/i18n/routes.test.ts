@@ -4,11 +4,12 @@ import { describe, expect, it } from "vitest";
 import { cs } from "@/content/cs";
 import { de } from "@/content/de";
 import { en } from "@/content/en";
+import { CASES } from "@/content/cases";
 import { LOCALES, SERVICE_IDS, alternates, href, resolvePath, type PageKey } from "./config";
 
 const APP = path.resolve(__dirname, "../app");
 const base = { cs: "(cs)/(site)", en: "(en)", de: "(de)" } as const;
-const KEYS: PageKey[] = ["home", "services", "machinery", "quality", "references", "about", "contact", "rfq", "careers", "privacy"];
+const KEYS: PageKey[] = ["home", "services", "cases", "machinery", "quality", "references", "about", "contact", "rfq", "careers", "privacy"];
 
 describe("lokalizované trasy", () => {
   it("každá adresa z tabulky má soubor stránky", () => {
@@ -23,6 +24,12 @@ describe("lokalizované trasy", () => {
     for (const l of LOCALES) {
       expect(fs.existsSync(path.join(APP, base[l], href(l, "services"), "[slug]", "page.tsx"))).toBe(true);
       for (const id of SERVICE_IDS) expect(resolvePath(href(l, "service", id))).toEqual({ locale: l, key: "service", serviceId: id });
+    }
+  });
+  it("zakázky: [slug] route a rozpoznání adresy ve všech jazycích", () => {
+    for (const l of LOCALES) {
+      expect(fs.existsSync(path.join(APP, base[l], href(l, "cases"), "[slug]", "page.tsx"))).toBe(true);
+      for (const c of CASES) expect(resolvePath(href(l, "case", c.slug.cs))).toEqual({ locale: l, key: "case", caseId: c.slug.cs });
     }
   });
   it("hreflang alternativy vedou na stejnou stránku", () => {

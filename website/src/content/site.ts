@@ -36,17 +36,17 @@ export const TECH = TEAM[2];
 
 export type IconName = "mill" | "axes" | "wire" | "die" | "machine" | "prototype" | "spare" | "cad" | "measure" | "stock";
 
-export const SERVICE_FACTS: Record<ServiceId, { icon: IconName; machines?: string[] }> = {
-  "cnc-obrabeni": { icon: "mill", machines: ["axile-g8", "hypertun-65", "mcv-754q", "vmca-760", "sab-50"] },
-  "petiose-cnc-obrabeni": { icon: "axes", machines: ["axile-g8", "hypertun-65"] },
-  "elektroerozivni-obrabeni": { icon: "wire", machines: ["fanuc-robocut"] },
-  "nahradni-dily-pro-vyrobni-linky": { icon: "spare", machines: ["hypertun-65", "axile-g8", "sab-50"] },
-  nastrojarstvi: { icon: "die", machines: ["fanuc-robocut", "axile-g8", "mcv-754q"] },
-  "jednoucelove-stroje": { icon: "machine" },
-  "vyroba-prototypu": { icon: "prototype", machines: ["axile-g8", "hypertun-65", "fanuc-robocut"] },
-  "programovani-a-konstrukce": { icon: "cad" },
-  "mereni-a-kontrola-kvality": { icon: "measure" },
-  "konsignacni-skladovani": { icon: "stock" },
+export const SERVICE_FACTS: Record<ServiceId, { icon: IconName; machines?: string[]; photo: string }> = {
+  "cnc-obrabeni": { icon: "mill", photo: "/img/zakazky/dily-podle-vykresu/1.jpg", machines: ["axile-g8", "hypertun-65", "mcv-754q", "vmca-760", "sab-50"] },
+  "petiose-cnc-obrabeni": { icon: "axes", photo: "/img/zakazky/tvarove-slozita-skrin/1.jpg", machines: ["axile-g8", "hypertun-65"] },
+  "elektroerozivni-obrabeni": { icon: "wire", photo: "/img/zakazky/hrebenova-deska-a-pouzdro/1.jpg", machines: ["fanuc-robocut"] },
+  "nahradni-dily-pro-vyrobni-linky": { icon: "spare", photo: "/img/zakazky/rotory-s-drazkami/1.jpg", machines: ["hypertun-65", "axile-g8", "sab-50"] },
+  nastrojarstvi: { icon: "die", photo: "/img/zakazky/paletove-upinaci-pripravky/1.jpg", machines: ["fanuc-robocut", "axile-g8", "mcv-754q"] },
+  "jednoucelove-stroje": { icon: "machine", photo: "/img/zakazky/pripravky-s-pneumatikou/1.jpg" },
+  "vyroba-prototypu": { icon: "prototype", photo: "/img/zakazky/tvarove-slozita-skrin/2.jpg", machines: ["axile-g8", "hypertun-65", "fanuc-robocut"] },
+  "programovani-a-konstrukce": { icon: "cad", photo: "/img/zakazky/desky-skorepiny-a-mereni/7.jpg" },
+  "mereni-a-kontrola-kvality": { icon: "measure", photo: "/img/zakazky/desky-skorepiny-a-mereni/1.jpg" },
+  "konsignacni-skladovani": { icon: "stock", photo: "/img/zakazky/presne-male-dily/2.jpg" },
 };
 export const SERVICE_ORDER: readonly ServiceId[] = SERVICE_IDS;
 

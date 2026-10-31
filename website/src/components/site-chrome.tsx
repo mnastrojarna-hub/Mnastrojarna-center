@@ -2,6 +2,7 @@ import { getDict } from "@/content";
 import type { Locale } from "@/i18n/config";
 import { Footer } from "./footer";
 import { Header } from "./header";
+import { Motion } from "./motion";
 
 export function SiteChrome({ locale, children }: { locale: Locale; children: React.ReactNode }) {
   const t = getDict(locale);
@@ -10,6 +11,7 @@ export function SiteChrome({ locale, children }: { locale: Locale; children: Rea
       <Header locale={locale} t={t.nav} note={`${t.minOrderShort} · ${t.hours}`} />
       <main id="obsah">{children}</main>
       <Footer locale={locale} />
+      <Motion />
     </>
   );
 }

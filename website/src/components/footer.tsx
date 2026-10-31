@@ -9,6 +9,7 @@ export function Footer({ locale }: { locale: Locale }) {
   const t = getDict(locale);
   const f = t.footer;
   const links: [string, string][] = [
+    [href(locale, "cases"), t.nav.cases],
     [href(locale, "about"), f.links.about],
     [href(locale, "machinery"), f.links.machinery],
     [href(locale, "quality"), f.links.quality],
