@@ -43,12 +43,15 @@ Testy: `src/cad/**/*.test.ts` (vitest, OCCT se inicializuje v Node). E2E: `e2e/c
 - **M – 3D interakce**: výběrový filtr (vše/prvek/plocha/hrana/bod/těleso/komponenta/podsestava), inspektor entit, měření mezi entitami (bod–plocha, plocha–plocha, úhel…), kontextové nabídky podle entity, TransformControls gizmo, barvy ploch, podsestavy v UI, strukturovaný kusovník.
 - **F – jádro 2**: pushPull, offsetFace, deleteFace, žebro, pružina, zesílení; `BuildResult.vertices`; `flattenAssembly`, `makeSubassembly`, `dissolveSubassembly`, strukturovaný kusovník; další normálie (ISO 7089, ISO 4032, ISO 8734).
 - **L – knihovna normálií**: registr rodin + textový parser + dialog knihovny s 3D náhledem.
-- **Vedoucí**: formařské nástroje (`mold.ts` hotovo s testy, `mold-panel.tsx` hotovo – čeká na zapojení), nastavení (`settings.ts`, `settings-dialog.tsx`), paleta příkazů, úvodní obrazovka, sdílené UI (`ui.tsx`) – vše čeká na zapojení do `cad-app.tsx` po dokončení M.
+- **Vedoucí**: formařské nástroje, nastavení, paleta příkazů, úvodní obrazovka – **zapojeno** (commit 3e0050a). SEO analýza `SEO-ANALYZA.md` + úpravy textů hotovo.
+- **M – 3D interakce**: **hotovo** (filtr výběru, inspektor, měření entit, kontextová menu, gizmo, barvy ploch, podsestavy, 127 testů).
+- **F – jádro 2**: **hotovo** (pushPull/offsetFace/deleteFace/rib/spring/thicken, podsestavy, normálie).
+- **D – DWG export**: probíhá (`cad/formats/dwg.ts` přes acad-ts).
 
 ### Zapojení po dokončení pracovníků (checklist pro vedoucího / další relaci)
-1. `cad-app.tsx`: nahradit lokální `loadPrefs/PREFS` modulem `cad/settings.ts` (`loadSettings/saveSettings`), přidat `SettingsDialog` (karta Data nebo ozubené kolo v titulní liště), `CommandPalette` (Ctrl+K; příkazy = zploštělé skupiny ribbonu + pohledy + soubor), `StartScreen` (při startu, pokud `settings.startScreen`; nedávné: `pushRecent` při uložení/otevření, thumbnail = `vp.current.snapshot()` zmenšený), `MoldPanel` (karta Nástroje → „Formy“; analýza úkosů = barvy vrcholů do viewportu – přidat prop `vertexColors?: Float32Array` do `viewport.tsx` a použít `MeshStandardMaterial({vertexColors:true})`), `LibraryDialog` (karta Tvorba/Sestava → „Knihovna normálií“ + Ctrl+L).
-2. Používat `ui.tsx` (Modal/FloatPanel/Row/Btn/Toggle/Segmented/Kbd) místo lokálních kopií v `cad-app.tsx`.
-3. Jednotky: `fmtLen` v stavových štítcích a inspektoru podle `settings.units`.
+1. ~~Settings/Palette/Start/MoldPanel~~ zapojeno. **Zbývá:** `LibraryDialog` (po dokončení L: karta Tvorba/Sestava → „Knihovna normálií“ + Ctrl+L + úvodní obrazovka + paleta), tlačítko DWG (D), náhledy (thumbnail) nedávných souborů z `vp.current.snapshot()`.
+2. Používat `ui.tsx` (Modal/FloatPanel/Row/Btn/Toggle/Segmented/Kbd) místo lokálních kopií v `cad-app.tsx` (kosmetika).
+3. Jednotky: `fmtLen` ve stavových štítcích, inspektoru a formulářích podle `settings.units` (dnes jen uloženo v nastavení, UI stále mm).
 4. E2E `e2e/cad.e2e.cjs`: doplnit kroky vazby skici + kóty, výběr plochy → pushPull, knihovna „M8x30“ → vložit, formařská analýza.
 5. Aktualizovat `README.md` (sekce CAD) a tento soubor.
 
@@ -97,21 +100,21 @@ Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · �
 | 21 | Plnohodnotný CAD jako ZW3D/Inventor, „nakreslit cokoli“, uložit do počítače | 🟡 | historie prvků 30+ typů, uložení .mncad/STEP; **chybí plošné modelování (surfacing), více těles v dílu, proměnné zaoblení** |
 | 22 | Dramaticky lepší UI, barevné ikony, 1:1 ZW3D (UX, UI, grafika, ovládání) | 🟡 | ribbon, správce, formulář OK/Storno, ViewCube, schéma myši ZW3D hotovo; **dokončují se: výběrový filtr entit, kontextové nabídky dle entity, gizmo, inspektor** (pracovník M) |
 | 23 | Import/export všech formátů, nejnovější i historické verze | 🟡/⛔ | STEP/IGES/BREP/STL/OBJ/3MF/glTF/PLY/OFF/DXF ✅. **⛔ nativní SLDPRT/IPT/Z3/CATPart/PRT/X_T – uzavřené formáty, bez licence ODA/Spatial nečitelné** → návod na STEP. **❌ JT (ISO 14306) a 3D PDF – otevřené, lze doplnit později** |
-| 24 | Výkresy PDF, DXF, **DWG** | 🟡 | PDF/DXF ✅. **DWG ❌** – libredwg-web umí jen DWG→DXF; prověřit kompilaci `dwg_write` z LibreDWG do wasm (GPL) – úkol níže |
+| 24 | Výkresy PDF, DXF, **DWG** | 🚧 | PDF/DXF ✅. **DWG**: libredwg-web umí jen číst; zvolena MIT knihovna `@node-projects/acad-ts` (zápis R2000–R2018 v prohlížeči) – pracovník D implementuje `cad/formats/dwg.ts` + tlačítko DWG ve výkresu |
 | 25 | Stavy (konfigurace) | ✅ | |
 | 26 | Složité sestavy forem obrovské velikosti, rychlost | 🟡 | sestavy, podsestavy, rám formy ✅; **výkon pro tisíce dílů ❌ (progresivní síť, IndexedDB cache, více workerů)** |
 | 27 | Hlavičky (razítka) a kusovníky ve výkresech | ✅ | |
 | 28 | Skica: práce s rovinami, zjištěné vzdálenosti, pravé tlačítko, uchopení rohu/hrany/křivky/středu | 🚧 | pracovník S (přichytávání, vazby, kóty, řešič, nástroje úprav) |
 | 29 | Entity: prvek/plocha/hrana/bod/sestava/podsestava/tvar – otáčet, barvy, mazat, posouvat jednotlivé prvky/plochy/tvary | 🚧 | jádro ✅ (pushPull, offsetFace, deleteFace, barvy ploch, transform), UI pracovník M |
 | 30 | Snímky všech nástrojů + počet nástrojů vs. ZW3D | ❌ | udělat po zapojení (viz checklist); do zprávy uvést poctivé srovnání počtu příkazů |
-| 31 | Top UI/UX vč. ikon, **nastavení** a používání | 🟡 | `settings-dialog.tsx` (7 karet, zkratky, jednotky mm/in, export/import) hotovo – **zapojit** |
+| 31 | Top UI/UX vč. ikon, **nastavení** a používání | ✅ | Nastavení (7 karet, zkratky, jednotky, export/import), paleta příkazů Ctrl+K, úvodní obrazovka s nedávnými soubory – zapojeno |
 | 32 | Obrovský adresář normalizovaných dílů „stačí napsat“: ozubená kola, řetězová kola, normálie, ocelové profily… | 🚧 | pracovník L (`cad/library`, parser, dialog s náhledem) |
 | 33 | Pracovat až do limitu, nic neztratit, předat dál | ✅ | WIP commity po každém kroku, tento dokument |
 | 34 | AI vrstva (21. století) – zadání textem, kontrola vyrobitelnosti | ❌ | etapa 7 níže |
 
 ### Úkoly z auditu (doplnit do nejbližší etapy)
 - [ ] Lighthouse (mobil + desktop) pro `/`, `/sluzby/cnc-obrabeni`, `/zakazky`, `/en` → cíl ≥ 90 Performance/SEO/Best practices; opravit nálezy (velikost fotek `public/img/zakazky` → WebP/AVIF přes `next/image`, lazy video).
-- [ ] DWG export: zkusit sestavit LibreDWG s `dwg_write` do wasm (Emscripten) nebo nabídnout konverzi DXF→DWG v CNC Sales OS (server, ODA File Converter je zdarma pro nekomerční… ověřit licenci) – jinak zůstává DXF.
+- [x] DWG export – rozhodnuto: `@node-projects/acad-ts` (MIT, DwgWriter AC1015–AC1032). LibreDWG zapisuje spolehlivě jen R2000/R2004 a wasm balíček je bez zápisu; ODA File Converter nelze redistribuovat ani komerčně automatizovat (členství ODA od 3 000 USD/rok). Po dodání ověřit výstup v AutoCAD/ZWCAD (audit) – mladá knihovna.
 - [ ] JT a 3D PDF export (otevřené formáty) – nízká priorita.
 - [ ] Snímky všech nástrojů CAD + tabulka počtu příkazů (náš CAD vs. ZW3D Standard) do zprávy zadavateli.
 - [ ] Vyžádat od zadavatele: texty k 10 zakázkám, fotky týmu, potvrzení claimu/klientů/konsignace.
