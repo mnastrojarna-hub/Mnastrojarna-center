@@ -18,6 +18,7 @@ const legacy = [
   ["/cz/kariera", "/kariera"],
   ["/cz/kontakt", "/kontakt"],
   ["/cz/mapa-stranek", "/sitemap.xml"],
+  ["/3d-prohlizec", "/cad"],
 ];
 
 const securityHeaders = [
@@ -33,6 +34,15 @@ const nextConfig = {
   outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   poweredByHeader: false,
   images: { formats: ["image/avif", "image/webp"] },
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) {
+      config.plugins.push(new webpack.NormalModuleReplacementPlugin(/^node:/, (r) => { r.request = r.request.replace(/^node:/, ""); }));
+      // Emscripten glue OpenCascade obsahuje větve pro Node — v prohlížeči je nepotřebujeme
+      config.resolve.fallback = { ...config.resolve.fallback, fs: false, path: false, crypto: false, module: false, url: false, worker_threads: false, perf_hooks: false };
+    }
+    config.experiments = { ...config.experiments, asyncWebAssembly: true };
+    return config;
+  },
   async redirects() {
     return legacy.map(([source, destination]) => ({ source, destination, permanent: true }));
   },

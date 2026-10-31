@@ -8,9 +8,6 @@ import { cn } from "@/lib/cn";
 import { Icon } from "./icons";
 import { Logo } from "./logo";
 
-/** Stránky s tmavým hero — hlavička na nich začíná průhledná se světlým logem. */
-const DARK_HERO = (p: string) => p === "/" || p.startsWith("/sluzby") || p === "/strojovy-park" || p === "/3d-prohlizec" || p === "/kvalita" || p === "/o-nas" || p === "/kariera";
-
 export function Header() {
   const pathname = usePathname() || "/";
   const [scrolled, setScrolled] = useState(false);
@@ -27,84 +24,71 @@ export function Header() {
     document.body.style.overflow = open ? "hidden" : "";
   }, [open]);
 
-  const dark = DARK_HERO(pathname) && !scrolled && !open;
-  const solidDark = scrolled || open;
-
   return (
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-500",
-        solidDark ? "border-b border-white/10 bg-ink/85 py-3 backdrop-blur-xl" : "py-5",
-      )}
-    >
-      <div className="container flex items-center justify-between gap-6">
-        <Link href="/" aria-label="Mnástrojárna – úvod" className="shrink-0">
-          <Logo tone={dark || solidDark ? "light" : "dark"} animate glow={dark} className="h-7 w-auto md:h-8" />
-        </Link>
-
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Hlavní navigace">
-          {NAV.map((n) => {
-            const active = pathname === n.href || pathname.startsWith(n.href + "/");
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={cn(
-                  "relative rounded-full px-4 py-2 text-[14px] font-medium transition-colors",
-                  dark || solidDark ? "text-white/75 hover:text-white" : "text-ink-700/70 hover:text-ink-700",
-                  active && (dark || solidDark ? "text-white" : "text-ink-700"),
-                )}
-              >
-                {n.label}
-                {active && <span className="absolute inset-x-4 -bottom-0.5 h-px bg-brand" />}
-              </Link>
-            );
-          })}
-          <Link
-            href="/3d-prohlizec"
-            className={cn(
-              "ml-1 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-medium transition-colors",
-              dark || solidDark ? "text-white/75 hover:text-white" : "text-ink-700/70 hover:text-ink-700",
-            )}
-          >
-            <Icon name="cube" className="h-4 w-4 text-brand" /> 3D prohlížeč
+    <header className={cn("fixed inset-x-0 top-0 z-50 transition-all duration-500", scrolled || open ? "py-2.5" : "py-5")}>
+      <div className="container">
+        <div
+          className={cn(
+            "flex items-center justify-between gap-6 rounded-full px-3 transition-all duration-500 md:px-4",
+            scrolled || open ? "border border-ink-700/10 bg-white/85 py-2 shadow-[0_12px_40px_-20px_rgba(39,36,37,.35)] backdrop-blur-xl" : "border border-transparent py-1",
+          )}
+        >
+          <Link href="/" aria-label="Mnástrojárna – úvod" className="shrink-0 pl-1">
+            <Logo tone="dark" animate className="h-7 w-auto md:h-8" />
           </Link>
-        </nav>
 
-        <div className="flex items-center gap-2">
-          <Link href="/poptavka" className="btn-primary hidden !px-5 !py-2.5 !text-[14px] sm:inline-flex">
-            Poptat výrobu <Icon name="arrow" className="h-4 w-4" />
-          </Link>
-          <button
-            type="button"
-            className={cn("rounded-full p-2.5 lg:hidden", dark || solidDark ? "text-white" : "text-ink-700")}
-            aria-label={open ? "Zavřít menu" : "Otevřít menu"}
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            <Icon name={open ? "x" : "menu"} />
-          </button>
+          <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Hlavní navigace">
+            {NAV.map((n) => {
+              const active = pathname === n.href || pathname.startsWith(n.href + "/");
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className={cn(
+                    "relative rounded-full px-4 py-2 text-[14px] font-medium transition-colors",
+                    active ? "bg-ink-700/[0.06] text-ink-700" : "text-ink-700/65 hover:text-ink-700",
+                  )}
+                >
+                  {n.label}
+                </Link>
+              );
+            })}
+            <Link
+              href="/cad"
+              className="ml-1 inline-flex items-center gap-2 rounded-full border border-ink-700/10 bg-white py-1.5 pl-1.5 pr-3.5 text-[14px] font-medium text-ink-700 transition hover:border-brand/40"
+            >
+              <span className="rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white">Nové</span>
+              Online CAD
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Link href="/poptavka" className="btn-primary hidden !px-5 !py-2.5 !text-[14px] sm:inline-flex">
+              Poptat výrobu <Icon name="arrow" className="h-4 w-4" />
+            </Link>
+            <button
+              type="button"
+              className="rounded-full p-2.5 text-ink-700 lg:hidden"
+              aria-label={open ? "Zavřít menu" : "Otevřít menu"}
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+            >
+              <Icon name={open ? "x" : "menu"} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Mobilní menu */}
-      <div
-        className={cn(
-          "fixed inset-x-0 bottom-0 top-[60px] bg-ink transition-all duration-500 lg:hidden",
-          open ? "visible opacity-100" : "invisible opacity-0",
-        )}
-      >
-        <div className="bg-grid absolute inset-0 opacity-60" />
-        <nav className="container relative flex h-full flex-col gap-1 pt-8" aria-label="Mobilní navigace">
-          {[...NAV, { href: "/3d-prohlizec", label: "3D prohlížeč" }].map((n, i) => (
+      <div className={cn("fixed inset-x-0 bottom-0 top-[72px] bg-white transition-all duration-500 lg:hidden", open ? "visible opacity-100" : "invisible opacity-0")}>
+        <div className="bg-grid-light absolute inset-0" />
+        <nav className="container relative flex h-full flex-col gap-1 pt-6" aria-label="Mobilní navigace">
+          {[...NAV, { href: "/cad", label: "Online CAD" }].map((n, i) => (
             <Link
               key={n.href}
               href={n.href}
               style={{ transitionDelay: open ? `${80 + i * 50}ms` : "0ms" }}
-              className={cn(
-                "h-display border-b border-white/10 py-4 text-3xl text-white transition-all duration-500",
-                open ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0",
-              )}
+              className={cn("h-display border-b border-ink-700/10 py-4 text-3xl text-ink-700 transition-all duration-500", open ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0")}
             >
               {n.label}
             </Link>
@@ -112,7 +96,7 @@ export function Header() {
           <Link href="/poptavka" className="btn-primary mt-8 w-full !py-4">
             Poptat výrobu <Icon name="arrow" className="h-4 w-4" />
           </Link>
-          <p className="mt-6 font-mono text-xs uppercase tracking-widest text-white/40">B2B zakázky od 50 000 Kč · {SITE.hours}</p>
+          <p className="mt-6 font-mono text-xs uppercase tracking-widest text-ink-700/40">B2B zakázky od 50 000 Kč · {SITE.hours}</p>
         </nav>
       </div>
     </header>

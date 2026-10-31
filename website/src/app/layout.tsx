@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Roboto, Roboto_Condensed, Roboto_Mono } from "next/font/google";
 import { Analytics } from "@/components/analytics";
-import { Footer } from "@/components/footer";
-import { Header } from "@/components/header";
 import { JsonLd } from "@/components/json-ld";
 import { RevealObserver } from "@/components/reveal-observer";
 import { SITE } from "@/content/site";
@@ -54,9 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#obsah" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-brand focus:px-4 focus:py-2 focus:text-white">
           Přeskočit na obsah
         </a>
-        <Header />
-        <main id="obsah">{children}</main>
-        <Footer />
+        {children}
         <RevealObserver />
         <Analytics />
         <JsonLd data={organizationJsonLd()} />

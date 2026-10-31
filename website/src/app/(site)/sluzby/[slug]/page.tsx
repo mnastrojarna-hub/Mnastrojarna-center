@@ -36,7 +36,7 @@ export default async function ServicePage({ params }: Props) {
           <Link href={`/poptavka?sluzba=${s.slug}`} className="btn-primary !px-7 !py-3.5">
             <Icon name="upload" className="h-5 w-5" /> Nezávazně poptat
           </Link>
-          <a href={`mailto:${tech.email}?subject=${encodeURIComponent("Technický dotaz – " + s.title)}`} className="btn-ghost-dark !px-7 !py-3.5">
+          <a href={`mailto:${tech.email}?subject=${encodeURIComponent("Technický dotaz – " + s.title)}`} className="btn-ghost !px-7 !py-3.5">
             Technický dotaz technologovi
           </a>
         </div>
@@ -80,10 +80,9 @@ export default async function ServicePage({ params }: Props) {
       </section>
 
       {s.machines && s.machines.length > 0 && (
-        <section className="noise relative overflow-hidden bg-ink py-24 text-white">
-          <div className="bg-grid absolute inset-0 opacity-50" />
+        <section className="relative overflow-hidden bg-steel-100 py-24">
           <div className="container relative">
-            <SectionHeading dark eyebrow="Technologie" title="Na čem to vyrobíme" />
+            <SectionHeading eyebrow="Technologie" title="Na čem to vyrobíme" />
             <div className="mt-12">
               <MachinesForService ids={s.machines} />
             </div>

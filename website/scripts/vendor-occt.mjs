@@ -19,3 +19,4 @@ for (const f of ["occt-import-js.js", "occt-import-js.wasm"]) {
   if (!fs.existsSync(dst) || fs.statSync(dst).size !== fs.statSync(src).size) fs.copyFileSync(src, dst);
 }
 console.log(`[vendor-occt] public/vendor/occt-${version} připraveno.`);
+

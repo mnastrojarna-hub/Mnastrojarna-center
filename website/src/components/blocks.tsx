@@ -28,55 +28,64 @@ export function SectionHeading({
   );
 }
 
-/** Tmavé záhlaví podstránek. */
+/** Záhlaví podstránek — světlý výkresový list s číslem listu a ořezovými značkami. */
 export function PageHero({
   eyebrow,
   title,
   lead,
   children,
   crumbs,
+  sheet,
 }: {
   eyebrow?: string;
   title: React.ReactNode;
   lead?: React.ReactNode;
   children?: React.ReactNode;
   crumbs?: { name: string; path: string }[];
+  sheet?: string;
 }) {
   return (
-    <section className="noise relative overflow-hidden bg-ink pb-16 pt-36 text-white md:pb-24 md:pt-44">
-      <div className="bg-grid mask-fade absolute inset-0" />
-      <div className="absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-brand/25 blur-[140px]" />
+    <section className="paper relative overflow-hidden pb-16 pt-32 md:pb-24 md:pt-40">
+      <div className="bg-grid-light absolute inset-0" />
+      <div className="absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-brand/10 blur-[140px]" />
       <div className="container relative">
-        {crumbs && (
-          <nav aria-label="Drobečková navigace" className="mb-8 font-mono text-[11px] uppercase tracking-[0.18em] text-white/40">
-            <ol className="flex flex-wrap items-center gap-2">
-              <li>
-                <Link href="/" className="hover:text-white">
-                  Úvod
-                </Link>
-              </li>
-              {crumbs.map((c, i) => (
-                <li key={c.path} className="flex items-center gap-2">
-                  <span className="text-brand">/</span>
-                  {i === crumbs.length - 1 ? (
-                    <span className="text-white/70" aria-current="page">
-                      {c.name}
-                    </span>
-                  ) : (
-                    <Link href={c.path} className="hover:text-white">
-                      {c.name}
+        <div className="crop px-5 py-8 md:px-10 md:py-12">
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-4 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-700/45">
+            {crumbs ? (
+              <nav aria-label="Drobečková navigace">
+                <ol className="flex flex-wrap items-center gap-2">
+                  <li>
+                    <Link href="/" className="hover:text-brand">
+                      Úvod
                     </Link>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </nav>
-        )}
-        <div className="max-w-4xl animate-fade-up">
-          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-          <h1 className="h-display mt-5 text-5xl md:text-7xl">{title}</h1>
-          {lead && <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/70">{lead}</p>}
-          {children}
+                  </li>
+                  {crumbs.map((c, i) => (
+                    <li key={c.path} className="flex items-center gap-2">
+                      <span className="text-brand">/</span>
+                      {i === crumbs.length - 1 ? (
+                        <span className="text-ink-700/70" aria-current="page">
+                          {c.name}
+                        </span>
+                      ) : (
+                        <Link href={c.path} className="hover:text-brand">
+                          {c.name}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            ) : (
+              <span />
+            )}
+            <span>List {sheet ?? "01"} · Mnástrojárna s.r.o.</span>
+          </div>
+          <div className="max-w-4xl animate-fade-up">
+            {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+            <h1 className="h-display mt-5 text-5xl text-ink-700 md:text-7xl">{title}</h1>
+            {lead && <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-700/70">{lead}</p>}
+            {children}
+          </div>
         </div>
       </div>
     </section>
@@ -152,16 +161,16 @@ export function PersonCard({ p, i, dark }: { p: Person; i: number; dark?: boolea
       style={{ ["--d" as string]: `${i * 100}ms` }}
       className={cn("spot group overflow-hidden rounded-2xl border", dark ? "border-white/10 bg-white/[0.03]" : "border-ink-700/10 bg-white")}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-ink">
+      <div className="relative aspect-[4/3] overflow-hidden bg-steel-100">
         {p.photo ? (
           <Image src={p.photo} alt={p.name} fill sizes="(min-width: 768px) 33vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
         ) : (
-          <div className="bg-grid absolute inset-0 grid place-items-center">
-            <div className="absolute h-40 w-40 rounded-full bg-brand/30 blur-3xl transition-all duration-700 group-hover:bg-brand/50" />
-            <span className="relative font-display text-7xl font-bold text-white/90">{p.initials}</span>
+          <div className="bg-grid-light absolute inset-0 grid place-items-center">
+            <div className="absolute h-40 w-40 rounded-full bg-brand/15 blur-3xl transition-all duration-700 group-hover:bg-brand/30" />
+            <span className="relative font-display text-7xl font-bold text-ink-700/80">{p.initials}</span>
           </div>
         )}
-        <span className="absolute left-4 top-4 rounded-full bg-black/50 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white backdrop-blur">
+        <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-700 shadow-sm backdrop-blur">
           {p.role}
         </span>
       </div>
@@ -215,9 +224,10 @@ export function FaqList({ items = FAQ, dark }: { items?: { q: string; a: string 
 
 export function MachineCard({ m, i = 0 }: { m: Machine; i?: number }) {
   return (
-    <article data-reveal style={{ ["--d" as string]: `${(i % 2) * 120}ms` }} className="spot group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+    <article data-reveal style={{ ["--d" as string]: `${(i % 2) * 120}ms` }} className="spot group overflow-hidden rounded-2xl border border-ink-700/10 bg-white transition-shadow duration-500 hover:shadow-[0_40px_80px_-40px_rgba(39,36,37,.35)]">
       {m.image && (
-        <div className="relative aspect-[16/10] overflow-hidden bg-white">
+        <div className="relative aspect-[16/10] overflow-hidden border-b border-ink-700/10 bg-white">
+          <div className="bg-grid-light absolute inset-0" />
           <Image
             src={m.image}
             alt={`${m.name} – ${m.type}, Mnástrojárna`}
@@ -229,17 +239,17 @@ export function MachineCard({ m, i = 0 }: { m: Machine; i?: number }) {
       )}
       <div className="p-7">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-brand">{m.type}</p>
-        <h3 className="mt-2 font-display text-3xl font-bold uppercase text-white">{m.name}</h3>
-        <p className="mt-3 text-[15px] leading-relaxed text-white/60">{m.description}</p>
-        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10">
+        <h3 className="mt-2 font-display text-3xl font-bold uppercase text-ink-700">{m.name}</h3>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink-700/65">{m.description}</p>
+        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-ink-700/10 bg-ink-700/10">
           {m.specs.map(([k, v]) => (
-            <div key={k} className="bg-ink-900 p-3">
-              <dt className="text-[11px] uppercase tracking-wider text-white/40">{k}</dt>
-              <dd className="mt-1 font-mono text-[14px] text-white">{v}</dd>
+            <div key={k} className="bg-white p-3">
+              <dt className="text-[11px] uppercase tracking-wider text-ink-700/45">{k}</dt>
+              <dd className="mt-1 font-mono text-[14px] text-ink-700">{v}</dd>
             </div>
           ))}
         </dl>
-        {m.euProject && <p className="mt-4 text-[12px] leading-relaxed text-white/35">Pořízeno z projektu {m.euProject}.</p>}
+        {m.euProject && <p className="mt-4 text-[12px] leading-relaxed text-ink-700/40">Pořízeno z projektu {m.euProject}.</p>}
       </div>
     </article>
   );
@@ -300,29 +310,31 @@ export function FitBlock() {
   );
 }
 
-/** Závěrečná výzva k akci. */
+/** Závěrečná výzva k akci — světlý výkresový list s velkou typografií. */
 export function CtaBand({ title = "Pošlete výkres. Zbytek vyřešíme my.", lead }: { title?: string; lead?: string }) {
   return (
-    <section className="noise relative overflow-hidden bg-ink py-24 text-white md:py-32">
-      <div className="bg-grid mask-fade absolute inset-0" />
-      <div className="absolute left-1/2 top-1/2 h-[600px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/20 blur-[160px]" />
-      <div className="container relative text-center" data-reveal>
-        <p className="eyebrow justify-center">Nezávazná poptávka</p>
-        <h2 className="h-display mx-auto mt-5 max-w-4xl text-5xl md:text-7xl">{title}</h2>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-white/65">
-          {lead ?? "Technolog posoudí vyrobitelnost, obchodník připraví nabídku s cenou a termínem. Data zpracováváme důvěrně."}
-        </p>
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link href="/poptavka" className="btn-primary !px-8 !py-4 !text-base">
-            <Icon name="upload" className="h-5 w-5" /> Nahrát výkres a poptat
-          </Link>
-          <a href={`mailto:${TEAM[1].email}`} className="btn-ghost-dark !px-8 !py-4 !text-base">
-            <Icon name="mail" className="h-5 w-5" /> {TEAM[1].email}
-          </a>
+    <section className="paper relative overflow-hidden py-24 md:py-32">
+      <div className="bg-grid-light absolute inset-0" />
+      <div className="absolute left-1/2 top-1/2 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/10 blur-[140px]" />
+      <div className="container relative">
+        <div className="crop px-6 py-14 text-center md:px-16 md:py-20" data-reveal>
+          <p className="eyebrow justify-center">Nezávazná poptávka</p>
+          <h2 className="h-display mx-auto mt-5 max-w-4xl text-5xl text-ink-700 md:text-7xl">{title}</h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-ink-700/65">
+            {lead ?? "Technolog posoudí vyrobitelnost, obchodník připraví nabídku s cenou a termínem. Data zpracováváme důvěrně."}
+          </p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link href="/poptavka" className="btn-primary !px-8 !py-4 !text-base">
+              <Icon name="upload" className="h-5 w-5" /> Nahrát výkres a poptat
+            </Link>
+            <Link href="/cad" className="btn-ghost !px-8 !py-4 !text-base">
+              <Icon name="cube" className="h-5 w-5" /> Nakreslit díl v online CAD
+            </Link>
+          </div>
+          <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.2em] text-ink-700/40">
+            B2B zakázky od 50 000 Kč · ISO 9001 & 14001 · {SITE.workshop.city}, střed ČR
+          </p>
         </div>
-        <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.2em] text-white/35">
-          B2B zakázky od 50 000 Kč · ISO 9001 & 14001 · {SITE.workshop.city}, střed ČR
-        </p>
       </div>
     </section>
   );

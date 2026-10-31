@@ -14,7 +14,7 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-white text-ink-700 antialiased;
+    @apply bg-[#fbfbfa] text-ink-700 antialiased;
     font-feature-settings: "ss01", "cv11";
   }
   ::selection {
@@ -205,4 +205,105 @@
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
+}
+
+/* ---------- Světlý „výkresový“ styl ---------- */
+.paper {
+  background: radial-gradient(ellipse at 70% 40%, #ffffff 0%, #f7f6f5 60%, #f1efee 100%);
+}
+/* ořezové značky v rozích sekcí (jako na výkresovém listu) */
+.crop {
+  position: relative;
+}
+.crop::before,
+.crop::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border-color: rgba(39, 36, 37, 0.35);
+}
+.crop::before {
+  left: 0;
+  top: 0;
+  border-left: 1px solid;
+  border-top: 1px solid;
+}
+.crop::after {
+  right: 0;
+  bottom: 0;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+/* odkazové kóty v hero */
+.callout-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 1s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+  animation-delay: calc(1.2s + var(--i) * 0.35s);
+}
+.callout-dot {
+  opacity: 0;
+  animation: pop 0.4s ease forwards;
+  animation-delay: calc(1s + var(--i) * 0.35s);
+}
+.callout-label {
+  opacity: 0;
+  animation: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: calc(1.9s + var(--i) * 0.35s);
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pop {
+  to { opacity: 1; }
+}
+
+/* kóta jako dekor: čára se šipkami, kreslí se při zobrazení */
+.dim {
+  position: relative;
+  height: 1px;
+  background: currentColor;
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 1.2s cubic-bezier(0.6, 0, 0.2, 1);
+}
+.is-visible .dim,
+.dim.is-visible {
+  transform: scaleX(1);
+}
+.dim::before,
+.dim::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 9px;
+  background: currentColor;
+}
+.dim::before { left: 0; }
+.dim::after { right: 0; }
+
+/* odhalení textu po řádcích */
+.line-reveal > span {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.line-reveal > span > span {
+  display: inline-block;
+  transform: translateY(105%);
+  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.1, 1) forwards;
+  animation-delay: calc(var(--l, 0) * 0.12s + 0.1s);
+}
+@keyframes rise {
+  to { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .callout-line { stroke-dashoffset: 0; }
+  .callout-dot, .callout-label { opacity: 1; }
+  .line-reveal > span > span { transform: none; }
+  .dim { transform: none; }
 }

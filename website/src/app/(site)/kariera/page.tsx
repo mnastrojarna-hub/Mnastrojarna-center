@@ -24,7 +24,7 @@ export default function CareerPage() {
         <a href={`mailto:${TEAM[0].email}?subject=${encodeURIComponent("Otevřená přihláška")}`} className="btn-primary !px-7 !py-3.5">
           Poslat přihlášku
         </a>
-        <span className="btn-ghost-dark pointer-events-none !px-7 !py-3.5">
+        <span className="btn-ghost pointer-events-none !px-7 !py-3.5">
           {SITE.workshop.street}, {SITE.workshop.city}
         </span>
       </div>

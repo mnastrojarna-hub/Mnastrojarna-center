@@ -1,4 +1,4 @@
-// E2E: 3D prohlížeč → poptávka → ARES → odeslání na webhook.
+// E2E: online CAD → poptávka → ARES → odeslání na webhook.
 // Spuštění: node e2e/hook-server (viz README) + LEAD_WEBHOOK_URL=http://localhost:3999/ npm start, pak:
 // node e2e/rfq.e2e.cjs <složka pro screenshoty, musí obsahovat shots/> src/lib/__fixtures__/cube.stp
 const { chromium } = require('playwright');
@@ -10,15 +10,12 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exitCode =
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
 
-  // 1) 3D prohlížeč → poptávka
-  await page.goto('http://localhost:3100/3d-prohlizec', { waitUntil: 'networkidle' });
-  await page.setInputFiles('input[type=file]', FIX);
-  await page.getByText('Gabarit (mm)').waitFor({ timeout: 30000 });
-  const dims = await page.locator('text=Gabarit (mm)').locator('xpath=..').innerText();
-  ok(/×/.test(dims), '3D prohlížeč změřil model: ' + dims.replace(/\n/g, ' '));
-  await page.screenshot({ path: S + '/shots/e2e-viewer.png' });
-  await page.getByRole('button', { name: /Poptat výrobu tohoto dílu/ }).click();
-  await page.waitForURL(/poptavka/);
+  // 1) online CAD → poptávka (model se předá jako STEP)
+  await page.goto('http://localhost:3100/cad', { waitUntil: 'networkidle' });
+  await page.getByText(/Jádro připraveno/).waitFor({ timeout: 60000 });
+  await page.getByRole('button', { name: 'Poptat výrobu' }).click();
+  await page.waitForURL(/poptavka/, { timeout: 30000 });
+  ok(true, 'CAD předal model do poptávky');
 
   // 2) krok 1
   await page.getByRole('button', { name: 'Pokračovat' }).click();
@@ -32,7 +29,7 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exitCode =
   await page.getByRole('button', { name: 'Pokračovat' }).click();
 
   // 3) krok 2 — soubor z prohlížeče je předaný
-  ok(await page.getByText(/cube\.stp/).first().isVisible(), 'soubor z 3D prohlížeče je v poptávce');
+  ok(await page.getByText(/\.step/).first().isVisible(), 'STEP z CAD je v poptávce');
   await page.getByText('Gabarit (mm)').waitFor({ timeout: 30000 });
   await page.getByRole('button', { name: 'Pokračovat' }).click();
 
@@ -52,7 +49,7 @@ const ok = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exitCode =
   await page.screenshot({ path: S + '/shots/e2e-done.png' });
   const hook = JSON.parse(require('fs').readFileSync((process.env.HOOK_FILE || S + '/hook.json'), 'utf8'));
   ok(hook.lead.company && hook.company?.name, 'webhook přijal lead: ' + hook.lead.company + ' / skóre ' + hook.score.grade + ' ' + hook.score.score);
-  ok(hook.files[0]?.name === 'cube.stp', 'příloha dorazila');
+  ok(/\.step$/.test(hook.files[0]?.name || ''), 'příloha dorazila: ' + hook.files[0]?.name);
   ok(/mm/.test(hook.lead.cad), 'souhrn 3D modelu: ' + hook.lead.cad);
   ok(errs.length === 0, 'žádné JS chyby ' + errs.join('|'));
   await b.close();

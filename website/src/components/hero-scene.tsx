@@ -3,10 +3,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 
 /**
  * Hero 3D scéna: obráběný díl (stupňovitá hřídel s přírubou) z leštěné oceli,
@@ -30,15 +26,13 @@ export default function HeroScene({ className }: { className?: string }) {
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1.5 : 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
+    renderer.toneMappingExposure = 1.0;
     renderer.setClearColor(0x000000, 0);
     el.appendChild(renderer.domElement);
     renderer.domElement.style.opacity = "0";
     renderer.domElement.style.transition = "opacity 1.6s ease";
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f0e0e);
-    scene.fog = new THREE.Fog(0x0f0e0e, 12, 26);
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTex;
@@ -59,19 +53,19 @@ export default function HeroScene({ className }: { className?: string }) {
     const lathe = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), mobile ? 72 : 128);
     lathe.computeVertexNormals();
     const steel = new THREE.MeshPhysicalMaterial({
-      color: 0x9a9ea3,
-      metalness: 1,
+      color: 0x7d8186,
+      metalness: 0.92,
       roughness: 0.3,
       clearcoat: 0.3,
       clearcoatRoughness: 0.35,
-      envMapIntensity: 0.85,
+      envMapIntensity: 0.9,
     });
     const part = new THREE.Mesh(lathe, steel);
     root.add(part);
 
     // Otvory v přírubě (tmavé zahloubení) + drážka pera
     const holeGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.6, 24);
-    const holeMat = new THREE.MeshStandardMaterial({ color: 0x0c0b0b, metalness: 0.6, roughness: 0.6 });
+    const holeMat = new THREE.MeshStandardMaterial({ color: 0x3a3637, metalness: 0.6, roughness: 0.5 });
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       const h = new THREE.Mesh(holeGeo, holeMat);
@@ -86,7 +80,7 @@ export default function HeroScene({ className }: { className?: string }) {
     // Červené ostré hrany (feature lines)
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(lathe, 35),
-      new THREE.LineBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.85 }),
+      new THREE.LineBasicMaterial({ color: 0x272425, transparent: true, opacity: 0.55 }),
     );
     edges.scale.setScalar(1.002);
     root.add(edges);
@@ -103,16 +97,16 @@ export default function HeroScene({ className }: { className?: string }) {
       pathPts.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
     }
     const pathGeo = new THREE.BufferGeometry().setFromPoints(pathPts);
-    const pathMat = new THREE.LineBasicMaterial({ color: 0xff4a3d, transparent: true, opacity: 0.9 });
+    const pathMat = new THREE.LineBasicMaterial({ color: 0xe03930, transparent: true, opacity: 0.9 });
     const toolPath = new THREE.Line(pathGeo, pathMat);
     pathGeo.setDrawRange(0, 0);
     root.add(toolPath);
 
     // Hlavička nástroje = zářící bod
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffd2c9 }));
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), new THREE.MeshBasicMaterial({ color: 0xe03930 }));
     root.add(tip);
     const tipHalo = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xff4a3d, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.SpriteMaterial({ map: makeGlowTexture(), color: 0xff6a5d, transparent: true, opacity: 0.6, depthWrite: false }),
     );
     tipHalo.scale.setScalar(0.9);
     root.add(tipHalo);
@@ -126,7 +120,7 @@ export default function HeroScene({ className }: { className?: string }) {
     spGeo.setAttribute("position", new THREE.BufferAttribute(spPos, 3));
     const sparks = new THREE.Points(
       spGeo,
-      new THREE.PointsMaterial({ color: 0xff6a4d, size: 0.045, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+      new THREE.PointsMaterial({ color: 0xe03930, size: 0.04, transparent: true, opacity: 0.85, depthWrite: false }),
     );
     root.add(sparks);
 
@@ -140,11 +134,11 @@ export default function HeroScene({ className }: { className?: string }) {
     }
     const dGeo = new THREE.BufferGeometry();
     dGeo.setAttribute("position", new THREE.BufferAttribute(dPos, 3));
-    const dust = new THREE.Points(dGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.018, transparent: true, opacity: 0.35, depthWrite: false }));
+    const dust = new THREE.Points(dGeo, new THREE.PointsMaterial({ color: 0x272425, size: 0.014, transparent: true, opacity: 0.18, depthWrite: false }));
     scene.add(dust);
 
     // Kruhové „měřicí“ prstence
-    const ringMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 });
+    const ringMat = new THREE.LineBasicMaterial({ color: 0x272425, transparent: true, opacity: 0.14 });
     for (const [r, y] of [[2.6, -0.65], [3.2, -0.65]] as const) {
       const pts = Array.from({ length: 129 }, (_, i) => {
         const a = (i / 128) * Math.PI * 2;
@@ -154,7 +148,7 @@ export default function HeroScene({ className }: { className?: string }) {
     }
 
     // Světla (doplněk k env mapě): červený protisvit pro siluetu
-    const rim = new THREE.PointLight(0xff3b30, 30, 20);
+    const rim = new THREE.PointLight(0xff5a4d, 18, 20);
     rim.position.set(-4, 2, -3);
     scene.add(rim);
     const keyL = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -162,18 +156,10 @@ export default function HeroScene({ className }: { className?: string }) {
     scene.add(keyL);
 
     root.rotation.set(0.32, 0, -0.38);
-    root.position.set(3, 0, 0);
+    root.position.set(0, 0, 0);
 
-    // Postprocessing (bloom) — na mobilu vypnuto kvůli výkonu
-    let composer: EffectComposer | null = null;
-    if (!mobile) {
-      composer = new EffectComposer(renderer);
-      composer.addPass(new RenderPass(scene, camera));
-      composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.38, 0.45, 0.9));
-      composer.addPass(new OutputPass());
-    }
 
-    let baseX = 3;
+    let baseX = 0;
     let baseY = 0;
     const resize = () => {
       const w = el.clientWidth;
@@ -182,13 +168,10 @@ export default function HeroScene({ className }: { className?: string }) {
       renderer.setSize(w, h, false);
       renderer.domElement.style.width = "100%";
       renderer.domElement.style.height = "100%";
-      composer?.setSize(w, h);
       camera.aspect = w / h;
-      // desktop: díl vpravo vedle textu; mobil: menší, za textem vpravo dole
-      const narrow = w / h < 0.9;
-      camera.position.z = narrow ? 17 : 13;
-      baseX = narrow ? 1.6 : w / h > 1.5 ? 3.1 : 2.2;
-      baseY = narrow ? -2.2 : 0;
+      camera.position.z = w / h < 0.9 ? 15 : 13;
+      baseX = 0;
+      baseY = 0;
       root.position.set(baseX, baseY, 0);
       camera.updateProjectionMatrix();
     };
@@ -270,8 +253,7 @@ export default function HeroScene({ className }: { className?: string }) {
       spGeo.attributes.position.needsUpdate = true;
       dust.rotation.y = t * 0.01;
 
-      if (composer) composer.render();
-      else renderer.render(scene, camera);
+      renderer.render(scene, camera);
       if (first) {
         first = false;
         renderer.domElement.style.opacity = "1";
@@ -293,7 +275,6 @@ export default function HeroScene({ className }: { className?: string }) {
       });
       envTex.dispose();
       pmrem.dispose();
-      composer?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

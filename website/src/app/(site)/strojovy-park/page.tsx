@@ -26,7 +26,7 @@ export default function MachinesPage() {
         }
         lead="Moderní a vysoce přesná obráběcí a měřicí centra. Obrábíme v pěti i více osách současně, soustružíme a frézujeme v jednom upnutí a drátem řežeme velké díly."
       />
-      <section className="noise relative overflow-hidden bg-ink pb-24 text-white">
+      <section className="relative overflow-hidden bg-steel-100 py-20">
         <div className="container relative grid gap-5 lg:grid-cols-2">
           {MACHINES.map((m, i) => (
             <MachineCard key={m.id} m={m} i={i} />

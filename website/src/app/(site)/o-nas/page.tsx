@@ -57,11 +57,11 @@ export default function AboutPage() {
             <div className="relative col-span-2 aspect-[16/9] overflow-hidden rounded-2xl">
               <Image src="/img/axile-g8.png" alt="Pětiosé obráběcí centrum AXILE G8" fill sizes="(min-width:1024px) 50vw, 100vw" className="bg-white object-contain p-4" />
             </div>
-            <div className="rounded-2xl bg-ink p-6 text-white">
+            <div className="rounded-2xl border border-ink-700/10 bg-white p-6 text-ink-700">
               <p className="font-display text-5xl font-bold">
                 <Counter value={SITE.founded} />
               </p>
-              <p className="mt-1 text-sm text-white/60">tradice od roku</p>
+              <p className="mt-1 text-sm text-ink-700/55">tradice od roku</p>
             </div>
             <div className="rounded-2xl bg-brand p-6 text-white">
               <p className="font-display text-5xl font-bold">ISO</p>
@@ -71,16 +71,16 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="noise relative overflow-hidden bg-ink py-24 text-white md:py-32">
-        <div className="bg-grid absolute inset-0 opacity-50" />
+      <section className="relative overflow-hidden bg-steel-100 py-24 md:py-32">
+        <div className="bg-grid-light absolute inset-0" />
         <div className="container relative">
-          <SectionHeading dark eyebrow="Příběh" title="Cesta k partnerovi ve strojírenství" />
-          <ol className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 md:grid-cols-3">
+          <SectionHeading eyebrow="Příběh" title="Cesta k partnerovi ve strojírenství" />
+          <ol className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 md:grid-cols-3">
             {TIMELINE.map((x, i) => (
-              <li key={x.y + x.t} data-reveal style={{ ["--d" as string]: `${(i % 3) * 100}ms` }} className="bg-ink p-8">
+              <li key={x.y + x.t} data-reveal style={{ ["--d" as string]: `${(i % 3) * 100}ms` }} className="bg-white p-8">
                 <p className="font-display text-5xl font-bold text-brand">{x.y}</p>
-                <h3 className="mt-4 font-display text-xl font-bold uppercase">{x.t}</h3>
-                <p className="mt-2 text-[15px] text-white/60">{x.d}</p>
+                <h3 className="mt-4 font-display text-xl font-bold uppercase text-ink-700">{x.t}</h3>
+                <p className="mt-2 text-[15px] text-ink-700/60">{x.d}</p>
               </li>
             ))}
           </ol>
