@@ -136,7 +136,9 @@ export function CadApp() {
   const [mate, setMate] = useState<{ mode: "mate" | "flush" | "center"; compId: string; local?: { origin: Vec3; normal: Vec3 } } | null>(null);
   const [bomOpen, setBomOpen] = useState(false);
   const [moldOpen, setMoldOpen] = useState(false);
-  const [parentAsm, setParentAsm] = useState<{ asm: CadDoc; key: string } | null>(null);
+  const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
+  const parentAsm = asmStack.length ? asmStack[asmStack.length - 1] : null;
+  const setParentAsm = (v: null) => setAsmStack(v === null ? [] : []);
   const vp = useRef<ViewportHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const loaded = useRef(false);
@@ -332,19 +334,21 @@ export function CadApp() {
     insertComponent(partComponent(d, { position: b && (doc.components?.length ?? 0) > 0 ? [Math.round(b.center[0] + b.radius * 1.2), 0, 0] : [0, 0, 0] }, { group, number: d.props?.number, color: d.color ?? "#b9c2cc" }));
   };
   const editPartInContext = (c: AsmComponent) => {
-    if (c.source.kind !== "part") return flash("Importovaný soubor nelze upravovat historií – lze jen umístit.");
-    setParentAsm({ asm: doc, key: sourceKey(c.source) });
-    commit({ ...c.source.doc, kind: "part" });
+    if (c.source.kind === "file") return flash("Importovaný soubor nelze upravovat historií – lze jen umístit.");
+    setAsmStack((st) => [...st, { asm: doc, key: sourceKey(c.source) }]);
+    commit(c.source.kind === "asm" ? { ...c.source.doc, kind: "assembly" } : { ...c.source.doc, kind: "part" });
     setAsmSel(null);
     setTab("create");
     setTimeout(() => vp.current?.setView("iso"), 700);
   };
   const backToAssembly = () => {
     if (!parentAsm) return;
-    const part = { ...doc, kind: "part" as const };
-    const comps = (parentAsm.asm.components ?? []).map((c) => (c.source.kind === "part" && sourceKey(c.source) === parentAsm.key ? { ...c, source: { kind: "part" as const, doc: part }, name: c.name } : c));
+    const sub = doc.kind === "assembly";
+    const comps = (parentAsm.asm.components ?? []).map((c) =>
+      c.source.kind !== "file" && sourceKey(c.source) === parentAsm.key ? { ...c, source: sub ? { kind: "asm" as const, doc: { ...doc } } : { kind: "part" as const, doc: { ...doc, kind: "part" as const } } } : c,
+    );
     commit({ ...parentAsm.asm, components: comps });
-    setParentAsm(null);
+    setAsmStack((st) => st.slice(0, -1));
     setActiveId(null);
     setSketchId(null);
     setTab("asm");
@@ -396,6 +400,285 @@ export function CadApp() {
     setMate(null);
     flash("Vazba použita – komponenta zarovnána.");
   };
+  // ---------- výběr entit, inspektor, měření ----------
+  const srcOf = (it: SelItem): ShapeSrc => {
+    const cid = it.kind !== "feature" ? it.compId : undefined;
+    if (isAsm && cid) {
+      const l = leaves.find((x) => x.id === cid);
+      if (l) return { kind: "comp", key: l.key, matrix: l.matrix };
+    }
+    return { kind: "part" };
+  };
+  const refOf = (it: SelItem): EntRef => (it.kind === "face" || it.kind === "edge" || it.kind === "vertex" ? { kind: it.kind, index: it.index } : { kind: "body" });
+  const densityOf = (it: SelItem) => {
+    const cid = it.kind !== "feature" ? it.compId : undefined;
+    const l = cid ? leaves.find((x) => x.id === cid) : undefined;
+    const matId = l ? (l.comp.source.kind === "part" ? l.comp.source.doc.material : (l.comp.material ?? "ocel")) : doc.material;
+    return MATERIALS.find((x) => x.id === matId)?.density ?? 7.85;
+  };
+  const runInspect = async (it: SelItem) => {
+    if (it.kind === "feature") return;
+    if (it.kind === "component") {
+      const top = doc.components?.find((c) => c.id === (it.topId ?? it.compId)) ?? doc.components?.find((c) => it.compId.startsWith(c.id));
+      const leaf = leaves.find((l) => l.id === it.compId);
+      const c = top;
+      if (!c) return;
+      const info = asmPartInfo(leaf?.comp ?? c);
+      const subLeaves = leaves.filter((l) => l.topId === c.id);
+      const mass = subLeaves.reduce((sum, l) => sum + (asmPartInfo(l.comp).massKg ?? 0), 0);
+      setInspect({
+        item: it,
+        info: {
+          title: c.source.kind === "asm" ? `Podsestava · ${c.name}` : `Komponenta · ${c.name}`,
+          rows: [
+            ["Číslo / norma", c.number ?? "—"],
+            ["Poloha", c.placement.position.map((v) => fmtNum(v, 2)).join(" ; ")],
+            ["Natočení", c.placement.rotation.map((v) => fmtNum(v, 2) + "°").join(" ; ")],
+            ["Materiál", c.source.kind === "asm" ? "—" : (info.material ?? "—")],
+            ["Hmotnost", `${fmtNum(mass, 3)} kg`],
+            ["Dílů", String(subLeaves.length)],
+            ["Zdroj", c.source.kind === "part" ? "parametrický díl" : c.source.kind === "asm" ? "podsestava" : `soubor ${c.source.fileName}`],
+          ],
+        },
+      });
+      return;
+    }
+    try {
+      const info = await cad.inspect(srcOf(it), refOf(it), densityOf(it));
+      setInspect({ item: it, info });
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
+  const runMeasure = async (items: SelItem[]) => {
+    if (!items.length) return setMeasureRes(null);
+    try {
+      const a = { src: srcOf(items[0]), ref: refOf(items[0]) };
+      const b = items[1] ? { src: srcOf(items[1]), ref: refOf(items[1]) } : null;
+      setMeasureRes(await cad.measureEnt(a, b));
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
+  const startMeasureWith = (it: SelItem) => {
+    setMeasure(true);
+    setActiveId(null);
+    setMeasureSel([it]);
+    runMeasure([it]);
+  };
+  const onPick = (it: SelItem | null, additive: boolean) => {
+    if (mate) {
+      if (it?.kind === "face" && it.compId) onMateFace(it.compId, it.index);
+      return;
+    }
+    if (measure) {
+      if (!it) return;
+      const next = measureSel.length >= 2 ? [it] : [...measureSel, it];
+      setMeasureSel(next);
+      runMeasure(next);
+      return;
+    }
+    if (!it) {
+      if (!additive) {
+        setSelection([]);
+        setInspect(null);
+        if (isAsm) setAsmSel(null);
+      }
+      return;
+    }
+    const next = additive ? (selection.some((x) => sameSel(x, it)) ? selection.filter((x) => !sameSel(x, it)) : [...selection, it]) : [it];
+    setSelection(next);
+    if (isAsm && it.kind !== "feature") {
+      const top = it.topId ?? it.compId;
+      if (top) setAsmSel(top.split("/")[0]);
+    }
+    if (next.length === 1) runInspect(next[0]);
+  };
+  useEffect(() => {
+    setSelFilter(isAsm ? "component" : "all");
+    setSelection([]);
+    setInspect(null);
+    setGizmoOn(null);
+  }, [isAsm]);
+
+  const selFaces = selection.filter((x): x is Extract<SelItem, { kind: "face" }> => x.kind === "face" && !x.compId).map((x) => x.index);
+  const selEdges = selection.filter((x): x is Extract<SelItem, { kind: "edge" }> => x.kind === "edge" && !x.compId).map((x) => x.index);
+  /** nový prvek přímých úprav z vybraných ploch / hran */
+  const addWithFaces = (type: "pushPull" | "offsetFace" | "deleteFace" | "draft" | "shell" | "thicken", faces = selFaces) => {
+    if (isAsm) return flash("Přímé úpravy ploch se dělají v dílu – otevřete ho (Upravit díl).");
+    if (!faces.length) return flash("Vyberte plochu (filtr Plocha) a zopakujte příkaz.");
+    const f = newFeature(doc, type as never, { faces } as Partial<Feature>);
+    commit({ ...doc, features: [...doc.features, f] });
+    beginEdit(f.id, doc);
+    setSelection([]);
+    track("cad_feature", { type });
+  };
+  const addWithEdges = (type: "fillet" | "chamfer", edges = selEdges) => {
+    if (isAsm) return flash("Zaoblení se dělá v dílu – otevřete ho (Upravit díl).");
+    const f = newFeature(doc, type, { edges: edges.length ? edges : [] } as Partial<Feature>);
+    commit({ ...doc, features: [...doc.features, f] });
+    beginEdit(f.id, doc);
+    setSelection([]);
+  };
+  const setFaceColor = (faces: number[], color: string | null) => {
+    const fc = { ...(doc.faceColors ?? {}) };
+    for (const i of faces) {
+      if (color) fc[i] = color;
+      else delete fc[i];
+    }
+    commit({ ...doc, faceColors: fc });
+  };
+
+  // ---------- gizmo (přesun / otočení) ----------
+  const startBodyGizmo = () => {
+    if (isAsm) return;
+    if (!result?.metrics) return flash("Není těleso k přesunutí.");
+    const last = doc.features[doc.features.length - 1];
+    let id = last?.type === "transform" ? last.id : null;
+    if (!id) {
+      const f = newFeature(doc, "transform");
+      commit({ ...doc, features: [...doc.features, f] });
+      id = f.id;
+    }
+    setActiveId(id);
+    setEditBase(doc);
+    setGizmoOn({ target: "body", id, mode: "translate" });
+    flash("Táhněte šipkami (posun, krok 1 mm) nebo oblouky (otočení, krok 15°). R přepne posun/otočení.");
+  };
+  const startCompGizmo = (id: string) => {
+    const c = doc.components?.find((x) => x.id === id);
+    if (!c) return;
+    if (c.fixed) return flash("Komponenta je ukotvená – nejdřív ji uvolněte.");
+    setAsmSel(id);
+    setGizmoOn({ target: "component", id, mode: "translate" });
+  };
+  const gizmo: Gizmo = useMemo(() => {
+    if (!gizmoOn) return null;
+    if (gizmoOn.target === "component") {
+      const c = doc.components?.find((x) => x.id === gizmoOn.id);
+      if (!c) return null;
+      return { id: c.id, matrix: placementMatrix(c.placement), mode: gizmoOn.mode, targets: [c.id] };
+    }
+    const b = result?.metrics?.bbox;
+    if (!b) return null;
+    const c = [0, 1, 2].map((k) => (b[0][k] + b[1][k]) / 2);
+    return { id: gizmoOn.id, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, c[0], c[1], c[2], 1], mode: gizmoOn.mode, targets: ["__body__"] };
+  }, [gizmoOn, doc.components, result?.metrics?.bbox]);
+  const onGizmo = (delta: number[], final: boolean) => {
+    if (!final || !gizmoOn) return;
+    if (gizmoOn.target === "component") {
+      const c = doc.components?.find((x) => x.id === gizmoOn.id);
+      if (!c) return;
+      setComp(c.id, { placement: matrixToPlacement(mul4(delta, placementMatrix(c.placement))) });
+      return;
+    }
+    const f = doc.features.find((x) => x.id === gizmoOn.id);
+    if (!f || f.type !== "transform") return;
+    // rotace z delta matice → osa + úhel
+    const R = [delta[0], delta[4], delta[8], delta[1], delta[5], delta[9], delta[2], delta[6], delta[10]];
+    const tr = R[0] + R[4] + R[8];
+    const ang = Math.acos(Math.max(-1, Math.min(1, (tr - 1) / 2)));
+    const round = (v: number) => Math.round(v * 1e4) / 1e4;
+    const d: Vec3 = [delta[12], delta[13], delta[14]];
+    const rt = apply3(R as never, f.translate);
+    if (ang < 1e-6) {
+      updateFeature(f.id, { translate: [round(f.translate[0] + d[0]), round(f.translate[1] + d[1]), round(f.translate[2] + d[2])] } as Partial<Feature>);
+      return;
+    }
+    const sn = 2 * Math.sin(ang);
+    const axis: Vec3 = [(R[7] - R[5]) / sn, (R[2] - R[6]) / sn, (R[3] - R[1]) / sn];
+    const k = [0, 1, 2].reduce((a, b) => (Math.abs(axis[b]) > Math.abs(axis[a]) ? b : a), 0);
+    if (Math.abs(axis[k]) < 0.999) return flash("Otočení kolem obecné osy nelze uložit – otáčejte po jednom oblouku.");
+    const ax = (["X", "Y", "Z"] as const)[k];
+    const deg = round(((axis[k] > 0 ? 1 : -1) * ang * 180) / Math.PI);
+    if (f.rotateAngle && f.rotateAxis !== ax) {
+      // jiná osa → nový prvek transformace navazující na předchozí
+      const nf = newFeature(doc, "transform", { translate: d.map(round) as Vec3, rotateAxis: ax, rotateAngle: deg } as Partial<Feature>);
+      commit({ ...doc, features: [...doc.features, nf] });
+      setActiveId(nf.id);
+      setGizmoOn({ ...gizmoOn, id: nf.id });
+      return;
+    }
+    updateFeature(f.id, { translate: [round(d[0] + rt[0]), round(d[1] + rt[1]), round(d[2] + rt[2])], rotateAxis: ax, rotateAngle: round((f.rotateAngle || 0) + deg) } as Partial<Feature>);
+  };
+  useEffect(() => {
+    if (gizmoOn?.target === "body" && activeId !== gizmoOn.id) setGizmoOn(null);
+  }, [activeId, gizmoOn]);
+
+  // ---------- kontextové nabídky podle entity ----------
+  const COLOR_MENU = (apply: (c: string | null) => void, label: string): RMenuEntry[] => [
+    { divider: true, label },
+    ...COLORS.slice(4).concat(COLORS.slice(0, 4)).map((c) => ({ id: `c${c.c}`, label: `● ${c.l}`, icon: "palette" as CadIconName, onClick: () => apply(c.c) })),
+    { id: "c-reset", label: "Výchozí barva", icon: "palette", onClick: () => apply(null) },
+  ];
+  const entityMenu = (it: SelItem | null): RMenuEntry[] => {
+    if (!it) return [];
+    const head: RMenuEntry = { divider: true, label: KIND_LABEL[it.kind] + (it.kind === "face" || it.kind === "edge" || it.kind === "vertex" ? ` ${it.index + 1}` : "") };
+    const props: RMenuEntry = { id: "props", label: "Vlastnosti", icon: "info", tone: "tool", onClick: () => { setInspectOpen(true); runInspect(it); } };
+    const meas: RMenuEntry = { id: "meas", label: it.kind === "vertex" ? "Měřit odsud" : it.kind === "edge" ? "Měřit délku / odsud" : "Měřit", icon: "measure", tone: "tool", onClick: () => startMeasureWith(it) };
+    if (it.kind === "face") {
+      const faces = selection.some((x) => sameSel(x, it)) && selFaces.length ? selFaces : [it.index];
+      if (isAsm) return [head, meas, props];
+      return [
+        head,
+        { id: "sk", label: "Nová skica na ploše", icon: "sketch", tone: "sketch", onClick: () => sketchOnFace(it.index) },
+        { id: "pp", label: "Vytáhnout / Zatlačit", icon: "extrude", tone: "create", onClick: () => addWithFaces("pushPull", faces) },
+        { id: "of", label: "Odsadit plochu", icon: "shell", tone: "feature", onClick: () => addWithFaces("offsetFace", faces) },
+        { id: "df", label: "Odstranit plochu", icon: "trash", tone: "cut", kbd: "Del", onClick: () => addWithFaces("deleteFace", faces) },
+        { id: "dr", label: "Úkos", icon: "draft", tone: "feature", onClick: () => addWithFaces("draft", faces) },
+        { id: "sh", label: "Skořepina (otevřít plochu)", icon: "shell", tone: "feature", onClick: () => addWithFaces("shell", faces) },
+        { id: "th", label: "Zesílit", icon: "thicken" as CadIconName, tone: "feature", onClick: () => addWithFaces("thicken", faces) },
+        meas,
+        props,
+        ...COLOR_MENU((c) => setFaceColor(faces, c), "Barva plochy"),
+      ];
+    }
+    if (it.kind === "edge") {
+      const edges = selection.some((x) => sameSel(x, it)) && selEdges.length ? selEdges : [it.index];
+      if (isAsm) return [head, meas, props];
+      return [
+        head,
+        { id: "fi", label: "Zaoblit hranu", icon: "fillet", tone: "feature", onClick: () => addWithEdges("fillet", edges) },
+        { id: "ch", label: "Srazit hranu", icon: "chamfer", tone: "feature", onClick: () => addWithEdges("chamfer", edges) },
+        meas,
+        props,
+      ];
+    }
+    if (it.kind === "vertex") return [head, { id: "co", label: `Souřadnice ${it.point.map((v) => fmtNum(v, 2)).join(" ; ")}`, icon: "axes", onClick: () => runInspect(it) }, meas, props];
+    if (it.kind === "body" && !isAsm) {
+      return [
+        head,
+        { id: "mv", label: "Přesunout / otočit (gizmo)", icon: "transform", tone: "pattern", onClick: startBodyGizmo },
+        { id: "hd", label: bodyHidden ? "Zobrazit těleso" : "Skrýt těleso", icon: "eye", onClick: () => setBodyHidden((v) => !v) },
+        { id: "tr", label: bodyOpacity < 1 ? "Neprůhledné" : "Průhledné", icon: "xray", onClick: () => setBodyOpacity((v) => (v < 1 ? 1 : 0.35)) },
+        meas,
+        props,
+        ...COLOR_MENU((c) => commit({ ...doc, color: c ?? undefined }), "Barva tělesa"),
+      ];
+    }
+    // komponenta / podsestava (i těleso v sestavě)
+    const topId = (it.kind === "component" || it.kind === "body" ? (it.topId ?? it.compId) : undefined)?.split("/")[0];
+    const c = doc.components?.find((x) => x.id === topId);
+    if (!c) return [head, props];
+    const multi = selection.filter((x) => x.kind === "component" || x.kind === "body").map((x) => ("topId" in x ? x.topId : undefined) ?? ("compId" in x ? x.compId : undefined)).filter(Boolean) as string[];
+    const tops = [...new Set(multi.map((x) => x.split("/")[0]))];
+    return [
+      { divider: true, label: c.source.kind === "asm" ? `Podsestava · ${c.name}` : c.name },
+      { id: "gz", label: "Přesunout / otočit (gizmo)", icon: "transform", tone: "pattern", kbd: "G", onClick: () => startCompGizmo(c.id) },
+      ...(c.source.kind === "asm"
+        ? ([
+            { id: "osub", label: "Otevřít podsestavu", icon: "layers", onClick: () => editPartInContext(c) },
+            { id: "dis", label: "Rozpustit podsestavu", icon: "layers", onClick: () => { commit(dissolveSubassembly(doc, c.id)); setAsmSel(null); setSelection([]); } },
+          ] as RMenuEntry[])
+        : []),
+      ...(tops.length > 1 ? ([{ id: "mksub", label: `Vytvořit podsestavu z vybraných (${tops.length})`, icon: "layers", tone: "create", onClick: () => { commit(makeSubassembly(doc, tops, `Podsestava ${(doc.components ?? []).filter((x) => x.source.kind === "asm").length + 1}`)); setSelection([]); } }] as RMenuEntry[]) : []),
+      ...compMenu(c),
+      meas,
+      props,
+      ...COLOR_MENU((col) => setComp(c.id, { color: col ?? undefined }), "Barva komponenty"),
+    ];
+  };
+
   const runInterference = async () => {
     flash("Kontroluji kolize…");
     try {
@@ -1314,7 +1597,9 @@ export function CadApp() {
 
             {parentAsm && (
               <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-3 rounded-md bg-[#2563eb] px-3 py-1.5 text-[12.5px] text-white shadow-lg">
-                <span>Úprava dílu v sestavě „{parentAsm.asm.name}“</span>
+                <span>
+                  {doc.kind === "assembly" ? "Úprava podsestavy" : "Úprava dílu"} v sestavě „{parentAsm.asm.name}“{asmStack.length > 1 ? ` (úroveň ${asmStack.length})` : ""}
+                </span>
                 <button type="button" onClick={backToAssembly} className="rounded bg-white px-2.5 py-0.5 text-[12px] font-semibold text-[#2563eb] hover:bg-blue-50">
                   ← Zpět do sestavy
                 </button>
