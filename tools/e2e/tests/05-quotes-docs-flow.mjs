@@ -260,10 +260,18 @@ await T("detail Nabídky: PDF náhled z karty → 200 application/pdf %PDF, náh
   expect(href === `/api/pdf/job/${Q1.id}?type=nabidka&quoteId=${st.q1.id}`, `odkaz PDF náhledu (${href})`);
   const link = card.getByRole("link", { name: "PDF náhled" });
   expect((await link.getAttribute("target")) === "_blank" && /noopener/.test((await link.getAttribute("rel")) ?? ""), "odkaz otevírá nový panel (target=_blank, noopener)");
-  // nový panel se otevře; headless Chromium u PDF prohlížeče adresu nehlásí (":"), obsah ověří fetch níže
-  const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 10_000 }), link.click()]);
-  expect(popup.url() !== page.url(), `PDF se otevřelo v novém panelu, karta zůstala (${popup.url()})`);
-  await popup.close();
+  // od 3D/PDF prohlížeče (d3e2f41) se PDF otevře v aplikaci (vrstva file-viewer se Zpět); bez JS by šel odkaz do nového panelu.
+  // Headless Chromium u PDF adresu nehlásí (":"), obsah ověří fetch níže.
+  const viewer = page.getByTestId("file-viewer-layer");
+  const popupP = page.waitForEvent("popup", { timeout: 10_000 }).catch(() => null);
+  await link.click();
+  const opened = await Promise.race([
+    viewer.waitFor({ timeout: 10_000 }).then(() => "viewer").catch(() => null),
+    popupP.then((p) => (p ? "popup" : null)),
+  ]);
+  expect(opened === "viewer" || opened === "popup", `PDF náhled se otevřel (v aplikaci nebo v novém panelu: ${opened})`);
+  if (opened === "popup") (await popupP)?.close();
+  expect(page.url().includes(`/orders/${Q1.id}`), `karta zakázky zůstala (${page.url()})`);
   expectPdf(await fetchPdf(page.request, `${BASE}${href}`), "PDF náhled nabídky");
   expect(sql(`select count(*) from job_files where job_id = ${lit(Q1.id)}`) === "0", "náhled nic neuložil do Dokumentů");
 });
