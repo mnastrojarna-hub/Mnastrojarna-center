@@ -3,6 +3,7 @@ import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-
 import type { ModelNode, ParsedModel } from "@/lib/viewer3d/types";
 import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
 import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
+import { buildAssemblyGroups, type AssemblyGroups } from "@/lib/viewer3d/assembly-groups";
 import type { StockGeometry, StockMode, StockResult } from "@/lib/viewer3d/stock";
 import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
@@ -227,11 +228,8 @@ export class ViewerEngine {
   private filter: PickFilter = "auto";
   private entity: SnapPoint | null = null;
   private entityObj: THREE.Object3D | null = null;
-  // strom sestavy: díl → uzel, uzel → rodič
-  private nodeParts: number[][] = [];
-  private nodeAll: number[][] = [];
-  private nodeParent: number[] = [];
-  private partNode: number[] = [];
+  // strom sestavy: díl a podsestava k tělesu
+  private groups: AssemblyGroups | null = null;
 
   // řez
   private clipPlane: THREE.Plane | null = null;
@@ -406,7 +404,7 @@ export class ViewerEngine {
     this.partMaterial.clear();
     this.partStockMode.clear();
     this.setStockPreview(null);
-    this.indexTree(model.root, model.parts.length);
+    this.groups = buildAssemblyGroups(model.root, model.parts.map((p) => p.name));
 
     model.parts.forEach((part, index) => {
       const g = new THREE.BufferGeometry();
@@ -512,38 +510,14 @@ export class ViewerEngine {
     this.onChange("section");
   }
 
-  /** Strom sestavy → rychlé dotazy „díl tohoto tělesa" a „podsestava". */
-  private indexTree(root: ModelNode, partCount: number) {
-    this.nodeParts = [];
-    this.nodeAll = [];
-    this.nodeParent = [];
-    this.partNode = new Array(partCount).fill(-1);
-    const visit = (n: ModelNode, parent: number): number[] => {
-      const id = this.nodeParts.length;
-      this.nodeParts.push(n.parts);
-      this.nodeAll.push([]);
-      this.nodeParent.push(parent);
-      for (const p of n.parts) if (p >= 0 && p < partCount && this.partNode[p] < 0) this.partNode[p] = id;
-      const all = [...n.parts];
-      for (const c of n.children) all.push(...visit(c, id));
-      this.nodeAll[id] = all;
-      return all;
-    };
-    visit(root, -1);
-  }
-
-  /** Všechna tělesa dílu, do kterého patří těleso i. */
+  /** Tělesa dílu, do kterého patří těleso i (většinou jen ono samo). */
   partGroup(i: number): number[] {
-    const n = this.partNode[i];
-    return n >= 0 && this.nodeParts[n].length ? [...this.nodeParts[n]] : [i];
+    return this.groups ? this.groups.partGroup(i) : [i];
   }
 
-  /** Všechna tělesa podsestavy, do které patří díl tělesa i. */
+  /** Tělesa nejbližší podsestavy, do které díl tělesa i patří. */
   assemblyGroup(i: number): number[] {
-    const n = this.partNode[i];
-    if (n < 0) return [i];
-    const parent = this.nodeParent[n];
-    return parent >= 0 ? [...this.nodeAll[parent]] : [...this.nodeAll[n]];
+    return this.groups ? this.groups.assemblyGroup(i) : [i];
   }
 
   private triCount(i: number): number {

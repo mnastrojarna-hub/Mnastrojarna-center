@@ -525,6 +525,17 @@ if (files.asm) {
       await page.screenshot({ path: path.join(ARTIFACTS, "viewer3d-assembly.png") });
       await page.getByTestId("tool-showall").click();
       await page.waitForFunction(() => !/skryto/.test(document.querySelector('[data-testid="viewer3d-status"]')?.textContent ?? ""));
+      // výchozí klik vybere jen jeden díl (ne celou podsestavu)
+      {
+        const bb = await canvasBox(page);
+        let card = "";
+        for (let dx = -60; dx <= 60 && !card; dx += 20) {
+          await page.mouse.click(bb.x + bb.width / 2 + dx, bb.y + bb.height / 2);
+          card = await page.getByTestId("viewer3d-part").innerText({ timeout: 400 }).catch(() => "");
+        }
+        expect(card && !/Vybráno dílů/.test(card) && /Rozměr/.test(card), `klik = jeden díl: ${card.slice(0, 60)}`);
+        await page.keyboard.press("Escape");
+      }
       // filtr Sestava: klik na díl vybere celou podsestavu, Delete ji smaže, Ctrl+Z vrátí
       await page.getByTestId("tool-filter").click();
       await page.getByTestId("filter-items").getByRole("radio", { name: /Sestava/ }).click();
