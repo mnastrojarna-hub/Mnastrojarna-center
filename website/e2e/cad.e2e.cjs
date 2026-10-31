@@ -82,7 +82,7 @@ const dl = async (page, trigger) => { const [d] = await Promise.all([page.waitFo
   d = await dl(page, () => page.getByRole('button', { name: 'PDF', exact: true }).click());
   const pdf = fs.readFileSync(await d.path());
   ok(pdf.slice(0, 5).toString() === '%PDF-', 'výkres PDF (' + pdf.length + ' B)');
-  await page.getByRole('button', { name: 'Zavřít', exact: true }).click();
+  await page.locator('div.fixed.z-50 header').getByRole('button', { name: 'Zavřít', exact: true }).click();
 
   // sestava: rám formy → kusovník → export STEP
   await page.getByRole('button', { name: 'Soubor', exact: true }).click();

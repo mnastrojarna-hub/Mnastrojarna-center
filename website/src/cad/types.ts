@@ -168,6 +168,8 @@ export type CadDoc = {
   components?: AsmComponent[];
   /** barvy jednotlivých ploch výsledného tělesa (index plochy → #rrggbb) */
   faceColors?: Record<number, string>;
+  /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
+  drawings?: DrawingDoc[];
 };
 
 /** Umístění komponenty: posun (mm) a natočení kolem os X, Y, Z (°, v tomto pořadí). */
@@ -223,3 +225,30 @@ export type FaceInfo = { index: number; planar: boolean; origin: Vec3; normal: V
 export const emptyDoc = (name = "Nový díl"): CadDoc => ({ app: "mnastrojarna-cad", version: 2, name, material: "ocel", features: [] });
 
 export const uid = () => Math.random().toString(36).slice(2, 9);
+
+// ---------------- výkresy v dokumentu ----------------
+
+/**
+ * Uživatelská poznámka/kóta ve výkrese. Souřadnice jsou v souřadnicích promítnutého pohledu (`view` = klíč pohledu,
+ * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
+ */
+export type DrawingAnnotation = { id: string; view: string } & (
+  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string }
+  | { type: "note"; at: Vec2; leader?: Vec2; text: string }
+  | { type: "roughness"; at: Vec2; ra: string; leader?: Vec2 }
+  | { type: "gdt"; at: Vec2; symbol: GdtSymbol; value: string; datum?: string; leader?: Vec2 }
+  | { type: "datum"; at: Vec2; label: string }
+  | { type: "text"; at: Vec2; text: string; size: number }
+);
+
+export type GdtSymbol = "straight" | "flat" | "circ" | "cyl" | "prof" | "par" | "perp" | "angle" | "pos" | "conc" | "sym" | "runout";
+
+export type DrawingDoc = {
+  id: string;
+  name: string;
+  /** DrawingOptions (volně typované – definice je v cad/drawing.ts) */
+  options: Record<string, unknown>;
+  /** razítko: číslo, autor, revize… */
+  meta: Record<string, unknown>;
+  annotations: DrawingAnnotation[];
+};

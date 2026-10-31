@@ -112,3 +112,37 @@ describe("výkres", () => {
     fs.writeFileSync("/tmp/claude-0/wc/test.svg", d.svg);
   }, 30_000);
 });
+
+describe("uživatelské kóty a poznámky", async () => {
+  const { annotationGeometry, withAnnotations, viewAt, sheetToAnn, annToSheet } = await import("./drawing");
+  const base = { sheet: { name: "A4" as const, w: 297, h: 210 }, views: [{ key: "front", px: 40, py: 40, s: 0.5, x0: -50, y0: -20, w: 100, h: 40 }], scale: "1:2", scaleValue: 0.5, polys: [], texts: [], svg: "", dxf: "", warnings: [] };
+  it("kóta ukazuje rozměr v jednotkách modelu nezávisle na měřítku", () => {
+    const g = annotationGeometry(base, [{ id: "d1", view: "front", type: "dim", kind: "horizontal", a: [-50, 20], b: [50, 20], offset: 8 }]);
+    expect(g.texts[0].s).toBe("100");
+    expect(g.polys.filter((p) => p.fill)).toHaveLength(2); // dvě šipky
+    const g2 = annotationGeometry(base, [{ id: "d2", view: "sheet", type: "dim", kind: "aligned", a: [0, 0], b: [30, 40], offset: 5 }]);
+    expect(g2.texts[0].s).toBe("100"); // 50 mm listu / 0,5
+  });
+  it("poznámka, drsnost, tolerance, základna a text vytvoří geometrii; withAnnotations přegeneruje SVG/DXF", () => {
+    const anns = [
+      { id: "n", view: "front", type: "note" as const, at: [0, -30] as [number, number], leader: [0, 0] as [number, number], text: "Ostré hrany srazit" },
+      { id: "r", view: "front", type: "roughness" as const, at: [10, 20] as [number, number], ra: "Ra 1,6" },
+      { id: "g", view: "front", type: "gdt" as const, at: [20, -40] as [number, number], symbol: "perp" as const, value: "0,05", datum: "A", leader: [20, -20] as [number, number] },
+      { id: "a", view: "front", type: "datum" as const, at: [-40, 20] as [number, number], label: "A" },
+      { id: "t", view: "sheet", type: "text" as const, at: [150, 190] as [number, number], text: "Kalit 58 HRC", size: 4 },
+    ];
+    const r = withAnnotations(base, anns);
+    expect(r.polys.length).toBeGreaterThan(10);
+    expect(r.svg).toContain("Ostré hrany srazit");
+    expect(r.svg).toContain("Ra 1,6");
+    expect(r.dxf).toContain("Kalit 58 HRC");
+  });
+  it("mapování list ↔ pohled", () => {
+    const v = base.views[0];
+    const sheet = annToSheet(base.views, "front", [0, 0]);
+    expect(sheet).toEqual([65, 50]);
+    expect(sheetToAnn(v, sheet)).toEqual([0, 0]);
+    expect(viewAt(base.views, [60, 45])?.key).toBe("front");
+    expect(viewAt(base.views, [250, 150])).toBeNull();
+  });
+});

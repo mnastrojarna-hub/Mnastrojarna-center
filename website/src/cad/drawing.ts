@@ -69,8 +69,13 @@ export const defaultDrawingOptions: DrawingOptions = {
   dimensions: "auto",
 };
 
+/** Umístění pohledu na listu (pro mapování kliknutí → souřadnice pohledu a zpět). */
+export type PlacedView = { key: string; px: number; py: number; s: number; x0: number; y0: number; w: number; h: number };
+
 export type DrawingResult = {
   sheet: { name: SheetName; w: number; h: number };
+  /** umístěné pohledy (bez izometrie) */
+  views: PlacedView[];
   scale: string;
   scaleValue: number;
   polys: Poly[];
@@ -679,6 +684,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
 
   return {
     sheet: { name: sheet, w: SW, h: SH },
+    views: [...placed.values()].map((p) => ({ key: p.key, px: p.px, py: p.py, s: p.s, x0: p.x0, y0: p.y0, w: p.w, h: p.h })),
     scale: scaleLabel(scale),
     scaleValue: scale,
     polys,
@@ -1269,4 +1275,232 @@ export function toDxf(H: number, polys: Poly[], texts: DText[]) {
   }
   add(0, "ENDSEC", 0, "EOF");
   return o.join("\n") + "\n";
+}
+
+// ---------------- uživatelské kóty a poznámky (asociativní) ----------------
+
+import type { DrawingAnnotation, GdtSymbol } from "./types";
+
+const fmtVal = (n: number) => (Math.round(n * 100) / 100).toLocaleString("cs-CZ");
+
+/** souřadnice pohledu → list; `view: "sheet"` = už v mm listu */
+export function annToSheet(views: PlacedView[], view: string, q: Vec2): Vec2 {
+  if (view === "sheet") return q;
+  const v = views.find((x) => x.key === view);
+  if (!v) return q;
+  return [v.px + (q[0] - v.x0) * v.s, v.py + (q[1] - v.y0) * v.s];
+}
+/** list → souřadnice pohledu */
+export function sheetToAnn(v: PlacedView, q: Vec2): Vec2 {
+  return [(q[0] - v.px) / v.s + v.x0, (q[1] - v.py) / v.s + v.y0];
+}
+/** který pohled obsahuje bod listu (s okrajem) */
+export function viewAt(views: PlacedView[], q: Vec2, margin = 12): PlacedView | null {
+  let best: PlacedView | null = null;
+  let bd = Infinity;
+  for (const v of views) {
+    const w = v.w * v.s;
+    const h = v.h * v.s;
+    const dx = Math.max(v.px - q[0], 0, q[0] - (v.px + w));
+    const dy = Math.max(v.py - q[1], 0, q[1] - (v.py + h));
+    const d = Math.hypot(dx, dy);
+    if (d <= margin && d < bd) {
+      bd = d;
+      best = v;
+    }
+  }
+  return best;
+}
+
+export const GDT_LABEL: Record<GdtSymbol, string> = {
+  straight: "Přímost",
+  flat: "Rovinnost",
+  circ: "Kruhovitost",
+  cyl: "Válcovitost",
+  prof: "Tvar plochy",
+  par: "Rovnoběžnost",
+  perp: "Kolmost",
+  angle: "Sklon",
+  pos: "Poloha",
+  conc: "Soustřednost",
+  sym: "Souměrnost",
+  runout: "Házení",
+};
+
+function arrowAt(polys: Poly[], tip: Vec2, dir: Vec2, layer: Layer = "dim") {
+  const l = 3;
+  const w = 0.8;
+  const d = Math.hypot(dir[0], dir[1]) || 1;
+  const ux = dir[0] / d;
+  const uy = dir[1] / d;
+  polys.push({ layer, fill: true, pts: [tip, [tip[0] - ux * l - uy * w, tip[1] - uy * l + ux * w], [tip[0] - ux * l + uy * w, tip[1] - uy * l - ux * w], tip] });
+}
+
+function circlePts(c: Vec2, r: number, n = 24): Vec2[] {
+  const out: Vec2[] = [];
+  for (let i = 0; i <= n; i++) out.push([c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)]);
+  return out;
+}
+
+/** značka geometrické tolerance ISO 1101 jako geometrie (čáry) – funguje v SVG/DXF/DWG/PDF bez speciálního písma */
+function gdtGlyph(polys: Poly[], c: Vec2, sym: GdtSymbol) {
+  const r = 2;
+  const L = (pts: Vec2[]) => polys.push({ layer: "dim", pts });
+  const [x, y] = c;
+  switch (sym) {
+    case "straight": L([[x - r, y], [x + r, y]]); break;
+    case "flat": L([[x - r, y + r * 0.6], [x - r * 0.2, y - r * 0.6], [x + r, y - r * 0.6], [x + r * 0.2, y + r * 0.6], [x - r, y + r * 0.6]]); break;
+    case "circ": L(circlePts(c, r * 0.9)); break;
+    case "cyl": L(circlePts(c, r * 0.8)); L([[x - r * 1.3, y + r], [x - r * 0.8, y - r]]); L([[x + r * 0.8, y + r], [x + r * 1.3, y - r]]); break;
+    case "prof": { const pts = circlePts([x, y + r * 0.3], r * 0.9).filter((p) => p[1] <= y + r * 0.35); L([[x - r * 0.9, y + r * 0.3], ...pts.sort((a, b) => a[0] - b[0]), [x + r * 0.9, y + r * 0.3], [x - r * 0.9, y + r * 0.3]]); break; }
+    case "par": L([[x - r * 0.7, y + r], [x - r * 0.1, y - r]]); L([[x + r * 0.1, y + r], [x + r * 0.7, y - r]]); break;
+    case "perp": L([[x - r, y + r * 0.8], [x + r, y + r * 0.8]]); L([[x, y + r * 0.8], [x, y - r]]); break;
+    case "angle": L([[x - r, y + r * 0.8], [x + r, y + r * 0.8], [x - r * 0.6, y - r]]); break;
+    case "pos": L(circlePts(c, r * 0.7)); L([[x - r * 1.2, y], [x + r * 1.2, y]]); L([[x, y - r * 1.2], [x, y + r * 1.2]]); break;
+    case "conc": L(circlePts(c, r * 0.9)); L(circlePts(c, r * 0.45)); break;
+    case "sym": L([[x - r, y - r * 0.7], [x + r, y - r * 0.7]]); L([[x - r * 0.6, y], [x + r * 0.6, y]]); L([[x - r, y + r * 0.7], [x + r, y + r * 0.7]]); break;
+    case "runout": L([[x - r * 0.9, y + r], [x + r * 0.7, y - r * 0.9]]); arrowAt(polys, [x + r * 0.9, y - r], [1, -1]); break;
+  }
+}
+
+/** Geometrie (čáry + texty v mm listu) pro uživatelské poznámky a kóty. */
+export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue">, annotations: DrawingAnnotation[]): { polys: Poly[]; texts: DText[] } {
+  const polys: Poly[] = [];
+  const texts: DText[] = [];
+  const S = (view: string, q: Vec2) => annToSheet(d.views, view, q);
+  const modelLen = (view: string, a: Vec2, b: Vec2) => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy);
+    return view === "sheet" ? len / d.scaleValue : len; // souřadnice pohledu jsou v mm modelu
+  };
+  for (const a of annotations) {
+    switch (a.type) {
+      case "dim": {
+        const A = S(a.view, a.a);
+        const B = S(a.view, a.b);
+        let A2: Vec2;
+        let B2: Vec2;
+        let value: number;
+        let u: Vec2;
+        if (a.kind === "horizontal") {
+          const y = A[1] + a.offset;
+          A2 = [A[0], y];
+          B2 = [B[0], y];
+          value = Math.abs(modelLen(a.view, [a.a[0], 0], [a.b[0], 0]));
+          u = [Math.sign(B[0] - A[0]) || 1, 0];
+        } else if (a.kind === "vertical") {
+          const x = A[0] + a.offset;
+          A2 = [x, A[1]];
+          B2 = [x, B[1]];
+          value = Math.abs(modelLen(a.view, [0, a.a[1]], [0, a.b[1]]));
+          u = [0, Math.sign(B[1] - A[1]) || 1];
+        } else {
+          const dx = B[0] - A[0];
+          const dy = B[1] - A[1];
+          const l = Math.hypot(dx, dy) || 1;
+          u = [dx / l, dy / l];
+          const n: Vec2 = [-u[1], u[0]];
+          A2 = [A[0] + n[0] * a.offset, A[1] + n[1] * a.offset];
+          B2 = [B[0] + n[0] * a.offset, B[1] + n[1] * a.offset];
+          value = modelLen(a.view, a.a, a.b);
+        }
+        // vynášecí čáry (s přesahem 1,5 mm) a kótovací čára
+        const ext = (P: Vec2, P2: Vec2) => {
+          const dx = P2[0] - P[0];
+          const dy = P2[1] - P[1];
+          const l = Math.hypot(dx, dy) || 1;
+          polys.push({ layer: "dim", pts: [[P[0] + (dx / l) * 1, P[1] + (dy / l) * 1], [P2[0] + (dx / l) * 1.5, P2[1] + (dy / l) * 1.5]] });
+        };
+        ext(A, A2);
+        ext(B, B2);
+        polys.push({ layer: "dim", pts: [A2, B2] });
+        const span = Math.hypot(B2[0] - A2[0], B2[1] - A2[1]);
+        const inside = span > 8;
+        arrowAt(polys, A2, inside ? [-u[0], -u[1]] : [u[0], u[1]]);
+        arrowAt(polys, B2, inside ? [u[0], u[1]] : [-u[0], -u[1]]);
+        const label = a.text ?? `${a.prefix ?? ""}${fmtVal(value)}${a.suffix ?? ""}`;
+        let ang = (Math.atan2(u[1], u[0]) * 180) / Math.PI;
+        if (ang > 90 || ang <= -90) ang += 180;
+        const rad = (ang * Math.PI) / 180;
+        const nx = Math.sin(rad);
+        const ny = -Math.cos(rad); // kolmo „nad“ čáru (SVG y dolů)
+        const mid: Vec2 = [(A2[0] + B2[0]) / 2 + nx * 1.2, (A2[1] + B2[1]) / 2 + ny * 1.2];
+        texts.push({ x: mid[0], y: mid[1], s: label, size: 3.5, anchor: "middle", rotate: Math.abs(ang) < 0.01 ? undefined : ang, layer: "dim" });
+        break;
+      }
+      case "note": {
+        const at = S(a.view, a.at);
+        const w = Math.max(6, a.text.length * 3.5 * 0.58 + 2);
+        if (a.leader) {
+          const tip = S(a.view, a.leader);
+          polys.push({ layer: "dim", pts: [tip, at, [at[0] + w, at[1]]] });
+          arrowAt(polys, tip, [tip[0] - at[0], tip[1] - at[1]]);
+        }
+        texts.push({ x: at[0] + 1, y: at[1] - 1, s: a.text, size: 3.5, layer: "text" });
+        break;
+      }
+      case "roughness": {
+        const t = S(a.view, a.at); // hrot značky leží na povrchu
+        const short: Vec2 = [t[0] - 2.9, t[1] - 5];
+        const long: Vec2 = [t[0] + 5.8, t[1] - 10];
+        polys.push({ layer: "dim", pts: [short, t, long] });
+        polys.push({ layer: "dim", pts: [long, [long[0] + 12, long[1]]] });
+        texts.push({ x: long[0] + 1, y: long[1] + 4.2, s: a.ra, size: 3, layer: "text" });
+        if (a.leader) {
+          const tip = S(a.view, a.leader);
+          polys.push({ layer: "dim", pts: [tip, t] });
+          arrowAt(polys, tip, [tip[0] - t[0], tip[1] - t[1]]);
+        }
+        break;
+      }
+      case "gdt": {
+        const at = S(a.view, a.at);
+        const H = 7;
+        const cells = [7, Math.max(9, a.value.length * 3.5 * 0.6 + 3), ...(a.datum ? [7] : [])];
+        let x = at[0];
+        const y = at[1];
+        const rect = (w: number) => polys.push({ layer: "dim", pts: [[x, y], [x + w, y], [x + w, y + H], [x, y + H], [x, y]] });
+        rect(cells[0]);
+        gdtGlyph(polys, [x + cells[0] / 2, y + H / 2], a.symbol);
+        x += cells[0];
+        rect(cells[1]);
+        texts.push({ x: x + cells[1] / 2, y: y + H / 2 + 1.25, s: a.value, size: 3.5, anchor: "middle", layer: "text" });
+        x += cells[1];
+        if (a.datum) {
+          rect(cells[2]);
+          texts.push({ x: x + cells[2] / 2, y: y + H / 2 + 1.25, s: a.datum, size: 3.5, anchor: "middle", bold: true, layer: "text" });
+        }
+        if (a.leader) {
+          const tip = S(a.view, a.leader);
+          polys.push({ layer: "dim", pts: [tip, [at[0], y + H / 2]] });
+          arrowAt(polys, tip, [tip[0] - at[0], tip[1] - y - H / 2]);
+        }
+        break;
+      }
+      case "datum": {
+        const at = S(a.view, a.at); // vrchol trojúhelníku na povrchu
+        polys.push({ layer: "dim", fill: true, pts: [at, [at[0] - 1.8, at[1] - 3], [at[0] + 1.8, at[1] - 3], at] });
+        polys.push({ layer: "dim", pts: [[at[0], at[1] - 3], [at[0], at[1] - 10]] });
+        polys.push({ layer: "dim", pts: [[at[0] - 3, at[1] - 16], [at[0] + 3, at[1] - 16], [at[0] + 3, at[1] - 10], [at[0] - 3, at[1] - 10], [at[0] - 3, at[1] - 16]] });
+        texts.push({ x: at[0], y: at[1] - 11.7, s: a.label, size: 3.5, anchor: "middle", bold: true, layer: "text" });
+        break;
+      }
+      case "text": {
+        const at = S(a.view, a.at);
+        texts.push({ x: at[0], y: at[1], s: a.text, size: a.size || 3.5, layer: "text" });
+        break;
+      }
+    }
+  }
+  return { polys, texts };
+}
+
+/** Výkres + uživatelské poznámky → nový výsledek (polys/texts/svg/dxf přepočítané). */
+export function withAnnotations(d: DrawingResult, annotations: DrawingAnnotation[]): DrawingResult {
+  if (!annotations.length) return d;
+  const g = annotationGeometry(d, annotations);
+  const polys = [...d.polys, ...g.polys];
+  const texts = [...d.texts, ...g.texts];
+  return { ...d, polys, texts, svg: toSvg(d.sheet.w, d.sheet.h, polys, texts), dxf: toDxf(d.sheet.h, polys, texts) };
 }

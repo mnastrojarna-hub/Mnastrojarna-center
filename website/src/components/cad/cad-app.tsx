@@ -2163,6 +2163,9 @@ export function CadApp() {
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? "dle kusovníku" : mat.label}
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
+            drawings={doc.drawings}
+            onDrawingsChange={(d) => live({ ...doc, drawings: d })}
+            onPropsChange={(p) => commit({ ...doc, props: p })}
             onClose={() => setDrawingOpen(false)}
           />
         )}
