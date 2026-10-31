@@ -15,15 +15,14 @@ import { getFlowCounts } from "@/lib/data/flow-status";
 import { BookEmpty } from "@/components/jobs/book/book-empty";
 import { StageLegend } from "@/components/jobs/book/stage-legend";
 import {
-  ORDER_STAGES, bookKpis, bookParamsToFilters, bookQuery, bookSegment, boardStages, countLabel, defaultStageFor, firstParam,
-  isFiltered, parseBookParams, segmentCounts, sumValue, todayInPrague,
+  DEFAULT_PARAMS, bookKpis, bookParamsToFilters, bookQuery, bookSegment, boardStages, countLabel, defaultStageFor, firstParam,
+  isFiltered, parseBookParams, segmentCounts, segmentStageCounts, sumValue, todayInPrague,
 } from "@/components/jobs/book/book-params";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { FEATURE_HINTS, FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
-import { listJobs, getJobStageCounts, getJobFormOptions } from "@/lib/data/jobs";
+import { listJobs, getJobStageCounts, getJobFormOptions, countOverdueInvoices } from "@/lib/data/jobs";
 import { listQuoteApprovers } from "@/lib/data/current-user";
 import { listOperationLocations } from "@/lib/data/production";
-import { paymentStateOf } from "@/lib/jobs/mapping";
 
 /**
  * Kolik řádků vykreslit napoprvé a o kolik přidat odkazem „Zobrazit další" (?radku=…). Každý řádek je
@@ -60,12 +59,16 @@ export default async function OrdersPage({
   const { can, features } = await getAccess();
   const margins = can("margins");
   const chipSegment = params.segment === "objednavky" || params.segment === "poptavky";
-  // objednávky v běhu: hodnota (jen s právem na marže) a faktury po splatnosti
-  const [jobs, counts, options, running, production, flowCounts, quoteApprovers] = await Promise.all([
+  const today = todayInPrague();
+  // „Hodnota v běhu" (jen s právem na marže) = VŠECHNY objednávky v běhu (bez DL na vše) — stejné filtry jako
+  // záložka Objednávky bez dalších filtrů, ne jen zobrazené řádky; dotaz do DB sdílí se seznamem (React cache).
+  // „Po splatnosti" = vlastní dotaz přes celou knihu (vyfakturované jsou v Dokončených).
+  const [jobs, counts, options, running, overdueInvoices, production, flowCounts, quoteApprovers] = await Promise.all([
     listJobs(bookParamsToFilters(params)),
     getJobStageCounts(),
     getJobFormOptions(),
-    listJobs({ stages: ORDER_STAGES }),
+    margins ? listJobs(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "objednavky" })) : Promise.resolve([]),
+    countOverdueInvoices(today),
     listOperationLocations(),
     chipSegment ? getFlowCounts() : Promise.resolve({} as Record<string, number>),
     // 31. 10.: schvalovatelé (štítek „čeká na schválení (V. Volný nebo super admin)“)
@@ -75,8 +78,6 @@ export default async function OrdersPage({
     features, userId: user.id, role: user.role, quoteNeedsApproval: user.quoteNeedsApproval !== false, quoteApprovers,
   };
 
-  const today = todayInPrague();
-  const overdueInvoices = running.filter((j) => paymentStateOf(j, today) === "po_splatnosti").length;
   const filtered = isFiltered(params);
   const defaultStage = defaultStageFor(params.segment);
   // #25: obchodníka zakázky volí jen super admin — ostatním ho doplní server (obchodník zákazníka)
@@ -107,8 +108,8 @@ export default async function OrdersPage({
         <KpiStrip kpis={bookKpis(counts)} runningValue={margins ? sumValue(running) : null} overdueInvoices={overdueInvoices} />
 
         <section aria-label="Filtry knihy" className="space-y-3 rounded-2xl border bg-card p-2.5 shadow-sm sm:p-3">
-          <SegmentTabs counts={segmentCounts(counts.byStage)} />
-          <StageChips byStage={counts.byStage} />
+          <SegmentTabs counts={segmentCounts(counts.byStage, counts.deliveredByStage)} />
+          <StageChips byStage={segmentStageCounts(counts.byStage, counts.deliveredByStage, params.segment)} />
           {chipSegment && <FlowFilterChips counts={flowCounts} />}
           <BookToolbar options={options} production={production} />
         </section>
@@ -132,7 +133,7 @@ export default async function OrdersPage({
           {jobs.length === 0 ? (
             <BookEmpty segment={params.segment} filtered={filtered} options={options} defaultStage={defaultStage} userId={user.id} />
           ) : params.view === "tabule" ? (
-            <JobBoard jobs={jobs} stages={boardStages(params)} today={today} access={access} />
+            <JobBoard jobs={jobs} stages={boardStages(params, jobs)} today={today} access={access} />
           ) : (
             <>
               <JobRowsHeader />

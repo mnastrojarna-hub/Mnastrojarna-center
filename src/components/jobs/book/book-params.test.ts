@@ -5,8 +5,9 @@ import {
   moveJobStage, todayInPrague, dateFromIso, shortDate, initials, avatarTone, AVATAR_TONES, countLabel,
   normalizeStages, segmentOfStage, defaultStageFor, firstParam, sumValue, DEFAULT_PARAMS, RESET_FILTERS,
   KPI_PATCHES, ORDER_STAGES, INQUIRY_STAGES, BOOK_SEGMENTS, PAYMENT_FILTERS, isProductionStepKey, canonicalBookHref, type BookParams,
+  DONE_STAGES, ORDER_FILTER_KEYS, deliveryFiltersFor, segmentQueryStages, segmentStageCounts,
 } from "./book-params";
-import { STAGE_ORDER } from "@/lib/jobs/stages";
+import { PRE_DELIVERY_STAGES, STAGE_ORDER, isDeliveredToCustomer, isRunningOrder } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
 
 const UUID = "3f2b8c1e-1d2a-4c3b-9a8e-7f6d5c4b3a21";
@@ -138,6 +139,50 @@ describe("bookParamsToFilters", () => {
     expect(f.q).toBeUndefined();
   });
 
+  it("31. 10.: Objednávky = od objednávky do DL (bez Dodáno/Vyfakturováno), jen bez DL na vše", () => {
+    expect(ORDER_STAGES).toEqual(["objednavka", "potvrzeno", "ve_vyrobe", "dodano_k_nam", "na_sklade", "montaz", "pozastaveno", "reklamace"]);
+    const f = bookParamsToFilters(DEFAULT_PARAMS);
+    expect(f.deliveredToCustomer).toBe(false);
+    expect(f.stages).not.toContain("dodano_zakaznikovi");
+    expect(f.stages).not.toContain("fakturovano");
+    // vybraný stav v Objednávkách = také jen bez DL na vše
+    const picked = bookParamsToFilters({ ...DEFAULT_PARAMS, stages: ["montaz"] });
+    expect([picked.stages, picked.deliveredToCustomer]).toEqual([["montaz"], false]);
+  });
+
+  it("31. 10.: Dokončené = Dodáno zákazníkovi, Vyfakturováno, Dokončeno + stavy před dodáním s dodaným vším", () => {
+    const seg = BOOK_SEGMENTS.find((s) => s.key === "dokoncene")!;
+    expect(seg.stages).toEqual(DONE_STAGES);
+    expect(DONE_STAGES).toEqual(["dodano_zakaznikovi", "fakturovano", "dokonceno"]);
+    expect(seg.hint).toBe("Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené.");
+    expect(BOOK_SEGMENTS.find((s) => s.key === "objednavky")!.hint).toBe("Objednané zakázky bez dodacího listu — v běhu.");
+    const f = bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "dokoncene" });
+    expect(f.deliveredToCustomer).toBe(true);
+    expect(f.stages).toEqual(STAGE_ORDER.filter((s) => DONE_STAGES.includes(s) || PRE_DELIVERY_STAGES.includes(s)));
+    expect(segmentQueryStages(seg)).toEqual(f.stages);
+    // vybraný stav = jen ten stav
+    expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "dokoncene", stages: ["fakturovano"] }).stages).toEqual(["fakturovano"]);
+    // ostatní záložky dodání neřeší
+    expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "vse" }).deliveredToCustomer).toBeUndefined();
+    expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "poptavky" }).deliveredToCustomer).toBeUndefined();
+  });
+
+  it("31. 10.: filtr Dodání podle záložky (Dodáno jen v Dokončených), chip „Vše dodáno“ v Objednávkách není", () => {
+    expect(deliveryFiltersFor("objednavky")).toEqual(["k_expedici", "castecne"]);
+    expect(deliveryFiltersFor("dokoncene")).toEqual(["dodano", "dl_potvrzen"]);
+    expect(deliveryFiltersFor("vse")).toEqual(["k_expedici", "castecne", "dodano", "dl_potvrzen"]);
+    expect(parseBookParams({ dodani: "dodano" }).delivery).toEqual([]);
+    expect(parseBookParams({ dodani: "castecne" }).delivery).toEqual(["castecne"]);
+    expect(parseBookParams({ segment: "dokoncene", dodani: "dodano,castecne" }).delivery).toEqual(["dodano"]);
+    // přepnutí záložky ruší volbu, která v nové záložce nedává smysl
+    const done = applyBookPatch(DEFAULT_PARAMS, { segment: "dokoncene", delivery: ["dl_potvrzen"] });
+    expect(applyBookPatch(done, { segment: "objednavky" }).delivery).toEqual([]);
+    expect(applyBookPatch(done, { segment: "vse" }).delivery).toEqual(["dl_potvrzen"]);
+    expect(bookQuery({ ...DEFAULT_PARAMS, delivery: ["dodano"] })).toBe("");
+    expect(ORDER_FILTER_KEYS).not.toContain("dokoncena");
+    expect(parseBookParams({ objednavka: "dokoncena,rozpor" }).order).toEqual(["rozpor"]);
+  });
+
   it("Vše = bez omezení stavů", () => {
     const f = bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "vse" });
     expect(f.stages).toBeUndefined();
@@ -217,10 +262,47 @@ describe("počty", () => {
   it("segmenty sečtou své stavy", () => {
     const c = segmentCounts(byStage);
     expect(c.poptavky).toBe(1 + 2 + 3);
-    expect(c.dokoncene).toBe(byStage.dokonceno);
+    expect(c.dokoncene).toBe(byStage.dodano_zakaznikovi + byStage.fakturovano + byStage.dokonceno);
     expect(c.nerealizovane).toBe(byStage.nerealizovano + byStage.zruseno);
     expect(c.vse).toBe(STAGE_ORDER.reduce((n, _s, i) => n + i + 1, 0));
     expect(c.objednavky).toBe(ORDER_STAGES.reduce((n, s) => n + byStage[s], 0));
+  });
+
+  it("31. 10.: zakázka s dodaným vším ve stavu před dodáním → počet Dokončené, ne Objednávky (záložky, chipy, KPI)", () => {
+    const delivered = { montaz: 2, objednavka: 1 };
+    const c = segmentCounts(byStage, delivered);
+    const plain = segmentCounts(byStage);
+    expect(c.objednavky).toBe(plain.objednavky - 3);
+    expect(c.dokoncene).toBe(plain.dokoncene + 3);
+    expect([c.poptavky, c.nerealizovane, c.vse]).toEqual([plain.poptavky, plain.nerealizovane, plain.vse]);
+    // součet záložek (bez Vše) = celá kniha
+    expect(c.objednavky + c.poptavky + c.dokoncene + c.nerealizovane).toBe(c.vse);
+    // chipy: v Objednávkách bez dodaných, jinde podle stavu
+    const chips = segmentStageCounts(byStage, delivered, "objednavky");
+    expect([chips.montaz, chips.objednavka, chips.ve_vyrobe]).toEqual([byStage.montaz - 2, byStage.objednavka - 1, byStage.ve_vyrobe]);
+    expect(segmentStageCounts(byStage, delivered, "vse")).toBe(byStage);
+    expect(segmentStageCounts(byStage, delivered, "dokoncene")).toBe(byStage);
+    // KPI Objednávky v běhu = záložka Objednávky (i na přehledu)
+    expect(bookKpis({ byStage, deliveredByStage: delivered, overdue: 0, dueThisWeek: 0 }).ordersRunning).toBe(c.objednavky);
+  });
+
+  it("31. 10.: vystavený DL na vše = Dokončené; částečná dodávka zůstává v běhu", () => {
+    const job = (stage: JobStage, itemsCount: number, itemsDelivered: number) => ({ stage, flow: { itemsCount, itemsDelivered } });
+    // stav Dodáno zákazníkovi a dál = vždy dodáno
+    for (const s of DONE_STAGES) expect(isDeliveredToCustomer(job(s, 0, 0))).toBe(true);
+    // stav před dodáním: rozhodují položky
+    expect(isDeliveredToCustomer(job("montaz", 2, 2))).toBe(true);
+    expect(isRunningOrder(job("montaz", 2, 2))).toBe(false);
+    expect(isDeliveredToCustomer(job("ve_vyrobe", 2, 1))).toBe(false);
+    expect(isRunningOrder(job("ve_vyrobe", 2, 1))).toBe(true);
+    expect(isRunningOrder(job("objednavka", 0, 0))).toBe(true);
+    expect(isRunningOrder({ stage: "potvrzeno" })).toBe(true);
+    // pozastavené a reklamace zůstávají v běhu (chtějí pozornost), i když je dodáno vše
+    expect(isRunningOrder(job("reklamace", 1, 1))).toBe(true);
+    expect(isRunningOrder(job("pozastaveno", 1, 1))).toBe(true);
+    // mimo objednávky
+    expect(isRunningOrder(job("fakturovano", 1, 0))).toBe(false);
+    expect(isRunningOrder(job("nabidka", 0, 0))).toBe(false);
   });
 
   it("každý stav patří do právě jednoho segmentu (kromě Vše)", () => {
@@ -259,6 +341,14 @@ describe("tabule", () => {
     expect(boardStages({ ...DEFAULT_PARAMS, segment: "poptavky" })).toEqual(INQUIRY_STAGES);
     expect(boardStages({ ...DEFAULT_PARAMS, segment: "poptavky", stages: ["nabidka"] })).toEqual(["nabidka"]);
     expect(boardStages({ ...DEFAULT_PARAMS, segment: "vse" })).toEqual(STAGE_ORDER);
+    expect(boardStages(DEFAULT_PARAMS)).toEqual(ORDER_STAGES);
+  });
+
+  it("31. 10.: Dokončené — zakázka s dodaným vším ve stavu Montáž dostane svůj sloupec", () => {
+    const p = { ...DEFAULT_PARAMS, segment: "dokoncene" as const };
+    expect(boardStages(p)).toEqual(DONE_STAGES);
+    expect(boardStages(p, [{ stage: "fakturovano" }, { stage: "montaz" }])).toEqual(["montaz", ...DONE_STAGES]);
+    expect(boardStages({ ...p, stages: ["fakturovano"] }, [{ stage: "montaz" }])).toEqual(["fakturovano"]);
   });
 
   it("seskupí zakázky a sečte hodnoty", () => {

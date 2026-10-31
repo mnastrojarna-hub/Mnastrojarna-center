@@ -25,7 +25,7 @@ const EMPTY: Record<BookSegmentKey, { icon: LucideIcon; tone: string; title: str
   dokoncene: {
     icon: CircleCheckBig, tone: "bg-slate-200 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300",
     title: "Zatím nic dokončeného",
-    text: "Zakázka se sem přesune, jakmile ji označíš jako Dokončeno (zaplaceno).",
+    text: "Zakázka se sem přesune, jakmile vystavíš dodací list na celou dodávku (Dodáno zákazníkovi), a zůstane tu i po faktuře a zaplacení.",
     actions: false,
   },
   nerealizovane: {

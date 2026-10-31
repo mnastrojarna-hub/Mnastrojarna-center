@@ -7,8 +7,10 @@ import {
   resolveStageFilter, filterJobs, sortJobs, countJobStages, aiFilledColumns, stageEventMessage,
   computeMargin, todayIso, matchesDeadline, fetchPaged, isGenericCaptureName, translateDbError, type JobRow,
   paymentStateOf, matchesPayment, JOB_LIST_SELECT, rowToJobItem, rowToJobQuote, paymentKeyOf, flowFactsOfRow,
+  JOB_COUNT_SELECT, OVERDUE_INVOICE_SELECT, isOverdueInvoiceRow,
 } from "./mapping";
 import type { JobListItem } from "./types";
+import type { FlowFacts } from "./flow-status";
 
 const UUID = "3f2b8c1e-1d2a-4c3b-9a8e-7f6d5c4b3a21";
 const UUID2 = "11111111-2222-4333-8444-555555555555";
@@ -397,6 +399,55 @@ describe("filtry a řazení", () => {
     expect(counts.active).toBe(4);
     expect(counts.overdue).toBe(2);
     expect(counts.dueThisWeek).toBe(2);
+    expect(counts.deliveredByStage).toEqual({});
+  });
+
+  it("31. 10.: countJobStages — dodáno vše ve stavu před dodáním (stav se neposunul) se počítá zvlášť", () => {
+    expect(JOB_COUNT_SELECT).toContain("items_count");
+    expect(JOB_COUNT_SELECT).toContain("items_delivered");
+    const counts = countJobStages([
+      { status: "montaz", items_count: 2, items_delivered: 2 },
+      { status: "montaz", items_count: 2, items_delivered: 1 },
+      { status: "ve_vyrobe", items_count: "3", items_delivered: "3" },
+      { status: "objednavka", items_count: 0, items_delivered: 0 },
+      { status: "dodano_zakaznikovi", items_count: 1, items_delivered: 1 },
+      { status: "reklamace", items_count: 1, items_delivered: 1 },
+    ], today);
+    expect(counts.byStage.montaz).toBe(2);
+    expect(counts.deliveredByStage).toEqual({ montaz: 1, ve_vyrobe: 1 });
+  });
+
+  it("31. 10.: filterJobs — deliveredToCustomer (Objednávky v běhu ↔ Dokončené)", () => {
+    const flow = (itemsCount: number, itemsDelivered: number) => ({ itemsCount, itemsDelivered }) as unknown as FlowFacts;
+    const all = [
+      listItem({ id: "full", stage: "montaz", flow: flow(2, 2) }),
+      listItem({ id: "part", stage: "ve_vyrobe", flow: flow(2, 1) }),
+      listItem({ id: "none", stage: "objednavka", flow: flow(1, 0) }),
+      listItem({ id: "dl", stage: "dodano_zakaznikovi", flow: flow(1, 1) }),
+      listItem({ id: "fa", stage: "fakturovano" }),
+    ];
+    expect(filterJobs(all, { deliveredToCustomer: false }).map((j) => j.id)).toEqual(["part", "none"]);
+    expect(filterJobs(all, { deliveredToCustomer: true }).map((j) => j.id)).toEqual(["full", "dl", "fa"]);
+    expect(filterJobs(all, {})).toHaveLength(5);
+  });
+
+  it("31. 10.: faktura po splatnosti z lehkého řádku = filtr Platba „Po splatnosti“", () => {
+    const day = "2026-10-31";
+    expect(OVERDUE_INVOICE_SELECT).toContain("paid_so_far");
+    const row = (over: Record<string, unknown>) => ({ status: "fakturovano", paid_at: null, paid_so_far: 0, invoice_number: "FA-1", invoice_due_date: "2026-10-20", ...over });
+    expect(isOverdueInvoiceRow(row({}), day)).toBe(true);
+    // nezáleží na záložce: dodáno / ve výrobě s fakturou po splatnosti také
+    expect(isOverdueInvoiceRow(row({ status: "dodano_zakaznikovi" }), day)).toBe(true);
+    expect(isOverdueInvoiceRow(row({ status: "ve_vyrobe" }), day)).toBe(true);
+    expect(isOverdueInvoiceRow(row({ status: "ve_vyrobe", invoice_number: null, paid_so_far: 500 }), day)).toBe(true);
+    expect(isOverdueInvoiceRow(row({ status: "ve_vyrobe", invoice_number: null }), day)).toBe(false);
+    expect(isOverdueInvoiceRow(row({ invoice_due_date: "2026-11-05" }), day)).toBe(false);
+    expect(isOverdueInvoiceRow(row({ paid_at: "2026-10-25" }), day)).toBe(false);
+    expect(isOverdueInvoiceRow(row({ status: "dokonceno" }), day)).toBe(false);
+    expect(isOverdueInvoiceRow(row({ status: "zruseno" }), day)).toBe(false);
+    // stejné jako paymentStateOf řádku Knihy
+    const item = listItem({ stage: "fakturovano", invoiceNumber: "FA-1", invoiceDueDate: "2026-10-20", paidAt: null });
+    expect(paymentStateOf(item, day)).toBe("po_splatnosti");
   });
 });
 

@@ -3,25 +3,28 @@
 import * as React from "react";
 import { CountChips } from "@/components/flow-status/count-chips";
 import { useBookNav } from "@/components/jobs/book/book-nav";
+import { ORDER_FILTER_KEYS } from "@/components/jobs/book/book-params";
 import { chipsForTab } from "@/lib/jobs/flow-status";
 import type { InquiryStatus } from "@/lib/supabase/database.types";
 
 /**
  * Chipy podrobných stavů v Knize: segment Objednávky = doklad a plnění (Doručená · Rozpor ·
- * Aktualizovaná · Potvrzená · Ve výrobě · Částečně dodaná · Dokončená · Stornovaná), segment
- * Poptávky = stav poptávky. Počty z flow_counts (uzavřené stavy za posledních 30 dní).
+ * Aktualizovaná · Potvrzená · Ve výrobě · Částečně dodaná · Stornovaná — bez „Vše dodáno": dodané
+ * celé zakázky jsou v Dokončených), segment Poptávky = stav poptávky. Počty z flow_counts
+ * (uzavřené stavy za posledních 30 dní).
  */
 /** V Knize vedle záložek hlavního stavu („Ve výrobě", „Dokončené") jiná slova pro doklad a plnění. */
 const BOOK_LABELS: Record<string, string> = {
   "order.potvrzena": "Doklad potvrzen",
   "fulfilment.ve_vyrobe": "Plnění: ve výrobě",
-  "fulfilment.dokoncena": "Vše dodáno",
 };
 
 export function FlowFilterChips({ counts }: { counts: Record<string, number> }) {
   const { params, navigate } = useBookNav();
   if (params.segment === "objednavky") {
-    const chips = chipsForTab("confirmations", counts).map((c) => ({ ...c, label: BOOK_LABELS[`${c.phase}.${c.key}`] ?? c.label }));
+    const chips = chipsForTab("confirmations", counts)
+      .filter((c) => ORDER_FILTER_KEYS.includes(c.key))
+      .map((c) => ({ ...c, label: BOOK_LABELS[`${c.phase}.${c.key}`] ?? c.label }));
     return (
       <CountChips
         label="Stav objednávky"

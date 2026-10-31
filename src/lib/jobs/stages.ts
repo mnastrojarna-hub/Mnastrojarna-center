@@ -206,6 +206,37 @@ export const CLOSED_STAGES: JobStage[] = ["dokonceno", "nerealizovano", "zruseno
 /** Stavy, kdy je zboží už u zákazníka (termín dodání splněn). */
 export const DELIVERED_STAGES: JobStage[] = ["dodano_zakaznikovi", "fakturovano", "dokonceno"];
 
+/** Stavy toku od objednávky do dodání — zakázka v nich ještě nemá vystavený dodací list na vše (pokud se stav neopozdil). */
+export const PRE_DELIVERY_STAGES: JobStage[] = ["objednavka", "potvrzeno", "ve_vyrobe", "dodano_k_nam", "na_sklade", "montaz"];
+
+/**
+ * Objednávky v běhu (Kniha → Objednávky, „Objednávky v běhu", „Hodnota v běhu"): od objednávky do vystavení
+ * dodacího listu, vč. pozastavených a reklamací (ty chtějí pozornost i po dodání). Dodáno zákazníkovi,
+ * vyfakturováno a dokončeno = Dokončené.
+ */
+export const RUNNING_ORDER_STAGES: JobStage[] = [...PRE_DELIVERY_STAGES, "pozastaveno", "reklamace"];
+
+/**
+ * Zboží je u zákazníka (vystavený DL na celou dodávku): stav Dodáno zákazníkovi a dál, nebo stav toku před
+ * dodáním, ve kterém má zakázka dodané všechny položky (stav se neposunul — ruční vrácení, starší data).
+ * Částečná dodávka = ne (zakázka zůstává v běhu). Pozastavené a reklamace se neposouvají.
+ * Fakta položek = orders.items_count / items_delivered (udržuje DB, jako job_flow_v).
+ */
+export function isDeliveredToCustomer(j: {
+  stage: JobStage;
+  flow?: { itemsCount?: number | null; itemsDelivered?: number | null } | null;
+}): boolean {
+  if (DELIVERED_STAGES.includes(j.stage)) return true;
+  if (!PRE_DELIVERY_STAGES.includes(j.stage)) return false;
+  const count = Number(j.flow?.itemsCount ?? 0);
+  return count > 0 && Number(j.flow?.itemsDelivered ?? 0) >= count;
+}
+
+/** Objednávka v běhu = stav objednávky… a zboží ještě není celé u zákazníka (bez DL na vše). */
+export function isRunningOrder(j: Parameters<typeof isDeliveredToCustomer>[0]): boolean {
+  return RUNNING_ORDER_STAGES.includes(j.stage) && !isDeliveredToCustomer(j);
+}
+
 export function isJobStage(value: unknown): value is JobStage {
   return typeof value === "string" && value in STAGES;
 }

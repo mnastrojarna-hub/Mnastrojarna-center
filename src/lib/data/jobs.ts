@@ -17,6 +17,7 @@ import {
   JOB_FILE_LIST_SELECT, JOB_EVENT_SELECT, JOB_COUNT_SELECT, MATCH_JOB_SELECT, MATCH_CUSTOMER_SELECT,
   rowToJobListItem, rowToJobDetail, rowToJobQuote, rowToJobFile, resolveStageFilter, filterJobs,
   sortJobs, countJobStages, emptyStageCounts, isUuid, one, searchNormalize, isQuoteStatus, fetchPaged,
+  OVERDUE_INVOICE_SELECT, isOverdueInvoiceRow,
   type JobRow, type QuoteRow, type FileRow, type EventRow, type JobStageCounts, type ViewOptions,
 } from "@/lib/jobs/mapping";
 import type { FlowScope } from "@/lib/auth/flow-scope";
@@ -182,6 +183,8 @@ function lightEligible(filters: JobFilters, narrowed: FlowScope | null): boolean
   return !narrowed && limit > 0 && limit <= LIGHT_MAX && LIGHT_SORTS.has(filters.sort ?? "created")
     && !(filters.q ?? "").trim() && !(filters.step ?? "").trim() && !(filters.location ?? "").trim() && !filters.payment
     && !(filters.inquiry ?? []).length && !(filters.order ?? []).length && !(filters.delivery ?? []).length
+    // dodáno zákazníkovi potřebuje items_count / items_delivered (lehké řádky je nemají)
+    && typeof filters.deliveredToCustomer !== "boolean"
     && filters.deadline !== "krok";
 }
 
@@ -220,7 +223,7 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
     if (!items) return [];
     const filtered = filterJobs(items, {
       q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
-      inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery,
+      inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery, deliveredToCustomer: filters.deliveredToCustomer,
     });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
@@ -379,6 +382,29 @@ export async function getJobStageCounts(): Promise<JobStageCounts> {
   } catch (err) {
     console.error(`[data:jobs:counts] ${err instanceof Error ? err.message : String(err)}`);
     return emptyStageCounts();
+  }
+}
+
+/**
+ * Počet nezaplacených faktur po splatnosti přes celou knihu (KPI „Po splatnosti" = filtr Platba „Po splatnosti"
+ * v záložce Vše) — vlastní lehký dotaz, nezávislý na záložce a na Objednávkách v běhu.
+ * today = RRRR-MM-DD (Praha); v DB jen předvýběr (splatnost před dneškem, nezaplaceno), rozhoduje paymentKey.
+ */
+export async function countOverdueInvoices(today: string): Promise<number> {
+  const s = await session("orders");
+  if (!s) return 0;
+  try {
+    const { data, error } = await fetchPaged<{ status: string; paid_at: string | null; paid_so_far: number | null; invoice_number: string | null; invoice_due_date: string | null }>(
+      (from, to) => s.db.from("orders").select(OVERDUE_INVOICE_SELECT).is("merged_into_id", null).is("paid_at", null)
+        .lt("invoice_due_date", today).order("id").range(from, to),
+      50_000,
+    );
+    warn("overdue-invoices", error);
+    if (error) return 0;
+    return data.filter((r) => isOverdueInvoiceRow(r, today)).length;
+  } catch (err) {
+    console.error(`[data:jobs:overdue-invoices] ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
   }
 }
 

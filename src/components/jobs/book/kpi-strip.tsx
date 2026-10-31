@@ -69,7 +69,7 @@ export function KpiStrip({
   const tiles: Tile[] = [
     {
       key: "orders", label: "Objednávky v běhu", value: String(kpis.ordersRunning),
-      hint: kpis.ordersRunning ? "objednávka → faktura" : "zatím žádná",
+      hint: kpis.ordersRunning ? "objednávka → dodací list" : "zatím žádná",
       icon: ShoppingCart, patch: KPI_PATCHES.ordersRunning, tone: TONES.orange,
     },
     {
@@ -103,7 +103,7 @@ export function KpiStrip({
   if (runningValue !== null) {
     tiles.push({
       key: "value", label: "Hodnota v běhu", value: formatCZK(runningValue),
-      hint: "objednávky bez DPH", icon: Banknote, patch: KPI_PATCHES.value, tone: TONES.emerald,
+      hint: "objednávky bez DL, bez DPH", icon: Banknote, patch: KPI_PATCHES.value, tone: TONES.emerald,
     });
   }
 

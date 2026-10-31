@@ -28,13 +28,43 @@ export const STAGE_LABELS = {
 export const LABEL_TO_STAGE = Object.fromEntries(Object.entries(STAGE_LABELS).map(([k, v]) => [v, k]));
 export const ALL_STAGES = Object.keys(STAGE_LABELS);
 
+/** Stavy toku před dodáním (stages.ts PRE_DELIVERY_STAGES). */
+export const PRE_DELIVERY = ["objednavka", "potvrzeno", "ve_vyrobe", "dodano_k_nam", "na_sklade", "montaz"];
+/** Zboží u zákazníka podle stavu (stages.ts DELIVERED_STAGES). */
+export const DONE = ["dodano_zakaznikovi", "fakturovano", "dokonceno"];
+
+/** Stavy záložek (chipy, sloupce tabule) — 31. 10.: Objednávky jen do vystavení DL, Dokončené od DL. */
 export const SEGMENTS = {
-  objednavky: ["objednavka", "potvrzeno", "ve_vyrobe", "dodano_k_nam", "na_sklade", "montaz", "dodano_zakaznikovi", "fakturovano", "pozastaveno", "reklamace"],
+  objednavky: [...PRE_DELIVERY, "pozastaveno", "reklamace"],
   poptavky: ["poptavka", "naceneni", "nabidka"],
-  dokoncene: ["dokonceno"],
+  dokoncene: DONE,
   nerealizovane: ["nerealizovano", "zruseno"],
   vse: ALL_STAGES,
 };
+/** Stavy řádků v záložce: v Dokončených i stav před dodáním, když je dodáno vše (stav se neposunul). */
+export const SEGMENT_ROWS = { ...SEGMENTS, dokoncene: [...PRE_DELIVERY, ...DONE] };
+
+/** SQL: zboží je u zákazníka (= isDeliveredToCustomer v stages.ts). */
+export const DELIVERED_SQL = `(status::text in (${DONE.map((s) => `'${s}'`).join(",")}) or (status::text in (${PRE_DELIVERY.map((s) => `'${s}'`).join(",")}) and items_count > 0 and items_delivered >= items_count))`;
+
+/** SQL podmínka záložky Knihy (stejně jako bookParamsToFilters + filterJobs; volitelně jen stav `stage`). */
+export function segmentWhere(key, stage = null) {
+  const only = stage ? ` and status::text = '${stage}'` : "";
+  const base = "merged_into_id is null";
+  if (key === "objednavky") return `${base} and status::text in (${SEGMENTS.objednavky.map((s) => `'${s}'`).join(",")}) and not ${DELIVERED_SQL}${only}`;
+  if (key === "dokoncene") return `${base} and ${DELIVERED_SQL}${only}`;
+  return `${base} and status::text in (${SEGMENTS[key].map((s) => `'${s}'`).join(",")})${only}`;
+}
+
+/** Počet zakázek v záložce podle DB (volitelně jen stav = počet na chipu). */
+export function dbSegmentCount(key, stage = null) {
+  return Number(sql(`select count(*) from orders where ${segmentWhere(key, stage)}`));
+}
+
+/** Hodnota v běhu podle DB = součet orders.value objednávek v běhu (bez DL na vše). */
+export function dbRunningValue() {
+  return Number(sql(`select coalesce(round(sum(value), 2), 0) from orders where ${segmentWhere("objednavky")}`));
+}
 
 /** Barva plného chipu stavu (shoda se stages.ts → „solid"). */
 export const STAGE_SOLID = {
@@ -186,10 +216,11 @@ export function createJob(f) {
   const row = sql(`insert into orders (${Object.keys(cols).join(", ")}) values (${Object.values(cols).join(", ")}) returning id || '|' || number`).split("\n")[0];
   const [id, number] = row.split("|");
   sql(`insert into job_events (job_id, type, message, data, actor_id) values (${lit(id)}, 'created', 'Zakázka založena', '{}', ${lit(f.ownerId ?? null)})`);
+  // it.delivered = dodáno (vložení položky stav neposouvá — „stav se neposunul" jako u starších dat)
   (f.items ?? []).forEach((it, i) => {
-    sql(`insert into order_items (order_id, position, drawing_number, revision, name, material, quantity, unit, unit_price, purchase_unit_price)
+    sql(`insert into order_items (order_id, position, drawing_number, revision, name, material, quantity, unit, unit_price, purchase_unit_price, delivered_quantity)
       values (${lit(id)}, ${i}, ${lit(it.drawing ?? null)}, ${lit(it.rev ?? null)}, ${lit(it.name ?? null)}, ${lit(it.material ?? null)},
-      ${Number(it.qty ?? 1)}, ${lit(it.unit ?? "ks")}, ${it.price ?? "null"}, ${it.purchase ?? "null"})`);
+      ${Number(it.qty ?? 1)}, ${lit(it.unit ?? "ks")}, ${it.price ?? "null"}, ${it.purchase ?? "null"}, ${Number(it.delivered ?? 0)})`);
   });
   return { id, number };
 }

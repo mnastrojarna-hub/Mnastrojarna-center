@@ -62,7 +62,8 @@ export default async function DashboardPage() {
   const commissionTotal = commissions.reduce((s, c) => s + c.commission, 0);
 
   const tiles: Tile[] = [
-    { label: "Objednávky v běhu", value: kpis.ordersRunning, hint: "objednávka → faktura", icon: ShoppingCart, href: "/orders", tone: TONE.orange },
+    // = záložka Objednávky v Knize (bez vystaveného DL na vše) — bookKpis z getJobStageCounts
+    { label: "Objednávky v běhu", value: kpis.ordersRunning, hint: "objednávka → dodací list", icon: ShoppingCart, href: "/orders", tone: TONE.orange },
     {
       label: "Po termínu", value: kpis.overdue, hint: kpis.overdue ? "hoří — řeš hned" : "vše v termínu", icon: AlarmClock,
       href: "/orders?segment=vse&deadline=overdue", tone: kpis.overdue ? TONE.red : TONE.green,
