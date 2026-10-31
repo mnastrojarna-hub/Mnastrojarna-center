@@ -385,6 +385,12 @@ export const cs = {
   machineNames: { konvencni: "Konvenční stroje" } as Record<string, string>,
 
   home: {
+    videoEyebrow: "Dílna naživo",
+    videoTitle: "Podívejte se *do našich strojů*",
+    videoLead: "Žádné animace, žádná fotobanka. Skutečné záběry z naší dílny – od jisker drátové eroze po pětiosé obrábění.",
+    videoPlay: "Přehrát",
+    videoNote: "Video se přehraje z YouTube",
+    videoChannel: "Celý kanál na YouTube",
     heroKicker: "Mnástrojárna · Pelhřimov · od roku 2012",
     heroLines: ["Vyrobíme,", "co ostatní", "*odmítli.*"],
     heroLead: "Strojírenská výroba pro firmy, které potřebují víc než obrobnu. Díly bez výkresu, přípravky pro linky, které nesmí stát, a stroje, které nikde nekoupíte.",
@@ -728,7 +734,7 @@ export const cs = {
         { h: "Jaké údaje zpracováváme a proč", p: "Při odeslání poptávkového formuláře zpracováváme identifikační a kontaktní údaje (jméno, pozice, firma, IČO, e-mail, telefon) a technickou dokumentaci, kterou nám poskytnete. Údaje používáme výhradně k vyřízení poptávky, přípravě nabídky a navazující obchodní komunikaci (právní základ: jednání o smlouvě a oprávněný zájem). IČO ověřujeme ve veřejném registru ARES." },
         { h: "Jak dlouho", p: "Údaje z poptávek, které nevedou ke spolupráci, uchováváme nejdéle 3 roky. Údaje související s realizovanými zakázkami po dobu stanovenou právními předpisy." },
         { h: "Online CAD", p: "Modely vytvořené v online CAD se zpracovávají a ukládají pouze ve vašem prohlížeči a na náš server se neodesílají, pokud je sami nepřipojíte k poptávce." },
-        { h: "Cookies", p: "Bez vašeho souhlasu používáme pouze technicky nezbytné úložiště. Analytické a marketingové cookies (Google Analytics / Google Ads) spouštíme jen po udělení souhlasu, který můžete kdykoli odvolat vymazáním dat webu ve vašem prohlížeči." },
+        { h: "Cookies", p: "Bez vašeho souhlasu používáme pouze technicky nezbytné úložiště. Analytické a marketingové cookies (Google Analytics / Google Ads) spouštíme jen po udělení souhlasu, který můžete kdykoli odvolat vymazáním dat webu ve vašem prohlížeči. Videa z YouTube se načtou (v režimu youtube-nocookie) až po kliknutí na tlačítko přehrát." },
         { h: "Vaše práva", p: "Máte právo na přístup k údajům, jejich opravu, výmaz, omezení zpracování, přenositelnost a vznesení námitky. Stížnost můžete podat u Úřadu pro ochranu osobních údajů (www.uoou.cz)." },
       ],
     },

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getDict } from "@/content";
-import { SITE } from "@/content/site";
+import { SITE, YOUTUBE_CHANNEL, type Video } from "@/content/site";
 import { LOCALES, LOCALE_META, alternates, href, type Locale, type PageKey } from "@/i18n/config";
 
 /** Metadata stránky vč. canonical a hreflang (cs, en, de, x-default). */
@@ -67,6 +67,7 @@ export function organizationJsonLd(locale: Locale) {
     telephone: SITE.phone,
     priceRange: "CZK 50,000+",
     knowsLanguage: ["cs", "en", "de"],
+    sameAs: [YOUTUBE_CHANNEL],
     address: {
       "@type": "PostalAddress",
       streetAddress: SITE.workshop.street,
@@ -89,6 +90,20 @@ export function organizationJsonLd(locale: Locale) {
     ],
     knowsAbout: Object.values(t.services).map((s) => s.title),
   };
+}
+
+export function videoJsonLd(videos: Video[], locale: Locale) {
+  return videos.map((v) => ({
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: v.title[locale],
+    description: v.title[locale],
+    thumbnailUrl: `${SITE.url}/img/video/${v.id}.jpg`,
+    uploadDate: v.date,
+    contentUrl: `https://www.youtube.com/watch?v=${v.id}`,
+    embedUrl: `https://www.youtube.com/embed/${v.id}`,
+    publisher: { "@id": ORG_ID },
+  }));
 }
 
 export function breadcrumbJsonLd(items: { name: string; path: string }[]) {

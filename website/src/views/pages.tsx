@@ -7,9 +7,9 @@ import { FitChecker } from "@/components/fit-checker";
 import { Gallery } from "@/components/gallery";
 import { JsonLd } from "@/components/json-ld";
 import { fill, getDict } from "@/content";
-import { GALLERY, MACHINES, SALES, SERVICE_FACTS, SERVICE_ORDER, SITE, TEAM, TECH } from "@/content/site";
+import { GALLERY, MACHINES, VIDEOS, SALES, SERVICE_FACTS, SERVICE_ORDER, SITE, TEAM, TECH } from "@/content/site";
 import { href, type Locale, type ServiceId } from "@/i18n/config";
-import { ORG_ID, breadcrumbJsonLd, faqJsonLd, pageMeta } from "@/lib/seo";
+import { ORG_ID, breadcrumbJsonLd, faqJsonLd, pageMeta, videoJsonLd } from "@/lib/seo";
 
 type P = { locale: Locale };
 
@@ -286,6 +286,7 @@ export function MachineryView({ locale }: P) {
       </section>
       <CtaBand locale={locale} title={p.ctaTitle} lead={p.ctaLead} />
       <JsonLd data={breadcrumbJsonLd(crumbs)} />
+      <JsonLd data={videoJsonLd(VIDEOS, locale)} />
     </>
   );
 }

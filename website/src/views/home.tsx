@@ -6,11 +6,12 @@ import { Icon } from "@/components/icons";
 import { JsonLd } from "@/components/json-ld";
 import { MachiningStory } from "@/components/machining-story";
 import { ServicesIndex } from "@/components/services-index";
+import { VideoShowcase } from "@/components/video-showcase";
 import { getDict } from "@/content";
 import { ALL_PHOTOS, CASES } from "@/content/cases";
-import { REFERENCES, SERVICE_FACTS, SERVICE_ORDER } from "@/content/site";
+import { REFERENCES, SERVICE_FACTS, SERVICE_ORDER, VIDEOS, YOUTUBE_CHANNEL } from "@/content/site";
 import { href, type Locale } from "@/i18n/config";
-import { faqJsonLd, pageMeta } from "@/lib/seo";
+import { faqJsonLd, pageMeta, videoJsonLd } from "@/lib/seo";
 
 export function homeMeta(locale: Locale) {
   const t = getDict(locale);
@@ -212,6 +213,28 @@ export function HomeView({ locale }: { locale: Locale }) {
         </div>
       </section>
 
+      {/* ================= DÍLNA NAŽIVO (YouTube) ================= */}
+      <section className="bg-steel-100 py-24 md:py-32">
+        <div className="container">
+          <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+            <div className="max-w-2xl">
+              <p className="eyebrow">{h.videoEyebrow}</p>
+              <h2 data-split className="h-display mt-4 text-4xl text-ink-700 md:text-6xl">
+                <Accent text={h.videoTitle} />
+              </h2>
+              <p className="mt-4 text-[16px] text-ink-700/65">{h.videoLead}</p>
+            </div>
+            <a href={YOUTUBE_CHANNEL} target="_blank" rel="noopener noreferrer" className="btn-ghost shrink-0" data-magnetic>
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-brand" fill="currentColor" aria-hidden>
+                <path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.75 15.02V8.98L15.5 12z" />
+              </svg>
+              {h.videoChannel}
+            </a>
+          </div>
+          <VideoShowcase videos={VIDEOS} locale={locale} play={h.videoPlay} note={h.videoNote} />
+        </div>
+      </section>
+
       {/* ================= JAK VZNIKÁ DÍL (3D) ================= */}
       <MachiningStory t={t.story} />
 
@@ -286,6 +309,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       <JsonLd data={faqJsonLd(t.faq)} />
+      <JsonLd data={videoJsonLd(VIDEOS, locale)} />
     </>
   );
 }

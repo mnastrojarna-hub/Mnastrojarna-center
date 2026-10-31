@@ -420,6 +420,12 @@ export const en: Dict = {
   machineNames: { konvencni: "Conventional machines" },
 
   home: {
+    videoEyebrow: "Workshop live",
+    videoTitle: "Look *inside our machines*",
+    videoLead: "No animation, no stock footage. Real shots from our workshop – from the sparks of wire EDM to 5-axis machining.",
+    videoPlay: "Play",
+    videoNote: "The video plays from YouTube",
+    videoChannel: "Full channel on YouTube",
     heroKicker: "Mnástrojárna · Pelhřimov, Czech Republic · since 2012",
     heroLines: ["We make", "what others", "*turned down.*"],
     heroLead: "Precision engineering for companies that need more than a machine shop. Parts without drawings, fixtures for lines that must not stop, and machines you can't buy anywhere.",
@@ -770,7 +776,7 @@ export const en: Dict = {
         { h: "What data we process and why", p: "When you submit the enquiry form, we process identification and contact data (name, position, company, company reg. no., e-mail, telephone) and the technical documentation you provide. We use the data solely to handle your enquiry, prepare a quotation and for related business communication (legal basis: pre-contractual negotiations and legitimate interest). We verify company registration numbers in the public Czech business register ARES." },
         { h: "How long", p: "Data from enquiries that do not lead to cooperation is kept for a maximum of 3 years. Data relating to completed orders is kept for the period required by law." },
         { h: "Online CAD", p: "Models created in the online CAD are processed and stored only in your browser and are not sent to our server unless you attach them to an enquiry yourself." },
-        { h: "Cookies", p: "Without your consent we use only technically necessary storage. Analytics and marketing cookies (Google Analytics / Google Ads) are enabled only once you have given consent, which you can withdraw at any time by clearing the website data in your browser." },
+        { h: "Cookies", p: "Without your consent we use only technically necessary storage. Analytics and marketing cookies (Google Analytics / Google Ads) are enabled only once you have given consent, which you can withdraw at any time by clearing the website data in your browser. YouTube videos are loaded (in youtube-nocookie mode) only after you click the play button." },
         { h: "Your rights", p: "You have the right to access your data, to rectification, erasure, restriction of processing, data portability and to object. You may lodge a complaint with the Office for Personal Data Protection (www.uoou.cz)." },
       ],
     },

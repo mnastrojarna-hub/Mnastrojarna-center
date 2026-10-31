@@ -427,6 +427,12 @@ export const de: Dict = {
   machineNames: { konvencni: "Konventionelle Maschinen" },
 
   home: {
+    videoEyebrow: "Werkstatt live",
+    videoTitle: "Ein Blick *in unsere Maschinen*",
+    videoLead: "Keine Animation, kein Stockmaterial. Echte Aufnahmen aus unserer Werkstatt – von den Funken des Drahterodierens bis zur 5-Achs-Bearbeitung.",
+    videoPlay: "Abspielen",
+    videoNote: "Das Video wird von YouTube abgespielt",
+    videoChannel: "Ganzer Kanal auf YouTube",
     heroKicker: "Mnástrojárna · Pelhřimov, Tschechien · seit 2012",
     heroLines: ["Wir fertigen,", "was andere", "*abgelehnt haben.*"],
     heroLead: "Präzisionsfertigung für Unternehmen, die mehr brauchen als eine Lohndreherei. Teile ohne Zeichnung, Vorrichtungen für Linien, die nicht stillstehen dürfen, und Maschinen, die man nirgends kaufen kann.",
@@ -770,7 +776,7 @@ export const de: Dict = {
         { h: "Welche Daten wir verarbeiten und warum", p: "Beim Absenden des Anfrageformulars verarbeiten wir Identifikations- und Kontaktdaten (Name, Position, Unternehmen, Firmen- bzw. Registernummer, E-Mail, Telefon) sowie die technischen Unterlagen, die Sie uns zur Verfügung stellen. Wir verwenden die Daten ausschließlich zur Bearbeitung der Anfrage, zur Angebotserstellung und für die anschließende geschäftliche Kommunikation (Rechtsgrundlage gemäß DSGVO: Durchführung vorvertraglicher Maßnahmen und berechtigtes Interesse). Die Firmennummer (IČO) überprüfen wir im öffentlichen tschechischen Unternehmensregister ARES." },
         { h: "Speicherdauer", p: "Daten aus Anfragen, die nicht zu einer Zusammenarbeit führen, speichern wir höchstens 3 Jahre. Daten im Zusammenhang mit ausgeführten Aufträgen bewahren wir für die gesetzlich vorgeschriebene Dauer auf." },
         { h: "Online-CAD", p: "Im Online-CAD erstellte Modelle werden ausschließlich in Ihrem Browser verarbeitet und gespeichert und nicht an unseren Server übertragen, sofern Sie sie nicht selbst einer Anfrage beifügen." },
-        { h: "Cookies", p: "Ohne Ihre Einwilligung verwenden wir ausschließlich technisch notwendige Speicher. Analyse- und Marketing-Cookies (Google Analytics / Google Ads) setzen wir nur nach Ihrer Einwilligung ein, die Sie jederzeit widerrufen können, indem Sie die Websitedaten in Ihrem Browser löschen." },
+        { h: "Cookies", p: "Ohne Ihre Einwilligung verwenden wir ausschließlich technisch notwendige Speicher. Analyse- und Marketing-Cookies (Google Analytics / Google Ads) setzen wir nur nach Ihrer Einwilligung ein, die Sie jederzeit widerrufen können, indem Sie die Websitedaten in Ihrem Browser löschen. YouTube-Videos werden (im Modus youtube-nocookie) erst geladen, wenn Sie auf Abspielen klicken." },
         { h: "Ihre Rechte", p: "Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie das Recht auf Widerspruch. Eine Beschwerde können Sie beim Amt für den Schutz personenbezogener Daten (www.uoou.cz) einreichen." },
       ],
     },

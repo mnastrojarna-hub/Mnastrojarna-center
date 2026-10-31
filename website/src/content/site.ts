@@ -117,3 +117,15 @@ export const GALLERY: { src: string; w: number; h: number }[] = [
   ["paletove-upinaci-pripravky/6", 1200, 900],
   ["dily-podle-vykresu/2", 1200, 720],
 ].map(([p, w, h]) => ({ src: `/img/zakazky/${p}.jpg`, w: w as number, h: h as number }));
+
+/** YouTube kanál a videa ze strojů (skutečné záběry z dílny). Náhledy v public/img/video/<id>.jpg. */
+export const YOUTUBE_CHANNEL = "https://www.youtube.com/@mnastrojarnas.r.o.1284";
+export type Video = { id: string; machine: string; date: string; title: Record<Locale, string> };
+export const VIDEOS: Video[] = [
+  { id: "ojZ2O_FNEU8", machine: "fanuc-robocut", date: "2020-03-02", title: { cs: "Elektroerozivní obrábění – FANUC ROBOCUT α-C800iB", en: "Wire EDM – FANUC ROBOCUT α-C800iB", de: "Drahterodieren – FANUC ROBOCUT α-C800iB" } },
+  { id: "-vU8Hml-KMM", machine: "axile-g8", date: "2020-03-02", title: { cs: "Pětiosé obrábění – AXILE G8", en: "5-axis machining – AXILE G8", de: "5-Achs-Bearbeitung – AXILE G8" } },
+  { id: "9uJORna2AhI", machine: "hypertun-65", date: "2020-03-02", title: { cs: "CNC soustružení – EMCO HYPERTURN 65 Powermill", en: "CNC turning – EMCO HYPERTURN 65 Powermill", de: "CNC-Drehen – EMCO HYPERTURN 65 Powermill" } },
+  { id: "yzSBm9zTi5k", machine: "mcv-754q", date: "2020-03-02", title: { cs: "CNC frézování – MCV 754Q", en: "CNC milling – MCV 754Q", de: "CNC-Fräsen – MCV 754Q" } },
+  { id: "K9mPHd_ILLY", machine: "vmca-760", date: "2020-03-02", title: { cs: "CNC obrábění – VMCA 760", en: "CNC machining – VMCA 760", de: "CNC-Bearbeitung – VMCA 760" } },
+];
+export const videoFor = (machine: string) => VIDEOS.find((v) => v.machine === machine);

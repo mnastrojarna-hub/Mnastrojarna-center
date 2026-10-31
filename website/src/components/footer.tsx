@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getDict } from "@/content";
-import { SALES, SERVICE_ORDER, SITE } from "@/content/site";
+import { SALES, SERVICE_ORDER, SITE, YOUTUBE_CHANNEL } from "@/content/site";
 import { href, type Locale } from "@/i18n/config";
 import { Icon } from "./icons";
 import { Logo } from "./logo";
@@ -33,6 +33,12 @@ export function Footer({ locale }: { locale: Locale }) {
             <span className="rounded-full border border-ink-700/15 px-3 py-1.5">ISO 14001</span>
             <span className="rounded-full border border-ink-700/15 px-3 py-1.5">{t.minOrderShort}</span>
           </div>
+          <a href={YOUTUBE_CHANNEL} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 text-[14px] font-medium text-ink-700 hover:text-brand">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-brand" fill="currentColor" aria-hidden>
+              <path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.75 15.02V8.98L15.5 12z" />
+            </svg>
+            YouTube
+          </a>
         </div>
 
         <div className="md:col-span-3">

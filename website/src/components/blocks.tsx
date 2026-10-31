@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getDict } from "@/content";
-import { MACHINES, REFERENCES, SALES, SERVICE_FACTS, SERVICE_ORDER, TEAM, type Person } from "@/content/site";
+import { MACHINES, REFERENCES, SALES, SERVICE_FACTS, SERVICE_ORDER, TEAM, videoFor, type Person } from "@/content/site";
 import { href, type Locale, type ServiceId } from "@/i18n/config";
 import { cn } from "@/lib/cn";
 import { Accent } from "./accent";
 import { Icon } from "./icons";
+import { LiteYouTube } from "./lite-youtube";
 
 export function SectionHeading({ eyebrow, title, lead, center, className }: { eyebrow?: string; title: React.ReactNode; lead?: React.ReactNode; center?: boolean; className?: string }) {
   return (
@@ -216,7 +217,9 @@ export function MachineCard({ locale, id, i = 0 }: { locale: Locale; id: string;
   const name = t.machineNames[id] ?? f.name;
   return (
     <article data-reveal style={{ ["--d" as string]: `${(i % 2) * 120}ms` }} className="spot group overflow-hidden rounded-2xl border border-ink-700/10 bg-white transition-shadow duration-500 hover:shadow-[0_40px_80px_-40px_rgba(39,36,37,.35)]">
-      {f.image && (
+      {videoFor(id) ? (
+        <LiteYouTube id={videoFor(id)!.id} title={videoFor(id)!.title[locale]} play={t.home.videoPlay} note={t.home.videoNote} className="aspect-video border-b border-ink-700/10" sizes="(min-width: 1024px) 50vw, 100vw" />
+      ) : f.image && (
         <div className="relative aspect-[16/10] overflow-hidden border-b border-ink-700/10 bg-white">
           <div className="bg-grid-light absolute inset-0" />
           <Image src={f.image} alt={`${name} – ${m.type}, ${t.common.machineAlt}`} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-contain p-4 transition-transform duration-700 group-hover:scale-[1.04]" />
