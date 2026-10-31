@@ -213,12 +213,12 @@ export const en: Dict = {
     "nahradni-dily-pro-vyrobni-linky": {
       title: "Spare parts for production lines",
       short: "Rolls, shafts, gears and wear parts – made fast and ready before you need them.",
-      seoTitle: "Spare Parts Manufacturing for Production Lines",
-      seoDescription: "Spare parts for production lines: rolls, rollers, shafts, gears, knives and fixtures. Urgent production for regular partners, consignment stock, ISO 9001.",
+      seoTitle: "Spare Parts for Special-Purpose Machines and Production Lines – Even from a Sample",
+      seoDescription: "Spare parts manufacturing for maintenance: parts for special-purpose machines and lines to drawing or from a worn sample (reverse engineering). 1–99 pcs, urgent for regular partners, consignment stock of critical parts. ISO 9001, Czech Republic.",
       lead: "When a line stops, you don't wait weeks for a part. We make it to drawing or without one – and can keep critical parts ready in stock for you.",
       problem: "Original parts from the machine builder have long lead times, nobody has drawings for many older lines any more, and every hour of downtime costs more than the part itself.",
       approach: [
-        "No drawing? Our design engineers prepare the documentation with you and propose a solution.",
+        "No drawing? We measure the worn part (3D probing down to 2 µm), model it and suggest a better material or heat treatment – you receive the documentation with the part.",
         "We make the part complete – machining, heat treatment and surface finishing.",
         "For regular partners we manufacture urgently, ahead of other orders.",
         "Critical parts are held in consignment stock and you call them off only as needed.",
@@ -226,7 +226,12 @@ export const en: Dict = {
       deliverables: ["A spare part ready for installation", "Documentation for the next order", "Final inspection results", "Option of consignment stock"],
       typical: ["Rolls and rollers", "Shafts and pins", "Gears and pulleys", "Format and cutting parts", "Wear components"],
       bullets: ["Urgent production for regular partners", "Rotational parts up to 1,150 mm long", "Large parts up to Ø 1,000 mm", "Consignment stock of critical parts"],
-      keywords: ["spare parts manufacturing", "spare parts for production lines", "machine spare parts", "roller manufacturing", "shaft manufacturing"],
+      keywords: ["spare parts for special-purpose machines", "custom machined spare parts maintenance", "spare part from sample", "reverse engineering machined parts", "spare parts for production lines", "consignment stock spare parts"],
+      faq: [
+        { q: "The builder of our machine no longer exists. Can you make the part from an old one?", a: "Yes – that is our most common case. We measure the part, model it, add tolerances according to its function and manufacture it. You receive a drawing and a 3D model, so next time you only order a part number." },
+        { q: "How fast can you deliver a part for a stopped line?", a: "Regular partners are served with priority – simple rotational parts typically within 2–5 working days, complex parts within 2 weeks. Critical parts are better kept in consignment stock so you do not wait at all." },
+        { q: "What is the critical-parts audit?", a: "Send us a list of the parts that most often stop your production (10 items with a photo or drawing is enough). We return a proposal of what to keep in consignment stock, in what quantity and at what price – free and without obligation." },
+      ],
     },
     nastrojarstvi: {
       title: "Tooling and fixtures",

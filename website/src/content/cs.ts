@@ -225,12 +225,12 @@ export const cs = {
     "nahradni-dily-pro-vyrobni-linky": {
       title: "Náhradní díly pro výrobní linky",
       short: "Válce, hřídele, ozubená kola a opotřebitelné díly – vyrobené rychle a připravené dřív, než je budete potřebovat.",
-      seoTitle: "Výroba náhradních dílů pro výrobní linky a stroje",
-      seoDescription: "Náhradní díly pro výrobní linky: válce, válečky, hřídele, ozubená kola, nože a přípravky. Urgentní výroba pro stálé partnery, konsignační sklad, ISO 9001.",
+      seoTitle: "Náhradní díly do jednoúčelových strojů a výrobních linek – i podle vzorku",
+      seoDescription: "Výroba náhradních dílů pro údržbu: díly do jednoúčelových strojů a linek podle výkresu i podle opotřebeného vzorku (reverse engineering). 1–99 ks, urgentně pro stálé partnery, konsignační sklad kritických dílů. ISO 9001, Pelhřimov.",
       lead: "Když se zastaví linka, nečekáte na díl týdny. Vyrobíme ho podle výkresu i bez něj – a kritické díly vám můžeme držet připravené skladem.",
       problem: "Originální díly od výrobce stroje mají dlouhé dodací lhůty, k mnoha starším linkám už výkresy nikdo nemá a každá hodina prostoje stojí víc než samotný díl.",
       approach: [
-        "Chybí výkres? Konstruktéři s vámi připraví dokumentaci a navrhnou řešení.",
+        "Chybí výkres? Opotřebený díl změříme (3D sondy, až 2 µm), vymodelujeme a navrhneme lepší materiál či tepelné zpracování – dokumentaci dostanete k dílu.",
         "Díl vyrobíme komplet – obrábění, tepelné zpracování i povrchovou úpravu.",
         "Stálým partnerům vyrábíme urgentně, přednostně před ostatními zakázkami.",
         "Kritické díly držíme v konsignačním skladu a odebíráte je až podle potřeby.",
@@ -238,7 +238,12 @@ export const cs = {
       deliverables: ["Náhradní díl připravený k montáži", "Dokumentace pro příští objednávku", "Výsledky výstupní kontroly", "Možnost zásoby v konsignačním skladu"],
       typical: ["Válce a válečky", "Hřídele a čepy", "Ozubená kola a kladky", "Formátovací a řezné díly", "Opotřebitelné komponenty"],
       bullets: ["Urgentní výroba pro stálé partnery", "Rotační díly do délky 1 150 mm", "Velké díly do Ø 1 000 mm", "Konsignační sklad kritických dílů"],
-      keywords: ["náhradní díly", "výroba náhradních dílů", "díly pro výrobní linky", "výroba válečků", "výroba hřídelí"],
+      keywords: ["náhradní díly do jednoúčelových strojů", "výroba náhradních dílů pro údržbu", "výroba dílu podle vzorku", "reverse engineering dílů", "díly pro výrobní linky", "konsignační sklad náhradních dílů"],
+      faq: [
+        { q: "Výrobce našeho stroje už neexistuje. Vyrobíte díl jen podle starého kusu?", a: "Ano – to je náš nejčastější případ. Díl změříme, vymodelujeme, doplníme tolerance podle funkce a vyrobíme. Dostanete výkres i 3D model, takže příště už objednáváte jen číslo dílu." },
+        { q: "Jak rychle dokážete díl do stojící linky dodat?", a: "Stálým partnerům vyrábíme přednostně – jednoduché rotační díly typicky do 2–5 pracovních dnů, složitější díly do 2 týdnů. Kritické díly je ale lepší mít v konsignačním skladu a nečekat vůbec." },
+        { q: "Co je audit kritických dílů?", a: "Pošlete nám seznam dílů, které vám nejčastěji zastavují výrobu (stačí 10 položek s fotkou nebo výkresem). Vrátíme návrh, které držet v konsignačním skladu, v jakém množství a za jakou cenu – zdarma a nezávazně." },
+      ],
     },
     nastrojarstvi: {
       title: "Nástroje a přípravky",

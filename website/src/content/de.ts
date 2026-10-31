@@ -213,12 +213,12 @@ export const de: Dict = {
     "nahradni-dily-pro-vyrobni-linky": {
       title: "Ersatzteile für Produktionslinien",
       short: "Walzen, Wellen, Zahnräder und Verschleißteile – schnell gefertigt und bereitgehalten, bevor Sie sie brauchen.",
-      seoTitle: "Ersatzteilfertigung für Produktionslinien und Maschinen",
-      seoDescription: "Ersatzteile für Produktionslinien: Walzen, Rollen, Wellen, Zahnräder, Messer und Vorrichtungen. Eilfertigung für Stammpartner, Konsignationslager, ISO 9001.",
+      seoTitle: "Ersatzteile für Sondermaschinen und Produktionslinien – auch nach Muster",
+      seoDescription: "Ersatzteilfertigung für die Instandhaltung: Teile für Sondermaschinen und Linien nach Zeichnung oder nach verschlissenem Muster (Reverse Engineering). 1–99 Stück, Eilfertigung für Stammpartner, Konsignationslager für kritische Teile. ISO 9001, Tschechien.",
       lead: "Wenn die Linie steht, warten Sie nicht wochenlang auf ein Teil. Wir fertigen es nach Zeichnung oder auch ohne – und kritische Teile können wir für Sie auf Lager bereithalten.",
       problem: "Originalteile vom Maschinenhersteller haben lange Lieferzeiten, für viele ältere Linien besitzt niemand mehr Zeichnungen, und jede Stunde Stillstand kostet mehr als das Teil selbst.",
       approach: [
-        "Keine Zeichnung vorhanden? Unsere Konstrukteure erstellen mit Ihnen die Dokumentation und schlagen eine Lösung vor.",
+        "Keine Zeichnung? Wir vermessen das verschlissene Teil (3D-Tastung bis 2 µm), modellieren es und schlagen einen besseren Werkstoff oder eine Wärmebehandlung vor – die Dokumentation erhalten Sie zum Teil.",
         "Wir fertigen das Teil komplett – Zerspanung, Wärme- und Oberflächenbehandlung.",
         "Für Stammpartner fertigen wir im Eilverfahren, mit Vorrang vor anderen Aufträgen.",
         "Kritische Teile halten wir im Konsignationslager vor – Sie rufen sie erst bei Bedarf ab.",
@@ -226,7 +226,12 @@ export const de: Dict = {
       deliverables: ["Einbaufertiges Ersatzteil", "Dokumentation für die nächste Bestellung", "Ergebnisse der Endkontrolle", "Optionaler Bestand im Konsignationslager"],
       typical: ["Walzen und Rollen", "Wellen und Bolzen", "Zahnräder und Laufrollen", "Format- und Schneidteile", "Verschleißkomponenten"],
       bullets: ["Eilfertigung für Stammpartner", "Drehteile bis 1.150 mm Länge", "Großteile bis Ø 1.000 mm", "Konsignationslager für kritische Teile"],
-      keywords: ["Ersatzteilfertigung", "Ersatzteile Produktionslinie", "Walzenfertigung", "Wellenfertigung", "Ersatzteile nach Muster"],
+      keywords: ["Ersatzteile für Sondermaschinen", "Ersatzteilfertigung Instandhaltung", "Ersatzteil nach Muster", "Reverse Engineering Ersatzteil", "Ersatzteile Produktionslinie", "Konsignationslager Ersatzteile"],
+      faq: [
+        { q: "Den Hersteller unserer Maschine gibt es nicht mehr. Fertigen Sie das Teil nach dem alten Stück?", a: "Ja – das ist unser häufigster Fall. Wir vermessen das Teil, modellieren es, ergänzen Toleranzen nach Funktion und fertigen es. Sie erhalten Zeichnung und 3D-Modell, beim nächsten Mal bestellen Sie nur noch eine Teilenummer." },
+        { q: "Wie schnell liefern Sie ein Teil für eine stehende Linie?", a: "Stammpartner bedienen wir vorrangig – einfache Drehteile typisch in 2–5 Arbeitstagen, komplexe Teile in 2 Wochen. Kritische Teile gehören aber ins Konsignationslager, damit Sie gar nicht warten." },
+        { q: "Was ist das Audit kritischer Teile?", a: "Schicken Sie uns die Liste der Teile, die Ihre Produktion am häufigsten stoppen (10 Positionen mit Foto oder Zeichnung genügen). Sie erhalten einen Vorschlag, was in welcher Menge und zu welchem Preis im Konsignationslager liegen sollte – kostenlos und unverbindlich." },
+      ],
     },
     nastrojarstvi: {
       title: "Werkzeuge und Vorrichtungen",

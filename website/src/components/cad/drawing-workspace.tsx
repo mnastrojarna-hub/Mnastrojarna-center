@@ -2,11 +2,12 @@
 
 /**
  * Výkresové prostředí (jako list výkresu v ZW3D / Inventoru): vlevo nastavení listu, pohledů, řezu,
- * kót a razítka; uprostřed živý náhled listu (kolečko = zoom, tažení = posun); nahoře export PDF / DXF / SVG / tisk.
+ * kót a razítka; uprostřed živý náhled listu (kolečko = zoom, tažení = posun); nahoře export PDF / DWG / DXF / SVG / tisk.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import { bomToCsv, defaultDrawingOptions, scaleLabel, STANDARD_SCALES, VIEW_LABEL, type BomItem, type DrawingMeta, type DrawingOptions, type DrawingResult, type SheetName, type ViewKey } from "@/cad/drawing";
+import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import type { CadDoc, PlaneName, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 
@@ -79,6 +80,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
     tolerance: "ISO 2768-mK",
   }));
   const [showBom, setShowBom] = useState(!!bom?.length);
+  const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
+    try {
+      const v = localStorage.getItem("mn-cad-dwg-version") as DwgVersion | null;
+      return v && DWG_VERSIONS.some((x) => x.id === v) ? v : "R2018";
+    } catch {
+      return "R2018";
+    }
+  });
   const [res, setRes] = useState<DrawingResult | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +153,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
       download(`${base}_vykres.pdf`, blob, "application/pdf");
     } catch (e) {
       flash((e as Error).message || "PDF se nepodařilo vytvořit.");
+    }
+  };
+
+  const exportDwg = async () => {
+    if (!res) return;
+    try {
+      flash(`Generuji DWG (${dwgVer})…`);
+      const { drawingToDwg } = await import("@/cad/formats/dwg");
+      const buf = await drawingToDwg(res, { version: dwgVer });
+      download(`${base}_vykres.dwg`, buf, "application/acad");
+      flash(`DWG ${dwgVer} uloženo (${Math.round(buf.byteLength / 1024)} kB).`);
+    } catch (e) {
+      flash((e as Error).message || "DWG se nepodařilo vytvořit.");
     }
   };
 
@@ -223,7 +245,33 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
         <Btn primary onClick={exportPdf} disabled={!res}>
           PDF
         </Btn>
-        <Btn onClick={() => res && download(`${base}_vykres.dxf`, res.dxf, "application/dxf")} disabled={!res} title="DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD; DWG uložíte z nich">
+        <span className="inline-flex items-stretch overflow-hidden rounded-md border border-ink-700/15 bg-white">
+          <button type="button" onClick={exportDwg} disabled={!res} title={`DWG ${DWG_VERSIONS.find((v) => v.id === dwgVer)?.hint ?? ""} – přímo do AutoCADu, ZWCADu, BricsCADu`} className="px-3 py-1.5 text-[12.5px] font-medium hover:bg-steel-100 disabled:opacity-40">
+            DWG
+          </button>
+          <select
+            value={dwgVer}
+            onChange={(e) => {
+              const v = e.target.value as DwgVersion;
+              setDwgVer(v);
+              try {
+                localStorage.setItem("mn-cad-dwg-version", v);
+              } catch {
+                /* ignore */
+              }
+            }}
+            aria-label="Verze DWG"
+            title="Verze souboru DWG"
+            className="border-l border-ink-700/15 bg-steel-100 px-1.5 text-[11px] text-ink-700/80 outline-none"
+          >
+            {DWG_VERSIONS.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+        </span>
+        <Btn onClick={() => res && download(`${base}_vykres.dxf`, res.dxf, "application/dxf")} disabled={!res} title="DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD">
           DXF
         </Btn>
         <Btn onClick={() => res && download(`${base}_vykres.svg`, res.svg, "image/svg+xml")} disabled={!res}>
@@ -349,7 +397,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
             </Row>
           </Section>
           <p className="px-4 pb-5 text-[11px] leading-relaxed text-ink-700/45">
-            DXF je ve formátu AutoCAD R12 s vrstvami a typy čar – otevřete ho v AutoCADu, ZWCADu, DraftSightu či LibreCADu a případně uložte jako DWG.
+            DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).
           </p>
         </aside>
 
