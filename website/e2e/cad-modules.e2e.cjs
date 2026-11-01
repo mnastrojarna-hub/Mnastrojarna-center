@@ -19,10 +19,9 @@ const chips = async (page) => page.locator('footer').innerText();
   if (await cont.isVisible({ timeout: 5000 }).catch(() => false)) await cont.click();
   await page.waitForFunction(() => document.body.innerText.includes('OCCT') && !document.body.innerText.includes('Načítám jádro'), null, { timeout: 120000 });
 
-  // nový díl
-  await page.getByRole('button', { name: 'Soubor', exact: true }).click();
-  await page.getByRole('button', { name: 'Nový díl', exact: true }).click();
-  await page.waitForTimeout(600);
+  // nový díl (rychlé tlačítko v hlavičce)
+  const newPart = async () => { await page.locator('header button[title="Nový díl"]').click(); await page.waitForTimeout(600); };
+  await newPart();
 
   // svařence: rám z profilů (bez skici)
   await palette(page, 'Rám z profilů');
@@ -37,9 +36,7 @@ const chips = async (page) => page.locator('footer').innerText();
   await page.keyboard.press('Escape');
 
   // plech: nový díl → skica obdélník → základní plech → rozvin DXF
-  await page.getByRole('button', { name: 'Soubor', exact: true }).click();
-  await page.getByRole('button', { name: 'Nový díl', exact: true }).click();
-  await page.waitForTimeout(500);
+  await newPart();
   await page.getByRole('button', { name: 'Tvorba', exact: true }).click();
   await page.getByRole('button', { name: /^Skica/ }).first().click();
   await page.getByRole('button', { name: /Rovina XY/ }).click();
@@ -90,8 +87,9 @@ const chips = async (page) => page.locator('footer').innerText();
   await page.getByRole('button', { name: 'Nástroje', exact: true }).click();
   await page.getByRole('button', { name: /Formařské/ }).click();
   await page.waitForTimeout(400);
-  await page.getByText('Plochy', { exact: true }).click();
-  await page.getByText(/Zebra pruhy/).click();
+  const panel = page.locator('div.absolute.z-20').filter({ hasText: 'Formařské nástroje' });
+  await panel.getByRole('button', { name: 'Plochy', exact: true }).click();
+  await panel.getByText(/Zebra pruhy/).click();
   await page.waitForTimeout(1200);
   await page.screenshot({ path: S + '/modules-final.png' });
   ok(errs.length === 0, 'bez JS chyb ' + errs.join(' | '));
