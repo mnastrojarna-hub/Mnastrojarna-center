@@ -53,6 +53,16 @@ Testy: `src/cad/**/*.test.ts` (vitest, OCCT se inicializuje v Node). E2E: `e2e/c
 - E2E `e2e/cad.e2e.cjs` (16 kroků): úvodní obrazovka → ukázka → skica + vysunutí → paleta → měření → knihovna M8×30 → výkres DXF/DWG R2018/SVG/PDF → rám formy → kusovník → STEP; bez JS chyb.
 - Snímky všech nástrojů: `/tmp/claude-0/cadshots/tools.cjs` (28 snímků) + ruční kóty/poznámky ověřeny v prohlížeči (kóta, poznámka, drsnost, tolerance, základna).
 
+### 3. vlna (listopad 2026) – modelovací schopnosti a počet příkazů
+Zásuvná infrastruktura prvků rozšíření (`cad/ext/registry.ts` + `components/cad/ext/registry.tsx`): modul zaregistruje prvek (`registerExt`), jádro ho staví v `build.ts` (`type: "ext"`), UI vykreslí formulář z `params` (nebo vlastní `Form`), tlačítko na pásu (`tab`/`group`), výběr ploch/hran (`pick`), akce bez prvku (`action`). Moduly se importují v `cad/ext/index.ts` a `components/cad/ext/index.tsx`.
+- **W1 Plochy** (`cad/ext/surface.ts`): plošné vysunutí/rotace/tažení/šablonování, rovinná a odsazená plocha, prodloužit, oříznout, sešít, uzavřít → těleso, zesílit, rozdělit tělesa, nahradit plochu, záplata, křivka průniku, promítnutí skici, šroubovice + tažení po šroubovici – **probíhá**.
+- **W2 Plech** (`cad/ext/sheetmetal.ts`): základní plech, ohyb z hrany, lem, ohyb podle čáry, obruba, výřez, rohová úleva, rozvinout, rozvin → DXF/SVG s čarami ohybů a tabulkou, parametry plechu (t, R, K) – **probíhá**.
+- **W3 Pokročilé** (`cad/ext/advanced.ts`): proměnné a plné zaoblení, tečný řetězec, nestejné sražení, zrcadlení prvků, pole podél křivky, výplňové pole, zkrut, kopule, text na válec, úkos s dělicí rovinou, lem a drážka, měřítko, díry v bodech skici, kontrola/oprava geometrie, tloušťka stěn – **probíhá**.
+- **W4 Sestavy a výkresy 2** (`cad/mates.ts`, `drawing.ts`, `drawing-workspace.tsx`, `asm-panel.tsx`): trvalé vazby (kontakt/zarovnat/soustřednost/vzdálenost/úhel/rovnoběžnost) se sekvenčním řešičem, pole a zrcadlení komponent, šroubový spoj do díry, pozice (balónky) na výkresu sestavy, detailní pohled, více listů, tabulka děr, tabulka revizí – **probíhá**.
+- **W5 Knihovna 2** (`cad/library/*`): šikmá/kuželová/šneková kola, kuželíková/axiální/jehlová ložiska a tělesa, další šrouby/matice/podložky, kolíky, hliníkové profily s T-drážkou + T-matice, pneumatické válce ISO 15552/6432, lineární vedení HGR/HGW, kuličkové šrouby, vodicí tyče, příruby PN16, talířové/tažné/zkrutné pružiny, normálie HASCO/Meusburger – **probíhá** (cíl ≥ 85 rodin).
+- **Vedoucí**: analýza ploch ve 3D (zebra, křivost, tloušťka stěn) ✅.
+Po dokončení: zapojit (automaticky přes registr), přidat snímky karet Plochy/Plech do `tools.cjs`, rozšířit `e2e/cad.e2e.cjs` (plech → rozvin DXF, plošné vysunutí, vazba soustřednost), build, přeměřit počet příkazů.
+
 ### Zapojení po dokončení pracovníků (checklist pro vedoucího / další relaci)
 1. ~~Settings/Palette/Start/MoldPanel/LibraryDialog/DWG/náhledy~~ – vše zapojeno.
 2. Používat `ui.tsx` (Modal/FloatPanel/Row/Btn/Toggle/Segmented/Kbd) místo lokálních kopií v `cad-app.tsx` (kosmetika).
