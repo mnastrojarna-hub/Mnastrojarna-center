@@ -8,7 +8,8 @@ import { alignFaces, apply3, bomCsv, emptyAssembly, ejectorPin, explodeOffset, g
 import { cad } from "@/cad/client";
 import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
 import { keyCombo, loadRecent, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
-import { EXAMPLES, FEATURE_LABEL, newFeature, nextName, planeLabel } from "@/cad/defaults";
+import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
+import { extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
@@ -18,8 +19,9 @@ import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { track } from "../analytics";
 import { LogoMark } from "../logo";
-import { CadIcon, type CadIconName } from "./cad-icons";
+import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
 import { CommandPalette, type Command } from "./command-palette";
+import { getExtUi, type ExtActionApi } from "./ext";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup } from "./mold-panel";
 import { SettingsDialog } from "./settings-dialog";
@@ -38,8 +40,8 @@ const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) =>
 
 const STORE = "mn-cad-doc-v1";
 type Hist = { past: CadDoc[]; present: CadDoc; future: CadDoc[] };
-type Tab = "create" | "sketch" | "asm" | "tools" | "view" | "drawing" | "data";
-type AddType = Exclude<FeatureType, "sketch" | "import" | "pattern">;
+type Tab = "create" | "sketch" | "surface" | "sheet" | "asm" | "tools" | "view" | "drawing" | "data";
+type AddType = Exclude<FeatureType, "sketch" | "import" | "pattern" | "ext">;
 
 const EXPORTS: { f: ExportFormat; label: string; ext: string; mime: string; hint: string }[] = [
   { f: "step", label: "STEP AP214 (.step)", ext: "step", mime: "application/step", hint: "ZW3D, SolidWorks, Inventor, CATIA, Creo, CAM" },
@@ -229,7 +231,7 @@ export function CadApp() {
   // ---------- přestavba modelu ----------
   const active = doc.features.find((f) => f.id === activeId) ?? null;
   const activeIndex = active ? doc.features.indexOf(active) : -1;
-  const rollback = !!active && PICK_TYPES.has(active.type);
+  const rollback = !!active && (PICK_TYPES.has(active.type) || (active.type === "ext" && !!getExt(active.ext)?.rollback));
   const buildDocView = useMemo<CadDoc>(() => {
     if (sketchId) {
       const i = doc.features.findIndex((f) => f.id === sketchId);
@@ -726,6 +728,48 @@ export function CadApp() {
     setEditBase(base);
     setMeasure(false);
   };
+  // ---------- prvky rozšíření (plochy, plech, pokročilé…) ----------
+  const extActionApi = (): ExtActionApi => ({
+    doc,
+    result,
+    selection,
+    commit,
+    flash,
+    notice: (title, body) => setNotice({ title, body }),
+    download,
+    exportModel: (format) => exportModel(format as ExportFormat),
+  });
+  const addExt = (def: ExtDef) => {
+    if (def.action) {
+      void getExtUi(def.ext)?.action?.(extActionApi());
+      return;
+    }
+    if (isAsm && def.scope !== "assembly" && def.scope !== "both") return flash("V sestavě se prvky nepřidávají – otevřete díl (pravé tlačítko → Upravit díl).");
+    const extra: Record<string, unknown> = {};
+    if (def.pick?.kind === "faces" && selFaces.length) extra[def.pick.key] = selFaces;
+    if (def.pick?.kind === "edges" && selEdges.length) extra[def.pick.key] = selEdges;
+    try {
+      const f = newExtFeature(doc, def.ext, extra);
+      commit({ ...doc, features: [...doc.features, f] });
+      beginEdit(f.id, doc);
+      track("cad_feature", { type: def.ext });
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
+  const extGroups = (tab: ExtTab): RGroup[] => {
+    const by = new Map<string, ExtDef[]>();
+    for (const d of extByTab(tab)) by.set(d.group, [...(by.get(d.group) ?? []), d]);
+    return [...by.entries()].map(([label, defs]) => {
+      const sorted = [...defs].sort((a, b) => Number(!!b.big) - Number(!!a.big));
+      return {
+        label,
+        big: sorted.filter((d) => d.big).length,
+        items: sorted.map((d) => ({ id: d.ext, label: d.label, icon: d.icon ?? "cube", tone: d.tone ?? "create", hint: d.hint, kbd: d.kbd, disabled: !d.action && (d.scope === "assembly" ? !isAsm : d.scope === "both" ? false : isAsm), onClick: () => addExt(d) })),
+      };
+    });
+  };
+
   const addFeature = (type: AddType) => {
     if (isAsm) return flash("V sestavě se prvky nepřidávají – otevřete díl (pravé tlačítko → Upravit díl).");
     if ((type === "extrude" || type === "revolve") && !doc.features.some((f) => f.type === "sketch")) {
@@ -818,9 +862,29 @@ export function CadApp() {
             : "edges"
           : active && FACE_PICK.has(active.type)
             ? "faces"
-            : "select";
+            : active?.type === "ext"
+              ? getExt(active.ext)?.pick?.kind === "faces"
+                ? "faces"
+                : getExt(active.ext)?.pick?.kind === "edges"
+                  ? "edges"
+                  : "select"
+              : "select";
 
+  const toggleExtPick = (i: number, kind: "faces" | "edges") => {
+    if (active?.type !== "ext") return false;
+    const pk = getExt(active.ext)?.pick;
+    if (!pk || pk.kind !== kind) return false;
+    const cur = (active.data[pk.key] as number[] | undefined) ?? [];
+    updateFeature(active.id, { data: { ...active.data, [pk.key]: cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i] } } as Partial<Feature>);
+    return true;
+  };
+  const extPicked = (kind: "faces" | "edges"): number[] => {
+    if (active?.type !== "ext") return [];
+    const pk = getExt(active.ext)?.pick;
+    return pk && pk.kind === kind ? ((active.data[pk.key] as number[] | undefined) ?? []) : [];
+  };
   const onPickEdge = (i: number) => {
+    if (toggleExtPick(i, "edges")) return;
     if (!active || (active.type !== "fillet" && active.type !== "chamfer") || active.edges === "all") return;
     const edges = active.edges.includes(i) ? active.edges.filter((x) => x !== i) : [...active.edges, i];
     updateFeature(active.id, { edges } as Partial<Feature>);
@@ -832,6 +896,7 @@ export function CadApp() {
   };
   const onPickFace = async (i: number, point?: [number, number, number]) => {
     if (planePick) return sketchOnFace(i);
+    if (toggleExtPick(i, "faces")) return;
     if (active && "faces" in active && FACE_PICK.has(active.type)) {
       const faces = active.faces.includes(i) ? active.faces.filter((x) => x !== i) : [...active.faces, i];
       updateFeature(active.id, { faces } as Partial<Feature>);
@@ -1145,7 +1210,7 @@ export function CadApp() {
     }
   };
 
-  const groups: Record<Tab, RGroup[]> = {
+  const baseGroups: Record<Exclude<Tab, "surface" | "sheet">, RGroup[]> = {
     create: [
       { label: "Skica", items: [{ id: "sketch", label: "Skica", icon: "sketch", tone: "sketch", menu: sketchPlanes, active: planePick, hint: "2D profil na rovině nebo ploše" }] },
       {
@@ -1418,15 +1483,26 @@ export function CadApp() {
     ],
   };
 
+  const groups: Record<Tab, RGroup[]> = {
+    ...baseGroups,
+    create: [...baseGroups.create, ...extGroups("create")],
+    tools: [...baseGroups.tools, ...extGroups("tools")],
+    asm: [...baseGroups.asm, ...extGroups("asm")],
+    drawing: [...baseGroups.drawing, ...extGroups("drawing")],
+    surface: extGroups("surface"),
+    sheet: extGroups("sheet"),
+  };
   const tabs: [Tab, string][] = [
     isAsm ? ["asm", "Sestava"] : ["create", "Tvorba"],
+    ...(!isAsm && groups.surface.length ? ([["surface", "Plochy"]] as [Tab, string][]) : []),
+    ...(!isAsm && groups.sheet.length ? ([["sheet", "Plech"]] as [Tab, string][]) : []),
     ...(sketch ? ([["sketch", "Skica"]] as [Tab, string][]) : []),
     ["tools", "Nástroje"],
     ["view", "Zobrazení"],
     ["drawing", "Výkres"],
     ["data", "Data"],
   ];
-  const curTab: Tab = isAsm ? (tab === "create" || tab === "sketch" ? "asm" : tab) : sketch ? (tab === "create" || tab === "asm" ? "sketch" : tab) : tab === "sketch" || tab === "asm" ? "create" : tab;
+  const curTab: Tab = isAsm ? (tab === "create" || tab === "sketch" || tab === "surface" || tab === "sheet" ? "asm" : tab) : sketch ? (tab === "create" || tab === "asm" ? "sketch" : tab) : tab === "sketch" || tab === "asm" ? "create" : tab;
 
   // ---------- výzva v řádku příkazů ----------
   const prompt = isAsm
@@ -1466,7 +1542,7 @@ export function CadApp() {
                 ? "Vyberte plochy pro úkos · Enter = OK"
                 : active.type === "hole"
                   ? "Klikněte na plochu, kam se má vrtat · Enter = OK"
-                  : `${FEATURE_LABEL[active.type]}: upravte parametry · Enter = OK, Esc = Storno`
+                  : `${featureLabel(active)}: upravte parametry · Enter = OK, Esc = Storno`
           : selection.length
             ? `Vybráno: ${selection.length}× ${KIND_LABEL[selection[0].kind].toLowerCase()} · pravé tlačítko = příkazy pro výběr · Esc zruší`
             : `Filtr výběru: ${FILTER_LABEL[selFilter]} · klikněte na entitu · pravé tlačítko = nabídka`;
@@ -1528,7 +1604,7 @@ export function CadApp() {
 
   const buildCommands = (): Command[] => {
     const out: Command[] = [];
-    const tabLabel: Record<Tab, string> = { create: "Tvorba", sketch: "Skica", asm: "Sestava", tools: "Nástroje", view: "Zobrazení", drawing: "Výkres", data: "Data" };
+    const tabLabel: Record<Tab, string> = { create: "Tvorba", sketch: "Skica", surface: "Plochy", sheet: "Plech", asm: "Sestava", tools: "Nástroje", view: "Zobrazení", drawing: "Výkres", data: "Data" };
     (Object.keys(groups) as Tab[]).forEach((t) => {
       for (const g of groups[t])
         for (const it of g.items) {
@@ -1687,8 +1763,8 @@ export function CadApp() {
                 sketches={sketchesForView}
                 datums={datums}
                 pickMode={pickMode}
-                selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : []}
-                selectedFaces={active && "faces" in active ? active.faces : []}
+                selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
+                selectedFaces={active && "faces" in active ? active.faces : extPicked("faces")}
                 onPickEdge={onPickEdge}
                 onPickFace={onPickFace}
                 selFilter={selFilter}
@@ -1943,8 +2019,8 @@ export function CadApp() {
           {(active || (sketch && sketchSel)) && (
             <aside className="absolute inset-y-0 right-0 z-20 flex w-[300px] shrink-0 flex-col border-l border-[#d5dbe2] bg-white shadow-xl lg:static lg:shadow-none">
               <div className="flex items-center gap-2 border-b border-[#d5dbe2] bg-gradient-to-b from-[#f7f9fb] to-[#eef2f6] px-3 py-2">
-                <CadIcon name={(active?.type ?? "sketch") as CadIconName} tone={FEATURE_TONE[active?.type ?? "sketch"] ?? "create"} className="h-5 w-5" />
-                <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">{active ? `${FEATURE_LABEL[active.type]} · ${active.name}` : "Entita skici"}</p>
+                <CadIcon name={active ? featureIcon(active) : "sketch"} tone={((active && featureTone(active)) ?? FEATURE_TONE[active?.type ?? "sketch"] ?? "create") as Tone} className="h-5 w-5" />
+                <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">{active ? `${featureLabel(active)} · ${active.name}` : "Entita skici"}</p>
                 {active ? (
                   <>
                     <button type="button" title="OK (Enter)" onClick={okEdit} className="grid h-7 w-7 place-items-center rounded bg-[#16a34a] text-white shadow-sm hover:bg-[#15803d]">

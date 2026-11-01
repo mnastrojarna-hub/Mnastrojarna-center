@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
+import { getExt, type ExtParam } from "@/cad/ext/registry";
+import { getExtUi } from "./ext/registry";
 import { evalExpr, exprRefs, isExpression } from "@/cad/params";
 import type { Axis, BoolMode, CadDoc, Feature, HoleKind, PlaneName, SketchEntity, Vec2, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -259,6 +261,8 @@ export function FeatureProps({
       </Field>
       {(() => {
         switch (f.type) {
+          case "ext":
+            return <ExtForm f={f} doc={doc} set={set} sketches={sketches} toolFeatures={toolFeatures} />;
           case "sketch":
             return <Info>Rovina: {planeLabel(f.plane)} · {f.entities.length} entit</Info>;
           case "extrude":
@@ -872,3 +876,105 @@ function LineLength({ e, onChange }: { e: Extract<SketchEntity, { type: "line" }
 }
 
 export { FEATURE_LABEL };
+
+// ---------- prvky rozšíření: formulář z registru nebo automaticky z params ----------
+
+function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, { type: "ext" }>; doc: CadDoc; set: (p: Record<string, unknown>) => void; sketches: Feature[]; toolFeatures: Feature[] }) {
+  const def = getExt(f.ext);
+  const ui = getExtUi(f.ext);
+  const data = f.data ?? {};
+  const patch = (p: Record<string, unknown>) => set({ data: { ...data, ...p } });
+  if (!def) return <p className="text-[12px] text-brand-600">Modul prvku „{f.ext}“ není načten.</p>;
+  if (ui?.Form) {
+    const Form = ui.Form;
+    return <Form f={f} doc={doc} onChange={patch} />;
+  }
+  if (!def.params?.length) return <p className="text-[12px] text-ink-700/55">{def.hint ?? "Prvek nemá parametry."}</p>;
+  return (
+    <>
+      {def.params.map((p: ExtParam) => {
+        const v = data[p.key];
+        switch (p.kind) {
+          case "number":
+            return <Num key={p.key} label={p.label} value={typeof v === "number" ? v : 0} step={p.step ?? 1} min={p.min} suffix={p.unit ?? "mm"} hint={p.hint} bind={`${f.id}:data.${p.key}`} onChange={(n) => patch({ [p.key]: p.max != null ? Math.min(p.max, n) : n })} />;
+          case "bool":
+            return (
+              <label key={p.key} className="flex items-center gap-2 text-[13px]">
+                <input type="checkbox" checked={!!v} onChange={(e) => patch({ [p.key]: e.target.checked })} className="accent-[#E03930]" />
+                {p.label}
+                {p.hint && <span className="text-[11px] text-ink-700/45">{p.hint}</span>}
+              </label>
+            );
+          case "enum":
+            return <Seg key={p.key} label={p.label} value={String(v ?? p.options[0]?.v ?? "")} options={p.options} onChange={(x) => patch({ [p.key]: x })} />;
+          case "mode":
+            return <Seg key={p.key} label="Operace" value={String(v === "new" ? "add" : (v ?? "add"))} options={MODES as unknown as { v: string; l: string }[]} onChange={(x) => patch({ [p.key]: x })} />;
+          case "text":
+            return (
+              <Field key={p.key} label={p.label}>
+                <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" value={String(v ?? "")} onChange={(e) => patch({ [p.key]: e.target.value })} />
+              </Field>
+            );
+          case "vec3":
+            return <Vec key={p.key} label={p.label} value={(Array.isArray(v) ? v : [0, 0, 0]) as Vec3} bind={`${f.id}:data.${p.key}`} onChange={(x: Vec3) => patch({ [p.key]: x })} />;
+          case "sketch":
+            return (
+              <Field key={p.key} label={p.label}>
+                <select className="w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px]" value={String(v ?? "")} onChange={(e) => patch({ [p.key]: e.target.value })}>
+                  <option value="">— vyberte skicu —</option>
+                  {sketches.map((sk) => (
+                    <option key={sk.id} value={sk.id}>
+                      {sk.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            );
+          case "sketches": {
+            const ids = Array.isArray(v) ? (v as string[]) : [];
+            return (
+              <Field key={p.key} label={p.label}>
+                <div className="space-y-1">
+                  {sketches.map((sk) => (
+                    <label key={sk.id} className="flex items-center gap-2 text-[12.5px]">
+                      <input type="checkbox" className="accent-[#E03930]" checked={ids.includes(sk.id)} onChange={(e) => patch({ [p.key]: e.target.checked ? [...ids, sk.id] : ids.filter((x) => x !== sk.id) })} />
+                      {sk.name}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            );
+          }
+          case "feature":
+            return (
+              <Field key={p.key} label={p.label}>
+                <select className="w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px]" value={String(v ?? "")} onChange={(e) => patch({ [p.key]: e.target.value })}>
+                  <option value="">— vyberte prvek —</option>
+                  {toolFeatures.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            );
+          case "faces":
+          case "edges": {
+            const n = Array.isArray(v) ? (v as number[]).length : 0;
+            return (
+              <div key={p.key} className="rounded-lg border border-dashed border-ink-700/20 p-2.5 text-[12.5px]">
+                <span className="font-medium">{p.label}:</span> {n ? `${n} vybráno` : `vyberte v modelu (${p.kind === "faces" ? "plochy" : "hrany"})`}
+                {n > 0 && (
+                  <button type="button" className="ml-2 text-brand hover:underline" onClick={() => patch({ [p.key]: [] })}>
+                    vymazat
+                  </button>
+                )}
+                {p.hint && <p className="mt-1 text-[11px] text-ink-700/45">{p.hint}</p>}
+              </div>
+            );
+          }
+        }
+      })}
+    </>
+  );
+}

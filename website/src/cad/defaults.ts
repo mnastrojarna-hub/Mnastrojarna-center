@@ -1,8 +1,10 @@
 /** Výchozí parametry prvků, roviny skic a ukázkové modely. */
+import { getExt } from "./ext/registry";
 import type { CadDoc, Feature, FeatureType, SketchPlane, Vec2, Vec3 } from "./types";
 import { uid } from "./types";
 
 export const FEATURE_LABEL: Record<FeatureType, string> = {
+  ext: "Rozšíření",
   sketch: "Skica",
   extrude: "Vysunutí",
   revolve: "Rotace",
@@ -67,12 +69,34 @@ export const METRIC_THREADS: { name: string; d: number; pitch: number; tap: numb
 
 export const threadByName = (name?: string) => METRIC_THREADS.find((t) => t.name.toLowerCase() === (name ?? "").trim().toLowerCase().replace(",", "."));
 
+/** Popisek prvku (včetně prvků rozšíření). */
+export function featureLabel(f: Pick<Feature, "type"> & { ext?: string }): string {
+  if (f.type === "ext") return getExt((f as { ext: string }).ext)?.label ?? (f as { ext: string }).ext;
+  return FEATURE_LABEL[f.type];
+}
+/** Ikona prvku pro strom a formulář. */
+export function featureIcon(f: Pick<Feature, "type"> & { ext?: string }): string {
+  if (f.type === "ext") return getExt((f as { ext: string }).ext)?.icon ?? "cube";
+  return f.type;
+}
+export function featureTone(f: Pick<Feature, "type"> & { ext?: string }): string | undefined {
+  if (f.type === "ext") return getExt((f as { ext: string }).ext)?.tone ?? "create";
+  return undefined;
+}
+/** Nový prvek rozšíření s výchozími daty (extra = např. vybrané plochy). */
+export function newExtFeature(doc: CadDoc, ext: string, extra: Record<string, unknown> = {}): Feature {
+  const def = getExt(ext);
+  if (!def) throw new Error(`Neznámý prvek rozšíření „${ext}“.`);
+  const n = doc.features.filter((f) => f.type === "ext" && f.ext === ext).length + 1;
+  return { id: uid(), name: `${def.label} ${n}`, type: "ext", ext, data: def.make(doc, extra) };
+}
+
 export function nextName(doc: CadDoc, type: FeatureType) {
   const n = doc.features.filter((f) => f.type === type).length + 1;
   return `${FEATURE_LABEL[type]} ${n}`;
 }
 
-export type NewFeatureType = Exclude<FeatureType, "sketch" | "import" | "pattern">;
+export type NewFeatureType = Exclude<FeatureType, "sketch" | "import" | "pattern" | "ext">;
 
 export function newFeature(doc: CadDoc, type: NewFeatureType, extra: Partial<Feature> = {}): Feature {
   const base = { id: uid(), name: nextName(doc, type) };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { featureIcon, featureTone } from "@/cad/defaults";
 import { resolveDoc } from "@/cad/params";
 import { uid, type CadDoc, type Config, type Feature, type FeatureStatus, type Variable } from "@/cad/types";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -146,7 +147,7 @@ export function Manager({
                       onContext(e.clientX, e.clientY, featureMenu(f));
                     }}
                   >
-                    <CadIcon name={(f.type as CadIconName) ?? "cube"} tone={FEATURE_TONE[f.type] ?? "create"} className="h-4 w-4 shrink-0" />
+                    <CadIcon name={featureIcon(f)} tone={((featureTone(f) as Tone | undefined) ?? FEATURE_TONE[f.type] ?? "create") as Tone} className="h-4 w-4 shrink-0" />
                     {renaming === f.id ? (
                       <input
                         autoFocus

@@ -1,3 +1,4 @@
+import { EXTRA_ICONS } from "./ext/icons";
 /** Ikony nástrojů CAD (vlastní, technický styl). */
 const P: Record<string, React.ReactNode> = {
   sketch: (<><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="2 2" /><path d="M7 16l4-8 3 5 2-3 2 6" /></>),
@@ -126,7 +127,7 @@ const P: Record<string, React.ReactNode> = {
   filterSel: (<><path d="M3 5h18l-7 8v6l-4 2v-8z" /></>),
 };
 
-export type CadIconName = keyof typeof P;
+export type CadIconName = keyof typeof P | (string & {});
 
 /** Barevné tóny ikon podle kategorie (jako barevné ikony v profesionálních CAD). */
 export const TONE = {
@@ -146,7 +147,7 @@ export type Tone = keyof typeof TONE;
  * Ikona nástroje. S `tone` se kreslí dvoubarevně: obrys v barvě kategorie + jemná výplň.
  */
 export function CadIcon({ name, className = "h-5 w-5", tone }: { name: CadIconName; className?: string; tone?: Tone }) {
-  const body = P[name] ?? P.cube;
+  const body = (P as Record<string, React.ReactNode>)[name] ?? EXTRA_ICONS[name] ?? P.cube;
   if (!tone) {
     return (
       <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

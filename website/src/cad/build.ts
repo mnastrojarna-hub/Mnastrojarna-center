@@ -4,6 +4,7 @@
  */
 import * as r from "replicad";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
+import { getExt } from "./ext/index";
 import { importBody } from "./formats/kernel-import";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
@@ -570,6 +571,13 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           const origin: Vec3 = f.plane === "YZ" ? [f.offset, 0, 0] : f.plane === "XZ" ? [0, f.offset, 0] : [0, 0, f.offset];
           const m = body.clone().mirror(f.plane, origin) as Shape;
           next = f.keepOriginal ? body.fuse(m) : m;
+          break;
+        }
+        case "ext": {
+          const def = getExt(f.ext);
+          if (!def) throw new Error(`Neznámý prvek rozšíření „${f.ext}“ – modul není načten.`);
+          if (!def.build) break;
+          next = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools });
           break;
         }
         default: {

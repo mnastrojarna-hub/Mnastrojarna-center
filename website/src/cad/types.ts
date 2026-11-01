@@ -135,6 +135,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean } & (
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
   | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean }
+  /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
+  | { type: "ext"; ext: string; data: Record<string, unknown> }
 );
 
 export type FeatureType = Feature["type"];
