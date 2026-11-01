@@ -577,7 +577,8 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           const def = getExt(f.ext);
           if (!def) throw new Error(`Neznámý prvek rozšíření „${f.ext}“ – modul není načten.`);
           if (!def.build) break;
-          next = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools });
+          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools });
+          if (out !== null && out !== undefined) next = out; // null = prvek bez geometrie (těleso zůstává)
           break;
         }
         default: {

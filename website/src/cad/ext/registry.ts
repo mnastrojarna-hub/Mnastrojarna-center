@@ -76,7 +76,7 @@ export type ExtDef = {
   pick?: { kind: "faces" | "edges"; key: string };
   /** zobrazit model před tímto prvkem při úpravě (výběr ploch/hran na původním tělese) */
   rollback?: boolean;
-  /** stavba geometrie; null = bez geometrie */
+  /** stavba geometrie: vrací nové aktuální těleso; null = prvek bez geometrie (těleso zůstává beze změny) */
   build?: (data: Record<string, unknown>, ctx: ExtBuildCtx) => Promise<Shape | null> | Shape | null;
   /** místo prvku spustí akci v UI (registrovanou v UI registru pod stejným id) – např. export rozvinu */
   action?: boolean;
