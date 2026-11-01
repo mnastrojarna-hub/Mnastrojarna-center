@@ -348,8 +348,6 @@ function solve3(rows: Vec3[], rhs: Vec3): Vec3 {
   const [a, b, c] = rows;
   const det = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
   if (Math.abs(det) < 1e-12) throw new Error("Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.");
-  const col = (k: number): Vec3 => [k === 0 ? rhs[0] : a[k - 1 + (k === 0 ? 0 : 0)] , 0, 0];
-  void col;
   const D = (m: Vec3[]) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
   const rep = (k: number): Vec3[] => rows.map((row, i) => row.map((v, j) => (j === k ? rhs[i] : v)) as Vec3);
   return [D(rep(0)) / det, D(rep(1)) / det, D(rep(2)) / det];
