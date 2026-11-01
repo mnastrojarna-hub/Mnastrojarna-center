@@ -590,3 +590,124 @@ export function moldBase(p: MoldBaseParams = defaultMoldBase, name = "Rám formy
 
   return { ...emptyAssembly(name), components: comps, material: p.material, props: { number: "SF-001", note: `Rám ${W}×${L}` } };
 }
+
+// ---------------- pole a zrcadlení komponent ----------------
+
+export type CompPattern = { kind: "linear"; count: number; spacing: number; direction: Vec3 } | { kind: "circular"; count: number; angle: number; axis: "X" | "Y" | "Z"; center: Vec3 };
+
+const axisVec = (a: "X" | "Y" | "Z"): Vec3 => (a === "X" ? [1, 0, 0] : a === "Y" ? [0, 1, 0] : [0, 0, 1]);
+
+/** Rotační matice kolem osy o úhel (°). */
+export function axisRotation(axis: Vec3, deg: number): Mat3 {
+  const [x, y, z] = norm(axis);
+  const a = rad(deg);
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const t = 1 - c;
+  return [t * x * x + c, t * x * y - s * z, t * x * z + s * y, t * x * y + s * z, t * y * y + c, t * y * z - s * x, t * x * z - s * y, t * y * z + s * x, t * z * z + c];
+}
+
+/** Pole komponenty: vrátí sestavu s kopiemi (stejný zdroj, nové id, název „… (2)“…). Kopie se vloží za originál. */
+export function patternComponent(doc: CadDoc, compId: string, p: CompPattern): CadDoc {
+  const comps = doc.components ?? [];
+  const i = comps.findIndex((c) => c.id === compId);
+  const c = comps[i];
+  if (!c) throw new Error("Komponenta nenalezena.");
+  const n = Math.max(1, Math.round(p.count));
+  const copies: AsmComponent[] = [];
+  for (let k = 1; k < n; k++) {
+    let placement: Placement;
+    if (p.kind === "linear") {
+      const d = norm(p.direction);
+      placement = { ...c.placement, position: [c.placement.position[0] + d[0] * p.spacing * k, c.placement.position[1] + d[1] * p.spacing * k, c.placement.position[2] + d[2] * p.spacing * k] };
+    } else {
+      const step = (p.angle >= 360 ? 360 / n : p.angle / Math.max(1, n - 1)) * k;
+      const Rk = axisRotation(axisVec(p.axis), step);
+      const rel = apply3(Rk, [c.placement.position[0] - p.center[0], c.placement.position[1] - p.center[1], c.placement.position[2] - p.center[2]]);
+      placement = { position: [rel[0] + p.center[0], rel[1] + p.center[1], rel[2] + p.center[2]].map((v) => Math.round(v * 1e6) / 1e6) as Vec3, rotation: eulerXYZ(mul3(Rk, rotMatrix(c.placement.rotation))) };
+    }
+    copies.push({ ...c, id: uid(), name: `${c.name} (${k + 1})`, placement, fixed: false });
+  }
+  const next = [...comps];
+  next.splice(i + 1, 0, ...copies);
+  return { ...doc, components: next };
+}
+
+/**
+ * Zrcadlení komponenty podle roviny (XY/XZ/YZ s odsazením). Poloha se zrcadlí přesně; natočení se převede
+ * na vlastní rotaci (R' = S·R·S), takže geometrie dílu se nezrcadlí – přesné jen pro symetrické díly.
+ */
+export function mirrorComponent(doc: CadDoc, compId: string, plane: "XY" | "XZ" | "YZ", offset = 0): CadDoc {
+  const comps = doc.components ?? [];
+  const i = comps.findIndex((c) => c.id === compId);
+  const c = comps[i];
+  if (!c) throw new Error("Komponenta nenalezena.");
+  const k = plane === "YZ" ? 0 : plane === "XZ" ? 1 : 2;
+  const S: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  S[k * 4] = -1;
+  const pos: Vec3 = [...c.placement.position] as Vec3;
+  pos[k] = 2 * offset - pos[k];
+  const R = rotMatrix(c.placement.rotation);
+  const R2 = mul3(mul3(S, R), S);
+  const copy: AsmComponent = { ...c, id: uid(), name: `${c.name} (zrcadlo)`, placement: { position: pos, rotation: eulerXYZ(R2) }, fixed: false };
+  const next = [...comps];
+  next.splice(i + 1, 0, copy);
+  return { ...doc, components: next };
+}
+
+// ---------------- šroubový spoj ----------------
+
+/** Průchozí díra ISO 273 (střední řada) → metrický závit. */
+export const HOLE_TO_METRIC: [number, string][] = [
+  [3.4, "M3"],
+  [4.5, "M4"],
+  [5.5, "M5"],
+  [6.6, "M6"],
+  [9, "M8"],
+  [11, "M10"],
+  [13.5, "M12"],
+  [17.5, "M16"],
+  [22, "M20"],
+  [26, "M24"],
+];
+export const SCREW_LENGTHS = [8, 10, 12, 16, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160];
+
+/** Velikost závitu podle průměru díry (nejbližší průchozí díra ISO 273, tolerance ±0,6 mm; jinak nejbližší menší). */
+export function metricForHole(diameter: number): string {
+  let best = HOLE_TO_METRIC[0][1];
+  let bd = Infinity;
+  for (const [d, m] of HOLE_TO_METRIC) {
+    const e = Math.abs(d - diameter);
+    if (e < bd) {
+      bd = e;
+      best = m;
+    }
+  }
+  if (bd > 0.6) {
+    const smaller = HOLE_TO_METRIC.filter(([d]) => d <= diameter + 0.6);
+    if (smaller.length) best = smaller[smaller.length - 1][1];
+  }
+  return best;
+}
+
+export type BoltStack = { size: string; length: number; screw: CadDoc; washer: CadDoc | null; nut: CadDoc | null; washerH: number; nutH: number; headH: number };
+
+/** Šroubový spoj do díry: šroub ISO 4762 + podložka ISO 7089 (+ matice ISO 4032), délka podle sevřené tloušťky. */
+export function boltStack(holeDiameter: number, clampLength: number, opts: { washer?: boolean; nut?: boolean } = {}): BoltStack {
+  const size = metricForHole(holeDiameter);
+  const washerH = opts.washer === false ? 0 : (ISO7089[size]?.[2] ?? 1.6);
+  const nutH = opts.nut ? (ISO4032[size]?.[1] ?? 6.8) : 0;
+  const d = Number(size.replace(/\D/g, "")) || 8;
+  const need = clampLength + washerH + (opts.nut ? nutH + washerH + d * 0.3 : d * 1.2);
+  const length = SCREW_LENGTHS.find((l) => l >= need) ?? SCREW_LENGTHS[SCREW_LENGTHS.length - 1];
+  return {
+    size,
+    length,
+    screw: screwISO4762(size, length),
+    washer: opts.washer === false ? null : washerISO7089(size),
+    nut: opts.nut ? nutISO4032(size) : null,
+    washerH,
+    nutH,
+    headH: ISO4762[size]?.k ?? d,
+  };
+}

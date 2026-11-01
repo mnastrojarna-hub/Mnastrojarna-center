@@ -5,6 +5,7 @@ import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { bomToCsv, defaultDrawingOptions, hatch, makeDrawing, type BomItem } from "./drawing";
 import { drawingToPdf } from "./pdf";
+import type { Vec3 } from "./types";
 
 beforeAll(async () => {
   const oc = await (opencascade as unknown as (o: object) => Promise<unknown>)({
@@ -144,5 +145,48 @@ describe("uživatelské kóty a poznámky", async () => {
     expect(sheetToAnn(v, sheet)).toEqual([0, 0]);
     expect(viewAt(base.views, [60, 45])?.key).toBe("front");
     expect(viewAt(base.views, [250, 150])).toBeNull();
+  });
+});
+
+describe("tabulka děr, pozice, detail, revize, listy", () => {
+  it("tabulka děr desky: 4× Ø6 (A1–A4) a 1× Ø20 (B1), značky v půdorysu", () => {
+    const d = makeDrawing(plate(), meta, { holeTable: true, views: { ...defaultDrawingOptions.views, top: true } });
+    expect(d.holes).toBeDefined();
+    const tags = d.holes!.map((h) => h.tag);
+    expect(tags).toEqual(["A1", "A2", "A3", "A4", "B1"]);
+    expect(d.holes!.filter((h) => h.d === 6)).toHaveLength(4);
+    expect(d.holes![4].d).toBe(20);
+    expect(d.svg).toContain("Tabulka děr");
+    expect(d.svg).toContain("B1");
+    // souřadnice relativně k levé dolní díře
+    const a1 = d.holes![0];
+    expect(a1.x).toBe(0);
+    expect(d.holes!.map((h) => h.x)).toContain(60);
+  });
+  it("pozice (balónky) = počet komponent, odkazy na průmět středu", () => {
+    const comps = [
+      { pos: 1, name: "Deska", bbox: [[-40, -25, 0], [40, 25, 20]] as [Vec3, Vec3] },
+      { pos: 2, name: "Čep", bbox: [[-5, -5, 0], [5, 5, 20]] as [Vec3, Vec3] },
+      { pos: 3, name: "Šroub", bbox: [[25, 10, 0], [35, 20, 20]] as [Vec3, Vec3] },
+    ];
+    const d = makeDrawing(plate(), { ...meta, components: comps }, { balloons: true });
+    expect(d.balloons).toHaveLength(3);
+    expect(d.balloons!.map((b) => b.pos).sort()).toEqual([1, 2, 3]);
+    const off = makeDrawing(plate(), { ...meta, components: comps }, { balloons: false });
+    expect(off.balloons).toBeUndefined();
+  });
+  it("detailní pohled: oříznutá kopie v měřítku 2:1 s popiskem", () => {
+    const d = makeDrawing(plate(), meta, { details: [{ id: "d1", label: "A", view: "front", cx: 0, cy: 0, r: 15, scale: 2 }] });
+    expect(d.details).toHaveLength(1);
+    expect(d.details![0].w).toBeCloseTo(60, 6);
+    expect(d.svg).toContain("A (2:1)");
+    const bad = makeDrawing(plate(), meta, { details: [{ id: "d2", label: "B", view: "front", cx: 500, cy: 500, r: 5, scale: 2 }] });
+    expect(bad.warnings.join(" ")).toMatch(/Detail B/);
+  });
+  it("tabulka revizí a číslo listu v razítku", () => {
+    const d = makeDrawing(plate(), { ...meta, revisions: [{ rev: "A", date: "1. 11. 2026", note: "První vydání", author: "VV" }, { rev: "B", date: "2. 11. 2026", note: "Změna Ø20 → Ø22" }], sheetIndex: 2, sheetCount: 3 });
+    expect(d.svg).toContain("Popis změny");
+    expect(d.svg).toContain("První vydání");
+    expect(d.svg).toContain("List 2/3");
   });
 });

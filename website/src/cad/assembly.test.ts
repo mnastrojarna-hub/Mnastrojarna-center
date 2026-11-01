@@ -159,3 +159,46 @@ describe("normálie", () => {
     expect(w.result.metrics!.volume).toBeCloseTo((Math.PI / 4) * (16 * 16 - 8.4 * 8.4) * 1.6, 1);
   }, 120_000);
 });
+
+describe("pole a zrcadlení komponent, šroubový spoj", async () => {
+  const { patternComponent, mirrorComponent, boltStack, metricForHole, transformPoint: tp } = await import("./assembly");
+  it("lineární a kruhové pole vytvoří kopie se správnou polohou", () => {
+    const a = { ...emptyDoc("S"), kind: "assembly" as const, components: [partComponent(cube("A"), { position: [10, 0, 0] })] };
+    const lin = patternComponent(a, a.components[0].id, { kind: "linear", count: 4, spacing: 25, direction: [0, 1, 0] });
+    expect(lin.components).toHaveLength(4);
+    expect(lin.components![3].placement.position).toEqual([10, 75, 0]);
+    expect(lin.components![1].name).toBe("A (2)");
+    const circ = patternComponent(a, a.components[0].id, { kind: "circular", count: 4, angle: 360, axis: "Z", center: [0, 0, 0] });
+    expect(circ.components).toHaveLength(4);
+    const p2 = circ.components![1].placement;
+    expect(p2.position[0]).toBeCloseTo(0, 6);
+    expect(p2.position[1]).toBeCloseTo(10, 6);
+    expect(p2.rotation[2]).toBeCloseTo(90, 6);
+    // bod [1,0,0] v souřadnicích kopie → natočený o 90°
+    const w = tp(p2, [1, 0, 0]);
+    expect(w[0]).toBeCloseTo(0, 6);
+    expect(w[1]).toBeCloseTo(11, 6);
+  });
+  it("zrcadlení podle YZ převrátí X a zachová vlastní rotaci", () => {
+    const a = { ...emptyDoc("S"), kind: "assembly" as const, components: [partComponent(cube("A"), { position: [10, 5, 2], rotation: [0, 0, 30] })] };
+    const m = mirrorComponent(a, a.components[0].id, "YZ", 0);
+    expect(m.components).toHaveLength(2);
+    expect(m.components![1].placement.position).toEqual([-10, 5, 2]);
+    expect(m.components![1].placement.rotation[2]).toBeCloseTo(-30, 6);
+    expect(m.components![1].name).toContain("zrcadlo");
+  });
+  it("šroubový spoj: závit podle díry, délka ze sevřené tloušťky", () => {
+    expect(metricForHole(9)).toBe("M8");
+    expect(metricForHole(6.5)).toBe("M6");
+    expect(metricForHole(13.3)).toBe("M12");
+    const b = boltStack(9, 20, { washer: true, nut: true });
+    expect(b.size).toBe("M8");
+    expect(b.length).toBeGreaterThanOrEqual(20 + b.washerH * 2 + b.nutH);
+    expect(b.screw.props?.number).toContain("ISO 4762 – M8×" + b.length);
+    expect(b.washer?.name).toBe("Podložka M8");
+    expect(b.nut?.name).toBe("Matice M8");
+    const noNut = boltStack(6.6, 10);
+    expect(noNut.nut).toBeNull();
+    expect(noNut.length).toBe(20);
+  });
+});

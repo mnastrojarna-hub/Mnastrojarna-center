@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
-import { bomToCsv, defaultDrawingOptions, GDT_LABEL, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BomItem, type DrawingMeta, type DrawingOptions, type DrawingResult, type SheetName, type ViewKey } from "@/cad/drawing";
+import { bomToCsv, defaultDrawingOptions, GDT_LABEL, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type RevisionItem, type SheetName, type ViewKey } from "@/cad/drawing";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -25,9 +25,11 @@ type Props = {
   /** výkresy uložené v dokumentu (volby, razítko, kóty a poznámky) */
   drawings?: DrawingDoc[];
   onDrawingsChange?: (d: DrawingDoc[]) => void;
+  /** komponenty sestavy pro pozice (balónky): světové obalové kvádry */
+  balloons?: BalloonItem[];
 };
 
-type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text";
+type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text" | "detail";
 type DimKind = "auto" | "aligned" | "horizontal" | "vertical";
 const ANN_TOOLS: { id: AnnTool; label: string; kbd: string; hint: string }[] = [
   { id: "dim", label: "Kóta", kbd: "D", hint: "2 body + umístění kótovací čáry" },
@@ -36,6 +38,7 @@ const ANN_TOOLS: { id: AnnTool; label: string; kbd: string; hint: string }[] = [
   { id: "gdt", label: "Geom. tolerance", kbd: "G", hint: "rámeček ISO 1101 s odkazem" },
   { id: "datum", label: "Základna", kbd: "B", hint: "A, B, C…" },
   { id: "text", label: "Text", kbd: "T", hint: "volný text na listu" },
+  { id: "detail", label: "Detail", kbd: "L", hint: "detailní pohled: střed, poloměr, umístění" },
 ];
 const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: "Kóta", note: "Poznámka", roughness: "Drsnost", gdt: "Tolerance", datum: "Základna", text: "Text" };
 
@@ -82,7 +85,7 @@ function loadOpts(): DrawingOptions {
   return defaultDrawingOptions;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbox, onPropsChange, drawings, onDrawingsChange }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(defaultDrawingOptions);
   const [meta, setMeta] = useState<DrawingMeta>(() => ({
     name: doc.name,
@@ -110,7 +113,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   const [toast, setToast] = useState<string | null>(null);
   const seq = useRef(0);
   // ---------- uživatelské kóty a poznámky (uložené v dokumentu) ----------
-  const saved = drawings?.[0];
+  // ---------- listy (každý list = DrawingDoc v doc.drawings) ----------
+  const sheets = useMemo(() => drawings ?? [], [drawings]);
+  const [sheetIdx, setSheetIdx] = useState(0);
+  const saved = sheets[sheetIdx];
+  const [sheetName, setSheetName] = useState(saved?.name ?? "List 1");
   const [ann, setAnn] = useState<DrawingAnnotation[]>(() => saved?.annotations ?? []);
   const [annTool, setAnnTool] = useState<AnnTool | null>(null);
   const [dimKind, setDimKind] = useState<DimKind>("auto");
@@ -119,26 +126,66 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   const [prompt, setPrompt] = useState<null | { id: string; kind: AnnTool; x: number; y: number; done: (v: Record<string, string>) => void }>(null);
   const dirty = useRef(false);
 
+  // načtení listu (při otevření a při přepnutí listu)
   useEffect(() => {
-    if (saved?.options) setOpts({ ...defaultDrawingOptions, ...(saved.options as Partial<DrawingOptions>), views: { ...defaultDrawingOptions.views, ...((saved.options as Partial<DrawingOptions>).views ?? {}) } });
+    const sv = sheets[sheetIdx];
+    dirty.current = false;
+    if (sv?.options) setOpts({ ...defaultDrawingOptions, ...(sv.options as Partial<DrawingOptions>), views: { ...defaultDrawingOptions.views, ...((sv.options as Partial<DrawingOptions>).views ?? {}) } });
     else setOpts(loadOpts());
-    if (saved?.meta) setMeta((m) => ({ ...m, ...(saved.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
+    if (sv?.meta) setMeta((m) => ({ ...m, ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
+    setAnn(sv?.annotations ?? []);
+    setSheetName(sv?.name ?? `List ${sheetIdx + 1}`);
+    setAnnTool(null);
+    setAnnPts([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sheetIdx]);
+  /** aktuální stav listu jako DrawingDoc */
+  const sheetDoc = (): DrawingDoc => {
+    const { bom: _b, massKg: _m, material: _mat, components: _c, sheetIndex: _si, sheetCount: _sc, ...metaRest } = meta;
+    void _b;
+    void _m;
+    void _mat;
+    void _c;
+    void _si;
+    void _sc;
+    return { id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann };
+  };
+  const persistNow = () => {
+    if (!onDrawingsChange) return;
+    const next = sheets.length ? [...sheets] : [];
+    next[sheetIdx] = sheetDoc();
+    onDrawingsChange(next);
+  };
   // uložení do dokumentu (po změně kót, voleb nebo razítka)
   useEffect(() => {
     if (!dirty.current || !onDrawingsChange) return;
-    const t = setTimeout(() => {
-      const { bom: _b, massKg: _m, material: _mat, ...metaRest } = meta;
-      void _b;
-      void _m;
-      void _mat;
-      onDrawingsChange([{ id: saved?.id ?? "main", name: meta.name, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann }]);
-    }, 500);
+    const t = setTimeout(persistNow, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ann, opts, meta]);
+  }, [ann, opts, meta, sheetName]);
   const markDirty = () => (dirty.current = true);
+  const addSheet = () => {
+    if (!onDrawingsChange) return;
+    const cur = sheets.length ? [...sheets] : [];
+    cur[sheetIdx] = sheetDoc();
+    const n = cur.length + 1;
+    cur.push({ id: uid(), name: `List ${n}`, options: { ...defaultDrawingOptions, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
+    dirty.current = false;
+    onDrawingsChange(cur);
+    setSheetIdx(n - 1);
+  };
+  const removeSheet = (i: number) => {
+    if (!onDrawingsChange || sheets.length <= 1) return;
+    const cur = sheets.filter((_, k) => k !== i);
+    dirty.current = false;
+    onDrawingsChange(cur);
+    setSheetIdx(Math.max(0, Math.min(i, cur.length - 1)));
+  };
+  const switchSheet = (i: number) => {
+    if (i === sheetIdx) return;
+    if (dirty.current) persistNow();
+    setSheetIdx(i);
+  };
   useEffect(() => {
     try {
       localStorage.setItem(OPTS_KEY, JSON.stringify({ ...opts, section: undefined }));
@@ -160,7 +207,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
     const t = setTimeout(async () => {
       const t0 = performance.now();
       try {
-        const d = await cad.drawing(doc, { ...meta, bom: showBom ? bom : undefined }, opts);
+        const d = await cad.drawing(doc, { ...meta, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length) }, opts);
         if (id !== seq.current) return;
         setRes(d);
         setError(null);
@@ -172,7 +219,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
       }
     }, 220);
     return () => clearTimeout(t);
-  }, [doc, meta, opts, bom, showBom]);
+  }, [doc, meta, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
 
   const set = <K extends keyof DrawingOptions>(k: K, v: DrawingOptions[K]) => {
     markDirty();
@@ -390,6 +437,25 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
         if (!v?.text) return setAnnPts([]);
         return addAnn({ id: uid(), view: "sheet", type: "text", at: raw, text: v.text, size: Number(v.size) || 3.5 });
       }
+      case "detail": {
+        if (pts.length < 3) return setAnnPts(pts);
+        const [C, Rp, At] = pts;
+        const v = viewAt(res.views, C);
+        if (!v) {
+          flash("Střed detailu musí ležet v některém pohledu.");
+          return setAnnPts([]);
+        }
+        const c = sheetToAnn(v, C);
+        const r = Math.max(1, Math.hypot(Rp[0] - C[0], Rp[1] - C[1]) / v.s);
+        const used = new Set((opts.details ?? []).map((d) => d.label));
+        const label = "ABCDEFGHJKLMNPRSTUVWXYZ".split("").find((ch) => !used.has(ch)) ?? "A";
+        const sc = STANDARD_SCALES.find((x) => x <= res.scaleValue * 2) ?? res.scaleValue * 2;
+        const size = 2 * r * sc;
+        const d: DetailView = { id: uid(), label, view: v.key, cx: c[0], cy: c[1], r, scale: sc, at: [At[0] - size / 2, At[1] - size / 2] };
+        set("details", [...(opts.details ?? []), d]);
+        setAnnPts([]);
+        return;
+      }
     }
   };
 
@@ -456,6 +522,40 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
           Zavřít
         </Btn>
       </header>
+      {/* listy výkresu */}
+      <div className="flex h-8 shrink-0 items-end gap-1 border-b border-black/10 bg-[#dfe5eb] px-3">
+        {(sheets.length ? sheets : [{ id: "main", name: sheetName }]).map((sh, i) => (
+          <div key={sh.id} className={cn("group flex items-center gap-1 rounded-t-md border-x border-t px-3 py-1 text-[12px]", i === sheetIdx ? "relative top-px border-black/10 bg-white font-semibold" : "border-transparent text-ink-700/60 hover:bg-white/60")}>
+            <button
+              type="button"
+              onClick={() => switchSheet(i)}
+              onDoubleClick={() => {
+                const n = window.prompt("Název listu", i === sheetIdx ? sheetName : sh.name);
+                if (n?.trim()) {
+                  if (i === sheetIdx) {
+                    setSheetName(n.trim());
+                    markDirty();
+                  } else onDrawingsChange?.(sheets.map((x, k) => (k === i ? { ...x, name: n.trim() } : x)));
+                }
+              }}
+              title="Dvojklik = přejmenovat"
+            >
+              {i === sheetIdx ? sheetName : sh.name}
+            </button>
+            {sheets.length > 1 && (
+              <button type="button" title="Odstranit list" onClick={() => removeSheet(i)} className="hidden text-ink-700/40 hover:text-brand group-hover:inline">
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        <button type="button" onClick={addSheet} disabled={!onDrawingsChange} className="mb-0.5 rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:opacity-40" title="Přidat list">
+          + List
+        </button>
+        <span className="ml-auto pb-1 text-[11px] text-ink-700/45">
+          List {sheetIdx + 1}/{Math.max(1, sheets.length)}
+        </span>
+      </div>
 
       <div className="flex min-h-0 flex-1">
         {/* nastavení */}
@@ -487,7 +587,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
               </div>
             )}
             <p className="mt-2 text-[11px] leading-snug text-ink-700/55">
-              {annTool ? (annTool === "dim" ? `Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno ${annPts.length}/3.` : annTool === "note" || annTool === "gdt" ? `1. klik = kam šipka ukazuje, 2. klik = umístění. (${annPts.length}/2)` : "Klikněte na místo ve výkresu.") : "Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu."}
+              {annTool ? (annTool === "detail" ? `Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu (${annPts.length}/3).` : annTool === "dim" ? `Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno ${annPts.length}/3.` : annTool === "note" || annTool === "gdt" ? `1. klik = kam šipka ukazuje, 2. klik = umístění. (${annPts.length}/2)` : "Klikněte na místo ve výkresu.") : "Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu."}
             </p>
             {ann.length > 0 && (
               <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">
@@ -600,6 +700,38 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
                 Kusovník nad razítkem ({bom.length} pol.)
               </Check>
             ) : null}
+            {balloons?.length ? (
+              <Check checked={opts.balloons !== false} onChange={(v) => set("balloons", v)}>
+                Pozice komponent – balónky ({balloons.length})
+              </Check>
+            ) : null}
+            <Check checked={!!opts.holeTable} onChange={(v) => set("holeTable", v)}>
+              Tabulka děr (X, Y, Ø v půdorysu)
+            </Check>
+          </Section>
+
+          <Section title="Detailní pohledy">
+            {(opts.details ?? []).length === 0 && <p className="text-[11px] text-ink-700/50">Nástroj „Detail“ (L): střed, poloměr, umístění.</p>}
+            {(opts.details ?? []).map((d) => (
+              <div key={d.id} className="flex items-center gap-2 py-0.5 text-[12px]">
+                <span className="w-6 font-semibold">{d.label}</span>
+                <span className="text-ink-700/55">{VIEW_LABEL[d.view as ViewKey] ?? d.view}</span>
+                <select
+                  className="ml-auto rounded border border-ink-700/15 bg-white px-1 py-0.5 text-[11.5px]"
+                  value={String(d.scale)}
+                  onChange={(e) => set("details", (opts.details ?? []).map((x) => (x.id === d.id ? { ...x, scale: Number(e.target.value), at: undefined } : x)))}
+                >
+                  {STANDARD_SCALES.filter((x) => x >= 1).map((x) => (
+                    <option key={x} value={String(x)}>
+                      {scaleLabel(x)}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" title="Smazat detail" onClick={() => set("details", (opts.details ?? []).filter((x) => x.id !== d.id))} className="text-ink-700/40 hover:text-brand">
+                  ×
+                </button>
+              </div>
+            ))}
           </Section>
 
           <Section title="Razítko">
@@ -628,6 +760,35 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
             <Row label="Materiál">
               <TextInput value={meta.material} onChange={(v) => setM({ material: v })} />
             </Row>
+          </Section>
+
+          <Section title="Tabulka revizí">
+            {(meta.revisions ?? []).map((r, i) => (
+              <div key={i} className="mb-1.5 rounded border border-ink-700/10 p-1.5">
+                <div className="grid grid-cols-[2.2rem_1fr_1fr] gap-1">
+                  <TextInput value={r.rev} placeholder="A" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, rev: v } : x)) })} />
+                  <TextInput value={r.date} placeholder="datum" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, date: v } : x)) })} />
+                  <TextInput value={r.author ?? ""} placeholder="kreslil" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, author: v } : x)) })} />
+                </div>
+                <div className="mt-1 flex gap-1">
+                  <TextInput value={r.note} placeholder="popis změny" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, note: v } : x)) })} />
+                  <button type="button" title="Smazat revizi" onClick={() => setM({ revisions: (meta.revisions ?? []).filter((_, k) => k !== i) })} className="px-1 text-ink-700/40 hover:text-brand">
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const list: RevisionItem[] = meta.revisions ?? [];
+                const next = String.fromCharCode(65 + Math.min(25, list.length));
+                setM({ revisions: [...list, { rev: next, date: new Date().toLocaleDateString("cs-CZ"), note: "", author: meta.author ?? "" }], revision: next });
+              }}
+              className="w-full rounded border border-dashed border-ink-700/25 py-1 text-[12px] hover:border-brand hover:text-brand"
+            >
+              + Přidat revizi
+            </button>
           </Section>
           <p className="px-4 pb-5 text-[11px] leading-relaxed text-ink-700/45">
             DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).

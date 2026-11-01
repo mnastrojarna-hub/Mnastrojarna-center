@@ -37,7 +37,20 @@ export type DrawingMeta = {
   tolerance?: string;
   /** kusovník (sestava) – vykreslí se nad razítkem dle ISO 7573 */
   bom?: BomItem[];
+  /** komponenty sestavy pro pozice (balónky) – světový obalový kvádr každé komponenty */
+  components?: BalloonItem[];
+  /** tabulka revizí (vpravo nahoře) */
+  revisions?: RevisionItem[];
+  /** číslo listu / počet listů (razítko „List i/n“) */
+  sheetIndex?: number;
+  sheetCount?: number;
 };
+
+export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3] };
+export type RevisionItem = { rev: string; date: string; note: string; author?: string };
+/** Detailní pohled: kruh v pohledu `view` (střed a poloměr v souřadnicích pohledu = mm modelu), měřítko detailu a umístění na listu. */
+export type DetailView = { id: string; label: string; view: string; cx: number; cy: number; r: number; scale: number; at?: Vec2 };
+export type HoleRow = { tag: string; x: number; y: number; d: number; /** střed v souřadnicích pohledu */ c: Vec2; view: string };
 
 export type BomItem = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; note?: string };
 
@@ -55,6 +68,12 @@ export type DrawingOptions = {
   section: null | { plane: PlaneName; offset: number };
   centerLines: boolean;
   dimensions: "none" | "overall" | "auto";
+  /** pozice komponent (balónky) – jen sestavy s meta.components */
+  balloons?: boolean;
+  /** tabulka děr (souřadnice a průměry děr v půdorysu) */
+  holeTable?: boolean;
+  /** detailní pohledy */
+  details?: DetailView[];
 };
 
 export const defaultDrawingOptions: DrawingOptions = {
@@ -67,6 +86,9 @@ export const defaultDrawingOptions: DrawingOptions = {
   section: null,
   centerLines: true,
   dimensions: "auto",
+  balloons: true,
+  holeTable: false,
+  details: [],
 };
 
 /** Umístění pohledu na listu (pro mapování kliknutí → souřadnice pohledu a zpět). */
@@ -83,6 +105,12 @@ export type DrawingResult = {
   svg: string;
   dxf: string;
   warnings: string[];
+  /** řádky tabulky děr (je-li zapnutá) */
+  holes?: HoleRow[];
+  /** umístěné detailní pohledy (list: levý horní roh, velikost) */
+  details?: { id: string; label: string; x: number; y: number; w: number; h: number }[];
+  /** pozice (balónky) – střed kroužku na listu */
+  balloons?: { pos: number; x: number; y: number }[];
 };
 
 export const SHEETS: Record<SheetName, [number, number]> = {
@@ -483,10 +511,12 @@ const GAP = 24; // mezera mezi pohledy (místo pro kóty)
 const DIM_ROOM = 14;
 
 export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partial<DrawingOptions> = {}): DrawingResult {
-  // výška pásu nad spodním okrajem: razítko + kusovník
-  const TBH = TB.h + bomHeight(meta.bom);
   const opts: DrawingOptions = { ...defaultDrawingOptions, ...options, views: { ...defaultDrawingOptions.views, ...(options.views ?? {}) } };
   const warnings: string[] = [];
+  const circlesAll = opts.centerLines || opts.dimensions === "auto" || opts.holeTable ? circlesOf(shape) : [];
+  const holeRows = opts.holeTable ? holeRowsOf(circlesAll, opts.views.top ? "top" : "front") : [];
+  // výška pásu nad spodním okrajem: razítko + kusovník + tabulka děr
+  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeRows);
 
   // --- projekce
   const keys = ISO_KEYS.filter((k) => opts.views[k]);
@@ -671,16 +701,50 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
 
   // osy a kóty
-  const circles = opts.centerLines || opts.dimensions === "auto" ? circlesOf(shape) : [];
+  const circles = circlesAll;
   const ortho = [...placed.values()];
   if (opts.centerLines) for (const p of ortho) centerLines(p, circles, polys);
   if (opts.dimensions !== "none") overallDims(placed, polys, texts, opts.projection);
   if (opts.dimensions === "auto") diameterDims(ortho, circles, polys, texts);
 
+  // tabulka děr: značky v pohledu
+  if (holeRows.length) {
+    for (const h of holeRows) {
+      const p = placed.get(h.view);
+      if (!p) continue;
+      const q = toSheet(p, h.c);
+      polys.push({ layer: "dim", pts: [[q[0] - 2, q[1]], [q[0] + 2, q[1]]] }, { layer: "dim", pts: [[q[0], q[1] - 2], [q[0], q[1] + 2]] });
+      texts.push({ x: q[0] + 1.2, y: q[1] - 1.2, s: h.tag, size: 2.5, layer: "dim" });
+    }
+  }
+  // detailní pohledy
+  const details: NonNullable<DrawingResult["details"]> = [];
+  for (const d of opts.details ?? []) {
+    const p = placed.get(d.view);
+    if (!p) {
+      warnings.push(`Detail ${d.label}: pohled ${d.view} není na listu.`);
+      continue;
+    }
+    const res = detailView(d, p, SW, SH, TBH, polys, texts, details);
+    if (!res) warnings.push(`Detail ${d.label}: v kruhu není žádná geometrie.`);
+  }
+  // pozice (balónky) komponent sestavy
+  const balloons: NonNullable<DrawingResult["balloons"]> = [];
+  if (opts.balloons && meta.components?.length) {
+    const mainView = centerView ? placed.get(centerView.key) : [...placed.values()][0];
+    if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons);
+  }
+
   // rám, centrovací značky, razítko
   frame(SW, SH, polys);
-  titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts);
-  if (meta.bom?.length) partsList(SW - M - TB.w, SH - M - TB.h, meta.bom, polys, texts);
+  titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeRows));
+  let yTop = SH - M - TB.h;
+  if (meta.bom?.length) {
+    partsList(SW - M - TB.w, yTop, meta.bom, polys, texts);
+    yTop -= bomHeight(meta.bom);
+  }
+  if (holeRows.length) holeTable(SW - M - TB.w, yTop, holeRows, polys, texts);
+  if (meta.revisions?.length) revisionTable(SW, meta.revisions, polys, texts);
 
   return {
     sheet: { name: sheet, w: SW, h: SH },
@@ -692,6 +756,9 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     svg: toSvg(SW, SH, polys, texts),
     dxf: toDxf(SH, polys, texts),
     warnings,
+    holes: holeRows.length ? holeRows : undefined,
+    details: details.length ? details : undefined,
+    balloons: balloons.length ? balloons : undefined,
   };
 }
 
@@ -1043,7 +1110,7 @@ function projectionSymbol(polys: Poly[], x: number, y: number, projection: "E" |
   }
 }
 
-function titleBlock(W: number, H: number, sheet: SheetName, scale: number, projection: "E" | "A", meta: DrawingMeta, polys: Poly[], texts: DText[]) {
+function titleBlock(W: number, H: number, sheet: SheetName, scale: number, projection: "E" | "A", meta: DrawingMeta, polys: Poly[], texts: DText[], extraAbove = 0) {
   const x = W - M - TB.w;
   const y = H - M - TB.h;
   const T = (tx: number, ty: number, s: string, size: number, bold = false, brand = false) => texts.push({ x: tx, y: ty, s, size, bold, brand, layer: "text" });
@@ -1080,9 +1147,9 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
   cell(145, r2, "Datum", meta.date ?? new Date().toLocaleDateString("cs-CZ"), 2.8);
   cell(166, r2, "Rev.", meta.revision ?? "–");
   // poznámka nad razítkem a list
-  const ny = y - bomHeight(meta.bom);
+  const ny = y - bomHeight(meta.bom) - extraAbove;
   T(x, ny - 5.5, `Nepředepsané tolerance ${meta.tolerance || "ISO 2768-mK"} · Rozměry v mm · Ostré hrany srazit 0,5×45°`, 2.5);
-  T(x, ny - 1.8, "Nekótované rozměry dle 3D modelu (STEP) · List 1/1", 2.5);
+  T(x, ny - 1.8, `Nekótované rozměry dle 3D modelu (STEP) · List ${meta.sheetIndex ?? 1}/${meta.sheetCount ?? 1}`, 2.5);
 }
 
 // ---------------------------------------------------------------- kusovník (ISO 7573)
@@ -1134,6 +1201,213 @@ function partsList(x: number, yBottom: number, bom: BomItem[], polys: Poly[], te
     cellText(3, rb, fmt(it.qty));
     cellText(4, rb, it.material ?? "");
     cellText(5, rb, it.massKg != null ? `${fmt(it.massKg)} kg` : "");
+  });
+}
+
+// ---------------------------------------------------------------- tabulka děr
+
+const HOLE_ROW = 5.5;
+const HOLE_COLS: [string, number][] = [
+  ["Značka", 24],
+  ["X", 40],
+  ["Y", 40],
+  ["Ø", 40],
+  ["Ks", 36],
+];
+const holeTableHeight = (rows: HoleRow[]) => (rows.length ? (rows.length + 1) * HOLE_ROW + 4 : 0);
+
+/** Díry v daném pohledu: kružnice ohraničující válcové plochy s osou ve směru pohledu; obě hrany téže díry = jeden řádek. */
+function holeRowsOf(circles: Circle[], viewKey: string): HoleRow[] {
+  const cam = CAMS[(viewKey in CAMS ? viewKey : "top") as ViewKey];
+  const seen = new Map<string, { c: Vec2; d: number }>();
+  for (const c of circles) {
+    if (!c.cyl) continue;
+    if (Math.abs(Math.abs(dot(c.a, cam.d)) - 1) > 1e-3) continue;
+    const q = proj(cam, c.c);
+    const key = `${k3(q[0], 2)},${k3(q[1], 2)},${k3(c.r * 2, 2)}`;
+    if (!seen.has(key)) seen.set(key, { c: q, d: Math.round(c.r * 200) / 100 });
+  }
+  const list = [...seen.values()].sort((a, b) => a.d - b.d || a.c[1] - b.c[1] || a.c[0] - b.c[0]);
+  // počátek souřadnic = levý dolní roh obrysu v pohledu (min x, max y obrazu)
+  let x0 = Infinity;
+  let yMax = -Infinity;
+  for (const h of list) {
+    x0 = Math.min(x0, h.c[0]);
+    yMax = Math.max(yMax, h.c[1]);
+  }
+  const diameters = [...new Set(list.map((h) => h.d))];
+  const counters: Record<string, number> = {};
+  return list.map((h) => {
+    const letter = String.fromCharCode(65 + Math.min(25, diameters.indexOf(h.d)));
+    counters[letter] = (counters[letter] ?? 0) + 1;
+    return { tag: `${letter}${counters[letter]}`, x: Math.round((h.c[0] - x0) * 100) / 100, y: Math.round((yMax - h.c[1]) * 100) / 100, d: h.d, c: h.c, view: viewKey in CAMS ? viewKey : "top" };
+  });
+}
+
+/** Tabulka děr nad kusovníkem/razítkem: Značka | X | Y | Ø | Ks (shodné průměry se sečtou do Ks ve sloupci „Ks“ řádku). */
+function holeTable(x: number, yBottom: number, rows: HoleRow[], polys: Poly[], texts: DText[]) {
+  const h = holeTableHeight(rows) - 4;
+  const y0 = yBottom - 4 - h;
+  rect(polys, x, y0, TB.w, h, "frame", 0.7);
+  for (let i = 1; i <= rows.length; i++) polys.push({ layer: "title", width: i === 1 ? 0.5 : undefined, pts: [[x, y0 + i * HOLE_ROW], [x + TB.w, y0 + i * HOLE_ROW]] });
+  let cx = x;
+  const colX: number[] = [];
+  for (const [, w] of HOLE_COLS) {
+    colX.push(cx);
+    cx += w;
+    if (cx < x + TB.w - 1e-6) polys.push({ layer: "title", pts: [[cx, y0], [cx, y0 + h]] });
+  }
+  const cell = (col: number, rowBottom: number, s: string, bold = false) => texts.push({ x: colX[col] + HOLE_COLS[col][1] / 2, y: rowBottom - 1.6, s, size: 2.6, bold, anchor: "middle", layer: "text" });
+  HOLE_COLS.forEach(([label], i) => cell(i, y0 + HOLE_ROW, i === 0 ? "Tabulka děr" : label, true));
+  const countByD = new Map<number, number>();
+  for (const r of rows) countByD.set(r.d, (countByD.get(r.d) ?? 0) + 1);
+  rows.forEach((r, i) => {
+    const rb = y0 + (i + 2) * HOLE_ROW;
+    cell(0, rb, r.tag, true);
+    cell(1, rb, fmt(r.x));
+    cell(2, rb, fmt(r.y));
+    cell(3, rb, `Ø${fmt(r.d)}`);
+    cell(4, rb, `${countByD.get(r.d) ?? 1}×`);
+  });
+}
+
+// ---------------------------------------------------------------- tabulka revizí
+
+const REV_COLS: [string, number][] = [
+  ["Rev.", 12],
+  ["Datum", 24],
+  ["Popis změny", 66],
+  ["Kreslil", 22],
+];
+const REV_ROW = 6;
+
+/** Tabulka revizí v pravém horním rohu listu. */
+function revisionTable(W: number, revisions: RevisionItem[], polys: Poly[], texts: DText[]) {
+  const w = REV_COLS.reduce((a, [, c]) => a + c, 0);
+  const x = W - M - w;
+  const y = M + 6;
+  const h = (revisions.length + 1) * REV_ROW;
+  rect(polys, x, y, w, h, "frame", 0.7);
+  for (let i = 1; i <= revisions.length; i++) polys.push({ layer: "title", width: i === 1 ? 0.5 : undefined, pts: [[x, y + i * REV_ROW], [x + w, y + i * REV_ROW]] });
+  let cx = x;
+  const colX: number[] = [];
+  for (const [, cw] of REV_COLS) {
+    colX.push(cx);
+    cx += cw;
+    if (cx < x + w - 1e-6) polys.push({ layer: "title", pts: [[cx, y], [cx, y + h]] });
+  }
+  const cell = (col: number, rowBottom: number, s: string, bold = false) => {
+    const max = Math.floor((REV_COLS[col][1] - 2) / (2.6 * 0.52));
+    texts.push({ x: colX[col] + 1.5, y: rowBottom - 1.8, s: s.length > max ? s.slice(0, max - 1) + "…" : s, size: 2.6, bold, layer: "text" });
+  };
+  REV_COLS.forEach(([label], i) => cell(i, y + REV_ROW, label, true));
+  revisions.forEach((r, i) => {
+    const rb = y + (i + 2) * REV_ROW;
+    cell(0, rb, r.rev, true);
+    cell(1, rb, r.date);
+    cell(2, rb, r.note);
+    cell(3, rb, r.author ?? "");
+  });
+}
+
+// ---------------------------------------------------------------- detailní pohled
+
+/** Oříznutí lomené čáry kruhem (střed c, poloměr r) – vrací části uvnitř. */
+export function clipPolylineToCircle(pts: Vec2[], c: Vec2, r: number): Vec2[][] {
+  const out: Vec2[][] = [];
+  let cur: Vec2[] = [];
+  const inside = (p: Vec2) => Math.hypot(p[0] - c[0], p[1] - c[1]) <= r + 1e-9;
+  const hits = (p: Vec2, q: Vec2): number[] => {
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    const fx = p[0] - c[0];
+    const fy = p[1] - c[1];
+    const a = dx * dx + dy * dy;
+    if (a < 1e-18) return [];
+    const b = 2 * (fx * dx + fy * dy);
+    const cc = fx * fx + fy * fy - r * r;
+    const disc = b * b - 4 * a * cc;
+    if (disc < 0) return [];
+    const sq = Math.sqrt(disc);
+    return [(-b - sq) / (2 * a), (-b + sq) / (2 * a)].filter((t) => t > 0 && t < 1).sort((u, v) => u - v);
+  };
+  const lerp = (p: Vec2, q: Vec2, t: number): Vec2 => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (i === 0) {
+      if (inside(p)) cur.push(p);
+      continue;
+    }
+    const q = pts[i - 1];
+    const ts = hits(q, p);
+    let segIn = inside(q);
+    let last = q;
+    for (const t of ts) {
+      const m = lerp(q, p, t);
+      if (segIn) {
+        cur.push(m);
+        if (cur.length > 1) out.push(cur);
+        cur = [];
+      } else cur = [m];
+      segIn = !segIn;
+      last = m;
+    }
+    void last;
+    if (segIn) cur.push(p);
+  }
+  if (cur.length > 1) out.push(cur);
+  return out;
+}
+
+/** Vykreslí detailní pohled: kroužek s písmenem v rodičovském pohledu + zvětšená oříznutá kopie na listu. */
+function detailView(d: DetailView, p: Placed, SW: number, SH: number, TBH: number, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["details"]>): boolean {
+  const cs = toSheet(p, [d.cx, d.cy]);
+  const rs = d.r * p.s;
+  polys.push({ layer: "thin", pts: circlePts(cs, rs, 48) });
+  texts.push({ x: cs[0] + rs * 0.75, y: cs[1] - rs * 0.75, s: d.label, size: 5, bold: true, layer: "text" });
+  const clipped: { layer: Layer; pts: Vec2[] }[] = [];
+  for (const pl of p.polys) for (const part of clipPolylineToCircle(pl.pts, [d.cx, d.cy], d.r)) clipped.push({ layer: pl.layer, pts: part });
+  if (!clipped.length) return false;
+  const size = 2 * d.r * d.scale;
+  const at: Vec2 = d.at ?? [Math.min(SW - M - size - 4, p.px + p.w * p.s + 20), Math.max(M + 12, Math.min(SH - M - TBH - size - 10, p.py))];
+  const map = (q: Vec2): Vec2 => [at[0] + (q[0] - (d.cx - d.r)) * d.scale, at[1] + (q[1] - (d.cy - d.r)) * d.scale];
+  for (const c of clipped) polys.push({ layer: c.layer, pts: c.pts.map(map) });
+  const center: Vec2 = [at[0] + size / 2, at[1] + size / 2];
+  polys.push({ layer: "thin", pts: circlePts(center, size / 2, 64) });
+  texts.push({ x: center[0], y: at[1] - 3, s: `${d.label} (${scaleLabel(d.scale)})`, size: 4.5, bold: true, anchor: "middle", layer: "text" });
+  out.push({ id: d.id, label: d.label, x: at[0], y: at[1], w: size, h: size });
+  return true;
+}
+
+// ---------------------------------------------------------------- pozice (balónky)
+
+/** Balónky s čísly pozic nad hlavním pohledem s odkazy na průmět středu komponenty. */
+function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>) {
+  const R = 4;
+  const pts = items
+    .map((it) => {
+      const c: Vec3 = [(it.bbox[0][0] + it.bbox[1][0]) / 2, (it.bbox[0][1] + it.bbox[1][1]) / 2, (it.bbox[0][2] + it.bbox[1][2]) / 2];
+      return { pos: it.pos, q: toSheet(v, proj(v.cam, c)) };
+    })
+    .sort((a, b) => a.q[0] - b.q[0]);
+  const n = pts.length;
+  const left = v.px;
+  const width = v.w * v.s;
+  const spacing = Math.max(2 * R + 3, Math.min(14, width / Math.max(1, Math.ceil(n / 2))));
+  pts.forEach((b, i) => {
+    const above = i % 2 === 0;
+    const col = Math.floor(i / 2);
+    const bx = left + col * spacing + R;
+    const by = above ? v.py - 12 - R : v.py + v.h * v.s + 12 + R;
+    polys.push({ layer: "dim", pts: circlePts([bx, by], R, 32) });
+    texts.push({ x: bx, y: by + 1.3, s: String(b.pos), size: 3.5, anchor: "middle", bold: true, layer: "dim" });
+    // odkazová čára od okraje kroužku k bodu komponenty, zakončená tečkou
+    const dx = b.q[0] - bx;
+    const dy = b.q[1] - by;
+    const l = Math.hypot(dx, dy) || 1;
+    polys.push({ layer: "dim", pts: [[bx + (dx / l) * R, by + (dy / l) * R], b.q] });
+    polys.push({ layer: "dim", fill: true, pts: circlePts(b.q, 0.7, 10) });
+    out.push({ pos: b.pos, x: bx, y: by });
   });
 }
 

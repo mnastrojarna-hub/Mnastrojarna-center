@@ -106,3 +106,77 @@ export async function interference(doc: CadDoc, tolerance = 1e-3): Promise<Inter
 export function cachedBody(key: string): Shape | null {
   return cache.get(key)?.body ?? null;
 }
+
+// ---------------- geometrie ploch pro vazby ----------------
+
+/** Geometrie plochy dílu (lokální souřadnice dílu) pro trvalé vazby: rovina (normála) nebo válec/kužel (osa). */
+export type MateFaceInfo = { kind: "plane" | "cylinder" | "other"; origin: Vec3; normal: Vec3; radius?: number; /** rozsah válce podél osy (parametr t od origin) */ extent?: [number, number] };
+
+type OcAny = Record<string, new (...a: unknown[]) => Record<string, (...a: unknown[]) => unknown>>;
+const P3 = (p: { X(): number; Y(): number; Z(): number }): Vec3 => [p.X(), p.Y(), p.Z()];
+
+export function mateFaceInfoOf(body: Shape, index: number): MateFaceInfo | null {
+  const face = body.faces[index];
+  if (!face) return null;
+  const type = face.geomType as string;
+  const c = face.center;
+  const origin: Vec3 = [c.x, c.y, c.z];
+  if (type === "PLANE") {
+    const n = face.normalAt(c);
+    return { kind: "plane", origin, normal: [n.x, n.y, n.z] };
+  }
+  if (type === "CYLINDRE" || type === "CONE") {
+    try {
+      const oc = r.getOC() as unknown as OcAny;
+      const ad = new oc.BRepAdaptor_Surface(face.wrapped);
+      const g = (type === "CYLINDRE" ? ad.Cylinder() : ad.Cone()) as { Radius?(): number; RefRadius?(): number; Axis(): { Location(): { X(): number; Y(): number; Z(): number }; Direction(): { X(): number; Y(): number; Z(): number } } };
+      const ax = g.Axis();
+      const o = P3(ax.Location());
+      const d = P3(ax.Direction());
+      const radius = type === "CYLINDRE" ? g.Radius!() : g.RefRadius!();
+      (ad as unknown as { delete(): void }).delete();
+      // rozsah podél osy z obalového kvádru plochy
+      const [[x0, y0, z0], [x1, y1, z1]] = face.boundingBox.bounds as [Vec3, Vec3];
+      let tmin = Infinity;
+      let tmax = -Infinity;
+      for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) {
+        const t = (x - o[0]) * d[0] + (y - o[1]) * d[1] + (z - o[2]) * d[2];
+        tmin = Math.min(tmin, t);
+        tmax = Math.max(tmax, t);
+      }
+      return { kind: "cylinder", origin: o, normal: d, radius, extent: [tmin, tmax] };
+    } catch {
+      return { kind: "other", origin, normal: [0, 0, 1] };
+    }
+  }
+  return { kind: "other", origin, normal: [0, 0, 1] };
+}
+
+export function mateFaceInfo(key: string, index: number): MateFaceInfo | null {
+  const b = cachedBody(key);
+  return b ? mateFaceInfoOf(b, index) : null;
+}
+
+/** Index válcové plochy dílu s daným poloměrem (největší plocha) – pro automatické vazby normálií (šroub v díře). */
+export function findCylFace(key: string, radius: number, tol = 0.05): number {
+  const b = cachedBody(key);
+  if (!b) return -1;
+  let best = -1;
+  let bestArea = -1;
+  b.faces.forEach((f, i) => {
+    if (f.geomType !== "CYLINDRE") return;
+    const info = mateFaceInfoOf(b, i);
+    if (!info?.radius || Math.abs(info.radius - radius) > tol) return;
+    let area = 0;
+    try {
+      area = r.measureArea(f);
+    } catch {
+      area = 0;
+    }
+    if (area > bestArea) {
+      bestArea = area;
+      best = i;
+    }
+  });
+  return best;
+}

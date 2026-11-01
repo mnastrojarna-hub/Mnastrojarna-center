@@ -112,7 +112,7 @@ export function residual(mate: Mate, wA: FaceGeo, wB: FaceGeo): number {
     case "distance": {
       const sign = (mate.type === "flush" ? 1 : -1) * (mate.flip ? -1 : 1);
       const ang = Math.abs(dot(nA, nB) - sign);
-      const gap = Math.abs(dot(d, nB) - (mate.type === "distance" ? -(mate.value ?? 0) : 0));
+      const gap = Math.abs(dot(d, nB) - (mate.type === "distance" ? (mate.value ?? 0) : 0));
       const ctr = mate.center ? Math.hypot(...d) : 0;
       return ang * 10 + gap + ctr;
     }

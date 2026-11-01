@@ -4,7 +4,7 @@ import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { buildDoc, faceInfo } from "./build";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
-import { cachedBody, interference, partEntry, shapeOfDoc } from "./asm-kernel";
+import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
 import type { CadDoc, ComponentSource, ExportFormat, MeshData } from "./types";
@@ -34,6 +34,8 @@ type Req =
   | { id: number; op: "asmParts"; parts: { key: string; source: ComponentSource }[] }
   | { id: number; op: "asmFace"; key: string; index: number }
   | { id: number; op: "interference"; doc: CadDoc }
+  | { id: number; op: "mateFace"; key: string; index: number }
+  | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
   | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> };
@@ -112,6 +114,12 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       }
       case "interference":
         ctx.postMessage({ id: m.id, ok: true, result: await interference(m.doc) });
+        break;
+      case "mateFace":
+        ctx.postMessage({ id: m.id, ok: true, result: mateFaceInfo(m.key, m.index) });
+        break;
+      case "cylFace":
+        ctx.postMessage({ id: m.id, ok: true, result: findCylFace(m.key, m.radius) });
         break;
       case "export": {
         const b = await shapeOfDoc(m.doc);
