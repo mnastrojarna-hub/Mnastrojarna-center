@@ -64,7 +64,19 @@ const chips = async (page) => page.locator('footer').innerText();
   await page.waitForTimeout(1000);
   ok(await historyHas(page, /Plošné vysunutí/), 'plochy: plošné vysunutí v historii');
 
-  // pokročilé: zkrut
+  // pokročilé: zkrut na čistém dílu (skica → zkrut)
+  await newPart();
+  await page.getByRole('button', { name: 'Tvorba', exact: true }).click();
+  await page.getByRole('button', { name: /^Skica/ }).first().click();
+  await page.getByRole('button', { name: /Rovina XY/ }).click();
+  await page.waitForTimeout(600);
+  await page.keyboard.press('r');
+  await page.mouse.click(700, 420); await page.mouse.click(820, 520);
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: /Dokončit skicu/ }).click();
+  await page.waitForTimeout(1200);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
   await palette(page, 'Zkrut');
   await page.waitForTimeout(3500);
   await page.keyboard.press('Enter');

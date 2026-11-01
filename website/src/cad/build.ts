@@ -602,6 +602,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
 function humanError(e: unknown): string {
   if (e instanceof Error && e.message && !/^\d+$/.test(e.message)) {
     if (/deleted/i.test(e.message)) return "Vnitřní chyba jádra – zkuste upravit parametry.";
+    if (/has not type|is null/i.test(e.message)) return "Operace vrátila prázdné těleso – nejčastěji kvůli volným plochám v modelu (sešijte je nebo uzavřete do tělesa) nebo neplatné geometrii.";
     return e.message;
   }
   return "Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).";
