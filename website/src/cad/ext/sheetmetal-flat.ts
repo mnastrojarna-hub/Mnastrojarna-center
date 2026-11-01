@@ -145,13 +145,14 @@ function lineEntity(entities: SketchEntity[]): [Vec2, Vec2] {
 
 type Ctx = { doc: CadDoc; outer: Seg[]; holes: Seg[][]; bends: FlatBend[]; panels: Panel[]; warnings: string[]; t: number; tol: number };
 
-function findPanel(ctx: Ctx, pts: Vec3[]): { panel: Panel; onTop: boolean } | null {
+function findPanel(ctx: Ctx, pts: Vec3[], within = false): { panel: Panel; onTop: boolean } | null {
   for (let i = ctx.panels.length - 1; i >= 0; i--) {
     const p = ctx.panels[i];
     const ls = pts.map((q) => local3(p.frame, q));
     const top = ls.every((l) => Math.abs(l[2]) < ctx.tol);
     const bottom = ls.every((l) => Math.abs(l[2] + ctx.t) < ctx.tol);
-    if (!top && !bottom) continue;
+    const inside = within && ls.every((l) => l[2] <= ctx.tol && l[2] >= -ctx.t - ctx.tol);
+    if (!top && !bottom && !inside) continue;
     const ok = ls.every((l) => {
       const fp = flatOf(p.toFlat, [l[0], l[1]]);
       return p.regions.every((rg) => {
@@ -369,7 +370,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
       case "sheet.relief": {
         const pt = data.point as Vec3 | undefined;
         if (!pt) break;
-        const hit = findPanel(ctx, [pt]);
+        const hit = findPanel(ctx, [pt], true);
         if (!hit) {
           ctx.warnings.push(`${f.name}: bod úlevy neleží na plechu – vynechán.`);
           break;

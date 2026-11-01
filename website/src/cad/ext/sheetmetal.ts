@@ -77,7 +77,9 @@ async function bendSolid(origin: Vec3, w: Vec3, n: Vec3, u: Vec3, L: number, ang
   const Fout: Vec2 = [Eout[0] + d[0] * len, Eout[1] + d[1] * len];
   let pen = r.draw([-extraBack, 0]);
   if (extraBack > 0) pen = pen.lineTo([0, 0]);
-  pen = pen.threePointsArcTo(Ein, pIn(h)).lineTo(Fin).lineTo(Fout).lineTo(Eout).threePointsArcTo([0, -t], pOut(h));
+  pen = pen.threePointsArcTo(Ein, pIn(h));
+  pen = len > 1e-6 ? pen.lineTo(Fin).lineTo(Fout).lineTo(Eout) : pen.lineTo(Eout);
+  pen = pen.threePointsArcTo([0, -t], pOut(h));
   if (extraBack > 0) pen = pen.lineTo([-extraBack, -t]);
   const drawing = pen.close();
   const plane = new r.Plane(origin, w, u);
@@ -106,7 +108,7 @@ async function materialOn(body: Shape, p: Vec3, n: Vec3, t: number): Promise<boo
   const s = Math.max(0.02, t * 0.1);
   const probe = r.makeBox([c[0] - s, c[1] - s, c[2] - s], [c[0] + s, c[1] + s, c[2] + s]) as Shape;
   try {
-    return r.measureVolume(body.intersect(probe)) > 1e-9;
+    return r.measureVolume(body.clone().intersect(probe)) > 1e-9;
   } catch {
     return false;
   }
@@ -318,9 +320,10 @@ registerExt({
     const angle = num(d.angle, 90);
     const R = bendRadius(d, p);
     const ba = bendAllowance(angle, R, t, p.k);
-    const matAbove = await materialOn(ctx.body, p0, ns, t);
-    const matBelow = await materialOn(ctx.body, p0, mul(ns, -1), t);
-    if (!matAbove && !matBelow) throw new Error("Čára ohybu musí ležet na ploše plechu (skica na horní nebo spodní ploše).");
+    const pm = mul(add(p0, p1), 0.5);
+    const matAbove = await materialOn(ctx.body, pm, ns, t);
+    const matBelow = await materialOn(ctx.body, pm, mul(ns, -1), t);
+    if (!matAbove && !matBelow) throw new Error("Čára ohybu musí ležet na ploše plechu (skica na horní nebo spodní ploše) a procházet materiálem.");
     const down = d.direction === "down";
     const nEff = down ? mul(ns, -1) : ns;
     // vnitřní plocha ohybu: horní (ve směru nEff) plocha plechu
@@ -328,9 +331,9 @@ registerExt({
     const innerOrigin = down ? sub(topOrigin, mul(ns, t)) : topOrigin;
     const u = norm(cross(w, nEff));
     const BIG = bboxDiag(ctx.body) * 4 + 100;
-    const fixed = ctx.body.intersect(await slab(innerOrigin, u, w, -BIG, 0, BIG)) as Shape;
-    const moving = ctx.body.intersect(await slab(innerOrigin, u, w, ba, BIG, BIG)) as Shape;
-    const strip = ctx.body.intersect(await slab(innerOrigin, u, w, 0, ba, BIG)) as Shape;
+    const fixed = ctx.body.clone().intersect(await slab(innerOrigin, u, w, -BIG, 0, BIG)) as Shape;
+    const moving = ctx.body.clone().intersect(await slab(innerOrigin, u, w, ba, BIG, BIG)) as Shape;
+    const strip = ctx.body.clone().intersect(await slab(innerOrigin, u, w, 0, ba, BIG)) as Shape;
     const vol = (s: Shape) => {
       try {
         return r.measureVolume(s);
@@ -453,8 +456,9 @@ registerExt({
     const plane = planeOf(sk.plane);
     const pb = planeBasis(sk.plane);
     const p0 = toWorld(sk.plane, q0);
-    const matAbove = await materialOn(ctx.body, p0, pb.n, p.t);
-    const matBelow = await materialOn(ctx.body, p0, mul(pb.n, -1), p.t);
+    const pm = mul(add(p0, toWorld(sk.plane, q1)), 0.5);
+    const matAbove = await materialOn(ctx.body, pm, pb.n, p.t);
+    const matBelow = await materialOn(ctx.body, pm, mul(pb.n, -1), p.t);
     if (!matAbove && !matBelow) throw new Error("Osa prolisu musí ležet na ploše plechu.");
     const dx = q1[0] - q0[0];
     const dy = q1[1] - q0[1];
