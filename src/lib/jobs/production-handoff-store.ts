@@ -106,8 +106,11 @@ async function loadHistory(db: JobsDb, jobId: string, items: SuggestItem[]): Pro
       const since = new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10);
       const { data } = await db.from("purchase_order_items")
         .select("drawing_number, unit_price, po:purchase_orders!purchase_order_id(id, job_id, number, status, order_date, supplier_id, supplier:suppliers!supplier_id(id, name))")
-        .in("drawing_number", raw).order("created_at", { ascending: false }).limit(40);
-      for (const r of (data ?? []) as Row[]) {
+        .in("drawing_number", raw).limit(200);
+      // purchase_order_items nemá created_at (dřív .order("created_at") dotaz tiše shodil) → řadit podle data objednávky
+      const poDate = (r: Row) => String(one(r.po as Row | Row[] | null)?.order_date ?? "");
+      const rows = ((data ?? []) as Row[]).sort((a, b) => poDate(b).localeCompare(poDate(a)));
+      for (const r of rows) {
         const po = one(r.po as Row | Row[] | null);
         if (!po || po.job_id === jobId || po.status === "zrusena" || String(po.order_date ?? "") < since) continue;
         if (!norms.has(normalizeDrawingNumber(r.drawing_number as string) ?? "")) continue;

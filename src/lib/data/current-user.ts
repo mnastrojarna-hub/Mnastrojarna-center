@@ -29,6 +29,11 @@ export interface CurrentUser {
    * Kterou nabídku smí schválit, rozhoduje mayManageQuoteApproval (a DB quote_user_may_approve).
    */
   canApproveQuotes?: boolean;
+  /**
+   * 31. 10.: „Smí poptávat dodavatele" (profiles.can_rfq) → funkce „rfq" i bez práva na marže (zaměstnanec Šponer):
+   * poptávkové kolo u dodavatelů a jejich ceny v porovnání. Obchodník a super admin smí vždy.
+   */
+  canRfq?: boolean;
 }
 
 /**
@@ -74,18 +79,23 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     let mustChangePassword = false;
     let quoteNeedsApproval = true;
     let canApproveQuotes = false;
+    let canRfq = false;
 
     // Profil: servisním klíčem, jinak vlastní session (RLS povoluje číst sám sebe).
     const db = hasServiceKey() ? createAdminClient() : supabase;
     const base = "full_name, role, ai_access, active, password_change_required";
-    let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", user.id).maybeSingle();
+    let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq`).eq("id", user.id).maybeSingle();
+    // DB bez migrace 20261031160000 (can_rfq) — bez příznaku poptávek, zbytek beze změny
+    if (res.error && /can_rfq/.test(res.error.message ?? "")) {
+      res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", user.id).maybeSingle() as typeof res;
+    }
     // DB bez migrace 20261030200000 (nasazení kódu před migrací) — přihlášení nesmí spadnout
     if (res.error && /quote_needs_approval|can_approve_quotes/.test(res.error.message ?? "")) {
       res = await db.from("profiles").select(base).eq("id", user.id).maybeSingle() as typeof res;
     }
     const profile = res.data as {
       full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean; password_change_required?: boolean;
-      quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null;
+      quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null; can_rfq?: boolean | null;
     } | null;
     if (profile) {
       hasProfile = true;
@@ -96,6 +106,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       mustChangePassword = Boolean(profile.password_change_required);
       quoteNeedsApproval = role !== "super_admin" && profile.quote_needs_approval !== false;
       canApproveQuotes = role === "super_admin" || profile.can_approve_quotes === true;
+      canRfq = role === "super_admin" || role === "obchodnik" || profile.can_rfq === true;
     }
 
     const email = user.email ?? "";
@@ -112,6 +123,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       mustChangePassword,
       quoteNeedsApproval: role !== "super_admin" && quoteNeedsApproval,
       canApproveQuotes,
+      canRfq,
     };
   } catch {
     return null;

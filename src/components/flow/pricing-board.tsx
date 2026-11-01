@@ -24,6 +24,7 @@ import { QUOTE_STATES, quoteDisplayState } from "@/lib/jobs/flow-status";
 import { quoteStateFromStatus } from "@/lib/data/labels";
 import { FlowRowState } from "./flow-row-state";
 import { FlowActionBar } from "./flow-actions";
+import { RfqListLink } from "@/components/rfq/rfq-list-link";
 import { actionPalette, type FlowJobState } from "./flow-state";
 
 /** Zakázka k nacenění (čistá data ze serveru). */
@@ -145,11 +146,14 @@ export function PricingBoard({
   margins,
   today,
   initialOpenId,
+  canRfq = true,
 }: {
   jobs: PricingJob[];
   me: PersonRef;
   margins: boolean;
   today: string;
+  /** „Poptat dodavatele" u zakázky (právo rfq). */
+  canRfq?: boolean;
   /** Rozbalit tuto zakázku (odkaz „Nacenit" z Poptávek), jinak první. */
   initialOpenId?: string | null;
 }) {
@@ -227,6 +231,8 @@ export function PricingBoard({
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <FlowRowState state={job.flow} tab="pricing" />
                 </div>
+                {/* 31. 10.: poptávkové kolo u dodavatelů (Nacenění = super admin → smí vždy) */}
+                {canRfq && <RfqListLink jobId={job.id} className="self-start sm:self-auto" />}
                 <FlowActionBar
                   target={{
                     jobId: job.id, jobNumber: job.number, facts: job.flow.facts, quotes: job.flow.quotes,

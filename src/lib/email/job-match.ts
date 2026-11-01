@@ -114,6 +114,7 @@ export const LINK_SOURCE_LABEL: Record<string, string> = {
   manual: "ručně",
   created: "založeno z e-mailu",
   sent: "odesláno ze zakázky",
+  rfq: "odpověď na poptávku",
 };
 
 export const AUTO_LINK_SCORE = 0.85;

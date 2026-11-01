@@ -447,6 +447,19 @@ function UserRow({
             <span className="truncate">schvaluje nabídky</span>
           </button>
         )}
+        {/* 31. 10.: zaměstnanec smí poptávat dodavatele (obchodník a super admin vždy — štítek nepotřebují) */}
+        {user.role === "zamestnanec" && user.canRfq === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-rfq-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[11px] font-medium text-orange-700 transition hover:bg-orange-500/15 hover:shadow-sm dark:text-orange-300"
+            title="Posílá poptávky dodavatelům a vidí jejich ceny v porovnání — změnit v Upravit"
+          >
+            <ShieldCheck className="h-3 w-3 shrink-0" />
+            <span className="truncate">poptává dodavatele</span>
+          </button>
+        )}
         {/* relativní čas se mezi serverem a prohlížečem může lišit o minutu */}
         <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" suppressHydrationWarning>
           <Clock className="h-3 w-3" />

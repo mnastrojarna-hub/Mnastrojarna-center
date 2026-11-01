@@ -27,6 +27,8 @@ export interface ManagedUser {
   /** Kdo a kdy právo schvalovat naposledy změnil. */
   quoteApproverChangedBy?: string | null;
   quoteApproverChangedAt?: string | null;
+  /** 31. 10.: smí poptávat dodavatele (profil can_rfq; obchodník a super admin vždy). Výchozí ne. */
+  canRfq?: boolean;
 }
 
 /** Schránka k přiřazení uživateli. */

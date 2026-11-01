@@ -62,25 +62,28 @@ describe("Karta Technologie — model", () => {
     expect(steps(v).every((s) => s.cost === null && s.quotePending === null)).toBe(true);
     expect(v.cost).toBeNull();
     expect(steps(v)[1].phase).toBe("bez_firmy");
-    const can = (f: string) => f !== "margins";
+    const can = (f: string) => f !== "margins" && f !== "rfq";
     expect(next(v, "naceneni", null, can)).toMatchObject({ key: "production.plan", label: "Doplnit, kdo to dělá" });
+    // 31. 10.: zaměstnanec se „Smí poptávat" (rfq bez marží) → rovnou poptávkové kolo pro kalení těch položek
+    expect(next(v, "naceneni", null, (f) => f !== "margins")).toMatchObject({ key: "rfq.create", label: "Poptat dodavatele", rfq: { kinds: ["tepelne_zpracovani"], itemIds: null } });
   });
 
   it("nacenění: firma kroku bez nabídky → „Bez nabídky“ a „Poptat dodavatele“", () => {
     const v = buildTechCard(input({ items: ITEMS, ops: [op({ id: "a", supplier: NOVAK })] }));
     expect(steps(v)[0]).toMatchObject({ phase: "k_objednani", status: "Bez nabídky", cost: null });
-    expect(next(v, "naceneni")).toMatchObject({ key: "pricing.supplierPrice", label: "Poptat dodavatele" });
+    expect(next(v, "naceneni")).toMatchObject({ key: "rfq.create", label: "Poptat dodavatele", rfq: { kinds: null, itemIds: null } });
     expect(next(v, "naceneni")?.hint).toContain(`${NOVAK.name} — zatím bez nabídky`);
-    // bez práva na ceny nevíme, jestli nabídka je → jen „K objednání“, bez tlačítka na Nákup
+    // bez práva na ceny ani poptávky nevíme, jestli nabídka je → jen „K objednání“, bez tlačítka
     const w = buildTechCard(input({ items: ITEMS, ops: [op({ id: "a", supplier: NOVAK })], canSeePrices: false, quotes: null }));
     expect(steps(w)[0].status).toBe("K objednání");
-    expect(next(w, "naceneni", null, (f) => f !== "margins")).toBeNull();
+    expect(next(w, "naceneni", null, (f) => f !== "margins" && f !== "rfq")).toBeNull();
   });
 
-  it("nacenění bez nabídek: krok bez firmy → „Poptat dodavatele“ (Nákup)", () => {
+  it("nacenění bez nabídek: krok bez firmy → „Poptat dodavatele“ (poptávkové kolo na operaci kroku)", () => {
     const v = buildTechCard(input({ items: ITEMS, ops: [op({ id: "a", kind: "brouseni", label: "Broušení" })] }));
     expect(steps(v)[0]).toMatchObject({ phase: "bez_firmy", status: "Vybrat, kdo to dělá" });
-    expect(next(v, "naceneni")).toMatchObject({ key: "pricing.supplierPrice", label: "Poptat dodavatele" });
+    expect(next(v, "naceneni")).toMatchObject({ key: "rfq.create", label: "Poptat dodavatele", rfq: { kinds: ["brouseni"], itemIds: null } });
+    expect(next(v, "naceneni")?.hint).toContain("pošli poptávku 2–5 dodavatelům");
   });
 
   it("potvrzeno, dvě položky s jinou technologií: dvě skupiny, termín kalení za termínem zákazníka červeně, další krok z hlavičky", () => {

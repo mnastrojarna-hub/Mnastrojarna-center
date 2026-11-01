@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, AlertTriangle, FileCheck2, KeyRound, Loader2, Pencil, ShieldCheck, Trash2, UserX } from "lucide-react";
+import { AlertCircle, AlertTriangle, FileCheck2, KeyRound, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,6 +140,47 @@ export function QuoteApproverToggle({
   );
 }
 
+/**
+ * 31. 10. „Smí poptávat dodavatele" (profiles.can_rfq): zaměstnanec pošle poptávkové kolo dodavatelům a vidí jejich
+ * ceny v porovnání (ne marže, provize ani objednávky dodavatelům). Obchodník a super admin smí vždy.
+ */
+export function RfqToggle({
+  id, checked, onChange, role, disabled,
+}: { id: string; checked: boolean; onChange: (v: boolean) => void; role: UserRole; disabled?: boolean }) {
+  const always = role !== "zamestnanec";
+  const on = always || checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-rfq-toggle={always ? "role" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-orange-500/15 text-orange-600 dark:text-orange-400" : "bg-muted text-muted-foreground",
+        )}>
+          <Send className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Smí poptávat dodavatele</label>
+          <p className="text-xs text-muted-foreground">
+            {always
+              ? "Obchodník a super admin poptávají dodavatele vždy."
+              : on
+                ? "Pošle poptávku 2–5 dodavatelům (anonymně), zapíše jejich nabídky a vybere vítěze — ceny dodavatelů vidí jen v porovnání, marže ne."
+                : "Poptávky dodavatelům neposílá a jejich ceny nevidí."}
+          </p>
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={always || disabled}
+        aria-label="Smí poptávat dodavatele"
+        className="mt-1 data-[state=checked]:bg-orange-600"
+      />
+    </div>
+  );
+}
+
 function DialogHeader({
   icon: Icon,
   tone,
@@ -198,6 +239,7 @@ export function EditUserDialog({
   const [commission, setCommission] = React.useState(String(user.commissionPercent).replace(".", ","));
   const [quoteApproval, setQuoteApproval] = React.useState(user.quoteNeedsApproval !== false);
   const [quoteApprover, setQuoteApprover] = React.useState(user.canApproveQuotes === true);
+  const [rfq, setRfq] = React.useState(user.canRfq === true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -210,6 +252,7 @@ export function EditUserDialog({
     setCommission(String(user.commissionPercent).replace(".", ","));
     setQuoteApproval(user.quoteNeedsApproval !== false);
     setQuoteApprover(user.canApproveQuotes === true);
+    setRfq(user.canRfq === true);
     setError(null);
   }, [open, user]);
 
@@ -227,6 +270,7 @@ export function EditUserDialog({
         commissionRate: role === "obchodnik" || user.commissionPercent > 0 ? commission : undefined,
         quoteNeedsApproval: role === "super_admin" ? undefined : quoteApproval,
         canApproveQuotes: role === "super_admin" ? undefined : quoteApprover,
+        canRfq: role === "zamestnanec" ? rfq : undefined,
       });
       if (!res.ok) {
         setError(res.error ?? "Uložení se nepovedlo.");
@@ -286,6 +330,8 @@ export function EditUserDialog({
             changedBy={user.quoteApproverChangedBy}
             changedAt={user.quoteApproverChangedAt}
           />
+
+          <RfqToggle id={`eu-rfq-${user.id}`} checked={rfq} onChange={setRfq} role={role} />
 
           {(role === "obchodnik" || user.commissionPercent > 0) && (
             <div className="space-y-1.5">

@@ -9,6 +9,7 @@ import { FIELD_STAMP_COLUMNS } from "@/components/jobs/detail/detail-helpers";
 import { getJob, getJobFormOptions, getJobTitle } from "@/lib/data/jobs";
 import { getJobProduction } from "@/lib/data/production";
 import { getJobPurchasing } from "@/lib/data/purchasing";
+import { getJobRfq } from "@/lib/data/rfq";
 import { JobDetailView } from "@/components/jobs/detail/job-detail-view";
 import { getJobCommunication } from "@/lib/data/job-mail";
 import { JobMailProvider } from "@/components/jobs/communication/job-mail-context";
@@ -34,13 +35,15 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
   const user = await requireFeature("orders");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const mergedFrom = typeof sp.slouceno === "string" ? sp.slouceno : null;
-  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions, mergedInto, banner, communication] = await Promise.all([
+  const [job, options, access, production, purchasing, stamps, fieldStamps, payments, revisions, mergedInto, banner, communication, rfq] = await Promise.all([
     loadJob(id), getJobFormOptions(), getAccess(), getJobProduction(id), getJobPurchasing(id),
     getJobStamps(id), getFieldStamps(id, FIELD_STAMP_COLUMNS), listJobPayments(id), listOrderRevisions(id),
     // #24: sloučená zakázka (zdroj) → přesměrovat na tu, která zůstala; na ní banner
     getMergeRedirect(id), mergedFrom ? getMergeBanner(id, mergedFrom, sp.presmerovano === "1") : Promise.resolve(null),
     // Pošta B: Komunikace (vlákna, návrhy, změny z e-mailů) — pošta jen podle pravidel viditelnosti
     getJobCommunication(id).catch(() => null),
+    // 31. 10.: poptávky dodavatelům (kola, nabídky, výběr) — jen s právem „rfq"
+    getJobRfq(id),
   ]);
   if (!job) notFound();
   // ?historie=1 = původní (sloučenou) zakázku jen zobrazit — odkaz z banneru cíle
@@ -72,6 +75,8 @@ export default async function JobDetailPage({ params, searchParams }: Params) {
       }}
       production={production}
       purchasing={purchasing}
+      rfq={rfq}
+      canRfq={!sourceInfo && access.can("rfq")}
     />
     </JobMailProvider>
     </>

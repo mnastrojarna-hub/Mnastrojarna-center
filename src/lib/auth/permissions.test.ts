@@ -80,6 +80,18 @@ describe("oprávnění dle rolí", () => {
     expect(allowedFeatures(workerApprover, ctx())).not.toContain("margins");
   });
 
+  it("31. 10.: poptávky dodavatelům (rfq) — obchodník a super admin vždy, zaměstnanec jen se „Smí poptávat“ a bez marží", () => {
+    expect(can(admin, "rfq", ctx())).toBe(true);
+    expect(can(sales, "rfq", ctx())).toBe(true);
+    expect(can(staff, "rfq", ctx())).toBe(false);
+    const sponer: AccessSubject = { ...staff, canRfq: true };
+    expect(can(sponer, "rfq", ctx())).toBe(true);
+    expect(can({ ...sponer, active: false }, "rfq", ctx())).toBe(false);
+    // příznak nedává marže, provize ani objednávky dodavatelům
+    for (const f of ["margins", "commissions", "pricing", "commissions_all"] as const) expect(can(sponer, f, ctx())).toBe(false);
+    expect(FEATURE_HINTS.rfq).toContain("Smí poptávat dodavatele");
+  });
+
   it("#25: AI focení pro všechny je výchozí — s klíčem ho má obchodník i zaměstnanec", () => {
     expect(DEFAULT_ACCESS_CONTEXT.aiCaptureForAll).toBe(true);
     const withKey = { ...DEFAULT_ACCESS_CONTEXT, aiConfigured: true };

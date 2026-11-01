@@ -24,6 +24,7 @@ import { kickInBackground } from "@/lib/anonymize/queue";
 import { guessFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import { jobFilePath } from "@/lib/jobs/mapping";
 import type { JobsDb } from "@/lib/jobs/events";
+import { noteRfqReply } from "@/lib/rfq/reply";
 import type { EmailCategory } from "@/lib/supabase/database.types";
 
 /**
@@ -435,6 +436,24 @@ export async function processEmailForJobs(a: MailJobActor, emailId: string, opts
   // B5: faktura dodavatele z e-mailu → Faktury dodavatelů (i bez zakázky; rozdělí je ten modul)
   if (e.direction === "in" && !opts.backfill && isSupplierInvoiceMail(e) && e.has_attachments !== false && timeLeft(opts.stopAt) > 20_000) {
     out.files += (await supplierInvoicesFromMail(a, e)).created;
+  }
+
+  // 31. 10. poptávky dodavatelům: odpověď na naši poptávku (naše PD-… v předmětu / textu, odpověď na náš e-mail)
+  // → dodavatel kola „Odpověděl" a e-mail (vlákno) k zakázce kola — jistě, naše číslo
+  if (e.direction === "in" && !e.job_match_at && e.category !== "spam") {
+    const hit = await noteRfqReply(db, e).catch((err: unknown) => {
+      console.error(`[mail-job] Poptávka dodavateli: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    });
+    if (hit && !e.order_id) {
+      const r = await linkThread(a, { email: e, jobId: hit.jobId, source: "rfq", confidence: 1, strong: true, reasons: [`odpověď na poptávku ${hit.number}`] });
+      if (r.ok && r.linked) {
+        e.order_id = hit.jobId;
+        e.job_link_source = "rfq";
+        const job = await jobBrief(db, hit.jobId);
+        out.linked = { jobId: hit.jobId, number: job?.number ?? hit.number, source: "rfq" };
+      }
+    }
   }
 
   if (e.order_id) {

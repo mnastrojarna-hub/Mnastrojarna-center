@@ -132,7 +132,7 @@ export default async function PricingPage({
         ) : (
           <>
             <ToastProvider>
-              <PricingBoard jobs={jobs} me={me} margins={margins} today={today} initialOpenId={wanted} />
+              <PricingBoard jobs={jobs} me={me} margins={margins} today={today} initialOpenId={wanted} canRfq={can("rfq")} />
             </ToastProvider>
             {list.length > jobs.length && (
               <p className="text-center text-xs text-muted-foreground">

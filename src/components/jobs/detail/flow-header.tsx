@@ -17,6 +17,7 @@ import { useJobDetail } from "./detail-context";
 import { useFlowActions } from "./flow-actions";
 import { cn } from "@/lib/utils";
 import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
+import { RfqHeaderAction } from "@/components/rfq/rfq-header";
 
 const EMPTY_STAMPS: JobStamps = {
   stage: null, inquiry: null, order: null, confirmed: null, confirmationSent: null, deliveryNote: null, invoiced: null,
@@ -126,6 +127,8 @@ export function FlowActionBar({ className }: { className?: string }) {
           onUndo={next && isDirectAction(next.key) && canUndo(next.key) && undo ? undo : undefined}
         />
       ))}
+      {/* 31. 10.: poptávka u dodavatelů (kolo) — vedle dalšího kroku, další krok toku se nemění */}
+      <RfqHeaderAction stage={flow.facts.stage} />
       <StateMenu actions={menu} onAction={(k) => run(k)} label="Akce se stavem" />
     </div>
   );

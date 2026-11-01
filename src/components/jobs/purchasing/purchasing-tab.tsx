@@ -17,6 +17,8 @@ import { EditPurchaseOrderDialog, SendPurchaseOrderDialog } from "./purchase-ord
 import { SectionTitle } from "./ui-bits";
 import { ownerAssignedStamp } from "./purchasing-model";
 import { JobSupplierInvoices } from "@/components/supplier-invoices/job-supplier-invoices";
+import { useRfq } from "@/components/rfq/rfq-context";
+import { RfqSection } from "@/components/rfq/rfq-panel";
 
 type SendTarget = { id: string; number: string; supplierName: string | null; fileId: string | null };
 
@@ -33,6 +35,7 @@ export function PurchasingTab({ job, data, stepOf }: {
   stepOf?: Record<string, string>;
 }) {
   const { notify, refresh } = useJobDetail();
+  const rfq = useRfq();
   const today = isoToday();
   const [quoteDialog, setQuoteDialog] = React.useState<{ open: boolean; quote: SupplierQuoteView | null }>({ open: false, quote: null });
   const [issueOpen, setIssueOpen] = React.useState(false);
@@ -52,6 +55,9 @@ export function PurchasingTab({ job, data, stepOf }: {
   return (
     <div className="space-y-6">
       <MarginHeroCard job={job} data={data} ownerAssigned={ownerAssigned} />
+
+      {/* 31. 10.: poptávkové kolo u dodavatelů (anonymně, každý zvlášť) — porovnání, doporučení, výběr */}
+      {rfq?.canRfq && <RfqSection data={rfq.data} jobId={job.id} />}
 
       {/* Další krok: vystavit objednávku */}
       <section className="flex flex-col gap-3 rounded-2xl border border-lime-200/80 bg-gradient-to-r from-lime-50 via-card to-card p-4 shadow-sm sm:flex-row sm:items-center dark:border-lime-500/25 dark:from-lime-500/10">

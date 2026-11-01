@@ -22,6 +22,9 @@ import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
 import { sortOperations, stepLabel } from "@/lib/jobs/production";
 import type { ChangeStamp, JobStamps } from "@/lib/jobs/flow-status";
 import type { JobPayment, OrderRevision } from "@/lib/data/flow-status";
+import type { JobRfqData } from "@/lib/rfq/store";
+import { RfqProvider } from "@/components/rfq/rfq-context";
+import { RfqSection } from "@/components/rfq/rfq-panel";
 
 /** Podrobné stavy a „kdo · kdy" karty (načítá stránka; bez nich karta funguje se sloupci zakázky). */
 export interface JobFlowData {
@@ -50,8 +53,11 @@ const TABS: { key: DetailTab; label: string; icon: LucideIcon; tone: string; cou
  * hlavička se stavem, časová osa, termíny a záložky.
  */
 export function JobDetailView({
-  job, options, perms, initialTab, production, purchasing, flow, initialAction,
+  job, options, perms, initialTab, production, purchasing, flow, initialAction, rfq = null, canRfq = false,
 }: {
+  /** 31. 10.: poptávky dodavatelům (kola) — jen s právem „rfq". */
+  rfq?: JobRfqData | null;
+  canRfq?: boolean;
   job: JobDetail;
   options: JobFormOptions;
   perms: DetailPerms;
@@ -64,7 +70,9 @@ export function JobDetailView({
   /** Akce z odkazu Knihy (?akce=…) — otevře se rovnou její dialog. */
   initialAction?: string | null;
 }) {
-  const tabs = TABS.filter((t) => t.key !== "nakup" || Boolean(purchasing));
+  // Nákup & marže jen s maržemi; zaměstnanec se „Smí poptávat dodavatele" má místo něj záložku „Poptávky" (bez marží)
+  const tabs = TABS.filter((t) => t.key !== "nakup" || Boolean(purchasing) || canRfq)
+    .map((t) => (t.key === "nakup" && !purchasing ? { ...t, label: "Poptávky dodavatelům" } : t));
   const fromUrl = detailTabOf(initialTab);
   const [tab, setTab] = React.useState<DetailTab>(fromUrl && tabs.some((t) => t.key === fromUrl) ? fromUrl : "prehled");
   // odkaz na jinou záložku stejné zakázky (soft navigace) — stránka zůstává připojená
@@ -118,13 +126,14 @@ export function JobDetailView({
     vyroba: production?.summary.total ?? 0,
     polozky: job.items.length,
     nabidky: job.quotes.filter((q) => !q.archived).length,
-    nakup: (purchasing?.supplierQuotes.length ?? 0) + (purchasing?.purchaseOrders.length ?? 0),
+    nakup: purchasing ? purchasing.supplierQuotes.length + purchasing.purchaseOrders.length : rfq?.rounds.length ?? 0,
     dokumenty: job.files.filter((f) => !f.archived).length,
     historie: job.events.length,
   };
 
   return (
     <JobDetailProvider jobId={job.id} perms={perms} options={options}>
+      <RfqProvider jobId={job.id} data={rfq} canRfq={canRfq}>
       <FlowActionsProvider
         job={job}
         stamps={flow?.stamps ?? job.stamps ?? null}
@@ -175,11 +184,15 @@ export function JobDetailView({
             <TabsContent value="nabidky">
               <QuotesTab job={job} />
             </TabsContent>
-            {purchasing && (
+            {purchasing ? (
               <TabsContent value="nakup">
                 <PurchasingTab job={job} data={purchasing} stepOf={poSteps} />
               </TabsContent>
-            )}
+            ) : canRfq ? (
+              <TabsContent value="nakup">
+                <RfqSection data={rfq} jobId={job.id} />
+              </TabsContent>
+            ) : null}
             <TabsContent value="dokumenty">
               <DocumentsTab files={job.files} quotes={job.quotes} />
             </TabsContent>
@@ -192,6 +205,7 @@ export function JobDetailView({
           </Tabs>
         </div>
       </FlowActionsProvider>
+      </RfqProvider>
     </JobDetailProvider>
   );
 }
