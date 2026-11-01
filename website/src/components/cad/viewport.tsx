@@ -17,6 +17,8 @@ import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./select
 export type PickMode = "none" | "select" | "edges" | "faces" | "face-plane" | "measure" | "component" | "asmFace";
 export type ViewName = "iso" | "front" | "top" | "right" | "back" | "bottom" | "left";
 export type DisplayMode = "shadedEdges" | "shaded" | "wireframe" | "hiddenLine" | "xray";
+/** analýza ploch: zebra pruhy (návaznost ploch) – přebije běžný materiál tělesa */
+export type SurfaceAnalysis = "none" | "zebra";
 /** Schéma myši: ZW3D (pravé otáčí, prostřední posouvá), SolidWorks (prostřední otáčí, Ctrl+prostřední posouvá), jednoduché (levé otáčí). */
 export type MouseScheme = "zw3d" | "solidworks" | "simple";
 export type Section = { axis: "X" | "Y" | "Z"; offset: number; flip: boolean } | null;
@@ -69,6 +71,8 @@ type Props = {
   faceColors?: Record<number, string>;
   /** barvy vrcholů (RGB po trojicích, délka = vertices.length) – např. analýza úkosů; přebije barvy ploch */
   vertexColors?: Float32Array | null;
+  /** zebra pruhy pro kontrolu hladkosti/návaznosti ploch */
+  surface?: SurfaceAnalysis;
   bodyOpacity?: number;
   bodyHidden?: boolean;
   gizmo?: Gizmo;
@@ -825,7 +829,12 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       const vc = props.vertexColors && props.vertexColors.length === m.vertices.length ? props.vertexColors : null;
       if (vc) gi.geo.setAttribute("color", new THREE.BufferAttribute(vc, 3));
       else if (gi.geo.getAttribute("color")) gi.geo.deleteAttribute("color");
-      const mats = vc
+      const mats = props.surface === "zebra"
+        ? (() => {
+            const zm = new THREE.MeshMatcapMaterial({ matcap: zebraTexture(), polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, clippingPlanes: props.section ? [s.clip] : [] });
+            return new Array(3 + colors.length).fill(zm) as THREE.Material[];
+          })()
+        : vc
         ? (() => {
             const vm = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xffffff, metalness: 0.08, roughness: 0.62, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, clippingPlanes: props.section ? [s.clip] : [] });
             return new Array(3 + colors.length).fill(vm) as THREE.Material[];
@@ -864,7 +873,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     paint();
     drawHilite();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.mesh, props.display, props.bodyColor, !!props.section, fcKey, props.bodyOpacity, props.bodyHidden, props.vertexColors]);
+  }, [props.mesh, props.display, props.bodyColor, !!props.section, fcKey, props.bodyOpacity, props.bodyHidden, props.vertexColors, props.surface]);
 
   useEffect(() => {
     applyClip();
@@ -1193,4 +1202,31 @@ function niceStep(x: number) {
   const p = Math.pow(10, Math.floor(Math.log10(x)));
   const n = x / p;
   return (n < 2 ? 1 : n < 5 ? 2 : 5) * p;
+}
+
+let zebraTex: THREE.Texture | null = null;
+/** Matcap textura s vodorovnými pruhy – odraz pruhů ukazuje zlomy a nehladké přechody ploch. */
+function zebraTexture() {
+  if (zebraTex) return zebraTex;
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 512;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#f4f6f8";
+  g.fillRect(0, 0, 512, 512);
+  g.fillStyle = "#1b2430";
+  const stripes = 14;
+  for (let i = 0; i < stripes; i++) {
+    const y = (i / stripes) * 512;
+    g.fillRect(0, y, 512, 512 / stripes / 2);
+  }
+  // lehké stínění po okrajích matcapu, ať je tvar čitelný
+  const grad = g.createRadialGradient(256, 256, 120, 256, 256, 256);
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.55)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 512, 512);
+  zebraTex = new THREE.CanvasTexture(c);
+  zebraTex.colorSpace = THREE.SRGBColorSpace;
+  return zebraTex;
 }

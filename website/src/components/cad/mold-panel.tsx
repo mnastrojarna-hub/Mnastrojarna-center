@@ -10,6 +10,8 @@ import { Num } from "./props";
 import { Btn, FloatPanel, Row, Segmented, Toggle } from "./ui";
 
 export type DraftSetup = { on: boolean; pull: Vec3; minDeg: number };
+/** analýza ploch: žádná / zebra / křivost / tloušťka stěn */
+export type SurfaceSetup = { mode: "none" | "zebra" | "curvature" | "thickness"; limit: number; info?: string };
 
 /**
  * Panel formařských nástrojů: analýza úkosů (barevná mapa), smrštění, dělicí rovina,
@@ -27,6 +29,8 @@ export function MoldPanel({
   ejectors,
   onCooling,
   onClose,
+  surface,
+  setSurface,
 }: {
   bbox: [Vec3, Vec3] | null;
   draft: DraftSetup;
@@ -39,8 +43,10 @@ export function MoldPanel({
   ejectors: EjectorSuggestion[];
   onCooling: (p: CoolingParams, mode: "part" | "component") => void;
   onClose: () => void;
+  surface: SurfaceSetup;
+  setSurface: (s: SurfaceSetup) => void;
 }) {
-  const [tab, setTab] = useState<"draft" | "shrink" | "eject" | "cool">("draft");
+  const [tab, setTab] = useState<"draft" | "surface" | "shrink" | "eject" | "cool">("draft");
   const [shrinkId, setShrinkId] = useState("pp");
   const [custom, setCustom] = useState<number | null>(null);
   const [cool, setCool] = useState<CoolingParams | null>(bbox ? defaultCooling(bbox) : null);
@@ -56,6 +62,7 @@ export function MoldPanel({
         value={tab}
         options={[
           { v: "draft", l: "Úkosy" },
+          { v: "surface", l: "Plochy" },
           { v: "shrink", l: "Smrštění" },
           { v: "eject", l: "Vyhazovače" },
           { v: "cool", l: "Chlazení" },
@@ -98,6 +105,28 @@ export function MoldPanel({
         </div>
       )}
 
+      {tab === "surface" && (
+        <div className="mt-3 space-y-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Analýza ploch</p>
+          <div className="space-y-1">
+            {(
+              [
+                ["none", "Vypnuto"],
+                ["zebra", "Zebra pruhy – návaznost a hladkost ploch"],
+                ["curvature", "Mapa křivosti – modrá vydutá, zelená rovina, červená vypuklá"],
+                ["thickness", "Tloušťka stěn – červená pod limitem"],
+              ] as [SurfaceSetup["mode"], string][]
+            ).map(([m, l]) => (
+              <label key={m} className={cn("flex cursor-pointer items-start gap-2 rounded px-2 py-1 text-[12px]", surface.mode === m ? "bg-[#eef2f6]" : "hover:bg-[#f7f9fb]")}>
+                <input type="radio" name="surface-mode" checked={surface.mode === m} onChange={() => setSurface({ ...surface, mode: m })} className="mt-0.5 accent-[#E03930]" />
+                {l}
+              </label>
+            ))}
+          </div>
+          {surface.mode === "thickness" && <Num label="Minimální tloušťka" value={surface.limit} step={0.5} min={0.1} onChange={(v) => setSurface({ ...surface, limit: v })} />}
+          {surface.info && <p className="rounded bg-[#eef2f6] px-2 py-1 text-[11.5px] text-[#4a5664]">{surface.info}</p>}
+        </div>
+      )}
       {tab === "shrink" && (
         <div className="mt-3 space-y-2">
           <p className="text-[11.5px] leading-relaxed text-[#6b7785]">Dutina formy musí být o smrštění větší než výlisek. Přidá do historie dílu měřítko (lze kdykoli upravit nebo potlačit).</p>

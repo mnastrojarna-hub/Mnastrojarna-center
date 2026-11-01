@@ -23,7 +23,8 @@ import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
 import { CommandPalette, type Command } from "./command-palette";
 import { getExtUi, type ExtActionApi } from "./ext";
 import { LibraryDialog } from "./library-dialog";
-import { MoldPanel, type DraftSetup } from "./mold-panel";
+import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
+import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { SettingsDialog } from "./settings-dialog";
 import { StartScreen } from "./start-screen";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
@@ -143,6 +144,7 @@ export function CadApp() {
   const [startOpen, setStartOpen] = useState(false);
   const [moldTools, setMoldTools] = useState(false);
   const [draftSetup, setDraftSetup] = useState<DraftSetup>({ on: false, pull: [0, 0, 1], minDeg: 1 });
+  const [surface, setSurface] = useState<SurfaceSetup>({ mode: "none", limit: 1 });
   const [partingZ, setPartingZ] = useState<{ z: number; perimeter: number } | null>(null);
   const docId = useRef(uid());
   const lastThumb = useRef(0);
@@ -1177,7 +1179,20 @@ export function CadApp() {
 
   // ---------- formařské nástroje ----------
   const draftResult = useMemo<DraftResult | null>(() => (draftSetup.on && !isAsm && result?.mesh ? draftAnalysis(result.mesh, draftSetup.pull, draftSetup.minDeg) : null), [draftSetup, result, isAsm]);
-  const vertexColors = useMemo(() => (draftResult && result?.mesh ? draftVertexColors(result.mesh, draftResult) : null), [draftResult, result]);
+  const analysis = useMemo(() => {
+    const mesh = result?.mesh;
+    if (!mesh || isAsm) return { colors: null as Float32Array | null, info: undefined as string | undefined };
+    if (surface.mode === "curvature") {
+      const c = curvatureColors(mesh);
+      return { colors: c.colors, info: `Křivost min ${fmtNum(c.min, 4)} · max ${fmtNum(c.max, 4)} 1/mm (plná barva při ±${fmtNum(c.range, 4)})` };
+    }
+    if (surface.mode === "thickness") {
+      const w = wallThickness(mesh, surface.limit);
+      return { colors: w.colors, info: `Nejtenčí stěna ≈ ${fmtNum(w.min, 2)} mm · průměr ${fmtNum(w.avg, 2)} mm · pod limitem ${fmtNum(w.below * 100, 1)} % vzorků` };
+    }
+    return { colors: null, info: undefined };
+  }, [result, isAsm, surface.mode, surface.limit]);
+  const vertexColors = useMemo(() => analysis.colors ?? (draftResult && result?.mesh ? draftVertexColors(result.mesh, draftResult) : null), [analysis.colors, draftResult, result]);
   const ejectors = useMemo<EjectorSuggestion[]>(() => (m ? suggestEjectors(m.bbox) : []), [m]);
   const addEjectors = (list: EjectorSuggestion[], mode: "holes" | "pins") => {
     if (!m) return;
@@ -1785,6 +1800,7 @@ export function CadApp() {
                 bodyColor={doc.color}
                 mouse={prefs.mouse}
                 vertexColors={vertexColors}
+                surface={surface.mode === "zebra" ? "zebra" : "none"}
                 showGrid={showGrid}
                 assembly={isAsm ? asmViews : undefined}
               />
@@ -1937,9 +1953,12 @@ export function CadApp() {
                 onEjectors={addEjectors}
                 ejectors={ejectors}
                 onCooling={addCooling}
+                surface={{ ...surface, info: analysis.info }}
+                setSurface={setSurface}
                 onClose={() => {
                   setMoldTools(false);
                   setDraftSetup((d) => ({ ...d, on: false }));
+                  setSurface((x) => ({ ...x, mode: "none" }));
                 }}
               />
             )}
