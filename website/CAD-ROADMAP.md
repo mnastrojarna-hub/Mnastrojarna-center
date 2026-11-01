@@ -64,6 +64,14 @@ Zásuvná infrastruktura prvků rozšíření (`cad/ext/registry.ts` + `componen
 - **Vedoucí**: analýza ploch ve 3D (zebra, křivost, tloušťka stěn) ✅; karta Svařence ✅.
 Hotovo: vše zapojeno přes registr; `tools.cjs` snímá karty Plochy/Plech/Svařence a analýzu ploch; `e2e/cad-modules.e2e.cjs` (svařence, plech → rozvin DXF, plochy, zkrut, knihovna 2, zebra); build OK; 361 testů.
 
+### 4. vlna (listopad 2026) – probíhá
+- **X1 Skica 2** (`sketcher.tsx`, `sketch-ref.ts`): promítnutí hran modelu, obrys tělesa, průnik s rovinou jako uzamčené referenční entity, vazby a kóty k referencím, text ve skice (obrysy písma jako profil), offset od hran modelu.
+- **X2 Více těles** (`build.ts`, `manager.tsx`, `viewport.tsx`, `props.tsx`): pojmenovaná tělesa v dílu, cílové těleso u prvků, sloučit/rozdělit těla, barvy a skrývání těles, export těla.
+- **X3 Pohyb mechanismu** (`mates.ts`, `motion.ts`, `asm-panel.tsx`): živé řešení vazeb při tažení gizmem, stupně volnosti komponenty, omezený pohyb (otáčení kolem osy souososti), animace, úprava hodnot vazeb, hrubá kontrola kolizí při pohybu.
+- **X4 Výkresy 3** (`drawing.ts`, `drawing-workspace.tsx`, `pdf.ts`): částečný řez, přerušený pohled, pomocný pohled, úhlové/poloměrové/průměrové/souřadnicové/sražené kóty, tolerance a uložení ISO 286, úprava a tažení kót, značky svarů, značky středů, drsnost celého dílu, varianty razítka, PDF všech listů.
+- **X5 AI asistent** (`app/api/cad-ai/route.ts`, `cad/ai/*`, `ai-panel.tsx`): zadání textem → prvky (schéma z registru), vysvětlení chyb prvků, kontrola vyrobitelnosti; klíč `ANTHROPIC_API_KEY`.
+- Vedoucí: po dokončení zapojit AI panel (tlačítko v hlavičce, Ctrl+J, paleta), build, e2e, snímky, přepočet příkazů.
+
 ### Zapojení po dokončení pracovníků (checklist pro vedoucího / další relaci)
 1. ~~Settings/Palette/Start/MoldPanel/LibraryDialog/DWG/náhledy~~ – vše zapojeno.
 2. Používat `ui.tsx` (Modal/FloatPanel/Row/Btn/Toggle/Segmented/Kbd) místo lokálních kopií v `cad-app.tsx` (kosmetika).
