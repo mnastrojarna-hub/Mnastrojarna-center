@@ -172,6 +172,8 @@ export type CadDoc = {
   faceColors?: Record<number, string>;
   /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
   drawings?: DrawingDoc[];
+  /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
+  mates?: Mate[];
 };
 
 /** Umístění komponenty: posun (mm) a natočení kolem os X, Y, Z (°, v tomto pořadí). */
@@ -254,3 +256,11 @@ export type DrawingDoc = {
   meta: Record<string, unknown>;
   annotations: DrawingAnnotation[];
 };
+
+// ---------------- vazby sestavy ----------------
+
+export type MateType = "mate" | "flush" | "concentric" | "distance" | "angle" | "parallel" | "fixed";
+/** Odkaz na plochu komponenty nejvyšší úrovně; `leaf` = cesta listu („a/b“) u podsestav, `face` = index plochy v dílu (−1 = doplní se automaticky podle `radius`). */
+export type MateRef = { compId: string; leaf?: string; face: number; radius?: number };
+/** Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl. */
+export type Mate = { id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string };
