@@ -137,7 +137,6 @@ export const taperedBearing: Family = {
       const roller: Feature = { id: uid(), name: "Kuželík", type: "cone", radius1: dw / 2, radius2: dw / 2 + lw * t * 0.5, height: lw, position: [rm, 0, b.B * 0.2], axis: "Z", mode: "add" };
       f.push(roller, { id: uid(), name: "Kuželíky", type: "pattern", featureId: roller.id, kind: "circular", count: z, angle: 360, axis: "Z", center: [0, 0, 0] });
     }
-    f.push(chamferAll(Math.min(0.6, h * 0.06)));
     return part(`Kuželíkové ložisko ${code}`, "ocel", f, `${code} – ${b.d}×${b.D}×${b.T}`, "#b9c2cc");
   },
 };
@@ -248,7 +247,6 @@ export const plummerBlock: Family = {
       cyl("Díra 1", u.s, baseT + 2, -1, "cut", "Z", [-u.e / 2, 0]),
       cyl("Díra 2", u.s, baseT + 2, -1, "cut", "Z", [u.e / 2, 0]),
       { id: uid(), name: "Maznice", type: "cylinder", radius: 3, height: 10, position: [0, 0, u.h + u.D / 2 + 2], axis: "Z", mode: "add" },
-      chamferAll(1),
     ];
     return part(`Ložiskové těleso ${code}`, "ocel", f, `${code} – Ø${u.d} – rozteč ${u.e}`, "#7f8a96");
   },

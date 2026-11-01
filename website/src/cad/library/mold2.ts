@@ -39,7 +39,7 @@ export const guidePillarZ01: Family = {
     const d = num(v.d, 24);
     const l = num(v.l, 150);
     const fit = Math.min(l * 0.3, 1.5 * d);
-    return part(`Vodicí sloupek Z01 Ø${fmt(d)}×${fmt(l)}`, "1.7131", [cyl("Lisovací část", d + 4, fit, 0, "new"), cyl("Vodicí část", d, l - fit, fit, "add"), tube("Zápich", d + 1, d - 1.5, 1.5, fit - 1.5, "cut"), chamferAll(Math.min(1.5, d * 0.08))], `Z01 / ${fmt(d)} × ${fmt(l)}`, "#d6d9dd");
+    return part(`Vodicí sloupek Z01 Ø${fmt(d)}×${fmt(l)}`, "1.7131", [cyl("Lisovací část", d + 4, fit, 0, "new"), cyl("Vodicí část", d, l - fit, fit, "add"), chamferAll(Math.min(1.5, d * 0.08)), tube("Zápich", d + 1, d - 1.5, 1.5, fit - 1.5, "cut")], `Z01 / ${fmt(d)} × ${fmt(l)}`, "#d6d9dd");
   },
 };
 
@@ -160,7 +160,7 @@ export const coolingPlug: Family = {
   make: (v) => {
     const th = COOL_THREADS[str(v.thread, "G1/4")] ?? COOL_THREADS["G1/4"];
     const hose = num(v.hose, 9);
-    return part(`Temperační spojka ${v.thread}`, "mosaz", [cyl("Závit", th.od, 10, 0, "new"), ...hexPrism("Šestihran", th.s, 6, 10, "add"), ...revolveProfile("Vsuvka", [[0, 16], [hose / 2 + 1.5, 16], [hose / 2 + 1.5, 20], [hose / 2 + 3, 22], [hose / 2 + 3, 25], [hose / 2 + 1, 27], [hose / 2 + 1, 32], [0, 32]], "add"), cyl("Kanál", hose * 0.6, 40, -1, "cut"), chamferAll(0.4)], `Z81 / ${v.thread} / Ø${hose}`, "#c9a46a");
+    return part(`Temperační spojka ${v.thread}`, "mosaz", [cyl("Závit", th.od, 10, 0, "new"), chamferAll(0.4), ...hexPrism("Šestihran", th.s, 6, 10, "add"), ...revolveProfile("Vsuvka", [[0, 16], [hose / 2 + 1.5, 16], [hose / 2 + 1.5, 20], [hose / 2 + 3, 22], [hose / 2 + 3, 25], [hose / 2 + 1, 27], [hose / 2 + 1, 32], [0, 32]], "add"), cyl("Kanál", hose * 0.6, 40, -1, "cut")], `Z81 / ${v.thread} / Ø${hose}`, "#c9a46a");
   },
 };
 
@@ -177,7 +177,7 @@ export const dateStamp: Family = {
   make: (v) => {
     const d = num(v.d, 8);
     const l = num(v.l, 20);
-    const f: Feature[] = [cyl("Pouzdro", d, l, 0, "new"), cyl("Šipka – vložka", d * 0.5, 0.3, l, "add"), tube("Mezikruží", d * 0.95, d * 0.55, 0.3, l - 0.3, "cut"), chamferAll(0.2)];
+    const f: Feature[] = [cyl("Pouzdro", d, l, 0, "new"), chamferAll(0.2), cyl("Šipka – vložka", d * 0.5, 0.3, l, "add"), tube("Mezikruží", d * 0.95, d * 0.55, 0.3, l - 0.3, "cut")];
     for (let i = 0; i < 12; i++) f.push({ id: uid(), name: `Měsíc ${i + 1}`, type: "cylinder", radius: d * 0.05, height: 0.4, position: [(d * 0.37) * Math.cos((2 * Math.PI * i) / 12), (d * 0.37) * Math.sin((2 * Math.PI * i) / 12), l - 0.3], axis: "Z", mode: "cut" });
     return part(`Datumovka Ø${fmt(d)}`, "nerez", f, `Z170 / ${fmt(d)} × ${fmt(l)}`, "#b9c2cc");
   },

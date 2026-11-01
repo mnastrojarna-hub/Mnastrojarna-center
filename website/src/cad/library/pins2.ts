@@ -58,7 +58,7 @@ const groovedPin = (id: string, std: string, name: string, half: boolean): Famil
     const l = num(v.l, 30);
     const gl = half ? l / 2 : l * 0.9;
     const groove: Feature = box("Rýha", [d * 0.12, d * 0.18, gl], [0, d / 2, l - gl / 2 - (half ? 0 : l * 0.05)], "cut");
-    return part(`Rýhovaný kolík Ø${fmt(d)}×${fmt(l)}`, "ocel", [cyl("Kolík", d, l, 0, "new"), groove, { id: uid(), name: "Rýhy", type: "pattern", featureId: groove.id, kind: "circular", count: 3, angle: 360, axis: "Z", center: [0, 0, 0] }, chamferAll(Math.min(0.5, d * 0.1))], `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
+    return part(`Rýhovaný kolík Ø${fmt(d)}×${fmt(l)}`, "ocel", [cyl("Kolík", d, l, 0, "new"), chamferAll(Math.min(0.5, d * 0.1)), groove, { id: uid(), name: "Rýhy", type: "pattern", featureId: groove.id, kind: "circular", count: 3, angle: 360, axis: "Z", center: [0, 0, 0] }], `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
   },
 });
 export const groovedDin1473 = groovedPin("din1473", "DIN 1473", "Rýhovaný kolík s rýhami po celé délce", false);
@@ -124,13 +124,13 @@ const clevisPin = (id: string, std: string, name: string, head: boolean): Family
     const l = num(v.l, 60);
     const f: Feature[] = [cyl("Čep", d, l, 0, "new")];
     if (head) f.push(cyl("Hlava", d * 1.5, d * 0.5, l, "add"));
+    f.push(chamferAll(Math.min(1, d * 0.08)));
     if (v.groove !== false) {
       const w = Math.max(0.8, d * 0.1);
       const dg = d - 2 * Math.max(0.4, d * 0.05);
       f.push(tube("Drážka 1", d + 2, dg, w, d * 0.5, "cut"));
       if (!head) f.push(tube("Drážka 2", d + 2, dg, w, l - d * 0.5 - w, "cut"));
     }
-    f.push(chamferAll(Math.min(1, d * 0.08)));
     return part(`Čep Ø${fmt(d)}×${fmt(l)} ${std}`, "ocel", f, `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
   },
 });

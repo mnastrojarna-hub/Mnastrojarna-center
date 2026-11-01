@@ -6,12 +6,9 @@ import { chamferAll, cyl, fmt, num, part, revolveProfile, str, tube } from "./ut
 
 const G = "Pružiny a těsnění";
 
-/** Kruhová smyčka (torus) s osou X: skica v rovině XY(z) s kružnicí, rotace kolem osy x skici. */
+/** Očko tažné pružiny: plochý kroužek (střední poloměr Rm, drát wire) v rovině YZ se středem v z – zjednodušení torusu (rychlá booleovská operace). */
 function loopX(name: string, z: number, Rm: number, wire: number, mode: "add" | "new" = "add"): Feature[] {
-  const pts: Vec2[] = [];
-  for (let i = 0; i < 16; i++) pts.push([(wire / 2) * Math.cos((2 * Math.PI * i) / 16), Rm + (wire / 2) * Math.sin((2 * Math.PI * i) / 16)]);
-  const sk: Feature = { id: uid(), name: `${name} – průřez`, type: "sketch", plane: { kind: "base", name: "XY", offset: z }, entities: [{ id: uid(), type: "polyline", closed: true, points: pts }] };
-  return [sk, { id: uid(), name, type: "revolve", sketchId: sk.id, angle: 360, axis: "x", mode }];
+  return [{ id: uid(), name, type: "tube", outer: 2 * Rm + wire, inner: Math.max(0.2, 2 * Rm - wire), height: wire, position: [-wire / 2, 0, z], axis: "X", mode }];
 }
 
 function parseSpring(q: string, words: string[]) {
@@ -46,7 +43,7 @@ export const extensionSpring: Family = {
     { key: "d", label: "Průměr drátu d", kind: "number", min: 0.2, max: 12, step: 0.1, unit: "mm", default: 1.6 },
     { key: "D", label: "Vnější průměr De", kind: "number", min: 1, max: 200, step: 0.5, unit: "mm", default: 12 },
     { key: "L", label: "Délka těla Lk", kind: "number", min: 2, max: 1000, step: 1, unit: "mm", default: 40 },
-    { key: "n", label: "Počet závitů n", kind: "number", min: 1, max: 200, step: 1, unit: "", default: 20 },
+    { key: "n", label: "Počet závitů n", kind: "number", min: 1, max: 200, step: 1, unit: "", default: 10 },
   ],
   parse: (q) => parseSpring(q, ["tazna", "s ocky", "extension spring", "tension spring", "2097"]),
   describe: (v) => `Tažná pružina ${fmt(num(v.d))}×${fmt(num(v.D))}×${fmt(num(v.L))} – n=${v.n}`,
@@ -54,7 +51,7 @@ export const extensionSpring: Family = {
     const d = num(v.d, 1.6);
     const D = num(v.D, 12);
     const L = num(v.L, 40);
-    const n = Math.max(1, num(v.n, 20));
+    const n = Math.max(1, num(v.n, 10));
     const Rm = (D - d) / 2;
     const pitch = Math.max(d * 1.02, (L - d) / n);
     return part(`Tažná pružina ${fmt(d)}×${fmt(D)}×${fmt(L)}`, "ocel", [
@@ -201,9 +198,9 @@ export const gasStrut: Family = {
     return part(`Plynová vzpěra ${v.size} z${fmt(stroke)}`, "ocel", [
       cyl("Válec", g.cyl, body, 0, "new"),
       cyl("Pístnice", g.rod, 15 + ext, body, "add"),
+      chamferAll(0.5),
       { id: uid(), name: "Oko 1", type: "tube", outer: eye, inner: eye * 0.4, height: g.rod, position: [0, -g.rod / 2, -eye / 2 + 1], axis: "Y", mode: "add" },
       { id: uid(), name: "Oko 2", type: "tube", outer: eye, inner: eye * 0.4, height: g.rod, position: [0, -g.rod / 2, body + 15 + ext + eye / 2 - 1], axis: "Y", mode: "add" },
-      chamferAll(0.5),
     ], `Plynová vzpěra ${v.size} – zdvih ${fmt(stroke)} – ${v.force} N`, "#3a3f45");
   },
 };

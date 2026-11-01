@@ -129,7 +129,7 @@ export const tNut: Family = {
     const s = TNUT_SLOTS[str(v.slot, "8")] ?? TNUT_SLOTS["8"];
     const l = num(v.l, 20);
     const td = Number(str(v.thread, "M6").replace("M", "")) || 6;
-    return part(`T-matice ${v.slot}/${v.thread}`, "ocel", [box("Tělo", [l, s.w, s.h], [0, 0, s.h / 2], "new"), box("Krk", [l, s.neck, 2], [0, 0, s.h + 1], "add"), cyl("Závitová díra", td * 0.85, s.h + 4, -1, "cut"), chamferAll(0.5)], `T-matice drážka ${v.slot} – ${v.thread} – L${fmt(l)}`, "#5b6670");
+    return part(`T-matice ${v.slot}/${v.thread}`, "ocel", [box("Tělo", [l, s.w, s.h], [0, 0, s.h / 2], "new"), box("Krk", [l, s.neck, 2], [0, 0, s.h + 1], "add"), chamferAll(0.4), cyl("Závitová díra", td * 0.85, s.h + 4, -1, "cut")], `T-matice drážka ${v.slot} – ${v.thread} – L${fmt(l)}`, "#5b6670");
   },
 };
 

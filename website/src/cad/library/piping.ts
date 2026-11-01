@@ -109,14 +109,14 @@ export const flangePN16: Family = {
     const key = str(v.dn, "DN50");
     const fl = FLANGES[key] ?? FLANGES.DN50;
     const type = str(v.type, "01");
-    const f: Feature[] = [cyl("Příruba", fl.D, fl.b, 0, "new"), cyl("Těsnicí lišta", fl.d1, 2, fl.b, "add")];
+    const f: Feature[] = [cyl("Příruba", fl.D, fl.b, 0, "new"), chamferAll(1), cyl("Těsnicí lišta", fl.d1, 2, fl.b, "add")];
     if (type === "11") {
       const neckH = fl.b * 2.2;
       f.push(...revolveProfile("Krk", [[fl.pipe / 2 - 1, 0], [fl.pipe / 2 + fl.b * 0.9, 0], [fl.pipe / 2 + 4, -neckH], [fl.pipe / 2 - 1, -neckH]], "add"));
     }
     if (type !== "05") f.push(cyl("Otvor", fl.pipe + (type === "11" ? -2 * 3.2 : 1), fl.b * 4 + 10, -fl.b * 3, "cut"));
     const hole: Feature = cyl("Díra pro šroub", fl.l, fl.b + 6, -2, "cut", "Z", [fl.k / 2, 0]);
-    f.push(hole, { id: uid(), name: "Díry pro šrouby", type: "pattern", featureId: hole.id, kind: "circular", count: fl.n, angle: 360, axis: "Z", center: [0, 0, 0] }, chamferAll(1));
+    f.push(hole, { id: uid(), name: "Díry pro šrouby", type: "pattern", featureId: hole.id, kind: "circular", count: fl.n, angle: 360, axis: "Z", center: [0, 0, 0] });
     return part(`Příruba ${key} PN16 typ ${type}`, "ocel", f, `EN 1092-1 – ${type} – ${key} – PN16`, "#7f8a96");
   },
 };
@@ -148,7 +148,7 @@ export const hoseBarb: Family = {
     const prof: [number, number][] = [[0, 0], [hose / 2 - 0.5, 0]];
     for (let i = 0; i < 3; i++) prof.push([hose / 2 + 1, 6 + i * 6], [hose / 2 - 0.5, 6 + i * 6 + 0.2], [hose / 2 - 0.5, 12 + i * 6]);
     prof.push([0, 24]);
-    return part(`Nátrubek ${v.thread} Ø${fmt(hose)}`, "mosaz", [...revolveProfile("Trn", prof, "new"), ...hexPrism("Šestihran", th.s, 6, 24, "add"), cyl("Závit", th.od, 12, 30, "add"), cyl("Kanál", hose * 0.6, 50, -1, "cut"), chamferAll(0.5)], `Nátrubek ${v.thread} – Ø${fmt(hose)}`, "#c9a46a");
+    return part(`Nátrubek ${v.thread} Ø${fmt(hose)}`, "mosaz", [...revolveProfile("Trn", prof, "new"), ...hexPrism("Šestihran", th.s, 6, 24, "add"), cyl("Závit", th.od, 12, 30, "add"), cyl("Kanál", hose * 0.6, 50, -1, "cut")], `Nátrubek ${v.thread} – Ø${fmt(hose)}`, "#c9a46a");
   },
 };
 

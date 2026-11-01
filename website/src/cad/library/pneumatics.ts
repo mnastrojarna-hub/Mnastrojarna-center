@@ -69,7 +69,6 @@ export const cylinderIso15552: Family = {
     for (const [i, [x, y]] of [[-o, -o], [o, -o], [o, o], [-o, o]].entries()) f.push(cyl(`Táhlo ${i + 1}`, c.tie, L, 0, "add", "Z", [x, y]), cyl(`Matice táhla ${i + 1}`, c.tie * 1.6, c.tie * 0.8, L, "add", "Z", [x, y]));
     f.push(cyl("Pístnice", c.MM, c.cap + 10 + ext, L - 2, "add"), cyl("Vedení pístnice", c.MM + 8, 6, L, "add"));
     f.push({ id: uid(), name: "Přípoj 1", type: "cylinder", radius: 5, height: c.AM / 2 + 1, position: [0, 0, c.cap / 2], axis: "Y", mode: "cut" }, { id: uid(), name: "Přípoj 2", type: "cylinder", radius: 5, height: c.AM / 2 + 1, position: [0, 0, L - c.cap / 2], axis: "Y", mode: "cut" });
-    f.push(chamferAll(1));
     return part(`Válec ISO 15552 Ø${bore}×${fmt(stroke)}`, "hlinik", f, `ISO 15552 – Ø${bore}×${fmt(stroke)} – ${c.KK} – ${c.port}`, "#d6d9dd");
   },
 };
@@ -107,7 +106,6 @@ export const cylinderIso6432: Family = {
       cyl("Pístnice", c.MM, c.OD * 0.8 + ext, L, "add"),
       { id: uid(), name: "Přípoj 1", type: "cylinder", radius: 2.5, height: c.OD / 2 + 2, position: [0, 0, cap / 2], axis: "Y", mode: "cut" },
       { id: uid(), name: "Přípoj 2", type: "cylinder", radius: 2.5, height: c.OD / 2 + 2, position: [0, 0, L - cap / 2], axis: "Y", mode: "cut" },
-      chamferAll(0.5),
     ], `ISO 6432 – Ø${bore}×${fmt(stroke)} – ${c.KK}`, "#b9c2cc");
   },
 };
@@ -139,11 +137,11 @@ export const pushInFitting: Family = {
     const bodyD = t + 6;
     return part(`Šroubení Ø${t} ${v.thread}`, "mosaz", [
       cyl("Závit", th.od, 8, 0, "new"),
+      chamferAll(0.4),
       ...hexPrism("Šestihran", th.s, 5, 8, "add"),
       cyl("Tělo", bodyD, 10, 13, "add"),
       tube("Uvolňovací kroužek", t + 4, t + 0.2, 3, 23, "add"),
       cyl("Kanál", t * 0.65, 30, -1, "cut"),
-      chamferAll(0.4),
     ], `Šroubení push-in Ø${t} – ${v.thread}`, "#c9a46a");
   },
 };

@@ -129,9 +129,9 @@ const block = (id: string, name: string, table: typeof HGH, flange: boolean): Fa
     const s = str(v.size, "20");
     const b = table[s] ?? table["20"];
     const r = HGR[s] ?? HGR["20"];
-    const f: Feature[] = [box("Vozík", [b.W, b.L, b.H - b.H1], [0, 0, b.H1 + (b.H - b.H1) / 2], "new"), box("Kanál kolejnice", [r.W + 0.6, b.L + 2, r.H - b.H1 + 0.3], [0, 0, b.H1 + (r.H - b.H1 + 0.3) / 2 - 0.3], "cut")];
+    const f: Feature[] = [box("Vozík", [b.W, b.L, b.H - b.H1], [0, 0, b.H1 + (b.H - b.H1) / 2], "new"), chamferAll(0.5), box("Kanál kolejnice", [r.W + 0.6, b.L + 2, r.H - b.H1 + 0.3], [0, 0, b.H1 + (r.H - b.H1 + 0.3) / 2 - 0.3], "cut")];
     for (const [x, y] of [[-b.B / 2, -b.C / 2], [b.B / 2, -b.C / 2], [-b.B / 2, b.C / 2], [b.B / 2, b.C / 2]]) f.push(cyl("Závitová díra", b.M * 0.85, flange ? b.H - b.H1 + 1 : b.M * 1.5 + 1, flange ? b.H1 - 0.5 : b.H - b.M * 1.5, "cut", "Z", [x, y]));
-    f.push(box("Koncovka 1", [b.W * 0.98, 4, b.H - b.H1 - 1], [0, -b.L / 2 + 2, b.H1 + (b.H - b.H1) / 2], "add"), box("Koncovka 2", [b.W * 0.98, 4, b.H - b.H1 - 1], [0, b.L / 2 - 2, b.H1 + (b.H - b.H1) / 2], "add"), chamferAll(0.5));
+    f.push(box("Koncovka 1", [b.W * 0.98, 4, b.H - b.H1 - 1], [0, -b.L / 2 + 2, b.H1 + (b.H - b.H1) / 2], "add"), box("Koncovka 2", [b.W * 0.98, 4, b.H - b.H1 - 1], [0, b.L / 2 - 2, b.H1 + (b.H - b.H1) / 2], "add"));
     return part(`Vozík ${flange ? "HGW" : "HGH"}${s}`, "ocel", f, `${flange ? "HGW" : "HGH"}${s}${flange ? "CC" : "CA"}`, COLOR);
   },
 });
@@ -221,12 +221,12 @@ export const shaftSupport: Family = {
     return part(`Domeček SHF${s}`, "hlinik", [
       box("Patka", [h.W, h.L, 6], [0, 0, 3], "new"),
       box("Stojina", [d + 14, h.L, top - 6], [0, 0, 6 + (top - 6) / 2], "add"),
+      chamferAll(0.5),
       { id: uid(), name: "Díra tyče", type: "cylinder", radius: d / 2, height: h.L + 2, position: [0, -h.L / 2 - 1, h.H], axis: "Y", mode: "cut" },
       box("Rozříznutí", [1.2, h.L + 2, top - h.H], [0, 0, h.H + (top - h.H) / 2], "cut"),
       { id: uid(), name: "Stahovací šroub", type: "cylinder", radius: h.s / 2, height: d + 16, position: [-(d + 16) / 2, 0, h.H + d / 2 + 3], axis: "X", mode: "cut" },
       cyl("Díra 1", h.s, 8, -1, "cut", "Z", [-h.P / 2, 0]),
       cyl("Díra 2", h.s, 8, -1, "cut", "Z", [h.P / 2, 0]),
-      chamferAll(0.5),
     ], `SHF${s} – rozteč ${h.P}`, "#d6d9dd");
   },
 };
@@ -276,9 +276,8 @@ export const bearingHousingSC: Family = {
     const s = str(v.size, "16");
     const b = SC[s] ?? SC["16"];
     const lm = LM[s] ?? LM["16"];
-    const f: Feature[] = [box("Těleso", [b.W, b.L, b.H], [0, 0, b.H / 2], "new"), { id: uid(), name: "Otvor pouzdra", type: "cylinder", radius: lm.D / 2 + 0.1, height: b.L + 2, position: [0, -b.L / 2 - 1, b.H * 0.55], axis: "Y", mode: "cut" }];
+    const f: Feature[] = [box("Těleso", [b.W, b.L, b.H], [0, 0, b.H / 2], "new"), chamferAll(0.8), { id: uid(), name: "Otvor pouzdra", type: "cylinder", radius: lm.D / 2 + 0.1, height: b.L + 2, position: [0, -b.L / 2 - 1, b.H * 0.55], axis: "Y", mode: "cut" }];
     for (const [x, y] of [[-b.px / 2, -b.py / 2], [b.px / 2, -b.py / 2], [-b.px / 2, b.py / 2], [b.px / 2, b.py / 2]]) f.push(cyl("Díra", 5.5, b.H + 2, -1, "cut", "Z", [x, y]));
-    f.push(chamferAll(0.8));
     return part(`Těleso SC${s}UU`, "hlinik", f, `SC${s}UU`, "#d6d9dd");
   },
 };

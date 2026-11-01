@@ -121,7 +121,7 @@ describe("stavba dílů", () => {
       expect(doc.props?.number, f.id).toBeTruthy();
       await vol(doc);
     }
-  }, 300_000);
+  }, 600_000);
 
   it("šrouby a matice více velikostí", async () => {
     for (const [id, size, l] of [

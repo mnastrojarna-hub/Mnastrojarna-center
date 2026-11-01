@@ -58,7 +58,7 @@ export const panHeadCross: Family = {
       const x = (g.dk / 2) * (1 - i / 6);
       cap.push([x, g.k * 0.4 + (g.k * 0.6 - (R - Math.sqrt(Math.max(0, R * R - x * x))))]);
     }
-    return part(`Šroub ${size}×${fmt(l)} ISO 7045`, mat(str(v.grade)), [cyl("Dřík", d, l, -l, "new"), ...revolveProfile("Hlava", cap, "add"), ...cross(g.dk, g.k, g.k), chamferAll(Math.max(0.2, d * 0.06)), thread(size, -l, l)], `ISO 7045 – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
+    return part(`Šroub ${size}×${fmt(l)} ISO 7045`, mat(str(v.grade)), [cyl("Dřík", d, l, -l, "new"), chamferAll(Math.max(0.2, d * 0.06)), ...revolveProfile("Hlava", cap, "add"), ...cross(g.dk, g.k, g.k), thread(size, -l, l)], `ISO 7045 – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
   },
 };
 
@@ -104,7 +104,7 @@ export const lockNut: Family = {
     const m = METRIC[size] ?? METRIC.M8;
     const h = LOCKNUT[size] ?? m.d;
     const hh = h * 0.65;
-    return part(`Pojistná matice ${size}`, mat(str(v.grade)), [...hexPrism("Matice", m.s, hh, 0, "new"), cyl("Límec vložky", m.s * 0.95, h - hh, hh, "add"), cyl("Nylonová vložka", m.d * 0.92, h - hh + 0.1, hh, "cut"), cyl("Závitová díra", m.d - 1.0825 * m.p, hh + 2, -1, "cut"), chamferAll(Math.min(0.5, m.p * 0.4)), thread(size, 0, hh)], `DIN 985 – ${size} – ${v.grade}`, "#3a3f45");
+    return part(`Pojistná matice ${size}`, mat(str(v.grade)), [...hexPrism("Matice", m.s, hh, 0, "new"), chamferAll(Math.min(0.5, m.p * 0.4)), cyl("Límec vložky", m.s * 0.95, h - hh, hh, "add"), cyl("Nylonová vložka", m.d * 0.92, h - hh + 0.1, hh, "cut"), cyl("Závitová díra", m.d - 1.0825 * m.p, hh + 2, -1, "cut"), thread(size, 0, hh)], `DIN 985 – ${size} – ${v.grade}`, "#3a3f45");
   },
 };
 
@@ -125,7 +125,7 @@ export const flangeNut: Family = {
     const m = METRIC[size] ?? METRIC.M8;
     const g = FLANGE_NUT[size] ?? FLANGE_NUT.M8;
     const fl = m.p * 0.8;
-    return part(`Přírubová matice ${size}`, mat(str(v.grade)), [...revolveProfile("Příruba", [[0, 0], [g.dc / 2, 0], [g.dc / 2, fl * 0.5], [m.s / 2, fl * 2.2], [0, fl * 2.2]], "new"), ...hexPrism("Matice", m.s, g.m, 0, "add"), cyl("Závitová díra", m.d - 1.0825 * m.p, g.m + 2, -1, "cut"), chamferAll(Math.min(0.5, m.p * 0.4)), thread(size, 0, g.m)], `DIN 6923 – ${size} – ${v.grade}`, "#3a3f45");
+    return part(`Přírubová matice ${size}`, mat(str(v.grade)), [...revolveProfile("Příruba", [[0, 0], [g.dc / 2, 0], [g.dc / 2, fl * 0.5], [m.s / 2, fl * 2.2], [0, fl * 2.2]], "new"), ...hexPrism("Matice", m.s, g.m, 0, "add"), cyl("Závitová díra", m.d - 1.0825 * m.p, g.m + 2, -1, "cut"), thread(size, 0, g.m)], `DIN 6923 – ${size} – ${v.grade}`, "#3a3f45");
   },
 };
 
