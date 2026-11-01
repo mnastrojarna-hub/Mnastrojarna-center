@@ -1,8 +1,8 @@
 /** Hliníkové konstrukční profily s T-drážkou (item / Bosch Rexroth styl), T-matice a úhelníky. */
-import type { Vec2 } from "../types";
+import { uid, type Feature, type Vec2 } from "../types";
 import { has, length, nums, score } from "./parse-util";
 import type { Family, ParamSchema } from "./types";
-import { box, chamferAll, cyl, extrudePoly, fmt, num, part, rnd, str } from "./util";
+import { box, chamferAll, cyl, extrudePoly, fmt, num, part, rnd, sketch, str, XZ } from "./util";
 
 const G = "Hliníkové profily";
 const ALU = "hlinik";
@@ -49,8 +49,10 @@ export function tslotOutline(W: number, H: number, p: { g: number; s: number; li
   side(H, H / 2, -1, (u, v) => [rnd(W / 2 - v, 4), rnd(u, 4)]); // pravá
   side(W, W / 2, -1, (u, v) => [rnd(u, 4), rnd(-H / 2 + v, 4)]); // dolní
   side(H, -H / 2, 1, (u, v) => [rnd(-W / 2 + v, 4), rnd(u, 4)]); // levá
-  // odstranit duplicitní rohové body
-  return pts.filter((q, i) => i === 0 || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) > 1e-6);
+  // odstranit duplicitní rohové body (včetně uzavíracího bodu = první bod)
+  const out = pts.filter((q, i) => i === 0 || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) > 1e-6);
+  if (out.length > 1 && Math.hypot(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1]) < 1e-6) out.pop();
+  return out;
 }
 
 export const tslotProfile: Family = {
@@ -154,13 +156,15 @@ export const angleBracket: Family = {
     const w = num(v.w, a - 2);
     const t = Math.max(3, a * 0.12);
     const hole = seriesOf(`${a}x${a}`).thread === "M5" ? 5.5 : seriesOf(`${a}x${a}`).thread === "M8" ? 9 : 11;
+    // trojúhelníkové žebro v rovině XZ (skica x → X, y → Z), symetricky vysunuté o t
+    const ribSk = sketch("Žebro – profil", XZ(0), [{ id: uid(), type: "polyline", closed: true, points: [[t - 0.1, t - 0.1], [a - 1, t - 0.1], [t - 0.1, a - 1]] }]);
+    const rib: Feature[] = [ribSk, { id: uid(), name: "Žebro", type: "extrude", sketchId: ribSk.id, distance: t, symmetric: true, reverse: false, mode: "add" }];
     return part(`Úhelník ${a}×${a}`, ALU, [
       box("Rameno 1", [a, w, t], [a / 2, 0, t / 2], "new"),
       box("Rameno 2", [t, w, a], [t / 2, 0, a / 2], "add"),
-      box("Žebro", [a - t, t, a - t], [t + (a - t) / 2, 0, t + (a - t) / 2], "add"),
-      { id: "z", name: "Zkosení žebra", type: "box", size: [a, a, a], position: [t + a / 2 + (a - t) / 2 * 0.0 + 0, 0, t + a / 2], centered: true, mode: "cut" },
+      ...rib,
       cyl("Díra 1", hole, t + 2, -1, "cut", "Z", [a * 0.6, 0]),
-      { id: "h2", name: "Díra 2", type: "cylinder", radius: hole / 2, height: t + 2, position: [-1, 0, a * 0.6], axis: "X", mode: "cut" },
+      { id: uid(), name: "Díra 2", type: "cylinder", radius: hole / 2, height: t + 2, position: [-1, 0, a * 0.6], axis: "X", mode: "cut" },
     ], `Úhelník ${a}×${a}×${fmt(w)}`, COLOR);
   },
 };

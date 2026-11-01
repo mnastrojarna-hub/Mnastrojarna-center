@@ -4,7 +4,7 @@ import { has, nums, score } from "./parse-util";
 import type { Family } from "./types";
 import { box, chamferAll, cyl, fmt, hexPrism, num, part, str, tube } from "./util";
 
-const G = "Pneumatika";
+const G = "Pneumatika a hydraulika";
 
 /** ISO 15552 – profilové válce: AM (čtverec tělesa), MM (pístnice), tie (táhla), cap (délka víka), KK (závit pístnice). */
 export const ISO15552: Record<number, { AM: number; MM: number; tie: number; cap: number; KK: string; port: string }> = {

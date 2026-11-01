@@ -226,7 +226,7 @@ export const plummerBlock: Family = {
   sizes: { key: "code", columns: [{ key: "d", label: "d" }, { key: "a", label: "a" }, { key: "e", label: "e" }, { key: "h", label: "h" }, { key: "b", label: "b" }], rows: Object.entries(UCP).map(([k, v]) => ({ code: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "ucp", "domek", "domecek", "teleso", "plummer", "pillow");
-    if (!kw) return null;
+    if (!kw || has(q, "shf", "sk8", "sk10", "sk12", "sk16", "sk20", "sk25", "sk30", "tyce", "shaft", "rod", "scuu", "sc8", "sc10", "sc12", "sc16", "sc20", "sc25", "pouzdr", "linear")) return null;
     const code = (q.match(/\bucp\s?(2(?:04|05|06|07|08|09|10))\b/) ?? [])[1];
     const d = nums(q).find((x) => Object.values(UCP).some((u) => u.d === x));
     const key = code ? `UCP${code}` : d ? Object.keys(UCP).find((k) => UCP[k].d === d) : undefined;

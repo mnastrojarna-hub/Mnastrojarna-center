@@ -31,9 +31,9 @@ export const moldGuidePillar: Family = {
   group: "Normálie forem",
   icon: "cylinder",
   standards: ["HASCO Z00", "Meusburger E1000", "DIN 9825"],
-  keywords: ["vodici sloupek", "sloupek", "guide pillar", "leader pin", "z00", "e1000"],
+  keywords: ["vodici sloupek", "sloupek", "guide pillar", "leader pin", "z00", "e1000", "hasco", "meusburger", "din 9825"],
   params: [dEnum(PILLAR_D, 24), lParam(120)],
-  parse: (q) => (has(q, "oper", "support") ? null : parseDL(q, ["vodici sloupek", "sloupek", "guide pillar", "leader pin"], PILLAR_D)),
+  parse: (q) => (has(q, "oper", "support", "z01", "bez limce", "without collar", "e1010", "plain", "sikm", "angle pin", "cam pin", "vodici tyc", "kalen") ? null : parseDL(q, ["vodici sloupek", "sloupek", "guide pillar", "leader pin", "z00", "e1000"], PILLAR_D)),
   describe: (v) => `Vodicí sloupek Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => guidePillar(num(v.d, 24), num(v.l, 120)),
 };
@@ -44,9 +44,9 @@ export const moldGuideBush: Family = {
   group: "Normálie forem",
   icon: "tube",
   standards: ["HASCO Z10", "Meusburger E1100", "DIN 9831"],
-  keywords: ["vodici pouzdro", "pouzdro", "guide bush", "z10", "e1100"],
+  keywords: ["vodici pouzdro", "pouzdro", "guide bush", "z10", "e1100", "hasco", "meusburger", "din 9831"],
   params: [dEnum(PILLAR_D, 24), lParam(56)],
-  parse: (q) => parseDL(q, ["vodici pouzdro", "pouzdro", "guide bush"], PILLAR_D),
+  parse: (q) => (has(q, "z11", "bez limce", "without collar", "e1110", "plain", "linear", "kulickov", "lm", "bronz", "kluzn", "4379", "sc") ? null : parseDL(q, ["vodici pouzdro", "pouzdro", "guide bush", "z10", "e1100"], PILLAR_D)),
   describe: (v) => `Vodicí pouzdro Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => guideBush(num(v.d, 24), num(v.l, 56)),
 };
@@ -59,7 +59,7 @@ export const moldEjector: Family = {
   standards: ["ISO 8694", "DIN 1530 A", "HASCO Z40"],
   keywords: ["vyhazovac", "vyhazovaci kolik", "ejector pin", "z40", "din 1530"],
   params: [dEnum(EJ_D, 6), lParam(160, 50, 800)],
-  parse: (q) => (has(q, "vratn", "return") ? null : parseDL(q, ["vyhazovac", "ejector"], EJ_D)),
+  parse: (q) => (has(q, "vratn", "return", "trubk", "ploch", "z42", "z46", "e1760", "e1720", "sleeve", "flat", "blade") ? null : parseDL(q, ["vyhazovac", "ejector", "z40", "e1700"], EJ_D)),
   describe: (v) => `Vyhazovač Ø${v.d}×${fmt(num(v.l))}`,
   make: (v) => ejectorPin(num(v.d, 6), num(v.l, 160)),
 };

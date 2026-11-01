@@ -128,7 +128,7 @@ export const spurGear: Family = {
   ],
   parse: (q) => {
     const kw = has(q, "ozuben", "gear", "pastorek", "pinion", "modul", "kolo");
-    if (!kw || has(q, "retez", "sprocket", "remen", "pulley", "hreben", "rack", "vnitrn", "internal")) return null;
+    if (!kw || has(q, "retez", "sprocket", "remen", "pulley", "hreben", "rack", "vnitrn", "internal", "sikm", "helical", "kuzel", "bevel", "snek", "worm")) return null;
     const m = tagged(q, "m") ?? tagged(q, "modul");
     const z = tagged(q, "z");
     const b = tagged(q, "b");

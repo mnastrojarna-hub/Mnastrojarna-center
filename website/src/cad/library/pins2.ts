@@ -114,6 +114,7 @@ const clevisPin = (id: string, std: string, name: string, head: boolean): Family
   params: [dEnum(CLEVIS_D, 12), lParam(60), { key: "groove", label: "Drážky pro pojistný kroužek", kind: "bool", default: true }],
   parse: (q) => {
     if (has(q, "kolik", "pero", "retez", "lozisk", "m20", "zavit")) return null;
+    if (has(q, "sikm", "angle pin", "cam pin", "celist", "slider")) return null;
     const hit = parseDL(q, ["cep", "clevis", std.toLowerCase().replace("din ", ""), head ? "2341" : "2340"], CLEVIS_D);
     return hit && { ...hit, score: hit.score * (head === !!has(q, "s hlavou", "hlav", "head", "1444", "2341") || !has(q, "s hlavou", "hlav", "head", "bez hlavy", "1443", "1444", "2340", "2341") ? 1 : 0.85) };
   },

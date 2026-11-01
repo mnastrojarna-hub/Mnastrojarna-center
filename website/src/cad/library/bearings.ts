@@ -28,6 +28,7 @@ export const deepGrooveBearing: Family = {
     const kw = has(q, "lozisk", "bearing", "skf", "zkl", "fag");
     const code = (q.match(/\b(6[0-3]\d{2}|6[02][4-8])(?!\d)/) ?? [])[1];
     if (!kw && !code) return null;
+    if (!code && has(q, "kuzelik", "taper", "axial", "thrust", "jehl", "needle", "domek", "domecek", "ucp", "pouzdr", "bush", "kluzn", "bronz", "linear", "lm")) return null;
     if (code && !BEARINGS[code]) return kw ? { values: {}, score: 0.5 } : null;
     const seal = /2rs|rs/.test(q) ? "2RS" : /2z|zz/.test(q) ? "2Z" : /otev|open/.test(q) ? "" : undefined;
     const values: Record<string, string> = {};

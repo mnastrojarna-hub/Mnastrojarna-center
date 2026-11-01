@@ -162,7 +162,7 @@ export const hollow: Family = {
     const k = has(q, "jakl", "jekl", "uzavren", "ctvercov", "obdelnik", "shs", "rhs", "tenkosten", "profil");
     const d = dims(q);
     if (!k && d.length < 3) return null;
-    if (has(q, "trubk", "chs", "kulat", "ipe", "hea", "heb", "upn", "uhelnik", "ploch") && !has(q, "jakl", "jekl")) return null;
+    if (has(q, "trubk", "chs", "kulat", "ipe", "hea", "heb", "upn", "uhelnik", "ploch", "drazk", "hlinik", "alu", "item", "bosch", "rexroth", "slot", "t-draz", "kolejnic", "hgr", "pneumat", "valec", "vodici", "sloupek") && !has(q, "jakl", "jekl")) return null;
     const values: Record<string, number> = {};
     if (d.length >= 2) {
       values.w = d[0];
@@ -198,7 +198,7 @@ export const chs: Family = {
   sizes: { key: "D", columns: [{ key: "t", label: "t" }], rows: CHS.map(([D, t]) => ({ D, t })) },
   parse: (q) => {
     const k = has(q, "trubk", "chs", "tube", "pipe", "rour");
-    if (!k) return null;
+    if (!k || has(q, "dn", "zavit", "prirub", "flange", "palc", "\"", "plynar", "2440", "10255", "vyhazovaci", "trubkov", "z42", "pneumat", "natrubek", "hadic")) return null;
     const d = dims(q);
     const values: Record<string, number> = {};
     if (d.length >= 2) {

@@ -1,32 +1,51 @@
 /**
- * Knihovna normálií – registr rodin a textové vyhledávání („M8x30“, „IPE 200 L=1500“, „ložisko 6205 2RS“).
+ * Knihovna normálií – registr rodin a textové vyhledávání („M8x30“, „IPE 200 L=1500“, „ložisko 6205 2RS“,
+ * „šikmé kolo m2 z30 β15“, „kuželíkové ložisko 30206“, „HGR20 L500“, „příruba PN16 DN80“, „vodicí sloupek Z00 24x150“).
+ *
+ * Rodiny jsou rozděleny do souborů podle oblasti; každá má tabulku rozměrů, citované normy a parser (česky i anglicky,
+ * bez diakritiky). Nové rodiny stačí přidat do pole LIBRARY – dialog si skupiny i tabulky sestaví sám.
+ *
+ * Známá zjednodušení geometrie (všechny díly se staví < ~2 s):
+ *  - šikmé / šneková kola: loft natočených evolventních profilů (bez twistExtrude), šnekové kolo bez globoidního hrdla
+ *  - šnek: závit jako kruhový profil (prvek spring), ne lichoběžník ZA/ZN; kuželové kolo: přímé zuby, loft hlava→pata
+ *  - kuželíková a axiální ložiska: skutečné rozměry d/D/T, valivá tělesa zjednodušená; UPN bez úkosu pásnic
+ *  - hliníkové profily: T-drážky jako lomená čára (bez zaoblení a vnitřních žeber), středová díra pro závit čela
+ *  - pneumatické válce: profil těla jako válec + čtvercová víka s táhly; příruby bez těsnicí lišty typu C
  *
  * TODO (navazující práce, nic z toho neblokuje použití):
- *  - šikmé ozubení (helical) – potřebuje twistExtrude v prvku extrude; kuželová a šneková kola
- *  - pružné podložky DIN 127/ISO 7092, zubové DIN 6797, pojistné matice DIN 985 (nylonová vložka), křídlové matice
- *  - skutečné UPN pásnice s úkosem 8 %, nerovnoramenné L v obou orientacích, profily HEM, IPN, T
- *  - ložiska: kuželíková 30xxx, válečková NU, axiální 51xxx, ložiskové domky UCP/UCF, pouzdra
- *  - řetězy: samotný řetěz jako sestava článků; řemenice: Poly-V, plochá; spojky, hřídelové spojky
- *  - normálie forem: vyhazovací trubky, ploché vyhazovače, šikmé čepy, tahače jader, datumovky, temperační spojky
- *  - lineární technika: kuličková pouzdra, vodicí tyče, kolejnice + vozíky (HIWIN), kuličkové šrouby
- *  - pneumatika/hydraulika: válce ISO 15552, šroubení; elektro: motory IEC (kostra B5/B14)
+ *  - válečková ložiska NU/N, dvouřadá naklápěcí 22xx, ložiskové domky UCF/UCFL, samomazná pouzdra s límcem
+ *  - řetěz jako sestava článků; řemenice Poly-V a plochá; hřídelové spojky (pružné, vlnovcové), svěrné pouzdra
+ *  - normálie forem: tahače jader, zámky desek, horké trysky; Meusburger E 1300 šikmé vedení
+ *  - lineární technika: vozíky MGN (miniaturní), lineární moduly, podpěrné lišty SK/SBR
+ *  - pneumatika/hydraulika: kompaktní válce ISO 21287, ventily, hydraulické válce ISO 6020; elektro: motory IEC (B5/B14)
+ *  - profily HEM, IPN, T; nerovnoramenné L v obou orientacích
  *  - import vlastních tabulek (CSV/JSON) a oblíbené sestavy („šroub + podložka + matice“ jedním klikem)
  */
 import type { CadDoc } from "../types";
+import { ALU_PROFILES } from "./alu-profiles";
 import { BEARING_FAMILIES } from "./bearings";
+import { BEARINGS2 } from "./bearings2";
 import { FASTENERS } from "./fasteners";
+import { FASTENERS2 } from "./fasteners2";
 import { GEARS } from "./gears";
+import { GEARS2 } from "./gears2";
+import { LINEAR } from "./linear";
 import { MOLD_PARTS } from "./mold-parts";
+import { MOLD2 } from "./mold2";
 import { norm } from "./parse-util";
 import { PINS } from "./pins";
+import { PINS2 } from "./pins2";
+import { PIPING } from "./piping";
+import { PNEUMATICS } from "./pneumatics";
 import { PROFILES } from "./profiles";
+import { SPRINGS2 } from "./springs2";
 import { GROUPS, defaults, withDefaults, type Family, type Group, type SearchResult, type Values } from "./types";
 
 export type { Family, Group, ParamSchema, SearchResult, Values } from "./types";
 export { GROUPS, defaults, withDefaults } from "./types";
 export { norm } from "./parse-util";
 
-export const LIBRARY: Family[] = [...FASTENERS, ...PINS, ...BEARING_FAMILIES, ...GEARS, ...PROFILES, ...MOLD_PARTS];
+export const LIBRARY: Family[] = [...FASTENERS, ...FASTENERS2, ...PINS, ...PINS2, ...SPRINGS2, ...BEARING_FAMILIES, ...BEARINGS2, ...GEARS, ...GEARS2, ...PROFILES, ...ALU_PROFILES, ...LINEAR, ...PNEUMATICS, ...PIPING, ...MOLD_PARTS, ...MOLD2];
 
 export const familyById = (id: string) => LIBRARY.find((f) => f.id === id);
 

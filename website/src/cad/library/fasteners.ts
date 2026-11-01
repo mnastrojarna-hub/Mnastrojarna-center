@@ -36,12 +36,12 @@ export const socketCap: Family = {
   group: "Spojovací materiál",
   icon: "thread",
   standards: ["ISO 4762", "DIN 912", "ČSN 02 1143"],
-  keywords: ["sroub", "imbus", "inbus", "valcova hlava", "din 912", "iso 4762", "socket", "cap screw", "shcs"],
+  keywords: ["sroub", "imbus", "inbus", "valcova hlava", "din 912", "iso 4762", "socket", "cap screw", "shcs", "z31", "z33", "hasco z31", "meusburger e1200"],
   params: [sizeParam(Object.keys(ISO4762)), lenParam(30), gradeParam(["8.8", "10.9", "12.9", "A2-70", "A4-80"], "12.9")],
   sizes: { key: "size", columns: [{ key: "d", label: "d" }, { key: "p", label: "P" }, { key: "dk", label: "dk" }, { key: "k", label: "k" }, { key: "s", label: "s" }], rows: Object.entries(ISO4762).map(([k, v]) => ({ size: k, d: METRIC[k].d, p: METRIC[k].p, ...v })) },
   parse: (q) => {
-    if (has(q, "sestihran", "hex", "6hr", "pulkulat", "button", "zapust", "countersunk", "stavec", "cerv", "matice", "nut", "podloz", "washer", "tyc", "rod", "kolik", "pin", "kolo", "ozub", "gear", "lozisk", "pruzin", "retez", "pero", "sloupek", "vyhazov", "931", "933", "4014", "4017", "din 9")) return null;
-    return parseScrew(q, ["imbus", "inbus", "valcov", "912", "4762", "socket", "sroub", "screw", "bolt"], 0.45);
+    if (has(q, "sestihran", "hex", "6hr", "pulkulat", "button", "zapust", "countersunk", "stavec", "cerv", "matice", "nut", "podloz", "washer", "tyc", "rod", "kolik", "pin", "kolo", "ozub", "gear", "lozisk", "pruzin", "retez", "pero", "sloupek", "vyhazov", "kulickov", "sfu", "ocko", "oko", "okem", "eye", "nyt", "rivet", "samorez", "tapping", "kriz", "phillips", "pozi", "zavrtn", "stud", "pan head", "931", "933", "4014", "4017", "din 9")) return null;
+    return parseScrew(q, ["imbus", "inbus", "valcov", "912", "4762", "socket", "sroub", "screw", "bolt", "z31", "z33", "e1200"], 0.45);
   },
   describe: (v) => `ISO 4762 – ${v.size}×${fmt(num(v.l))} – ${v.grade}`,
   make: (v) => {
@@ -70,7 +70,7 @@ const hexBolt = (id: string, std: string, full: boolean): Family => ({
   sizes: { key: "size", columns: [{ key: "d", label: "d" }, { key: "p", label: "P" }, { key: "s", label: "s" }, { key: "k", label: "k" }], rows: METRIC_SIZES.map((k) => ({ size: k, ...METRIC[k] })) },
   parse: (q) => {
     const words = ["sestihran", "hex", "6hr", full ? "933" : "931", std.toLowerCase().replace("iso ", "")];
-    if (!has(q, ...words) || has(q, "matice", "nut", "tyc", "bar", "podloz")) return null;
+    if (!has(q, ...words) || has(q, "matice", "nut", "tyc", "bar", "podloz", "ocko", "oko", "okem", "eye", "zavrtn", "stud", "sroubeni", "natrubek", "spojk")) return null;
     const hit = parseScrew(q, words);
     if (!hit) return null;
     const wantsPartial = !!has(q, "castecn", "931", "4014", "partial");
@@ -102,7 +102,7 @@ export const buttonHead: Family = {
   keywords: ["pulkulat", "pulkulata hlava", "button head", "iso 7380", "7380", "cockova"],
   params: [sizeParam(Object.keys(ISO7380)), lenParam(20), gradeParam(["10.9", "A2-70"], "10.9")],
   sizes: { key: "size", columns: [{ key: "dk", label: "dk" }, { key: "k", label: "k" }, { key: "s", label: "s" }], rows: Object.entries(ISO7380).map(([k, v]) => ({ size: k, ...v })) },
-  parse: (q) => (has(q, "pulkulat", "button", "7380", "cockov") ? parseScrew(q, ["pulkulat", "button", "7380", "cockov"]) : null),
+  parse: (q) => (has(q, "pulkulat", "button", "7380", "cockov") && !has(q, "kriz", "phillips", "pozi", "7045", "7046", "965", "pan head") ? parseScrew(q, ["pulkulat", "button", "7380", "cockov"]) : null),
   describe: (v) => `ISO 7380 – ${v.size}×${fmt(num(v.l))} – ${v.grade}`,
   make: (v) => {
     const size = str(v.size, "M8");
@@ -133,7 +133,7 @@ export const countersunk: Family = {
   keywords: ["zapustn", "zapustna hlava", "countersunk", "flat head", "din 7991", "iso 10642"],
   params: [sizeParam(Object.keys(ISO10642)), lenParam(20), gradeParam(["10.9", "A2-70"], "10.9")],
   sizes: { key: "size", columns: [{ key: "dk", label: "dk" }, { key: "k", label: "k" }, { key: "s", label: "s" }], rows: Object.entries(ISO10642).map(([k, v]) => ({ size: k, ...v })) },
-  parse: (q) => (has(q, "zapust", "countersunk", "7991", "10642", "flat head") ? parseScrew(q, ["zapust", "countersunk", "7991", "10642"]) : null),
+  parse: (q) => (has(q, "zapust", "countersunk", "7991", "10642", "flat head") && !has(q, "kriz", "phillips", "pozi", "7046", "965", "7982", "samorez") ? parseScrew(q, ["zapust", "countersunk", "7991", "10642"]) : null),
   describe: (v) => `ISO 10642 – ${v.size}×${fmt(num(v.l))} – ${v.grade}`,
   make: (v) => {
     const size = str(v.size, "M8");
@@ -188,7 +188,7 @@ const nut = (id: string, std: string, thin: boolean): Family => ({
   sizes: { key: "size", columns: [{ key: "s", label: "s" }, { key: "m", label: thin ? "m (nízká)" : "m" }], rows: METRIC_SIZES.map((k) => ({ size: k, s: METRIC[k].s, m: thin ? NUT[k].mt : NUT[k].m })) },
   parse: (q) => {
     const kw = has(q, "matice", "nut", thin ? "439" : "934", std.toLowerCase().replace("iso ", ""));
-    if (!kw) return null;
+    if (!kw || has(q, "pojist", "nylon", "nyloc", "samojist", "prirub", "kridl", "lock", "flange", "wing", "985", "7040", "6923", "315", "t-matice", "t matice", "tmatice", "kamen", "drazk", "slot", "kulickov")) return null;
     const m = metric(q);
     const isThin = !!has(q, "nizk", "thin", "439", "4035");
     if (isThin !== thin) return { values: m ? { size: m } : {}, score: 0.3 };
@@ -225,7 +225,7 @@ const washer = (id: string, std: string, large: boolean): Family => ({
   },
   parse: (q) => {
     const kw = has(q, "podloz", "washer", large ? "9021" : "7089", large ? "velk" : "125");
-    if (!kw) return null;
+    if (!kw || has(q, "pruzn", "perov", "zubov", "vejir", "ozuben", "tezk", "siln", "heavy", "spring", "tooth", "serrated", "127", "6798", "7349")) return null;
     const isLarge = !!has(q, "velk", "9021", "7093", "large", "karos");
     if (isLarge !== large) return { values: {}, score: 0.3 };
     const m = metric(q) ?? (nums(q)[0] ? `M${Math.round(nums(q)[0])}` : null);
@@ -252,7 +252,7 @@ export const threadedRod: Family = {
   params: [sizeParam(), { key: "l", label: "Délka", kind: "number", min: 10, max: 3000, step: 10, unit: "mm", default: 1000 }, gradeParam(["4.8", "8.8", "A2", "A4"], "4.8")],
   parse: (q) => {
     const kw = has(q, "zavitova tyc", "zavitovka", "tyc", "rod", "975", "976");
-    if (!kw) return null;
+    if (!kw || has(q, "zavrtn", "stud", "938", "939", "vodici", "kalen", "brousen", "h6", "linear", "support", "domecek", "shf")) return null;
     const hit = parseScrew(q, ["tyc", "rod"]);
     return hit && { ...hit, score: score(kw, hit.values.size ? 0.3 : 0) };
   },

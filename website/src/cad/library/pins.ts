@@ -30,7 +30,7 @@ const dowel = (id: string, std: string, name: string, extraKw: string[], round: 
   keywords: ["kolik", "valcovy kolik", "dowel", "pin", ...extraKw],
   params: [dParam(6), lParam(30)],
   parse: (q) => {
-    if (has(q, "pruzn", "spring pin", "8752", "zavlac", "roll pin")) return null;
+    if (has(q, "pruzn", "spring pin", "8752", "zavlac", "roll pin", "kuzel", "taper", "ryhov", "grooved", "cep", "clevis", "1444", "1443", "1234", "2339", "1473", "1474", "sikm", "angle pin", "cam pin", "vratn", "return")) return null;
     const hit = parsePin(q, ["kolik", "dowel", "pin", ...extraKw]);
     return hit && { ...hit, score: hit.score * (has(q, ...extraKw) ? 1 : id === "iso8734" ? 0.95 : 0.8) };
   },
@@ -83,7 +83,7 @@ export const key6885: Family = {
   sizes: { key: "b", columns: [{ key: "h", label: "h" }, { key: "t1", label: "t1 hřídel" }, { key: "t2", label: "t2 náboj" }, { key: "shaft", label: "hřídel d" }], rows: KEYS.map((k) => ({ b: String(k.b), h: k.h, t1: k.t1, t2: k.t2, shaft: `${k.from}–${k.to}` })) },
   parse: (q) => {
     const kw = has(q, "pero", "tesne", "key", "6885", "klin");
-    if (!kw || has(q, "pruzin", "kolik")) return null;
+    if (!kw || has(q, "pruzin", "kolik", "woodruff", "6888", "usecov", "kulickov", "sfu", "remenic", "t-matice", "kamen")) return null;
     const dm = dims(q);
     const values: Record<string, string | number> = {};
     if (dm.length >= 2 && keyByWidth(dm[0])) {
@@ -133,7 +133,7 @@ const ring = (id: string, std: string, external: boolean): Family => ({
   sizes: { key: "d", columns: [{ key: "s", label: "s" }, { key: "b", label: "b" }, { key: "g", label: external ? "d2 drážka" : "D2 drážka" }], rows: RINGS.map((r) => ({ d: String(r.d), s: r.s, b: r.b, g: external ? r.d2 : r.D2 })) },
   parse: (q) => {
     const kw = has(q, "pojistn", "segrov", "seeger", "circlip", "retaining", std.toLowerCase().replace("din ", ""));
-    if (!kw) return null;
+    if (!kw || has(q, "matice", "nut", "podloz", "washer")) return null;
     const wantInt = !!has(q, "dir", "vnitrn", "bore", "472", "internal");
     if (wantInt === external) return { values: {}, score: 0.3 };
     const n = nums(q).find((x) => x >= 8 && x <= 100);
@@ -207,7 +207,7 @@ export const compressionSpring: Family = {
   ],
   parse: (q) => {
     const kw = has(q, "pruzin", "spring", "2095");
-    if (!kw || has(q, "podloz", "kolik", "pin")) return null;
+    if (!kw || has(q, "podloz", "washer", "kolik", "pin", "tazn", "extension", "tension", "ocky", "zkrut", "torzn", "torsion", "talir", "disc", "belleville", "plynov", "gas", "vzper", "2097", "2088", "2093")) return null;
     const values: Record<string, number> = {};
     // „d1.6 D12“ – po normalizaci jsou obě malá: menší = drát, větší = vnější průměr
     const ds = [...q.matchAll(/(?:^|[^a-z])de?\s?=?\s?(\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]));

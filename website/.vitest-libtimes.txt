@@ -1,0 +1,16 @@
+1691	Šroub M4×12 ISO 7045
+1855	Šikmé kolo mn3 z16 β20°
+3332	Kuželové kolo m2,5 z24
+1776	Šnek m3 q10
+2258	Šnekové kolo m3 z24
+2515	Kuželíkové ložisko 32208
+410	Šroub M2.5×6 ISO 7045
+18	Kuželový kolík Ø10×80
+109	Rýhovaný kolík Ø3×16
+64	Profil 20×20 L200
+117	Profil 40×80 L300
+35	Profil 45×45 L100
+35	T-matice 10/M10
+14	Trubka R 4" L300
+14	Trubka R 1 1/4" L500
+196	Příruba DN200 PN16 typ 01

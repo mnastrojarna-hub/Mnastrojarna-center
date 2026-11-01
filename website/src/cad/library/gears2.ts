@@ -60,11 +60,14 @@ export const helicalGear: Family = {
     if (!kw || has(q, "kuzel", "bevel", "snek", "worm")) return null;
     const m = tagged(q, "mn") ?? tagged(q, "m") ?? tagged(q, "modul");
     const z = tagged(q, "z");
-    const beta = tagged(q, "beta") ?? tagged(q, "b") ?? (q.match(/(\d+(?:\.\d+)?)\s*(?:°|st|deg)/) ?? [])[1];
+    const betaM = q.match(/(?:β|beta|sklon\w*)\s?=?\s?(\d+(?:\.\d+)?)/) ?? q.match(/(\d+(?:\.\d+)?)\s*(?:°|st\b|deg)/);
+    const beta = betaM ? Number(betaM[1]) : null;
+    const b = tagged(q, "b");
     const values: Record<string, string | number> = {};
     if (m) values.mn = String(m);
     if (z) values.z = z;
-    if (beta) values.beta = Number(beta);
+    if (beta) values.beta = beta;
+    if (b) values.b = b;
     if (has(q, "lev", "left")) values.hand = "L";
     return { values, score: score(kw, (m ? 0.15 : 0) + (z ? 0.15 : 0) + (beta ? 0.1 : 0)) };
   },

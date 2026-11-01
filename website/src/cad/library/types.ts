@@ -17,9 +17,13 @@ export type Group =
   | "Řemenice"
   | "Ocelové profily a trubky"
   | "Pružiny a těsnění"
-  | "Normálie forem";
+  | "Normálie forem"
+  | "Lineární technika"
+  | "Pneumatika a hydraulika"
+  | "Hliníkové profily"
+  | "Potrubí a příruby";
 
-export const GROUPS: Group[] = ["Spojovací materiál", "Kolíky a pera", "Pojistné kroužky", "Ložiska", "Ozubení a řetězy", "Řemenice", "Ocelové profily a trubky", "Pružiny a těsnění", "Normálie forem"];
+export const GROUPS: Group[] = ["Spojovací materiál", "Kolíky a pera", "Pojistné kroužky", "Ložiska", "Ozubení a řetězy", "Řemenice", "Ocelové profily a trubky", "Pružiny a těsnění", "Normálie forem", "Lineární technika", "Pneumatika a hydraulika", "Hliníkové profily", "Potrubí a příruby"];
 
 /** Výsledek rozpoznání textového dotazu rodinou: hodnoty parametrů + skóre (0–1). */
 export type ParseHit = { values: Partial<Values>; score: number };
