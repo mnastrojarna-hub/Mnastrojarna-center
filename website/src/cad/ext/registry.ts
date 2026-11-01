@@ -48,7 +48,7 @@ export type ExtParam =
   | { key: string; label: string; kind: "faces" | "edges"; hint?: string }
   | { key: string; label: string; kind: "mode" };
 
-export type ExtTab = "create" | "surface" | "sheet" | "tools" | "asm" | "drawing";
+export type ExtTab = "create" | "surface" | "sheet" | "weld" | "tools" | "asm" | "drawing";
 
 export type ExtDef = {
   /** jedinečné id, např. "surf.extrude" */

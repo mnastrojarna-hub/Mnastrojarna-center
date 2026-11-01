@@ -5,4 +5,5 @@
 import "./surface";
 import "./sheetmetal";
 import "./advanced";
+import "./weld";
 export * from "./registry";

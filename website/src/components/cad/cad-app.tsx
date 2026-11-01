@@ -43,7 +43,7 @@ const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) =>
 
 const STORE = "mn-cad-doc-v1";
 type Hist = { past: CadDoc[]; present: CadDoc; future: CadDoc[] };
-type Tab = "create" | "sketch" | "surface" | "sheet" | "asm" | "tools" | "view" | "drawing" | "data";
+type Tab = "create" | "sketch" | "surface" | "sheet" | "weld" | "asm" | "tools" | "view" | "drawing" | "data";
 type AddType = Exclude<FeatureType, "sketch" | "import" | "pattern" | "ext">;
 
 const EXPORTS: { f: ExportFormat; label: string; ext: string; mime: string; hint: string }[] = [
@@ -1417,7 +1417,7 @@ export function CadApp() {
     }
   };
 
-  const baseGroups: Record<Exclude<Tab, "surface" | "sheet">, RGroup[]> = {
+  const baseGroups: Record<Exclude<Tab, "surface" | "sheet" | "weld">, RGroup[]> = {
     create: [
       { label: "Skica", items: [{ id: "sketch", label: "Skica", icon: "sketch", tone: "sketch", menu: sketchPlanes, active: planePick, hint: "2D profil na rovině nebo ploše" }] },
       {
@@ -1698,18 +1698,20 @@ export function CadApp() {
     drawing: [...baseGroups.drawing, ...extGroups("drawing")],
     surface: extGroups("surface"),
     sheet: extGroups("sheet"),
+    weld: extGroups("weld"),
   };
   const tabs: [Tab, string][] = [
     isAsm ? ["asm", "Sestava"] : ["create", "Tvorba"],
     ...(!isAsm && groups.surface.length ? ([["surface", "Plochy"]] as [Tab, string][]) : []),
     ...(!isAsm && groups.sheet.length ? ([["sheet", "Plech"]] as [Tab, string][]) : []),
+    ...(!isAsm && groups.weld.length ? ([["weld", "Svařence"]] as [Tab, string][]) : []),
     ...(sketch ? ([["sketch", "Skica"]] as [Tab, string][]) : []),
     ["tools", "Nástroje"],
     ["view", "Zobrazení"],
     ["drawing", "Výkres"],
     ["data", "Data"],
   ];
-  const curTab: Tab = isAsm ? (tab === "create" || tab === "sketch" || tab === "surface" || tab === "sheet" ? "asm" : tab) : sketch ? (tab === "create" || tab === "asm" ? "sketch" : tab) : tab === "sketch" || tab === "asm" ? "create" : tab;
+  const curTab: Tab = isAsm ? (tab === "create" || tab === "sketch" || tab === "surface" || tab === "sheet" || tab === "weld" ? "asm" : tab) : sketch ? (tab === "create" || tab === "asm" ? "sketch" : tab) : tab === "sketch" || tab === "asm" ? "create" : tab;
 
   // ---------- výzva v řádku příkazů ----------
   const prompt = isAsm
@@ -1813,7 +1815,7 @@ export function CadApp() {
 
   const buildCommands = (): Command[] => {
     const out: Command[] = [];
-    const tabLabel: Record<Tab, string> = { create: "Tvorba", sketch: "Skica", surface: "Plochy", sheet: "Plech", asm: "Sestava", tools: "Nástroje", view: "Zobrazení", drawing: "Výkres", data: "Data" };
+    const tabLabel: Record<Tab, string> = { create: "Tvorba", sketch: "Skica", surface: "Plochy", sheet: "Plech", weld: "Svařence", asm: "Sestava", tools: "Nástroje", view: "Zobrazení", drawing: "Výkres", data: "Data" };
     (Object.keys(groups) as Tab[]).forEach((t) => {
       for (const g of groups[t])
         for (const it of g.items) {
