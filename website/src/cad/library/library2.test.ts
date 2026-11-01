@@ -1,5 +1,6 @@
 /** Knihovna normálií 2 – nové rodiny (ozubení, ložiska, spojovací materiál, kolíky, profily, lineární technika, pneumatika, potrubí, pružiny, formy). */
 import { appendFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
@@ -12,7 +13,8 @@ import { GROUPS, LIBRARY, byGroup, defaults, familyById, makeFromText, search, w
 import { FLANGES, PIPES } from "./piping";
 import { DISC } from "./springs2";
 
-const TIMES = path.resolve(__dirname, "../../../.vitest-libtimes.txt");
+/** Časy stavby (ms) pro ruční kontrolu – mimo repozitář. */
+const TIMES = path.join(os.tmpdir(), "mn-cad-libtimes.txt");
 
 beforeAll(async () => {
   const oc = await (opencascade as unknown as (o: object) => Promise<unknown>)({
