@@ -4,7 +4,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Interference } from "@/cad/asm-kernel";
-import { alignFaces, apply3, bomCsv, emptyAssembly, ejectorPin, explodeOffset, guideBush, guidePillar, locatingRing, moldBase, partComponent, placementMatrix, rotMatrix, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
+import { apply3, boltStack, bomCsv, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
+import type { MateFaceInfo } from "@/cad/asm-kernel";
+import { solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
 import { cad } from "@/cad/client";
 import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
 import { keyCombo, loadRecent, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
@@ -13,7 +15,7 @@ import { extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
-import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { SALES } from "@/content/site";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
@@ -29,7 +31,7 @@ import { SettingsDialog } from "./settings-dialog";
 import { StartScreen } from "./start-screen";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
-import { AsmProps, AsmTree, BomTable, MoldWizard } from "./asm-panel";
+import { AsmProps, AsmTree, BomTable, MoldWizard, type MateMode } from "./asm-panel";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { FEATURE_TONE, Manager } from "./manager";
 import { EntityProps, FeatureProps, ParamContext } from "./props";
@@ -133,7 +135,12 @@ export function CadApp() {
   const [asmLoading, setAsmLoading] = useState(0);
   const [explode, setExplode] = useState(0);
   const [clashes, setClashes] = useState<Interference[] | null>(null);
-  const [mate, setMate] = useState<{ mode: "mate" | "flush" | "center"; compId: string; local?: { origin: Vec3; normal: Vec3 } } | null>(null);
+  const [mate, setMate] = useState<{ mode: MateMode; compId: string; a?: MateRef; value?: number } | null>(null);
+  const [mateStatus, setMateStatus] = useState<Record<string, MateStatus>>({});
+  const [boltPick, setBoltPick] = useState<{ washer: boolean; nut: boolean } | null>(null);
+  const mateGeo = useRef(new Map<string, MateFaceInfo>());
+  const docRef = useRef<CadDoc>(doc);
+  docRef.current = doc;
   const [bomOpen, setBomOpen] = useState(false);
   const [moldOpen, setMoldOpen] = useState(false);
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
@@ -398,40 +405,215 @@ export function CadApp() {
     { divider: true },
     { id: "del", label: "Odebrat ze sestavy", icon: "trash", tone: "cut", kbd: "Del", onClick: () => { commit({ ...doc, components: (doc.components ?? []).filter((x) => x.id !== c.id) }); setAsmSel(null); } },
   ];
-  const startMate = (compId: string, mode: "mate" | "flush" | "center") => {
+  const startMate = (compId: string, mode: MateMode) => {
     const c = doc.components?.find((x) => x.id === compId);
     if (c?.fixed) return flash("Komponenta je ukotvená – nejdřív ji uvolněte.");
     setAsmSel(compId);
-    setMate({ mode, compId });
+    setBoltPick(null);
+    setMate((m) => (m?.mode === mode && m.compId === compId ? null : { mode, compId, value: mode === "distance" ? 10 : mode === "angle" ? 90 : undefined }));
     setMeasure(false);
+  };
+  // ---------- trvalé vazby: geometrie ploch a řešič ----------
+  const leafOf = (ref: MateRef, d: CadDoc) => {
+    const ls = isAsm && d === doc ? leaves : flattenLeaves(d);
+    return ls.find((l) => l.id === (ref.leaf ?? ref.compId)) ?? null;
+  };
+  /** geometrie plochy v souřadnicích komponenty nejvyšší úrovně (nezávislá na jejím umístění) */
+  const geoProvider = (d: CadDoc) => (ref: MateRef): FaceGeo | null => {
+    const leaf = leafOf(ref, d);
+    if (!leaf || ref.face < 0) return null;
+    const info = mateGeo.current.get(`${leaf.key}:${ref.face}`);
+    if (!info || info.kind === "other") return null;
+    const top = d.components?.find((c) => c.id === ref.compId);
+    if (!top) return null;
+    const relPl = matrixToPlacement(mul4(invPlacementMatrix(top.placement), leaf.matrix));
+    return { kind: info.kind, origin: transformPoint(relPl, info.origin), normal: apply3(rotMatrix(relPl.rotation), info.normal), radius: info.radius };
+  };
+  /** doplní chybějící geometrii ploch (a indexy válcových ploch u normálií) – async přes worker */
+  const ensureMateGeo = async (d: CadDoc): Promise<Mate[]> => {
+    const mates = (d.mates ?? []).map((m) => ({ ...m, a: { ...m.a }, b: { ...m.b } }));
+    for (const m of mates) {
+      for (const ref of [m.a, m.b]) {
+        const leaf = leafOf(ref, d);
+        if (!leaf) continue;
+        if (ref.face < 0 && ref.radius) {
+          try {
+            const idx = await cad.cylFace(leaf.key, ref.radius);
+            if (idx >= 0) ref.face = idx;
+          } catch {
+            /* díl se ještě staví */
+          }
+        }
+        if (ref.face < 0) continue;
+        const key = `${leaf.key}:${ref.face}`;
+        if (!mateGeo.current.has(key)) {
+          try {
+            const info = await cad.mateFace(leaf.key, ref.face);
+            if (info) mateGeo.current.set(key, info);
+          } catch {
+            /* díl se ještě staví */
+          }
+        }
+      }
+    }
+    return mates;
+  };
+  const resolveMates = async (d: CadDoc, anchorId?: string | null) => {
+    if (d.kind !== "assembly" || !d.mates?.length) {
+      setMateStatus({});
+      return;
+    }
+    const mates = await ensureMateGeo(d);
+    const withMates = { ...d, mates };
+    const r = solveMates(withMates, geoProvider(withMates), anchorId);
+    setMateStatus(r.status);
+    const matesChanged = JSON.stringify(mates) !== JSON.stringify(d.mates);
+    if (!r.moved.length && !matesChanged) return;
+    // aplikovat na aktuální dokument (uživatel mohl mezitím pokračovat)
+    const cur = docRef.current;
+    const byId = new Map(r.components.map((c) => [c.id, c.placement]));
+    live({ ...cur, mates: matesChanged ? mates : cur.mates, components: (cur.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) });
   };
   /** vazba: leafId = list (díl), face = index plochy v dílu */
   const onMateFace = async (leafId: string, face: number) => {
     if (!mate || face < 0) return;
     const leaf = leaves.find((l) => l.id === leafId);
     if (!leaf) return;
-    const comps = doc.components ?? [];
-    const moving = comps.find((c) => c.id === mate.compId);
-    if (!moving) return;
-    if (!mate.local) {
+    let info: MateFaceInfo | null = null;
+    try {
+      info = await cad.mateFace(leaf.key, face);
+    } catch {
+      info = null;
+    }
+    if (!info) return flash("Plochu se nepodařilo načíst.");
+    const needCyl = mate.mode === "concentric";
+    if (needCyl && info.kind !== "cylinder") return flash("Souosost potřebuje válcovou nebo kuželovou plochu (díra, čep, šroub).");
+    if (!needCyl && info.kind !== "plane") return flash("Tato vazba potřebuje rovinnou plochu.");
+    mateGeo.current.set(`${leaf.key}:${face}`, info);
+    const ref: MateRef = { compId: leaf.topId, leaf: leaf.id !== leaf.topId ? leaf.id : undefined, face };
+    if (!mate.a) {
       if (leaf.topId !== mate.compId) return flash("Nejdřív klikněte na plochu vybrané (pohyblivé) komponenty.");
-      const info = await cad.asmFace(leaf.key, face);
-      if (!info?.planar) return flash("Vazby zatím umí rovinné plochy – vyberte rovinnou plochu.");
-      // plocha listu → souřadnice komponenty nejvyšší úrovně
-      const rel = mul4(invPlacementMatrix(moving.placement), leaf.matrix);
-      const relPl = matrixToPlacement(rel);
-      setMate({ ...mate, local: { origin: transformPoint(relPl, info.origin), normal: apply3(rotMatrix(relPl.rotation), info.normal) } });
+      setMate({ ...mate, a: ref });
+      flash("Teď klikněte na plochu cílové komponenty.");
       return;
     }
     if (leaf.topId === mate.compId) return flash("Teď klikněte na plochu jiné komponenty.");
-    const info = await cad.asmFace(leaf.key, face);
-    if (!info?.planar) return flash("Cílová plocha musí být rovinná.");
-    const wp = matrixToPlacement(leaf.matrix);
-    const world = { origin: transformPoint(wp, info.origin), normal: apply3(rotMatrix(wp.rotation), info.normal) };
-    setComp(moving.id, { placement: alignFaces(moving.placement, mate.local, world, mate.mode) });
+    const m: Mate = {
+      id: uid(),
+      type: mate.mode === "center" ? "mate" : mate.mode,
+      center: mate.mode === "center" || undefined,
+      a: mate.a,
+      b: ref,
+      value: mate.mode === "distance" || mate.mode === "angle" ? (mate.value ?? 0) : undefined,
+    };
+    const next = { ...doc, mates: [...(doc.mates ?? []), m] };
+    commit(next);
     setMate(null);
-    flash("Vazba použita – komponenta zarovnána.");
+    flash("Vazba uložena – přepočítá se při každém pohybu komponent.");
+    void resolveMates(next);
   };
+  // po postavení dílů doplnit chybějící geometrii vazeb
+  useEffect(() => {
+    if (!isAsm || !doc.mates?.length) return;
+    const st = Object.values(mateStatus);
+    if (!st.length || st.some((x) => x === "missing")) void resolveMates(doc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asmVer, isAsm, doc.mates?.length]);
+  // ---------- pole, zrcadlení, šroubový spoj ----------
+  const norm3 = (v: Vec3): Vec3 => {
+    const l = Math.hypot(...v) || 1;
+    return [v[0] / l, v[1] / l, v[2] / l];
+  };
+  const addBoltAt = async (leafId: string, face: number, point?: Vec3) => {
+    if (!boltPick) return;
+    const leaf = leaves.find((l) => l.id === leafId);
+    if (!leaf) return;
+    let info: MateFaceInfo | null = null;
+    try {
+      info = await cad.mateFace(leaf.key, face);
+    } catch {
+      info = null;
+    }
+    if (!info || info.kind !== "cylinder" || !info.extent || !info.radius) return flash("Klikněte na válcovou plochu díry.");
+    mateGeo.current.set(`${leaf.key}:${face}`, info);
+    const wp = matrixToPlacement(leaf.matrix);
+    const dir = norm3(apply3(rotMatrix(wp.rotation), info.normal));
+    const o = transformPoint(wp, info.origin);
+    const [t0, t1] = info.extent;
+    const e0: Vec3 = [o[0] + dir[0] * t0, o[1] + dir[1] * t0, o[2] + dir[2] * t0];
+    const e1: Vec3 = [o[0] + dir[0] * t1, o[1] + dir[1] * t1, o[2] + dir[2] * t1];
+    const dd = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const pt = point ?? e1;
+    const head = dd(pt, e0) < dd(pt, e1) ? e0 : e1;
+    const bottom = head === e0 ? e1 : e0;
+    const out = norm3([head[0] - bottom[0], head[1] - bottom[1], head[2] - bottom[2]]);
+    const stack = boltStack(info.radius * 2, t1 - t0, boltPick);
+    const rotUp = eulerXYZ(rotationBetween([0, 0, 1], out));
+    const rotDown = eulerXYZ(rotationBetween([0, 0, 1], [-out[0], -out[1], -out[2]]));
+    const at = (p: Vec3, k: number): Vec3 => [p[0] + out[0] * k, p[1] + out[1] * k, p[2] + out[2] * k];
+    const holeRef: MateRef = { compId: leaf.topId, leaf: leaf.id !== leaf.topId ? leaf.id : undefined, face };
+    const comps: AsmComponent[] = [];
+    const mates: Mate[] = [];
+    const d = Number(stack.size.replace(/\D/g, "")) || 8;
+    if (stack.washer) comps.push(partComponent(stack.washer, { position: head, rotation: rotUp }, { group: "Normálie", number: stack.washer.props?.number, color: "#9aa7b5" }));
+    const screw = partComponent(stack.screw, { position: at(head, stack.washerH), rotation: rotUp }, { group: "Normálie", number: stack.screw.props?.number, color: "#3a3f45" });
+    comps.push(screw);
+    mates.push({ id: uid(), type: "concentric", name: `Souosost ${stack.size}`, a: { compId: screw.id, face: -1, radius: d / 2 }, b: holeRef });
+    if (stack.nut) {
+      if (stack.washer) comps.push(partComponent(stack.washer, { position: bottom, rotation: rotDown }, { group: "Normálie", number: stack.washer.props?.number, color: "#9aa7b5" }));
+      const nut = partComponent(stack.nut, { position: at(bottom, -stack.washerH), rotation: rotDown }, { group: "Normálie", number: stack.nut.props?.number, color: "#3a3f45" });
+      comps.push(nut);
+      mates.push({ id: uid(), type: "concentric", name: `Souosost matice ${stack.size}`, a: { compId: nut.id, face: -1, radius: (d * 0.85) / 2 }, b: holeRef });
+    }
+    const next = { ...doc, components: [...(doc.components ?? []), ...comps], mates: [...(doc.mates ?? []), ...mates] };
+    commit(next);
+    setBoltPick(null);
+    setAsmSel(screw.id);
+    flash(`Vložen šroub ${stack.size}×${stack.length}${stack.washer ? " s podložkou" : ""}${stack.nut ? " a maticí" : ""} – vazba Souosost.`);
+  };
+  const patternSelected = (p: Parameters<typeof patternComponent>[2]) => {
+    if (!asmSel) return;
+    try {
+      commit(patternComponent(doc, asmSel, p));
+      flash(`Pole: ${p.count} komponent.`);
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
+  const mirrorSelected = (plane: "XY" | "XZ" | "YZ", offset: number) => {
+    if (!asmSel) return;
+    try {
+      commit(mirrorComponent(doc, asmSel, plane, offset));
+      flash("Komponenta zrcadlena (poloha a natočení; geometrie dílu se nezrcadlí).");
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
+  // pozice (balónky) pro výkres sestavy: světové obalové kvádry komponent podle řádků kusovníku
+  const balloonItems = useMemo(() => {
+    if (!isAsm) return undefined;
+    const out: { pos: number; name: string; bbox: [Vec3, Vec3] }[] = [];
+    for (const r of bom) {
+      let bb: [Vec3, Vec3] | null = null;
+      for (const l of leaves) {
+        if (!r.ids.includes(l.topId) || l.hidden) continue;
+        const m = asmCache.current.get(l.key)?.metrics?.bbox;
+        if (!m) continue;
+        const pl = matrixToPlacement(l.matrix);
+        for (const x of [m[0][0], m[1][0]]) for (const y of [m[0][1], m[1][1]]) for (const z of [m[0][2], m[1][2]]) {
+          const w = transformPoint(pl, [x, y, z]);
+          if (!bb) bb = [[...w] as Vec3, [...w] as Vec3];
+          else for (let k = 0; k < 3; k++) {
+            bb[0][k] = Math.min(bb[0][k], w[k]);
+            bb[1][k] = Math.max(bb[1][k], w[k]);
+          }
+        }
+      }
+      if (bb) out.push({ pos: r.pos, name: r.name, bbox: bb });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAsm, bom, leaves, asmVer]);
   // ---------- výběr entit, inspektor, měření ----------
   const srcOf = (it: SelItem): ShapeSrc => {
     const cid = it.kind !== "feature" ? it.compId : undefined;
@@ -499,6 +681,10 @@ export function CadApp() {
     runMeasure([it]);
   };
   const onPick = (it: SelItem | null, additive: boolean) => {
+    if (boltPick) {
+      if (it?.kind === "face" && it.compId) void addBoltAt(it.compId, it.index, it.point);
+      return;
+    }
     if (mate) {
       if (it?.kind === "face" && it.compId) onMateFace(it.compId, it.index);
       return;
@@ -601,7 +787,10 @@ export function CadApp() {
     if (gizmoOn.target === "component") {
       const c = doc.components?.find((x) => x.id === gizmoOn.id);
       if (!c) return;
-      setComp(c.id, { placement: matrixToPlacement(mul4(delta, placementMatrix(c.placement))) });
+      const pl = matrixToPlacement(mul4(delta, placementMatrix(c.placement)));
+      const nextDoc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? { ...x, placement: pl } : x)) };
+      commit(nextDoc);
+      if (doc.mates?.length) void resolveMates(nextDoc, c.id);
       return;
     }
     const f = doc.features.find((x) => x.id === gizmoOn.id);
@@ -1084,6 +1273,7 @@ export function CadApp() {
       if (sketchId || mod || e.altKey) return;
       if (e.key === "Escape") {
         if (mate) setMate(null);
+        if (boltPick) setBoltPick(null);
         else if (asmSel) setAsmSel(null);
         if (active) cancelEdit();
         setPlanePick(false);
@@ -1521,10 +1711,12 @@ export function CadApp() {
 
   // ---------- výzva v řádku příkazů ----------
   const prompt = isAsm
-    ? mate
-      ? !mate.local
-        ? "Vazba: klikněte na rovinnou plochu vybrané (pohyblivé) komponenty · Esc zruší"
-        : "Vazba: klikněte na rovinnou plochu cílové komponenty"
+    ? boltPick
+      ? "Šroubový spoj: klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu) · Esc zruší"
+      : mate
+      ? !mate.a
+        ? `Vazba ${mate.mode === "concentric" ? "Souosost: klikněte na válcovou plochu" : "– klikněte na rovinnou plochu"} vybrané (pohyblivé) komponenty · Esc zruší`
+        : `Vazba: klikněte na ${mate.mode === "concentric" ? "válcovou" : "rovinnou"} plochu cílové komponenty`
       : measure
         ? measureSel.length < 2
           ? `Měření (${FILTER_LABEL[selFilter]}): klikněte na ${measureSel.length ? "druhou" : "první"} entitu`
@@ -1763,7 +1955,7 @@ export function CadApp() {
           {/* Správce */}
           <aside className={cn("absolute inset-y-0 left-0 z-20 w-[270px] shrink-0 flex-col border-r border-[#d5dbe2] bg-white shadow-xl lg:static lg:flex lg:shadow-none", panels ? "flex" : "hidden")}>
             {isAsm ? (
-              <AsmTree doc={doc} selected={asmSel} onSelect={setAsmSel} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} />
+              <AsmTree doc={doc} selected={asmSel} onSelect={setAsmSel} onCommit={(d) => { commit(d); if (d.mates !== doc.mates) void resolveMates(d); }} onContext={(x, y, entries) => setCtx({ x, y, entries })} menuFor={compMenu} mateStatus={mateStatus} onResolve={() => void resolveMates(doc)} />
             ) : (
               <Manager doc={doc} status={result?.status} activeId={activeId} sketchId={sketchId} onSelect={selectFeature} onCommit={commit} onContext={(x, y, entries) => setCtx({ x, y, entries })} />
             )}
@@ -2023,7 +2215,26 @@ export function CadApp() {
                 </button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                <AsmProps c={doc.components.find((c) => c.id === asmSel)!} onChange={(p) => setComp(asmSel, p)} onMate={(mode) => startMate(asmSel, mode)} mating={!!mate} />
+                <AsmProps
+                  c={doc.components.find((c) => c.id === asmSel)!}
+                  onChange={(p) => {
+                    const nextDoc = { ...doc, components: (doc.components ?? []).map((c) => (c.id === asmSel ? { ...c, ...p } : c)) };
+                    commit(nextDoc);
+                    if (p.placement && doc.mates?.length) void resolveMates(nextDoc, asmSel);
+                  }}
+                  onMate={(mode) => startMate(asmSel, mode)}
+                  mating={mate?.compId === asmSel ? mate.mode : false}
+                  mateValue={mate?.value ?? 0}
+                  onMateValue={(v) => setMate((m) => (m ? { ...m, value: v } : m))}
+                  onPattern={patternSelected}
+                  onMirror={mirrorSelected}
+                  onBolt={(o) => {
+                    setMate(null);
+                    setBoltPick((b) => (b ? null : o));
+                    flash("Klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu).");
+                  }}
+                  bolting={!!boltPick}
+                />
               </div>
               <div className="flex gap-2 border-t border-[#d5dbe2] p-3">
                 <button type="button" disabled={doc.components.find((c) => c.id === asmSel)!.source.kind !== "part"} onClick={() => editPartInContext(doc.components!.find((c) => c.id === asmSel)!)} className="flex-1 rounded bg-[#2563eb] py-2 text-[12.5px] font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-40">
@@ -2259,6 +2470,7 @@ export function CadApp() {
             materialLabel={isAsm ? "dle kusovníku" : mat.label}
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
             drawings={doc.drawings}
+            balloons={balloonItems}
             onDrawingsChange={(d) => live({ ...doc, drawings: d })}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onClose={() => setDrawingOpen(false)}
