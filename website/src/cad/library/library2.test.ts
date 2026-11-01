@@ -298,3 +298,13 @@ describe("stavba dílů 2 (více velikostí)", () => {
     await build("mDateStamp", { d: "20", l: 40 });
   }, 180_000);
 });
+
+describe("aliasy normálií forem nekolidují s počtem zubů", () => {
+  for (const [q, id] of [
+    ["hřeben m2 z40", "rack"],
+    ["kolo m2 z10", "gear"],
+    ["ozubené kolo m3 z11", "gear"],
+    ["řetězka 08B z40", "sprocket"],
+  ])
+    it(`„${q}“ → ${id}`, () => expect(top(q).family.id, q).toBe(id));
+});

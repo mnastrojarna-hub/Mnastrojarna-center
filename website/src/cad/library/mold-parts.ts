@@ -10,7 +10,7 @@ const lParam = (def: number, min = 10, max = 600): ParamSchema => ({ key: "l", l
 
 function parseDL(q: string, words: string[], dVals?: number[]) {
   const kw = has(q, ...words);
-  if (!kw) return null;
+  if (!kw || has(q, "kolo", "gear", "ozub", "hreben", "rack", "retez", "sprocket", "remenic", "pulley", "snek", "worm", "zub")) return null; // Z00/Z10/Z40… nejsou počty zubů
   const dm = dims(q);
   const n = nums(q);
   let d = dm[0] ?? n[0];
