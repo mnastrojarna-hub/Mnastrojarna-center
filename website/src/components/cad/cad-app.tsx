@@ -534,7 +534,6 @@ export function CadApp() {
     } catch {
       info = null;
     }
-    console.log("W4DBG", JSON.stringify({ leafId, face, key: leaf.key.slice(0, 40), info }));
     if (!info || info.kind !== "cylinder" || !info.extent || !info.radius) return flash("Klikněte na válcovou plochu díry.");
     mateGeo.current.set(`${leaf.key}:${face}`, info);
     const wp = matrixToPlacement(leaf.matrix);
@@ -683,7 +682,6 @@ export function CadApp() {
   };
   const onPick = (it: SelItem | null, additive: boolean) => {
     if (boltPick) {
-      console.log("W4PICK", JSON.stringify(it));
       if (it?.kind === "face" && it.compId) void addBoltAt(it.compId, it.index, it.point);
       return;
     }
