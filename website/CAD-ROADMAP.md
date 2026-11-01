@@ -60,7 +60,8 @@ Zásuvná infrastruktura prvků rozšíření (`cad/ext/registry.ts` + `componen
 - **W3 Pokročilé** (`cad/ext/advanced.ts`): proměnné a plné zaoblení, tečný řetězec, nestejné sražení, zrcadlení prvků, pole podél křivky, výplňové pole, zkrut, kopule, text na válec, úkos s dělicí rovinou, lem a drážka, měřítko, díry v bodech skici, kontrola/oprava geometrie, tloušťka stěn – **probíhá**.
 - **W4 Sestavy a výkresy 2** (`cad/mates.ts`, `drawing.ts`, `drawing-workspace.tsx`, `asm-panel.tsx`): trvalé vazby (kontakt/zarovnat/soustřednost/vzdálenost/úhel/rovnoběžnost) se sekvenčním řešičem, pole a zrcadlení komponent, šroubový spoj do díry, pozice (balónky) na výkresu sestavy, detailní pohled, více listů, tabulka děr, tabulka revizí – **probíhá**.
 - **W5 Knihovna 2** (`cad/library/*`): šikmá/kuželová/šneková kola, kuželíková/axiální/jehlová ložiska a tělesa, další šrouby/matice/podložky, kolíky, hliníkové profily s T-drážkou + T-matice, pneumatické válce ISO 15552/6432, lineární vedení HGR/HGW, kuličkové šrouby, vodicí tyče, příruby PN16, talířové/tažné/zkrutné pružiny, normálie HASCO/Meusburger – **probíhá** (cíl ≥ 85 rodin).
-- **Vedoucí**: analýza ploch ve 3D (zebra, křivost, tloušťka stěn) ✅.
+- **W6 Svařence** (`cad/ext/weld.ts`): konstrukční profily po skice (jäkl, trubka, L, U, IPE/HEB, plochá, kulatina) s pokosy/tupými rohy a mezerou, ořez/prodloužení, víčka, styčníky, svarové housenky, desky, kusovník řezů (CSV), tabulka svarů, značky svarů ISO 2553, generátor rámu – **probíhá**.
+- **Vedoucí**: analýza ploch ve 3D (zebra, křivost, tloušťka stěn) ✅; karta Svařence ✅.
 Po dokončení: zapojit (automaticky přes registr), přidat snímky karet Plochy/Plech do `tools.cjs`, rozšířit `e2e/cad.e2e.cjs` (plech → rozvin DXF, plošné vysunutí, vazba soustřednost), build, přeměřit počet příkazů.
 
 ### Zapojení po dokončení pracovníků (checklist pro vedoucího / další relaci)
