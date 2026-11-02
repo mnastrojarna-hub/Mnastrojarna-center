@@ -32,6 +32,7 @@ import {
 } from "@/cad/refs";
 import type { Axis, CadDoc, Feature, PlaneName, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
+import { PickList } from "./pick-list";
 import { ContextMenu, type RMenuEntry } from "./ribbon";
 
 export type Want = "point" | "vertex" | "edge" | "face" | "plane" | "axis" | "any";
@@ -45,6 +46,8 @@ export const RefPickContext = createContext<{
   /** vybrané entity (pro „použít výběr“) */
   selectionRefs: Ref[];
   lastPoint: Vec3 | null;
+  /** počty entit aktuálního tělesa (pro „Vybrat ze seznamu…“) */
+  counts?: { faces: number; edges: number; vertices: number };
 } | null>(null);
 
 let seq = 0;
@@ -78,6 +81,14 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [opt, setOpt] = useState<{ o: PointOption; got: Ref[] } | null>(null);
+  const [list, setList] = useState(false);
+  // dlouhý stisk (dotyk) = stejná nabídka jako pravé tlačítko
+  const press = useRef<{ t: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const longFired = useRef(false);
+  const cancelPress = () => {
+    if (press.current) clearTimeout(press.current.t);
+    press.current = null;
+  };
   const active = ctx?.target?.id === id;
   const empty = !value || isPlaceholder(value);
 
@@ -167,6 +178,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
     ...(want === "point" || want === "any" || want === "vertex" ? POINT_OPTIONS.filter((o) => want !== "vertex" || ["vertex", "edgeMid", "edgeStart", "edgeEnd", "center", "faceCenter", "percent", "mid", "between", "offset", "project", "intersect", "origin", "xyz"].includes(o.id)).map((o) => ({ id: o.id, label: o.label, icon: o.picks[0]?.want === "edge" ? "edge" : o.picks[0]?.want === "face" ? "face" : "point", hint: o.hint, onClick: () => runOption(o) })) : []),
     ...(want === "face" || want === "plane" ? [{ id: "face", label: "Vybrat plochu klikem", icon: "face", onClick: pickPlain }] : []),
     ...(want === "edge" || want === "axis" ? [{ id: "edge", label: "Vybrat hranu klikem", icon: "edge", onClick: pickPlain }] : []),
+    { id: "list", label: "Vybrat ze seznamu…", icon: "table", hint: "seznam ploch / hran / vrcholů s filtrem a hledáním", onClick: () => setList(true) },
     { divider: true },
     { id: "sel", label: "Použít aktuální výběr", icon: "select", disabled: !ctx?.selectionRefs.length, onClick: useSelection },
     { id: "clear", label: "Vymazat", icon: "delete", onClick: () => onChange({ kind: want === "face" || want === "plane" ? "face" : want === "edge" || want === "axis" ? "edge" : "vertex", index: -1 }) },
@@ -200,11 +212,33 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
           className={cn(fieldCls, active ? "border-brand bg-brand/5 ring-2 ring-brand/20" : empty ? "border-dashed border-ink-700/25 bg-white" : "border-ink-700/12 bg-white")}
           onContextMenu={(e) => {
             e.preventDefault();
-            setMenu({ x: e.clientX, y: e.clientY });
+            if (!menu) setMenu({ x: e.clientX, y: e.clientY });
           }}
-          title="Pravé tlačítko: další způsoby zadání"
+          onPointerDown={(e) => {
+            if (e.pointerType === "mouse" && e.button !== 0) return;
+            cancelPress();
+            const x = e.clientX;
+            const y = e.clientY;
+            press.current = { x, y, t: setTimeout(() => {
+              press.current = null;
+              longFired.current = true;
+              setMenu((m) => m ?? { x, y });
+            }, 450) };
+          }}
+          onPointerMove={(e) => press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > 8 && cancelPress()}
+          onPointerUp={cancelPress}
+          onPointerCancel={cancelPress}
+          onPointerLeave={cancelPress}
+          title="Pravé tlačítko / dlouhý stisk: další způsoby zadání"
         >
-          <button type="button" onClick={pickPlain} className={cn("flex-1 truncate text-left", empty && !active && "text-ink-700/45")}>
+          <button
+            type="button"
+            onClick={() => {
+              if (longFired.current) return void (longFired.current = false);
+              pickPlain();
+            }}
+            className={cn("flex-1 truncate text-left", empty && !active && "text-ink-700/45")}
+          >
             {active ? (opt ? `${opt.o.label} – ${opt.got.length + 1}/${opt.o.picks.length}…` : `Klikněte v modelu (${WANT_LABEL[want]})…`) : empty ? `Vyberte ${WANT_LABEL[want]}` : refLabel(value)}
           </button>
           {allowXyz && (
@@ -220,6 +254,19 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
       {err && <p className="mt-0.5 text-[11px] text-brand">{err}</p>}
       {info && !err && <p className="mt-0.5 truncate text-[11px] text-ink-700/50">{info}</p>}
       {menu && <ContextMenu x={menu.x} y={menu.y} entries={entries} close={() => setMenu(null)} />}
+      {list && ctx && (
+        <PickList
+          doc={ctx.doc}
+          counts={ctx.counts}
+          want={want}
+          title={`${label}: vybrat ze seznamu`}
+          onPick={(r) => {
+            onChange(r);
+            setList(false);
+          }}
+          onClose={() => setList(false)}
+        />
+      )}
     </div>
   );
 }
