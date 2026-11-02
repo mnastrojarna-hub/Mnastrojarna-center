@@ -5,6 +5,8 @@
 import * as r from "replicad";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { getExt } from "./ext/index";
+import "./feat/index";
+import { getFeatureBuilder } from "./feat/registry";
 import { importBody } from "./formats/kernel-import";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
@@ -82,7 +84,7 @@ function oriented(s: Shape, axis: Axis, position: Vec3): Shape {
   return s.translate(position);
 }
 
-function applyMode(body: Shape | null, tool: Shape, mode: BoolMode): Shape {
+export function applyMode(body: Shape | null, tool: Shape, mode: BoolMode): Shape {
   if (!body) {
     if (mode === "cut" || mode === "intersect") throw new Error("Není z čeho odebírat – nejdřív vytvořte těleso.");
     return tool;
@@ -92,7 +94,7 @@ function applyMode(body: Shape | null, tool: Shape, mode: BoolMode): Shape {
   return body.fuse(tool);
 }
 
-function bboxDiag(s: Shape) {
+export function bboxDiag(s: Shape) {
   const b = s.boundingBox;
   const [[x0, y0, z0], [x1, y1, z1]] = b.bounds;
   return Math.hypot(x1 - x0, y1 - y0, z1 - z0) || 100;
@@ -104,7 +106,7 @@ const rctx = (ctx: Ctx): ResolveCtx => ({ body: ctx.body, sketches: ctx.sketches
 const planeFrom = (p: { origin: Vec3; normal: Vec3; xDir: Vec3 }) => new r.Plane(p.origin, p.xDir, p.normal);
 
 /** Tenká stěna z uzavřeného profilu: prstenec kolem obrysu (ven / dovnitř / na střed / dvě tloušťky). */
-function thinDrawing(d: r.Drawing, thin: Thin): r.Drawing {
+export function thinDrawing(d: r.Drawing, thin: Thin): r.Drawing {
   const t1 = Math.abs(thin.t1);
   const t2 = Math.abs(thin.t2 ?? thin.t1);
   if (!(t1 > 0)) throw new Error("Tloušťka tenké stěny musí být kladná.");
@@ -121,7 +123,7 @@ function thinDrawing(d: r.Drawing, thin: Thin): r.Drawing {
 }
 
 /** Profil skici jako replicad skica v dané rovině (volitelně bez otvorů / jako tenká stěna; otevřený profil jen s tenkou stěnou). */
-function profileSketch(sk: SketchF, plane: r.Plane, o: { outerOnly?: boolean; thin?: Thin }, shift: Vec3 = [0, 0, 0]): r.SketchInterface {
+export function profileSketch(sk: SketchF, plane: r.Plane, o: { outerOnly?: boolean; thin?: Thin }, shift: Vec3 = [0, 0, 0]): r.SketchInterface {
   const d = sketchDrawing(sk, o.outerOnly);
   if (d) return (o.thin ? thinDrawing(d, o.thin) : d).sketchOnPlane(plane) as r.SketchInterface;
   if (!o.thin) throw new Error("Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu).");
@@ -134,7 +136,7 @@ function profileSketch(sk: SketchF, plane: r.Plane, o: { outerOnly?: boolean; th
 }
 
 /** Tělesa složeného tvaru (po booleovské operaci může vzniknout více kusů). */
-function solidsOf(s: Shape): Shape[] {
+export function solidsOf(s: Shape): Shape[] {
   const list = (s as unknown as { solids?: Shape[] }).solids;
   return list && list.length ? list : [s];
 }
@@ -145,7 +147,7 @@ const corners = (s: Shape): Vec3[] => {
 const minProj = (s: Shape, o: Vec3, d: Vec3) => Math.min(...corners(s).map((c) => V.dot(V.sub(c, o), d)));
 const maxProj = (s: Shape, o: Vec3, d: Vec3) => Math.max(...corners(s).map((c) => V.dot(V.sub(c, o), d)));
 /** Kus nejblíže počátku ve směru d (pro „k dalšímu“). */
-function nearestSolid(parts: Shape, o: Vec3, d: Vec3): { solid: Shape; far: number } {
+export function nearestSolid(parts: Shape, o: Vec3, d: Vec3): { solid: Shape; far: number } {
   let best: Shape | null = null;
   let bestT = Infinity;
   for (const sl of solidsOf(parts)) {
@@ -159,14 +161,14 @@ function nearestSolid(parts: Shape, o: Vec3, d: Vec3): { solid: Shape; far: numb
   return { solid: best, far: maxProj(best, o, d) };
 }
 
-function needSketch(ctx: Ctx, id: string, role = "skica"): SketchF {
+export function needSketch(ctx: { sketches: Map<string, SketchF> }, id: string, role = "skica"): SketchF {
   const sk = ctx.sketches.get(id);
   if (!sk) throw new Error(`Chybí ${role} – vyberte ji v parametrech.`);
   return sk;
 }
 
 /** Uzavřené smyčky skici jako dráty v prostoru, s hloubkou vnoření (0 = vnější obrys, 1 = otvor…). */
-function sketchWires(sk: SketchF, plane: r.Plane = planeOf(sk.plane)): { wire: r.Wire; depth: number; area: number }[] {
+export function sketchWires(sk: SketchF, plane: r.Plane = planeOf(sk.plane)): { wire: r.Wire; depth: number; area: number }[] {
   const { loops } = findLoops(sk.entities);
   if (!loops.length) throw new Error(`Skica „${sk.name}“ neobsahuje uzavřený profil.`);
   return nestLoops(loops).map(({ loop, depth, area }) => {
@@ -209,7 +211,7 @@ export function sketchPathWire(sk: SketchF): r.Wire {
 }
 
 /** Otevřená (nebo uzavřená) křivka skici jako seřazené 2D segmenty – pro žebro. */
-function sketchChain(sk: SketchF): Seg[] {
+export function sketchChain(sk: SketchF): Seg[] {
   const segs: Seg[] = [];
   for (const e of sk.entities) {
     if (e.construction) continue;
@@ -266,7 +268,7 @@ export function chainSegs(segs: Seg[]): Seg[] {
   return chain;
 }
 
-function combine(parts: { solid: Shape; depth: number }[]): Shape {
+export function combine(parts: { solid: Shape; depth: number }[]): Shape {
   let acc: Shape | null = null;
   for (const { solid, depth } of parts.sort((a, b) => a.depth - b.depth)) {
     if (!acc) acc = solid;
@@ -621,7 +623,7 @@ function modeOf(f: Feature): BoolMode {
   return "mode" in f ? f.mode : "add";
 }
 
-function edgeFilter(body: Shape, edges: number[] | "all") {
+export function edgeFilter(body: Shape, edges: number[] | "all") {
   if (edges === "all") return null;
   const all = body.edges;
   const picked = edges.map((i) => all[i]).filter(Boolean);
@@ -630,7 +632,7 @@ function edgeFilter(body: Shape, edges: number[] | "all") {
 }
 
 /** Rovina kolmá na osu (XY ⟂ Z, XZ ⟂ Y, YZ ⟂ X) posunutá o `offset` v kladném směru osy. */
-function axisPlane(name: PlaneName, offset: number): r.Plane {
+export function axisPlane(name: PlaneName, offset: number): r.Plane {
   if (name === "XY") return new r.Plane([0, 0, offset], [1, 0, 0], [0, 0, 1]);
   if (name === "XZ") return new r.Plane([0, offset, 0], [1, 0, 0], [0, 1, 0]);
   return new r.Plane([offset, 0, 0], [0, 1, 0], [1, 0, 0]);
@@ -662,6 +664,14 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
     }
     try {
       let next: Shape | null = body;
+      const custom = f.type !== "sketch" && f.type !== "datum" && f.type !== "ext" ? getFeatureBuilder(f.type) : undefined;
+      if (custom) {
+        const out = await custom(f, { body, sketches, features, tools, index: i, doc });
+        if (out !== null && out !== undefined) next = out;
+        body = next;
+        status.push({ id: f.id, ok: true });
+        continue;
+      }
       switch (f.type) {
         case "sketch": {
           if (!f.planeDef) {

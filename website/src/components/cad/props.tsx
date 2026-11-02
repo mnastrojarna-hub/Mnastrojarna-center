@@ -9,6 +9,8 @@ import type { Axis, BoolMode, CadDoc, Feature, HoleKind, PlaneName, SketchEntity
 import { cn } from "@/lib/cn";
 import type { Extent, HoleEnd } from "@/cad/types";
 import { AxisField, DirectionField, ExtentField, PlaneDefField, RefListField, StartField, ThinField } from "./ref-field";
+import "./forms/index";
+import { getFeatureForm } from "./forms/registry";
 
 // ---------- parametry (proměnné / rovnice) ----------
 
@@ -20,7 +22,7 @@ const ISO273: Record<string, [number, number, number]> = {
 const FIT_IDX = { fine: 0, medium: 1, coarse: 2 } as const;
 
 /** Sbalitelná sekce formuláře (pokročilé volby). */
-function Details({ summary, children, open }: { summary: string; children: React.ReactNode; open?: boolean }) {
+export function Details({ summary, children, open }: { summary: string; children: React.ReactNode; open?: boolean }) {
   return (
     <details open={open} className="group rounded-lg border border-ink-700/10">
       <summary className="cursor-pointer select-none px-3 py-2 text-[12px] font-medium text-ink-700/75 marker:text-ink-700/40 group-open:border-b group-open:border-ink-700/10">{summary}</summary>
@@ -220,13 +222,13 @@ const MODES: { v: BoolMode; l: string }[] = [
   { v: "cut", l: "Odebrat" },
   { v: "intersect", l: "Průnik" },
 ];
-const AXES: { v: Axis; l: string }[] = [
+export const AXES: { v: Axis; l: string }[] = [
   { v: "X", l: "X" },
   { v: "Y", l: "Y" },
   { v: "Z", l: "Z" },
 ];
 /** Roviny kolmé na osu (pro řez, úkos): offset se měří ve směru osy. */
-const AXIS_PLANES: { v: PlaneName; l: string; axis: Axis }[] = [
+export const AXIS_PLANES: { v: PlaneName; l: string; axis: Axis }[] = [
   { v: "XY", l: "XY ⟂ Z", axis: "Z" },
   { v: "XZ", l: "XZ ⟂ Y", axis: "Y" },
   { v: "YZ", l: "YZ ⟂ X", axis: "X" },
@@ -241,7 +243,7 @@ const TOOL_TYPES = ["extrude", "revolve", "box", "cylinder", "sphere", "cone", "
 
 const fmtMm = (n: number) => String(Math.round(n * 1000) / 1000).replace(".", ",");
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{label}</span>
@@ -249,8 +251,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
-const selectCls = "w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-brand";
-const Info = ({ children }: { children: React.ReactNode }) => <p className="rounded-lg bg-steel-100 p-3 text-[12px] leading-relaxed text-ink-700/70">{children}</p>;
+export const selectCls = "w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px] outline-none focus:border-brand";
+export const Info = ({ children }: { children: React.ReactNode }) => <p className="rounded-lg bg-steel-100 p-3 text-[12px] leading-relaxed text-ink-700/70">{children}</p>;
 
 // ---------- prvky ----------
 
@@ -272,6 +274,7 @@ export function FeatureProps({
   const sketches = before.filter((x) => x.type === "sketch");
   const toolFeatures = before.filter((x) => TOOL_TYPES.includes(x.type) && x.id !== f.id);
   const mode = "mode" in f ? <Seg label="Operace" value={f.mode === "new" ? "add" : f.mode} options={MODES} onChange={(v) => set({ mode: v })} /> : null;
+  const custom = getFeatureForm(f.type);
 
   return (
     <div className="space-y-3.5">
@@ -279,6 +282,7 @@ export function FeatureProps({
         <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" value={f.name} onChange={(e) => set({ name: e.target.value })} />
       </Field>
       {(() => {
+        if (custom) return custom({ f, doc, set, b, sketches, toolFeatures, mode, pickHint });
         switch (f.type) {
           case "ext":
             return <ExtForm f={f} doc={doc} set={set} sketches={sketches} toolFeatures={toolFeatures} />;
@@ -804,7 +808,7 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
   );
 }
 
-function SketchPick({ value, sketches, onChange, label = "Profil (skica)" }: { value: string; sketches: Feature[]; onChange: (v: string) => void; label?: string }) {
+export function SketchPick({ value, sketches, onChange, label = "Profil (skica)" }: { value: string; sketches: Feature[]; onChange: (v: string) => void; label?: string }) {
   return (
     <Field label={label}>
       <select className={selectCls} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -819,7 +823,7 @@ function SketchPick({ value, sketches, onChange, label = "Profil (skica)" }: { v
   );
 }
 
-function PickInfo({ n, what, hint, onClear }: { n: number; what: string; hint?: string; onClear: () => void }) {
+export function PickInfo({ n, what, hint, onClear }: { n: number; what: string; hint?: string; onClear: () => void }) {
   return (
     <div className="rounded-lg border border-dashed border-brand/40 bg-brand/5 p-3 text-[12px] text-ink-700">
       <p>
