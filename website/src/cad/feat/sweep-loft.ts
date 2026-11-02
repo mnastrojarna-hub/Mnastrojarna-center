@@ -41,8 +41,11 @@ export function profileWires(sk: SketchF, thin?: Thin): PWire[] {
   const faces = s instanceof r.Sketches ? s.faces().faces : s instanceof r.Sketch || s instanceof r.CompoundSketch ? [s.face()] : [];
   const out: PWire[] = [];
   for (const face of faces) {
-    out.push({ wire: face.outerWire(), depth: 0, area: r.measureArea(face) });
-    for (const w of face.innerWires()) out.push({ wire: w, depth: 1, area: 0 });
+    // pozor: outerWire() / innerWires() plochu v replicadu mažou – proto klon a plocha předem
+    const area = r.measureArea(face);
+    const inner = face.clone().innerWires();
+    out.push({ wire: face.outerWire(), depth: 0, area });
+    for (const w of inner) out.push({ wire: w, depth: 1, area: 0 });
   }
   if (!out.length) throw new Error(`Skica „${sk.name}“ neobsahuje profil pro tenkou stěnu.`);
   return out;
@@ -149,11 +152,15 @@ export function pathFrames(spine: r.Wire, n: number, o: { xHint?: Vec3; guide?: 
 
 /** Přenese drát z rámce `from` do rámce `to`, natočí o `twistDeg` kolem tečny a zvětší `scale`× kolem bodu dráhy. */
 export function wireToFrame(w: r.Wire, from: Frame, to: Frame, twistDeg = 0, scale = 1): r.Wire {
-  let out: r.Wire = w;
+  // replicad rotate/scale původní drát mažou – pracujeme vždy s novým drátem
   const same = V.len(V.sub(from.p, to.p)) < EPS && V.len(V.sub(from.t, to.t)) < EPS && V.len(V.sub(from.n, to.n)) < EPS;
-  if (!same) {
-    const tr = new r.Transformation().coordSystemChange({ origin: to.p, zDir: to.t, xDir: to.n }, { origin: from.p, zDir: from.t, xDir: from.n });
-    out = asWire(r.cast(tr.transform(out.wrapped)));
+  let out: r.Wire;
+  if (same) out = w.clone();
+  else {
+    // OCCT SetTransformation(From, To) převádí souřadnice: svět → lokální rámce `from`, pak lokální rámce `to` → svět
+    const toLocal = new r.Transformation().coordSystemChange("reference", { origin: from.p, zDir: from.t, xDir: from.n });
+    const toWorld = new r.Transformation().coordSystemChange({ origin: to.p, zDir: to.t, xDir: to.n }, "reference");
+    out = asWire(r.cast(toWorld.transform(toLocal.transform(w.wrapped))));
   }
   if (Math.abs(twistDeg) > EPS) out = out.rotate(twistDeg, to.p, to.t);
   if (Math.abs(scale - 1) > EPS) out = out.scale(scale, to.p);
@@ -307,8 +314,8 @@ export function loftTool(f: LoftF, ctx: FeatCtx): Shape {
     const s1 = end ? null : condShift(rc, sks[last], outer[last], bboxCenter(outer[last - 1]), f.endCond, f.endDir, f.endLen);
     const ins = (ws: r.Wire[]) => {
       const out = ws.slice();
-      if (s1) out.splice(last, 0, ws[last].translate(s1));
-      if (s0) out.splice(1, 0, ws[0].translate(s0));
+      if (s1) out.splice(last, 0, ws[last].clone().translate(s1)); // translate() původní drát maže → klon
+      if (s0) out.splice(1, 0, ws[0].clone().translate(s0));
       return out;
     };
     outer = ins(outer);
