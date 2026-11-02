@@ -14,7 +14,7 @@ import { NativeSelect } from "@/components/jobs/book/native-select";
 import { StagePicker } from "@/components/jobs/book/stage-picker";
 import {
   DATE_FIELDS, PRIORITIES, UNITS, MAX_TITLE, emptyItem, findSameCustomer, firstErrorKey, formTotals, initialFormState,
-  lineTotal, ownerPreview, validateJobForm, type ItemDraft, type JobFormErrors, type JobFormInitial, type JobFormState, type JobFormValues,
+  customerOwnerOf, lineTotal, ownerHint, ownerPreview, validateJobForm, type ItemDraft, type JobFormErrors, type JobFormInitial, type JobFormState, type JobFormValues,
 } from "@/components/jobs/book/job-form-model";
 import { formatMoney } from "@/components/jobs/book/job-cells";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
@@ -90,11 +90,17 @@ export function JobForm({
   const uid = React.useId();
   const fid = (key: string) => `${uid}-${key.replace(/\./g, "-")}`;
 
+  // 2. 11.: obchodník zakázky = obchodník zákazníka — super admin ho vidí předvyplněný podle zákazníka
+  // a dokud ho sám nezmění, neposílá se (server / DB ho určí podle zákazníka i při změně zákazníka)
   const [state, setState] = React.useState<JobFormState>(() =>
     ownerEditable
-      ? initialFormState(initial, { ownerId: access.userId ?? undefined })
+      ? initialFormState(initial, {
+          ownerId: (initial?.customerId ? customerOwnerOf(options, initial.customerId) : null) ?? access.userId ?? undefined,
+        })
       : initialFormState({ ...initial, ownerId: undefined }),
   );
+  const [ownerTouched, setOwnerTouched] = React.useState(false);
+  const prevCustomer = React.useRef(state.customerMode === "existing" ? state.customerId : "");
   const [errors, setErrors] = React.useState<JobFormErrors>({});
   const [formError, setFormError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -111,6 +117,16 @@ export function JobForm({
       setState((s) => ({ ...s, ownerId: access.userId ?? "" }));
     }
   }, [ownerEditable, access.userId, state.ownerId, dirty, options.users]);
+
+  // změna zákazníka → obchodník zákazníka (dokud ho super admin ručně nezměnil)
+  const currentCustomer = state.customerMode === "existing" ? state.customerId : "";
+  React.useEffect(() => {
+    if (prevCustomer.current === currentCustomer) return;
+    prevCustomer.current = currentCustomer;
+    if (!ownerEditable || ownerTouched) return;
+    const owner = currentCustomer ? customerOwnerOf(options, currentCustomer) : null;
+    if (owner) setState((s) => ({ ...s, ownerId: owner }));
+  }, [currentCustomer, ownerEditable, ownerTouched, options]);
 
   function patch(p: Partial<JobFormState>) {
     setState((s) => ({ ...s, ...p }));
@@ -170,7 +186,7 @@ export function JobForm({
     try {
       // ne-admin obchodníka neposílá (server vezme obchodníka zákazníka) — jinak by „—" zakázku nechalo bez obchodníka
       const sent: JobFormValues = { ...values };
-      if (!ownerEditable) delete sent.ownerId;
+      if (!ownerEditable || !ownerTouched) delete sent.ownerId;
       const res = await onSubmit(sent);
       if (res && !res.ok) setFormError(res.error ?? "Uložení se nepovedlo.");
       else setDirty(false);
@@ -377,8 +393,12 @@ export function JobForm({
       <Section icon={Users} tone={TONES.emerald} title="Lidé">
         <div className={grid2}>
           {ownerEditable ? (
-            <Field id={fid("ownerId")} label="Obchodník" hint="odpovídá za zakázku">
-              <NativeSelect id={fid("ownerId")} value={state.ownerId} onChange={(e) => patch({ ownerId: e.target.value })}>
+            <Field id={fid("ownerId")} label="Obchodník" hint={ownerHint(state, options, ownerTouched)}>
+              <NativeSelect
+                id={fid("ownerId")}
+                value={state.ownerId}
+                onChange={(e) => { setOwnerTouched(true); patch({ ownerId: e.target.value }); }}
+              >
                 <option value="">— nikdo —</option>
                 {options.users.map((u) => (
                   <option key={u.id} value={u.id}>{userLabel(u)}</option>

@@ -219,13 +219,16 @@ export async function createJob(
       }
     }
 
-    // #25: bez výslovné volby jako u e-mailu a fotky — Obchodník = obchodník zákazníka, jinak zakládající
+    // #25 + 2. 11.: Obchodník = obchodník zákazníka (vynucuje i DB, trg_orders_owner_sync), jinak zakládající
     // obchodník / super admin; zaměstnanec zakázku zpracovává (Obchodník = obchodník zákazníka, jinak nikdo).
+    // Jiného obchodníka, než má zákazník, zvolí jen super admin — zakázka se pak zákazníkem nehýbe (owner_override).
+    const customerOwner = await activeCustomerOwner(db, row.customer_id as string | null | undefined);
     let ownerId: string | null;
-    if (requestedOwner !== undefined) {
+    let ownerOverride = false;
+    if (requestedOwner !== undefined && (isAdmin || !customerOwner)) {
       ownerId = requestedOwner;
+      ownerOverride = isAdmin && customerOwner !== null && requestedOwner !== customerOwner;
     } else {
-      const customerOwner = await activeCustomerOwner(db, row.customer_id as string | null | undefined);
       ownerId = customerOwner ?? (isSales ? user.id : null);
       if (!isSales && row.assignee_id === undefined) row.assignee_id = user.id;
     }
@@ -263,8 +266,15 @@ export async function createJob(
       ai_filled: Boolean(opts.aiFilled),
       ai_confidence: clamp01(opts.aiConfidence),
       ...(opts.captureKey ? { capture_key: opts.captureKey } : {}),
+      ...(ownerOverride ? { owner_override: true } : {}),
     };
-    const { data: created, error } = await db.from("orders").insert(insert as never).select("id, number").single();
+    let { data: created, error } = await db.from("orders").insert(insert as never).select("id, number").single();
+    // DB bez migrace 20261102110000 (owner_override) — založit bez příznaku
+    if (error && ownerOverride && /owner_override/.test(error.message ?? "")) {
+      const { owner_override: _skip, ...plain } = insert as typeof insert & { owner_override?: boolean };
+      void _skip;
+      ({ data: created, error } = await db.from("orders").insert(plain as never).select("id, number").single());
+    }
     if (error || !created) return fail(error?.message ?? "Zakázku se nepodařilo založit.");
     const jobId = (created as { id: string }).id;
 
@@ -350,6 +360,17 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
       for (const ch of changes) update[ch.field] = row[ch.field];
       const { error } = await db.from("orders").update(update as never).eq("id", id);
       if (error) return fail(error.message);
+
+      // 2. 11.: změna zákazníka → DB (trg_orders_owner_sync) dala zakázce obchodníka nového zákazníka
+      // (není-li ručně změněn super adminem) — do historie zakázky jako změna pole
+      if (changes.some((ch) => ch.field === "customer_id") && !changes.some((ch) => ch.field === "owner_id")) {
+        const { data: after } = await db.from("orders").select("owner_id").eq("id", id).maybeSingle();
+        const ownerAfter = (after as { owner_id: string | null } | null)?.owner_id ?? null;
+        const ownerBefore = (before.owner_id as string | null | undefined) ?? null;
+        if (after && ownerAfter !== ownerBefore) {
+          changes.push(...diffJob({ owner_id: ownerBefore }, { owner_id: ownerAfter }));
+        }
+      }
 
       // AI se učí: oprava pole, které vyplnila AI (události „ai" s data.filledColumns)
       let aiCorrected: string[] = [];

@@ -223,6 +223,26 @@ export function ownerPreview(
   return state.customerName.trim() ? fallback : "obchodník zákazníka (doplní se sám)";
 }
 
+/** Obchodník zákazníka z voleb formuláře (null = zákazník nemá obchodníka / není v seznamu). */
+export function customerOwnerOf(options: Pick<JobFormOptions, "customers">, customerId: string): string | null {
+  return options.customers.find((c) => c.id === customerId)?.ownerId ?? null;
+}
+
+/**
+ * 2. 11. Nápověda u obchodníka (super admin): sleduje zákazníka, nebo je ručně jiný (pak se změnou
+ * zákazníka / jeho obchodníka nehýbe — orders.owner_override).
+ */
+export function ownerHint(
+  state: Pick<JobFormState, "customerMode" | "customerId" | "ownerId">,
+  options: Pick<JobFormOptions, "customers">,
+  touched: boolean,
+): string {
+  const owner = state.customerMode === "existing" && state.customerId ? customerOwnerOf(options, state.customerId) : null;
+  if (!owner) return touched ? "zvolen ručně (zákazník obchodníka nemá)" : "podle zákazníka";
+  if (state.ownerId === owner) return "podle zákazníka";
+  return touched ? "ručně — jiný než obchodník zákazníka" : "jiný než obchodník zákazníka (ručně)";
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**

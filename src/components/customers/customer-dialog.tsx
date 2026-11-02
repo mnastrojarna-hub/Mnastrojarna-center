@@ -297,7 +297,11 @@ export function CustomerDialog({
                 {input("customerNumber", { placeholder: editing ? "ponechat stávající číslo" : "přidělí se samo" })}
               </Field>
               {ownerEditable ? (
-                <Field id="cust-ownerId" label="Obchodník" hint={owner ? `Zákazníka má na starosti ${owner.name}.` : "Kdo zákazníka obchodně vede."}>
+                <Field
+                  id="cust-ownerId"
+                  label="Obchodník"
+                  hint={`${owner ? `Zákazníka má na starosti ${owner.name}.` : "Kdo zákazníka obchodně vede."} Platí pro všechny jeho zakázky — změna se propíše do otevřených (kromě ručně změněných u zakázky).`}
+                >
                   <SelectInput id="cust-ownerId" value={values.ownerId} onChange={(e) => set("ownerId", e.target.value)}>
                     <option value="">— bez obchodníka —</option>
                     {owners.map((o) => (
@@ -313,7 +317,7 @@ export function CustomerDialog({
                   <p className="flex min-h-10 items-center rounded-md border border-dashed px-3 text-sm text-muted-foreground">
                     {owner?.name ?? (values.ownerId ? "—" : "— bez obchodníka —")}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">Obchodníka zákazníka mění jen super admin.</p>
+                  <p className="text-[11px] text-muted-foreground">Obchodníka zákazníka (a tím všech jeho zakázek) mění jen super admin.</p>
                 </div>
               )}
               <Field id={fid("email")} label="E-mail firmy" error={errors.email} hint="Obecná adresa — použije se, když účel nemá vlastní.">
