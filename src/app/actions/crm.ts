@@ -5,6 +5,7 @@ import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/serve
 import { userActor } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
+import { logJobEvent } from "@/lib/jobs/events";
 import { ensureContactPerson, moveToneEmail, savePartyBook } from "@/lib/contacts/server";
 import { bookContactPerson, validatePartyBookInput, type PartyBookInput } from "@/lib/contacts/book-draft";
 import type { PartyKind } from "@/lib/contacts/roles";
@@ -182,11 +183,49 @@ export async function createCustomer(
   }
 }
 
+type JobOwnerRow = { id: string; owner_id: string | null };
+type CrmDb = Awaited<ReturnType<typeof createOperatorClient>>;
+
+/** Obchodníci zakázek zákazníka (před změnou obchodníka zákazníka). */
+async function customerJobOwners(db: CrmDb, customerId: string): Promise<Map<string, JobOwnerRow>> {
+  const { data } = await db.from("orders").select("id, owner_id").eq("customer_id", customerId).limit(2000);
+  return new Map(((data ?? []) as JobOwnerRow[]).map((r) => [r.id, r]));
+}
+
+/**
+ * Zakázky, kterým DB po změně obchodníka zákazníka přepsala obchodníka → záznam do historie každé z nich.
+ * Vrací jejich počet. Best-effort (historie nesmí shodit uložení zákazníka).
+ */
+async function logOwnerFollow(db: CrmDb, customerId: string, before: Map<string, JobOwnerRow>, actorId: string): Promise<number> {
+  try {
+    const after = await customerJobOwners(db, customerId);
+    const moved = [...after.values()].filter((r) => before.has(r.id) && before.get(r.id)!.owner_id !== r.owner_id);
+    if (!moved.length) return 0;
+    const ids = [...new Set(moved.flatMap((r) => [before.get(r.id)!.owner_id, r.owner_id]).filter((x): x is string => !!x))];
+    const { data: profs } = await db.from("profiles").select("id, full_name, email").in("id", ids);
+    const name = new Map(((profs ?? []) as { id: string; full_name: string | null; email: string | null }[])
+      .map((p) => [p.id, (p.full_name ?? "").trim() || (p.email ?? "").trim() || "—"]));
+    const label = (v: string | null) => (v ? name.get(v) ?? "—" : "—");
+    for (const r of moved.slice(0, 500)) {
+      const from = before.get(r.id)!.owner_id;
+      await logJobEvent(db, {
+        jobId: r.id, type: "field",
+        message: `Obchodník: ${label(from)} → ${label(r.owner_id)} (podle obchodníka zákazníka)`,
+        data: { changes: [{ field: "owner_id", label: "Obchodník", from, to: r.owner_id, fromText: label(from), toText: label(r.owner_id) }], ownerFromCustomer: true },
+        actorId,
+      });
+    }
+    return moved.length;
+  } catch {
+    return 0;
+  }
+}
+
 export async function updateCustomer(
   id: string,
   input: CustomerFormValues,
   book?: PartyBookInput | null,
-): Promise<ActionResult<{ customerNumber: string | null; duplicateId: string; partySaved: boolean }>> {
+): Promise<ActionResult<{ customerNumber: string | null; duplicateId: string; partySaved: boolean; ownerJobs: number }>> {
   const auth = await checkFeature("customers");
   if ("error" in auth) return { ok: false, error: auth.error };
   if (!isUuid(id)) return { ok: false, error: "Neplatný zákazník." };
@@ -215,16 +254,25 @@ export async function updateCustomer(
     const row: CustomerColumns = { ...mapped.cols };
     const number = clean(input.customerNumber, 40);
     if (number) row.customer_number = number; // prázdné = ponechat stávající číslo
+    // 2. 11.: nový obchodník zákazníka se v DB propíše do jeho otevřených zakázek (trg_customers_owner_sync)
+    const prevOwner = (current as { owner_id: string | null }).owner_id ?? null;
+    const nextOwner = (mapped.cols.owner_id as string | null | undefined) ?? null;
+    const ownerChanged = nextOwner !== null && nextOwner !== prevOwner;
+    const jobsBefore = ownerChanged ? await customerJobOwners(db, id) : new Map<string, JobOwnerRow>();
     const { data, error } = await db.from("customers").update(row as never).eq("id", id).select("id, customer_number").maybeSingle();
     if (error || !data) return { ok: false, error: dbError(error?.message ?? "Zákazníka se nepodařilo uložit.", number) };
-    await logAudit({ action: "customer_updated", entity: "customers", entityId: id, diff: { name: row.name } });
+    const ownerJobs = ownerChanged ? await logOwnerFollow(db, id, jobsBefore, auth.user.id) : 0;
+    await logAudit({
+      action: "customer_updated", entity: "customers", entityId: id,
+      diff: { name: row.name, ...(ownerChanged ? { owner_id: { from: prevOwner, to: nextOwner }, ownerJobs } : {}) },
+    });
     let bookError: string | null = null;
     if (checked.book) bookError = await saveBookAfter(db, "customer", id, checked.book);
     else await ensureContactPerson(db, { customerId: id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
     revalidateCustomer(id);
     const customerNumber = (data as { customer_number: string | null }).customer_number;
     if (bookError) return { ok: false, error: bookError, customerNumber, partySaved: true };
-    return { ok: true, customerNumber };
+    return { ok: true, customerNumber, ...(ownerChanged ? { ownerJobs } : {}) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
   }

@@ -59,7 +59,7 @@ describe("#25 Nový zákazník — Obchodník podle role", () => {
     const out = html(<CustomerDialog owners={OWNERS} defaultOwnerId="u1" />);
     expect(out).not.toContain('id="cust-ownerId"');
     expect(ownerReadonly(out)).toContain("Petr Obchodník");
-    expect(out).toContain("Obchodníka zákazníka mění jen super admin.");
+    expect(out).toContain("Obchodníka zákazníka (a tím všech jeho zakázek) mění jen super admin.");
   });
 
   it("zaměstnanec: jen pro čtení „— bez obchodníka —“, sám sebe nepředvyplní", () => {
@@ -121,7 +121,7 @@ describe("#25 Nová zakázka — Obchodník jen pro čtení mimo super admina", 
     who.userId = "u9";
     const out = html(<JobForm options={OPTIONS} onSubmit={() => {}} />);
     expect(out).not.toContain('data-field="owner-readonly"');
-    expect(out).toContain("odpovídá za zakázku");
+    expect(out).toContain("podle zákazníka");
   });
 
   it("náhled jména: obchodník vybraného zákazníka, jinak zakládající obchodník; zaměstnanec nikdo", () => {

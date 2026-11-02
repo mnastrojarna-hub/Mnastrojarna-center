@@ -7,6 +7,9 @@
 --     mazání …) KROMĚ: pošty ostatních schránek (mail_all — vidí jen svou), správy schránek a správy
 --     uživatelů (users). Rozhoduje src/lib/auth/permissions.ts (FULL_ACCESS_DENIED) + current-user.ts.
 --  2) profiles_guard: full_access smí měnit jen super admin (nikdo si ho nezapne sám).
+--  2b) app_actor_is_super_admin(): DB pojistky zápisů z našeho serveru (obchodník zakázky / zákazníka, schvalování
+--     nabídek, platby, faktury dodavatelů …) berou plný přístup jako super admina — jinak by DB odmítla, co aplikace
+--     dovolí. Pošta ani správa uživatelů na této funkci nestojí (hlídá je aplikace + profiles_guard / is_super_admin).
 --  3) Jednorázově (značka full_access_v1): Vít Volný a Dominik Šponer → plný přístup + bez schvalování
 --     nabídek, smí schvalovat nabídky ostatních, smí poptávat dodavatele, AI přístup.
 --     Shoda podle e-mailu, jinak jména — jen když je právě jeden; jinak NOTICE a nastaví se ve Správě uživatelů.
@@ -34,6 +37,13 @@ begin
   end if;
   return new;
 end $$;
+
+-- ── 2b) DB pojistky: plný přístup = super admin ─────────────
+create or replace function app_actor_is_super_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select (p.role = 'super_admin' or coalesce(p.full_access, false)) and p.active
+                   from profiles p where p.id = app_actor()), false)
+$$;
 
 -- ── 3) Volný + Šponer (jednorázově) ──────────────────────────
 do $$

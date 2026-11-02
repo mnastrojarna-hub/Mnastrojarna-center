@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseDecimal, formatDecimalInput, initialFormState, validateJobForm, emptyItem, isItemEmpty, lineTotal,
-  formTotals, findSameCustomer, firstErrorKey, type JobFormState,
+  formTotals, findSameCustomer, firstErrorKey, customerOwnerOf, ownerHint, type JobFormState,
 } from "./job-form-model";
 
 const C1 = "3f2b8c1e-1d2a-4c3b-9a8e-7f6d5c4b3a21";
@@ -157,5 +157,24 @@ describe("findSameCustomer", () => {
     expect(findSameCustomer(list, "strojmetal s.r.o.")?.id).toBe(C1);
     expect(findSameCustomer(list, "Jiný")).toBeNull();
     expect(findSameCustomer(list, "")).toBeNull();
+  });
+});
+
+describe("obchodník podle zákazníka (2. 11.)", () => {
+  const opts = { customers: [{ id: "c1", name: "A", ownerId: "u1" }, { id: "c2", name: "B", ownerId: null }] } as unknown as Parameters<typeof ownerHint>[1];
+  const st = (customerId: string, ownerId: string) => ({ customerMode: "existing" as const, customerId, ownerId });
+
+  it("obchodník zákazníka z voleb formuláře", () => {
+    expect(customerOwnerOf(opts, "c1")).toBe("u1");
+    expect(customerOwnerOf(opts, "c2")).toBeNull();
+    expect(customerOwnerOf(opts, "x")).toBeNull();
+  });
+
+  it("nápověda: podle zákazníka / ručně", () => {
+    expect(ownerHint(st("c1", "u1"), opts, false)).toBe("podle zákazníka");
+    expect(ownerHint(st("c1", "u2"), opts, true)).toBe("ručně — jiný než obchodník zákazníka");
+    expect(ownerHint(st("c1", "u2"), opts, false)).toBe("jiný než obchodník zákazníka (ručně)");
+    expect(ownerHint(st("c2", "u2"), opts, false)).toBe("podle zákazníka");
+    expect(ownerHint(st("c2", "u2"), opts, true)).toBe("zvolen ručně (zákazník obchodníka nemá)");
   });
 });
