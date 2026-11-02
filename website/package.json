@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "node scripts/vendor-occt.mjs",
-    "prebuild": "node scripts/vendor-occt.mjs"
+    "prebuild": "node scripts/vendor-occt.mjs",
+    "build:ftp": "STATIC_EXPORT=1 next build && node scripts/gen-htaccess.mjs"
   },
   "dependencies": {
     "@node-projects/acad-ts": "^3.7.0",

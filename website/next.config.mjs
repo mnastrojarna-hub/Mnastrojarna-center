@@ -33,11 +33,16 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
+// STATIC_EXPORT=1 → čisté HTML do složky out/ pro klasický FTP hosting (Hosting90/Webglobe).
+// Přesměrování a hlavičky pak řeší public/.htaccess (vygeneruje scripts/gen-htaccess.mjs).
+const staticExport = process.env.STATIC_EXPORT === "1";
+
 const nextConfig = {
   reactStrictMode: true,
+  ...(staticExport ? { output: "export", trailingSlash: true } : {}),
   outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   poweredByHeader: false,
-  images: { formats: ["image/avif", "image/webp"] },
+  images: staticExport ? { unoptimized: true } : { formats: ["image/avif", "image/webp"] },
   webpack(config, { isServer, webpack }) {
     if (!isServer) {
       config.plugins.push(new webpack.NormalModuleReplacementPlugin(/^node:/, (r) => { r.request = r.request.replace(/^node:/, ""); }));
@@ -47,6 +52,7 @@ const nextConfig = {
     config.experiments = { ...config.experiments, asyncWebAssembly: true };
     return config;
   },
+  ...(staticExport ? {} : {
   async redirects() {
     return legacy.map(([source, destination]) => ({ source, destination, permanent: true }));
   },
@@ -56,6 +62,8 @@ const nextConfig = {
       { source: "/vendor/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
   },
+  }),
 };
 
+export { legacy, securityHeaders };
 export default nextConfig;

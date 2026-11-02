@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE } from "@/content/site";
 
+export const dynamic = "force-static";
 export default function robots(): MetadataRoute.Robots {
   const isProd = process.env.VERCEL_ENV ? process.env.VERCEL_ENV === "production" : true;
   return {

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { cs } from "@/content/cs";
 import { SITE } from "@/content/site";
 
+export const dynamic = "force-static";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: SITE.name,

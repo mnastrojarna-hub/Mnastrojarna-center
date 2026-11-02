@@ -1,5 +1,29 @@
-import { Roboto, Roboto_Condensed, Roboto_Mono } from "next/font/google";
+import localFont from "next/font/local";
 
-export const sans = Roboto({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "700"], variable: "--font-sans", display: "swap" });
-export const display = Roboto_Condensed({ subsets: ["latin", "latin-ext"], weight: ["600", "700", "800"], variable: "--font-display", display: "swap" });
-export const mono = Roboto_Mono({ subsets: ["latin", "latin-ext"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
+// Roboto hostované přímo s webem (latin + latin-ext) — build nepotřebuje Google Fonts
+export const sans = localFont({
+  src: [
+    { path: "./fonts-local/roboto-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts-local/roboto-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts-local/roboto-700.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-sans",
+  display: "swap",
+});
+export const display = localFont({
+  src: [
+    { path: "./fonts-local/roboto-condensed-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts-local/roboto-condensed-700.woff2", weight: "700", style: "normal" },
+    { path: "./fonts-local/roboto-condensed-800.woff2", weight: "800", style: "normal" },
+  ],
+  variable: "--font-display",
+  display: "swap",
+});
+export const mono = localFont({
+  src: [
+    { path: "./fonts-local/roboto-mono-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts-local/roboto-mono-500.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-mono",
+  display: "swap",
+});

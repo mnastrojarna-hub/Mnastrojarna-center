@@ -16,6 +16,7 @@ const PAGES: [PageKey, number, MetadataRoute.Sitemap[number]["changeFrequency"]]
 ];
 
 /** Sitemapa všech jazykových verzí vč. hreflang alternativ. */
+export const dynamic = "force-static";
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const entry = (key: PageKey, priority: number, changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"], id?: string) => {
