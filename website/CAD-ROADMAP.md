@@ -160,3 +160,27 @@ Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · �
 - Web: opraven vlastní kurzor (po optimalizaci výkonu se GSAP navázal na ještě nevykreslené prvky → nativní myš skryta, vlastní neviditelná). Nově se nativní kurzor skrývá až po prvním pohybu myši a po opuštění okna se vrací.
 - Web: přidána vstupní stránka **Pro údržbu** (`/pro-udrzbu`, `/en/for-maintenance`, `/de/fuer-instandhaltung`) – díl podle vzorku, audit kritických dílů, konsignace, kalkulačka prostojů, FAQ + JSON-LD, v sitemapě a patičce.
 - **Plán zadávacích možností** (analýza ZW3D/SolidWorks/NX/Creo/Inventor/Fusion/Onshape, referenční systém `Ref`/`Extent`/`Direction`/`PlaneDef`, etapy A–E, měřítka): viz `CAD-PLAN-ZADANI.md`. Hotovo hned: nabídky pásu v portálu (mobil = spodní list), 7 nových způsobů zadání roviny skici.
+
+## 5. vlna (2. 11. 2026) – „jak nakrmit příkazy“: hotovo
+
+Referenční systém zadání (`cad/refs.ts`, `cad/ref-resolve.ts`, `components/cad/ref-field.tsx`) + registry stavitelů a formulářů
+(`cad/feat/*`, `components/cad/forms/*`). Souhrn způsobů zadání je v tabulce v `CAD-PLAN-ZADANI.md` (oddíl 5).
+
+- **Jádro (vedoucí):** odkazy s otiskem entity (přežijí změnu indexů), odvozené body, 8 směrů, 12 definic rovin (asociativní),
+  vysunutí 8 ukončení + 2 směry + začátek + tenká stěna + kroucení + měřítko, rotace 10 os, díra více poloh / k dalšímu / k ploše,
+  pole odkazu (klik, psaní, pravé tlačítko / dlouhý stisk), kontextová mini lišta, spodní listy na mobilu, 11 testů jádra.
+- **W5-A zaoblení/zkosení** (`feat/fillet.ts`, 29 testů): konstantní, R1→R2, tabulka, plocha–plocha, plný rádius, tečné řetězení;
+  zkosení stejné, D1×D2, D×úhel, vrchol, tečné. Nejde v OCCT: setback a eliptické (skutečně asymetrické) zaoblení.
+- **W5-B pole/skořepina/úkos** (`feat/pattern.ts`, 20 testů): 5 druhů pole, vynechané kusy, celková délka, střídavé, symetrické,
+  více zdrojů, jedna booleovská operace; skořepina ven (ostré hrany přes OCCT) + rozdílné tloušťky rovinných stěn; úkos se směrem
+  tahu a tečným řetězením. Nejde: dělicí křivka / stupňovitý úkos.
+- **W5-C tažení/šablonování** (`feat/sweep-loft.ts`, 25 testů): vodicí křivka, kroucení, měřítko, kruhový profil bez skici, tenká
+  stěna, pevná orientace, 3 přechody; loft do bodu, uzavřený (C0 na švu), okrajové podmínky (aproximace pomocným řezem), osová
+  a vodicí křivka (MakePipeShell), tenká stěna.
+- **W5-E odkazy ve zbytku prvků + pomocná geometrie** (`feat/refs-more.ts`, 22 testů, `pick-list.tsx`): primitiva, pružina, závit,
+  text, transformace, Vytáhnout/Zatlačit odkazem; pomocná osa (10 způsobů vč. průsečnice rovin), bod (14), souřadný systém;
+  výběr entit ze seznamu s filtrem; vykreslení os/bodů/CSYS ve 3D okně a tlačítka v pásu Reference (vedoucí).
+- **W5-D skica:** viz závěrečná zpráva agenta (doplní se po odevzdání).
+
+Zbývá z plánu: vazby sestav (18 druhů + mate connector), výkresy (13 druhů pohledů, tolerance, tabulky), dělicí křivka úkosu,
+setback zaoblení, zvýraznění indexů kusů pole ve 3D, šipka začátku hrany pro R1→R2.

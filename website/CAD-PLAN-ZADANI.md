@@ -175,15 +175,21 @@ vykreslí `RefField`. Moduly rozšíření (`cad/ext/*`) tak dostanou bohaté za
 ---
 
 ## 5. Měřítka (abychom se „neošulili")
-| Měřítko | Dnes | Po etapě A | Cíl (špička) |
+| Měřítko | Před 5. vlnou | **Stav 2. 11. 2026 (po 5. vlně)** | Cíl (špička) |
 | --- | --- | --- | --- |
-| Způsoby zadání bodu v libovolném poli | 2 | 18 | 15–20 |
-| Způsoby zadání směru | 1 (výčet os) | 11 | 10–12 |
-| Způsoby zadání roviny skici | 11 (po dnešku) | 15 | 12–15 |
-| Ukončení vysunutí | 1 | 9 (+ 2 směry, počátek, tenká stěna) | 9 |
-| Varianty zaoblení | 1 | 1 | 8 (etapa B) |
-| Typy pole | 2 | 2 | 8 (etapa B) |
-| Vazby skici | 12 | 12 | 20 + automatické (etapa C) |
+| Způsoby zadání bodu v libovolném poli | 2 | **14 voleb v nabídce pole** (vrchol, začátek/konec/střed hrany, střed kružnice, střed plochy, % hrany, střed mezi, poměr mezi, odsazení, průmět, průsečík, počátek, souřadnice) + bod skici, pomocný bod, výběr ze seznamu | 15–20 |
+| Způsoby zadání směru | 1 (výčet os) | **8** (normála, osa, hrana/osa válce, 2 body, normála plochy, vektor, úhel, tečna) | 10–12 |
+| Definice roviny (skica, pomocná rovina, zrcadlení, řez, úkos) | 4 | **12 druhů** (základní + odsazení, rovnoběžně s plochou, 3 body, bod + přímka, bod + normála, pod úhlem kolem hrany, střední, tečně k válci, kolmo na křivku, 2 hrany, pomocná rovina, vlastní), asociativní | 12–15 |
+| Ukončení vysunutí | 1 | **8** (na vzdálenost, skrz vše, k dalšímu, k vrcholu, k ploše i zakřivené, odsazeně od plochy, k tělesu, střední rovina) + nezávislý 2. směr + začátek 4 způsoby + tenká stěna 4 režimy + kroucení + měřítko konce + jen obrys | 9 |
+| Osa rotace | 2 | **10** (osy skici, čára skici, hrana, válcová plocha, 2 body, globální, pomocná rovina, průsečnice rovin, pomocná osa) + 1 / 2 směry / střední + tenká stěna | 8 |
+| Díra | 1 poloha, slepá/skrz | **ukončení 4** (slepá, skrz, k dalšímu, k ploše), **více poloh odkazy**, směr 8 způsoby, úhel špičky, řady ISO 273 jemná/střední/hrubá | ✔ |
+| Varianty zaoblení / zkosení | 1 / 1 | **6 / 5** (konstantní, R1→R2 podél hrany, tabulka po hranách, plocha–plocha, plný rádius, tečné řetězení / stejné, D1×D2, D×úhel, vrchol, tečné řetězení) | 8 / 5 |
+| Typy pole | 2 | **5** (lineární, kruhové, po křivce, podle skici, výplňové) + směr/osa odkazem, vynechané kusy, celková délka, střídavé, symetrické, bez natáčení, více zdrojů, jedna booleovská operace | 8 |
+| Skořepina / úkos | 1 / 1 | skořepina **ven + rozdílné tloušťky stěn**; úkos **směr tahu, libovolná neutrální rovina, tečné řetězení** | ✔ (bez dělicí křivky) |
+| Tažení / šablonování | 2 / 2 | **7 / 7** (skica nebo kružnice, vodicí křivka, kroucení °/otáčky, měřítko konce, tenká stěna, pevná orientace, 3 přechody / 2+ profily, do bodu, uzavřené, okrajové podmínky, osová křivka, vodicí křivka, tenká stěna) | ✔ |
+| Pomocná geometrie | rovina (ručně) | **rovina 12, osa 10, bod 14, souřadný systém** – vše použitelné jako odkaz v dalších prvcích | ✔ |
+| Primitiva, pružina, závit, text, transformace, Vytáhnout/Zatlačit | čísla | **poloha odkazem, osa libovolným směrem, rovina textu, posun z bodu do bodu, otočení kolem hrany/osy, ukončení k ploše/vrcholu** | ✔ |
+| Vazby skici | 12 | viz zpráva W5-D (skica: číselné zadání, auto-vazby, stav určenosti, nástroje) | 20 + automatické |
 | Vazby sestavy | 5 (+ auto) | 5 | 18 (etapa D) |
 | Typy pohledů výkresu | 6 | 6 | 13 (etapa D) |
 
