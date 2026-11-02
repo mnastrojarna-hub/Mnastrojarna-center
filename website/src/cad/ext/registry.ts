@@ -29,6 +29,10 @@ export type ExtBuildCtx = {
   featureId: string;
   /** nástrojová tělesa dřívějších prvků (pro pole/zrcadlení) */
   tools: Map<string, { tool: Shape; mode: BoolMode }>;
+  /** všechna tělesa dílu (název → těleso) – více těles; `body` je aktivní/cílové */
+  bodies?: Map<string, Shape>;
+  /** název aktivního (cílového) tělesa */
+  activeBody?: string | null;
 };
 
 /** Parametr pro automatický formulář. */

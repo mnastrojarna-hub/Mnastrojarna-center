@@ -257,32 +257,43 @@ export function Motion() {
   return <Cursor />;
 }
 
-/** Vlastní kurzor: bod + kroužek, nad [data-cursor] zobrazí popisek. Jen pro myš. */
+/** Vlastní kurzor: bod + kroužek, nad [data-cursor] zobrazí popisek. Jen pro myš.
+ *  Nativní kurzor se skryje (html.has-cursor) až po prvním pohybu, kdy je vlastní kurzor umístěn –
+ *  nikdy tak nenastane stav „žádná myš není vidět". Po opuštění okna se nativní kurzor vrátí. */
 function Cursor() {
   const dot = useRef<HTMLDivElement>(null);
   const ring = useRef<HTMLDivElement>(null);
   const [label, setLabel] = useState<string | null>(null);
-  const [on, setOn] = useState(false);
 
   useEffect(() => {
+    const d = dot.current;
+    const r = ring.current;
+    if (!d || !r) return;
     if (
       !window.matchMedia("(pointer: fine)").matches ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     )
       return;
-    setOn(true);
-    document.documentElement.classList.add("has-cursor");
-    const xd = gsap.quickTo(dot.current, "x", { duration: 0.08 });
-    const yd = gsap.quickTo(dot.current, "y", { duration: 0.08 });
-    const xr = gsap.quickTo(ring.current, "x", {
-      duration: 0.45,
-      ease: "power3",
-    });
-    const yr = gsap.quickTo(ring.current, "y", {
-      duration: 0.45,
-      ease: "power3",
-    });
+    const root = document.documentElement;
+    const xd = gsap.quickTo(d, "x", { duration: 0.08 });
+    const yd = gsap.quickTo(d, "y", { duration: 0.08 });
+    const xr = gsap.quickTo(r, "x", { duration: 0.45, ease: "power3" });
+    const yr = gsap.quickTo(r, "y", { duration: 0.45, ease: "power3" });
+    let shown = false;
+    const hide = () => {
+      shown = false;
+      root.classList.remove("has-cursor");
+    };
     const move = (e: PointerEvent) => {
+      if (e.pointerType && e.pointerType !== "mouse") {
+        if (shown) hide();
+        return;
+      }
+      if (!shown) {
+        shown = true;
+        gsap.set([d, r], { x: e.clientX, y: e.clientY });
+        root.classList.add("has-cursor");
+      }
       xd(e.clientX);
       yd(e.clientY);
       xr(e.clientX);
@@ -292,16 +303,22 @@ function Cursor() {
       ) as HTMLElement | null;
       const l = t?.dataset.cursor ?? null;
       setLabel(l);
-      ring.current?.classList.toggle("is-link", !!t && !l);
+      r.classList.toggle("is-link", !!t && !l);
+    };
+    const out = (e: MouseEvent) => {
+      if (!e.relatedTarget) hide();
     };
     window.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("mouseout", out);
+    window.addEventListener("blur", hide);
     return () => {
       window.removeEventListener("pointermove", move);
-      document.documentElement.classList.remove("has-cursor");
+      document.removeEventListener("mouseout", out);
+      window.removeEventListener("blur", hide);
+      hide();
     };
   }, []);
 
-  if (!on) return null;
   return (
     <>
       <div ref={dot} className="cursor-dot" aria-hidden />

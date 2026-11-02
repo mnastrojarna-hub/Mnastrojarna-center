@@ -62,7 +62,8 @@ export type KernelImportFormat = "step" | "brep" | "stl";
 /** Formáty 3D exportu. */
 export type ExportFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl";
 
-export type Feature = { id: string; name: string; suppressed?: boolean } & (
+/** Cílové těleso prvku (`body`): název tělesa v dílu; chybí-li, použije se aktivní (naposledy vytvořené/upravené) těleso. */
+export type Feature = { id: string; name: string; suppressed?: boolean; body?: string } & (
   | { type: "sketch"; plane: SketchPlane; entities: SketchEntity[]; constraints?: SketchConstraint[]; dims?: SketchDim[] }
   | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number }
   | { type: "revolve"; sketchId: string; angle: number; axis: "x" | "y"; mode: BoolMode }
@@ -137,6 +138,12 @@ export type Feature = { id: string; name: string; suppressed?: boolean } & (
   | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
+  /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */
+  | { type: "combine"; target: string; tool: string; op: "add" | "cut" | "intersect"; keepTool: boolean }
+  /** Více těles: rozříznutí tělesa rovinou na dvě samostatná tělesa (kladná strana si nechá název, záporná = `nameB`). */
+  | { type: "splitBodies"; plane: PlaneName; offset: number; nameB?: string }
+  /** Více těles: kopie tělesa jako nové těleso s posunutím. */
+  | { type: "copyBody"; source: string; translate: Vec3; newName?: string }
 );
 
 export type FeatureType = Feature["type"];
@@ -174,7 +181,16 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
+  /** metadata těles dílu (barva, skrytí) – název = klíč tělesa z historie */
+  bodies?: BodyMeta[];
+  /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */
+  activeBody?: string | null;
 };
+
+export type BodyMeta = { name: string; color?: string; hidden?: boolean };
+
+/** Těleso ve výsledku stavby: indexy ploch/hran jsou globální (v pořadí těles ve složeném výsledku). */
+export type BodyInfo = { name: string; faces: number[]; edges: number[]; volume: number; area: number; createdBy: string; hidden?: boolean };
 
 /** Umístění komponenty: posun (mm) a natočení kolem os X, Y, Z (°, v tomto pořadí). */
 export type Placement = { position: Vec3; rotation: Vec3 };
@@ -221,6 +237,8 @@ export type BuildResult = {
   metrics: { volume: number; area: number; bbox: [Vec3, Vec3]; faces: number; edges: number } | null;
   /** polohy topologických vrcholů tělesa (x,y,z po trojicích) – pro výběr bodů */
   vertices?: Float32Array;
+  /** tělesa dílu (více těles) s globálními indexy ploch a hran */
+  bodies?: BodyInfo[];
   ms: number;
 };
 

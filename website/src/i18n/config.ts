@@ -15,7 +15,7 @@ export const LOCALE_META: Record<Locale, { label: string; short: string; hreflan
   de: { label: "Deutsch", short: "DE", hreflang: "de", og: "de_DE" },
 };
 
-export type PageKey = "home" | "services" | "service" | "cases" | "case" | "machinery" | "quality" | "references" | "about" | "contact" | "careers" | "privacy";
+export type PageKey = "home" | "services" | "service" | "cases" | "case" | "machinery" | "quality" | "references" | "about" | "contact" | "careers" | "privacy" | "maintenance";
 type StaticKey = Exclude<PageKey, "service" | "case">;
 
 const PATHS: Record<Locale, Record<StaticKey, string>> = {
@@ -30,6 +30,7 @@ const PATHS: Record<Locale, Record<StaticKey, string>> = {
     contact: "/kontakt",
     careers: "/kariera",
     privacy: "/ochrana-osobnich-udaju",
+    maintenance: "/pro-udrzbu",
   },
   en: {
     home: "/en",
@@ -42,6 +43,7 @@ const PATHS: Record<Locale, Record<StaticKey, string>> = {
     contact: "/en/contact",
     careers: "/en/careers",
     privacy: "/en/privacy-policy",
+    maintenance: "/en/for-maintenance",
   },
   de: {
     home: "/de",
@@ -54,6 +56,7 @@ const PATHS: Record<Locale, Record<StaticKey, string>> = {
     contact: "/de/kontakt",
     careers: "/de/karriere",
     privacy: "/de/datenschutz",
+    maintenance: "/de/fuer-instandhaltung",
   },
 };
 

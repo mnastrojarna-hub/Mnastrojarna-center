@@ -5,6 +5,7 @@ import { LOCALES, LOCALE_META, SERVICE_IDS, alternates, href, type PageKey } fro
 
 const PAGES: [PageKey, number, MetadataRoute.Sitemap[number]["changeFrequency"]][] = [
   ["home", 1, "weekly"],
+  ["maintenance", 0.9, "monthly"],
   ["services", 0.9, "monthly"],
   ["cases", 0.9, "monthly"],
   ["machinery", 0.8, "monthly"],

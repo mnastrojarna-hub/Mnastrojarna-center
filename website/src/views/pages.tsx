@@ -350,6 +350,97 @@ export function QualityView({ locale }: P) {
   );
 }
 
+// ---------------- Pro údržbu ----------------
+
+export function maintenanceMeta(locale: Locale) {
+  const p = getDict(locale).pages.maintenance;
+  return pageMeta({ locale, page: "maintenance", title: p.metaTitle, description: p.metaDescription });
+}
+export function MaintenanceView({ locale }: P) {
+  const t = getDict(locale);
+  const p = t.pages.maintenance;
+  const crumbs = [{ name: p.crumb, path: href(locale, "maintenance") }];
+  const rfq = mailToSales(p.mailSubject, t.common.mailBody);
+  const audit = mailToSales(p.auditMailSubject, p.auditMailBody);
+  return (
+    <>
+      <PageHero locale={locale} eyebrow={p.eyebrow} crumbs={crumbs} title={p.title} lead={p.lead} sheet="08" />
+      <section className="section">
+        <div className="container">
+          <SectionHeading eyebrow={p.stepsEyebrow} title={p.stepsTitle} />
+          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {p.steps.map((x, i) => (
+              <div key={x.t} data-reveal style={{ ["--d" as string]: `${i * 90}ms` }} className="spot card">
+                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-brand">0{i + 1}</span>
+                <h2 className="mt-3 font-display text-2xl font-bold uppercase text-ink-700">{x.t}</h2>
+                <p className="mt-2 text-[15px] leading-relaxed text-ink-700/65">{x.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="section bg-steel-100">
+        <div className="container grid gap-10 lg:grid-cols-2">
+          <div data-reveal>
+            <SectionHeading title={p.sendTitle} lead={p.sendLead} />
+            <ul className="mt-6 space-y-3">
+              {p.sendItems.map((x) => (
+                <li key={x} className="flex gap-3 text-[15px] text-ink-700">
+                  <Icon name="check" className="mt-1 h-4 w-4 shrink-0 text-brand" />
+                  {x}
+                </li>
+              ))}
+            </ul>
+            <a href={rfq} className="btn-primary mt-8" data-magnetic>
+              <Icon name="mail" className="h-5 w-5" /> {t.common.emailCta}
+            </a>
+          </div>
+          <div data-reveal>
+            <SectionHeading title={p.partsTitle} />
+            <div className="mt-6 flex flex-wrap gap-2">
+              {p.parts.map((x) => (
+                <span key={x} className="rounded-full border border-ink-700/15 bg-white px-4 py-2 text-[14px] text-ink-700">
+                  {x}
+                </span>
+              ))}
+            </div>
+            <div className="mt-8 rounded-2xl border border-ink-700/10 bg-white p-6">
+              <h3 className="font-display text-xl font-bold uppercase text-ink-700">{p.consignTitle}</h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-700/65">{p.consignText}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="section">
+        <div className="container">
+          <SectionHeading eyebrow={p.calcEyebrow} title={p.calcTitle} />
+          <div className="mt-10">
+            <DowntimeCalc t={t.calc} ctaHref={rfq} locale={locale} />
+          </div>
+        </div>
+      </section>
+      <section className="section bg-ink text-white">
+        <div className="container max-w-4xl text-center" data-reveal>
+          <p className="eyebrow !text-brand-400">{p.auditEyebrow}</p>
+          <h2 className="h-display mt-4 text-4xl md:text-6xl">{p.auditTitle}</h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/70">{p.auditLead}</p>
+          <a href={audit} className="btn-primary mt-8 !px-8 !py-4 !text-base" data-magnetic>
+            <Icon name="mail" className="h-5 w-5" /> {p.auditCta}
+          </a>
+        </div>
+      </section>
+      <section className="section">
+        <div className="container max-w-4xl">
+          <FaqList items={p.faq} />
+        </div>
+      </section>
+      <CtaBand locale={locale} title={p.ctaTitle} lead={p.ctaLead} />
+      <JsonLd data={breadcrumbJsonLd(crumbs)} />
+      <JsonLd data={faqJsonLd(p.faq)} />
+    </>
+  );
+}
+
 // ---------------- Reference ----------------
 
 export function referencesMeta(locale: Locale) {

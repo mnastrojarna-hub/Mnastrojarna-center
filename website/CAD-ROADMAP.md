@@ -153,3 +153,9 @@ Legenda: ✅ splněno a ověřeno · 🟡 částečně / čeká na podklady · �
 - Modelovaný závit = soustředné drážky, ne šroubovice.
 - Vazby sestavy se zatím aplikují jednorázově (neudržují se při změně).
 - Obrovské sestavy (tisíce dílů) jsou v prohlížeči pomalejší než v desktopu; opakované díly se sdílejí.
+
+## Stav k 2. 11. 2026 – přerušení 4. vlny (týdenní limit API)
+
+- Všech 5 workerů 4. vlny (X1 reference ve skice, X2 více těles, X3 pohyb mechanismu, X4 výkresy 3, X5 AI asistent) skončilo na limitu **před odevzdáním**. Na disku zůstaly jen typy pro více těles (`cad/types.ts`: prvky `combine`, `splitBodies`, `copyBody`, `BodyMeta`, `BodyInfo`, `ExtBuildCtx.bodies`) a závislost `@anthropic-ai/sdk` v `package.json` (pro X5). Tyto typy mají zatím jen výchozí hodnoty a popisky v `cad/defaults.ts`; **stavba (`build.ts`), formuláře (`props.tsx`) a UI chybí** – navázat podle plánu 4. vlny výše.
+- Web: opraven vlastní kurzor (po optimalizaci výkonu se GSAP navázal na ještě nevykreslené prvky → nativní myš skryta, vlastní neviditelná). Nově se nativní kurzor skrývá až po prvním pohybu myši a po opuštění okna se vrací.
+- Web: přidána vstupní stránka **Pro údržbu** (`/pro-udrzbu`, `/en/for-maintenance`, `/de/fuer-instandhaltung`) – díl podle vzorku, audit kritických dílů, konsignace, kalkulačka prostojů, FAQ + JSON-LD, v sitemapě a patičce.

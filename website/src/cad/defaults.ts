@@ -5,6 +5,9 @@ import { uid } from "./types";
 
 export const FEATURE_LABEL: Record<FeatureType, string> = {
   ext: "Rozšíření",
+  combine: "Sloučení těles",
+  splitBodies: "Rozdělení na tělesa",
+  copyBody: "Kopie tělesa",
   sketch: "Skica",
   extrude: "Vysunutí",
   revolve: "Rotace",
@@ -184,6 +187,15 @@ export function newFeature(doc: CadDoc, type: NewFeatureType, extra: Partial<Fea
       break;
     case "thicken":
       f = { ...base, type, faces: [], thickness: 2, mode: "add" };
+      break;
+    case "combine":
+      f = { ...base, type, target: "", tool: "", op: "add", keepTool: false };
+      break;
+    case "splitBodies":
+      f = { ...base, type, plane: "XY", offset: 0 };
+      break;
+    case "copyBody":
+      f = { ...base, type, source: "", translate: [0, 0, 0] };
       break;
   }
   return { ...f, ...extra } as Feature;

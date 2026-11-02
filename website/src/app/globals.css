@@ -336,6 +336,12 @@ html.lenis body {
   pointer-events: none;
   z-index: 100;
   border-radius: 9999px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+html.has-cursor .cursor-dot,
+html.has-cursor .cursor-ring {
+  opacity: 1;
 }
 .cursor-dot {
   width: 6px;
