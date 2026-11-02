@@ -267,3 +267,48 @@ export function ContextMenu({ x, y, entries, close }: { x: number; y: number; en
     </div>
   );
 }
+
+/** Kontextová mini lišta u kurzoru (jako v ZW3D/SolidWorks): nejčastější příkazy pro vybranou entitu na jeden klik. */
+export function HudBar({ x, y, entries, onMore, onClose, max = 4 }: { x: number; y: number; entries: RMenuEntry[]; onMore: () => void; onClose: () => void; max?: number }) {
+  const items = entries.filter((e): e is RItem => !("divider" in e) && !e.disabled).slice(0, max);
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x + 12, top: y + 14 });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    setPos({ left: Math.max(8, Math.min(x + 12, window.innerWidth - w - 8)), top: y + 14 + h > window.innerHeight - 8 ? Math.max(8, y - h - 10) : y + 14 });
+  }, [x, y]);
+  if (!items.length) return null;
+  return (
+    <div
+      ref={ref}
+      data-cad-menu
+      role="toolbar"
+      aria-label="Rychlé příkazy pro výběr"
+      className="fixed z-[58] flex items-center gap-0.5 rounded-lg border border-[#cfd6de] bg-white/95 p-1 shadow-[0_8px_24px_-8px_rgba(15,23,42,.35)] backdrop-blur"
+      style={pos}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {items.map((it) => (
+        <button
+          key={it.id}
+          type="button"
+          title={tip(it)}
+          onClick={() => {
+            onClose();
+            it.onClick?.();
+          }}
+          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[11.5px] text-[#26303b] hover:bg-[#e3e9f0]"
+        >
+          <CadIcon name={it.icon} tone={it.tone} className="h-5 w-5" />
+          <span className="hidden sm:inline">{it.label}</span>
+        </button>
+      ))}
+      <button type="button" title="Další příkazy (pravé tlačítko)" onClick={onMore} className="h-8 rounded-md px-2 text-[14px] leading-none text-[#6b7785] hover:bg-[#e3e9f0]">
+        ⋯
+      </button>
+    </div>
+  );
+}

@@ -37,7 +37,7 @@ import { FEATURE_TONE, Manager } from "./manager";
 import { EntityProps, FeatureProps, ParamContext } from "./props";
 import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Want } from "./ref-field";
 import type { Ref } from "@/cad/refs";
-import { ContextMenu, Dropdown, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
+import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, sketchRibbon, type SketchPatch, type SketchTool } from "./sketcher";
 import { Viewport, type AsmView, type Datum, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
@@ -119,6 +119,9 @@ export function CadApp() {
   const [selection, setSelection] = useState<SelItem[]>([]);
   /** čekající výběr do pole odkazu ve formuláři prvku (bod / hrana / plocha…) */
   const [refPick, setRefPick] = useState<RefPickTarget | null>(null);
+  /** kontextová mini lišta u kurzoru po výběru entity */
+  const [hud, setHud] = useState<{ x: number; y: number; item: SelItem } | null>(null);
+  const lastPtr = useRef({ x: 0, y: 0 });
   const [lastPoint, setLastPoint] = useState<Vec3 | null>(null);
   const [inspect, setInspect] = useState<{ item: SelItem; info: EntityInfo } | null>(null);
   const [inspectOpen, setInspectOpen] = useState(true);
@@ -736,6 +739,7 @@ export function CadApp() {
       return;
     }
     if (!it) {
+      setHud(null);
       if (!additive) {
         setSelection([]);
         setInspect(null);
@@ -745,6 +749,7 @@ export function CadApp() {
     }
     const next = additive ? (selection.some((x) => sameSel(x, it)) ? selection.filter((x) => !sameSel(x, it)) : [...selection, it]) : [it];
     setSelection(next);
+    setHud(!additive && next.length === 1 && !isAsm && !activeId && !sketchId ? { x: lastPtr.current.x, y: lastPtr.current.y, item: next[0] } : null);
     if (isAsm && it.kind !== "feature") {
       const top = it.topId ?? it.compId;
       if (top) setAsmSel(top.split("/")[0]);
@@ -782,6 +787,9 @@ export function CadApp() {
   );
   useRefPickEscape(refPick, () => setRefPick(null));
   useEffect(() => setRefPick(null), [activeId]);
+  useEffect(() => {
+    if (activeId || sketchId || !selection.length || measure) setHud(null);
+  }, [activeId, sketchId, selection.length, measure]);
   const refCtxValue = useMemo(() => ({ doc, target: refPick, request: setRefPick, selectionRefs, lastPoint }), [doc, refPick, selectionRefs, lastPoint]);
   const selFaces = selection.filter((x): x is Extract<SelItem, { kind: "face" }> => x.kind === "face" && !x.compId).map((x) => x.index);
   const selEdges = selection.filter((x): x is Extract<SelItem, { kind: "edge" }> => x.kind === "edge" && !x.compId).map((x) => x.index);
@@ -2096,7 +2104,14 @@ export function CadApp() {
           </aside>
 
           {/* Pracovní plocha */}
-          <main className="relative min-w-0 flex-1 overflow-hidden">
+          <main
+            className="relative min-w-0 flex-1 overflow-hidden"
+            onPointerDownCapture={(e) => {
+              lastPtr.current = { x: e.clientX, y: e.clientY };
+              setHud(null);
+            }}
+            onWheelCapture={() => setHud(null)}
+          >
             <div className={cn("absolute inset-0", sketch && "invisible")} style={{ background: bg.css }}>
               <Viewport
                 ref={vp}
@@ -2468,6 +2483,19 @@ export function CadApp() {
         </footer>
 
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} entries={ctx.entries} close={() => setCtx(null)} />}
+        {hud && !active && !sketch && !ctx && !measure && !refPick && (
+          <HudBar
+            x={hud.x}
+            y={hud.y}
+            entries={entityMenu(hud.item)}
+            onClose={() => setHud(null)}
+            onMore={() => {
+              const h = hud;
+              setHud(null);
+              vpContext(h.x, h.y, h.item);
+            }}
+          />
+        )}
 
         {/* Hmotnostní vlastnosti */}
         {massOpen && m && (
