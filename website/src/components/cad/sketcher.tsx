@@ -1907,7 +1907,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (spec.length && !(e.ctrlKey || e.metaKey || e.altKey)) {
         const cur = dyn.texts[dyn.active] ?? "";
         const sepLike = (e.key === "x" || e.key === "X") && cur.trim().length > 0 && spec.length > 1;
-        if (/^[0-9.,;@<+*/()\-]$/.test(e.key) || (sepLike && spec.length === 1)) {
+        if (/^[0-9.,;@<+*/()\-]$/.test(e.key)) {
           e.preventDefault();
           setDyn((d) => {
             const texts = [...d.texts];
