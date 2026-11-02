@@ -672,7 +672,10 @@ export function PlaneDefField({ label = "Rovina", value, onChange, allowNone, no
   );
 }
 
-/** Seznam bodů (více poloh díry apod.). */
+const ITEM_LABEL: Record<Want, string> = { point: "Bod", vertex: "Vrchol", edge: "Hrana", face: "Plocha", plane: "Rovina", axis: "Osa", any: "Entita" };
+const ITEMS_LABEL: Record<Want, string> = { point: "body", vertex: "vrcholy", edge: "hrany", face: "plochy", plane: "roviny", axis: "hrany / válce", any: "entity" };
+
+/** Seznam odkazů (více poloh díry, více ploch, více vrcholů…). */
 export function RefListField({ label, value, onChange, want = "point" }: { label: string; value: Ref[]; onChange: (v: Ref[]) => void; want?: Want }) {
   const ctx = useContext(RefPickContext);
   const [id] = useState(nid);
@@ -702,7 +705,7 @@ export function RefListField({ label, value, onChange, want = "point" }: { label
       {value.map((r, i) => (
         <div key={i} className="flex items-center gap-1">
           <div className="flex-1">
-            <RefField compact label={`Bod ${i + 1}`} value={r} want={want} onChange={(nr) => onChange(value.map((x, k) => (k === i ? nr : x)))} />
+            <RefField compact label={`${ITEM_LABEL[want]} ${i + 1}`} value={r} want={want} onChange={(nr) => onChange(value.map((x, k) => (k === i ? nr : x)))} />
           </div>
           <button type="button" onClick={() => onChange(value.filter((_, k) => k !== i))} className="rounded px-1.5 text-[13px] text-ink-700/50 hover:bg-steel-100" title="Odebrat">
             ×
@@ -711,11 +714,13 @@ export function RefListField({ label, value, onChange, want = "point" }: { label
       ))}
       <div className="flex gap-1">
         <button type="button" onClick={addPick} className={cn("flex-1 rounded-md border border-dashed px-2 py-1.5 text-[12px]", active ? "border-brand bg-brand/5 text-brand" : "border-ink-700/25 text-ink-700/70 hover:bg-steel-100")}>
-          {active ? "Klikejte na body v modelu… (Esc = konec)" : "+ Přidat body klikem"}
+          {active ? `Klikejte na ${ITEMS_LABEL[want]} v modelu… (Esc = konec)` : `+ Přidat ${ITEMS_LABEL[want]} klikem`}
         </button>
-        <button type="button" onClick={() => onChange([...value, { kind: "xyz", p: [0, 0, 0] }])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title="Přidat bod zadaný souřadnicemi">
-          + XYZ
-        </button>
+        {(want === "point" || want === "any") && (
+          <button type="button" onClick={() => onChange([...value, { kind: "xyz", p: [0, 0, 0] }])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title="Přidat bod zadaný souřadnicemi">
+            + XYZ
+          </button>
+        )}
         {!!ctx?.selectionRefs.length && (
           <button type="button" onClick={() => onChange([...value, ...ctx.selectionRefs])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title="Přidat vybrané entity">
             + výběr
