@@ -319,10 +319,10 @@ export const CAPTURE_HANDOFF_WAITING = "Zakázka čeká na předání do výroby
 
 /** Kdo předává z focení: účet, který fotil (plná automatika = ✨ AI za něj — autora nese klient db). */
 export function captureHandoffActor(
-  c: { user: { id: string; fullName: string; role?: string }; margins: boolean; access?: { can: (f: "mail_all") => boolean } },
+  c: { user: { id: string; fullName: string; role?: string; fullAccess?: boolean }; margins: boolean; access?: { can: (f: "mail_all") => boolean } },
   auto?: boolean,
 ): HandoffActor {
-  const mailAll = c.access ? c.access.can("mail_all") : c.user.role === "super_admin";
+  const mailAll = c.access ? c.access.can("mail_all") : c.user.role === "super_admin" && c.user.fullAccess !== true;
   return { id: c.user.id, fullName: c.user.fullName, margins: c.margins, mailAll, via: auto ? "ai" : "foto" };
 }
 

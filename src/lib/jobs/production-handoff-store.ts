@@ -2184,9 +2184,11 @@ export async function autoAdvanceAfterDelivery(db: JobsDb, userId: string | null
     const manual = { hint: `K předání dalšímu kroku: ${label}${where} — „Předat do kroku…".` };
     if (next.inHouse || !hasWho(next) || !cleanDate(next.plannedEnd) || !userId) return manual;
     if ((await purchaseOrderMode(db)) !== "full") return manual;
-    const { data: prof } = await db.from("profiles").select("id, full_name, role, active").eq("id", userId).maybeSingle();
-    const p = prof as { full_name: string | null; role: string; active: boolean } | null;
-    const margins = Boolean(p?.active) && (p?.role === "super_admin" || p?.role === "obchodnik");
+    // "*": DB bez migrace full_access (2. 11.) nesmí dotaz shodit
+    const { data: prof } = await db.from("profiles").select("*").eq("id", userId).maybeSingle();
+    const p = prof as { full_name: string | null; role: string; active: boolean; full_access?: boolean | null } | null;
+    // plný přístup (2. 11.) = marže jako super admin; pošta všech schránek ne
+    const margins = Boolean(p?.active) && (p?.role === "super_admin" || p?.role === "obchodnik" || p?.full_access === true);
     if (!margins) return manual;
     const box = await purchaseOrderSender(db, { id: userId }, ctx.job.ownerId);
     const plan = buildHandoffPlan(ctx, { kind: "dalsi_krok", operationId: next.id, margins, mailAll: p?.role === "super_admin", actorId: userId, automationMode: "full", senderEmail: box.mailboxEmail });

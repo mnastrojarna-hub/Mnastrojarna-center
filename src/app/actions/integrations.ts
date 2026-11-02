@@ -32,6 +32,20 @@ async function guardSettings(): Promise<string | null> {
   return "error" in access ? access.error : null;
 }
 
+/**
+ * Schránky všech (servery, hesla, vlastník) — jen kdo vidí poštu všech schránek (mail_all = skutečný super admin).
+ * Plný přístup (2. 11.) nastavení jinak smí, cizí schránky ne („každý bude vidět jen svůj mail"); svou schránku
+ * si spravuje v Můj účet (/api/mailboxes/my).
+ */
+async function guardMailboxes(): Promise<string | null> {
+  const denied = await guardSettings();
+  if (denied) return denied;
+  if (!isSupabaseConfigured() || !hasServiceKey()) return null;
+  if (!(await superAdminExists())) return null;
+  const access = await checkFeature("mail_all");
+  return "error" in access ? "Schránky všech spravuje jen super admin — svou schránku nastavíš v Můj účet." : null;
+}
+
 const VALID_PROVIDERS: MailboxProvider[] = ["imap", "outlook", "gmail"];
 
 /** Uloží hodnoty integrací. Prázdné hodnoty u tajných klíčů přeskočí (nepřepíše). */
@@ -144,7 +158,7 @@ export async function addMailbox(payload: MailboxPayload): Promise<Result & { id
   const { config, errors, notes } = prepareConfig(payload, null);
   const invalid = validateMailbox(payload, config, errors);
   if (invalid) return { ok: false, error: invalid };
-  const denied = await guardSettings();
+  const denied = await guardMailboxes();
   if (denied) return { ok: false, error: denied };
   try {
     const db = await createOperatorClient();
@@ -183,7 +197,7 @@ export async function addMailbox(payload: MailboxPayload): Promise<Result & { id
 export async function updateMailbox(id: string, payload: MailboxPayload): Promise<Result & { notes?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   if (!isUuidLike(id)) return { ok: false, error: "Schránka nenalezena." };
-  const denied = await guardSettings();
+  const denied = await guardMailboxes();
   if (denied) return { ok: false, error: denied };
   try {
     const db = await createOperatorClient();
@@ -240,7 +254,7 @@ export async function updateMailbox(id: string, payload: MailboxPayload): Promis
 export async function setMailboxActive(id: string, active: boolean): Promise<Result> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   if (!isUuidLike(id)) return { ok: false, error: "Schránka nenalezena." };
-  const denied = await guardSettings();
+  const denied = await guardMailboxes();
   if (denied) return { ok: false, error: denied };
   try {
     const db = await createOperatorClient();
@@ -258,7 +272,7 @@ export async function setMailboxActive(id: string, active: boolean): Promise<Res
 export async function deleteMailbox(id: string): Promise<Result> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
   if (!isUuidLike(id)) return { ok: false, error: "Schránka nenalezena." };
-  const denied = await guardSettings();
+  const denied = await guardMailboxes();
   if (denied) return { ok: false, error: denied };
   try {
     const db = await createOperatorClient();
@@ -291,7 +305,7 @@ export async function testMailboxConnection(
   config: MailboxConfig,
   opts: { mailboxId?: string; email?: string; provider?: MailboxProvider; secrets?: SecretChanges } = {},
 ): Promise<MailboxTestResult> {
-  const guard = await guardSettings();
+  const guard = await guardMailboxes();
   if (guard) {
     const denied = { ok: false, error: guard };
     return { imap: denied, smtp: denied, graph: null };

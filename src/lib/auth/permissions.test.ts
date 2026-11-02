@@ -108,3 +108,29 @@ describe("oprávnění dle rolí", () => {
     expect(new Set(ALL_FEATURES).size).toBe(ALL_FEATURES.length);
   });
 });
+
+describe("plný přístup (2. 11. — Volný, Šponer)", () => {
+  // current-user.ts dosadí efektivní roli super_admin + fullAccess
+  const full: AccessSubject = { role: "super_admin", aiAccess: true, active: true, fullAccess: true };
+
+  it("smí vše jako super admin kromě pošty ostatních schránek a správy uživatelů", () => {
+    const allowed = allowedFeatures(full, ctx({ supplierInvoicesForAll: false }));
+    expect(allowed).not.toContain("users");
+    expect(allowed).not.toContain("mail_all");
+    expect([...allowed].sort()).toEqual(ALL_FEATURES.filter((f) => f !== "users" && f !== "mail_all").sort());
+  });
+
+  it("vlastní pošta ano, ostatní schránky ne", () => {
+    expect(can(full, "mail", ctx())).toBe(true);
+    expect(can(full, "mail_all", ctx())).toBe(false);
+  });
+
+  it("neaktivní účet s plným přístupem nesmí nic", () => {
+    expect(allowedFeatures({ ...full, active: false }, ctx())).toEqual([]);
+  });
+
+  it("skutečný super admin beze změny", () => {
+    expect(can(admin, "users", ctx())).toBe(true);
+    expect(can(admin, "mail_all", ctx())).toBe(true);
+  });
+});
