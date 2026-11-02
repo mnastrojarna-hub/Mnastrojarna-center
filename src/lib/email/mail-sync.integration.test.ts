@@ -124,7 +124,7 @@ describe.skipIf(!LOCAL_ENABLED)("stahování pošty ↔ lokální Supabase + tes
     localSql(`update mailbox_status set sync_lock_until = null where mailbox_id = '${id}'`);
   });
 
-  it("odmítnuté heslo: automatika (otevření pošty, plánovač) se znovu NEpřihlašuje; ručně ano; po opravě hesla zase automaticky", async () => {
+  it("odmítnuté heslo: automatika (otevření pošty, plánovač) se znovu NEpřihlašuje; ručně až po hodině; po opravě hesla zase automaticky", async () => {
     const id = await newBox("blok@mnastrojarna.test", { imap_host: "127.0.0.1", imap_port: srv.ports.imaps, imap_user: USER, imap_password: "spatne-heslo" });
     const logins = () => srv.events.filter((e) => e.type === "auth" && e.proto === "imap" && e.user === USER).length;
     const n0 = logins();
@@ -145,7 +145,15 @@ describe.skipIf(!LOCAL_ENABLED)("stahování pošty ↔ lokální Supabase + tes
     expect(auto.boxes?.[0]).toMatchObject({ skipped: "auth" });
     expect(logins()).toBe(n0 + 1);
 
-    // ruční tlačítko to zkusí znovu
+    // ruční tlačítko do hodiny také ne (2. 11.: opakované chybné heslo = blokace IP) — s časem dalšího pokusu
+    const early = await ingest.syncMailbox({ mailboxIds: [id], manual: true });
+    expect(early.boxes?.[0]).toMatchObject({ ok: false, skipped: "auth" });
+    expect(early.boxes?.[0].error).toMatch(/Heslo bylo odmítnuto[\s\S]*zkus znovu po/);
+    expect(early.boxes?.[0].retryAt).toBeTruthy();
+    expect(logins()).toBe(n0 + 1);
+
+    // po hodině ruční tlačítko to zkusí znovu (jednou)
+    localSql(`update mailbox_status set auth_fail_at = now() - interval '61 minutes' where mailbox_id = '${id}'`);
     const manual = await ingest.syncMailbox({ mailboxIds: [id], manual: true });
     expect(manual.boxes?.[0]).toMatchObject({ ok: false });
     expect(manual.boxes?.[0].skipped).toBeUndefined();

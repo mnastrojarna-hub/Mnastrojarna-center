@@ -9,7 +9,8 @@ import {
   type EmailListRow, type SentMailRow, type ApprovalSentRow, type MailViewer, type MailboxOption,
 } from "@/lib/email/visibility";
 import type { EmailCategory, MailboxConfig, MailboxProvider } from "@/lib/supabase/database.types";
-import { getMailboxStatuses, isAuthBlocked } from "@/lib/email/mailbox-status";
+import { authLockFor, getMailboxStatuses, isAuthBlocked } from "@/lib/email/mailbox-status";
+import type { AuthLock } from "@/lib/email/auth-lockout";
 import { mailboxMissing } from "@/lib/email/mail-config";
 import type { EmailItem, SentItem } from "@/lib/data/types";
 
@@ -109,9 +110,14 @@ export async function getMailboxesForUser(): Promise<MailboxOption[]> {
       lastSyncAt: st?.last_sync_ok_at ?? null,
       lastSyncError: st?.last_sync_error ?? null,
       authBlocked: isAuthBlocked(st, { provider: m.provider, email: m.email, config: m.config }),
+      ...lockFields(authLockFor(st, { provider: m.provider, email: m.email, config: m.config })),
       incomplete: mailboxMissing(m.provider, m.config ?? {}).length > 0,
     };
   });
+}
+
+function lockFields(l: AuthLock): { authRetryAt: string | null; authLockReason: string | null } {
+  return { authRetryAt: l.blocked ? l.until : null, authLockReason: l.blocked ? l.reason : null };
 }
 
 const EMAIL_LIST_SELECT = [

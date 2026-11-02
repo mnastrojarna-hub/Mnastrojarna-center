@@ -9,11 +9,13 @@ import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/su
 import type { MailboxConfig, MailboxProvider } from "@/lib/supabase/database.types";
 import {
   defaultTlsForPort, isLoopbackHost, normalizeHost, resolveSmtp, tlsModesForPort,
-  type SmtpAuthMethod, type SmtpPasswordSource, type TlsMode,
+  type MailErrorKind, type SmtpAuthMethod, type SmtpPasswordSource, type TlsMode,
 } from "@/lib/email/mail-config";
 import { graphError, graphToken, providerFallbacks, smtpTransport } from "@/lib/email/mail-connect";
 import { describeSmtpFailure, sendWithSmtpRecovery, type SmtpTry } from "@/lib/email/smtp-recovery";
 import { healSmtpPassword } from "@/lib/email/smtp-heal";
+import { authLockFor, clearAuthFailure, explainHostLockout, getAuthFailState, noteAuthFailure } from "@/lib/email/mailbox-status";
+import { LOCKOUT_TEXT } from "@/lib/email/auth-lockout";
 import { appendToSent, type SentCopyState } from "@/lib/email/mail-append";
 import { bracketId } from "@/lib/email/threading";
 import { outgoingCategory } from "@/lib/email/mail-rules";
@@ -49,6 +51,10 @@ export interface SendResult {
   /** Kopie ve složce Odeslané na serveru. */
   sentCopy?: SentCopyState;
   sentCopyError?: string;
+  /** Příčina neúspěchu SMTP (classifyMailError) — „auth" = odmítnuté heslo. */
+  errorKind?: MailErrorKind;
+  /** Zkouška odeslání zablokovaná po odmítnutém hesle (auth-lockout.ts): nejbližší další pokus (ISO). */
+  retryAt?: string;
 }
 
 interface SmtpConfig {
@@ -493,7 +499,7 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
     });
     if (!rec.ok) {
       const owner = !s.box ? "global" : s.box.owner_id ? "own" : "company";
-      return { sent: false, reason: `Odeslání selhalo — ${describeSmtpFailure(rec, { owner })}` };
+      return { sent: false, reason: `Odeslání selhalo — ${describeSmtpFailure(rec, { owner })}`, ...(rec.kind ? { errorKind: rec.kind } : {}) };
     }
     if (rec.healSmtpPassword && s.mailboxId && s.passwordSource === "smtp" && s.password) {
       await healSmtpPassword(s.mailboxId, s.password, { reason: "send" });
@@ -564,13 +570,20 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
  */
 export async function sendTestMail(mailboxId: string, who?: string | null): Promise<SendResult & { to?: string }> {
   let email: string | undefined;
+  type TestBox = { provider: MailboxProvider; email: string; config: MailboxConfig | null };
+  let box: TestBox | null = null;
   try {
-    const { data } = await createAdminClient().from("mailboxes").select("email").eq("id", mailboxId).maybeSingle();
-    email = (data as { email: string } | null)?.email;
+    const { data } = await createAdminClient().from("mailboxes").select("email, provider, config").eq("id", mailboxId).maybeSingle();
+    box = (data as TestBox | null) ?? null;
+    email = box?.email;
   } catch {
     // níže
   }
-  if (!email) return { sent: false, reason: "Schránka nenalezena." };
+  if (!email || !box) return { sent: false, reason: "Schránka nenalezena." };
+  // po odmítnutém hesle se do změny hesla / 60 min nepřihlašuje ani zkouška odeslání (blokace IP u hostingu)
+  const prev = await getAuthFailState(mailboxId);
+  const lock = authLockFor(prev, box);
+  if (lock.blocked) return { sent: false, reason: lock.reason ?? "Přihlášení je dočasně pozastavené.", errorKind: "auth", retryAt: lock.until ?? undefined, to: email };
   const when = new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
   const res = await sendMail({
     to: email,
@@ -579,5 +592,12 @@ export async function sendTestMail(mailboxId: string, who?: string | null): Prom
     from: { mailboxId },
     log: false,
   });
+  if (res.sent) {
+    if (prev?.auth_fail_at) await clearAuthFailure(mailboxId);
+  } else if (res.errorKind === "auth") {
+    await noteAuthFailure(mailboxId, box, "send");
+  } else if (res.errorKind && (await explainHostLockout(mailboxId, box, res.errorKind, box.config?.smtp_host ?? null, prev))) {
+    return { ...res, reason: `Odeslání selhalo — ${LOCKOUT_TEXT}`, to: email };
+  }
   return { ...res, to: email };
 }

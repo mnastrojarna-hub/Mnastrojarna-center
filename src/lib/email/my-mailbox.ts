@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/server";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
-import { getMailboxStatuses, isAuthBlocked, updateMailboxStatus } from "@/lib/email/mailbox-status";
+import { authLockFor, getMailboxStatuses, isAuthBlocked, updateMailboxStatus } from "@/lib/email/mailbox-status";
 import { detectMailbox, testMailbox, type MailboxTestResponse } from "@/lib/email/mailbox-diagnose";
 import {
   describeConfigChanges, endpointLabel, mailboxMissing, mergeMailboxSecrets, normalizeEmail, normalizeMailboxConfig, presetOf, providerForPreset,
@@ -37,6 +37,10 @@ export interface MyMailbox {
   lastSyncAt: string | null;
   lastSyncError: string | null;
   authBlocked: boolean;
+  /** Po odmítnutém hesle: test / stažení / zkouška odeslání až po tomto čase (ISO) nebo po změně hesla. */
+  authRetryAt?: string | null;
+  /** Proč jsou pokusy pozastavené (česky). */
+  authLockReason?: string | null;
   /** Assigned by admin (vlastník nastaven adminem — schránka je moje, smím ji spravovat). */
   createdByOther: boolean;
   remaining: number | null;
@@ -129,6 +133,10 @@ function describe(row: Row, status: MailboxStatus | undefined, userId: string, a
     lastSyncAt: st?.last_sync_ok_at ?? null,
     lastSyncError: st?.last_sync_error ?? null,
     authBlocked: isAuthBlocked(st, { provider: row.provider, email: row.email, config: cfg }),
+    ...(() => {
+      const l = authLockFor(st, { provider: row.provider, email: row.email, config: cfg });
+      return { authRetryAt: l.blocked ? l.until : null, authLockReason: l.blocked ? l.reason : null };
+    })(),
     createdByOther: Boolean(row.created_by && row.created_by !== userId),
     remaining: st?.last_sync_remaining ?? null,
     total: typeof st?.last_sync_total === "number" ? st.last_sync_total : null,

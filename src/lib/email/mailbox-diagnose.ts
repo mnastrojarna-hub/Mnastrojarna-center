@@ -2,7 +2,10 @@ import "server-only";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
 import { SYSTEM_ACTOR } from "@/lib/supabase/actor-headers";
 import { diagnoseEndpoint, diagnoseGraph, detectMailSettings, type DetectInput } from "@/lib/email/mail-connect";
-import { updateMailboxStatus } from "@/lib/email/mailbox-status";
+import {
+  authLockFor, clearAuthFailure, explainHostLockout, getAuthFailState, noteAuthFailure, updateMailboxStatus,
+} from "@/lib/email/mailbox-status";
+import { LOCKOUT_TEXT, type AuthLock } from "@/lib/email/auth-lockout";
 import {
   alternateAuthMethod, isPresetId, mergeMailboxSecrets, normalizeMailboxConfig, resolveIncoming, resolveSmtp, normalizeEmail, EMAIL_RE,
   SMTP_PASSWORD_SOURCE_LABEL, type DetectResult, type DiagResult, type ResolvedSmtp, type SecretChanges,
@@ -33,6 +36,8 @@ export interface MailboxTestResponse {
   missing?: string[];
   notes?: string[];
   error?: string;
+  /** Test se nespustil: po odmítnutém hesle je přihlašování schránky dočasně pozastavené (auth-lockout.ts). */
+  authLock?: AuthLock;
 }
 
 async function storedConfig(mailboxId: string | null | undefined): Promise<{ config: MailboxConfig; email?: string } | null> {
@@ -55,6 +60,12 @@ export async function testMailbox(input: MailboxTestInput, opts: { userId?: stri
   if (!EMAIL_RE.test(email)) return { incoming: null, smtp: null, graph: null, error: "Zadej platnou e-mailovou adresu schránky." };
   const { config, errors, notes } = await effectiveConfig(input);
   if (errors.length) return { incoming: null, smtp: null, graph: null, error: errors.join(" "), notes };
+  // Po odmítnutém hesle (< 60 min, stejné heslo i uživatel) se znovu nepřihlašuje — opakované chybné
+  // přihlášení u hosting90 zablokuje IP. Nově zadané heslo (formulář) = jiný otisk = test proběhne.
+  const box = { provider: input.provider, email, config };
+  const failState = input.mailboxId ? await getAuthFailState(input.mailboxId) : null;
+  const lock = authLockFor(failState, box);
+  if (lock.blocked) return { incoming: null, smtp: null, graph: null, error: lock.reason ?? undefined, authLock: lock, notes };
   const out: MailboxTestResponse = { incoming: null, smtp: null, graph: null, notes };
 
   if (input.provider === "outlook") {
@@ -71,6 +82,21 @@ export async function testMailbox(input: MailboxTestInput, opts: { userId?: stri
     const [a, b] = await Promise.all([inc ? diagnoseEndpoint(inc) : null, smtp ? diagnoseEndpoint(smtp) : null]);
     out.incoming = a;
     out.smtp = b && smtp ? await recoverSmtpDiag(b, smtp, { mailboxId: input.mailboxId, stored: await storedConfig(input.mailboxId), userId: opts.userId }) : b;
+  }
+
+  if (input.mailboxId && input.provider !== "outlook") {
+    // odmítnuté heslo → blokace dalších pokusů; časový limit na známém serveru krátce po něm → vysvětlení
+    let host = false;
+    for (const d of [out.incoming, out.smtp]) {
+      if (d && !d.ok && d.kind !== "auth" && (await explainHostLockout(input.mailboxId, box, d.kind, d.endpoint?.host, failState))) {
+        d.error = LOCKOUT_TEXT;
+        d.hostLockout = true;
+        host = true;
+      }
+    }
+    const authFailed = out.incoming?.kind === "auth" ? "test" : out.smtp?.kind === "auth" ? "smtp" : null;
+    if (authFailed) await noteAuthFailure(input.mailboxId, box, authFailed);
+    else if (!host && out.incoming?.ok && failState?.auth_fail_at) await clearAuthFailure(input.mailboxId, { syncAuth: true });
   }
 
   if (input.mailboxId && (out.incoming || out.graph)) {
@@ -150,7 +176,15 @@ export async function detectMailbox(req: DetectRequest): Promise<DetectResult> {
   const empty: DetectResult = { ok: false, preset: null, evidence: [], attempts: [] };
   if (!EMAIL_RE.test(email)) return { ...empty, error: "Zadej platnou e-mailovou adresu schránky." };
   let password = typeof req.password === "string" && req.password !== "" ? req.password.replace(/[\r\n]+/g, "") : "";
-  if (!password) password = (await storedConfig(req.mailboxId))?.config.imap_password ?? "";
+  if (!password && req.mailboxId) {
+    // bez nového hesla zkouší „Najít nastavení" uložené (odmítnuté) heslo — po odmítnutí ne (blokace IP u hostingu)
+    const stored = await storedConfig(req.mailboxId);
+    if (stored) {
+      const lock = authLockFor(await getAuthFailState(req.mailboxId), { provider: "imap", email: stored.email ?? email, config: stored.config });
+      if (lock.blocked) return { ...empty, error: lock.reason ?? undefined };
+    }
+    password = stored?.config.imap_password ?? "";
+  }
   if (!password) return { ...empty, error: "Zadej heslo ke schránce — bez něj nejde ověřit, který server funguje." };
   const input: DetectInput = {
     email,

@@ -9,7 +9,8 @@ import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
 import { fetchIncoming, syncIncoming, type MailSyncState } from "@/lib/email/mail-fetch";
 import { graphError } from "@/lib/email/mail-connect";
 import {
-  acquireSyncLock, authBlockedMessage, credentialFingerprint, getMailboxStatuses, isAuthBlocked, releaseSyncLock, saveSyncProgress,
+  acquireSyncLock, authBlockedMessage, authLockFor, clearAuthFailure, credentialFingerprint, explainHostLockout, getMailboxStatuses,
+  isAuthBlocked, noteAuthFailure, releaseSyncLock, saveSyncProgress,
 } from "@/lib/email/mailbox-status";
 import {
   classifyMailError, defaultTlsForPort, describeMailError, mailboxMissing, normalizeHost, rawErrorText, resolveIncoming,
@@ -26,6 +27,7 @@ import { categoryAfterLink, STRONG_SIGNALS } from "@/lib/email/job-match";
 import { aiActor, cronActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import type { MailboxConfig, MailboxStatus } from "@/lib/supabase/database.types";
+import { LOCKOUT_TEXT, type AuthFailState } from "@/lib/email/auth-lockout";
 import { detectRoleEmails } from "@/lib/contacts/role-detect";
 import { aiToneFor, ownAddressFilter, rememberRoleEmails } from "@/lib/contacts/server";
 
@@ -767,6 +769,8 @@ export interface MailboxSyncReport {
   skipped?: "incomplete" | "locked" | "recent" | "deadline" | "auth";
   /** Uložený server nefungoval, použil se ověřený server poskytovatele (uloženo ke schránce). */
   healed?: string;
+  /** Blokace po odmítnutém hesle: nejbližší další pokus (ISO). */
+  retryAt?: string;
 }
 
 /** Zpráv na serveru při posledním stažení (mailbox_status.last_sync_total, migrace 20261029100000). */
@@ -876,10 +880,16 @@ async function syncOneMailbox(box: MailboxRow, o: OneOptions): Promise<MailboxSy
   if (missing.length) {
     return { ...base, ok: false, skipped: "incomplete", error: `Schránka ${box.email} nemá vyplněno: ${missing.join(", ")} — doplň v nastavení schránky (Můj účet → Moje e-mailová schránka).` };
   }
-  // Známé odmítnuté heslo: automatika se nepřihlašuje, dokud se údaje nezmění (jen ručně)
+  const source = box.provider === "outlook" ? "graph" as const : cfg.incoming_protocol === "pop3" ? "pop3" as const : "imap" as const;
+  // Odmítnuté heslo před < 60 min (stejné údaje): nepřihlašovat se vůbec — ani ručně (opakované chybné
+  // přihlášení = blokace IP u hosting90), viz auth-lockout.ts
+  const failState = o.status as (MailboxStatus & AuthFailState) | undefined;
+  // Známé odmítnuté heslo: automatika se nepřihlašuje, dokud se údaje nezmění (ručně až po 60 min, viz níže)
   if (!o.manual && isAuthBlocked(o.status, box)) {
-    return { ...base, ok: false, skipped: "auth", source: box.provider === "outlook" ? "graph" : cfg.incoming_protocol === "pop3" ? "pop3" : "imap", error: authBlockedMessage(box.email) };
+    return { ...base, ok: false, skipped: "auth", source, error: authBlockedMessage(box.email) };
   }
+  const lock = authLockFor(failState, box);
+  if (lock.blocked) return { ...base, ok: false, skipped: "auth", source, error: `${box.email}: ${lock.reason}`, retryAt: lock.until ?? undefined };
   // zámek jen do konce běhu (+ 30 s): přerušený běh (limit platformy) schránku nezablokuje na dlouho
   const lockMs = Math.max(60_000, o.deadline - Date.now() + 30_000);
   if (!(await acquireSyncLock(box.id, lockMs, o.auto ? o.minIntervalMs ?? AUTO_MIN_INTERVAL_MS : 0))) {
@@ -889,6 +899,8 @@ async function syncOneMailbox(box: MailboxRow, o: OneOptions): Promise<MailboxSy
   }
   const now = () => new Date().toISOString();
   const okPatch = () => ({ last_sync_ok_at: now(), last_sync_error: null, last_sync_error_kind: null, last_sync_auth_fp: null });
+  // přihlášení prošlo → případná blokace po odmítnutém hesle pryč
+  const clearFail = async () => { if (failState?.auth_fail_at) await clearAuthFailure(box.id); };
   const progress: IngestProgress = { processed: 0, ingested: 0 };
 
   // Microsoft 365 (Graph)
@@ -899,6 +911,7 @@ async function syncOneMailbox(box: MailboxRow, o: OneOptions): Promise<MailboxSy
       await releaseSyncLock(box.id, {
         ...okPatch(), last_sync_fetched: r.fetched, last_sync_new: progress.ingested, last_sync_remaining: r.remaining, sync_state: r.state,
       });
+      await clearFail();
       return { ...base, ok: true, source: "graph", fetched: r.fetched, ingested: progress.ingested, remaining: r.remaining, partial: !r.complete, aiSorted };
     } catch (err) {
       const message = `${box.email}: ${err instanceof Error ? err.message : "Microsoft Graph chyba"}`;
@@ -949,15 +962,23 @@ async function syncOneMailbox(box: MailboxRow, o: OneOptions): Promise<MailboxSy
       ...okPatch(), last_sync_fetched: res.fetched, last_sync_new: progress.ingested,
       last_sync_remaining: res.remaining, last_sync_total: res.total, sync_state: res.state,
     } as never);
+    await clearFail();
     return {
       ...base, ok: true, source: res.endpoint.protocol === "pop3" ? "pop3" : "imap", fetched: res.fetched, ingested: progress.ingested,
       remaining: res.remaining, total: res.total, partial: !res.complete && res.remaining === 0, healed, aiSorted, note: note || undefined,
     };
   } catch (err) {
     const kind = classifyMailError(err);
+    // odmítnuté heslo → blokace dalších pokusů (60 min / do změny hesla); časový limit na známém serveru
+    // krátce po odmítnutí → nejspíš dočasná blokace IP u poskytovatele (ne „špatný server nebo port")
+    let hostLock = false;
+    if (!started && kind === "auth") await noteAuthFailure(box.id, box, "sync");
+    else if (!started) hostLock = await explainHostLockout(box.id, box, kind, incoming.host, failState ?? null);
     const message = started
       ? `${box.email}: uložení stažené pošty selhalo (${err instanceof Error ? err.message : "chyba"}) — zbytek se stáhne příště.`
-      : `${box.email}: ${describeMailError(kind, { endpoint: incoming, raw: rawErrorText(err), user: incoming.user })}`;
+      : hostLock
+        ? `${box.email}: ${LOCKOUT_TEXT}`
+        : `${box.email}: ${describeMailError(kind, { endpoint: incoming, raw: rawErrorText(err), user: incoming.user })}`;
     // zámek vždy uvolnit; už zpracované zprávy zůstanou zpracované (stav se posune jen o ně)
     await releaseSyncLock(box.id, {
       last_sync_error: message,

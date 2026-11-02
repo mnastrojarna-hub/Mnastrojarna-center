@@ -844,6 +844,17 @@ export interface MailboxStatus {
   last_sync_error_kind?: string | null;
   /** Otisk přihlašovacích údajů při odmítnutém hesle (credentialFingerprint) — automatika se do změny nepřihlašuje. */
   last_sync_auth_fp?: string | null;
+  /** Poslední odmítnuté přihlášení (stahování / test / SMTP / test odeslání) — blokace 60 min (auth-lockout.ts). */
+  auth_fail_at?: string | null;
+  /** Odmítnutí za poslední hodinu. */
+  auth_fail_count?: number | null;
+  /** Otisk údajů při odmítnutí (lockoutFingerprint) — změna hesla / uživatele blokaci ruší. */
+  auth_fail_fp?: string | null;
+  /** Kde selhalo: sync | test | smtp | send | host (časový limit vysvětlený blokací poskytovatele). */
+  auth_fail_where?: string | null;
+  /** Jen do prohlížeče (settings-data.ts): blokace přihlášení do (ISO) a důvod. */
+  auth_retry_at?: string | null;
+  auth_lock_reason?: string | null;
   last_sync_fetched: number | null;
   last_sync_new: number | null;
   /** Kolik nových zpráv na serveru ještě čeká (časový limit / limit dávky). */

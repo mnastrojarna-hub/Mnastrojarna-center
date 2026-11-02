@@ -813,6 +813,8 @@ export interface DiagResult {
   note?: string;
   /** SMTP: mechanismus AUTH, kterým se přihlašovalo (PLAIN / LOGIN). */
   authMethod?: SmtpAuthMethod;
+  /** Časový limit vysvětlený dočasnou blokací přihlášení u poskytovatele (auth-lockout.ts). */
+  hostLockout?: boolean;
 }
 
 export interface DetectAttempt {

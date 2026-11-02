@@ -51,6 +51,10 @@ export interface MailboxOption {
   lastSyncError?: string | null;
   /** Server odmítl heslo a údaje se od té doby nezměnily — automaticky se nestahuje (jen ručně). */
   authBlocked?: boolean;
+  /** Po odmítnutém hesle se do tohoto času (ISO) nepřihlašuje ani ručně — leda po změně hesla (auth-lockout.ts). */
+  authRetryAt?: string | null;
+  /** Proč (česky) — u tlačítek a v přehledu schránek. */
+  authLockReason?: string | null;
   /** Schránka nemá kompletní nastavení (server / heslo) — nestahuje se. */
   incomplete?: boolean;
 }
