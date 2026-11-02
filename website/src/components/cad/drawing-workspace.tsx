@@ -4,6 +4,7 @@
  * Výkresové prostředí (jako list výkresu v ZW3D / Inventoru): vlevo nastavení listu, pohledů, řezu,
  * kót a razítka; uprostřed živý náhled listu (kolečko = zoom, tažení = posun); nahoře export PDF / DWG / DXF / SVG / tisk.
  */
+import { saveFile } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import { bomToCsv, defaultDrawingOptions, GDT_LABEL, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type RevisionItem, type SheetName, type ViewKey } from "@/cad/drawing";
@@ -44,15 +45,8 @@ const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: "Kóta", not
 
 const OPTS_KEY = "mn-cad-drawing-opts-v1";
 
-function download(name: string, data: BlobPart, type: string) {
-  const url = URL.createObjectURL(new Blob([data], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+function download(name: string, data: BlobPart | (() => Promise<BlobPart> | BlobPart), type: string) {
+  void saveFile(name, data, type).catch((e) => console.warn("Uložení se nezdařilo:", e));
 }
 
 const safeName = (s: string) => (s || "vykres").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w.-]+/g, "_").slice(0, 60);
@@ -246,10 +240,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   const exportPdf = async () => {
     if (!out) return;
     try {
-      flash("Generuji PDF…");
-      const { drawingToPdf } = await import("@/cad/pdf");
-      const blob = await drawingToPdf({ ...out, title: meta.name });
-      download(`${base}_vykres.pdf`, blob, "application/pdf");
+      const saved = await saveFile(`${base}_vykres.pdf`, async () => {
+        flash("Generuji PDF…");
+        const { drawingToPdf } = await import("@/cad/pdf");
+        return drawingToPdf({ ...out, title: meta.name });
+      }, "application/pdf");
+      if (saved) flash(`PDF uloženo: ${saved.name}`);
     } catch (e) {
       flash((e as Error).message || "PDF se nepodařilo vytvořit.");
     }
@@ -258,11 +254,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   const exportDwg = async () => {
     if (!out) return;
     try {
-      flash(`Generuji DWG (${dwgVer})…`);
-      const { drawingToDwg } = await import("@/cad/formats/dwg");
-      const buf = await drawingToDwg(out, { version: dwgVer });
-      download(`${base}_vykres.dwg`, buf, "application/acad");
-      flash(`DWG ${dwgVer} uloženo (${Math.round(buf.byteLength / 1024)} kB).`);
+      const saved = await saveFile(`${base}_vykres.dwg`, async () => {
+        flash(`Generuji DWG (${dwgVer})…`);
+        const { drawingToDwg } = await import("@/cad/formats/dwg");
+        return drawingToDwg(out, { version: dwgVer });
+      }, "application/acad");
+      if (saved) flash(`DWG ${dwgVer} uloženo: ${saved.name}`);
     } catch (e) {
       flash((e as Error).message || "DWG se nepodařilo vytvořit.");
     }

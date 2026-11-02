@@ -60,6 +60,8 @@ type Props = {
   datumGfx?: DatumGfx[];
   pickMode: PickMode;
   selFilter?: SelFilter;
+  /** uchopování bodů na hranách (začátek, konec, střed, střed kružnice) – měření a výběr bodu do odkazu */
+  snapPoints?: boolean;
   selection?: SelItem[];
   selectedEdges: number[];
   selectedFaces: number[];
@@ -95,6 +97,7 @@ const HOVER_HEX = 0xf59e0b;
 const SEL_HEX = 0xe03930;
 
 type GeoInfo = { geo: THREE.BufferGeometry; edges: THREE.BufferGeometry; faceOf: Int32Array; edgeOf: Int32Array; mesh: MeshData };
+type SnapCand = { item: SelItem; p: THREE.Vector3 };
 
 type St = {
   renderer: THREE.WebGLRenderer;
@@ -123,6 +126,9 @@ type St = {
   hoverFace: number;
   hoverEdge: number;
   hoverItem: SelItem | null;
+  /** kandidáti uchopení na naposledy přejeté hraně (začátek, konec, střed, střed kružnice) */
+  snapCands: SnapCand[];
+  snapGroup: THREE.Group;
   radius: number;
   center: THREE.Vector3;
   clip: THREE.Plane;
@@ -215,6 +221,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const hilite = new THREE.Group();
     hilite.matrixAutoUpdate = false;
     scene.add(hilite);
+    const snapGroup = new THREE.Group();
+    snapGroup.matrixAutoUpdate = false;
+    scene.add(snapGroup);
     const sketchGroup = new THREE.Group();
     scene.add(sketchGroup);
     const asmGroup = new THREE.Group();
@@ -319,7 +328,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
     S.current = {
       renderer, scene, persp, orthoCam, camera: persp, key, controls, tc, proxy, gizmoStart: new THREE.Matrix4(), dragStarts: new Map(), model, overlay, hilite, sketchGroup, asmGroup,
-      asmGeo: new Map(), grid, hoverFace: -1, hoverEdge: -1, hoverItem: null, radius: 100, center: new THREE.Vector3(), clip, render,
+      asmGeo: new Map(), grid, hoverFace: -1, hoverEdge: -1, hoverItem: null, snapCands: [], snapGroup, radius: 100, center: new THREE.Vector3(), clip, render,
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -427,6 +436,96 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       } else test(propsRef.current.vertices, null, {});
       return (best as { d: number; item: SelItem } | null)?.item ?? null;
     };
+    /** lomená čára hrany ve světových souřadnicích (úseky hrany jdou v bufferu za sebou) */
+    const edgePoints = (obj: THREE.LineSegments, idx: number): THREE.Vector3[] => {
+      const edgeOf = obj.geometry.userData.edgeOf as Int32Array | undefined;
+      const pos = obj.geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+      if (!edgeOf || !pos) return [];
+      const pts: THREE.Vector3[] = [];
+      for (let seg = 0; seg < edgeOf.length; seg++) {
+        if (edgeOf[seg] !== idx) continue;
+        if (!pts.length) pts.push(new THREE.Vector3().fromBufferAttribute(pos, seg * 2));
+        pts.push(new THREE.Vector3().fromBufferAttribute(pos, seg * 2 + 1));
+      }
+      obj.updateMatrixWorld();
+      return pts.map((p) => p.applyMatrix4(obj.matrixWorld));
+    };
+    /** střed kružnice třemi body (nebo null, nejsou-li body na kružnici) */
+    const circleOf = (pts: THREE.Vector3[]): { c: THREE.Vector3; r: number } | null => {
+      if (pts.length < 4) return null;
+      const A = pts[0];
+      const B = pts[Math.floor(pts.length / 3)];
+      const C = pts[Math.floor((2 * pts.length) / 3)];
+      const a = A.clone().sub(C);
+      const b = B.clone().sub(C);
+      const axb = a.clone().cross(b);
+      const den = 2 * axb.lengthSq();
+      if (den < 1e-12) return null;
+      const num = b.clone().multiplyScalar(a.lengthSq()).sub(a.clone().multiplyScalar(b.lengthSq())).cross(axb);
+      const c = C.clone().add(num.divideScalar(den));
+      const r = c.distanceTo(A);
+      if (!(r > 1e-6)) return null;
+      const tol = r * 0.02 + 1e-6;
+      return pts.every((p) => Math.abs(p.distanceTo(c) - r) <= tol) ? { c, r } : null;
+    };
+    /** body k uchopení na hraně: začátek, konec, střed délky, střed kružnice/oblouku */
+    const snapCandidates = (obj: THREE.LineSegments, idx: number, extra: object): SnapCand[] => {
+      const pts = edgePoints(obj, idx);
+      if (pts.length < 2) return [];
+      const mk = (at: "start" | "end" | "mid" | "center", p: THREE.Vector3): SnapCand => ({ item: { kind: "edge", index: idx, at, point: [p.x, p.y, p.z], ...extra } as SelItem, p });
+      const out: SnapCand[] = [];
+      const a = pts[0];
+      const b = pts[pts.length - 1];
+      const closed = a.distanceTo(b) < 1e-6;
+      if (!closed) out.push(mk("start", a), mk("end", b));
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+      const half = cum[cum.length - 1] / 2;
+      for (let i = 1; i < pts.length; i++) {
+        if (cum[i] >= half) {
+          const t = cum[i] - cum[i - 1] > 1e-9 ? (half - cum[i - 1]) / (cum[i] - cum[i - 1]) : 0;
+          out.push(mk("mid", pts[i - 1].clone().lerp(pts[i], t)));
+          break;
+        }
+      }
+      const circ = circleOf(pts);
+      if (circ) out.push(mk("center", circ.c));
+      return out;
+    };
+    const drawSnaps = () => {
+      const s = S.current!;
+      for (const o of [...s.snapGroup.children]) {
+        s.snapGroup.remove(o);
+        (o as THREE.Mesh).geometry?.dispose();
+        ((o as THREE.Mesh).material as THREE.Material | undefined)?.dispose?.();
+      }
+      if (propsRef.current.snapPoints) {
+        const active = s.hoverItem && s.hoverItem.kind === "edge" && s.hoverItem.at ? s.hoverItem : null;
+        for (const c of s.snapCands) {
+          const isActive = !!active && sameSel(active, c.item);
+          const at = (c.item as { at?: string }).at;
+          const geo = at === "center" ? new THREE.OctahedronGeometry(s.radius / (isActive ? 70 : 110)) : new THREE.SphereGeometry(s.radius / (isActive ? 90 : 150), 12, 8);
+          const dot = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: isActive ? 0xe03930 : 0x0284c7, depthTest: false, transparent: true, opacity: isActive ? 1 : 0.85 }));
+          dot.position.copy(c.p);
+          dot.renderOrder = 9;
+          s.snapGroup.add(dot);
+        }
+      }
+      s.render();
+    };
+    /** nejbližší kandidát uchopení do 12 px od kurzoru */
+    const pickSnap = (e: PointerEvent | MouseEvent): SelItem | null => {
+      const s = S.current!;
+      if (!propsRef.current.snapPoints || !s.snapCands.length) return null;
+      let best: { d: number; item: SelItem } | null = null;
+      for (const c of s.snapCands) {
+        if (!clipOk(c.p)) continue;
+        const [sx, sy] = toScreen(c.p);
+        const d = Math.hypot(sx - e.clientX, sy - e.clientY);
+        if (d < 12 && (!best || d < best.d)) best = { d, item: c.item };
+      }
+      return best?.item ?? null;
+    };
     const pickEdge = (e: PointerEvent | MouseEvent, meshHit: THREE.Intersection | null): SelItem | null => {
       const s = S.current!;
       setRay(e);
@@ -436,11 +535,20 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       const edgeOf = (hit.object as THREE.LineSegments).geometry.userData.edgeOf as Int32Array | undefined;
       const idx = edgeOf?.[Math.floor(hit.index / 2)] ?? -1;
       if (idx < 0) return null;
-      return { kind: "edge", index: idx, point: [hit.point.x, hit.point.y, hit.point.z], ...ids(hit.object) };
+      const extra = ids(hit.object);
+      if (propsRef.current.snapPoints) {
+        const cur = s.snapCands[0]?.item;
+        if (!cur || cur.kind !== "edge" || cur.index !== idx || (cur.compId ?? "") !== ((extra as { compId?: string }).compId ?? "")) s.snapCands = snapCandidates(hit.object as THREE.LineSegments, idx, extra);
+      }
+      return { kind: "edge", index: idx, point: [hit.point.x, hit.point.y, hit.point.z], ...extra };
     };
     /** výběr podle filtru */
     const pickSel = (e: PointerEvent | MouseEvent, filterOverride?: SelFilter): SelItem | null => {
       const filter = filterOverride ?? propsRef.current.selFilter ?? "all";
+      if (filter === "all" || filter === "vertex" || filter === "edge") {
+        const snap = pickSnap(e);
+        if (snap) return snap;
+      }
       const h = hitMesh(e);
       const pt = h ? ([h.point.x, h.point.y, h.point.z] as Vec3) : undefined;
       const faceIdx = h && h.faceIndex != null ? ((h.object as THREE.Mesh).geometry.userData.faceOf as Int32Array | undefined)?.[h.faceIndex] ?? -1 : -1;
@@ -514,6 +622,11 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         s.hoverItem = it;
         renderer.domElement.style.cursor = it ? "pointer" : "";
         drawHilite();
+      }
+      if (propsRef.current.snapPoints) drawSnaps();
+      else if (s.snapGroup.children.length) {
+        s.snapCands = [];
+        drawSnaps();
       }
     };
     // dlouhý stisk prstem = kontextová nabídka (pravé tlačítko) na dotykových zařízeních

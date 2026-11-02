@@ -745,7 +745,10 @@ export function RefListField({ label, value, onChange, want = "point" }: { label
 /** Převod položky výběru 3D okna na odkaz. */
 export function selToRef(it: { kind: string; index?: number; point?: Vec3 }, want: Want): Ref | null {
   if (it.kind === "vertex" && it.index != null) return { kind: "vertex", index: it.index };
-  if (it.kind === "edge" && it.index != null) return { kind: "edge", index: it.index, at: want === "point" ? "mid" : undefined };
+  if (it.kind === "edge" && it.index != null) {
+    const at = (it as { at?: "start" | "end" | "mid" | "center" }).at;
+    return { kind: "edge", index: it.index, at: at ?? (want === "point" ? "mid" : undefined) };
+  }
   if (it.kind === "face" && it.index != null) return { kind: "face", index: it.index };
   if (want === "point" && it.point) return { kind: "xyz", p: it.point };
   return null;

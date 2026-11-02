@@ -12,12 +12,16 @@ type Action = { id: string; label: string; desc: string; icon: CadIconName; tone
 /** Úvodní obrazovka (jako Start Page v ZW3D / Inventoru): šablony, nedávné soubory, ukázky. */
 export function StartScreen({
   actions,
+  secondary = [],
   examples,
   onOpenRecent,
   onClose,
   onDisable,
 }: {
+  /** hlavní šablony (díl, sestava, výkres) – velké karty */
   actions: Action[];
+  /** další akce (otevřít, knihovna, paleta, nastavení, dokumentace) – kompaktní řádek */
+  secondary?: Action[];
   examples: { id: string; label: string; run: () => void }[];
   onOpenRecent: (r: RecentDoc) => void;
   onClose: () => void;
@@ -40,7 +44,7 @@ export function StartScreen({
       <div className="mx-auto grid w-full max-w-6xl flex-1 gap-8 overflow-y-auto p-6 lg:grid-cols-[1fr_380px] lg:p-10">
         <section>
           <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Začít</h2>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {actions.map((a) => (
               <button
                 key={a.id}
@@ -63,6 +67,18 @@ export function StartScreen({
               </button>
             ))}
           </div>
+
+          {secondary.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {secondary.map((a) => (
+                <button key={a.id} type="button" onClick={a.run} title={a.desc} className="inline-flex items-center gap-1.5 rounded-md border border-[#d5dbe2] bg-white px-3 py-1.5 text-[12.5px] text-[#26303b] hover:border-brand/50 hover:text-brand">
+                  <CadIcon name={a.icon} tone={a.tone} className="h-4 w-4" />
+                  {a.label}
+                  {a.kbd && <Kbd k={a.kbd} />}
+                </button>
+              ))}
+            </div>
+          )}
 
           <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Ukázkové modely</h2>
           <div className="flex flex-wrap gap-2">

@@ -57,7 +57,7 @@ export const CAD_DOCS: DocSection[] = [
     title: "1. Co je Mnástrojárna CAD",
     lead: "Profesionální parametrický 3D a 2D CAD, který běží přímo ve webovém prohlížeči – bez instalace, bez registrace a zdarma. Vytvořila ho nástrojárna Mnástrojárna s.r.o. pro konstruktéry, údržbu, vývojáře a studenty, kteří potřebují rychle vymodelovat díl, sestavu nebo výkres a případně rovnou poptat výrobu.",
     blocks: [
-      { t: "img", src: `${IMG}/start.webp`, alt: "Úvodní obrazovka Mnástrojárna CAD s nedávnými soubory a rychlými akcemi", caption: "Úvodní obrazovka: nedávné soubory s náhledy, nový díl, nová sestava, rám formy, import, knihovna normálií." },
+      { t: "img", src: `${IMG}/start.webp`, alt: "Úvodní obrazovka Mnástrojárna CAD s nedávnými soubory a rychlými akcemi", caption: "Úvodní obrazovka: Nový díl, Nová sestava, Nový výkres, nedávné soubory s náhledy, otevřít / importovat, knihovna normálií." },
       { t: "p", text: "Jádrem je geometrický modelář **OpenCascade (OCCT)** přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se **neodesílají na server**; rozpracovaná práce se průběžně ukládá do úložiště prohlížeče a projekt si stáhnete jako soubor `.mncad` nebo exportujete do STEP." },
       { t: "h3", text: "Co umí" },
       { t: "ul", items: [
@@ -86,13 +86,13 @@ export const CAD_DOCS: DocSection[] = [
     lead: "Postup, který vás provede od prázdného dílu k výkresu v PDF a souboru STEP.",
     blocks: [
       { t: "ol", items: [
-        "**Nový díl:** na úvodní obrazovce zvolte „Nový díl“ (nebo ikonu listu v titulní liště). Otevře se prázdný díl se třemi základními rovinami XY, XZ, YZ.",
+        "**Nový díl:** program se otevře s prázdným dílem (tři základní roviny XY, XZ, YZ, mřížka vypnutá); na úvodní obrazovce jsou tři šablony – **Nový díl**, **Nová sestava**, **Nový výkres** (otevře díl ze souboru a rovnou založí výkres).",
         "**Skica:** v pásu **Tvorba → Skica** vyberte rovinu (XY = půdorys). Klávesou `r` nakreslete obdélník dvěma kliky, nebo začněte psát čísla: `60` `Tab` `40` `Enter` vytvoří obdélník 60 × 40 mm i s kótami.",
         "**Dokončit skicu** (tlačítko vpravo nahoře nebo `Enter`). Program rovnou nabídne **Vysunutí** – zadejte výšku (např. `20`) a potvrďte `Enter`.",
         "**Díra:** `h` nebo **Tvorba → Díra**; klikněte na horní plochu – bod a osa se doplní samy. Zvolte typ (vrtaná, válcové / kuželové zahloubení, závit), např. „Pro šroub M8“, ukončení „Skrz vše“, `Enter`.",
         "**Zaoblení:** `b`, klikněte na hrany, zadejte poloměr, `Enter`. Hrany lze vybírat i přes filtr výběru „Hrana“ ve stavovém řádku.",
         "**Výkres:** pás **Výkres → Nový výkres**. Vznikne list s pohledy a izometrií; doplňte kóty a drsnosti, pak **PDF** (nebo DXF/DWG).",
-        "**Export:** **Soubor → Export 3D → STEP** pro jiný CAD nebo CAM; **Uložit projekt** (.mncad) uchová celou historii prvků. Tlačítko **Poptat výrobu** připraví STEP a e-mail naší nástrojárně.",
+        "**Export:** **Soubor → Export 3D → STEP** pro jiný CAD nebo CAM; **Uložit projekt** (.mncad) uchová celou historii prvků. Při každém uložení a exportu se program zeptá, **kam a pod jakým názvem** soubor uložit (v Chrome a Edge systémovým dialogem; další `Ctrl+S` ukládá do téhož souboru, **Uložit jako…** se zeptá znovu). Tlačítko **Poptat výrobu** připraví STEP a e-mail naší nástrojárně.",
       ] },
       { t: "img", src: `${IMG}/vysunuti.webp`, alt: "Formulář vysunutí s ukončením K ploše a rozbalenou sekcí Začátek, směr, tenká stěna", caption: "Formulář prvku: hodnoty lze psát, vybírat klikem v modelu nebo zvolit pravým tlačítkem z nabídky způsobů zadání." },
     ],
@@ -104,7 +104,9 @@ export const CAD_DOCS: DocSection[] = [
     blocks: [
       { t: "img", src: `${IMG}/ribbon-tvorba.webp`, alt: "Pás karet Tvorba: Skica, Tvar, Primitiva, Konstrukční prvky, Úpravy, Přímé úpravy, Základní editace, Reference, Knihovna" },
       { t: "h3", text: "Titulní lišta" },
-      { t: "p", text: "Logo (zpět na web), rychlé akce **Nový díl / Otevřít / Uložit**, **Zpět / Znovu** (`Ctrl+Z`, `Ctrl+Y`), název dokumentu (klikněte a přepište), stav jádra (OCCT · doba poslední stavby v ms), přepínač světlého/tmavého vzhledu a tlačítko **Poptat výrobu**." },
+      { t: "p", text: "Logo (zpět na web), rychlé akce **Nový díl / Otevřít / Uložit**, **Zpět / Znovu** (`Ctrl+Z`, `Ctrl+Y`), **záložky otevřených dokumentů**, stav jádra (OCCT · doba poslední stavby v ms), přepínač světlého/tmavého vzhledu a tlačítko **Poptat výrobu**." },
+      { t: "h3", text: "Záložky dokumentů" },
+      { t: "p", text: "V jednom okně může být otevřeno více dílů, sestav a výkresů najednou – každý ve vlastní záložce (ikona krychle = díl, vrstvy = sestava, list = výkres). Název aktivní záložky lze přepsat přímo v ní. **+** otevře nový díl, **×** (nebo prostřední tlačítko myši) záložku zavře, **Nový výkres** otevře výkres jako další záložku vedle svého dílu. Záložky se pamatují i po obnovení stránky; dokumenty jsou uložené v nedávných souborech." },
       { t: "h3", text: "Pás karet (ribbon)" },
       { t: "table", head: ["Záložka", "Obsah"], rows: [
         ["Soubor", "Nový díl / sestava, otevřít a importovat, uložit projekt, export 3D, výkres, rám vstřikovací formy, ukázkové díly, knihovna normálií, nastavení, klávesové zkratky, poptávka výroby."],
@@ -154,7 +156,7 @@ export const CAD_DOCS: DocSection[] = [
       { t: "img", src: `${IMG}/volby-bodu.webp`, alt: "Nabídka pravého tlačítka v poli bodu se čtrnácti způsoby zadání", caption: "Pole odkazu: pravé tlačítko (nebo „⋯“) nabídne všechny způsoby zadání bodu." },
       { t: "h3", text: "Pole odkazu" },
       { t: "ul", items: [
-        "**Klik v modelu:** klikněte do pole (zvýrazní se a ve stavovém řádku je výzva) a pak na vrchol, hranu nebo plochu v 3D okně. Filtr výběru se přepne sám podle toho, co pole očekává.",
+        "**Klik v modelu:** klikněte do pole (zvýrazní se a ve stavovém řádku je výzva) a pak na vrchol, hranu nebo plochu v 3D okně. Filtr výběru se přepne sám podle toho, co pole očekává. U polí bodu se při najetí na hranu nabídnou **uchopovací body** (koncové, střed, střed kružnice) – stačí kliknout na značku.",
         "**Psaní:** tlačítko `xyz` přijme souřadnice `10; 20; 0` (oddělovač středník, čárka nebo mezera) nebo relativně `@5; 0; 0` od posledního zadaného bodu.",
         "**Nabídka „⋯“ / pravé tlačítko:** další způsoby zadání (níže), „Použít aktuální výběr“, „Vybrat ze seznamu…“ a „Vymazat“. Na dotykovém zařízení nabídku otevře dlouhý stisk.",
         "**Otisk entity:** odkaz si pamatuje typ, střed a velikost vybrané plochy či hrany. Když později změníte dřívější prvek a indexy se přečíslují, odkaz se znovu najde podle otisku – prvky se nerozbíjejí.",
@@ -441,7 +443,7 @@ export const CAD_DOCS: DocSection[] = [
     blocks: [
       { t: "img", src: `${IMG}/mereni.webp`, alt: "Měření vzdálenosti mezi dvěma entitami s kótou v 3D okně a tabulkou výsledků", caption: "Měření mezi entitami: vzdálenost, úhel, poloměr, délka, přímo v 3D okně." },
       { t: "ul", items: [
-        "**Měřit** (`M`): klikněte na jednu nebo dvě entity (bod, hrana, plocha, těleso) – vzdálenost (nejkratší), úhel, poloměr, délka, plocha; výsledek zůstane jako kóta v okně.",
+        "**Měřit** (`M`): klikněte na jednu nebo dvě entity (bod, hrana, plocha, těleso) – vzdálenost (nejkratší), úhel, poloměr, délka, plocha; výsledek zůstane jako kóta v okně. Při najetí na hranu se nabídnou **body k uchopení** – koncové body, střed hrany a **střed kružnice / oblouku** (červený kosočtverec) – takže změříte např. rozteč děr od středu ke středu.",
         "**Vlastnosti / inspektor:** typ plochy (rovinná, válcová, kuželová, kulová, toroidní, B-spline…), normála, osa, poloměr, obsah; u tělesa objem, povrch, hmotnost, těžiště, počet ploch a hran.",
         "**Hmotnost:** materiál z 12 položek (ocel, nerez, hliník, mosaz, měď, titan, POM, nástrojové oceli 1.2311, 1.2343, 1.2738, 1.1730, 1.7131) nebo vlastní hustota.",
         "**Řez** (`X`): dynamická rovina řezu podle osy s posunem, pro kontrolu vnitřku.",
@@ -467,7 +469,7 @@ export const CAD_DOCS: DocSection[] = [
     blocks: [
       { t: "img", src: `${IMG}/menu-soubor.webp`, alt: "Nabídka Soubor: nový díl, otevřít, uložit projekt, export 3D, výkres, sestavy, ukázky, knihovna, nastavení", caption: "Nabídka Soubor." },
       { t: "table", head: ["Formát", "Import", "Export", "Poznámka"], rows: [
-        ["Mnástrojárna projekt (.mncad)", "ano", "ano", "úplná historie prvků, skici, proměnné, stavy, výkresy, sestava"],
+        ["Mnástrojárna projekt (.mncad)", "ano", "ano", "úplná historie prvků, skici, proměnné, stavy, výkresy, sestava; při uložení se program zeptá na místo a název (Uložit / Uložit jako…)"],
         ["STEP (.step/.stp) AP214", "ano", "ano", "přesná geometrie; doporučený formát pro výměnu se SolidWorks, Inventor, ZW3D, CATIA, Creo, Fusion, CAM"],
         ["IGES (.igs/.iges)", "ano", "—", "starší přesný formát"],
         ["BREP (.brep)", "ano", "ano", "nativní formát OpenCascade"],
@@ -479,6 +481,7 @@ export const CAD_DOCS: DocSection[] = [
         ["DWG", "—", "výkres (R2000–R2018)", "AutoCAD a kompatibilní"],
         ["SVG · PDF", "—", "výkres, rozvin", "dokumentace, tisk"],
       ] },
+      { t: "p", text: "**Přetažení myší:** soubory lze přetáhnout přímo do okna CADu – z průzkumníka, z plochy i jako přílohu z Outlooku. Každý model se otevře ve **vlastní záložce** (v sestavě se vloží jako komponenta), DXF se načte jako skica. Tlačítko **Otevřít / importovat** (`Ctrl+O`) a úvodní obrazovka dělají totéž." },
       { t: "p", text: "**Nativní formáty** (SLDPRT, SLDASM, IPT, IAM, Z3, CATPART, PRT, X_T, F3D, SKP, 3DM, IFC, JT, SAT…) prohlížeč otevřít nemůže – program je rozpozná a ukáže přesný postup, jak soubor ve zdrojovém CADu uložit jako STEP. Síťové formáty se importují jako těleso ze sítě (lze měřit, řezat, exportovat; booleovské operace fungují omezeně)." },
       { t: "p", text: "**Poptat výrobu:** tlačítko v titulní liště připraví STEP aktuálního dílu a předvyplněný e-mail pro nástrojárnu Mnástrojárna (prototypy, náhradní díly, nástroje, přípravky, 1–99 ks)." },
     ],
@@ -507,7 +510,7 @@ export const CAD_DOCS: DocSection[] = [
         ["Ctrl+K", "paleta příkazů"], ["Ctrl+L", "knihovna normálií"], ["Ctrl+,", "nastavení"], ["Ctrl+S / Ctrl+O", "uložit projekt / otevřít"], ["Ctrl+Z / Ctrl+Y", "zpět / znovu"],
         ["S", "nová skica"], ["E", "vysunutí"], ["H", "díra"], ["B", "zaoblení"], ["N", "sražení"], ["M", "měřit"], ["X", "řez"], ["G", "gizmo přesunu tělesa / komponenty (R přepne otočení)"],
         ["0 · 1 · 2 · 3 · 4 · 5 · 6", "izometrie · přední · horní · pravý · zadní · spodní · levý"], ["F", "přizpůsobit pohled"], ["P", "perspektiva / pravoúhlá"],
-        ["Enter / Esc", "OK / Storno prvku; ve skice dokončit / zrušit krok"], ["Delete", "smazat vybraný prvek, entitu skici nebo komponentu"], ["Ctrl+klik", "přidat do výběru"],
+        ["Enter / Esc", "OK / Storno prvku; Esc opustí textové pole a pak zruší výběr; ve skice dokončit / zrušit krok"], ["Delete", "smazat upravovaný nebo vybraný prvek, vybranou plochu (Odstranit plochu), komponentu sestavy nebo entitu skici – stejně jako tlačítko Smazat v pásu"], ["Ctrl+klik", "přidat do výběru"],
         ["Skica: l k x r c a e n b p s", "úsečka · lomená čára · osa · obdélník · kružnice · oblouk · elipsa · spline · bod · mnohoúhelník · drážka"],
         ["Skica: t o d m v", "oříznout · odsadit · kóta · měřit · výběr"], ["Skica: Tab / Enter", "další pole číselného zadání (zámek) / potvrdit"], ["Shift+F · Shift+W", "ohyb z hrany (plech) · konstrukční profil (svařence)"],
       ] },

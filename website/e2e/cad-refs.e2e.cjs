@@ -5,9 +5,11 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await b.newPage({ viewport: { width: 1600, height: 950 } });
+  await page.addInitScript(() => { Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true }); }); // headless: ukládání přes dotaz na název
+  page.on('dialog', (d) => d.accept());
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:3100/cad', { waitUntil: 'networkidle', timeout: 180000 });
-  await page.waitForFunction(() => /×.*mm/.test(document.body.innerText) && !document.body.innerText.includes('Načítám jádro'), null, { timeout: 120000 });
+  await page.waitForFunction(() => document.body.innerText.includes('OCCT') && !document.body.innerText.includes('Načítám jádro'), null, { timeout: 120000 });
   for (let i = 0; i < 20; i++) { const st = page.locator('div.fixed.z-\\[65\\]'); if (await st.isVisible().catch(() => false)) { await st.getByText('Pokračovat v práci').first().click(); break; } await page.waitForTimeout(500); }
   await page.waitForTimeout(800);
   // nový díl, skica obdélník na XY, dokončit → automatické vysunutí (formulář)

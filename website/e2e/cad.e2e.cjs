@@ -11,6 +11,8 @@ const dl = async (page, trigger) => { const [d] = await Promise.all([page.waitFo
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await b.newPage({ viewport: { width: 1600, height: 950 }, acceptDownloads: true });
+  await page.addInitScript(() => { Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true }); }); // headless: ukládání přes dotaz na název
+  page.on('dialog', (d) => d.accept());
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:3100/cad', { waitUntil: 'networkidle' });
   // úvodní obrazovka

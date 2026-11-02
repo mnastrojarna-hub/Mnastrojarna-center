@@ -2,6 +2,8 @@
 import type { DisplayMode, MouseScheme } from "@/components/cad/viewport";
 
 export type Settings = {
+  /** revize výchozích hodnot (migrace uložených nastavení) */
+  rev?: number;
   // zobrazení
   display: DisplayMode;
   bg: string;
@@ -66,10 +68,11 @@ export const DEFAULT_SHORTCUTS: Record<string, string> = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  rev: 3,
   display: "shadedEdges",
   bg: "blue",
   ortho: false,
-  showGrid: true,
+  showGrid: false,
   showViewCube: true,
   showTriad: true,
   showChips: true,
@@ -107,6 +110,11 @@ export function loadSettings(): Settings {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as Partial<Settings>;
+      // rev 3: 3D mřížka je nově ve výchozím stavu vypnutá – dříve uložená nastavení ji měly zapnutou implicitně
+      if (!s.rev || s.rev < 3) {
+        s.showGrid = false;
+        s.rev = 3;
+      }
       return { ...DEFAULT_SETTINGS, ...s, shortcuts: { ...DEFAULT_SHORTCUTS, ...(s.shortcuts ?? {}) } };
     }
     const legacy = localStorage.getItem(LEGACY);
