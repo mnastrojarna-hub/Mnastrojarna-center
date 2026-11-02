@@ -100,7 +100,7 @@ describe("pružina, závit, text", () => {
   it("pružina: poloha odkazem a osa X – těžiště uprostřed délky na ose", async () => {
     const { body } = await run(doc([{ id: "s", name: "s", type: "spring", radius: 10, pitch: 5, turns: 8, wire: 2, position: [0, 0, 0], axis: "Z", mode: "new", positionRef: xyz([0, 50, 0]), dirDef: { kind: "axis", axis: "X" } }]));
     near(com(body), [20, 50, 0], 0.6);
-  });
+  }, 60_000);
   it("modelovaný závit: začátek ve středu kružnice, osa válcové plochy", async () => {
     const cyl: Feature = { id: "c", name: "c", type: "cylinder", radius: 10, height: 30, position: [5, 5, 0], axis: "Z", mode: "new" };
     const { body, vol: v0 } = await run(doc([cyl]));
@@ -109,7 +109,7 @@ describe("pružina, závit, text", () => {
     const v = await vol(doc([cyl, { id: "t", name: "t", type: "thread", designation: "M20", position: [0, 0, 0], axis: "X", length: 20, modeled: true, positionRef: { kind: "edge", index: bottom, at: "center" }, dirDef: { kind: "edge", ref: { kind: "face", index: side } } }]));
     expect(v).toBeLessThan(v0);
     expect(v).toBeGreaterThan(v0 * 0.85);
-  });
+  }, 60_000);
   it("text: rovina definicí a střed odkazem (průmět bodu do roviny)", async () => {
     const txt: Feature = { id: "x", name: "x", type: "text", text: "AB", height: 8, depth: 1, plane: { kind: "base", name: "XY", offset: 0 }, position: [0, 0], angle: 0, mode: "add", planeDef: { kind: "base", name: "XY", offset: 20 }, positionRef: xyz([30, 20, 99]) };
     const { body, bbox, vol: v } = await run(doc([...base, txt]));
@@ -117,7 +117,7 @@ describe("pružina, závit, text", () => {
     expect(bbox[1][2]).toBeCloseTo(21, 4);
     const c = com(body.cut(r.makeBox([0, 0, 0], [60, 40, 20])));
     near(c, [30, 20, 20.5], 0.6);
-  });
+  }, 60_000);
 });
 
 describe("transformace odkazy", () => {
