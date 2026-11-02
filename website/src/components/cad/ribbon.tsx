@@ -178,11 +178,14 @@ function Floating({ anchor, close, children }: { anchor: HTMLElement; close: () 
     };
     place();
     const onScroll = (e: Event) => {
-      // zavřít jen při posunu pásu/okna, ve kterém tlačítko leží (ne při posunu jiného panelu, např. historie)
+      // při posunu pásu/okna nabídku přemístit k tlačítku; zavřít jen když tlačítko zmizí z obrazovky
       const t = e.target as Node | Document | null;
       if (!t || ref.current?.contains(t as Node)) return;
       const scrolled = t instanceof Document ? t.documentElement : (t as Node);
-      if (scrolled.contains(anchor)) closeRef.current();
+      if (!scrolled.contains(anchor)) return;
+      const r = anchor.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) closeRef.current();
+      else place();
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("resize", place);
