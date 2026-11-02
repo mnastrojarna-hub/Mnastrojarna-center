@@ -1,12 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Send, Loader2, Paperclip, FileText, ExternalLink, BadgeCheck, CalendarCheck, Hash, Pencil } from "lucide-react";
+import {
+  Send, Loader2, Paperclip, FileText, ExternalLink, BadgeCheck, CalendarCheck, Hash, Pencil, Box, PencilRuler, AlertTriangle,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { draftPurchaseOrderEmail, sendPurchaseOrder, updatePurchaseOrder } from "@/app/actions/purchasing";
+import {
+  draftPurchaseOrderEmail, purchaseOrderDeviations, sendPurchaseOrder, updatePurchaseOrder, type PoMailAttachmentView,
+} from "@/app/actions/purchasing";
 import type { PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import { parseEmailList } from "@/lib/jobs/purchasing";
 import type { Notify } from "@/components/jobs/detail/toast";
@@ -22,18 +27,83 @@ import { PrintButton } from "@/components/print/print-button";
 
 type Step = "preparing" | "form" | "sending";
 
+function sizeText(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} kB`;
+  return `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+}
+
+const ROLE_LABEL: Record<PoMailAttachmentView["role"], string> = {
+  drawing: "výkres (anonymizovaný)",
+  model: "3D model",
+  old: "starší revize",
+};
+
+/**
+ * Přílohy e-mailu objednávky: výkresy a 3D modely jen dílů této objednávky (výchozí: aktuální výkres +
+ * model každé položky; starší revize nezaškrtnuté). Výkres, který se ještě anonymizuje, počká — e-mail
+ * pak odejde sám. Položka bez výkresu = varování.
+ */
+export function PoMailAttachments({ files, picked, onToggle, missing }: {
+  files: PoMailAttachmentView[];
+  picked: Set<string>;
+  onToggle: (fileId: string, on: boolean) => void;
+  missing: string[];
+}) {
+  const total = files.filter((f) => picked.has(f.fileId)).reduce((s, f) => s + (f.size ?? 0), 0);
+  return (
+    <div className="space-y-1.5" data-testid="po-mail-attachments">
+      {files.length > 0 && (
+        <ul className="divide-y rounded-lg border">
+          {files.map((f) => (
+            <li key={f.fileId} className={cn("flex items-center gap-2.5 px-3 py-2 text-sm", f.status === "blocked" && "opacity-60")}>
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-red-600"
+                checked={picked.has(f.fileId)}
+                disabled={f.status === "blocked"}
+                onChange={(e) => onToggle(f.fileId, e.target.checked)}
+                aria-label={`Přiložit ${f.name}`}
+              />
+              {f.role === "model" ? <Box className="h-4 w-4 shrink-0 text-purple-600" /> : <PencilRuler className={cn("h-4 w-4 shrink-0", f.role === "old" ? "text-muted-foreground" : "text-blue-600")} />}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{f.name}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {ROLE_LABEL[f.role]} · {f.refs.join(", ")}{f.size ? ` · ${sizeText(f.size)}` : ""}
+                  {f.status === "pending" ? " · anonymizuje se — e-mail počká" : ""}
+                  {f.status === "blocked" && f.message ? ` · ${f.message}` : ""}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {missing.length > 0 && (
+        <p className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100" data-testid="po-mail-missing-drawing">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>Bez výkresu: {missing.join(", ")} — nahraj výkres do Dokumentů zakázky, jinak dodavatel dostane jen PDF objednávky.</span>
+        </p>
+      )}
+      {files.length > 0 && <p className="text-right text-[11px] text-muted-foreground">Přílohy výkresů celkem {sizeText(total) || "0 B"}</p>}
+    </div>
+  );
+}
+
 /**
  * Odeslání objednávky dodavateli: předvyplněný e-mail (komu / kopie / předmět /
  * text — vše jde upravit), PDF objednávky v příloze, po odeslání stav „Odeslána".
  */
 export function SendPurchaseOrderDialog({
-  open, onOpenChange, order, notify, onSent,
+  open, onOpenChange, order, notify, onSent, drawingChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   order: { id: string; number: string; supplierName?: string | null; fileId?: string | null } | null;
   notify: Notify;
   onSent: () => void;
+  /** Poslat dodavateli novou revizi výkresu (odeslaná objednávka → změna objednávky s novým výkresem). */
+  drawingChange?: boolean;
 }) {
   const [step, setStep] = React.useState<Step>("preparing");
   const [error, setError] = React.useState<string | null>(null);
@@ -41,6 +111,11 @@ export function SendPurchaseOrderDialog({
   const [attachment, setAttachment] = React.useState<string | null>(null);
   /** Dodavatel objednávky — jeho kontakty a e-maily podle účelu nahoře v našeptávači. */
   const [supplierId, setSupplierId] = React.useState<string | null>(null);
+  const [files, setFiles] = React.useState<PoMailAttachmentView[]>([]);
+  const [picked, setPicked] = React.useState<Set<string>>(new Set());
+  const [missing, setMissing] = React.useState<string[]>([]);
+  const [deviations, setDeviations] = React.useState<{ ref: string; lines: string[] }[]>([]);
+  const [mode, setMode] = React.useState<"issue" | "change">("issue");
   const run = React.useRef(0);
   const orderId = order?.id ?? null;
 
@@ -53,23 +128,32 @@ export function SendPurchaseOrderDialog({
     setStep("preparing");
     setError(null);
     setAttachment(null);
+    setFiles([]);
+    setPicked(new Set());
+    setMissing([]);
+    setDeviations([]);
     setMail({ to: "", cc: "", subject: "", body: "" });
     void (async () => {
       try {
-        const res = await draftPurchaseOrderEmail(orderId);
+        const res = await draftPurchaseOrderEmail(orderId, drawingChange ? { drawingChange: true } : {});
         if (token !== run.current) return;
         if (!res.ok) setError(res.error ?? "Návrh e-mailu se nepodařilo připravit.");
         else {
           setMail({ to: res.to ?? "", cc: res.cc ?? "", subject: res.subject ?? "", body: res.body ?? "", reason: res.to ? res.recipientReason : undefined });
           setSupplierId(res.supplierId ?? null);
           setAttachment(res.attachmentName ?? null);
+          setFiles(res.attachments ?? []);
+          setPicked(new Set((res.attachments ?? []).filter((a) => a.checked).map((a) => a.fileId)));
+          setMissing(res.missingDrawing ?? []);
+          setDeviations(res.deviations ?? []);
+          setMode(res.mode ?? "issue");
         }
       } catch {
         if (token === run.current) setError("Spojení se nepovedlo — zkus to znovu.");
       }
       if (token === run.current) setStep("form");
     })();
-  }, [open, orderId]);
+  }, [open, orderId, drawingChange]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -82,13 +166,17 @@ export function SendPurchaseOrderDialog({
     setStep("sending");
     setError(null);
     try {
-      const res = await sendPurchaseOrder(order.id, { to: mail.to, cc: mail.cc || undefined, subject: mail.subject, body: mail.body });
+      const res = await sendPurchaseOrder(
+        order.id, { to: mail.to, cc: mail.cc || undefined, subject: mail.subject, body: mail.body },
+        { attachmentIds: files.filter((f) => picked.has(f.fileId)).map((f) => f.fileId), ...(drawingChange ? { drawingChange: true } : {}) },
+      );
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
         setStep("form");
         return;
       }
-      notify("success", `Objednávka ${order.number} odeslána na ${to.join(", ")}.`);
+      if (res.queued) notify("info", `Objednávka ${order.number} odejde na ${to.join(", ")}, jakmile se dokončí anonymizace výkresů.`);
+      else notify("success", `${mode === "change" ? "Změna objednávky" : "Objednávka"} ${order.number} odeslána na ${to.join(", ")}.`);
       onOpenChange(false);
       onSent();
     } catch {
@@ -105,8 +193,8 @@ export function SendPurchaseOrderDialog({
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
-          title={`Poslat objednávku ${order?.number ?? ""} dodavateli`}
-          subtitle={`E-mail odejde z tvé schránky s PDF v příloze${order?.supplierName ? ` — ${order.supplierName}` : ""}.`}
+          title={drawingChange ? `Nová revize výkresu — objednávka ${order?.number ?? ""}` : `Poslat objednávku ${order?.number ?? ""} dodavateli`}
+          subtitle={`E-mail odejde z tvé schránky s PDF a výkresy položek v příloze${order?.supplierName ? ` — ${order.supplierName}` : ""}.`}
         />
         <form onSubmit={send} className="space-y-4 p-4 sm:p-5" noValidate>
           <ErrorBox error={error} />
@@ -131,6 +219,19 @@ export function SendPurchaseOrderDialog({
                 </a>
                 {order && <PrintButton href={pdfHref} filename={attachment ?? "objednavka.pdf"} label="Tisknout objednávku" variant="outline" className="h-10 w-10 shrink-0" />}
               </div>
+              <PoMailAttachments files={files} picked={picked} onToggle={(id, on) => setPicked((s) => {
+                const n = new Set(s);
+                if (on) n.add(id); else n.delete(id);
+                return n;
+              })} missing={missing} />
+              {deviations.length > 0 && (
+                <div className="space-y-1 rounded-lg border border-rose-300 bg-rose-50/70 px-3 py-2 text-xs text-rose-950 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" data-testid="po-mail-deviations">
+                  <p className="font-semibold">Odchylky od výkresu (v PDF u položky i v e-mailu):</p>
+                  <ul className="space-y-0.5">
+                    {deviations.map((d) => <li key={d.ref}><span className="font-mono font-medium">{d.ref}</span>: {d.lines.join("; ")}</li>)}
+                  </ul>
+                </div>
+              )}
               <MailFields mail={mail} onChange={setMail} context={supplierId ? { supplierId } : null} idPrefix="po-mail" />
             </>
           )}
@@ -244,6 +345,24 @@ export function EditPurchaseOrderDialog({
       setError(null);
     }
   }
+  // odchylky od výkresu (potvrzené + nové ze zakázky) do formuláře k potvrzení
+  const editId = open ? order?.id ?? null : null;
+  React.useEffect(() => {
+    if (!editId) return;
+    let live = true;
+    void purchaseOrderDeviations(editId).then((res) => {
+      if (!live || !res.ok || !res.lines) return;
+      const lines = res.lines;
+      // platný seznam (potvrzený + nové ze zakázky) — jen když řádky formuláře odpovídají objednávce
+      setForm((f) => (f && f.items.length === lines.length ? {
+        ...f,
+        items: f.items.map((d, i) => ({
+          ...d, deviations: lines[i].list, ...(lines[i].orderItemId && !d.orderItemId ? { orderItemId: lines[i].orderItemId } : {}),
+        })),
+      } : f));
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [editId]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

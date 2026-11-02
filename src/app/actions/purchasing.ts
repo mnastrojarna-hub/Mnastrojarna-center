@@ -21,11 +21,16 @@ import {
 import {
   PURCHASE_ORDER_STATUS_META, applyPurchasePrices, buildPurchaseOrderDraft, canChangePurchaseOrderStatus, canFillPurchasePrices,
   cleanPurchaseItems, isPurchaseOrderEditable, isPurchaseOrderStatus, issueStageHint,
-  purchaseOrderEmail, purchaseOrderFileName, resolveQuoteDeliveryDate, resolveSupplierQuoteTotal, rowsTotal,
+  purchaseOrderChangeEmail, purchaseOrderEmail, purchaseOrderFileName, resolveQuoteDeliveryDate, resolveSupplierQuoteTotal, rowsTotal,
   rowToCommissionView, supplierNotesOfItems, supplierQuoteInputToRow, validatePurchaseOrderDraft,
   type CommissionDbRow, type PurchaseItemRowInput,
 } from "@/lib/jobs/purchasing";
-import { ourDeliveryAddressCore, purchaseOrderMailFor, purchasePriceOnlyChanges, sendPurchaseOrderCore, storePurchaseOrderPdfCore } from "@/lib/jobs/purchase-order-docs";
+import {
+  ourDeliveryAddressCore, purchaseOrderMailExtras, purchaseOrderMailFor, purchasePriceOnlyChanges, sendPurchaseOrderCore, storePurchaseOrderPdfCore,
+  type PoMailExtras,
+} from "@/lib/jobs/purchase-order-docs";
+import { lineDeviations, loadDeviationContext } from "@/lib/jobs/po-deviations-store";
+import type { PoDeviation } from "@/lib/jobs/po-deviations";
 import { nextStepAfterConfirmedHint, purchaseOrderSender } from "@/lib/jobs/production-handoff-store";
 import { getAccess } from "@/lib/auth/session";
 import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
@@ -165,7 +170,15 @@ async function replaceItems(
   const { error: delErr } = await db.from(table).delete().eq(fk, parentId);
   if (delErr) return delErr.message;
   if (!rows.length) return null;
-  const { error } = await db.from(table).insert(rows.map((r) => ({ ...r, [fk]: parentId })) as never);
+  const { error } = await db.from(table).insert(rows.map((r) => {
+    // odchylky od výkresu má jen objednávka dodavateli (nabídka dodavatele ten sloupec nemá)
+    if (table !== "purchase_order_items" && "drawing_deviations" in r) {
+      const { drawing_deviations: _omit, ...rest } = r;
+      void _omit;
+      return { ...rest, [fk]: parentId };
+    }
+    return { ...r, [fk]: parentId };
+  }) as never);
   return error ? error.message : null;
 }
 
@@ -426,7 +439,34 @@ export async function draftPurchaseOrder(
     if (opts.supplierId && !supplier) return fail("Dodavatel nenalezen.");
 
     const draft = buildPurchaseOrderDraft({ job, quote, supplier, deliveryAddress: await ourDeliveryAddress() });
+    // odchylky od výkresu po položkách (pokyny zákazníka z e-mailu, oprava, nová revize) — předvyplněné k potvrzení
+    const ctx = await loadDeviationContext(c.db, jobId).catch(() => null);
+    if (ctx) {
+      const devs = lineDeviations(ctx, draft.items.map((it) => ({
+        orderItemId: it.orderItemId ?? null, drawingNumber: it.drawingNumber ?? null, quantity: it.quantity, unit: it.unit ?? "ks", note: it.note ?? null,
+      })));
+      draft.items = draft.items.map((it, i) => ({ ...it, ...(devs[i]?.orderItemId ? { orderItemId: devs[i].orderItemId } : {}), deviations: devs[i]?.list ?? [] }));
+    }
     return { ok: true, draft };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/**
+ * Platné odchylky od výkresu u řádků vystavené objednávky (potvrzené + nové ze zdrojů) — pro úpravu
+ * objednávky a náhled před odesláním. Pořadí = pořadí položek objednávky.
+ */
+export async function purchaseOrderDeviations(id: string): Promise<ActionResult<{ lines: { orderItemId: string | null; list: PoDeviation[] }[] }>> {
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  if (!isUuid(id)) return fail(PO_NOT_FOUND);
+  try {
+    const po = await fetchPurchaseOrder(c.db, id);
+    if (!po) return fail(PO_NOT_FOUND);
+    const ctx = await loadDeviationContext(c.db, po.jobId);
+    if (!ctx) return { ok: true, lines: po.items.map((it) => ({ orderItemId: it.orderItemId ?? null, list: it.deviations ?? [] })) };
+    return { ok: true, lines: lineDeviations(ctx, po.items).map((l) => ({ orderItemId: l.orderItemId, list: l.list })) };
   } catch (err) {
     return fail(err);
   }
@@ -864,11 +904,35 @@ export async function regeneratePurchaseOrderPdf(id: string): Promise<ActionResu
   }
 }
 
-/** Návrh e-mailu s objednávkou: adresát z adresáře dodavatelů, předmět, zdvořilý text, podpis. */
+/** Příloha e-mailu objednávky v dialogu (výkres / 3D model / starší revize dílu objednávky). */
+export interface PoMailAttachmentView {
+  fileId: string;
+  role: "drawing" | "model" | "old";
+  name: string;
+  size: number | null;
+  status: "ready" | "pending" | "blocked";
+  message: string | null;
+  checked: boolean;
+  /** Položky objednávky, ke kterým soubor patří („VK-2291"). */
+  refs: string[];
+}
+
+/** Odeslaná / potvrzená objednávka po „Aktualizaci výkresu" → změna objednávky s novou revizí. */
+function drawingChangeMode(po: PurchaseOrderView, drawingChange: boolean | undefined): boolean {
+  return Boolean(drawingChange) && (po.status === "odeslana" || po.status === "potvrzena");
+}
+
+/**
+ * Návrh e-mailu s objednávkou: adresát z adresáře dodavatelů, předmět, zdvořilý text, podpis; odchylky od
+ * výkresu po položkách a přílohy (výkresy / modely dílů objednávky, výchozí zaškrtnutí). `drawingChange` =
+ * poslat dodavateli novou revizi výkresu (u odeslané objednávky jako změna objednávky).
+ */
 export async function draftPurchaseOrderEmail(
   id: string,
+  opts: { drawingChange?: boolean } = {},
 ): Promise<ActionResult<{
   to: string; cc: string; recipientReason: string; supplierId: string | null; subject: string; body: string; attachmentName: string;
+  mode: "issue" | "change"; attachments: PoMailAttachmentView[]; missingDrawing: string[]; deviations: { ref: string; lines: string[] }[];
 }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -876,6 +940,7 @@ export async function draftPurchaseOrderEmail(
   try {
     const po = await fetchPurchaseOrder(c.db, id);
     if (!po) return fail(PO_NOT_FOUND);
+    const change = drawingChangeMode(po, opts.drawingChange);
     await refreshCompanyFromSettings();
     const me = await fetchProfileContact(c.db, c.user.id);
     // podpis toho, z čí schránky objednávka odejde (stejná volba jako sendPurchaseOrder)
@@ -886,35 +951,80 @@ export async function draftPurchaseOrderEmail(
     const pick = await recipientsFor(c.db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null);
     const to = pick?.to[0] ?? po.supplier?.email ?? "";
     const tone = to ? await toneFor(c.db, sender.signerId ?? c.user.id, [to]).catch(() => null) : null;
-    const mail = purchaseOrderEmail({
-      address: tone?.setting.address ?? null,
+    const address = tone?.setting.address ?? null;
+    const extras = await purchaseOrderMailExtras(c.db, po, change ? "change" : "issue", address);
+    const signer = {
+      address,
       salutation: tone?.salutation ?? null,
       number: po.number,
       companyName: COMPANY.name,
-      supplierQuoteNumber: po.supplierQuote?.number,
-      requiredDate: po.confirmedDate ?? po.requiredDate,
-      itemNotes: supplierNotesOfItems(po.items ?? []),
       senderName: me.name ?? c.user.fullName,
       senderEmail: me.email ?? c.user.email,
       senderPhone: me.phone ?? COMPANY.phone,
       companyWeb: COMPANY.web,
       signatureText,
-    });
+    };
+    const changed = change ? drawingChangeRefs(extras) : [];
+    const mail = change
+      ? purchaseOrderChangeEmail({
+        ...signer, revision: Math.max(2, (await currentPoRevision(c.db, po.id)) + 1), requiredDate: po.confirmedDate ?? po.requiredDate,
+        reason: changed.length ? `nová revize výkresu ${changed.join(", ")}` : "nová revize výkresu",
+        deviations: extras.deviations, attachmentLines: extras.attachmentLines,
+      })
+      : purchaseOrderEmail({
+        ...signer,
+        supplierQuoteNumber: po.supplierQuote?.number,
+        requiredDate: po.confirmedDate ?? po.requiredDate,
+        itemNotes: supplierNotesOfItems(po.items ?? []),
+        deviations: extras.deviations,
+        attachmentLines: extras.attachmentLines,
+      });
+    const lines = extras.attachments?.lines ?? [];
+    const refOf = (i: number) => lines[i]?.label ?? `položka ${i + 1}`;
     return {
       ok: true, to, cc: (pick?.cc ?? []).join(", "), recipientReason: pick?.to.length ? pick.reason : to ? "E-mail dodavatele" : "",
       supplierId: po.supplier?.id ?? null, ...mail, attachmentName: purchaseOrderFileName(po.number),
+      mode: change ? "change" : "issue",
+      attachments: (extras.attachments?.plan.candidates ?? []).map((a) => ({
+        fileId: a.fileId, role: a.role, name: a.name, size: a.size, status: a.status, message: a.message, checked: a.checked, refs: a.lines.map(refOf),
+      })),
+      missingDrawing: (extras.attachments?.plan.missingDrawing ?? []).map((m) => m.label),
+      deviations: extras.deviations,
     };
   } catch (err) {
     return fail(err);
   }
 }
 
-/** Odešle objednávku dodavateli e-mailem z mé schránky (PDF v příloze), stav → Odeslána. */
-export async function sendPurchaseOrder(id: string, mail: PurchaseOrderMail): Promise<ActionResult<{ sent: boolean; emailId?: string }>> {
+async function currentPoRevision(db: JobsDb, poId: string): Promise<number> {
+  const { data } = await db.from("purchase_orders").select("revision").eq("id", poId).maybeSingle();
+  return Number((data as { revision?: number | null } | null)?.revision ?? 1) || 1;
+}
+
+/** Čísla výkresů, kterým se od odeslání změnila revize („VK-2291 rev. C"). */
+function drawingChangeRefs(extras: PoMailExtras): string[] {
+  return extras.attachmentLines
+    .map((l) => /^Výkres (.+?): platí nová revize (\S+?)(?: —|\.$)/.exec(l))
+    .filter((m): m is RegExpExecArray => Boolean(m))
+    .map((m) => `${m[1]} rev. ${m[2]}`);
+}
+
+/**
+ * Odešle objednávku dodavateli e-mailem z mé schránky (PDF + výkresy / modely dílů objednávky v příloze),
+ * stav → Odeslána. `attachmentIds` = výběr z dialogu (jen soubory dílů objednávky; chybí = výchozí).
+ * `drawingChange` u odeslané objednávky = změna objednávky (nová revize výkresu, PDF změny, nový výkres).
+ * Výkres, který se ještě anonymizuje → e-mail čeká ve frontě a odejde sám (`queued`).
+ */
+export async function sendPurchaseOrder(
+  id: string,
+  mail: PurchaseOrderMail,
+  opts: { attachmentIds?: string[]; drawingChange?: boolean } = {},
+): Promise<ActionResult<{ sent: boolean; emailId?: string; queued?: boolean }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(PO_NOT_FOUND);
   if (!mail || typeof mail !== "object") return fail("Chybí e-mail.");
+  const attachmentIds = Array.isArray(opts?.attachmentIds) ? opts.attachmentIds.filter((x) => isUuid(x)).slice(0, 80) : undefined;
   try {
     const { db, user } = c;
     const po = await fetchPurchaseOrder(db, id);
@@ -923,11 +1033,27 @@ export async function sendPurchaseOrder(id: string, mail: PurchaseOrderMail): Pr
     // Odesílá se ze schránky obchodníka zakázky, když ji má použitelnou (jako každé odeslání objednávky).
     const { data: jobRow } = await db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
     const sender = await purchaseOrderSender(db, { id: user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
-    const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, id, mail, { from: sender.from, kind: "issue" });
+    const author = { id: user.id, fullName: user.fullName };
+    const change = drawingChangeMode(po, opts?.drawingChange);
+    if (opts?.drawingChange) {
+      // nová revize výkresu → PDF s aktuální revizí (u odeslané objednávky jako změna č. N)
+      if (change) {
+        const revision = (await currentPoRevision(db, po.id)) + 1;
+        const { error } = await db.from("purchase_orders").update({ revision, drawing_changed_at: new Date().toISOString() } as never).eq("id", po.id);
+        if (error) return fail(error.message);
+      }
+      const fresh = await fetchPurchaseOrder(db, po.id);
+      const stored = fresh ? await storePurchaseOrderPdfCore(db, author, fresh, { replaceFileId: po.fileId }) : { error: PO_NOT_FOUND };
+      if ("error" in stored) return fail(`PDF objednávky se nepodařilo přegenerovat: ${stored.error}`);
+    }
+    const res = await sendPurchaseOrderCore(db, author, id, mail, {
+      from: sender.from, kind: change ? "change" : "issue", ...(attachmentIds ? { attachmentIds } : {}),
+      ...(opts?.drawingChange ? { eventData: { drawingChange: true } } : {}),
+    });
     if (!res.ok) return fail(res.error);
     revalidatePurchasing(po.jobId);
     revalidatePath("/sent");
-    return { ok: true, sent: true, ...(res.emailId ? { emailId: res.emailId } : {}) };
+    return { ok: true, sent: !res.queued, ...(res.queued ? { queued: true } : {}), ...(res.emailId ? { emailId: res.emailId } : {}) };
   } catch (err) {
     return fail(err);
   }

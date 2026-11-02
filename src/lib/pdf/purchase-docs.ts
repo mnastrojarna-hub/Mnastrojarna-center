@@ -68,6 +68,8 @@ export async function buildPurchaseOrderDoc(
     intro?: string; workInstruction?: string;
     /** Změna objednávky (revize ≥ 2) a její datum. */
     revision?: number | null; revisionDate?: string | null;
+    /** Odchylky od výkresu po položkách (stejné pořadí jako po.items). */
+    deviations?: string[][] | null;
   } = {},
 ): Promise<PurchaseOrderData> {
   await refreshCompanyFromSettings();
@@ -87,7 +89,11 @@ export async function buildPurchaseOrderDoc(
     buyer: supplierParty(),
     supplier: purchaseSupplierParty(supplier),
     supplierContact: u(supplier?.contactPerson),
-    items: po.items.map((it) => purchaseItemToDoc(it, job.items, vatRate)),
+    items: po.items.map((it, i) => {
+      const doc = purchaseItemToDoc(it, job.items, vatRate);
+      const dev = (opts.deviations?.[i] ?? []).filter((s) => s.trim());
+      return dev.length ? { ...doc, deviations: dev } : doc;
+    }),
     requiredDate: u(po.requiredDate),
     confirmedDate: u(po.confirmedDate),
     jobNumber: u(job.number),

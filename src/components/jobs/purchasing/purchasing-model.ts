@@ -4,6 +4,7 @@ import type {
   PurchaseReceiptInput, SupplierQuoteInput, SupplierQuoteView,
 } from "@/lib/jobs/purchasing-types";
 import { purchaseExtraStates, supplierNoteSegment } from "@/lib/jobs/purchasing";
+import type { PoDeviation } from "@/lib/jobs/po-deviations";
 import { dayDiff, type ChangeStamp, type Progress, type PurchaseExtraState } from "@/lib/jobs/flow-status";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import { parseDecimal, isInvalidDecimal, decimalInput, formatMoney, formatPercent } from "@/components/jobs/detail/detail-helpers";
@@ -25,6 +26,10 @@ export interface PurchaseItemDraft {
   unit: string;
   unitPrice: string;
   note: string;
+  /** Díl zakázky (objednávka dodavateli — výkresy a odchylky položky). */
+  orderItemId?: string | null;
+  /** Odchylky od výkresu (objednávka dodavateli): seznam k potvrzení; undefined = automaticky. */
+  deviations?: PoDeviation[];
 }
 
 let seq = 0;
@@ -47,6 +52,8 @@ export function purchaseDraftFrom(it: Partial<PurchaseItem> | PurchaseItemInput)
     unit: it.unit || "ks",
     unitPrice: decimalInput(it.unitPrice ?? null),
     note: it.note ?? "",
+    ...(it.orderItemId ? { orderItemId: it.orderItemId } : {}),
+    ...(it.deviations ? { deviations: it.deviations.map((d) => ({ ...d })) } : {}),
   };
 }
 
@@ -97,7 +104,16 @@ export function purchaseDraftsToInput(drafts: PurchaseItemDraft[]): PurchaseItem
     unit: d.unit.trim() || "ks",
     unitPrice: parseDecimal(d.unitPrice),
     note: d.note.trim() || undefined,
+    ...(d.orderItemId ? { orderItemId: d.orderItemId } : {}),
+    // potvrzený seznam odchylek (i prázdný = „bez odchylek"); vypnuté zůstávají s off (nevrátí se ze zdrojů)
+    ...(d.deviations ? { deviations: d.deviations.filter((x) => x.value.trim()) } : {}),
   }));
+}
+
+/** Nová ruční odchylka od výkresu (doplní obchodník v dialogu). */
+export function manualDeviation(): PoDeviation {
+  seq += 1;
+  return { key: `rucne:${Date.now().toString(36)}${seq}`, source: "rucne", label: "Odchylka", value: "" };
 }
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;

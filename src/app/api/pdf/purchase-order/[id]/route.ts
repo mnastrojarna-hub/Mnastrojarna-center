@@ -10,6 +10,7 @@ import { isUuid } from "@/lib/jobs/mapping";
 import type { PurchaseOrderDraftInput, PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import { buildPurchaseOrderDoc } from "@/lib/pdf/purchase-docs";
 import { renderPurchaseOrderPdf } from "@/lib/pdf/render-purchase";
+import { purchaseOrderDeviationLines } from "@/lib/jobs/po-deviations-store";
 import type { CurrentUser } from "@/lib/data/current-user";
 
 export const runtime = "nodejs";
@@ -42,7 +43,10 @@ async function render(po: PurchaseOrderView, user: CurrentUser): Promise<Buffer 
   if (!job) return NextResponse.json({ error: "Zakázka nenalezena." }, { status: 404 });
   const db = await createOperatorClient();
   const contact = await fetchProfileContact(db, po.createdBy?.id || user.id);
+  // odchylky od výkresu pod položkami (stejně jako uložené PDF)
+  const deviations = await purchaseOrderDeviationLines(db, po).catch(() => null);
   const data = await buildPurchaseOrderDoc(job, po, po.supplier, {
+    deviations,
     preparedBy: contact.name ?? po.createdBy?.name ?? user.fullName,
     contactEmail: contact.email,
     contactPhone: contact.phone,
