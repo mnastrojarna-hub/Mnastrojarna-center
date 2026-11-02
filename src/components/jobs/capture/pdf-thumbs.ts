@@ -20,8 +20,8 @@ let chain: Promise<unknown> = Promise.resolve();
 
 function loadLib(): Promise<PdfJs> {
   if (!lib) {
-    lib = import("pdfjs-dist").then((m) => {
-      m.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+    lib = import("pdfjs-dist/legacy/build/pdf.mjs").then((m) => {
+      m.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
       return m;
     });
     lib.catch(() => {
