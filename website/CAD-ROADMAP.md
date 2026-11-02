@@ -180,7 +180,13 @@ Referenční systém zadání (`cad/refs.ts`, `cad/ref-resolve.ts`, `components/
 - **W5-E odkazy ve zbytku prvků + pomocná geometrie** (`feat/refs-more.ts`, 22 testů, `pick-list.tsx`): primitiva, pružina, závit,
   text, transformace, Vytáhnout/Zatlačit odkazem; pomocná osa (10 způsobů vč. průsečnice rovin), bod (14), souřadný systém;
   výběr entit ze seznamu s filtrem; vykreslení os/bodů/CSYS ve 3D okně a tlačítka v pásu Reference (vedoucí).
-- **W5-D skica:** viz závěrečná zpráva agenta (doplní se po odevzdání).
+- **W5-D skica** (`sketcher.tsx`, `sketch-tools.ts`, `sketch-solver.ts`, 41 testů): číselné zadání u kurzoru pro všechny nástroje
+  (X;Y, @dx;dy, délka + úhel, `50<45`, Ø/R, šířka×výška, výrazy; Tab = další pole a zámek, Enter), „Kótovat při kreslení“,
+  automatické vazby s náhledem (8 druhů: vodorovně, svisle, rovnoběžně, kolmo, tečně, totožnost, bod na křivce, střed),
+  stav určenosti po entitách (modrá/černá/červená + nadbytečné vazby a konflikty), výkonný ořez tažením, odsazení řetězce,
+  rozdělit, promítnout hrany modelu, obdélník 3 body, kružnice 2 body, mnohoúhelník vepsaný/opsaný, drážka obloukem,
+  kóta délky oblouku, klávesa D = kóta hned, přepínače uchopení v pásu. Nejde zatím: spline s tečnami (nový typ entity),
+  prodloužení oblouků, vazba poměru.
 
 Zbývá z plánu: vazby sestav (18 druhů + mate connector), výkresy (13 druhů pohledů, tolerance, tabulky), dělicí křivka úkosu,
 setback zaoblení, zvýraznění indexů kusů pole ve 3D, šipka začátku hrany pro R1→R2.

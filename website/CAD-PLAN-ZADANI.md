@@ -189,7 +189,7 @@ vykreslí `RefField`. Moduly rozšíření (`cad/ext/*`) tak dostanou bohaté za
 | Tažení / šablonování | 2 / 2 | **7 / 7** (skica nebo kružnice, vodicí křivka, kroucení °/otáčky, měřítko konce, tenká stěna, pevná orientace, 3 přechody / 2+ profily, do bodu, uzavřené, okrajové podmínky, osová křivka, vodicí křivka, tenká stěna) | ✔ |
 | Pomocná geometrie | rovina (ručně) | **rovina 12, osa 10, bod 14, souřadný systém** – vše použitelné jako odkaz v dalších prvcích | ✔ |
 | Primitiva, pružina, závit, text, transformace, Vytáhnout/Zatlačit | čísla | **poloha odkazem, osa libovolným směrem, rovina textu, posun z bodu do bodu, otočení kolem hrany/osy, ukončení k ploše/vrcholu** | ✔ |
-| Vazby skici | 12 | viz zpráva W5-D (skica: číselné zadání, auto-vazby, stav určenosti, nástroje) | 20 + automatické |
+| Skica – zadání a vazby | 12 vazeb, klik | **číselné zadání u kurzoru u všech nástrojů (19 polí podle nástroje), 8 automatických vazeb s náhledem, 13 vazeb + 8 kót (vč. délky oblouku), stav určenosti po entitách, výkonný ořez, odsazení řetězce, rozdělit, projekce hran, 4 nové tvary, 11 druhů uchopení s přepínači** | 20 + automatické |
 | Vazby sestavy | 5 (+ auto) | 5 | 18 (etapa D) |
 | Typy pohledů výkresu | 6 | 6 | 13 (etapa D) |
 

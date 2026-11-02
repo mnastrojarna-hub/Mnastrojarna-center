@@ -178,7 +178,11 @@ function Floating({ anchor, close, children }: { anchor: HTMLElement; close: () 
     };
     place();
     const onScroll = (e: Event) => {
-      if (!ref.current?.contains(e.target as Node)) closeRef.current();
+      // zavřít jen při posunu pásu/okna, ve kterém tlačítko leží (ne při posunu jiného panelu, např. historie)
+      const t = e.target as Node | Document | null;
+      if (!t || ref.current?.contains(t as Node)) return;
+      const scrolled = t instanceof Document ? t.documentElement : (t as Node);
+      if (scrolled.contains(anchor)) closeRef.current();
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("resize", place);
