@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, AlertTriangle, FileCheck2, KeyRound, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX } from "lucide-react";
+import { AlertCircle, AlertTriangle, Crown, FileCheck2, KeyRound, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,6 +141,47 @@ export function QuoteApproverToggle({
 }
 
 /**
+ * 2. 11. „Plný přístup" (profiles.full_access): vše jako super admin — obchodní tok všech, nacenění, marže, provize
+ * všech, schvalování, AI, nastavení, mazání — KROMĚ pošty ostatních schránek (jen svou) a správy uživatelů.
+ */
+export function FullAccessToggle({
+  id, checked, onChange, role, disabled,
+}: { id: string; checked: boolean; onChange: (v: boolean) => void; role: UserRole; disabled?: boolean }) {
+  const admin = role === "super_admin";
+  const on = admin || checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-full-access-toggle={admin ? "role" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+        )}>
+          <Crown className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Plný přístup</label>
+          <p className="text-xs text-muted-foreground">
+            {admin
+              ? "Super admin má přístup ke všemu vždy."
+              : on
+                ? "Smí vše jako super admin — kromě pošty ostatních schránek (vidí jen svou) a správy uživatelů."
+                : "Přístupy podle role a přepínačů níže."}
+          </p>
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={admin || disabled}
+        aria-label="Plný přístup"
+        className="mt-1"
+      />
+    </div>
+  );
+}
+
+/**
  * 31. 10. „Smí poptávat dodavatele" (profiles.can_rfq): zaměstnanec pošle poptávkové kolo dodavatelům a vidí jejich
  * ceny v porovnání (ne marže, provize ani objednávky dodavatelům). Obchodník a super admin smí vždy.
  */
@@ -240,6 +281,7 @@ export function EditUserDialog({
   const [quoteApproval, setQuoteApproval] = React.useState(user.quoteNeedsApproval !== false);
   const [quoteApprover, setQuoteApprover] = React.useState(user.canApproveQuotes === true);
   const [rfq, setRfq] = React.useState(user.canRfq === true);
+  const [fullAccess, setFullAccess] = React.useState(user.fullAccess === true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -253,6 +295,7 @@ export function EditUserDialog({
     setQuoteApproval(user.quoteNeedsApproval !== false);
     setQuoteApprover(user.canApproveQuotes === true);
     setRfq(user.canRfq === true);
+    setFullAccess(user.fullAccess === true);
     setError(null);
   }, [open, user]);
 
@@ -271,6 +314,7 @@ export function EditUserDialog({
         quoteNeedsApproval: role === "super_admin" ? undefined : quoteApproval,
         canApproveQuotes: role === "super_admin" ? undefined : quoteApprover,
         canRfq: role === "zamestnanec" ? rfq : undefined,
+        fullAccess: isSelf || role === "super_admin" ? undefined : fullAccess,
       });
       if (!res.ok) {
         setError(res.error ?? "Uložení se nepovedlo.");
@@ -312,6 +356,8 @@ export function EditUserDialog({
             <RolePicker value={role} onChange={setRole} disabled={isSelf} name={`eu-role-${user.id}`} />
             {isSelf && <p className="text-xs text-muted-foreground">Svou vlastní roli změnit nemůžeš.</p>}
           </div>
+
+          <FullAccessToggle id={`eu-full-access-${user.id}`} checked={fullAccess} onChange={setFullAccess} role={role} disabled={isSelf} />
 
           <QuoteApprovalToggle
             id={`eu-quote-approval-${user.id}`}

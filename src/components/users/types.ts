@@ -29,6 +29,11 @@ export interface ManagedUser {
   quoteApproverChangedAt?: string | null;
   /** 31. 10.: smí poptávat dodavatele (profil can_rfq; obchodník a super admin vždy). Výchozí ne. */
   canRfq?: boolean;
+  /**
+   * 2. 11.: „Plný přístup" (profil full_access; ne u super admina) — vše jako super admin kromě pošty ostatních
+   * schránek a správy uživatelů. Výchozí ne.
+   */
+  fullAccess?: boolean;
 }
 
 /** Schránka k přiřazení uživateli. */

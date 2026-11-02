@@ -18,10 +18,16 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
     const db = createAdminClient();
     const base = "id, email, full_name, role, active, ai_access, phone, position, commission_rate, last_seen_at, created_at";
     const loadProfiles = async () => {
+      const withFull = await db.from("profiles")
+        .select(`${base}, quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at, `
+          + "can_approve_quotes, quote_approver_changed_by, quote_approver_changed_at, can_rfq, full_access")
+        .order("created_at", { ascending: true });
+      // DB bez migrace 20261102100000 (full_access) → bez plného přístupu
+      if (!withFull.error || !/full_access/.test(withFull.error.message ?? "")) return withFull;
       const withRfq = await db.from("profiles")
         .select(`${base}, quote_needs_approval, quote_approval_changed_by, quote_approval_changed_at, `
           + "can_approve_quotes, quote_approver_changed_by, quote_approver_changed_at, can_rfq")
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true }) as typeof withFull;
       // DB bez migrace 20261031160000 (can_rfq) → bez příznaku poptávek
       if (!withRfq.error || !/can_rfq/.test(withRfq.error.message ?? "")) return withRfq;
       const res = await db.from("profiles")
@@ -66,6 +72,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       quoteApproverChangedBy: p.quote_approver_changed_by ? nameOf.get(p.quote_approver_changed_by) ?? null : null,
       quoteApproverChangedAt: p.quote_approver_changed_at ?? null,
       canRfq: p.role !== "zamestnanec" || (p as Profile & { can_rfq?: boolean | null }).can_rfq === true,
+      fullAccess: p.role !== "super_admin" && (p as Profile & { full_access?: boolean | null }).full_access === true,
     }));
 
     const mailboxes: MailboxOption[] = ((mailboxesRes.data ?? []) as Mailbox[]).map((m) => ({

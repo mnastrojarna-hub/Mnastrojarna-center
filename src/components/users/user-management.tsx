@@ -447,6 +447,19 @@ function UserRow({
             <span className="truncate">schvaluje nabídky</span>
           </button>
         )}
+        {/* 2. 11.: plný přístup (vše kromě cizí pošty a správy uživatelů) */}
+        {user.role !== "super_admin" && user.fullAccess === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-full-access-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary transition hover:bg-primary/15 hover:shadow-sm"
+            title="Smí vše jako super admin kromě pošty ostatních schránek a správy uživatelů — změnit v Upravit"
+          >
+            <ShieldCheck className="h-3 w-3 shrink-0" />
+            <span className="truncate">plný přístup</span>
+          </button>
+        )}
         {/* 31. 10.: zaměstnanec smí poptávat dodavatele (obchodník a super admin vždy — štítek nepotřebují) */}
         {user.role === "zamestnanec" && user.canRfq === true && (
           <button

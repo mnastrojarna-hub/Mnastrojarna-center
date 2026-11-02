@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { requireUser, getAccess } from "@/lib/auth/session";
 import { listQuoteApprovers } from "@/lib/data/current-user";
 import { quoteApproverWho } from "@/lib/jobs/flow-status";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS, FEATURE_LABELS, can, type Feature } from "@/lib/auth/permissions";
+import { FULL_ACCESS_DESCRIPTION, ROLE_DESCRIPTIONS, ROLE_LABELS, FEATURE_LABELS, can, type Feature } from "@/lib/auth/permissions";
 import { loadAccountData } from "@/components/account/data";
 import { ProfileForm } from "@/components/account/profile-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
@@ -109,7 +109,7 @@ export default async function AccountPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={cn("gap-1 px-3 py-1 text-sm", style.badge)}>
-              <RoleIcon className="h-3.5 w-3.5" /> {ROLE_LABELS[user.role]}
+              <RoleIcon className="h-3.5 w-3.5" /> {user.fullAccess ? user.roleLabel : ROLE_LABELS[user.role]}
             </Badge>
             {hasAi && (
               <Badge className="gap-1 border-transparent bg-violet-500/10 px-3 py-1 text-sm text-violet-600 dark:text-violet-400">
@@ -154,7 +154,7 @@ export default async function AccountPage() {
               <CardTitle className="flex items-center gap-2 text-base">
                 <SectionIcon icon={ShieldCheck} tone="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" /> Tvoje role a přístupy
               </CardTitle>
-              <CardDescription>{ROLE_DESCRIPTIONS[user.role]}</CardDescription>
+              <CardDescription>{user.fullAccess ? FULL_ACCESS_DESCRIPTION : ROLE_DESCRIPTIONS[user.role]}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="flex flex-wrap gap-1.5">

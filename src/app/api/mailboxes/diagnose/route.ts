@@ -13,14 +13,15 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /**
- * Nastavení schránky (jen super admin — funkce „settings"):
+ * Nastavení schránky (jen super admin — funkce „mail_all"):
  *   { action: "test", mailboxId?, provider, email, config, secrets? } → postupná diagnostika IMAP/POP3 + SMTP (+ Graph)
  *   { action: "detect", mailboxId?, email, password?, host?, port?, protocol?, smtpHost?, smtpPort?, allowNameMismatch? }
  *     → „Najít nastavení automaticky" (tabulka pokusů, první fungující kombinace)
  * Uložená hesla se doplní na serveru podle mailboxId (do prohlížeče se neposílají).
  */
 export async function POST(req: Request) {
-  const auth = await apiRequire("settings");
+  // schránky všech jen super admin (plný přístup bez cizí pošty, 2. 11.)
+  const auth = await apiRequire("mail_all");
   if (auth instanceof NextResponse) return auth;
   let body: Record<string, unknown>;
   try {

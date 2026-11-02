@@ -44,12 +44,17 @@ async function guard(): Promise<{ user: CurrentUser; db: AdminDb } | { error: st
 
 type Target = GuardTarget & {
   email: string | null; full_name: string; quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null; can_rfq?: boolean | null;
+  full_access?: boolean | null;
 };
 
 async function loadTarget(db: AdminDb, id: string): Promise<Target | null> {
   if (!id || typeof id !== "string") return null;
   const base = "id, role, active, email, full_name";
-  let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq`).eq("id", id).maybeSingle();
+  let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq, full_access`).eq("id", id).maybeSingle();
+  // DB bez migrace 20261102100000 (full_access)
+  if (res.error && /full_access/.test(res.error.message ?? "")) {
+    res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq`).eq("id", id).maybeSingle() as typeof res;
+  }
   // DB bez migrace 20261031160000 (can_rfq)
   if (res.error && /can_rfq/.test(res.error.message ?? "")) {
     res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", id).maybeSingle() as typeof res;
@@ -225,6 +230,8 @@ export interface UpdateUserChanges {
   canApproveQuotes?: boolean;
   /** „Smí poptávat dodavatele" (31. 10.; jen zaměstnanec — obchodník a super admin smí vždy). Vidí ceny dodavatelů v poptávkovém kole. */
   canRfq?: boolean;
+  /** „Plný přístup" (2. 11.; ne u super admina) — vše kromě pošty ostatních schránek a správy uživatelů. */
+  fullAccess?: boolean;
 }
 
 /** Neodeslané nabídky autora, které čekají na schválení (přepočet po změně schvalování dělá DB trigger). */
@@ -297,6 +304,14 @@ export async function updateUser(
       // obchodník a super admin poptávají vždy — příznak se ukládá jen u zaměstnance
       const finalRole = (update.role as UserRole | undefined) ?? (target.role as UserRole);
       if (finalRole === "zamestnanec" && changes.canRfq !== (target.can_rfq === true)) update.can_rfq = changes.canRfq;
+    }
+    if (changes.fullAccess !== undefined) {
+      if (typeof changes.fullAccess !== "boolean") return { ok: false, error: "Neplatné nastavení plného přístupu." };
+      if (id === actor.id) return { ok: false, error: "Svůj vlastní přístup změnit nemůžeš." };
+      // super admin má vše — u něj se příznak neukládá (při změně na super admina se vypne)
+      const finalRole = (update.role as UserRole | undefined) ?? (target.role as UserRole);
+      const next = finalRole !== "super_admin" && changes.fullAccess;
+      if (next !== (target.full_access === true)) update.full_access = next;
     }
     if (Object.keys(update).length === 0) return { ok: true };
 

@@ -69,6 +69,11 @@ export interface AccessSubject {
    * Vidí ceny dodavatelů jen v poptávkovém kole (porovnání, výběr) — ne marže, provize ani objednávky dodavatelům.
    */
   canRfq?: boolean;
+  /**
+   * 2. 11.: „Plný přístup" (profiles.full_access) — vše jako super admin kromě FULL_ACCESS_DENIED
+   * („každý bude vidět jen svůj mail, jinak budou moci vše"; správu uživatelů ne).
+   */
+  fullAccess?: boolean;
 }
 
 export interface AccessContext {
@@ -98,6 +103,8 @@ const ADMIN_ONLY: Feature[] = [
   "mail_all", "dashboard", "ai_assistant", "ai_tuning", "knowledge", "drawings",
   "commissions_all", "users", "settings", "delete", "pricing", "quote_approval", "flow_all", "supplier_invoices_paid",
 ];
+/** Plný přístup (ne skutečný super admin): pošta jen vlastních schránek, bez správy uživatelů a schránek. */
+export const FULL_ACCESS_DENIED: Feature[] = ["users", "mail_all"];
 /** Funkce, které reálně volají AI — vyžadují hlavní vypínač i klíč (bez klíče se pracuje ručně). */
 const AI_RUNTIME: Feature[] = ["ai_pricing", "ai_capture"];
 
@@ -108,7 +115,7 @@ export function can(subject: AccessSubject | null | undefined, feature: Feature,
   // Asistent: vypnutý hlavním vypínačem zmizí; bez klíče stránka vysvětlí, co doplnit.
   if (feature === "ai_assistant" && !ctx.aiEnabled) return false;
 
-  if (subject.role === "super_admin") return true;
+  if (subject.role === "super_admin") return !(subject.fullAccess && FULL_ACCESS_DENIED.includes(feature));
 
   if (EVERYONE.includes(feature)) return true;
   // 31. 10.: schvalovatel nabídek ostatních (které nabídky smí schválit, řeší mayManageQuoteApproval / DB)
@@ -143,6 +150,10 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem nebo schvalovatelem (schvalování lze uživateli vypnout).",
   zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem nebo schvalovatelem odešle sám (schvalování lze uživateli vypnout). Poptávky dodavatelům (a jejich ceny v porovnání) jen se „Smí poptávat dodavatele“.",
 };
+
+/** Popis plného přístupu (profiles.full_access, 2. 11.) pro Můj účet. */
+export const FULL_ACCESS_DESCRIPTION =
+  "Plný přístup — vidíš a smíš vše jako super admin (obchodní tok všech, nacenění, marže, provize všech, schvalování, AI, nastavení), kromě pošty ostatních schránek (vidíš jen svou) a správy uživatelů.";
 
 /** Lidský popis, proč funkce není dostupná (pro stránku „bez přístupu"). */
 export const FEATURE_LABELS: Record<Feature, string> = {

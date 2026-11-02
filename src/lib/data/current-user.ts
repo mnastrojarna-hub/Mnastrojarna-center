@@ -34,6 +34,14 @@ export interface CurrentUser {
    * poptávkové kolo u dodavatelů a jejich ceny v porovnání. Obchodník a super admin smí vždy.
    */
   canRfq?: boolean;
+  /**
+   * 2. 11.: „Plný přístup" (profiles.full_access; Volný, Šponer) — v aplikaci se chová jako super admin
+   * (`role` = "super_admin", skutečná role v `realRole`), KROMĚ správy uživatelů a pošty ostatních schránek
+   * (vidí jen svou poštu, nespravuje schránky). Výjimky hlídá permissions.ts (FULL_ACCESS_DENIED).
+   */
+  fullAccess?: boolean;
+  /** Skutečná role v DB (liší se od `role` jen u plného přístupu). */
+  realRole?: UserRole;
 }
 
 /**
@@ -80,11 +88,16 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     let quoteNeedsApproval = true;
     let canApproveQuotes = false;
     let canRfq = false;
+    let fullAccess = false;
 
     // Profil: servisním klíčem, jinak vlastní session (RLS povoluje číst sám sebe).
     const db = hasServiceKey() ? createAdminClient() : supabase;
     const base = "full_name, role, ai_access, active, password_change_required";
-    let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq`).eq("id", user.id).maybeSingle();
+    let res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq, full_access`).eq("id", user.id).maybeSingle();
+    // DB bez migrace 20261102100000 (full_access) — bez plného přístupu, zbytek beze změny
+    if (res.error && /full_access/.test(res.error.message ?? "")) {
+      res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq`).eq("id", user.id).maybeSingle() as typeof res;
+    }
     // DB bez migrace 20261031160000 (can_rfq) — bez příznaku poptávek, zbytek beze změny
     if (res.error && /can_rfq/.test(res.error.message ?? "")) {
       res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes`).eq("id", user.id).maybeSingle() as typeof res;
@@ -96,11 +109,13 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     const profile = res.data as {
       full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean; password_change_required?: boolean;
       quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null; can_rfq?: boolean | null;
+      full_access?: boolean | null;
     } | null;
     if (profile) {
       hasProfile = true;
       if (profile.full_name) fullName = profile.full_name;
       if (profile.role) role = profile.role;
+      fullAccess = role !== "super_admin" && profile.full_access === true;
       aiAccess = Boolean(profile.ai_access);
       active = profile.active !== false;
       mustChangePassword = Boolean(profile.password_change_required);
@@ -110,13 +125,22 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     }
 
     const email = user.email ?? "";
+    const realRole = role;
+    // Plný přístup: v aplikaci jako super admin (výjimky viz permissions.ts)
+    if (fullAccess) {
+      role = "super_admin";
+      quoteNeedsApproval = false;
+      canApproveQuotes = true;
+      canRfq = true;
+      aiAccess = true;
+    }
     return {
       id: user.id,
       email,
       fullName: fullName || email,
       role,
       initials: initialsOf(fullName, email),
-      roleLabel: ROLE_LABELS[role] ?? role,
+      roleLabel: fullAccess ? `${ROLE_LABELS[realRole] ?? realRole} · plný přístup` : ROLE_LABELS[role] ?? role,
       aiAccess,
       active: hasProfile && active,
       hasProfile,
@@ -124,6 +148,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       quoteNeedsApproval: role !== "super_admin" && quoteNeedsApproval,
       canApproveQuotes,
       canRfq,
+      fullAccess,
+      realRole,
     };
   } catch {
     return null;

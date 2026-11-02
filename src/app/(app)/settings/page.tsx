@@ -40,7 +40,9 @@ export default async function SettingsPage() {
   // Vlastník schránky = uživatel, který vidí její poštu
   const mailboxUsers = users.map((u) => ({ id: u.id, full_name: u.full_name || u.email || "Bez jména", email: u.email }));
   // MailboxManager bere { mailboxes, users } (výběr vlastníka schránky); cast drží kompatibilitu i se starší signaturou
-  const mailboxProps = { mailboxes, users: mailboxUsers } as ComponentProps<typeof MailboxManager>;
+  // Schránky všech jen s poštou všech schránek (plný přístup ne — „každý bude vidět jen svůj mail", 2. 11.)
+  const manageMailboxes = access.can("mail_all");
+  const mailboxProps = { mailboxes: manageMailboxes ? mailboxes : [], users: mailboxUsers } as ComponentProps<typeof MailboxManager>;
 
   return (
     <div className="space-y-6">
@@ -170,7 +172,8 @@ export default async function SettingsPage() {
         </Card>
       </Link>
 
-      {/* Uživatelé — samostatná stránka */}
+      {/* Uživatelé — samostatná stránka (plný přístup bez správy uživatelů) */}
+      {access.can("users") && (
       <Link href="/users" className="group block">
         <Card className="transition-all group-hover:-translate-y-0.5 group-hover:border-rose-500/30 group-hover:shadow-md">
           <CardContent className="flex items-center gap-4 p-5">
@@ -190,8 +193,10 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </Link>
+      )}
 
       {/* Schránky */}
+      {manageMailboxes && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -207,6 +212,7 @@ export default async function SettingsPage() {
           <MailboxManager {...mailboxProps} />
         </CardContent>
       </Card>
+      )}
 
       {/* Import e-mailů z Outlooku */}
       <Card>
