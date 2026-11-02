@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { evalExpr } from "@/cad/params";
 import { arcGeom, circleFrom3, entityPath, findLoops, keyPoints, loopPolygon, prims, type Prim } from "@/cad/sketch";
 import {
@@ -24,7 +24,31 @@ import {
   xfRotate,
   xfScale,
 } from "@/cad/sketch-ops";
-import { constraintResiduals, measureDim, paramsOf, refCircle, refLine, refPoint, sketchDof, solveSketch } from "@/cad/sketch-solver";
+import { analyzeSketch, measureDim, paramsOf, refCircle, refLine, refPoint, solveSketch, type EntityState, type SketchAnalysis } from "@/cad/sketch-solver";
+import {
+  arcMidForRadius,
+  autoConstraints,
+  chainOf,
+  chainSide,
+  circleFrom2,
+  inferLine,
+  offsetChain,
+  parseInput,
+  parseNum,
+  polarPoint,
+  polygonFrom,
+  powerTrim,
+  projectModelLines,
+  rectFrom3,
+  resolveInput,
+  slotArcEntities,
+  splitAt,
+  splitCircle,
+  tangentArcEnd,
+  tangentAt,
+  type AutoKind,
+  type AutoRef,
+} from "@/cad/sketch-tools";
 import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "./cad-icons";
@@ -40,7 +64,9 @@ export type SketchTool =
   | "centerline"
   | "rect"
   | "rectCenter"
+  | "rect3"
   | "circle"
+  | "circle2"
   | "circle3"
   | "arc"
   | "arcCenter"
@@ -50,8 +76,11 @@ export type SketchTool =
   | "point"
   | "polygon"
   | "slot"
+  | "slotArc"
   | "trim"
   | "extend"
+  | "split"
+  | "project"
   | "offset"
   | "fillet"
   | "chamfer"
@@ -81,6 +110,8 @@ type Props = {
   snapGrid: boolean;
   setSnapGrid?: (v: boolean) => void;
   onFinish?: () => void;
+  /** hrany modelu (dvojice bodů x,y,z ve světových souřadnicích) – pro promítnutí do roviny skici */
+  modelLines?: Float32Array | null;
 };
 
 /** Druhy uchopení (OSNAP) jako v ZW3D. */
@@ -109,6 +140,39 @@ function loadSnaps(): SnapSettings {
   }
 }
 
+// ---- sdílený stav uchopení (skicář i pás karet) – malý externí store, aby přepínače v pásu ukazovaly živý stav ----
+let snapStore: SnapSettings = defaultSnaps;
+let snapHydrated = false;
+const snapListeners = new Set<() => void>();
+export function getSketchSnaps(): SnapSettings {
+  return snapStore;
+}
+export function setSketchSnap(k: keyof SnapSettings, v: boolean) {
+  snapStore = { ...snapStore, [k]: v };
+  try {
+    localStorage.setItem(SNAP_KEY, JSON.stringify(snapStore));
+  } catch {
+    /* soukromý režim */
+  }
+  snapListeners.forEach((l) => l());
+}
+export function subscribeSketchSnaps(l: () => void) {
+  snapListeners.add(l);
+  return () => {
+    snapListeners.delete(l);
+  };
+}
+function hydrateSnaps() {
+  if (snapHydrated) return;
+  snapHydrated = true;
+  snapStore = loadSnaps();
+  snapListeners.forEach((l) => l());
+}
+/** Aktuální nastavení uchopení (pro pás karet: `sketchRibbon({ …, snaps: useSketchSnaps(), setSnap: setSketchSnap })`). */
+export function useSketchSnaps(): SnapSettings {
+  return useSyncExternalStore(subscribeSketchSnaps, getSketchSnaps, () => defaultSnaps);
+}
+
 export const CON_INFO: Record<ConType, { label: string; icon: CadIconName; glyph: string; hint: string }> = {
   horizontal: { label: "Vodorovně", icon: "cHorizontal", glyph: "H", hint: "úsečka nebo 2 body" },
   vertical: { label: "Svisle", icon: "cVertical", glyph: "V", hint: "úsečka nebo 2 body" },
@@ -132,7 +196,9 @@ const TOOL_LABEL: Partial<Record<SketchTool, string>> = {
   centerline: "Osa",
   rect: "Obdélník",
   rectCenter: "Obdélník ze středu",
+  rect3: "Obdélník 3 body",
   circle: "Kružnice",
+  circle2: "Kružnice 2 body",
   circle3: "Kružnice 3 body",
   arc: "Oblouk 3 body",
   arcCenter: "Oblouk středem",
@@ -142,8 +208,11 @@ const TOOL_LABEL: Partial<Record<SketchTool, string>> = {
   point: "Bod",
   polygon: "Mnohoúhelník",
   slot: "Drážka",
+  slotArc: "Drážka obloukem",
   trim: "Oříznout",
   extend: "Prodloužit",
+  split: "Rozdělit",
+  project: "Promítnout hrany",
   offset: "Odsadit",
   fillet: "Zaoblit roh",
   chamfer: "Srazit roh",
@@ -167,12 +236,30 @@ const SEL_TOOLS = new Set<SketchTool>(["mirror", "move", "copy", "rotate", "scal
 
 // ======================= pás karet skici =======================
 
-/** Skupiny pásu karet pro režim skici (volá je cad-app). */
-export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => void; snapGrid: boolean; setSnapGrid: (v: boolean) => void; onExportDxf: () => void; onImportDxf: () => void }): RGroup[] {
+/**
+ * Skupiny pásu karet pro režim skici (volá je cad-app). Volitelné `snaps` + `setSnap` (z `useSketchSnaps()` /
+ * `setSketchSnap`) přidají skupinu přepínačů uchopení s živým stavem; bez nich zůstává panel uchopení ve skicáři.
+ */
+export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => void; snapGrid: boolean; setSnapGrid: (v: boolean) => void; onExportDxf: () => void; onImportDxf: () => void; snaps?: SnapSettings; setSnap?: (k: keyof SnapSettings, v: boolean) => void }): RGroup[] {
   const T = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ id: t, label: TOOL_LABEL[t] ?? t, icon, tone: "sketch", kbd, hint, active: p.tool === t, onClick: () => p.setTool(t) });
   const E = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ ...T(t, icon, kbd, hint), tone: "feature" });
   const K = (c: ConType): RItem => ({ id: `con-${c}`, label: CON_INFO[c].label, icon: CON_INFO[c].icon, tone: "pattern", hint: CON_INFO[c].hint, active: p.tool === `con-${c}`, onClick: () => p.setTool(`con-${c}`) });
+  const snapGroup: RGroup[] =
+    p.snaps && p.setSnap
+      ? [
+          {
+            label: "Uchopení",
+            big: 0,
+            items: [
+              ...SNAP_ORDER.map((k): RItem => ({ id: `snap-${k}`, label: SNAP_LABEL[k], icon: "magnet", tone: "view", active: p.snaps![k], onClick: () => p.setSnap!(k, !p.snaps![k]) })),
+              { id: "snap-infer", label: "Zarovnání (vodítka)", icon: "magnet", tone: "view", active: p.snaps.infer, onClick: () => p.setSnap!("infer", !p.snaps!.infer) },
+              { id: "snap-auto", label: "Automatické vazby", icon: "cCoincident", tone: "pattern", active: p.snaps.auto, onClick: () => p.setSnap!("auto", !p.snaps!.auto) },
+            ],
+          },
+        ]
+      : [];
   return [
+    ...snapGroup,
     {
       label: "Kreslení",
       big: 5,
@@ -193,15 +280,20 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
         T("slot", "slot", "S"),
         T("ellipse", "ellipse", "E", "střed, hlavní poloosa, vedlejší poloosa"),
         T("spline", "spline", "N", "body křivky, Enter ukončí"),
+        T("rect3", "rect", undefined, "natočený obdélník: 2 rohy první strany + výška"),
+        T("circle2", "circle", undefined, "dva body na průměru"),
+        T("slotArc", "slot", undefined, "střed, začátek a konec osy, šířka"),
       ],
     },
     {
       label: "Úpravy",
       big: 2,
       items: [
-        E("trim", "trim", "T", "klikněte na úsek k odstranění"),
-        E("offset", "offset", "O", "klikněte na entitu, pak stranu / zadejte vzdálenost"),
+        E("trim", "trim", "T", "klik na úsek, nebo táhněte přes více úseků (výkonný ořez)"),
+        E("offset", "offset", "O", "entita nebo řetězec, strana myší, vzdálenost číslem"),
         E("extend", "extend", undefined, "klikněte u konce úsečky"),
+        E("split", "split", undefined, "rozdělit úsečku/oblouk v bodě, kružnici 2 body"),
+        E("project", "face", undefined, "promítnout hrany modelu do roviny skici"),
         E("fillet", "fillet", undefined, "2 úsečky + poloměr"),
         E("chamfer", "chamfer", undefined, "2 úsečky + vzdálenost"),
         E("move", "move"),
@@ -243,6 +335,87 @@ const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
 const addv = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
 const mulv = (a: Vec2, k: number): Vec2 => [a[0] * k, a[1] * k];
 const angDeg = (a: Vec2, b: Vec2) => (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+const unitv = (a: Vec2): Vec2 => {
+  const l = Math.hypot(a[0], a[1]) || 1;
+  return [a[0] / l, a[1] / l];
+};
+const perpv = (a: Vec2): Vec2 => [-a[1], a[0]];
+const rotv = (p: Vec2, c: Vec2, deg: number): Vec2 => {
+  const t = (deg * Math.PI) / 180;
+  const x = p[0] - c[0];
+  const y = p[1] - c[1];
+  return [c[0] + x * Math.cos(t) - y * Math.sin(t), c[1] + x * Math.sin(t) + y * Math.cos(t)];
+};
+/** Kolmá vzdálenost bodu od přímky a→b (se znaménkem: kladně vlevo). */
+const sideDist = (p: Vec2, a: Vec2, b: Vec2) => {
+  const n = perpv(unitv(sub(b, a)));
+  return (p[0] - a[0]) * n[0] + (p[1] - a[1]) * n[1];
+};
+
+/** Volby kreslení (pás skici je bez vlastního stavu, proto přepínače ve skicáři + localStorage). */
+type DrawOpts = { autoDim: boolean; diameter: boolean; sides: number; circumscribed: boolean; chain: boolean; projAll: boolean; projConstruction: boolean };
+const OPTS_KEY = "mn-cad-sketch-opts-v1";
+const defaultOpts: DrawOpts = { autoDim: true, diameter: true, sides: 6, circumscribed: false, chain: true, projAll: false, projConstruction: false };
+function loadOpts(): DrawOpts {
+  try {
+    return { ...defaultOpts, ...JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}") };
+  } catch {
+    return defaultOpts;
+  }
+}
+
+/** Pole číselného zadání u kurzoru podle nástroje a kroku (Tab přepíná, Enter potvrdí, Esc smaže). */
+type DynField = { key: string; label: string; suffix?: string };
+function dynSpec(tool: SketchTool, n: number, picks: number, phase: number, o: DrawOpts): DynField[] {
+  const XY: DynField[] = [{ key: "x", label: "X", suffix: "mm" }, { key: "y", label: "Y", suffix: "mm" }];
+  const LA: DynField[] = [{ key: "len", label: "Délka", suffix: "mm" }, { key: "ang", label: "Úhel", suffix: "°" }];
+  const F = (key: string, label: string, suffix = "mm"): DynField => ({ key, label, suffix });
+  switch (tool) {
+    case "line":
+    case "centerline":
+    case "polyline":
+    case "spline":
+      return n ? LA : XY;
+    case "rect":
+    case "rectCenter":
+      return n ? [F("w", "Šířka"), F("h", "Výška")] : XY;
+    case "rect3":
+      return n === 0 ? XY : n === 1 ? [F("w", "Šířka"), F("ang", "Úhel", "°")] : [F("h", "Výška")];
+    case "circle":
+      return n ? [F("r", o.diameter ? "Průměr" : "Poloměr")] : XY;
+    case "circle2":
+      return n ? [F("d", "Průměr")] : XY;
+    case "circle3":
+    case "point":
+      return n ? [] : XY;
+    case "arc":
+      return n === 0 ? XY : n === 1 ? LA : [F("r", "Poloměr")];
+    case "arcCenter":
+      return n === 0 ? XY : n === 1 ? [F("r", "Poloměr")] : [F("sweep", "Úhel", "°")];
+    case "arcTangent":
+      return n ? [F("r", "Poloměr")] : [];
+    case "polygon":
+      return n ? [F("r", o.circumscribed ? "Poloměr vepsané" : "Poloměr opsané"), F("sides", "Stran", "")] : XY;
+    case "slot":
+      return n === 0 ? XY : n === 1 ? LA : [F("w", "Šířka")];
+    case "slotArc":
+      return n === 0 ? XY : n === 1 ? [F("r", "Poloměr osy")] : n === 2 ? [F("sweep", "Úhel", "°")] : [F("w", "Šířka")];
+    case "ellipse":
+      return n === 0 ? XY : n === 1 ? [F("rx", "Poloosa a"), F("ang", "Úhel", "°")] : [F("ry", "Poloosa b")];
+    case "offset":
+      return picks ? [F("d", "Vzdálenost")] : [];
+    case "move":
+    case "copy":
+    case "patternLinear":
+      return phase && n ? LA : [];
+    case "rotate":
+      return phase && n === 2 ? [F("ang", "Úhel", "°")] : [];
+    case "scale":
+      return phase && n === 2 ? [F("k", "Měřítko", "×")] : [];
+    default:
+      return [];
+  }
+}
 
 function niceStep(x: number) {
   const p = Math.pow(10, Math.floor(Math.log10(x)));
@@ -387,7 +560,11 @@ function pickOfEntity(e: SketchEntity, q: Vec2): Pick {
 
 // ======================= vrstva entit (memo – nevykresluje se při pohybu myši) =======================
 
-const EntityLayer = memo(function EntityLayer({ paths, entities, sel, hover, conflictIds, k }: { paths: Map<string, { d: string; closed: boolean }>; entities: SketchEntity[]; sel: Set<string>; hover: string | null; conflictIds: Set<string>; k: number }) {
+/** Barva podle stavu určenosti (jako SolidWorks): nedourčená modře, plně určená černě, přeurčená/konflikt červeně. */
+const STATE_COLOR: Record<EntityState, string> = { free: "#1d4ed8", full: "#1f2933", over: "#dc2626" };
+const STATE_COLOR_CONS: Record<EntityState, string> = { free: "#8fa3c4", full: "#7a8796", over: "#dc2626" };
+
+const EntityLayer = memo(function EntityLayer({ paths, entities, sel, hover, states, k }: { paths: Map<string, { d: string; closed: boolean }>; entities: SketchEntity[]; sel: Set<string>; hover: string | null; states: Map<string, EntityState>; k: number }) {
   return (
     <g>
       {entities.map((e) => {
@@ -395,15 +572,16 @@ const EntityLayer = memo(function EntityLayer({ paths, entities, sel, hover, con
         if (!p) return null;
         const isSel = sel.has(e.id);
         const isHover = hover === e.id && !isSel;
-        const bad = conflictIds.has(e.id);
+        const st = states.get(e.id) ?? "free";
+        const base = e.construction ? STATE_COLOR_CONS[st] : STATE_COLOR[st];
         if (e.type === "point")
-          return <circle key={e.id} cx={e.p[0]} cy={e.p[1]} r={3.2 / k} fill={isSel ? "#E03930" : isHover ? "#f59e0b" : "#1f2933"} />;
+          return <circle key={e.id} cx={e.p[0]} cy={e.p[1]} r={3.2 / k} fill={isSel ? "#E03930" : isHover ? "#f59e0b" : base} />;
         return (
           <path
             key={e.id}
             d={p.d}
             fill="none"
-            stroke={isSel ? "#E03930" : isHover ? "#f59e0b" : bad ? "#c2410c" : e.construction ? "#7a8796" : "#1f2933"}
+            stroke={isSel ? "#E03930" : isHover ? "#f59e0b" : base}
             strokeWidth={isSel || isHover ? 2.4 : 1.6}
             strokeDasharray={e.construction ? "7 3 1.5 3" : undefined}
             vectorEffect="non-scaling-stroke"
@@ -424,7 +602,12 @@ type DragS =
   | { kind: "handle"; id: string; key: string }
   | { kind: "move"; ids: string[]; from: Vec2; orig: SketchEntity[] }
   | { kind: "box"; from: Vec2; to: Vec2 }
-  | { kind: "dimLabel"; id: string; from: Vec2; orig: Vec2 };
+  | { kind: "dimLabel"; id: string; from: Vec2; orig: Vec2 }
+  | { kind: "trimPath"; path: Vec2[] };
+
+type DynState = { texts: string[]; locked: boolean[]; active: number };
+const emptyDyn: DynState = { texts: [], locked: [], active: 0 };
+const emptyStatus: SketchAnalysis = { dof: -1, conflicts: [], redundant: [], states: new Map(), status: "under" };
 
 type Snap = { p: Vec2; kind: SnapKind | "free"; ref?: SketchRef; hv?: "h" | "v" | null; guides?: [Vec2, Vec2][] };
 
@@ -432,10 +615,11 @@ type Snap = { p: Vec2; kind: SnapKind | "free"; ref?: SketchRef; hv?: "h" | "v" 
  * Profesionální 2D skicář: uchopování (OSNAP), vazby s numerickým řešičem, řídicí kóty,
  * editační nástroje, kontextové menu. Souřadnice v mm, osa Y nahoru.
  */
-export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish }: Props) {
+export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines }: Props) {
   const entities = sketch.entities;
   const constraints = useMemo(() => sketch.constraints ?? [], [sketch.constraints]);
   const dims = useMemo(() => sketch.dims ?? [], [sketch.dims]);
+  const emap = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities]);
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState({ cx: 0, cy: 0, scale: 4 });
@@ -450,22 +634,34 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const [hoverAnn, setHoverAnn] = useState<string | null>(null);
   const [ask, setAsk] = useState<Ask | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; entries: RMenuEntry[] } | null>(null);
-  const [snaps, setSnaps] = useState<SnapSettings>(defaultSnaps);
+  const snaps = useSketchSnaps();
   const [phase, setPhase] = useState(0); // fáze nástrojů s výběrem
   const [flash, setFlash] = useState<string | null>(null);
   const [measureRes, setMeasureRes] = useState<{ title: string; rows: [string, string][]; line?: [Vec2, Vec2] } | null>(null);
-  const [status, setStatus] = useState<{ dof: number; conflicts: string[] }>({ dof: -1, conflicts: [] });
+  const [status, setStatus] = useState<SketchAnalysis>(emptyStatus);
+  const [opts, setOpts] = useState<DrawOpts>(defaultOpts);
+  const [dyn, setDyn] = useState<DynState>(emptyDyn);
+  const [trimPreview, setTrimPreview] = useState<Vec2[] | null>(null);
   const drag = useRef<DragS | null>(null);
   const downAt = useRef<[number, number, number] | null>(null);
   const fitted = useRef(false);
   const lastVal = useRef<Record<string, number>>({ fillet: 5, chamfer: 2, offset: 5, count: 4, ccount: 6 });
+  /** poslední poloha kurzoru (mm) a poslední zadaný bod – pro Enter bez pohybu myši a relativní zadání „@“ */
+  const lastRaw = useRef<Vec2 | null>(null);
+  const lastPt = useRef<Vec2 | null>(null);
+  /** klíče hodnot zadaných číslem v předchozích krocích téže entity (např. poloměr oblouku středem) – pro kóty při kreslení */
+  const typedKeys = useRef<Set<string>>(new Set());
 
-  useEffect(() => setSnaps(loadSnaps()), []);
-  const setSnap = (k: keyof SnapSettings, v: boolean) =>
-    setSnaps((s) => {
-      const n = { ...s, [k]: v };
+  useEffect(() => {
+    hydrateSnaps();
+    setOpts(loadOpts());
+  }, []);
+  const setSnap = setSketchSnap;
+  const setOpt = <K extends keyof DrawOpts>(k: K, v: DrawOpts[K]) =>
+    setOpts((o) => {
+      const n = { ...o, [k]: v };
       try {
-        localStorage.setItem(SNAP_KEY, JSON.stringify(n));
+        localStorage.setItem(OPTS_KEY, JSON.stringify(n));
       } catch {
         /* soukromý režim */
       }
@@ -556,6 +752,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     setPicks([]);
     setPhase(0);
     setAsk(null);
+    typedKeys.current.clear();
     if (tool !== "measure") setMeasureRes(null);
     if (tool.startsWith("con-") && sel.size) applyConstraintToSelection(tool.slice(4) as ConType);
     if (tool === "explode" && sel.size) {
@@ -570,21 +767,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
 
-  // stav určenosti (debounce)
+  // stav určenosti po entitách (debounce) – stupně volnosti, nadbytečné vazby, konflikty
   useEffect(() => {
     if (drag.current) return;
-    const t = setTimeout(() => {
-      const m = new Map(entities.map((e) => [e.id, e]));
-      const conf = new Set<string>();
-      for (const c of constraints) if (constraintResiduals(m, c).some((v) => Math.abs(v) > 1e-4)) conf.add(c.id);
-      for (const d of dims) if (d.driving) {
-        const v = measureDim(m, d);
-        if (v != null && Math.abs(v - d.value) > 1e-4) conf.add(d.id);
-      }
-      setStatus({ dof: sketchDof(entities, constraints, dims), conflicts: [...conf] });
-    }, 160);
+    const t = setTimeout(() => setStatus(analyzeSketch(entities, constraints, dims)), 160);
     return () => clearTimeout(t);
   }, [entities, constraints, dims]);
+
+  // číselné zadání: nový krok nástroje = prázdná pole
+  const specKey = `${tool}|${pts.length}|${picks.length}|${phase}`;
+  useEffect(() => setDyn(emptyDyn), [specKey]);
 
   // ---------- souřadnice ----------
   const toMm = useCallback(
@@ -613,8 +805,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     [constraints, dims, onChange],
   );
 
-  const addEntities = (es: SketchEntity[], extraCons: SketchConstraint[] = []) => {
-    commitEdit([...entities, ...es], [...constraints, ...extraCons], dims);
+  const addEntities = (es: SketchEntity[], extraCons: SketchConstraint[] = [], extraDims: SketchDim[] = []) => {
+    commitEdit([...entities, ...es], [...constraints, ...extraCons], [...dims, ...extraDims]);
+    setDyn(emptyDyn);
     // řetězové nástroje nevybírají (panel by se otevíral při každém segmentu)
     if (es.length && !["line", "centerline", "polyline", "spline"].includes(tool)) setSelection([es[es.length - 1].id]);
   };
@@ -822,7 +1015,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const nextDims = [...dims, d];
     onChange({ dims: nextDims }, true);
     setAsk({
-      label: type === "angle" ? "Úhel" : type === "radius" ? "Poloměr" : type === "diameter" ? "Průměr" : "Vzdálenost",
+      label: type === "angle" ? "Úhel" : type === "radius" ? "Poloměr" : type === "diameter" ? "Průměr" : type === "arcLength" ? "Délka oblouku" : "Vzdálenost",
       value: d.value,
       suffix: type === "angle" ? "°" : "mm",
       at,
@@ -840,6 +1033,125 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     onChange({ entities: res.entities, constraints, dims: next }, true);
   };
 
+  // ---------- číselné zadání u kurzoru + odvozené vazby ----------
+  const spec = dynSpec(tool, pts.length, picks.length, phase, opts);
+  const dynT = (key: string) => {
+    const i = spec.findIndex((f) => f.key === key);
+    return i >= 0 ? (dyn.texts[i] ?? "") : "";
+  };
+  const dynNum = (key: string): number | null => {
+    const t = dynT(key);
+    if (!t.trim()) return null;
+    const v = parseNum(t);
+    return Number.isFinite(v) ? v : null;
+  };
+  const dynTyped = dyn.texts.some((t) => t.trim());
+  /** rozbor prvního pole: „x;y“, „@dx;dy“, „délka<úhel“ – u obdélníku dvojice znamená šířka × výška */
+  const firstInput = spec[0] && dynT(spec[0].key).trim() ? parseInput(dynT(spec[0].key)) : null;
+  const pairWH: [number, number] | null = firstInput && (firstInput.kind === "abs" || firstInput.kind === "rel") && (tool === "rect" || tool === "rectCenter") && pts.length >= 1 ? [Math.abs(firstInput.v[0]), Math.abs(firstInput.v[1])] : null;
+
+  type Resolved = { p: Vec2; kinds: AutoKind[]; ref?: string; typed: boolean; snap: Snap };
+  /** Výsledný bod kliknutí/náhledu: uchopení → zadané hodnoty u kurzoru → odvozené vazby (H/V, rovnoběžně, kolmo, tečně). */
+  const resolvePoint = (s0: Snap): Resolved => {
+    const n = pts.length;
+    const from = n ? pts[n - 1] : null;
+    const c0 = pts[0];
+    let p = s0.p;
+    let typed = false;
+    const ci = firstInput;
+    const keys = new Set(spec.map((f) => f.key));
+    if (ci && ci.kind !== "num" && !pairWH && (keys.has("x") || keys.has("len") || keys.has("w"))) {
+      // „x;y“ / „@dx;dy“ / „délka<úhel“ v prvním poli
+      const q = resolveInput(ci, from ?? lastPt.current);
+      if (q) {
+        p = q;
+        typed = true;
+      }
+    } else if (dynTyped) {
+      typed = true;
+      const dir = (c: Vec2) => (dist(p, c) > 1e-9 ? unitv(sub(p, c)) : ([1, 0] as Vec2));
+      if (keys.has("x") || keys.has("y")) p = [dynNum("x") ?? p[0], dynNum("y") ?? p[1]];
+      else if (keys.has("len") && from) p = polarPoint(from, p, dynNum("len"), dynNum("ang"));
+      else if ((tool === "rect" || tool === "rectCenter") && c0) {
+        const k = tool === "rect" ? 1 : 0.5;
+        const w = pairWH?.[0] ?? dynNum("w");
+        const h = pairWH?.[1] ?? dynNum("h");
+        p = [w != null ? c0[0] + (p[0] >= c0[0] ? 1 : -1) * w * k : p[0], h != null ? c0[1] + (p[1] >= c0[1] ? 1 : -1) * h * k : p[1]];
+      } else if (tool === "rect3" && c0) {
+        if (n === 1) p = polarPoint(c0, p, dynNum("w"), dynNum("ang"));
+        else {
+          const h = dynNum("h");
+          if (h != null && n >= 2) p = addv(pts[1], mulv(perpv(unitv(sub(pts[1], c0))), (sideDist(p, c0, pts[1]) >= 0 ? 1 : -1) * h));
+        }
+      } else if ((keys.has("r") || keys.has("d")) && c0) {
+        const v = dynNum("r") ?? dynNum("d");
+        if (v != null && v > 0) {
+          if (tool === "circle") p = addv(c0, mulv(dir(c0), opts.diameter ? v / 2 : v));
+          else if (tool === "arc" && n >= 2) p = arcMidForRadius(c0, pts[1], v, sideDist(p, c0, pts[1]) >= 0 ? -1 : 1) ?? p;
+          else if (tool === "arcTangent") {
+            const src = ptRefs[0] ? emap.get(ptRefs[0].e) : undefined;
+            const t = src && ptRefs[0] ? tangentAt(src, ptRefs[0].k) : null;
+            if (t) p = tangentArcEnd(c0, t, v, sideDist(p, c0, addv(c0, t)) >= 0 ? 1 : -1, p);
+          } else p = addv(c0, mulv(dir(c0), v)); // kružnice 2 body, oblouk středem, mnohoúhelník, drážka obloukem
+        }
+      } else if (keys.has("sweep") && c0 && n >= 2) {
+        const sw = dynNum("sweep");
+        if (sw != null) p = rotv(pts[1], c0, sw);
+      } else if (keys.has("w") && c0 && n >= 2) {
+        const w = dynNum("w");
+        if (w != null && w > 0) {
+          if (tool === "slot") p = addv(c0, mulv(perpv(unitv(sub(pts[1], c0))), (sideDist(p, c0, pts[1]) >= 0 ? 1 : -1) * (w / 2)));
+          else if (tool === "slotArc") {
+            const Rm = dist(c0, pts[1]);
+            p = addv(c0, mulv(dir(c0), Rm + (dist(p, c0) >= Rm ? 1 : -1) * (w / 2)));
+          }
+        }
+      } else if (keys.has("rx") && c0) p = polarPoint(c0, p, dynNum("rx"), dynNum("ang"));
+      else if (keys.has("ry") && c0 && n >= 2) {
+        const ry = dynNum("ry");
+        if (ry != null && ry > 0) p = addv(c0, mulv(perpv(unitv(sub(pts[1], c0))), (sideDist(p, c0, pts[1]) >= 0 ? 1 : -1) * ry));
+      }
+    }
+    let snap: Snap = dist(p, s0.p) > 1e-9 ? { p, kind: "free" } : s0;
+    let kinds: AutoKind[] = [];
+    let ref: string | undefined;
+    const lineTool = tool === "line" || tool === "centerline" || tool === "polyline";
+    if (lineTool && from && snaps.auto && dist(p, from) > 1e-9) {
+      const angTyped = dynNum("ang") != null || (ci != null && ci.kind !== "num");
+      if ((snap.kind === "free" || snap.kind === "grid") && !angTyped) {
+        const refs: AutoRef[] = [];
+        const pr = ptRefs[n - 1];
+        const pe = pr ? emap.get(pr.e) : undefined;
+        if (pe?.type === "line") refs.push({ id: pe.id, dir: sub(pe.b, pe.a), kind: "line" });
+        else if (pe?.type === "arc" && pr) {
+          const t = tangentAt(pe, pr.k);
+          if (t) refs.push({ id: pe.id, dir: t, kind: "tangent" });
+        }
+        const hid = hitEntity(s0.p);
+        const he = hid ? emap.get(hid) : undefined;
+        if (he?.type === "line" && he.id !== pe?.id) refs.push({ id: he.id, dir: sub(he.b, he.a), kind: "line" });
+        const res = inferLine(from, p, refs);
+        if (dist(res.p, p) > 1e-9) snap = { p: res.p, kind: "free" };
+        p = res.p;
+        kinds = res.kinds;
+        ref = res.ref;
+      } else if (Math.abs(p[1] - from[1]) < 1e-9) kinds = ["horizontal"];
+      else if (Math.abs(p[0] - from[0]) < 1e-9) kinds = ["vertical"];
+    }
+    return { p: R4(p), kinds, ref, typed, snap: { ...snap, p: R4(p) } };
+  };
+
+  /** Potvrzení zadaných hodnot klávesou Enter (bod se dopočítá z hodnot a poslední polohy kurzoru). */
+  const confirmDyn = (): boolean => {
+    if (!spec.length || !dynTyped) return false;
+    const raw = lastRaw.current ?? pts[pts.length - 1] ?? [0, 0];
+    const fake = { detail: 1, shiftKey: false } as React.PointerEvent;
+    if (tool === "offset") applyOffset(raw, dynNum("d"));
+    else if (SEL_TOOLS.has(tool)) selToolClick(raw, fake);
+    else toolClick(raw, fake);
+    return true;
+  };
+
   // ---------- kreslení: kliknutí ----------
   const lastAuto = (p: Snap, entityId: string, key: string): SketchConstraint[] => {
     if (!snaps.auto || !p.ref) return [];
@@ -855,34 +1167,91 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
 
   const toolClick = (raw: Vec2, ev: React.PointerEvent) => {
     const from = pts.length ? pts[pts.length - 1] : null;
-    const s = computeSnap(raw, { from });
-    const p = s.p;
+    const rp = resolvePoint(computeSnap(raw, { from }));
+    const s = rp.snap;
+    const p = rp.p;
     const next = [...pts, p];
-    const nextRefs = [...ptRefs, s.ref ? (s as Snap).ref : undefined];
+    const nextRefs = [...ptRefs, s.ref];
     const autoFor = (id: string, key: string, idx: number): SketchConstraint[] => {
       const snapAt = idx === next.length - 1 ? s : null;
       if (snapAt) return lastAuto(snapAt, id, key);
       const rf = nextRefs[idx];
       return rf && snaps.auto ? [{ id: uid(), type: "coincident", refs: [rf, { e: id, k: key }] }] : [];
     };
+    /** totožnost klíčového bodu nové entity s uchopeným bodem i-tého kliknutí */
+    const coinc = (id: string, key: string, idx: number): SketchConstraint[] => (nextRefs[idx] && snaps.auto ? [{ id: uid(), type: "coincident", refs: [nextRefs[idx]!, { e: id, k: key }] }] : []);
+    /** bod na křivce: uchopený bod i-tého kliknutí leží na nové kružnici/oblouku */
+    const onCurve = (id: string, idx: number): SketchConstraint[] => (nextRefs[idx] && snaps.auto && idx !== next.length - 1 ? [{ id: uid(), type: "pointOnCurve", refs: [nextRefs[idx]!, { e: id, k: "self" }] }] : idx === next.length - 1 && s.ref && snaps.auto && (s.kind === "end" || s.kind === "center" || s.kind === "int" || s.kind === "quad") ? [{ id: uid(), type: "pointOnCurve", refs: [s.ref, { e: id, k: "self" }] }] : []);
+    const cornerKey = (e: Extract<SketchEntity, { type: "rect" }>, q: Vec2) => {
+      const k = keyPoints(e);
+      return (["c0", "c1", "c2", "c3"] as const).reduce<"c0" | "c1" | "c2" | "c3">((b, kk) => (dist(k[kk], q) < dist(k[b], q) ? kk : b), "c0");
+    };
+    const refKind = (rid: string) => {
+      const t = emap.get(rid)?.type;
+      return t === "line" || t === "arc" ? t : null;
+    };
+    /** řídicí kóty z číselného zadání („Kótovat při kreslení“) */
+    const hasNum = (k: string) => {
+      if (pairWH && (k === "w" || k === "h")) return true;
+      const t = dynT(k);
+      if (!t.trim()) return false;
+      const c = parseInput(t);
+      return !!c && c.kind === "num";
+    };
+    const dimsFor = (e: SketchEntity): SketchDim[] => {
+      if (!opts.autoDim || (!rp.typed && !typedKeys.current.size)) return [];
+      const has = (k: string) => typedKeys.current.has(k) || hasNum(k);
+      const off = 14 / view.scale;
+      const D = (type: SketchDim["type"], refs: SketchRef[], value: number, offset: Vec2): SketchDim => ({ id: uid(), type, refs, value: r4(value), driving: true, offset });
+      const sideOff = (a: Vec2, b: Vec2, k = -1): Vec2 => mulv(perpv(unitv(sub(b, a))), k * off);
+      const useDia = opts.diameter || tool === "circle2";
+      switch (e.type) {
+        case "line":
+          return has("len") ? [D("length", [{ e: e.id, k: "self" }], dist(e.a, e.b), sideOff(e.a, e.b, 1))] : [];
+        case "circle":
+          return has("r") || has("d") ? [D(useDia ? "diameter" : "radius", [{ e: e.id, k: "self" }], useDia ? 2 * e.r : e.r, [e.r * 0.75, e.r * 0.75])] : [];
+        case "arc": {
+          const g = circleFrom3(e.a, e.b, e.c);
+          return g && has("r") ? [D("radius", [{ e: e.id, k: "self" }], g.r, mulv(unitv(sub(e.b, g.c)), g.r * 1.3))] : [];
+        }
+        case "rect": {
+          const k = keyPoints(e);
+          const out: SketchDim[] = [];
+          if (has("w")) out.push(D("length", [{ e: e.id, k: "s0" }], e.w, sideOff(k.c0, k.c1)));
+          if (has("h")) out.push(D("length", [{ e: e.id, k: "s1" }], e.h, sideOff(k.c1, k.c2)));
+          return out;
+        }
+        case "polygon":
+          return has("r") && !opts.circumscribed ? [D("radius", [{ e: e.id, k: "self" }], e.r, [e.r * 0.75, e.r * 0.75])] : [];
+        default:
+          return [];
+      }
+    };
+    const finish = (es: SketchEntity[], cons: SketchConstraint[] = [], dms: SketchDim[] = []) => {
+      addEntities(es, cons, dms);
+      typedKeys.current.clear();
+      lastPt.current = p;
+      setPts([]);
+      setPtRefs([]);
+    };
+    const step = () => {
+      for (const f of spec) if (hasNum(f.key)) typedKeys.current.add(f.key);
+      setPts(next);
+      setPtRefs(nextRefs);
+      lastPt.current = p;
+    };
     switch (tool) {
       case "line":
       case "centerline": {
-        if (!pts.length) {
-          setPts([p]);
-          setPtRefs([s.ref]);
-          return;
-        }
+        if (!pts.length) return step();
         const a = pts[pts.length - 1];
         if (dist(a, p) < 1e-6) return;
         const id = uid();
         const cons: SketchConstraint[] = [...autoFor(id, "a", next.length - 2), ...autoFor(id, "b", next.length - 1)];
-        // navázání na předchozí úsečku řetězu
-        if (snaps.auto && s.hv) cons.push({ id: uid(), type: s.hv === "h" ? "horizontal" : "vertical", refs: [{ e: id, k: "self" }] });
-        else if (snaps.auto && Math.abs(a[1] - p[1]) < 1e-9) cons.push({ id: uid(), type: "horizontal", refs: [{ e: id, k: "self" }] });
-        else if (snaps.auto && Math.abs(a[0] - p[0]) < 1e-9) cons.push({ id: uid(), type: "vertical", refs: [{ e: id, k: "self" }] });
+        if (snaps.auto) cons.push(...autoConstraints(id, rp, refKind));
         const line: SketchEntity = { id, type: "line", a, b: p, construction: tool === "centerline" || undefined };
-        addEntities([line], cons);
+        addEntities([line], cons, dimsFor(line));
+        lastPt.current = p;
         if (tool === "centerline" || (pts.length > 1 && dist(p, pts[0]) < 1e-6)) {
           setPts([]);
           setPtRefs([]);
@@ -895,77 +1264,71 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "polyline":
       case "spline": {
         if (pts.length >= 2 && dist(p, pts[0]) < tol) return finishPoly(true);
-        setPts(next);
-        setPtRefs(nextRefs);
+        step();
         if (ev.detail >= 2) finishPoly(false, next);
         return;
       }
       case "point": {
         const id = uid();
         addEntities([{ id, type: "point", p }], lastAuto(s, id, "p"));
+        lastPt.current = p;
         return;
       }
       case "rect":
       case "rectCenter": {
-        if (next.length < 2) return setPts(next);
+        if (next.length < 2) return step();
         const [a] = next;
         if (Math.abs(a[0] - p[0]) < 1e-6 || Math.abs(a[1] - p[1]) < 1e-6) return;
-        const e: SketchEntity =
+        const e: Extract<SketchEntity, { type: "rect" }> =
           tool === "rect"
             ? { id: uid(), type: "rect", cx: r4((a[0] + p[0]) / 2), cy: r4((a[1] + p[1]) / 2), w: r4(Math.abs(p[0] - a[0])), h: r4(Math.abs(p[1] - a[1])), r: 0, angle: 0 }
             : { id: uid(), type: "rect", cx: a[0], cy: a[1], w: r4(Math.abs(p[0] - a[0]) * 2), h: r4(Math.abs(p[1] - a[1]) * 2), r: 0, angle: 0 };
-        addEntities([e], tool === "rectCenter" && nextRefs[0] && snaps.auto ? [{ id: uid(), type: "coincident", refs: [nextRefs[0]!, { e: e.id, k: "center" }] }] : []);
-        setPts([]);
-        setPtRefs([]);
-        return;
+        const cons = tool === "rectCenter" ? coinc(e.id, "center", 0) : [...coinc(e.id, cornerKey(e, a), 0), ...coinc(e.id, cornerKey(e, p), 1)];
+        return finish([e], cons, dimsFor(e));
+      }
+      case "rect3": {
+        if (next.length < 3) return step();
+        const e = rectFrom3(next[0], next[1], p);
+        if (!e) return note("Body obdélníku leží na přímce.");
+        return finish([e], [...coinc(e.id, cornerKey(e, next[0]), 0), ...coinc(e.id, cornerKey(e, next[1]), 1)], dimsFor(e));
       }
       case "circle": {
-        if (next.length < 2) {
-          setPts(next);
-          setPtRefs(nextRefs);
-          return;
-        }
+        if (next.length < 2) return step();
         if (dist(next[0], p) < 1e-6) return;
         const id = uid();
-        addEntities([{ id, type: "circle", cx: next[0][0], cy: next[0][1], r: r4(dist(next[0], p)) }], nextRefs[0] && snaps.auto ? [{ id: uid(), type: "coincident", refs: [nextRefs[0]!, { e: id, k: "center" }] }] : []);
-        setPts([]);
-        setPtRefs([]);
-        return;
+        const e: SketchEntity = { id, type: "circle", cx: next[0][0], cy: next[0][1], r: r4(dist(next[0], p)) };
+        return finish([e], [...coinc(id, "center", 0), ...onCurve(id, 1)], dimsFor(e));
+      }
+      case "circle2": {
+        if (next.length < 2) return step();
+        const e = circleFrom2(next[0], p);
+        if (!e) return;
+        return finish([e], [...onCurve(e.id, 0), ...onCurve(e.id, 1)], dimsFor(e));
       }
       case "circle3": {
-        if (next.length < 3) return setPts(next);
+        if (next.length < 3) return step();
         const cc = circleFrom3(next[0], next[1], p);
         if (!cc) return note("Body leží na přímce.");
-        addEntities([{ id: uid(), type: "circle", cx: r4(cc.c[0]), cy: r4(cc.c[1]), r: r4(cc.r) }]);
-        setPts([]);
-        return;
+        const id = uid();
+        return finish([{ id, type: "circle", cx: r4(cc.c[0]), cy: r4(cc.c[1]), r: r4(cc.r) }], [...onCurve(id, 0), ...onCurve(id, 1), ...onCurve(id, 2)]);
       }
       case "arc": {
-        if (next.length < 3) {
-          setPts(next);
-          setPtRefs(nextRefs);
-          return;
-        }
+        if (next.length < 3) return step();
         if (!circleFrom3(next[0], p, next[1])) return;
         const id = uid();
-        addEntities([{ id, type: "arc", a: next[0], b: p, c: next[1] }], [...(nextRefs[0] && snaps.auto ? [{ id: uid(), type: "coincident" as const, refs: [nextRefs[0]!, { e: id, k: "a" }] }] : []), ...(nextRefs[1] && snaps.auto ? [{ id: uid(), type: "coincident" as const, refs: [nextRefs[1]!, { e: id, k: "c" }] }] : [])]);
-        setPts([]);
-        setPtRefs([]);
-        return;
+        const e: SketchEntity = { id, type: "arc", a: next[0], b: p, c: next[1] };
+        return finish([e], [...coinc(id, "a", 0), ...coinc(id, "c", 1)], dimsFor(e));
       }
       case "arcCenter": {
-        if (next.length < 3) return setPts(next);
+        if (next.length < 3) return step();
         const arc = arcFromCenter(next[0], next[1], p);
-        if (arc) addEntities([arc]);
-        setPts([]);
-        return;
+        if (!arc) return;
+        return finish([arc], [...coinc(arc.id, "center", 0), ...coinc(arc.id, "a", 1)], dimsFor(arc));
       }
       case "arcTangent": {
         if (!pts.length) {
           if (!s.ref || s.kind !== "end") return note("Začněte na konci úsečky nebo oblouku.");
-          setPts([p]);
-          setPtRefs([s.ref]);
-          return;
+          return step();
         }
         const arc = tangentArc(entities, ptRefs[0], pts[0], p);
         if (!arc) return note("Tečný oblouk nelze vytvořit.");
@@ -974,39 +1337,45 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           cons.push({ id: uid(), type: "coincident", refs: [ptRefs[0], { e: arc.id, k: "a" }] });
           cons.push({ id: uid(), type: "tangent", refs: [{ e: ptRefs[0].e, k: "self" }, { e: arc.id, k: "self" }] });
         }
-        addEntities([arc], entities.find((e) => e.id === ptRefs[0]?.e)?.type === "line" ? cons : cons.slice(0, 1));
-        setPts([]);
-        setPtRefs([]);
-        return;
+        const srcType = ptRefs[0] ? emap.get(ptRefs[0].e)?.type : undefined;
+        return finish([arc], srcType === "line" || srcType === "arc" ? cons : cons.slice(0, 1), dimsFor(arc));
       }
       case "ellipse": {
-        if (next.length < 3) return setPts(next);
+        if (next.length < 3) return step();
         const [c, a] = next;
         const rx = dist(c, a);
         const ang = angDeg(c, a);
         const t = (ang * Math.PI) / 180;
         const ry = Math.abs(-(p[0] - c[0]) * Math.sin(t) + (p[1] - c[1]) * Math.cos(t));
         if (rx < 1e-6 || ry < 1e-6) return;
-        addEntities([{ id: uid(), type: "ellipse", cx: c[0], cy: c[1], rx: r4(rx), ry: r4(ry), angle: r4(ang) }]);
-        setPts([]);
-        return;
+        const id = uid();
+        return finish([{ id, type: "ellipse", cx: c[0], cy: c[1], rx: r4(rx), ry: r4(ry), angle: r4(ang) }], coinc(id, "center", 0));
       }
       case "polygon": {
-        if (next.length < 2) return setPts(next);
-        addEntities([{ id: uid(), type: "polygon", cx: next[0][0], cy: next[0][1], r: r4(dist(next[0], p)), sides: 6, angle: r4(angDeg(next[0], p) - 90) }]);
-        setPts([]);
-        return;
+        if (next.length < 2) return step();
+        const sides = Math.max(3, Math.round(dynNum("sides") ?? opts.sides));
+        if (sides !== opts.sides) setOpt("sides", sides);
+        const e = polygonFrom(next[0], p, sides, opts.circumscribed);
+        if (!e) return;
+        return finish([e], coinc(e.id, "center", 0), dimsFor(e));
       }
       case "slot": {
-        if (next.length < 3) return setPts(next);
+        if (next.length < 3) return step();
         const [a, b] = next;
         const len = dist(a, b);
-        const dx = (b[0] - a[0]) / (len || 1);
-        const dy = (b[1] - a[1]) / (len || 1);
-        const w = Math.abs((p[0] - a[0]) * -dy + (p[1] - a[1]) * dx) * 2 || 10;
-        addEntities([{ id: uid(), type: "slot", cx: r4((a[0] + b[0]) / 2), cy: r4((a[1] + b[1]) / 2), length: r4(len + w), width: r4(w), angle: r4(angDeg(a, b)) }]);
-        setPts([]);
-        return;
+        if (len < 1e-6) return;
+        const w = Math.abs(sideDist(p, a, b)) * 2 || 10;
+        const id = uid();
+        return finish([{ id, type: "slot", cx: r4((a[0] + b[0]) / 2), cy: r4((a[1] + b[1]) / 2), length: r4(len + w), width: r4(w), angle: r4(angDeg(a, b)) }], [...coinc(id, "e0", 0), ...coinc(id, "e1", 1)]);
+      }
+      case "slotArc": {
+        if (next.length < 4) return step();
+        const [c, st, en] = next;
+        const w = Math.abs(dist(p, c) - dist(st, c)) * 2;
+        const r = slotArcEntities(c, st, en, w);
+        if (!r) return note("Šířka drážky musí být menší než dvojnásobek poloměru osy.");
+        const cons = [...r.constraints, ...(nextRefs[0] && snaps.auto ? [{ id: uid(), type: "coincident" as const, refs: [nextRefs[0]!, { e: r.entities[0].id, k: "center" }] }] : [])];
+        return finish(r.entities, cons);
       }
     }
   };
@@ -1022,6 +1391,35 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   };
 
   // ---------- editační nástroje: kliknutí ----------
+  /** Řetězec k odsazení (je-li zapnut a entita je úsečka/oblouk s návazností). */
+  const offsetChainOf = (src: SketchEntity) => {
+    if (!opts.chain || (src.type !== "line" && src.type !== "arc")) return null;
+    const ch = chainOf(entities, src.id);
+    return ch.segs.length > 1 ? ch : null;
+  };
+  /** Odsazení vybrané entity / řetězce: strana podle kurzoru, vzdálenost z kurzoru nebo zadaná číslem. */
+  const applyOffset = (raw: Vec2, typedD: number | null) => {
+    const src = picks.length ? emap.get(picks[0].ref.e) : undefined;
+    if (!src) return;
+    const ch = offsetChainOf(src);
+    if (ch) {
+      const dAbs = Math.abs(typedD ?? Math.min(...ch.segs.map((sg) => distToEntity(emap.get(sg.id)!, raw).d)));
+      if (dAbs < 1e-6) return note("Zadejte vzdálenost odsazení.");
+      const out = offsetChain(ch.segs, ch.closed, chainSide(ch.segs, raw) * dAbs, src.construction);
+      if (!out) return note("Odsazení je větší než poloměr oblouku v řetězci.");
+      lastVal.current.offset = dAbs;
+      addEntities(out);
+    } else {
+      const dAbs = Math.abs(typedD ?? distToEntity(src, raw).d);
+      if (dAbs < 1e-6) return note("Zadejte vzdálenost odsazení.");
+      const o = offsetEntity(src, r4(dAbs * offsetSide(src, raw)));
+      if (!o) return note("Entitu nelze o tuto vzdálenost odsadit (větší než poloměr).");
+      lastVal.current.offset = dAbs;
+      addEntities([o]);
+    }
+    setPicks([]);
+  };
+
   const editClick = (raw: Vec2, ev: React.PointerEvent) => {
     const id = hitEntity(raw);
     const e = id ? entities.find((x) => x.id === id) : undefined;
@@ -1030,6 +1428,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (!id) return;
         const r = trim(entities, id, raw);
         if (r) commitEdit(r);
+        else note("Tento úsek nelze oříznout (kružnice potřebuje 2 průsečíky).");
         return;
       }
       case "extend": {
@@ -1039,18 +1438,34 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         else note("Úsečku nelze k ničemu prodloužit.");
         return;
       }
+      case "split": {
+        const sn = computeSnap(raw);
+        const sid = hitEntity(sn.p) ?? id;
+        const se = sid ? emap.get(sid) : undefined;
+        if (!se) return;
+        if (se.type === "circle") {
+          if (!pts.length) {
+            setPts([sn.p]);
+            return note("Kružnice: klikněte na druhý bod rozdělení.");
+          }
+          const r = splitCircle(entities, se.id, pts[0], sn.p);
+          setPts([]);
+          if (r) commitEdit(r);
+          else note("Body rozdělení kružnice jsou totožné.");
+          return;
+        }
+        const r = splitAt(entities, se.id, sn.p);
+        if (r) commitEdit(r);
+        else note(se.type === "line" || se.type === "arc" ? "Klikněte dovnitř křivky, ne na její konec." : "Rozdělit lze úsečku, oblouk nebo kružnici – tvary nejdřív rozložte.");
+        return;
+      }
       case "offset": {
         if (!picks.length) {
           if (!e) return;
           setPicks([{ kind: "entity", ref: { e: e.id, k: "self" } }]);
           return;
         }
-        const src = entities.find((x) => x.id === picks[0].ref.e);
-        if (!src) return;
-        const d = distToEntity(src, raw).d * offsetSide(src, raw);
-        const o = offsetEntity(src, r4(d));
-        if (o) addEntities([o]);
-        setPicks([]);
+        applyOffset(raw, dynNum("d"));
         return;
       }
       case "fillet":
@@ -1115,7 +1530,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const ids = [...sel];
     const chosen = entities.filter((e) => sel.has(e.id));
     const s = computeSnap(raw, { exclude: new Set(ids), from: pts[pts.length - 1] ?? null });
-    const p = s.p;
+    const p = resolvePoint(s).p;
     switch (tool) {
       case "mirror": {
         const id = hitEntity(raw, new Set(ids));
@@ -1142,11 +1557,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "scale": {
         if (pts.length < 2) return setPts([...pts, p]);
         const [c, r0] = pts;
-        if (tool === "rotate") commitEdit(entities.map((x) => (sel.has(x.id) ? transformEntity(x, xfRotate(c, angDeg(c, p) - angDeg(c, r0))) : x)));
+        if (tool === "rotate") commitEdit(entities.map((x) => (sel.has(x.id) ? transformEntity(x, xfRotate(c, dynNum("ang") ?? angDeg(c, p) - angDeg(c, r0))) : x)));
         else {
-          const k = dist(c, p) / (dist(c, r0) || 1);
+          const k = dynNum("k") ?? dist(c, p) / (dist(c, r0) || 1);
           if (k > 1e-6) commitEdit(entities.map((x) => (sel.has(x.id) ? transformEntity(x, xfScale(c, k)) : x)));
         }
+        setDyn(emptyDyn);
         setTool("select");
         return;
       }
@@ -1295,6 +1711,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       drag.current = { kind: "pan", from: [ev.clientX, ev.clientY], view };
       return;
     }
+    if (tool === "trim" && ev.button === 0) {
+      // výkonný ořez: tažení přes víc úseků (klik bez pohybu = běžný ořez)
+      drag.current = { kind: "trimPath", path: [raw] };
+      return;
+    }
     if (tool !== "select") return;
     const ann = hitAnn(ev.clientX, ev.clientY);
     if (ann) {
@@ -1330,6 +1751,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
 
   const onPointerMove = (ev: React.PointerEvent) => {
     const raw = toMm(ev.clientX, ev.clientY);
+    lastRaw.current = raw;
     const d = drag.current;
     if (d?.kind === "pan") {
       setView({ ...d.view, cx: d.view.cx - (ev.clientX - d.from[0]) / view.scale, cy: d.view.cy + (ev.clientY - d.from[1]) / view.scale });
@@ -1338,6 +1760,13 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     if (d?.kind === "box") {
       drag.current = { ...d, to: raw };
       setCursor(raw);
+      return;
+    }
+    if (d?.kind === "trimPath") {
+      d.path.push(raw);
+      setCursor(raw);
+      setHover(hitEntity(raw));
+      if (d.path.length > 2) setTrimPreview([...d.path]);
       return;
     }
     if (d?.kind === "dimLabel") {
@@ -1362,8 +1791,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
     // bez tažení: uchopení + zvýraznění
     const from = pts.length ? pts[pts.length - 1] : null;
-    const drawTool = !["select", "trim", "extend", "offset", "fillet", "chamfer", "dimension", "measure", "mirror", "construction", "explode"].includes(tool) && !tool.startsWith("con-") && !(SEL_TOOLS.has(tool) && phase === 0);
-    if (drawTool || tool === "dimension" || tool === "measure" || tool.startsWith("con-")) {
+    const drawTool = !["select", "trim", "extend", "offset", "fillet", "chamfer", "dimension", "measure", "mirror", "construction", "explode", "split", "project"].includes(tool) && !tool.startsWith("con-") && !(SEL_TOOLS.has(tool) && phase === 0);
+    if (drawTool || tool === "dimension" || tool === "measure" || tool === "split" || tool.startsWith("con-")) {
       const s = computeSnap(raw, { from: drawTool ? from : null, exclude: SEL_TOOLS.has(tool) ? sel : undefined });
       setSnapState(s);
       setCursor(s.p);
@@ -1383,6 +1812,15 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     downAt.current = null;
     const clicked = dn && Math.hypot(ev.clientX - dn[0], ev.clientY - dn[1]) < 4;
     if (dn && dn[2] === 2 && clicked) return openContext(ev);
+    if (d?.kind === "trimPath") {
+      setTrimPreview(null);
+      if (!clicked && d.path.length > 1) {
+        const r = powerTrim(entities, d.path);
+        if (r) commitEdit(r);
+        else note("Tažení neprotnulo žádnou křivku.");
+        return;
+      }
+    }
     if (d?.kind === "box") {
       const [a, b] = [d.from, d.to];
       if (dist(a, b) * view.scale > 4) {
@@ -1410,7 +1848,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
     if (!clicked || !dn || dn[2] !== 0 || tool === "select") return;
     const raw = toMm(ev.clientX, ev.clientY);
-    const isEdit = ["trim", "extend", "offset", "fillet", "chamfer", "dimension", "measure"].includes(tool) || tool.startsWith("con-") || SEL_TOOLS.has(tool);
+    if (tool === "project") return;
+    const isEdit = ["trim", "extend", "split", "offset", "fillet", "chamfer", "dimension", "measure"].includes(tool) || tool.startsWith("con-") || SEL_TOOLS.has(tool);
     if (isEdit) editClick(raw, ev);
     else toolClick(raw, ev);
   };
@@ -1484,7 +1923,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       entries.push({ id: "sc", label: "Měřítko…", icon: "scale", onClick: () => setTool("scale") });
       if (es.length === 1) entries.push({ id: "off", label: "Odsadit…", icon: "offset", onClick: () => { setTool("offset"); setTimeout(() => setPicks([{ kind: "entity", ref: { e: es[0].id, k: "self" } }]), 0); } });
       if (es.some((e) => ["rect", "polygon", "slot", "polyline"].includes(e.type))) entries.push({ id: "exp", label: "Rozložit na úsečky a oblouky", icon: "explode", onClick: () => doExplode(current) });
-      entries.push({ id: "dim", label: "Okótovat", icon: "dimension", onClick: () => setTool("dimension") });
+      if (es.length === 1 && (es[0].type === "line" || es[0].type === "arc" || es[0].type === "circle")) entries.push({ id: "split", label: "Rozdělit v bodě…", icon: "split", onClick: () => setTool("split") });
+      entries.push({ id: "dim", label: "Okótovat", icon: "dimension", kbd: "D", onClick: () => setTool("dimension") });
+      if (es.length === 1 && es[0].type === "arc") {
+        const arc = es[0];
+        entries.push({ id: "alen", label: "Kóta délky oblouku", icon: "dimension", onClick: () => placeDim("arcLength", [{ e: arc.id, k: "self" }], raw, circleFrom3(arc.a, arc.b, arc.c)?.c ?? raw) });
+      }
       const applicable = (Object.keys(CON_INFO) as ConType[]).filter((t) => Array.isArray(matchConstraint(t, pk)));
       if (applicable.length) {
         entries.push({ divider: true, label: "Vazby" });
@@ -1511,6 +1955,47 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
       if (ask) return;
+      // číselné zadání u kurzoru: psaní hodnot, Tab = další pole (zámek), Enter = potvrdit, Esc = smazat
+      if (spec.length && !(e.ctrlKey || e.metaKey || e.altKey)) {
+        const cur = dyn.texts[dyn.active] ?? "";
+        const sepLike = (e.key === "x" || e.key === "X") && cur.trim().length > 0 && spec.length > 1;
+        if (/^[0-9.,;@<+*/()\-]$/.test(e.key) || (sepLike && spec.length === 1)) {
+          e.preventDefault();
+          setDyn((d) => {
+            const texts = [...d.texts];
+            texts[d.active] = (texts[d.active] ?? "") + e.key;
+            return { ...d, texts };
+          });
+          return;
+        }
+        if (e.key === "Tab" || sepLike) {
+          e.preventDefault();
+          setDyn((d) => {
+            const locked = [...d.locked];
+            if ((d.texts[d.active] ?? "").trim()) locked[d.active] = true;
+            return { ...d, locked, active: (d.active + 1) % spec.length };
+          });
+          return;
+        }
+        if (e.key === "Backspace" && cur.length) {
+          e.preventDefault();
+          setDyn((d) => {
+            const texts = [...d.texts];
+            texts[d.active] = cur.slice(0, -1);
+            return { ...d, texts };
+          });
+          return;
+        }
+        if (e.key === "Enter" && dynTyped) {
+          e.preventDefault();
+          confirmDyn();
+          return;
+        }
+        if (e.key === "Escape" && dynTyped) {
+          setDyn(emptyDyn);
+          return;
+        }
+      }
       if (e.key === "Escape") {
         if (pts.length || picks.length) {
           setPts([]);
@@ -1551,6 +2036,17 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (k === "f") return fit();
       if (k === "g" && setSnapGrid) return setSnapGrid(!snapGrid);
       if (k === "h" && sel.size) return applyConstraintToSelection("horizontal");
+      if (k === "d" && tool === "select" && sel.size === 1) {
+        // D nad vybranou entitou = kóta hned (úsečka → délka, kružnice → průměr, oblouk → poloměr)
+        const e = emap.get([...sel][0]);
+        if (e && (e.type === "line" || e.type === "circle" || e.type === "arc")) {
+          const kp = keyPoints(e);
+          const pk = pickOfEntity(e, kp.mid ?? kp.center ?? (e.type === "line" ? e.a : [0, 0]));
+          setTool("dimension");
+          setTimeout(() => setPicks([pk]), 0);
+          return;
+        }
+      }
       if (KEYS[k]) setTool(KEYS[k]);
     };
     window.addEventListener("keydown", onKey);
@@ -1560,13 +2056,28 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // ======================= vykreslení =======================
   const { loops, openCount } = useMemo(() => findLoops(entities), [entities]);
   const fillPath = useMemo(() => loops.map((l) => "M" + loopPolygon(l).map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join("L") + "Z").join(" "), [loops]);
-  const conflictSet = useMemo(() => new Set(status.conflicts), [status.conflicts]);
-  const conflictEntities = useMemo(() => {
-    const s = new Set<string>();
-    for (const c of constraints) if (conflictSet.has(c.id)) c.refs.forEach((r) => s.add(r.e));
-    for (const d of dims) if (conflictSet.has(d.id)) d.refs.forEach((r) => s.add(r.e));
-    return s;
-  }, [constraints, dims, conflictSet]);
+  const conflictSet = useMemo(() => new Set([...status.conflicts, ...status.redundant]), [status.conflicts, status.redundant]);
+  // promítnutí hran modelu (náhled i vložení)
+  const projected = useMemo(
+    () => (tool === "project" && modelLines && modelLines.length ? projectModelLines(modelLines, sketch.plane, { inPlaneOnly: !opts.projAll, construction: opts.projConstruction || undefined }) : []),
+    [tool, modelLines, sketch.plane, opts.projAll, opts.projConstruction],
+  );
+  const doProject = () => {
+    if (!projected.length) return;
+    // promítnuté hrany jsou vázané na model → pevné (plně určené), jako „převést entity“ v SolidWorks
+    const fixed: SketchConstraint[] = projected.map((e) => ({ id: uid(), type: "fixed", refs: [{ e: e.id, k: "self" }], value: paramsOf(e) }));
+    addEntities(projected, fixed);
+    note(`Promítnuto ${projected.length} hran.`);
+    setTool("select");
+  };
+  // zvýraznění řetězce při odsazení
+  const chainIds = useMemo(() => {
+    if (tool !== "offset" || !picks.length || !opts.chain) return [] as string[];
+    const src = emap.get(picks[0].ref.e);
+    if (!src || (src.type !== "line" && src.type !== "arc")) return [];
+    const ch = chainOf(entities, src.id);
+    return ch.segs.length > 1 ? ch.segs.map((s) => s.id) : [];
+  }, [tool, picks, opts.chain, emap, entities]);
 
   // mřížka (px)
   const gridLines: React.ReactNode[] = [];
@@ -1591,7 +2102,6 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // anotace
   const annNodes: React.ReactNode[] = [];
   const hits: typeof annHits.current = [];
-  const emap = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities]);
   {
     const stack = new Map<string, number>();
     for (const c of constraints) {
@@ -1634,9 +2144,73 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   }
   annHits.current = hits;
 
+  // výsledný bod kurzoru po zadání hodnot a odvození vazeb (náhled musí odpovídat kliknutí)
+  const resolved = cursor && snapState && tool !== "select" ? resolvePoint(snapState) : null;
+  const cursorPt = resolved?.p ?? cursor;
+
+  /** živá hodnota pole zadání (z polohy kurzoru), dokud uživatel nic nenapsal */
+  const liveValue = (key: string): string => {
+    const c = cursorPt;
+    if (!c) return "";
+    const n = pts.length;
+    const from = n ? pts[n - 1] : null;
+    const c0 = pts[0];
+    const perpTo = (a: Vec2, b: Vec2) => Math.abs(sideDist(c, a, b));
+    switch (key) {
+      case "x":
+        return fmt(c[0]);
+      case "y":
+        return fmt(c[1]);
+      case "len":
+        return from ? fmt(dist(from, c)) : "";
+      case "ang":
+        return from ? fmt(((angDeg(from, c) % 360) + 360) % 360) : "";
+      case "w":
+        if (!c0) return "";
+        if (tool === "rectCenter") return fmt(Math.abs(c[0] - c0[0]) * 2);
+        if (tool === "rect3") return fmt(dist(c0, c));
+        if (tool === "slot" && n >= 2) return fmt(perpTo(c0, pts[1]) * 2);
+        if (tool === "slotArc" && n >= 2) return fmt(Math.abs(dist(c, c0) - dist(pts[1], c0)) * 2);
+        return fmt(Math.abs(c[0] - c0[0]));
+      case "h":
+        if (!c0) return "";
+        if (tool === "rectCenter") return fmt(Math.abs(c[1] - c0[1]) * 2);
+        if (tool === "rect3" && n >= 2) return fmt(perpTo(c0, pts[1]));
+        return fmt(Math.abs(c[1] - c0[1]));
+      case "r": {
+        if (!c0) return "";
+        if (tool === "circle") return fmt(dist(c0, c) * (opts.diameter ? 2 : 1));
+        if (tool === "arc" && n >= 2) return fmt(circleFrom3(c0, c, pts[1])?.r ?? 0);
+        if (tool === "arcTangent") {
+          const a = tangentArc(entities, ptRefs[0], c0, c);
+          return a ? fmt(circleFrom3(a.a, a.b, a.c)?.r ?? 0) : "";
+        }
+        return fmt(dist(c0, c));
+      }
+      case "d": {
+        if (tool === "offset") {
+          const src = picks.length ? emap.get(picks[0].ref.e) : undefined;
+          return src ? fmt(chainIds.length ? Math.min(...chainIds.map((id) => distToEntity(emap.get(id)!, c).d)) : distToEntity(src, c).d) : "";
+        }
+        return c0 ? fmt(dist(c0, c)) : "";
+      }
+      case "sweep":
+        return c0 && n >= 2 ? fmt(((angDeg(c0, c) - angDeg(c0, pts[1]) + 720) % 360)) : "";
+      case "sides":
+        return String(opts.sides);
+      case "rx":
+        return c0 ? fmt(dist(c0, c)) : "";
+      case "ry":
+        return c0 && n >= 2 ? fmt(perpTo(c0, pts[1])) : "";
+      case "k":
+        return c0 && n >= 2 ? fmt(dist(c0, c) / (dist(c0, pts[1]) || 1), 3) : "";
+    }
+    return "";
+  };
+
   // náhled nástroje
   const preview = (() => {
-    const c = cursor;
+    const c = cursorPt;
     if (!c) return null;
     const stroke = { fill: "none", stroke: "#2563eb", strokeWidth: 1.5, strokeDasharray: "5 4" } as const;
     const label = (p: Vec2, s: string) => {
@@ -1655,11 +2229,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       const chosen = entities.filter((e) => sel.has(e.id));
       if ((tool === "move" || tool === "copy") && pts.length) return <g>{ghost(chosen.map((e) => transformEntity(e, xfMove(sub(c, pts[0])), true)))}{label(c, `Δ ${fmt(c[0] - pts[0][0])} ; ${fmt(c[1] - pts[0][1])}`)}</g>;
       if (tool === "rotate" && pts.length === 2) {
-        const a = angDeg(pts[0], c) - angDeg(pts[0], pts[1]);
+        const a = dynNum("ang") ?? angDeg(pts[0], c) - angDeg(pts[0], pts[1]);
         return <g>{ghost(chosen.map((e) => transformEntity(e, xfRotate(pts[0], a), true)))}{label(c, `${fmt(a)}°`)}</g>;
       }
       if (tool === "scale" && pts.length === 2) {
-        const k = dist(pts[0], c) / (dist(pts[0], pts[1]) || 1);
+        const k = dynNum("k") ?? dist(pts[0], c) / (dist(pts[0], pts[1]) || 1);
         return <g>{ghost(chosen.map((e) => transformEntity(e, xfScale(pts[0], k), true)))}{label(c, `× ${fmt(k, 3)}`)}</g>;
       }
       if (tool === "patternLinear" && pts.length) return <g>{ghost(linearPattern(chosen, sub(c, pts[0]), lastVal.current.count))}{label(c, `krok ${fmt(dist(pts[0], c))} mm`)}</g>;
@@ -1672,12 +2246,22 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       return null;
     }
     if (tool === "offset" && picks.length) {
-      const src = entities.find((x) => x.id === picks[0].ref.e);
+      const src = emap.get(picks[0].ref.e);
       if (!src) return null;
-      const d = distToEntity(src, c).d * offsetSide(src, c);
+      const dT = dynNum("d");
+      const ch = offsetChainOf(src);
+      if (ch) {
+        const dAbs = Math.abs(dT ?? Math.min(...ch.segs.map((sg) => distToEntity(emap.get(sg.id)!, c).d)));
+        const out = offsetChain(ch.segs, ch.closed, chainSide(ch.segs, c) * dAbs, src.construction);
+        return out ? <g>{ghost(out)}{label(c, `${fmt(dAbs)} mm · řetězec ${ch.segs.length}`)}</g> : label(c, "odsazení > poloměr");
+      }
+      const d = Math.abs(dT ?? distToEntity(src, c).d) * offsetSide(src, c);
       const o2 = offsetEntity(src, d);
       return o2 ? <g>{ghost([o2])}{label(c, `${fmt(Math.abs(d))} mm`)}</g> : null;
     }
+    if (tool === "project") return projected.length ? <g opacity={0.7}>{ghost(projected).map((n, i) => <g key={i} stroke="#6b7785">{n}</g>)}</g> : null;
+    if (tool === "trim" && trimPreview && trimPreview.length > 1) return <polyline points={trimPreview.map(P).join(" ")} fill="none" stroke="#dc2626" strokeWidth={1.5} strokeDasharray="4 3" />;
+    if (tool === "split" && pts.length === 1) return <circle cx={toPx(pts[0])[0]} cy={toPx(pts[0])[1]} r={4} fill="#9333ea" />;
     if (tool === "dimension" && picks.length && !(picks.length === 1 && picks[0].kind === "point")) {
       const d = dimFromPicks(picks, c);
       if (d) {
@@ -1717,17 +2301,47 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           </g>
         );
       }
+      case "rect3": {
+        if (pts.length === 1) return <g><polyline points={[pts[0], c].map(P).join(" ")} {...stroke} />{label(c, `${fmt(dist(pts[0], c))} mm · ${fmt(((angDeg(pts[0], c) % 360) + 360) % 360)}°`)}</g>;
+        const r3 = rectFrom3(pts[0], pts[1], c);
+        return r3 ? <g><polygon points={entityPath(r3).pts.map(P).join(" ")} {...stroke} fill="rgba(37,99,235,.05)" />{label(c, `${fmt(r3.w)} × ${fmt(r3.h)}`)}</g> : <polyline points={[pts[0], pts[1]].map(P).join(" ")} {...stroke} />;
+      }
       case "circle":
+      case "circle2":
       case "polygon": {
         const r = dist(pts[0], c);
         const [cx, cy] = toPx(pts[0]);
+        if (tool === "polygon") {
+          const pg = polygonFrom(pts[0], c, opts.sides, opts.circumscribed);
+          return (
+            <g>
+              <circle cx={cx} cy={cy} r={r * view.scale} {...stroke} strokeDasharray="2 4" />
+              {pg && <polygon points={entityPath(pg).pts.map(P).join(" ")} {...stroke} fill="rgba(37,99,235,.05)" />}
+              {label(c, `${opts.sides} stran · R ${fmt(r)} (${opts.circumscribed ? "vepsaná" : "opsaná"})`)}
+            </g>
+          );
+        }
+        if (tool === "circle2") {
+          const c2 = circleFrom2(pts[0], c);
+          return c2 ? <g><circle cx={toPx([c2.cx, c2.cy])[0]} cy={toPx([c2.cx, c2.cy])[1]} r={c2.r * view.scale} {...stroke} fill="rgba(37,99,235,.05)" />{label(c, `Ø ${fmt(r)}`)}</g> : null;
+        }
         return (
           <g>
             <circle cx={cx} cy={cy} r={r * view.scale} {...stroke} fill="rgba(37,99,235,.05)" />
             <line x1={cx} y1={cy} x2={toPx(c)[0]} y2={toPx(c)[1]} stroke="#2563eb" strokeDasharray="2 3" />
-            {label(c, tool === "circle" ? `Ø ${fmt(r * 2)}` : `R ${fmt(r)}`)}
+            {label(c, opts.diameter ? `Ø ${fmt(r * 2)}` : `R ${fmt(r)}`)}
           </g>
         );
+      }
+      case "slotArc": {
+        if (pts.length === 1) return <g><polyline points={[pts[0], c].map(P).join(" ")} {...stroke} />{label(c, `R ${fmt(dist(pts[0], c))}`)}</g>;
+        if (pts.length === 2) {
+          const a = arcFromCenter(pts[0], pts[1], c);
+          return a ? <g><polyline points={entityPath(a).pts.map(P).join(" ")} {...stroke} />{label(c, `${fmt(((angDeg(pts[0], c) - angDeg(pts[0], pts[1]) + 720) % 360))}°`)}</g> : null;
+        }
+        const w = Math.abs(dist(c, pts[0]) - dist(pts[1], pts[0])) * 2;
+        const sa = slotArcEntities(pts[0], pts[1], pts[2], w);
+        return sa ? <g>{ghost(sa.entities)}{label(c, `šířka ${fmt(w)}`)}</g> : label(c, "šířka > poloměr");
       }
       case "circle3": {
         if (pts.length < 2) return <polyline points={[...pts, c].map(P).join(" ")} {...stroke} />;
@@ -1778,7 +2392,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const snapGlyph = snapState && cursor && tool !== "select" && snapState.kind !== "free" ? snapState : null;
 
   const prompt = promptFor(tool, pts.length, picks.length, phase, sel.size);
-  const dofText = status.conflicts.length ? `Konflikt (${status.conflicts.length})` : status.dof === 0 ? "Plně určeno" : status.dof > 0 ? `Zbývá ${status.dof} st. volnosti` : "…";
+  const dofText =
+    status.status === "over"
+      ? status.conflicts.length
+        ? `Přeurčeno – konflikt (${status.conflicts.length})`
+        : `Přeurčeno – nadbytečné vazby (${status.redundant.length})`
+      : status.dof === 0
+        ? "Plně určeno"
+        : status.dof > 0
+          ? `Nedourčeno (${status.dof} st. volnosti)`
+          : "…";
 
   return (
     <div className="absolute inset-0 select-none" onContextMenu={(e) => e.preventDefault()}>
@@ -1802,8 +2425,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         <circle cx={o[0]} cy={o[1]} r={3} fill="#1f2933" />
         <g transform={T}>
           <path d={fillPath} fill="rgba(37,99,235,.07)" fillRule="evenodd" />
-          <EntityLayer paths={paths} entities={entities} sel={sel} hover={hover} conflictIds={conflictEntities} k={view.scale} />
+          <EntityLayer paths={paths} entities={entities} sel={sel} hover={hover} states={status.states} k={view.scale} />
         </g>
+        {chainIds.map((id) => {
+          const pp = paths.get(id);
+          return pp ? <polyline key={"ch" + id} points={pp.pts.map(P).join(" ")} fill="none" stroke="#9333ea" strokeWidth={3} opacity={0.35} /> : null;
+        })}
         {/* koncové body úseček a oblouků */}
         {entities.flatMap((e) =>
           e.type === "line" || e.type === "arc" || e.type === "polyline" || e.type === "spline"
@@ -1833,6 +2460,20 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         {preview}
         {snapState?.guides?.map(([a, b], i) => <line key={"g" + i} x1={toPx(a)[0]} y1={toPx(a)[1]} x2={toPx(b)[0]} y2={toPx(b)[1]} stroke="#0e7490" strokeDasharray="3 4" strokeWidth={1} />)}
         {snapGlyph && <SnapGlyph at={toPx(snapGlyph.p)} kind={snapGlyph.kind as SnapKind} />}
+        {/* náhled odvozených vazeb u kurzoru (žluté ikony jako v SolidWorks) */}
+        {resolved && resolved.kinds.length > 0 && cursorPt && (
+          <g transform={`translate(${toPx(cursorPt)[0] + 14},${toPx(cursorPt)[1] - 32})`} pointerEvents="none">
+            {resolved.kinds.map((k, i) => (
+              <g key={k} transform={`translate(${i * 18},0)`}>
+                <title>{CON_INFO[k].label}</title>
+                <rect width={16} height={16} rx={3} fill="#fef3c7" stroke="#d97706" strokeWidth={1} />
+                <text x={8} y={12} textAnchor="middle" fontSize={10} fontWeight={700} fill="#92400e" fontFamily="Roboto, Arial">
+                  {CON_INFO[k].glyph}
+                </text>
+              </g>
+            ))}
+          </g>
+        )}
         {box && (
           <rect
             x={Math.min(toPx(box.from)[0], toPx(box.to)[0])}
@@ -1865,10 +2506,104 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         <button type="button" title="Zarovnání (vodítka)" onClick={() => setSnap("infer", !snaps.infer)} className={cn("rounded px-1.5 text-[10.5px] font-semibold", snaps.infer ? "bg-[#cffafe] text-[#0e7490]" : "text-[#9aa5b1]")}>
           ⋯
         </button>
-        <button type="button" title="Automatické vazby při kreslení" onClick={() => setSnap("auto", !snaps.auto)} className={cn("rounded px-1.5 text-[10.5px] font-semibold", snaps.auto ? "bg-[#dcfce7] text-[#15803d]" : "text-[#9aa5b1]")}>
+        <Tgl on={snaps.auto} title="Automatické vazby při kreslení (vodorovně, svisle, totožnost, bod na křivce, střed, rovnoběžně, kolmo, tečně)" onClick={() => setSnap("auto", !snaps.auto)}>
           AV
-        </button>
+        </Tgl>
+        <Tgl on={opts.autoDim} title="Kótovat při kreslení – hodnoty zadané číslem u kurzoru vloží řídicí kótu" onClick={() => setOpt("autoDim", !opts.autoDim)} className="bg-[#dbeafe] text-[#1d4ed8]">
+          Kóty
+        </Tgl>
+        {(tool === "circle" || tool === "circle2") && (
+          <Tgl on title={opts.diameter ? "Zadávat průměr (přepnout na poloměr)" : "Zadávat poloměr (přepnout na průměr)"} onClick={() => setOpt("diameter", !opts.diameter)} className="bg-[#ede9fe] text-[#6d28d9]">
+            {opts.diameter ? "Ø" : "R"}
+          </Tgl>
+        )}
+        {tool === "polygon" && (
+          <>
+            <Tgl on title="Vepsaný: bod = vrchol (poloměr opsané kružnice) · Opsaný: bod = střed strany (poloměr vepsané kružnice)" onClick={() => setOpt("circumscribed", !opts.circumscribed)} className="bg-[#ede9fe] text-[#6d28d9]">
+              {opts.circumscribed ? "Opsaný" : "Vepsaný"}
+            </Tgl>
+            <input
+              type="number"
+              min={3}
+              max={64}
+              value={opts.sides}
+              title="Počet stran"
+              onChange={(e) => setOpt("sides", Math.max(3, Math.min(64, Math.round(Number(e.target.value) || 6))))}
+              className="h-5 w-10 rounded border border-[#cfd6de] px-1 text-[10.5px]"
+            />
+          </>
+        )}
+        {tool === "offset" && (
+          <Tgl on={opts.chain} title="Odsadit celý navazující řetězec úseček a oblouků" onClick={() => setOpt("chain", !opts.chain)} className="bg-[#ede9fe] text-[#6d28d9]">
+            Řetězec
+          </Tgl>
+        )}
       </div>
+
+      {/* promítnutí hran modelu */}
+      {tool === "project" && (
+        <div className="absolute right-3 top-3 w-64 rounded-md border border-[#cfd6de] bg-white/95 p-3 text-[12px] shadow-lg backdrop-blur" onPointerDown={(e) => e.stopPropagation()}>
+          <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
+            <CadIcon name="face" tone="feature" className="h-4 w-4" />
+            Promítnout hrany modelu
+          </p>
+          {!modelLines?.length ? (
+            <p className="text-[#6b7785]">Model zatím nemá žádné hrany (nejdřív vytvořte těleso).</p>
+          ) : (
+            <>
+              <label className="flex cursor-pointer items-center gap-2 py-0.5">
+                <input type="radio" name="proj" checked={!opts.projAll} onChange={() => setOpt("projAll", false)} /> Jen hrany v rovině skici (±0,01 mm)
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 py-0.5">
+                <input type="radio" name="proj" checked={opts.projAll} onChange={() => setOpt("projAll", true)} /> Všechny hrany (kolmý průmět)
+              </label>
+              <label className="mt-1 flex cursor-pointer items-center gap-2 py-0.5">
+                <input type="checkbox" checked={opts.projConstruction} onChange={(e) => setOpt("projConstruction", e.target.checked)} /> Jako pomocná geometrie
+              </label>
+              <p className="mt-1 text-[#6b7785]">{projected.length} úseček · vloží se jako pevné (plně určené)</p>
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={doProject} disabled={!projected.length} className="rounded bg-[#2563eb] px-2.5 py-1 text-[11.5px] font-semibold text-white disabled:opacity-40">
+                  Promítnout
+                </button>
+                <button type="button" onClick={() => setTool("select")} className="rounded border border-[#cfd6de] px-2.5 py-1 text-[11.5px]">
+                  Zrušit
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* číselné zadání u kurzoru */}
+      {spec.length > 0 && (cursorPt || dynTyped) && tool !== "select" && (() => {
+        const base = cursorPt ?? lastRaw.current ?? pts[pts.length - 1] ?? [0, 0];
+        const [px, py] = toPx(base);
+        return (
+          <div className="pointer-events-none absolute z-10 flex items-center gap-1 rounded-md border border-[#2563eb]/60 bg-white/95 px-1.5 py-1 font-mono text-[11px] shadow-md" style={{ left: Math.max(4, px + 18), top: Math.max(4, py + 24) }}>
+            {spec.map((f, i) => {
+              const t = dyn.texts[i] ?? "";
+              const act = i === dyn.active;
+              return (
+                <span key={f.key} className={cn("flex items-center gap-1 rounded px-1", act && "bg-[#dbeafe] ring-1 ring-[#2563eb]")}>
+                  <span className="text-[#6b7785]">{f.label}</span>
+                  <span className={cn("min-w-[3ch]", t ? "font-semibold text-[#1d4ed8]" : "text-[#9aa5b1]")}>
+                    {t || liveValue(f.key)}
+                    {act && <span className="animate-pulse text-[#2563eb]">|</span>}
+                  </span>
+                  {f.suffix && <span className="text-[#9aa5b1]">{f.suffix}</span>}
+                  {dyn.locked[i] && (
+                    <svg viewBox="0 0 12 12" className="h-3 w-3 text-[#1d4ed8]" aria-label="zamčeno">
+                      <rect x={2} y={5} width={8} height={6} rx={1} fill="currentColor" />
+                      <path d="M4 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" strokeWidth={1.4} />
+                    </svg>
+                  )}
+                </span>
+              );
+            })}
+            <span className="ml-1 text-[9.5px] text-[#9aa5b1]">Tab · Enter</span>
+          </div>
+        );
+      })()}
 
       {/* výsledek měření */}
       {tool === "measure" && measureRes && (
@@ -1901,7 +2636,10 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           {loops.length} profil{loops.length === 1 ? "" : loops.length > 1 && loops.length < 5 ? "y" : "ů"}
           {openCount ? ` · ${openCount} otevř.` : ""}
         </span>
-        <span className={cn("rounded border px-2 py-0.5", status.conflicts.length ? "border-red-300 bg-red-50 text-red-700" : status.dof === 0 ? "border-green-300 bg-green-50 text-green-700" : "border-[#c9d1da] bg-white/90")}>
+        <span
+          title="Barvy entit: modře nedourčená · černě plně určená · červeně přeurčená nebo v konfliktu"
+          className={cn("rounded border px-2 py-0.5", status.status === "over" ? "border-red-300 bg-red-50 text-red-700" : status.status === "full" ? "border-green-300 bg-green-50 text-green-700" : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]")}
+        >
           {dofText}
         </span>
         <span className="flex-1" />
@@ -1927,11 +2665,15 @@ function promptFor(tool: SketchTool, n: number, picks: number, phase: number, se
     case "spline":
       return n ? "Další bod · Enter / dvojklik ukončí · klik na 1. bod uzavře" : "První bod";
     case "rect":
-      return n ? "Protější roh" : "První roh";
+      return n ? "Protější roh (nebo šířka Tab výška, Enter)" : "První roh (nebo X;Y, Enter)";
     case "rectCenter":
-      return n ? "Roh" : "Střed obdélníku";
+      return n ? "Roh (nebo šířka Tab výška, Enter)" : "Střed obdélníku";
+    case "rect3":
+      return n === 0 ? "První roh" : n === 1 ? "Druhý roh (směr a šířka první strany)" : "Výška obdélníku";
     case "circle":
-      return n ? "Bod na kružnici (poloměr)" : "Střed kružnice";
+      return n ? "Bod na kružnici (nebo zadejte průměr/poloměr, Enter)" : "Střed kružnice";
+    case "circle2":
+      return n ? "Druhý bod průměru" : "První bod průměru";
     case "circle3":
       return `Bod ${n + 1} ze 3 na kružnici`;
     case "arc":
@@ -1945,15 +2687,21 @@ function promptFor(tool: SketchTool, n: number, picks: number, phase: number, se
     case "point":
       return "Umístěte bod";
     case "polygon":
-      return n ? "Vrchol (opsaná kružnice)" : "Střed mnohoúhelníku";
+      return n ? "Vrchol / střed strany (nebo poloměr Tab počet stran, Enter)" : "Střed mnohoúhelníku";
     case "slot":
-      return n === 0 ? "Střed prvního oblouku" : n === 1 ? "Střed druhého oblouku" : "Šířka drážky";
+      return n === 0 ? "Střed prvního oblouku" : n === 1 ? "Střed druhého oblouku (nebo délka Tab úhel)" : "Šířka drážky";
+    case "slotArc":
+      return n === 0 ? "Střed oblouku osy drážky" : n === 1 ? "Začátek osy (poloměr)" : n === 2 ? "Konec osy (proti směru hodin)" : "Šířka drážky";
     case "trim":
-      return "Klikněte na úsek k odstranění";
+      return "Klikněte na úsek k odstranění, nebo táhněte přes více úseků";
     case "extend":
       return "Klikněte u konce úsečky, která se má prodloužit";
+    case "split":
+      return n ? "Druhý bod rozdělení kružnice" : "Klikněte na křivku v místě rozdělení (kružnice: 2 body)";
+    case "project":
+      return "Zvolte hrany vpravo nahoře a potvrďte „Promítnout“";
     case "offset":
-      return picks ? "Klikněte na stranu a vzdálenost odsazení" : "Vyberte entitu k odsazení";
+      return picks ? "Strana myší, vzdálenost klikem nebo číslem + Enter" : "Vyberte entitu (řetězec) k odsazení";
     case "fillet":
     case "chamfer":
       return picks ? "Druhá úsečka" : "První úsečka";
@@ -2068,6 +2816,15 @@ function GlyphShape({ kind }: { kind: SnapKind }) {
   }
 }
 
+/** Malý přepínač v panelu uchopení / voleb kreslení. */
+function Tgl({ on, title, onClick, children, className }: { on: boolean; title: string; onClick: () => void; children: React.ReactNode; className?: string }) {
+  return (
+    <button type="button" title={title} onClick={onClick} className={cn("rounded px-1.5 text-[10.5px] font-semibold", on ? (className ?? "bg-[#dcfce7] text-[#15803d]") : "text-[#9aa5b1] hover:bg-[#eef2f6]")}>
+      {children}
+    </button>
+  );
+}
+
 function SnapGlyph({ at, kind }: { at: Vec2; kind: SnapKind }) {
   return (
     <g transform={`translate(${at[0]},${at[1]})`} color="#0e7490" pointerEvents="none">
@@ -2141,13 +2898,13 @@ function renderDim(d: SketchDim, m: Map<string, SketchEntity>, toPx: (p: Vec2) =
   const v = measureDim(m, d);
   if (v == null) return null;
   const col = bad ? "#dc2626" : hot ? "#E03930" : d.driving ? "#1d4ed8" : "#6b7785";
-  const txt = (d.type === "radius" ? "R" : d.type === "diameter" ? "Ø" : "") + fmt(d.driving ? d.value : v, 2) + (d.type === "angle" ? "°" : "");
+  const txt = (d.type === "radius" ? "R" : d.type === "diameter" ? "Ø" : d.type === "arcLength" ? "⌒" : "") + fmt(d.driving ? d.value : v, 2) + (d.type === "angle" ? "°" : "");
   const label = d.driving ? txt : `(${txt})`;
   const off = d.offset ?? [0, 10];
   const els: React.ReactNode[] = [];
   let tp: Vec2;
   const line = (a: Vec2, b: Vec2, k: string, dash?: string) => els.push(<line key={k} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={col} strokeWidth={0.9} strokeDasharray={dash} />);
-  if (d.type === "radius" || d.type === "diameter") {
+  if (d.type === "radius" || d.type === "diameter" || d.type === "arcLength") {
     const c = refCircle(m, d.refs[0]);
     if (!c) return null;
     const dir = Math.hypot(...off) > 1e-9 ? off : [1, 1];
