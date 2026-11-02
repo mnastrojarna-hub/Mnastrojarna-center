@@ -3,7 +3,7 @@
  * s numerickým Jakobiánem). Pracuje přímo s parametry entit (úsečka = 2 body, kružnice = střed + r…),
  * nezávislé parametry drží co nejblíž původním hodnotám (minimální změna).
  */
-import { circleFrom3, keyPoints } from "./sketch";
+import { arcGeom, circleFrom3, keyPoints } from "./sketch";
 import type { SketchConstraint, SketchDim, SketchEntity, SketchRef, Vec2 } from "./types";
 
 // ---------------- parametry entit ----------------
@@ -236,6 +236,12 @@ export function measureDim(map: Map<string, SketchEntity>, d: SketchDim): number
     case "length": {
       const l = r0 ? refLine(map, r0) : null;
       return l ? len(sub(l[1], l[0])) : null;
+    }
+    case "arcLength": {
+      const e = r0 ? map.get(r0.e) : null;
+      if (!e || e.type !== "arc") return null;
+      const g = arcGeom(e.a, e.b, e.c);
+      return g ? g.r * g.sweep : null;
     }
     case "angle": {
       const a = r0 ? refLine(map, r0) : null;
@@ -514,4 +520,166 @@ export function sketchDof(entities: SketchEntity[], constraints: SketchConstrain
     if (n > 1e-12) for (let k = 0; k < row.length; k++) row[k] /= n;
   }
   return Math.max(0, total - rank(J, 1e-6));
+}
+
+// ---------------- stav určenosti po entitách ----------------
+
+/** Stav entity: `free` = nedourčená (modře), `full` = plně určená (černě), `over` = přeurčená / v konfliktu (červeně). */
+export type EntityState = "free" | "full" | "over";
+export type SketchAnalysis = {
+  /** zbývající stupně volnosti celé skici */
+  dof: number;
+  /** vazby/kóty, které nejsou splněny (konflikt) */
+  conflicts: string[];
+  /** vazby/kóty závislé na ostatních (nadbytečné – skica je přeurčená i bez konfliktu) */
+  redundant: string[];
+  states: Map<string, EntityState>;
+  status: "under" | "full" | "over";
+};
+
+/**
+ * Rozbor určenosti: z normalizované Jakobiho matice vazeb a řídicích kót spočítá hodnost, nadbytečné řádky
+ * (řádková eliminace v pořadí vazeb – za nadbytečnou se označí později přidaná) a nulový prostor; entita je
+ * plně určená, když žádný směr nulového prostoru nehýbe jejími parametry (u oblouku se ignoruje posun
+ * prostředního bodu po oblouku, který geometrii nemění).
+ */
+export function analyzeSketch(entities: SketchEntity[], constraints: SketchConstraint[] = [], dims: SketchDim[] = []): SketchAnalysis {
+  const states = new Map<string, EntityState>(entities.map((e) => [e.id, "free"]));
+  const map0 = new Map(entities.map((e) => [e.id, e]));
+  const conflicts = new Set<string>();
+  for (const c of constraints) if (constraintResiduals(map0, c).some((v) => Math.abs(v) > 1e-4)) conflicts.add(c.id);
+  for (const d of dims) if (d.driving) {
+    const v = measureDim(map0, d);
+    if (v != null && Math.abs(v - d.value) > 1e-4) conflicts.add(d.id);
+  }
+  const involved = new Set<string>();
+  for (const c of constraints) for (const r of c.refs) involved.add(r.e);
+  for (const d of dims) if (d.driving) for (const r of d.refs) involved.add(r.e);
+  const vars = entities.filter((e) => involved.has(e.id));
+  const total = entities.reduce((s, e) => s + dofOf(e), 0);
+  const done = (dof: number, redundant: string[]): SketchAnalysis => {
+    const over = conflicts.size > 0 || redundant.length > 0;
+    for (const id of [...conflicts, ...redundant]) {
+      const c = constraints.find((x) => x.id === id) ?? dims.find((x) => x.id === id);
+      c?.refs.forEach((r) => states.set(r.e, "over"));
+    }
+    return { dof, conflicts: [...conflicts], redundant, states, status: over ? "over" : dof === 0 ? "full" : "under" };
+  };
+  if (!vars.length) return done(total, []);
+  const offs: number[] = [];
+  let x: number[] = [];
+  for (const e of vars) {
+    offs.push(x.length);
+    x = x.concat(paramsOf(e));
+  }
+  const owners: string[] = [];
+  const res = (xx: number[]) => {
+    const m = new Map(map0);
+    vars.forEach((e, i) => m.set(e.id, withParams(e, xx.slice(offs[i], offs[i] + paramsOf(e).length))));
+    const out: number[] = [];
+    owners.length = 0;
+    for (const c of constraints) for (const v of constraintResiduals(m, c)) {
+      out.push(v);
+      owners.push(c.id);
+    }
+    for (const d of dims) for (const v of dimResidual(m, d, 1)) {
+      out.push(v);
+      owners.push(d.id);
+    }
+    return out;
+  };
+  const f0 = res(x);
+  const rowOwner = [...owners];
+  const N = x.length;
+  if (!f0.length) return done(total, []);
+  const J: number[][] = Array.from({ length: f0.length }, () => new Array(N).fill(0));
+  for (let j = 0; j < N; j++) {
+    const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+    const xp = [...x];
+    xp[j] += h;
+    const fp = res(xp);
+    for (let i = 0; i < f0.length; i++) J[i][j] = (fp[i] - f0[i]) / h;
+  }
+  for (const row of J) {
+    const n = Math.hypot(...row);
+    if (n > 1e-12) for (let k = 0; k < row.length; k++) row[k] /= n;
+  }
+  // 1) nadbytečné řádky: eliminace v pořadí řádků
+  const redundant: string[] = [];
+  {
+    const basis: number[][] = [];
+    for (let i = 0; i < J.length; i++) {
+      const v = [...J[i]];
+      for (const b of basis) {
+        const d = v.reduce((s, vi, k) => s + vi * b[k], 0);
+        for (let k = 0; k < N; k++) v[k] -= d * b[k];
+      }
+      const n = Math.hypot(...v);
+      if (n < 1e-6) {
+        if (!redundant.includes(rowOwner[i])) redundant.push(rowOwner[i]);
+        continue;
+      }
+      basis.push(v.map((vi) => vi / n));
+    }
+  }
+  // 2) nulový prostor z redukovaného tvaru
+  const M = J.map((r) => [...r]);
+  const pivotCol: number[] = [];
+  let rk = 0;
+  for (let c = 0; c < N && rk < M.length; c++) {
+    let p = rk;
+    for (let r = rk + 1; r < M.length; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-6) continue;
+    [M[rk], M[p]] = [M[p], M[rk]];
+    const piv = M[rk][c];
+    for (let k = 0; k < N; k++) M[rk][k] /= piv;
+    for (let r = 0; r < M.length; r++) {
+      if (r === rk) continue;
+      const f = M[r][c];
+      if (f) for (let k = c; k < N; k++) M[r][k] -= f * M[rk][k];
+    }
+    pivotCol.push(c);
+    rk++;
+  }
+  const isPivot = new Set(pivotCol);
+  const freeCols = Array.from({ length: N }, (_, j) => j).filter((j) => !isPivot.has(j));
+  const nulls: number[][] = freeCols.map((f) => {
+    const v = new Array(N).fill(0);
+    v[f] = 1;
+    pivotCol.forEach((pc, i) => (v[pc] = -M[i][f]));
+    return v;
+  });
+  vars.forEach((e, i) => {
+    const o = offs[i];
+    const n = paramsOf(e).length;
+    let tan: Vec2 | null = null;
+    if (e.type === "arc") {
+      const g = circleFrom3(e.a, e.b, e.c);
+      if (g) {
+        const rr: Vec2 = [e.b[0] - g.c[0], e.b[1] - g.c[1]];
+        const L = Math.hypot(...rr) || 1;
+        tan = [-rr[1] / L, rr[0] / L];
+      }
+    }
+    let moves = false;
+    for (const v of nulls) {
+      let mx = 0;
+      for (let k = 0; k < n; k++) {
+        if (tan && (k === 2 || k === 3)) continue;
+        mx = Math.max(mx, Math.abs(v[o + k]));
+      }
+      if (tan) {
+        const bx = v[o + 2];
+        const by = v[o + 3];
+        const t = bx * tan[0] + by * tan[1];
+        mx = Math.max(mx, Math.hypot(bx - t * tan[0], by - t * tan[1]));
+      }
+      if (mx > 1e-3) {
+        moves = true;
+        break;
+      }
+    }
+    if (!moves && states.get(e.id) === "free") states.set(e.id, "full");
+  });
+  return done(Math.max(0, total - rk), redundant);
 }

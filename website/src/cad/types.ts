@@ -51,7 +51,7 @@ export type SketchConstraint = {
 /** Kóta ve skice. Řídicí (driving) kóta mění geometrii, referenční jen ukazuje hodnotu. */
 export type SketchDim = {
   id: string;
-  type: "distance" | "horizontal" | "vertical" | "radius" | "diameter" | "angle" | "length";
+  type: "distance" | "horizontal" | "vertical" | "radius" | "diameter" | "angle" | "length" | "arcLength";
   refs: SketchRef[];
   value: number;
   driving: boolean;
