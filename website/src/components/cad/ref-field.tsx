@@ -88,17 +88,21 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
       return;
     }
     let dead = false;
-    cad.refInfo(ctx.doc, value).then(
-      (r) => {
-        if (dead) return;
-        if (r.error) setInfo("⚠ " + r.error);
-        else if (r.geo?.point) setInfo(`${r.geo.kindLabel ?? ""} ${r.geo.point.map((v) => String(Math.round(v * 100) / 100).replace(".", ",")).join("; ")}`.trim());
-        else setInfo(null);
-      },
-      () => undefined,
-    );
+    // krátké zpoždění: při tažení hodnot (live) se dokument mění mnohokrát za sekundu
+    const t = setTimeout(() => {
+      cad.refInfo(ctx.doc, value).then(
+        (r) => {
+          if (dead) return;
+          if (r.error) setInfo("⚠ " + r.error);
+          else if (r.geo?.point) setInfo(`${r.geo.kindLabel ?? ""} ${r.geo.point.map((v) => String(Math.round(v * 100) / 100).replace(".", ",")).join("; ")}`.trim());
+          else setInfo(null);
+        },
+        () => undefined,
+      );
+    }, 180);
     return () => {
       dead = true;
+      clearTimeout(t);
     };
   }, [ctx, value]);
 
