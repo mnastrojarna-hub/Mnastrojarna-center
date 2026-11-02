@@ -3,8 +3,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { buildDoc } from "../build";
-import { emptyDoc, type CadDoc, type Feature, type Vec3 } from "../types";
-import { fillPoints } from "./pattern";
+import { emptyDoc, type AxisDef, type CadDoc, type Feature, type Vec3 } from "../types";
+import { fillPoints, tangentFaces } from "./pattern";
 
 beforeAll(async () => {
   const oc = await (opencascade as unknown as (o: object) => Promise<unknown>)({
@@ -16,11 +16,13 @@ beforeAll(async () => {
 }, 60_000);
 
 type PatternF = Extract<Feature, { type: "pattern" }>;
+/** Omit přes sjednocení (každý druh pole zvlášť). */
+type Body<T> = T extends unknown ? Omit<T, "id" | "name" | "type"> : never;
 const box = (id: string, size: Vec3, position: Vec3, mode: "new" | "add" = "add"): Feature => ({ id, name: id, type: "box", size, position, centered: false, mode });
 /** válcová díra (nástroj = válec, odebrat) osou Z */
 const hole = (id: string, x: number, y: number, rad = 3, h = 20): Feature => ({ id, name: id, type: "cylinder", radius: rad, height: h, position: [x, y, 0], axis: "Z", mode: "cut" });
 const sketch = (id: string, entities: Extract<Feature, { type: "sketch" }>["entities"], z = 20): Feature => ({ id, name: id, type: "sketch", plane: { kind: "base", name: "XY", offset: z }, entities });
-const pat = (p: Omit<PatternF, "id" | "name" | "type">): Feature => ({ id: "p", name: "p", type: "pattern", ...p } as Feature);
+const pat = (p: Body<PatternF>): Feature => ({ id: "p", name: "p", type: "pattern", ...p } as Feature);
 const doc = (features: Feature[]): CadDoc => ({ ...emptyDoc("t"), features });
 const build = async (d: CadDoc) => {
   const res = await buildDoc(d);
@@ -77,7 +79,7 @@ describe("pole – kruhové", () => {
     expect(v).toBeCloseTo(VD - 6 * H(3, 10), 0);
   });
   it("osa dvěma body + krok (angle/(n−1)) + symetricky + vynechání", async () => {
-    const ax = { kind: "twoPoints", a: { kind: "xyz", p: [0, 0, 0] }, b: { kind: "xyz", p: [0, 0, 1] } } as const;
+    const ax: AxisDef = { kind: "twoPoints", a: { kind: "xyz", p: [0, 0, 0] }, b: { kind: "xyz", p: [0, 0, 1] } };
     // 3 kusy na 90° → krok 45°: 0°, 45°, 90°
     const step = await vol(doc([...disc, hole("h", 30, 0, 3, 10), pat({ featureId: "h", kind: "circular", count: 3, angle: 90, axis: "Z", center: [0, 0, 0], axisDef: ax, equalSpacing: false })]));
     expect(step).toBeCloseTo(VD - 3 * H(3, 10), 0);
@@ -93,8 +95,8 @@ describe("pole – kruhové", () => {
   });
   it("bez natáčení kopií (radial = false) – kvádr zůstane rovnoběžný s osami", async () => {
     const tool = box("T", [10, 4, 5], [40, -2, 10]); // na kotouči, střed (45, 0, 12.5)
-    const res = await build(doc([...disc, tool, pat({ featureId: "T", kind: "circular", count: 2, angle: 180, axis: "Z", center: [0, 0, 0], equalSpacing: true, radial: false })]));
-    // kopie posunutá na (−45, 0): x od −50 do −40, y ±2 → bbox y stále ±2 u kopie, celé těleso: y ±40 (kotouč); ověříme plochu na x = −50
+    // krok = 180° (2 kusy, krok = úhel/(n−1)): kopie posunutá na (−45, 0) bez otočení → stěna x = −50 zůstane rovinná a rovnoběžná s YZ
+    const res = await build(doc([...disc, tool, pat({ featureId: "T", kind: "circular", count: 2, angle: 180, axis: "Z", center: [0, 0, 0], equalSpacing: false, radial: false })]));
     expect(res.body!.faces.some((f) => f.geomType === "PLANE" && Math.abs(f.center.x + 50) < 1e-6 && Math.abs(f.center.z - 12.5) < 1e-6)).toBe(true);
     expect(res.metrics!.volume).toBeCloseTo(VD + 2 * 10 * 4 * 5, 0);
   });
@@ -215,11 +217,16 @@ describe("úkos", () => {
     const [px] = await sideFaces(base, [60]);
     expect(px).toBeGreaterThanOrEqual(0);
     const t = Math.tan((5 * Math.PI) / 180);
-    const plain = await build(doc([...base, { id: "d", name: "d", type: "draft", angle: 5, faces: [px], plane: "XY", offset: 10 }]));
-    expect(plain.metrics!.bbox[1][1]).toBeCloseTo(40, 4); // stěna y = 40 beze změny
+    // výběr se rozšíří o zaoblení a stěnu y = 40 (3 plochy), protější stěny ne
+    const body = (await build(doc(base))).body!;
+    const chainIdx = tangentFaces(body, [px]);
+    expect(chainIdx.length).toBe(3);
+    expect(chainIdx.some((i) => body.faces[i].geomType === "CYLINDRE")).toBe(true);
+    expect(chainIdx.some((i) => body.faces[i].geomType === "PLANE" && Math.abs(body.faces[i].center.y - 40) < 1e-6)).toBe(true);
     const chain = await build(doc([...base, { id: "d", name: "d", type: "draft", angle: 5, faces: [px], plane: "XY", offset: 10, tangentChain: true }]));
     expect(chain.metrics!.bbox[1][0]).toBeCloseTo(60 + 10 * t, 3);
     expect(chain.metrics!.bbox[1][1]).toBeCloseTo(40 + 10 * t, 3);
+    expect(chain.metrics!.bbox[0][1]).toBeCloseTo(0, 4); // stěna y = 0 beze změny
   });
   it("chyby: bez ploch, úhel mimo rozsah", async () => {
     expect(await err(doc([...BASE, { id: "d", name: "d", type: "draft", angle: 5, faces: [], plane: "XY", offset: 0 }]))).toMatch(/Vyberte plochy/);

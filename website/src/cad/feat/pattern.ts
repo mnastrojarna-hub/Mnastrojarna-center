@@ -371,7 +371,7 @@ registerFeatureBuilder("pattern", (f, ctx) => {
   const tools = sourceTools(f, ctx);
   const inst = patternInstances(f, ctx, tools);
   if (!inst.length) return null;
-  return applyInstances(ctx.body, tools, inst, !!("geometryOnly" in f && f.geometryOnly));
+  return applyInstances(ctx.body, tools, inst, !!f.geometryOnly);
 });
 
 // ---------------- skořepina ----------------
@@ -383,6 +383,26 @@ const pickedFaces = (body: Shape, idx: number[], what: string) => {
   return picked;
 };
 
+type OC = any; // OCCT shim (bez typů, jako v direct.ts)
+
+/** Skořepina přímo přes OCCT: `offset` > 0 = stěna ven, < 0 = dovnitř; `join` = tvar vnějších hran (ostré / zaoblené). */
+function thickSolid(body: Shape, faces: r.Face[], offset: number, join: "intersection" | "arc"): Shape {
+  const oc = r.getOC() as OC;
+  const list = new oc.NCollection_List_TopoDS_Shape();
+  const mk = new oc.BRepOffsetAPI_MakeThickSolid();
+  try {
+    for (const f of faces) list.Append(f.wrapped);
+    mk.MakeThickSolidByJoin(body.wrapped, list, offset, 1e-3, oc.BRepOffset_Mode.BRepOffset_Skin, false, false, join === "arc" ? oc.GeomAbs_JoinType.GeomAbs_Arc : oc.GeomAbs_JoinType.GeomAbs_Intersection, false);
+    if (!mk.IsDone()) throw new Error("Skořepinu se nepodařilo vytvořit – zkuste menší tloušťku nebo jiné plochy.");
+    const s = r.cast(mk.Shape()) as unknown as Shape;
+    if (!(Math.abs(r.measureVolume(s)) > 0)) throw new Error("Skořepina nevytvořila objem – zkuste menší tloušťku.");
+    return s;
+  } finally {
+    mk.delete();
+    list.delete();
+  }
+}
+
 registerFeatureBuilder("shell", (f: ShellF, ctx) => {
   const body = ctx.body;
   if (!body) throw new Error("Není co skořepinovat.");
@@ -391,8 +411,15 @@ registerFeatureBuilder("shell", (f: ShellF, ctx) => {
   const all = body.faces;
   const picked = pickedFaces(body, f.faces, "plochy, které se mají otevřít");
   const outward = !!f.outward;
-  // replicad: kladná tloušťka = dovnitř; záporná = stěna přiroste ven (původní povrch zůstane vnitřní)
-  let out = body.clone().shell(outward ? -t : t, (ff) => ff.when(({ element }) => picked.some((p) => p.isSame(element as r.Face))));
+  let out: Shape;
+  if (outward) {
+    // stěna přiroste ven (původní povrch zůstane vnitřní); vnější hrany ostré, při neúspěchu zaoblené
+    try {
+      out = thickSolid(body, picked, t, "intersection");
+    } catch {
+      out = thickSolid(body, picked, t, "arc");
+    }
+  } else out = body.clone().shell(t, (ff) => ff.when(({ element }) => picked.some((p) => p.isSame(element as r.Face))));
   const extra = Object.entries(f.thicknesses ?? {})
     .map(([k, v]) => ({ k: Number(k), v: Number(v) }))
     .filter(({ k, v }) => all[k] && Number.isFinite(v) && v > 0 && Math.abs(v - t) > 1e-9 && !f.faces.includes(k));

@@ -147,11 +147,11 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** více zdrojových prvků naráz */
       featureIds?: string[];
     }
-  | { type: "pattern"; featureId: string; kind: "circular"; count: number; angle: number; axis: Axis; center: Vec3; axisDef?: AxisDef; skip?: number[]; symmetric?: boolean; equalSpacing?: boolean; radial?: boolean; featureIds?: string[] }
+  | { type: "pattern"; featureId: string; kind: "circular"; count: number; angle: number; axis: Axis; center: Vec3; axisDef?: AxisDef; skip?: number[]; symmetric?: boolean; equalSpacing?: boolean; radial?: boolean; featureIds?: string[]; geometryOnly?: boolean }
   /** Pole po křivce (skica s otevřenou/uzavřenou křivkou), podle bodů skici, nebo výplňové (plocha / skica obrysu). */
-  | { type: "pattern"; featureId: string; kind: "curve"; count: number; sketchId: string; align: "tangent" | "fixed"; spacing?: number; skip?: number[]; featureIds?: string[] }
-  | { type: "pattern"; featureId: string; kind: "sketch"; sketchId: string; skip?: number[]; featureIds?: string[] }
-  | { type: "pattern"; featureId: string; kind: "fill"; sketchId: string; spacing: number; margin: number; layout: "grid" | "stagger" | "circular"; skip?: number[]; featureIds?: string[] }
+  | { type: "pattern"; featureId: string; kind: "curve"; count: number; sketchId: string; align: "tangent" | "fixed"; spacing?: number; skip?: number[]; featureIds?: string[]; geometryOnly?: boolean }
+  | { type: "pattern"; featureId: string; kind: "sketch"; sketchId: string; skip?: number[]; featureIds?: string[]; geometryOnly?: boolean }
+  | { type: "pattern"; featureId: string; kind: "fill"; sketchId: string; spacing: number; margin: number; layout: "grid" | "stagger" | "circular"; skip?: number[]; featureIds?: string[]; geometryOnly?: boolean }
   | { type: "mirror"; plane: PlaneName; offset: number; keepOriginal: boolean; planeDef?: PlaneDef; featureIds?: string[] }
   | { type: "import"; fileName: string; format: KernelImportFormat | "iges"; data: string /* base64 */ }
   /** Tažení profilu po křivce (profil = uzavřená skica, dráha = skica s otevřenou/uzavřenou křivkou). */
