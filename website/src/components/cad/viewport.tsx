@@ -513,9 +513,38 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         drawHilite();
       }
     };
-    const onDown = (e: PointerEvent) => (downAt = [e.clientX, e.clientY, e.button]);
+    // dlouhý stisk prstem = kontextová nabídka (pravé tlačítko) na dotykových zařízeních
+    let longPress: ReturnType<typeof setTimeout> | null = null;
+    let swallowTouchEnd = false; // po dlouhém stisku potlačit náhradní mouse/click události (zavřely by nabídku)
+    const cancelLongPress = () => {
+      if (longPress) clearTimeout(longPress);
+      longPress = null;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (swallowTouchEnd) {
+        swallowTouchEnd = false;
+        e.preventDefault();
+      }
+    };
+    const onDown = (e: PointerEvent) => {
+      downAt = [e.clientX, e.clientY, e.button];
+      cancelLongPress();
+      if (e.pointerType === "touch" && propsRef.current.pickMode !== "none") {
+        longPress = setTimeout(() => {
+          longPress = null;
+          downAt = null;
+          swallowTouchEnd = true;
+          const it = pickSel(e, effFilter());
+          propsRef.current.onContext?.(e.clientX, e.clientY, it);
+        }, 550);
+      }
+    };
+    const onMoveCancel = (e: PointerEvent) => {
+      if (longPress && downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 8) cancelLongPress();
+    };
     const onUp = (e: PointerEvent) => {
       const s = S.current!;
+      cancelLongPress();
       if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4 || e.button !== downAt[2] || s.tc.dragging) {
         downAt = null;
         return;
@@ -546,6 +575,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       }
     };
     renderer.domElement.addEventListener("pointermove", onMove);
+    renderer.domElement.addEventListener("pointermove", onMoveCancel, { passive: true });
+    renderer.domElement.addEventListener("pointercancel", cancelLongPress);
+    renderer.domElement.addEventListener("touchend", onTouchEnd, { passive: false });
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointerup", onUp);
     renderer.domElement.addEventListener("pointerleave", onLeave);
@@ -557,6 +589,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       controls.dispose();
       tc.dispose();
       renderer.domElement.removeEventListener("pointermove", onMove);
+      renderer.domElement.removeEventListener("pointermove", onMoveCancel);
+      renderer.domElement.removeEventListener("pointercancel", cancelLongPress);
+      renderer.domElement.removeEventListener("touchend", onTouchEnd);
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
       renderer.domElement.removeEventListener("pointerleave", onLeave);

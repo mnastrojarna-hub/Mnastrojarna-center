@@ -2340,7 +2340,7 @@ export function CadApp() {
 
           {/* Formulář prvku (jako „Options“ v ZW3D) */}
           {isAsm && asmSel && doc.components?.find((c) => c.id === asmSel) && (
-            <aside className="absolute inset-y-0 right-0 z-20 flex w-[300px] shrink-0 flex-col border-l border-[#d5dbe2] bg-white shadow-xl lg:static lg:shadow-none">
+            <aside className="absolute inset-y-0 right-0 z-20 flex w-[300px] shrink-0 flex-col border-l border-[#d5dbe2] bg-white shadow-xl max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-auto max-sm:max-h-[58vh] max-sm:rounded-t-2xl max-sm:border-l-0 max-sm:border-t lg:static lg:shadow-none">
               <div className="flex items-center gap-2 border-b border-[#d5dbe2] bg-gradient-to-b from-[#f7f9fb] to-[#eef2f6] px-3 py-2">
                 <CadIcon name="cube" tone="create" className="h-5 w-5" />
                 <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">Komponenta · {doc.components.find((c) => c.id === asmSel)!.name}</p>
@@ -2381,7 +2381,7 @@ export function CadApp() {
             </aside>
           )}
           {(active || (sketch && sketchSel)) && (
-            <aside className="absolute inset-y-0 right-0 z-20 flex w-[300px] shrink-0 flex-col border-l border-[#d5dbe2] bg-white shadow-xl lg:static lg:shadow-none">
+            <aside className="absolute inset-y-0 right-0 z-20 flex w-[300px] shrink-0 flex-col border-l border-[#d5dbe2] bg-white shadow-xl max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-auto max-sm:max-h-[58vh] max-sm:rounded-t-2xl max-sm:border-l-0 max-sm:border-t lg:static lg:shadow-none">
               <div className="flex items-center gap-2 border-b border-[#d5dbe2] bg-gradient-to-b from-[#f7f9fb] to-[#eef2f6] px-3 py-2">
                 <CadIcon name={active ? featureIcon(active) : "sketch"} tone={((active && featureTone(active)) ?? FEATURE_TONE[active?.type ?? "sketch"] ?? "create") as Tone} className="h-5 w-5" />
                 <p className="min-w-0 flex-1 truncate text-[13px] font-semibold">{active ? `${featureLabel(active)} · ${active.name}` : "Entita skici"}</p>

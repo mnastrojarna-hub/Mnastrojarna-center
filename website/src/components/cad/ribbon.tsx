@@ -228,6 +228,7 @@ function Floating({ anchor, close, children }: { anchor: HTMLElement; close: () 
 /** Plovoucí kontextové menu (pravé tlačítko). */
 export function ContextMenu({ x, y, entries, close }: { x: number; y: number; entries: RMenuEntry[]; close: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const mountedAt = useRef(Date.now());
   const [pos, setPos] = useState({ x, y });
   useEffect(() => {
     const el = ref.current;
@@ -249,7 +250,19 @@ export function ContextMenu({ x, y, entries, close }: { x: number; y: number; en
     };
   }, [x, y, close]);
   return (
-    <div ref={ref} className="fixed z-[60]" style={{ left: pos.x, top: pos.y }} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      ref={ref}
+      className="fixed z-[60]"
+      style={{ left: pos.x, top: pos.y }}
+      onContextMenu={(e) => e.preventDefault()}
+      onClickCapture={(e) => {
+        // dotyk: náhradní „click“ po dlouhém stisku by hned spustil položku pod prstem
+        if (Date.now() - mountedAt.current < 400) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
       <Dropdown entries={entries} close={close} className="relative left-auto top-auto mt-0" />
     </div>
   );
