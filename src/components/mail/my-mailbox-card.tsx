@@ -11,6 +11,7 @@ import { PasswordInput } from "@/components/account/password-input";
 import { useMailSync } from "@/components/mail/use-mail-sync";
 import { endpointLabel, PRESETS, PRESET_IDS, type DetectResult, type DiagResult, type PresetId } from "@/lib/email/mail-config";
 import { progressText } from "@/lib/email/mail-types";
+import { retryClock } from "@/lib/email/auth-lockout";
 import type { MyMailbox } from "@/lib/email/my-mailbox";
 import type { MailboxConfig } from "@/lib/supabase/database.types";
 import { cn, relativeTime } from "@/lib/utils";
@@ -139,15 +140,20 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
       if (action === "test") {
         const r = await api<{ incoming?: { ok: boolean; error?: string; messages?: number } | null; smtp?: { ok: boolean; error?: string; note?: string } | null; graph?: { ok: boolean; error?: string } | null; error?: string }>({ action, mailboxId: b.id });
         const inc = r.incoming ?? r.graph;
+        // stejná chyba příjmu i odesílání (např. dočasná blokace u hostingu) → jednou
+        const same = Boolean(inc && !inc.ok && r.smtp && !r.smtp.ok && inc.error && inc.error === r.smtp.error);
         const parts = [
-          inc ? (inc.ok ? `Příjem OK${typeof (inc as { messages?: number }).messages === "number" ? ` (${(inc as { messages?: number }).messages} zpráv v INBOXu)` : ""}` : `Příjem: ${inc.error}`) : r.error ?? "",
-          r.smtp ? (r.smtp.ok ? "Odesílání (SMTP) OK" : `Odesílání: ${r.smtp.error}`) : b.provider === "outlook" ? "" : "Odesílání: SMTP není nastavené",
+          inc ? (inc.ok ? `Příjem OK${typeof (inc as { messages?: number }).messages === "number" ? ` (${(inc as { messages?: number }).messages} zpráv v INBOXu)` : ""}` : `${same ? "Příjem i odesílání" : "Příjem"}: ${inc.error}`) : r.error ?? "",
+          same ? "" : r.smtp ? (r.smtp.ok ? "Odesílání (SMTP) OK" : `Odesílání: ${r.smtp.error}`) : b.provider === "outlook" ? "" : "Odesílání: SMTP není nastavené",
           r.smtp?.note ?? "",
         ].filter(Boolean);
         onNote({ ok: Boolean(inc?.ok && (r.smtp?.ok ?? b.provider === "outlook")), text: parts.join(" · ") });
+        // odmítnuté heslo / blokace → stav schránky (tlačítka s důvodem a časem dalšího pokusu)
+        if (!inc?.ok || (r.smtp && !r.smtp.ok)) await onChanged();
       } else if (action === "testSend") {
         const r = await api<{ sent: boolean; text: string }>({ action, mailboxId: b.id });
         onNote({ ok: r.sent, text: r.sent ? `Zkušební e-mail odeslán. ${r.text}` : r.text });
+        if (!r.sent) await onChanged();
       } else {
         const r = await api<{ ok: boolean; error?: string }>({ action, mailboxId: b.id, ...extra });
         if (!r.ok) onNote({ ok: false, text: r.error ?? "Chyba" });
@@ -161,6 +167,8 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
       setConfirmDelete(false);
     }
   };
+  // po odmítnutém hesle: test / stažení / zkouška odeslání až po čase (nebo po změně hesla v Upravit)
+  const lock = useAuthLock(b.authRetryAt, b.authLockReason);
   return (
     <div className="min-w-0 space-y-2 rounded-lg border p-3" data-testid={`my-box-${b.email}`}>
       <div className="flex items-start gap-3">
@@ -178,9 +186,12 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
               <li className="text-amber-700 dark:text-amber-400" data-testid="my-box-smtp-separate">Odesílání používá zvlášť uložené SMTP heslo — Upravit ho nahradí heslem schránky (nezaškrtneš-li „SMTP má jiné heslo“).</li>
             )}
           </ul>
-          {b.authBlocked ? (
+          {b.authBlocked && (
             <p className="mt-1 text-xs text-destructive">Heslo odmítnuto — oprav ho (Upravit → nové heslo). Automatické stahování je pozastavené.</p>
-          ) : b.lastSyncError ? (
+          )}
+          {lock ? (
+            <p className="mt-1 break-words text-xs text-destructive" data-testid="my-box-auth-lock" suppressHydrationWarning>{lock}</p>
+          ) : b.authBlocked ? null : b.lastSyncError ? (
             <p className="mt-1 break-words text-xs text-destructive">Poslední stažení selhalo: {b.lastSyncError}</p>
           ) : b.incomplete ? (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Nastavení není kompletní — klikni na Upravit.</p>
@@ -194,13 +205,13 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
         <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", b.active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{b.active ? "aktivní" : "vypnutá"}</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="outline" onClick={() => void act("test")} disabled={busy !== null} data-testid="my-box-test">
+        <Button size="sm" variant="outline" onClick={() => void act("test")} disabled={busy !== null || lock !== null} title={lock ?? undefined} data-testid="my-box-test">
           {busy === "test" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Otestovat připojení
         </Button>
-        <Button size="sm" variant="outline" onClick={() => void act("testSend")} disabled={busy !== null || !b.canSend} data-testid="my-box-test-send">
+        <Button size="sm" variant="outline" onClick={() => void act("testSend")} disabled={busy !== null || !b.canSend || lock !== null} title={lock ?? undefined} data-testid="my-box-test-send">
           {busy === "testSend" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Vyzkoušet odeslání
         </Button>
-        <Button size="sm" variant="outline" onClick={() => void onSync()} disabled={busy !== null || syncing || !b.active}>
+        <Button size="sm" variant="outline" onClick={() => void onSync()} disabled={busy !== null || syncing || !b.active || lock !== null} title={lock ?? undefined} data-testid="my-box-sync">
           <Inbox className="h-4 w-4" /> Stáhnout
         </Button>
         {b.editable && (
@@ -218,6 +229,19 @@ function BoxRow({ b, onEdit, onChanged, onNote, onSync, syncing }: {
       </div>
     </div>
   );
+}
+
+/** Platná blokace přihlášení (text s časem dalšího pokusu) — po uplynutí se tlačítka samy odemknou. */
+function useAuthLock(retryAt: string | null | undefined, reason: string | null | undefined): string | null {
+  const [now, setNow] = React.useState(() => Date.now());
+  const until = retryAt ? Date.parse(retryAt) : NaN;
+  React.useEffect(() => {
+    if (!Number.isFinite(until) || until <= Date.now()) return;
+    const t = setTimeout(() => setNow(Date.now()), Math.min(until - Date.now() + 500, 2_147_000_000));
+    return () => clearTimeout(t);
+  }, [until]);
+  if (!Number.isFinite(until) || until <= now) return null;
+  return reason ?? `Přihlášení je pozastavené do ${retryClock(retryAt!)}.`;
 }
 
 type IncomingTlsChoice = "" | "tls" | "starttls";

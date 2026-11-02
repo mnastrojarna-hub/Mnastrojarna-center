@@ -18,6 +18,7 @@ import {
 } from "@/lib/email/mail-config";
 import { useRouter } from "next/navigation";
 import { cn, relativeTime } from "@/lib/utils";
+import { retryClock } from "@/lib/email/auth-lockout";
 
 /** Uživatel, kterému lze schránku přiřadit (vidí pak její poštu). */
 export interface MailboxUser {
@@ -477,6 +478,9 @@ function MailboxForm({
   const presetInfo = PRESETS[form.preset];
   const passwordStored = Boolean(stored?.imap_password);
   const showPassword = isNew || form.changePassword || !passwordStored;
+  // Po odmítnutém hesle (< 60 min) se se stejným heslem netestuje (blokace IP u hostingu) — nové heslo ano
+  const newPassword = Boolean((isNew || form.changePassword) && form.password);
+  const authLock = authLockText(editing?.status);
 
   return (
     <div className="space-y-3" data-testid="mailbox-form">
@@ -738,13 +742,18 @@ function MailboxForm({
         </div>
       )}
 
+      {authLock && (
+        <p className="break-words rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300" data-testid="auth-lock" suppressHydrationWarning>
+          {authLock}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={runTest} disabled={busy !== null} data-testid="test-btn">
+        <Button size="sm" variant="outline" onClick={runTest} disabled={busy !== null || (authLock !== null && !newPassword)} data-testid="test-btn" title={authLock ?? undefined}>
           {busy === "test" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
           Otestovat připojení
         </Button>
         {editing && (
-          <Button size="sm" variant="outline" onClick={runTestSend} disabled={busy !== null || sendBusy} data-testid="test-send-btn">
+          <Button size="sm" variant="outline" onClick={runTestSend} disabled={busy !== null || sendBusy || authLock !== null} data-testid="test-send-btn" title={authLock ?? undefined}>
             {sendBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Vyzkoušet odeslání
           </Button>
@@ -768,6 +777,12 @@ function MailboxForm({
   );
 }
 
+/** Platná blokace přihlášení po odmítnutém hesle (důvod + čas dalšího pokusu), jinak null. */
+function authLockText(st: Mailbox["status"] | null | undefined): string | null {
+  if (!st?.auth_retry_at || Date.parse(st.auth_retry_at) <= Date.now()) return null;
+  return st.auth_lock_reason ?? `Přihlášení je pozastavené do ${retryClock(st.auth_retry_at)}.`;
+}
+
 /** Relativní čas (server a prohlížeč ho mohou spočítat o minutu jinak — bez varování hydratace). */
 function Ago({ iso }: { iso: string }) {
   return <time dateTime={iso} suppressHydrationWarning>{relativeTime(iso)}</time>;
@@ -782,10 +797,13 @@ function MailboxStatusLine({ m }: { m: Mailbox }) {
     <div className="mt-1 space-y-0.5 text-xs" data-testid="mailbox-status">
       {missing.length > 0 ? (
         <p className="text-amber-700 dark:text-amber-400">Neúplná — chybí: {missing.join(", ")}. Pošta se nestahuje.</p>
+      ) : st?.last_sync_error_kind !== "auth" && authLockText(st) ? (
+        <p className="break-words text-destructive" data-testid="auth-lock-status" suppressHydrationWarning>{authLockText(st)}</p>
       ) : st?.last_sync_error_kind === "auth" ? (
         <p className="break-words text-destructive" data-testid="auth-blocked">
           Heslo odmítnuto{st.last_sync_attempt_at ? <> <Ago iso={st.last_sync_attempt_at} /></> : null} — oprav ho: Upravit schránku → Změnit heslo.
-          Automatické stahování je do opravy pozastavené (ochrana před zablokováním IP u poskytovatele); ručně tlačítkem Stáhnout.
+          Automatické stahování je do opravy pozastavené (ochrana před zablokováním IP u poskytovatele); ručně tlačítkem Stáhnout nejdřív hodinu po odmítnutí
+          {st.auth_retry_at && Date.parse(st.auth_retry_at) > Date.now() ? <span suppressHydrationWarning> ({retryClock(st.auth_retry_at)})</span> : null}.
         </p>
       ) : st?.last_sync_error ? (
         <p className="break-words text-destructive">
@@ -978,7 +996,7 @@ export function MailboxManager({
                   />
                 )}
                 {ownerBusy === m.id && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                <Button variant="outline" size="sm" onClick={() => syncOne(m.id)} disabled={busy || rowBusy !== null || !m.active} aria-label={`Stáhnout poštu ${m.email}`}>
+                <Button variant="outline" size="sm" onClick={() => syncOne(m.id)} disabled={busy || rowBusy !== null || !m.active || authLockText(m.status) !== null} aria-label={`Stáhnout poštu ${m.email}`} title={authLockText(m.status) ?? undefined}>
                   <RefreshCw className={cn("h-4 w-4", rowBusy === m.id && "animate-spin")} /> Stáhnout
                 </Button>
                 <Button variant="ghost" size="icon-sm" onClick={() => toggleActive(m)} disabled={busy || rowBusy !== null} aria-label={m.active ? "Vypnout schránku" : "Zapnout schránku"} title={m.active ? "Vypnout schránku" : "Zapnout schránku"}>

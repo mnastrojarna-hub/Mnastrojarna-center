@@ -26,6 +26,7 @@ import type { EmailCategory } from "@/lib/data/types";
 import { cn, formatDate } from "@/lib/utils";
 import { PrintButton } from "@/components/print/print-button";
 import { printabilityOf } from "@/lib/print/print-links";
+import { splitQuoted } from "@/lib/email/quoted";
 
 function initials(name: string): string {
   const parts = name.split(/[\s.@_-]+/).filter(Boolean);
@@ -193,9 +194,12 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
   };
   const categoryError = (text: string) => setNotice({ ok: false, text });
   return (
-    <Card className="overflow-hidden" data-testid="thread-view">
+    // overflow-clip (ne hidden): hlavička vlákna drží nahoře při rolování sloupce detailu (sticky)
+    <Card className="overflow-clip" data-testid="thread-view">
       <div className={cn("h-1.5 w-full", st.bar)} aria-hidden />
       <CardContent className="space-y-4 p-4 sm:p-5">
+        {/* počítač: předmět + akce zůstávají nahoře, zprávy rolují pod nimi */}
+        <div className="space-y-4 lg:sticky lg:top-0 lg:z-10 lg:-mx-5 lg:-mt-5 lg:border-b lg:bg-card lg:px-5 lg:pb-3 lg:pt-4" data-testid="thread-header">
         <div className="flex items-start gap-2">
           <Button size="icon-sm" variant="ghost" onClick={onBack} className="lg:hidden" aria-label="Zpět na seznam">
             <ArrowLeft className="h-4 w-4" />
@@ -271,6 +275,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           <Button size="sm" variant="outline" onClick={() => setShareOpen(true)} data-testid="btn-share" title="Předat kolegovi s poznámkou">
             <Share2 className="h-4 w-4" /><span className="hidden sm:inline">Předat kolegovi</span><span className="sm:hidden">Předat</span>
           </Button>
+        </div>
         </div>
 
         {notice && (
@@ -423,15 +428,13 @@ function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCate
           {asSent && m.signedHtml ? (
             <SentHtmlFrame html={m.signedHtml} />
           ) : (
-            <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-3 text-sm leading-relaxed scrollbar-thin" data-testid="message-body">
-              {m.body.trim() || "(prázdný e-mail)"}
-            </div>
+            <MessageBody body={m.body} />
           )}
           {m.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex min-w-0 flex-wrap gap-1.5" data-testid="message-attachments">
               {m.attachments.map((a) => (
-                <span key={a.id} className="inline-flex max-w-full items-center">
-                  <a href={`/api/emails/attachment/${a.id}`} className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent" data-testid="message-attachment">
+                <span key={a.id} className="inline-flex min-w-0 max-w-full items-center">
+                  <a href={`/api/emails/attachment/${a.id}`} className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent" data-testid="message-attachment">
                     <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="truncate">{a.filename}</span>
                     {a.sizeBytes ? <span className="text-muted-foreground">· {fmtSize(a.sizeBytes)}</span> : null}
                   </a>
@@ -456,13 +459,52 @@ function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCate
   );
 }
 
+/**
+ * Text zprávy přes celou šířku detailu; citovaná historie (starší zprávy pod odpovědí) sbalená za tlačítkem.
+ * Mobil: dlouhý text roluje v rámečku (jako dřív); počítač: roluje celý sloupec detailu (bez vnořeného rolování).
+ */
+function MessageBody({ body }: { body: string }) {
+  const { main, quoted, quotedLines } = React.useMemo(() => splitQuoted(body), [body]);
+  const [showQuoted, setShowQuoted] = React.useState(false);
+  return (
+    <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-3 text-sm leading-relaxed scrollbar-thin [overflow-wrap:anywhere] lg:max-h-none lg:overflow-visible" data-testid="message-body">
+      {main.trim() || "(prázdný e-mail)"}
+      {quoted && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowQuoted((v) => !v)}
+            aria-expanded={showQuoted}
+            className="mt-2 flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 font-sans text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            data-testid="message-quoted-toggle"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+            {showQuoted ? "Skrýt citovanou historii" : `Zobrazit citovanou historii (${quotedLines} ř.)`}
+          </button>
+          {showQuoted && <div className="mt-2 border-l-2 pl-3 text-muted-foreground" data-testid="message-quoted">{quoted}</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Obrázky a tabulky v HTML zprávě se vejdou do šířky detailu (bez vodorovného rolování). */
+const FRAME_FIT_CSS = "<style>html,body{margin:0;max-width:100%;overflow-x:hidden}img{max-width:100%!important;height:auto!important}table{max-width:100%!important}td,th{word-break:break-word}pre{white-space:pre-wrap}</style>";
+
+/** Styl „vejdi se" do <head> (doctype zůstane první — jinak by rám přepnul do quirks režimu). */
+export function fitHtml(html: string): string {
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head([^>]*)>/i, `<head$1>${FRAME_FIT_CSS}`);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html([^>]*)>/i, `<html$1><head>${FRAME_FIT_CSS}</head>`);
+  return FRAME_FIT_CSS + html;
+}
+
 /** Odeslaná zpráva tak, jak odešla (HTML s grafickým podpisem) — izolovaný rám bez skriptů, výška podle obsahu. */
 function SentHtmlFrame({ html }: { html: string }) {
   const ref = React.useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = React.useState(260);
   const measure = () => {
     const d = ref.current?.contentDocument;
-    if (d?.documentElement) setHeight(Math.min(900, Math.max(120, Math.ceil(d.documentElement.scrollHeight) + 4)));
+    if (d?.documentElement) setHeight(Math.min(4000, Math.max(120, Math.ceil(d.documentElement.scrollHeight) + 4)));
   };
   return (
     <div className="overflow-hidden rounded-lg border bg-white" data-testid="message-sent-html">
@@ -470,7 +512,7 @@ function SentHtmlFrame({ html }: { html: string }) {
         ref={ref}
         title="Zpráva, jak odešla"
         sandbox="allow-same-origin"
-        srcDoc={html}
+        srcDoc={fitHtml(html)}
         onLoad={measure}
         className="block w-full border-0 bg-white"
         style={{ height }}

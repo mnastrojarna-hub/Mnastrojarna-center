@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import {
   Mail, RefreshCw, Upload, Search, Loader2, Inbox as InboxIcon, UserRound, AlertCircle, CheckCircle2, X, PenSquare,
   Send, Flag, Layers, Ban, Share2, SlidersHorizontal, MailOpen, FolderKanban, FolderOpen, Wand2, Settings, Trash2, Clock,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
+import { useUiPrefs } from "@/components/ui-prefs/use-ui-prefs";
+import { retryClock } from "@/lib/email/auth-lockout";
+import {
+  MAIL_DETAIL_MIN, MAIL_LIST_DEFAULT_RATIO, MAIL_LIST_MIN, clampListWidth, listWidthForKey, type UiPrefs,
+} from "@/lib/ui-prefs";
 import { MailSettingsPanel, type MailSettingsTab } from "@/components/mail/mail-settings-panel";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,23 +50,33 @@ interface InboxViewProps {
   /** Vybraná schránka, null = všechny (moje). */
   mailboxId: string | null;
   folder: MailFolder;
+  /** Osobní rozložení Pošty (šířka seznamu, sbalené složky) z profiles.ui_prefs. */
+  uiPrefs?: UiPrefs;
 }
 
 const AUTO_SYNC_AFTER_MS = 5 * 60_000;
 const DESKTOP_QUERY = "(min-width: 1024px)"; // = Tailwind lg (seznam + vlákno vedle sebe)
+const WIDE_QUERY = "(min-width: 1280px)"; // = Tailwind xl (složky automaticky rozbalené)
+/** Šířka oddělovače seznam | vlákno (px, w-3) — sedí s .mail-list-pane v globals.css. */
+const SEPARATOR_W = 12;
 
-/** Je vidět rozdělené zobrazení (seznam + vlákno)? Na serveru / před hydratací ne. */
-function useIsDesktop(): boolean {
-  const [desktop, setDesktop] = React.useState(false);
+/** Odpovídá media query? (na serveru / před hydratací false) */
+function useMedia(query: string): boolean {
+  const [hit, setHit] = React.useState(false);
   React.useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia(DESKTOP_QUERY);
-    const on = () => setDesktop(mq.matches);
+    const mq = window.matchMedia(query);
+    const on = () => setHit(mq.matches);
     on();
     mq.addEventListener?.("change", on);
     return () => mq.removeEventListener?.("change", on);
-  }, []);
-  return desktop;
+  }, [query]);
+  return hit;
+}
+
+/** Je vidět rozdělené zobrazení (seznam + vlákno)? Na serveru / před hydratací ne. */
+function useIsDesktop(): boolean {
+  return useMedia(DESKTOP_QUERY);
 }
 const FOLDERS: { id: MailFolder; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "inbox", icon: InboxIcon },
@@ -81,8 +97,10 @@ function folderCount(f: MailFolder, c: FolderCounts): number {
  * kategorie (štítek, čipy filtru, oprava ťuknutím), odpověď / přeposlání / nová zpráva, předání kolegovi,
  * ozubené kolo „Nastavení pošty" (podpis).
  */
-export function InboxView({ initial, counts: initialCounts, mailboxes, scope, mailboxId: initialMailbox, folder: initialFolder }: InboxViewProps) {
-  const { can } = useAccess();
+export function InboxView({ initial, counts: initialCounts, mailboxes, scope, mailboxId: initialMailbox, folder: initialFolder, uiPrefs: serverPrefs }: InboxViewProps) {
+  const { can, userId } = useAccess();
+  // rozložení (šířka seznamu × detail, sbalené složky): uloží se hned, bez potvrzení, pro tohoto uživatele
+  const [prefs, setPref] = useUiPrefs(userId, serverPrefs ?? {});
   const canAi = can("dashboard"); // AI třídění, návrhy odpovědí a korekce — jen AI přehled
   const live = useMailLive();
   // otevřená Pošta: nová pošta se kontroluje každých 30 s (skrytá karta nekontroluje) a objeví se sama
@@ -110,6 +128,70 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   const [showImport, setShowImport] = React.useState(false);
   const seq = React.useRef(0);
   const sentinel = React.useRef<HTMLDivElement>(null);
+  const listScroll = React.useRef<HTMLDivElement>(null);
+  const detailScroll = React.useRef<HTMLDivElement>(null);
+  const panesRef = React.useRef<HTMLDivElement>(null);
+  const splitRef = React.useRef<HTMLDivElement>(null);
+  const listPane = React.useRef<HTMLDivElement>(null);
+
+  // ── Rozložení na počítači: šířka seznamu (oddělovač) a sbalené složky — uloží se hned (profil + prohlížeč) ──
+  const listWidthPref = prefs["mail.listWidth"];
+  const foldersCollapsed = prefs["mail.foldersCollapsed"];
+  const wide = useMedia(WIDE_QUERY);
+  // bez volby: pod 1280 px jen ikony (na 1024 px by jinak detail zprávy neměl místo)
+  const foldersShownCollapsed = foldersCollapsed ?? !wide;
+  const toggleFolders = () => setPref("mail.foldersCollapsed", !foldersShownCollapsed);
+  const [splitW, setSplitW] = React.useState(0);
+  const [listW, setListW] = React.useState(0);
+  React.useEffect(() => {
+    const split = splitRef.current;
+    const list = listPane.current;
+    if (!split || !list || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      setSplitW(Math.round(split.getBoundingClientRect().width));
+      setListW(Math.round(list.getBoundingClientRect().width));
+    });
+    ro.observe(split);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, []);
+  const available = () => Math.max(0, (splitRef.current?.getBoundingClientRect().width ?? splitW) - SEPARATOR_W);
+  const drag = React.useRef<{ id: number; x: number; w: number } | null>(null);
+  const [dragging, setDragging] = React.useState(false);
+  const onDividerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId); // tažení i mimo úzký oddělovač
+    } catch {
+      // ukazatel už neexistuje (syntetická událost) — tažení funguje i bez zachycení
+    }
+    drag.current = { id: e.pointerId, x: e.clientX, w: listPane.current?.getBoundingClientRect().width ?? listW };
+    setDragging(true);
+  };
+  const onDividerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const w = clampListWidth(d.w + e.clientX - d.x, available());
+    if (w !== listWidthPref) setPref("mail.listWidth", w);
+  };
+  const onDividerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current || drag.current.id !== e.pointerId) return;
+    drag.current = null;
+    setDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // nebylo zachyceno
+    }
+  };
+  const onDividerKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const cur = listPane.current?.getBoundingClientRect().width ?? listW;
+    const w = listWidthForKey(e.key, e.shiftKey, Math.round(cur), available());
+    if (w === null) return;
+    e.preventDefault();
+    setPref("mail.listWidth", w);
+  };
 
   const ownMailboxes = scope === "own" ? mailboxes : [];
   const noMailbox = scope === "own" && mailboxes.length === 0;
@@ -181,14 +263,16 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     }
   }, [loadingMore, page.hasMore, page.items.length, params]);
 
-  // nekonečné rolování
+  // nekonečné rolování — na počítači v rámci sloupce seznamu (roluje sám), na mobilu stránka
+  const isDesktopEarly = useIsDesktop();
   React.useEffect(() => {
     const el = sentinel.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && void loadMore(), { rootMargin: "400px" });
+    const root = isDesktopEarly ? listScroll.current : null;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && void loadMore(), { root, rootMargin: "400px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [loadMore]);
+  }, [loadMore, isDesktopEarly]);
 
   const { progress, run } = useMailSync({ canAi, onRound: () => void reload({ keep: page.items.length }) });
 
@@ -337,8 +421,12 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     const fresh = selectedId ? items.find((t) => t.threadId === selectedId) : undefined;
     if (fresh) setOpenedSummary(fresh);
   }, [items, selectedId]);
-  const isDesktop = useIsDesktop();
+  const isDesktop = isDesktopEarly;
   const paneVisible = isDesktop || mobileDetail;
+  // jiné vlákno → detail od začátku (seznam si svou pozici drží)
+  React.useEffect(() => {
+    if (detailScroll.current) detailScroll.current.scrollTop = 0;
+  }, [selectedId]);
   const open = (t: ThreadSummary) => {
     setOpenedSummary(t);
     setSelectedId(t.threadId);
@@ -423,7 +511,8 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
 
   return (
     // mobil: menší mezery — seznam vláken má začít co nejvýš (čipy kategorií přibyly)
-    <div className="space-y-3 sm:space-y-4">
+    // počítač: Pošta na celou výšku okna — složky, seznam a vlákno rolují každé samo (globals.css: main:has([data-mail-layout]))
+    <div className="space-y-3 sm:space-y-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0" data-mail-layout>
       <div className="relative">
       {/* mobil: stav živé pošty vpravo vedle nadpisu (bez dalšího řádku nad seznamem) */}
       {updatedLabel && (
@@ -560,9 +649,21 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         <Card><CardContent className="pt-5"><OutlookImport /></CardContent></Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[10rem_minmax(0,19rem)_minmax(0,1fr)] xl:grid-cols-[11rem_minmax(0,23rem)_minmax(0,1fr)] 2xl:grid-cols-[12rem_minmax(0,26rem)_minmax(0,1fr)]">
-        {/* Složky */}
-        <nav aria-label="Složky pošty" className={cn("-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0", mobileDetail && "hidden lg:flex")} data-testid="mail-folders">
+      <div
+        ref={panesRef}
+        className={cn("grid gap-4 lg:flex lg:min-h-[26rem] lg:flex-1 lg:gap-0", foldersCollapsed === true && "mail-folders-collapsed", foldersCollapsed === false && "mail-folders-expanded")}
+        data-testid="mail-panes"
+        data-folders={foldersCollapsed === undefined ? "auto" : foldersCollapsed ? "collapsed" : "expanded"}
+      >
+        {/* Složky — na počítači vlastní sloupec (roluje sám), jde sbalit na ikony */}
+        <nav
+          aria-label="Složky pošty"
+          className={cn(
+            "mail-folders -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin lg:mx-0 lg:mr-4 lg:shrink-0 lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:px-0 lg:pb-0",
+            mobileDetail && "hidden lg:flex",
+          )}
+          data-testid="mail-folders"
+        >
           {FOLDERS.map(({ id, icon: Icon }) => {
             const n = folderCount(id, counts);
             const active = folder === id;
@@ -573,163 +674,215 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                 type="button"
                 onClick={() => changeFolder(id)}
                 aria-current={active ? "page" : undefined}
+                title={FOLDER_LABEL[id]}
                 className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors lg:w-full lg:border-transparent",
+                  "mail-folder relative inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors lg:w-full lg:border-transparent",
                   active ? "border-primary/30 bg-primary/10 text-primary" : "bg-background text-foreground/80 hover:bg-accent lg:bg-transparent",
                 )}
                 data-testid={`folder-${id}`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span className="flex-1 text-left">{FOLDER_LABEL[id]}</span>
-                {n > 0 && <span className={cn("rounded-full px-1.5 text-[11px] font-semibold tabular-nums", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{n}</span>}
+                <span className="mail-folder-label flex-1 truncate text-left">{FOLDER_LABEL[id]}</span>
+                {n > 0 && <span className={cn("mail-folder-count rounded-full px-1.5 text-[11px] font-semibold tabular-nums", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{n}</span>}
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={toggleFolders}
+            className="mail-folders-toggle mt-auto hidden min-h-9 w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground lg:inline-flex"
+            aria-label={foldersShownCollapsed ? "Rozbalit složky" : "Sbalit složky na ikony"}
+            title={foldersShownCollapsed ? "Rozbalit složky" : "Sbalit složky na ikony"}
+            aria-pressed={foldersShownCollapsed}
+            data-testid="mail-folders-toggle"
+          >
+            {foldersShownCollapsed ? <PanelLeftOpen className="h-4 w-4 shrink-0" /> : <PanelLeftClose className="h-4 w-4 shrink-0" />}
+            <span className="mail-folder-label truncate">Sbalit</span>
+          </button>
         </nav>
 
-        {/* Seznam */}
-        <div className={cn("min-w-0 space-y-2", mobileDetail && "hidden lg:block")}>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Hledat (předmět, odesílatel, text)…" className="pl-9" aria-label="Hledat v poště" data-testid="mail-search" />
-            </div>
-            <Button variant={filtersOn ? "secondary" : "outline"} size="icon" onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters} aria-label="Filtry a řazení" data-testid="mail-filters-toggle">
-              <SlidersHorizontal className="h-4 w-4" />
-            </Button>
-          </div>
-          {showFilters && (
-            <div className="space-y-2 rounded-lg border bg-card p-2.5 text-sm" data-testid="mail-filters">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="w-16 text-xs text-muted-foreground">Priorita</span>
-                {[null, 1, 2, 3].map((p) => (
-                  <button
-                    key={String(p)}
-                    type="button"
-                    onClick={() => setPriorityMax(p)}
-                    className={cn("min-h-8 rounded-full border px-2.5 text-xs font-medium", priorityMax === p ? (p ? PRIORITY_STYLE[p as PriorityValue].solid : "border-foreground bg-foreground text-background") : "hover:bg-accent")}
-                    data-testid={`filter-priority-${p ?? "all"}`}
-                  >
-                    {p === null ? "Vše" : p === 1 ? "Jen P1" : `P1–P${p}`}
-                  </button>
-                ))}
+        {/* Seznam + oddělovač + vlákno: šířku seznamu jde táhnout (myš, dotyk, šipky), uloží se hned */}
+        <div ref={splitRef} className="contents lg:flex lg:min-h-0 lg:min-w-0 lg:flex-1" data-testid="mail-split">
+          {/* Seznam */}
+          <div
+            ref={listPane}
+            className={cn("mail-list-pane min-w-0 space-y-2 lg:flex lg:min-h-0 lg:flex-col lg:space-y-0", mobileDetail && "hidden lg:flex")}
+            style={{ "--mail-list-w": listWidthPref ? `${listWidthPref}px` : `${MAIL_LIST_DEFAULT_RATIO * 100}%` } as React.CSSProperties}
+            data-testid="mail-list-pane"
+          >
+            <div className="space-y-2 lg:shrink-0 lg:pb-2">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Hledat (předmět, odesílatel, text)…" className="pl-9" aria-label="Hledat v poště" data-testid="mail-search" />
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="w-16 text-xs text-muted-foreground">Řadit</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value as MailSort)} className="h-8 rounded-md border bg-background px-2 text-xs" aria-label="Řazení" data-testid="mail-sort">
-                  {(Object.keys(SORT_LABEL) as MailSort[]).map((s) => <option key={s} value={s}>{SORT_LABEL[s]}</option>)}
-                </select>
-                <button type="button" onClick={() => setUnreadOnly((v) => !v)} aria-pressed={unreadOnly} className={cn("inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", unreadOnly ? "border-blue-500 bg-blue-500 text-white" : "hover:bg-accent")}>
-                  <MailOpen className="h-3.5 w-3.5" /> Jen nepřečtené
-                </button>
-              </div>
-            </div>
-          )}
-          {chipCategories.length > 0 && (
-            // kategorie vždy na očích: jeden řádek čipů (na mobilu se posouvá do strany)
-            <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin" role="group" aria-label="Filtr kategorie" data-testid="category-chips">
-              {/* mobil: řádek s počtem vláken není (seznam začne výš) — načítání ukáže kolečko tady */}
-              {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground sm:hidden" aria-label="Načítám" />}
-              <button
-                type="button" onClick={() => setCategory(null)} aria-pressed={category === null}
-                className={cn("min-h-8 shrink-0 rounded-full border px-2.5 text-xs font-medium", category === null ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-accent")}
-                data-testid="category-chip-all"
-              >
-                Všechny
-              </button>
-              {chipCategories.map((c) => {
-                const Icon = CATEGORY_STYLE[c].icon;
-                return (
-                  <button
-                    key={c} type="button" onClick={() => setCategory(category === c ? null : c)} aria-pressed={category === c}
-                    className={cn("inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", category === c ? CATEGORY_STYLE[c].active : CATEGORY_STYLE[c].chip)}
-                    data-testid={`category-chip-${categoryCodeFromLabel(c)}`}
-                  >
-                    <Icon className="h-3.5 w-3.5" /> {c}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu */}
-          <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground", chipCategories.length ? "hidden sm:flex" : "flex")}>
-            <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
-            <span className="ml-auto inline-flex items-center gap-1.5">
-              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {updatedLabel && (
-                <span
-                  className={cn("text-[11px]", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
-                  title={live.error ? `Poslední kontrola: ${live.error}` : "Nová pošta se kontroluje sama každých 30 s"}
-                  data-testid="mail-updated"
-                  suppressHydrationWarning
-                >
-                  {updatedLabel}
-                </span>
-              )}
-            </span>
-          </div>
-          {folder === "sent" && scope === "all" && (
-            <p className="px-1 text-xs text-muted-foreground">
-              Starší odeslané z fronty schvalování: <Link href="/sent?archiv=1" className="text-primary underline-offset-4 hover:underline">archiv odeslané pošty</Link>
-            </p>
-          )}
-          {folder === "jobs" && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-xs text-fuchsia-900 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-200" data-testid="jobs-folder-hint">
-              <FolderKanban className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1">Pošta k běžícím zakázkám a poptávkám — přiřazuje se sama. Nejisté má otázku „Patří k…?“.</span>
-              <Button size="sm" variant="outline" className="h-7 bg-background text-xs" onClick={() => void backfill()} disabled={backfilling} data-testid="jobs-backfill">
-                {backfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} Přiřadit starou poštu
+              <Button variant={filtersOn ? "secondary" : "outline"} size="icon" onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters} aria-label="Filtry a řazení" data-testid="mail-filters-toggle">
+                <SlidersHorizontal className="h-4 w-4" />
               </Button>
             </div>
-          )}
-          {items.length === 0 ? (
-            <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} onConnect={() => openSettings("schranka")} />
-          ) : (
-            <div className="space-y-2" data-testid="thread-list">
-              {items.map((t, i) => (
-                <React.Fragment key={t.threadId}>
-                  {folder === "jobs" && (i === 0 || groupKey(items[i - 1]) !== groupKey(t)) && <JobGroupHeader t={t} />}
-                  <ThreadRow
-                    t={t}
-                    active={t.threadId === selected?.threadId}
-                    canAi={canAi}
-                    showMailbox={scope === "all" && !mailboxId}
-                    hideJob={folder === "jobs"}
-                    onOpen={() => open(t)}
-                    onFlag={() => void toggleFlag(t)}
-                    onPriority={(v) => void changePriority(t, v)}
-                    onSuggestion={(accept) => void answerSuggestion(t, accept)}
-                    suggestionBusy={suggBusy === t.threadId}
-                    onCategory={(c) => recategorize(t, c)}
-                    onError={(text) => setSyncMsg({ ok: false, text })}
-                    onAction={(key) => void rowActions.run(key, { threadId: t.threadId, emailId: t.emailId, jobId: t.jobId })}
-                    actionBusy={rowActions.busy?.threadId === t.threadId ? rowActions.busy.key : null}
-                  />
-                </React.Fragment>
-              ))}
-              <div ref={sentinel} />
-              {page.hasMore && (
-                <Button variant="outline" size="sm" className="w-full" onClick={() => void loadMore()} disabled={loadingMore} data-testid="load-more">
-                  {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Načíst další ({Math.max(0, page.total - items.length)})
+            {showFilters && (
+              <div className="space-y-2 rounded-lg border bg-card p-2.5 text-sm" data-testid="mail-filters">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="w-16 text-xs text-muted-foreground">Priorita</span>
+                  {[null, 1, 2, 3].map((p) => (
+                    <button
+                      key={String(p)}
+                      type="button"
+                      onClick={() => setPriorityMax(p)}
+                      className={cn("min-h-8 rounded-full border px-2.5 text-xs font-medium", priorityMax === p ? (p ? PRIORITY_STYLE[p as PriorityValue].solid : "border-foreground bg-foreground text-background") : "hover:bg-accent")}
+                      data-testid={`filter-priority-${p ?? "all"}`}
+                    >
+                      {p === null ? "Vše" : p === 1 ? "Jen P1" : `P1–P${p}`}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="w-16 text-xs text-muted-foreground">Řadit</span>
+                  <select value={sort} onChange={(e) => setSort(e.target.value as MailSort)} className="h-8 rounded-md border bg-background px-2 text-xs" aria-label="Řazení" data-testid="mail-sort">
+                    {(Object.keys(SORT_LABEL) as MailSort[]).map((s) => <option key={s} value={s}>{SORT_LABEL[s]}</option>)}
+                  </select>
+                  <button type="button" onClick={() => setUnreadOnly((v) => !v)} aria-pressed={unreadOnly} className={cn("inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", unreadOnly ? "border-blue-500 bg-blue-500 text-white" : "hover:bg-accent")}>
+                    <MailOpen className="h-3.5 w-3.5" /> Jen nepřečtené
+                  </button>
+                </div>
+              </div>
+            )}
+            {chipCategories.length > 0 && (
+              // kategorie vždy na očích: jeden řádek čipů (na mobilu se posouvá do strany)
+              <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin" role="group" aria-label="Filtr kategorie" data-testid="category-chips">
+                {/* mobil: řádek s počtem vláken není (seznam začne výš) — načítání ukáže kolečko tady */}
+                {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground sm:hidden" aria-label="Načítám" />}
+                <button
+                  type="button" onClick={() => setCategory(null)} aria-pressed={category === null}
+                  className={cn("min-h-8 shrink-0 rounded-full border px-2.5 text-xs font-medium", category === null ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-accent")}
+                  data-testid="category-chip-all"
+                >
+                  Všechny
+                </button>
+                {chipCategories.map((c) => {
+                  const Icon = CATEGORY_STYLE[c].icon;
+                  return (
+                    <button
+                      key={c} type="button" onClick={() => setCategory(category === c ? null : c)} aria-pressed={category === c}
+                      className={cn("inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", category === c ? CATEGORY_STYLE[c].active : CATEGORY_STYLE[c].chip)}
+                      data-testid={`category-chip-${categoryCodeFromLabel(c)}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" /> {c}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu */}
+            <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground", chipCategories.length ? "hidden sm:flex" : "flex")}>
+              <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
+              <span className="ml-auto inline-flex items-center gap-1.5">
+                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {updatedLabel && (
+                  <span
+                    className={cn("text-[11px]", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+                    title={live.error ? `Poslední kontrola: ${live.error}` : "Nová pošta se kontroluje sama každých 30 s"}
+                    data-testid="mail-updated"
+                    suppressHydrationWarning
+                  >
+                    {updatedLabel}
+                  </span>
+                )}
+              </span>
+            </div>
+            {folder === "sent" && scope === "all" && (
+              <p className="px-1 text-xs text-muted-foreground">
+                Starší odeslané z fronty schvalování: <Link href="/sent?archiv=1" className="text-primary underline-offset-4 hover:underline">archiv odeslané pošty</Link>
+              </p>
+            )}
+            {folder === "jobs" && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-xs text-fuchsia-900 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-200" data-testid="jobs-folder-hint">
+                <FolderKanban className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1">Pošta k běžícím zakázkám a poptávkám — přiřazuje se sama. Nejisté má otázku „Patří k…?“.</span>
+                <Button size="sm" variant="outline" className="h-7 bg-background text-xs" onClick={() => void backfill()} disabled={backfilling} data-testid="jobs-backfill">
+                  {backfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} Přiřadit starou poštu
                 </Button>
+              </div>
+            )}
+            </div>
+            <div ref={listScroll} className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 scrollbar-thin" data-testid="thread-list-scroll">
+              {items.length === 0 ? (
+                <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} onConnect={() => openSettings("schranka")} />
+              ) : (
+                <div className="space-y-2" data-testid="thread-list">
+                  {items.map((t, i) => (
+                    <React.Fragment key={t.threadId}>
+                      {folder === "jobs" && (i === 0 || groupKey(items[i - 1]) !== groupKey(t)) && <JobGroupHeader t={t} />}
+                      <ThreadRow
+                        t={t}
+                        active={t.threadId === selected?.threadId}
+                        canAi={canAi}
+                        showMailbox={scope === "all" && !mailboxId}
+                        hideJob={folder === "jobs"}
+                        onOpen={() => open(t)}
+                        onFlag={() => void toggleFlag(t)}
+                        onPriority={(v) => void changePriority(t, v)}
+                        onSuggestion={(accept) => void answerSuggestion(t, accept)}
+                        suggestionBusy={suggBusy === t.threadId}
+                        onCategory={(c) => recategorize(t, c)}
+                        onError={(text) => setSyncMsg({ ok: false, text })}
+                        onAction={(key) => void rowActions.run(key, { threadId: t.threadId, emailId: t.emailId, jobId: t.jobId })}
+                        actionBusy={rowActions.busy?.threadId === t.threadId ? rowActions.busy.key : null}
+                      />
+                    </React.Fragment>
+                  ))}
+                  <div ref={sentinel} />
+                  {page.hasMore && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => void loadMore()} disabled={loadingMore} data-testid="load-more">
+                      {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Načíst další ({Math.max(0, page.total - items.length)})
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Vlákno */}
-        <div
-          className={cn(
-            "min-w-0",
-            // mobil / tablet: detail vlákna přes celou obrazovku (nad hlavičkou, nad spodní lištou zůstává navigace)
-            mobileDetail
-              ? "fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 overflow-y-auto overscroll-contain bg-background p-3 md:bottom-0 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0"
-              : "hidden lg:block",
-          )}
-          data-testid="thread-pane"
-        >
-          {selected && paneVisible ? (
-            <div className="lg:sticky lg:top-2">
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Šířka seznamu pošty (šipky vlevo / vpravo, dvojklik = výchozí)"
+            aria-valuemin={MAIL_LIST_MIN}
+            aria-valuemax={Math.max(MAIL_LIST_MIN, splitW - SEPARATOR_W - MAIL_DETAIL_MIN)}
+            aria-valuenow={listW || undefined}
+            tabIndex={0}
+            onPointerDown={onDividerDown}
+            onPointerMove={onDividerMove}
+            onPointerUp={onDividerUp}
+            onPointerCancel={onDividerUp}
+            onDoubleClick={() => setPref("mail.listWidth", null)}
+            onKeyDown={onDividerKey}
+            title="Táhni pro změnu šířky seznamu · dvojklik = výchozí"
+            className={cn(
+              "group relative hidden w-3 shrink-0 cursor-col-resize touch-none select-none items-stretch justify-center outline-none lg:flex",
+              "focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+            data-testid="mail-divider"
+            data-dragging={dragging ? "1" : "0"}
+          >
+            <span className={cn("my-1 w-px rounded-full bg-border transition-colors group-hover:w-0.5 group-hover:bg-primary/60", dragging && "w-0.5 bg-primary")} aria-hidden />
+          </div>
+
+          {/* Vlákno */}
+          <div
+            ref={detailScroll}
+            className={cn(
+              "min-w-0",
+              // mobil / tablet: detail vlákna přes celou obrazovku (nad hlavičkou, nad spodní lištou zůstává navigace)
+              mobileDetail
+                ? "fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 overflow-y-auto overscroll-contain bg-background p-3 md:bottom-0"
+                : "hidden",
+              // počítač: vlastní sloupec, roluje sám (hlavička vlákna s akcemi zůstává nahoře)
+              "lg:static lg:z-auto lg:block lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:bg-transparent lg:p-0 scrollbar-thin",
+            )}
+            style={{ minWidth: isDesktop ? Math.min(MAIL_DETAIL_MIN, Math.max(0, splitW - SEPARATOR_W - MAIL_LIST_MIN)) : undefined }}
+            data-testid="thread-pane"
+          >
+            {selected && paneVisible ? (
               <ThreadView
                 key={selected.threadId}
                 summary={selected}
@@ -740,12 +893,12 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                 onCompose={setCompose}
                 onSplit={() => void reload({ keep: page.items.length })}
               />
-            </div>
-          ) : (
-            <Card className="flex h-64 items-center justify-center">
-              <div className="text-center text-sm text-muted-foreground"><Mail className="mx-auto mb-2 h-8 w-8 opacity-40" />Vyber e-mail vlevo.</div>
-            </Card>
-          )}
+            ) : (
+              <Card className="flex h-64 items-center justify-center">
+                <div className="text-center text-sm text-muted-foreground"><Mail className="mx-auto mb-2 h-8 w-8 opacity-40" />Vyber e-mail vlevo.</div>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
 
@@ -816,6 +969,11 @@ function OutboxBar({ items, busy, onSend, onDiscard, onSettings }: {
   );
 }
 
+/** Platná blokace přihlášení po odmítnutém hesle (auth-lockout.ts). */
+function lockActive(m: MailboxOption): boolean {
+  return Boolean(m.authRetryAt && m.authLockReason && Date.parse(m.authRetryAt) > Date.now());
+}
+
 /** Stav stahování schránek (poslední stažení / chyba / neúplné nastavení); vlastní schránku jde opravit hned. */
 function MailboxHealth({ mailboxes, onFix }: { mailboxes: MailboxOption[]; onFix?: (mailboxId: string) => void }) {
   const items = mailboxes
@@ -823,7 +981,9 @@ function MailboxHealth({ mailboxes, onFix }: { mailboxes: MailboxOption[]; onFix
       m.incomplete
         ? { id: m.id, bad: true, fix: true, text: `${m.email}: nastavení není kompletní — doplň heslo a servery.` }
         : m.authBlocked
-          ? { id: m.id, bad: true, fix: true, text: `${m.email}: Heslo odmítnuto — oprav ho v Nastavení pošty. Automatické stahování je do opravy pozastavené.` }
+          ? { id: m.id, bad: true, fix: true, text: `${m.email}: Heslo odmítnuto — oprav ho v Nastavení pošty. Automatické stahování je do opravy pozastavené.${lockActive(m) ? ` Ručně nejdřív po ${retryClock(m.authRetryAt!)}.` : ""}` }
+          : lockActive(m)
+          ? { id: m.id, bad: true, fix: true, text: `${m.email}: ${m.authLockReason}` }
           : m.lastSyncError
             ? { id: m.id, bad: true, fix: true, text: m.lastSyncError }
             : m.lastSyncAt

@@ -1,7 +1,7 @@
 import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { Mailbox } from "@/lib/supabase/database.types";
-import { getMailboxStatuses } from "@/lib/email/mailbox-status";
+import { getMailboxStatuses, authLockFor } from "@/lib/email/mailbox-status";
 
 /** Metadata nastavení (bez tajných hodnot — jen příznak „nastaveno"). */
 export interface SettingMeta {
@@ -79,7 +79,11 @@ export async function getMailboxes(): Promise<Mailbox[]> {
       for (const key of SECRET_MAILBOX_KEYS) delete config[key];
       const st = statuses.get(m.id);
       // stav inkrementálního stahování (UID / UIDL) do prohlížeče nepatří
-      const status = st ? { ...st, sync_state: {} } : null;
+      // blokace po odmítnutém hesle (auth-lockout.ts) — otisk údajů do prohlížeče nejde, jen čas a důvod
+      const lock = authLockFor(st, { provider: m.provider, email: m.email, config: m.config });
+      const status = st
+        ? { ...st, sync_state: {}, auth_fail_fp: null, auth_retry_at: lock.blocked ? lock.until : null, auth_lock_reason: lock.blocked ? lock.reason : null }
+        : null;
       return { ...m, config, secrets_set, status };
     });
   } catch {
