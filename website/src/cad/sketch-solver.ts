@@ -481,33 +481,58 @@ export function solveSketch(entities: SketchEntity[], constraints: SketchConstra
   return { entities: result, ok: residual < 1e-5, residual, dof, conflicts, iterations };
 }
 
-/** Zbývající stupně volnosti skici (0 = plně určená). */
-export function sketchDof(entities: SketchEntity[], constraints: SketchConstraint[] = [], dims: SketchDim[] = []): number {
-  const total = entities.reduce((s, e) => s + dofOf(e), 0);
+/**
+ * Parametry pro rozbor určenosti: oblouk jako (střed, poloměr, úhel začátku, úhel konce) – bez nadbytečného
+ * parametru tříbodového zápisu a bez singularity půlkruhu (poloměr je přímo parametr).
+ */
+function anaParams(e: SketchEntity): number[] {
+  if (e.type !== "arc") return paramsOf(e);
+  const g = arcGeom(e.a, e.b, e.c);
+  if (!g) return [...e.a, ...e.c, 0];
+  const startsAtA = Math.hypot(e.a[0] - (g.c[0] + g.r * Math.cos(g.a0)), e.a[1] - (g.c[1] + g.r * Math.sin(g.a0))) < 1e-6;
+  return [g.c[0], g.c[1], g.r, startsAtA ? g.a0 : g.a0 + g.sweep, startsAtA ? g.a0 + g.sweep : g.a0];
+}
+function anaWith(e: SketchEntity, x: number[]): SketchEntity {
+  if (e.type !== "arc") return withParams(e, x);
+  if (!arcGeom(e.a, e.b, e.c)) return { ...e, a: [x[0], x[1]], c: [x[2], x[3]] };
+  const P = (t: number): Vec2 => [x[0] + x[2] * Math.cos(t), x[1] + x[2] * Math.sin(t)];
+  return { ...e, a: P(x[3]), b: P((x[3] + x[4]) / 2), c: P(x[4]) };
+}
+
+/** Normalizovaná Jakobiho matice vazeb a řídicích kót (jen entity, kterých se týkají). */
+function jacobian(entities: SketchEntity[], constraints: SketchConstraint[], dims: SketchDim[]) {
   const involved = new Set<string>();
   for (const c of constraints) for (const r of c.refs) involved.add(r.e);
   for (const d of dims) if (d.driving) for (const r of d.refs) involved.add(r.e);
   const vars = entities.filter((e) => involved.has(e.id));
-  if (!vars.length) return total;
   const offs: number[] = [];
   let x: number[] = [];
   for (const e of vars) {
     offs.push(x.length);
-    x = x.concat(paramsOf(e));
+    x = x.concat(anaParams(e));
   }
   const map0 = new Map(entities.map((e) => [e.id, e]));
+  const owners: string[] = [];
   const res = (xx: number[]) => {
     const m = new Map(map0);
-    vars.forEach((e, i) => m.set(e.id, withParams(e, xx.slice(offs[i], offs[i] + paramsOf(e).length))));
+    vars.forEach((e, i) => m.set(e.id, anaWith(e, xx.slice(offs[i], offs[i] + anaParams(e).length))));
     const out: number[] = [];
-    for (const c of constraints) out.push(...constraintResiduals(m, c));
-    for (const d of dims) out.push(...dimResidual(m, d, 1));
+    owners.length = 0;
+    for (const c of constraints) for (const v of constraintResiduals(m, c)) {
+      out.push(v);
+      owners.push(c.id);
+    }
+    for (const d of dims) for (const v of dimResidual(m, d, 1)) {
+      out.push(v);
+      owners.push(d.id);
+    }
     return out;
   };
   const f0 = res(x);
-  if (!f0.length) return total;
-  const J: number[][] = Array.from({ length: f0.length }, () => new Array(x.length).fill(0));
-  for (let j = 0; j < x.length; j++) {
+  const rowOwner = [...owners];
+  const N = x.length;
+  const J: number[][] = Array.from({ length: f0.length }, () => new Array(N).fill(0));
+  for (let j = 0; j < N; j++) {
     const h = 1e-6 * Math.max(1, Math.abs(x[j]));
     const xp = [...x];
     xp[j] += h;
@@ -519,6 +544,13 @@ export function sketchDof(entities: SketchEntity[], constraints: SketchConstrain
     const n = Math.hypot(...row);
     if (n > 1e-12) for (let k = 0; k < row.length; k++) row[k] /= n;
   }
+  return { J, rowOwner, vars, offs, N, total: entities.reduce((s, e) => s + dofOf(e), 0) };
+}
+
+/** Zbývající stupně volnosti skici (0 = plně určená). */
+export function sketchDof(entities: SketchEntity[], constraints: SketchConstraint[] = [], dims: SketchDim[] = []): number {
+  const { J, total } = jacobian(entities, constraints, dims);
+  if (!J.length) return total;
   return Math.max(0, total - rank(J, 1e-6));
 }
 
@@ -540,8 +572,7 @@ export type SketchAnalysis = {
 /**
  * Rozbor určenosti: z normalizované Jakobiho matice vazeb a řídicích kót spočítá hodnost, nadbytečné řádky
  * (řádková eliminace v pořadí vazeb – za nadbytečnou se označí později přidaná) a nulový prostor; entita je
- * plně určená, když žádný směr nulového prostoru nehýbe jejími parametry (u oblouku se ignoruje posun
- * prostředního bodu po oblouku, který geometrii nemění).
+ * plně určená, když žádný směr nulového prostoru nehýbe jejími parametry.
  */
 export function analyzeSketch(entities: SketchEntity[], constraints: SketchConstraint[] = [], dims: SketchDim[] = []): SketchAnalysis {
   const states = new Map<string, EntityState>(entities.map((e) => [e.id, "free"]));
@@ -552,11 +583,6 @@ export function analyzeSketch(entities: SketchEntity[], constraints: SketchConst
     const v = measureDim(map0, d);
     if (v != null && Math.abs(v - d.value) > 1e-4) conflicts.add(d.id);
   }
-  const involved = new Set<string>();
-  for (const c of constraints) for (const r of c.refs) involved.add(r.e);
-  for (const d of dims) if (d.driving) for (const r of d.refs) involved.add(r.e);
-  const vars = entities.filter((e) => involved.has(e.id));
-  const total = entities.reduce((s, e) => s + dofOf(e), 0);
   const done = (dof: number, redundant: string[]): SketchAnalysis => {
     const over = conflicts.size > 0 || redundant.length > 0;
     for (const id of [...conflicts, ...redundant]) {
@@ -565,46 +591,9 @@ export function analyzeSketch(entities: SketchEntity[], constraints: SketchConst
     }
     return { dof, conflicts: [...conflicts], redundant, states, status: over ? "over" : dof === 0 ? "full" : "under" };
   };
-  if (!vars.length) return done(total, []);
-  const offs: number[] = [];
-  let x: number[] = [];
-  for (const e of vars) {
-    offs.push(x.length);
-    x = x.concat(paramsOf(e));
-  }
-  const owners: string[] = [];
-  const res = (xx: number[]) => {
-    const m = new Map(map0);
-    vars.forEach((e, i) => m.set(e.id, withParams(e, xx.slice(offs[i], offs[i] + paramsOf(e).length))));
-    const out: number[] = [];
-    owners.length = 0;
-    for (const c of constraints) for (const v of constraintResiduals(m, c)) {
-      out.push(v);
-      owners.push(c.id);
-    }
-    for (const d of dims) for (const v of dimResidual(m, d, 1)) {
-      out.push(v);
-      owners.push(d.id);
-    }
-    return out;
-  };
-  const f0 = res(x);
-  const rowOwner = [...owners];
-  const N = x.length;
-  if (!f0.length) return done(total, []);
-  const J: number[][] = Array.from({ length: f0.length }, () => new Array(N).fill(0));
-  for (let j = 0; j < N; j++) {
-    const h = 1e-6 * Math.max(1, Math.abs(x[j]));
-    const xp = [...x];
-    xp[j] += h;
-    const fp = res(xp);
-    for (let i = 0; i < f0.length; i++) J[i][j] = (fp[i] - f0[i]) / h;
-  }
-  for (const row of J) {
-    const n = Math.hypot(...row);
-    if (n > 1e-12) for (let k = 0; k < row.length; k++) row[k] /= n;
-  }
-  // 1) nadbytečné řádky: eliminace v pořadí řádků
+  const { J, rowOwner, vars, offs, N, total } = jacobian(entities, constraints, dims);
+  if (!J.length || !N) return done(total, []);
+  // 1) nadbytečné řádky: Gram–Schmidt v pořadí řádků
   const redundant: string[] = [];
   {
     const basis: number[][] = [];
@@ -622,7 +611,7 @@ export function analyzeSketch(entities: SketchEntity[], constraints: SketchConst
       basis.push(v.map((vi) => vi / n));
     }
   }
-  // 2) nulový prostor z redukovaného tvaru
+  // 2) nulový prostor z redukovaného řádkového tvaru
   const M = J.map((r) => [...r]);
   const pivotCol: number[] = [];
   let rk = 0;
@@ -642,43 +631,21 @@ export function analyzeSketch(entities: SketchEntity[], constraints: SketchConst
     rk++;
   }
   const isPivot = new Set(pivotCol);
-  const freeCols = Array.from({ length: N }, (_, j) => j).filter((j) => !isPivot.has(j));
-  const nulls: number[][] = freeCols.map((f) => {
+  const nulls: number[][] = [];
+  for (let f = 0; f < N; f++) {
+    if (isPivot.has(f)) continue;
     const v = new Array(N).fill(0);
     v[f] = 1;
     pivotCol.forEach((pc, i) => (v[pc] = -M[i][f]));
-    return v;
-  });
+    nulls.push(v);
+  }
   vars.forEach((e, i) => {
     const o = offs[i];
-    const n = paramsOf(e).length;
-    let tan: Vec2 | null = null;
-    if (e.type === "arc") {
-      const g = circleFrom3(e.a, e.b, e.c);
-      if (g) {
-        const rr: Vec2 = [e.b[0] - g.c[0], e.b[1] - g.c[1]];
-        const L = Math.hypot(...rr) || 1;
-        tan = [-rr[1] / L, rr[0] / L];
-      }
-    }
-    let moves = false;
-    for (const v of nulls) {
-      let mx = 0;
-      for (let k = 0; k < n; k++) {
-        if (tan && (k === 2 || k === 3)) continue;
-        mx = Math.max(mx, Math.abs(v[o + k]));
-      }
-      if (tan) {
-        const bx = v[o + 2];
-        const by = v[o + 3];
-        const t = bx * tan[0] + by * tan[1];
-        mx = Math.max(mx, Math.hypot(bx - t * tan[0], by - t * tan[1]));
-      }
-      if (mx > 1e-3) {
-        moves = true;
-        break;
-      }
-    }
+    const n = anaParams(e).length;
+    const moves = nulls.some((v) => {
+      for (let k = 0; k < n; k++) if (Math.abs(v[o + k]) > 1e-3) return true;
+      return false;
+    });
     if (!moves && states.get(e.id) === "free") states.set(e.id, "full");
   });
   return done(Math.max(0, total - rk), redundant);

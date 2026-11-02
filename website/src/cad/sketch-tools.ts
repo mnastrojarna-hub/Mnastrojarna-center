@@ -179,18 +179,23 @@ export function powerTrim(entities: SketchEntity[], path: Vec2[]): SketchEntity[
   let list = entities;
   let changed = false;
   const skip = new Set<string>();
-  for (let guard = 0; guard < 400; guard++) {
-    let best: { id: string; p: Vec2; t: number } | null = null;
+  type Hit = { id: string; p: Vec2; t: number };
+  const firstHit = (es: SketchEntity[]): Hit | null => {
+    let best: Hit | null = null;
     for (let si = 0; si < segs.length; si++) {
-      for (const e of list) {
+      for (const e of es) {
         if (skip.has(e.id) || e.type === "point") continue;
         for (const pr of prims(e)) for (const x of intersect(segs[si], pr)) {
           const t = si + primParam(segs[si], x);
           if (!best || t < best.t) best = { id: e.id, p: x, t };
         }
       }
-      if (best) break;
+      if (best) return best;
     }
+    return best;
+  };
+  for (let guard = 0; guard < 400; guard++) {
+    const best = firstHit(list);
     if (!best) break;
     const r = trim(list, best.id, best.p);
     if (!r) {
