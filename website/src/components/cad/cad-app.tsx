@@ -1357,12 +1357,72 @@ export function CadApp() {
   const hasBody = isAsm ? asmViews.length > 0 : !!result?.mesh;
 
   // ---------- pás karet ----------
+  const askNum = (label: string, def: number) => {
+    const raw = window.prompt(label, String(def));
+    if (raw === null) return null;
+    const v = Number(raw.replace(",", "."));
+    return Number.isFinite(v) ? v : null;
+  };
+  const selVerts = selection.filter((x): x is Extract<SelItem, { kind: "vertex" }> => x.kind === "vertex" && !x.compId).map((x) => x.point);
+  const v3 = {
+    sub: (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+    add: (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+    mul: (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k],
+    dot: (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    cross: (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    len: (a: Vec3) => Math.hypot(a[0], a[1], a[2]),
+    norm: (a: Vec3): Vec3 => {
+      const l = Math.hypot(a[0], a[1], a[2]) || 1;
+      return [a[0] / l, a[1] / l, a[2] / l];
+    },
+  };
+  const offsetPlane = (name: "XY" | "XZ" | "YZ") => () => {
+    const d = askNum(`Odsazení roviny ${name} (mm, kladně ve směru normály)`, 10);
+    if (d !== null) createSketch({ kind: "base", name, offset: d });
+  };
+  const parallelFace = async () => {
+    const i = selFaces[0];
+    const info = await cad.face(i);
+    if (!info?.planar) return flash("Vyberte rovinnou plochu.");
+    const d = askNum("Odsazení od plochy (mm, kladně ve směru normály plochy)", 10);
+    if (d === null) return;
+    createSketch({ kind: "custom", origin: v3.add(info.origin, v3.mul(info.normal, d)), normal: info.normal, xDir: info.xDir, label: `Plocha ${i + 1} ${d >= 0 ? "+" : ""}${d} mm` });
+  };
+  const midPlane = async () => {
+    const [a, b] = await Promise.all(selFaces.slice(0, 2).map((i) => cad.face(i)));
+    if (!a?.planar || !b?.planar) return flash("Vyberte dvě rovinné plochy.");
+    const n = v3.norm(a.normal);
+    if (Math.abs(v3.dot(n, v3.norm(b.normal))) > 0.999) {
+      const dist = v3.dot(v3.sub(b.origin, a.origin), n);
+      return createSketch({ kind: "custom", origin: v3.add(a.origin, v3.mul(n, dist / 2)), normal: n, xDir: a.xDir, label: "Střední rovina" });
+    }
+    // různoběžné plochy: půlicí rovina (úhlová osa normál) středem mezi plochami
+    const nb = v3.norm(b.normal);
+    const bis = v3.norm(v3.dot(n, nb) < 0 ? v3.sub(n, nb) : v3.add(n, nb));
+    const x = v3.norm(v3.cross(bis, Math.abs(bis[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]));
+    flash("Plochy nejsou rovnoběžné – založena půlicí rovina.");
+    createSketch({ kind: "custom", origin: v3.mul(v3.add(a.origin, b.origin), 0.5), normal: bis, xDir: x, label: "Půlicí rovina" });
+  };
+  const threePoints = () => {
+    const [p0, p1, p2] = selVerts;
+    const x = v3.norm(v3.sub(p1, p0));
+    const n0 = v3.cross(x, v3.sub(p2, p0));
+    if (v3.len(n0) < 1e-6) return flash("Body leží na jedné přímce – rovinu nelze určit.");
+    createSketch({ kind: "custom", origin: p0, normal: v3.norm(n0), xDir: x, label: "Rovina 3 body" });
+  };
   const sketchPlanes: RMenuEntry[] = [
     { divider: true, label: "Rovina skici" },
     { id: "xy", label: "Rovina XY (půdorys)", icon: "datum", tone: "ref", onClick: () => createSketch({ kind: "base", name: "XY", offset: 0 }) },
     { id: "xz", label: "Rovina XZ (nárys)", icon: "datum", tone: "ref", onClick: () => createSketch({ kind: "base", name: "XZ", offset: 0 }) },
     { id: "yz", label: "Rovina YZ (bokorys)", icon: "datum", tone: "ref", onClick: () => createSketch({ kind: "base", name: "YZ", offset: 0 }) },
     { id: "face", label: "Na rovinné ploše modelu…", icon: "face", tone: "sketch", disabled: !hasBody, onClick: () => { setPlanePick(true); setActiveId(null); flash("Klikněte na rovinnou plochu modelu."); } },
+    { divider: true, label: "Odsazené a odvozené roviny" },
+    { id: "xyo", label: "XY s odsazením…", icon: "datum", tone: "ref", onClick: offsetPlane("XY") },
+    { id: "xzo", label: "XZ s odsazením…", icon: "datum", tone: "ref", onClick: offsetPlane("XZ") },
+    { id: "yzo", label: "YZ s odsazením…", icon: "datum", tone: "ref", onClick: offsetPlane("YZ") },
+    { id: "faceOff", label: "Rovnoběžně s vybranou plochou…", icon: "face", tone: "sketch", disabled: selFaces.length !== 1, hint: "nejdřív vyberte 1 rovinnou plochu", onClick: parallelFace },
+    { id: "mid", label: "Střední rovina mezi 2 plochami", icon: "face", tone: "sketch", disabled: selFaces.length !== 2, hint: "nejdřív vyberte 2 plochy", onClick: midPlane },
+    { id: "pts", label: "Třemi body (3 vybrané vrcholy)", icon: "datum", tone: "ref", disabled: selVerts.length !== 3, hint: "filtr výběru Bod → vyberte 3 vrcholy", onClick: threePoints },
     ...(datums.length ? ([{ divider: true, label: "Pomocné roviny" }, ...datums.map((d) => ({ id: d.id, label: d.name, icon: "datum" as CadIconName, tone: "ref" as const, onClick: () => createSketch({ kind: "custom", origin: d.origin, normal: d.normal, xDir: d.xDir, label: d.name }) }))] as RMenuEntry[]) : []),
   ];
   const exportEntries: RMenuEntry[] = EXPORTS.map((e) => ({ id: e.f, label: e.label, icon: "export", tone: "file", hint: e.hint, disabled: !hasBody, onClick: () => exportModel(e.f) }));
