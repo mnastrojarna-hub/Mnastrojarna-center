@@ -30,6 +30,10 @@ export type Ref =
   | { kind: "datum"; featureId: string }
   /** počátek souřadnic nebo osa souřadnicového systému */
   | { kind: "csys"; axis?: Axis }
+  /** pomocná osa (prvek datumAxis, nebo osa Z souřadného systému csys) – bod na ose + směr */
+  | { kind: "datumAxis"; featureId: string }
+  /** pomocný bod (prvek datumPoint, nebo počátek souřadného systému csys) */
+  | { kind: "datumPoint"; featureId: string }
   | { kind: "derived"; op: DerivedOp; args: Ref[]; v?: number };
 
 /** Ukončení vysunutí / díry / rotace (jako SolidWorks „End Condition“, NX „Limits“, ZW3D „End E“). */
@@ -71,7 +75,11 @@ export type AxisDef =
   | { kind: "twoPoints"; a: Ref; b: Ref }
   | { kind: "global"; axis: Axis }
   | { kind: "cylFace"; ref: Ref }
-  | { kind: "datum"; featureId: string };
+  | { kind: "datum"; featureId: string }
+  /** průsečnice dvou rovin (rovinné plochy / pomocné roviny) */
+  | { kind: "twoPlanes"; a: Ref; b: Ref }
+  /** pomocná osa (prvek datumAxis / osa Z csys) */
+  | { kind: "datumAxis"; featureId: string };
 
 /** Definice roviny – 15 způsobů jako u referenční geometrie špičkových CADů. */
 export type PlaneDef =
@@ -203,6 +211,10 @@ export function refLabel(ref: Ref | null | undefined): string {
       return `Bod skici (${ref.k})`;
     case "datum":
       return "Pomocná rovina";
+    case "datumAxis":
+      return "Pomocná osa";
+    case "datumPoint":
+      return "Pomocný bod";
     case "csys":
       return ref.axis ? `Osa ${ref.axis}` : "Počátek";
     case "derived": {

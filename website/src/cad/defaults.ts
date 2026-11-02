@@ -37,6 +37,9 @@ export const FEATURE_LABEL: Record<FeatureType, string> = {
   rib: "Žebro",
   spring: "Pružina",
   thicken: "Zesílit",
+  datumAxis: "Osa",
+  datumPoint: "Bod",
+  csys: "Souřadný systém",
 };
 
 /**
@@ -196,6 +199,15 @@ export function newFeature(doc: CadDoc, type: NewFeatureType, extra: Partial<Fea
       break;
     case "copyBody":
       f = { ...base, type, source: "", translate: [0, 0, 0] };
+      break;
+    case "datumAxis":
+      f = { ...base, type, def: { kind: "global", axis: "Z" }, length: 100 };
+      break;
+    case "datumPoint":
+      f = { ...base, type, ref: { kind: "vertex", index: -1 } };
+      break;
+    case "csys":
+      f = { ...base, type, origin: { kind: "csys" }, xDir: { kind: "axis", axis: "X" }, zDir: { kind: "axis", axis: "Z" }, size: 50 };
       break;
   }
   return { ...f, ...extra } as Feature;

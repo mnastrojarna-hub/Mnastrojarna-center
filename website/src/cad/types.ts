@@ -82,11 +82,12 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number; extent?: Extent; extent2?: Extent; from?: StartFrom; dir?: Direction; thin?: Thin; twist?: number; endScale?: number; outerOnly?: boolean }
   /** Rotace. Osa `axisDef` (8 způsobů; starší `axis` = osa skici), druhý směr `angle2`, `symmetric` (střední rovina), tenká stěna. */
   | { type: "revolve"; sketchId: string; angle: number; axis: "x" | "y"; mode: BoolMode; axisDef?: AxisDef; angle2?: number; symmetric?: boolean; thin?: Thin }
-  | { type: "box"; size: Vec3; position: Vec3; centered: boolean; mode: BoolMode }
-  | { type: "cylinder"; radius: number; height: number; position: Vec3; axis: Axis; mode: BoolMode }
-  | { type: "sphere"; radius: number; position: Vec3; mode: BoolMode }
-  | { type: "cone"; radius1: number; radius2: number; height: number; position: Vec3; axis: Axis; mode: BoolMode }
-  | { type: "tube"; outer: number; inner: number; height: number; position: Vec3; axis: Axis; mode: BoolMode }
+  /** Primitiva: `positionRef` = poloha odkazem (má přednost před `position`), `dirDef` = osa libovolným směrem (má přednost před `axis`). */
+  | { type: "box"; size: Vec3; position: Vec3; centered: boolean; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
+  | { type: "cylinder"; radius: number; height: number; position: Vec3; axis: Axis; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
+  | { type: "sphere"; radius: number; position: Vec3; mode: BoolMode; positionRef?: Ref }
+  | { type: "cone"; radius1: number; radius2: number; height: number; position: Vec3; axis: Axis; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
+  | { type: "tube"; outer: number; inner: number; height: number; position: Vec3; axis: Axis; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
   | {
       type: "hole";
       position: Vec3;
@@ -162,13 +163,13 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Rozříznutí tělesa rovinou, ponechá se jedna strana (`planeDef` = libovolná rovina, `faceRef` = řez plochou). */
   | { type: "split"; plane: PlaneName; offset: number; keep: "positive" | "negative"; planeDef?: PlaneDef; faceRef?: Ref }
   /** Přesun / otočení / měřítko tělesa. */
-  | { type: "transform"; translate: Vec3; rotateAxis: Axis; rotateAngle: number; scale: number }
+  | { type: "transform"; translate: Vec3; rotateAxis: Axis; rotateAngle: number; scale: number; translateRef?: { a: Ref; b: Ref }; rotateAxisDef?: AxisDef; centerRef?: Ref }
   /** Pomocná (referenční) rovina – nevytváří geometrii, slouží pro skici. */
   | { type: "datum"; origin: Vec3; normal: Vec3; xDir: Vec3; size: number; planeDef?: PlaneDef }
   /** Text – vystouplý (add) nebo gravírovaný (cut) do tělesa. */
-  | { type: "text"; text: string; height: number; depth: number; plane: SketchPlane; position: Vec2; angle: number; mode: "add" | "cut" }
-  /** Přímé úpravy: posunout (vytáhnout/zatlačit) vybrané plochy o vzdálenost podél normály. */
-  | { type: "pushPull"; faces: number[]; distance: number }
+  | { type: "text"; text: string; height: number; depth: number; plane: SketchPlane; position: Vec2; angle: number; mode: "add" | "cut"; positionRef?: Ref; planeDef?: PlaneDef }
+  /** Přímé úpravy: posunout (vytáhnout/zatlačit) vybrané plochy o vzdálenost podél normály (`extent` = k vrcholu / k ploše / odsazeně od plochy). */
+  | { type: "pushPull"; faces: number[]; distance: number; extent?: Extent }
   /** Přímé úpravy: odstranit plochy (např. zaoblení, díry) a zacelit těleso. */
   | { type: "deleteFace"; faces: number[] }
   /** Přímé úpravy: odsadit plochy (offset) – kladně ven, záporně dovnitř. */
@@ -176,11 +177,11 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Žebro z otevřené skici (čára) s tloušťkou, dotažené k tělesu. */
   | { type: "rib"; sketchId: string; thickness: number; direction: "normal" | "inPlane"; flip: boolean }
   /** Šroubovice / pružina (tažení kruhového průřezu po šroubovici). */
-  | { type: "spring"; radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis; mode: BoolMode }
+  | { type: "spring"; radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
-  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean }
+  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; positionRef?: Ref; dirDef?: Direction }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */
@@ -189,6 +190,12 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   | { type: "splitBodies"; plane: PlaneName; offset: number; nameB?: string; planeDef?: PlaneDef }
   /** Více těles: kopie tělesa jako nové těleso s posunutím. */
   | { type: "copyBody"; source: string; translate: Vec3; newName?: string }
+  /** Pomocná osa – nevytváří geometrii; `def` = způsob zadání (hrana, válec, 2 body, globální osa, pomocná rovina, průsečnice dvou rovin…), `length` = délka zobrazení. */
+  | { type: "datumAxis"; def: AxisDef; length: number }
+  /** Pomocný bod – nevytváří geometrii; `ref` = libovolný způsob zadání bodu (vrchol, střed hrany, střed kružnice, průsečík…). */
+  | { type: "datumPoint"; ref: Ref }
+  /** Souřadný systém – počátek + směr X + směr Z (X se ortogonalizuje vůči Z); `size` = velikost zobrazení. */
+  | { type: "csys"; origin: Ref; xDir: Direction; zDir: Direction; size?: number }
 );
 
 export type FeatureType = Feature["type"];

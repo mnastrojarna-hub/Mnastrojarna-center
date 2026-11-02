@@ -136,6 +136,41 @@ function datumOf(ctx: ResolveCtx, id: string) {
   return d;
 }
 
+/** Souřadný systém (prvek csys): počátek, osa X ortogonalizovaná vůči ose Z, osa Y = Z × X. */
+export function csysBasis(ctx: ResolveCtx, f: Extract<Feature, { type: "csys" }>): { origin: Vec3; x: Vec3; y: Vec3; z: Vec3 } {
+  const origin = pointOf(ctx, f.origin, "počátek souřadného systému");
+  const z = resolveDirection(ctx, f.zDir, { normal: [0, 0, 1] });
+  const x0 = resolveDirection(ctx, f.xDir, { normal: [1, 0, 0] });
+  const xp = V.sub(x0, V.mul(z, V.dot(x0, z)));
+  if (V.len(xp) < 1e-6) throw new Error("Osa X souřadného systému je rovnoběžná s osou Z – zvolte jiný směr X.");
+  const x = V.norm(xp);
+  return { origin, x, y: V.cross(z, x), z };
+}
+
+const datumStack = new Set<string>();
+/** Geometrie pomocné osy / bodu / souřadného systému podle id prvku (s ochranou proti cyklickému odkazu). */
+function datumGeo(ctx: ResolveCtx, id: string, want: "axis" | "point"): Geo {
+  const f = ctx.features.find((x) => x.id === id);
+  const label = want === "axis" ? "Pomocná osa" : "Pomocný bod";
+  if (!f || (f.type !== "csys" && f.type !== (want === "axis" ? "datumAxis" : "datumPoint"))) throw new Error(`${label} odkazu neexistuje – vyberte ji znovu.`);
+  if (f.suppressed) throw new Error(`${label} „${f.name}“ je potlačená.`);
+  if (datumStack.has(id)) throw new Error(`Odkaz pomocné geometrie „${f.name}“ je cyklický.`);
+  datumStack.add(id);
+  try {
+    if (f.type === "csys") {
+      const b = csysBasis(ctx, f);
+      return { point: b.origin, dir: b.z, plane: { origin: b.origin, normal: b.z, xDir: b.x }, kindLabel: want === "axis" ? "osa Z souř. systému" : "souřadný systém" };
+    }
+    if (f.type === "datumAxis") {
+      const a = resolveAxis(ctx, f.def, null);
+      return { point: a.origin, dir: a.dir, kindLabel: "pomocná osa" };
+    }
+    return { point: pointOf(ctx, f.ref, "pomocný bod"), kindLabel: "pomocný bod" };
+  } finally {
+    datumStack.delete(id);
+  }
+}
+
 /** Geometrie odkazu: bod / směr / rovina / poloměr podle druhu entity. */
 export function resolveRef(ctx: ResolveCtx, ref: Ref): Geo {
   switch (ref.kind) {
@@ -192,6 +227,10 @@ export function resolveRef(ctx: ResolveCtx, ref: Ref): Geo {
       const n = V.norm(d.normal);
       return { point: d.origin, dir: n, plane: { origin: d.origin, normal: n, xDir: V.norm(d.xDir) }, kindLabel: "pomocná rovina" };
     }
+    case "datumAxis":
+      return datumGeo(ctx, ref.featureId, "axis");
+    case "datumPoint":
+      return datumGeo(ctx, ref.featureId, "point");
     case "derived":
       return derived(ctx, ref);
   }
@@ -328,6 +367,24 @@ export function resolveAxis(ctx: ResolveCtx, def: AxisDef | undefined, sk: Sketc
     case "datum": {
       const d = datumOf(ctx, (def as { featureId: string }).featureId);
       return { origin: d.origin, dir: V.norm(d.normal) };
+    }
+    case "twoPlanes": {
+      const dd = def as Extract<AxisDef, { kind: "twoPlanes" }>;
+      const a = planeOfRef(ctx, dd.a, "1. rovinu");
+      const b = planeOfRef(ctx, dd.b, "2. rovinu");
+      const dir0 = V.cross(a.normal, b.normal);
+      if (V.len(dir0) < 1e-6) throw new Error("Roviny jsou rovnoběžné – průsečnice neexistuje.");
+      const dir = V.norm(dir0);
+      // bod průsečnice nejblíže počátku roviny A: řešení soustavy n_a·p = d_a, n_b·p = d_b, dir·p = dir·o_a
+      const da = V.dot(a.normal, a.origin);
+      const db = V.dot(b.normal, b.origin);
+      const dc = V.dot(dir, a.origin);
+      const p = V.add(V.add(V.mul(V.cross(b.normal, dir), da), V.mul(V.cross(dir, a.normal), db)), V.mul(V.cross(a.normal, b.normal), dc));
+      return { origin: V.mul(p, 1 / V.dot(a.normal, V.cross(b.normal, dir))), dir };
+    }
+    case "datumAxis": {
+      const g = datumGeo(ctx, (def as { featureId: string }).featureId, "axis");
+      return { origin: g.point!, dir: g.dir! };
     }
   }
 }
