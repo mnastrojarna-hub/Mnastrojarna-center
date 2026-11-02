@@ -108,7 +108,7 @@ export function newFeature(doc: CadDoc, type: NewFeatureType, extra: Partial<Fea
   const base = { id: uid(), name: nextName(doc, type) };
   const sketchesRev = [...doc.features].reverse().filter((f) => f.type === "sketch");
   const lastSketch = sketchesRev[0];
-  const hasBody = doc.features.some((f) => f.type !== "sketch");
+  const hasBody = doc.features.some((f) => f.type !== "sketch" && f.type !== "datum" && f.type !== "datumAxis" && f.type !== "datumPoint" && f.type !== "csys");
   const mode = hasBody ? "add" : "new";
   let f: Feature;
   switch (type) {

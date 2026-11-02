@@ -23,6 +23,8 @@ export type SurfaceAnalysis = "none" | "zebra";
 export type MouseScheme = "zw3d" | "solidworks" | "simple";
 export type Section = { axis: "X" | "Y" | "Z"; offset: number; flip: boolean } | null;
 export type Datum = { id: string; name: string; origin: Vec3; normal: Vec3; xDir: Vec3; size: number };
+/** Pomocná osa / bod / souřadný systém k vykreslení (vyřešené jádrem). */
+export type DatumGfx = { kind: "axis"; origin: Vec3; dir: Vec3; length: number } | { kind: "point"; p: Vec3 } | { kind: "csys"; origin: Vec3; x: Vec3; y: Vec3; z: Vec3; size: number };
 /** Komponenta sestavy k vykreslení: síť dílu (sdílená podle `key`) + matice umístění (po sloupcích). */
 export type AsmView = {
   /** jedinečné id listu (u podsestav cesta „a/b“) */
@@ -55,6 +57,7 @@ type Props = {
   vertices?: Float32Array | null;
   sketches: Extract<Feature, { type: "sketch" }>[];
   datums?: Datum[];
+  datumGfx?: DatumGfx[];
   pickMode: PickMode;
   selFilter?: SelFilter;
   selection?: SelItem[];
@@ -962,6 +965,46 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       const border = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: 0x7c3aed }));
       s.sketchGroup.add(quad, border);
     }
+    for (const g of props.datumGfx ?? []) {
+      if (g.kind === "axis") {
+        const o = new THREE.Vector3(...g.origin);
+        const d = new THREE.Vector3(...g.dir).normalize();
+        const h = (g.length || 100) / 2;
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([o.clone().addScaledVector(d, -h), o.clone().addScaledVector(d, h)]), new THREE.LineDashedMaterial({ color: 0xea580c, dashSize: 4, gapSize: 2, depthTest: false }));
+        line.computeLineDistances();
+        line.renderOrder = 5;
+        s.sketchGroup.add(line);
+      } else if (g.kind === "point") {
+        const o = new THREE.Vector3(...g.p);
+        const r = Math.max(0.6, s.radius * 0.012);
+        const pts: THREE.Vector3[] = [];
+        for (const ax of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]) pts.push(o.clone().addScaledVector(ax, -r), o.clone().addScaledVector(ax, r));
+        const cross = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xea580c, depthTest: false }));
+        cross.renderOrder = 5;
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(r * 0.35, 12, 8), new THREE.MeshBasicMaterial({ color: 0xea580c, depthTest: false }));
+        dot.position.copy(o);
+        dot.renderOrder = 5;
+        s.sketchGroup.add(cross, dot);
+      } else {
+        const o = new THREE.Vector3(...g.origin);
+        const L = g.size || 50;
+        const axes: [Vec3, number][] = [
+          [g.x, 0xdc2626],
+          [g.y, 0x16a34a],
+          [g.z, 0x2563eb],
+        ];
+        for (const [v, color] of axes) {
+          const d = new THREE.Vector3(...v).normalize();
+          const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([o, o.clone().addScaledVector(d, L)]), new THREE.LineBasicMaterial({ color, depthTest: false }));
+          line.renderOrder = 5;
+          const cone = new THREE.Mesh(new THREE.ConeGeometry(L * 0.04, L * 0.12, 10), new THREE.MeshBasicMaterial({ color, depthTest: false }));
+          cone.position.copy(o.clone().addScaledVector(d, L));
+          cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+          cone.renderOrder = 5;
+          s.sketchGroup.add(line, cone);
+        }
+      }
+    }
     if (!props.mesh && !props.assembly?.length && props.sketches.length) {
       const box = new THREE.Box3().setFromObject(s.sketchGroup);
       if (!box.isEmpty()) {
@@ -971,7 +1014,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       }
     }
     s.render();
-  }, [props.sketches, props.mesh, props.datums, props.assembly]);
+  }, [props.sketches, props.mesh, props.datums, props.datumGfx, props.assembly]);
 
   // ---------- kóty měření ----------
   useEffect(() => {

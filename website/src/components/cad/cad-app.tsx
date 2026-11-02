@@ -39,7 +39,7 @@ import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Wa
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, sketchRibbon, type SketchPatch, type SketchTool } from "./sketcher";
-import { Viewport, type AsmView, type Datum, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
+import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
 
@@ -47,6 +47,8 @@ const STORE = "mn-cad-doc-v1";
 type Hist = { past: CadDoc[]; present: CadDoc; future: CadDoc[] };
 type Tab = "create" | "sketch" | "surface" | "sheet" | "weld" | "asm" | "tools" | "view" | "drawing" | "data";
 type AddType = Exclude<FeatureType, "sketch" | "import" | "pattern" | "ext">;
+/** prvky bez geometrie (nezakládají těleso) */
+const NO_BODY_TYPES = new Set<FeatureType>(["sketch", "datum", "datumAxis", "datumPoint", "csys"]);
 
 const EXPORTS: { f: ExportFormat; label: string; ext: string; mime: string; hint: string }[] = [
   { f: "step", label: "STEP AP214 (.step)", ext: "step", mime: "application/step", hint: "ZW3D, SolidWorks, Inventor, CATIA, Creo, CAM" },
@@ -790,7 +792,10 @@ export function CadApp() {
   useEffect(() => {
     if (activeId || sketchId || !selection.length || measure) setHud(null);
   }, [activeId, sketchId, selection.length, measure]);
-  const refCtxValue = useMemo(() => ({ doc, target: refPick, request: setRefPick, selectionRefs, lastPoint }), [doc, refPick, selectionRefs, lastPoint]);
+  const refCtxValue = useMemo(
+    () => ({ doc, target: refPick, request: setRefPick, selectionRefs, lastPoint, counts: result?.metrics ? { faces: result.metrics.faces, edges: result.metrics.edges, vertices: Math.floor((result.vertices?.length ?? 0) / 3) } : undefined }),
+    [doc, refPick, selectionRefs, lastPoint, result],
+  );
   const selFaces = selection.filter((x): x is Extract<SelItem, { kind: "face" }> => x.kind === "face" && !x.compId).map((x) => x.index);
   const selEdges = selection.filter((x): x is Extract<SelItem, { kind: "edge" }> => x.kind === "edge" && !x.compId).map((x) => x.index);
   /** nový prvek přímých úprav z vybraných ploch / hran */
@@ -1072,7 +1077,7 @@ export function CadApp() {
     if (!sk || sk.type !== "sketch") return;
     const usedBy = doc.features.some((f) => (f.type === "extrude" || f.type === "revolve") && f.sketchId === sk.id) || doc.features.some((f) => (f.type === "sweep" && (f.profileId === sk.id || f.pathId === sk.id)) || (f.type === "loft" && f.sketchIds.includes(sk.id)));
     if (!usedBy && sk.entities.length) {
-      const hasBody = doc.features.some((f) => f.type !== "sketch" && f.type !== "datum");
+      const hasBody = doc.features.some((f) => !NO_BODY_TYPES.has(f.type));
       const ex = newFeature(doc, "extrude", { sketchId: sk.id, mode: hasBody ? "add" : "new" } as Partial<Feature>);
       commit({ ...doc, features: [...doc.features, ex] });
       beginEdit(ex.id, doc);
@@ -1409,6 +1414,20 @@ export function CadApp() {
     () => doc.features.flatMap((f) => (f.type === "datum" && !f.suppressed ? [{ id: f.id, name: f.name, origin: f.origin, normal: f.normal, xDir: f.xDir, size: f.size }] : [])),
     [doc.features],
   );
+  // pomocné osy / body / souřadné systémy – řeší je jádro nad postaveným tělesem
+  const [datumGfx, setDatumGfx] = useState<DatumGfx[]>([]);
+  useEffect(() => {
+    if (isAsm || !doc.features.some((f) => f.type === "datumAxis" || f.type === "datumPoint" || f.type === "csys")) {
+      setDatumGfx((v) => (v.length ? [] : v));
+      return;
+    }
+    let dead = false;
+    cad.datumGfx(doc).then((list) => !dead && setDatumGfx(list.map((x) => x.gfx)), () => undefined);
+    return () => {
+      dead = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, doc.features, isAsm]);
   const setSketchEntities = useCallback(
     (entities: SketchEntity[], record = true) => {
       if (!sketchId) return;
@@ -1618,7 +1637,16 @@ export function CadApp() {
           { id: "transform", label: "Přesunout / otočit", icon: "transform", tone: "pattern", onClick: startBodyGizmo, hint: "gizmo – posun 1 mm, otočení 15°" },
         ],
       },
-      { label: "Reference", items: [{ id: "datum", label: "Rovina", icon: "datum", tone: "ref", onClick: () => addFeature("datum"), hint: "pomocná rovina pro skici" }] },
+      {
+        label: "Reference",
+        big: 1,
+        items: [
+          { id: "datum", label: "Rovina", icon: "datum", tone: "ref", onClick: () => addFeature("datum"), hint: "pomocná rovina – 12 způsobů zadání" },
+          { id: "datumAxis", label: "Osa", icon: "datumAxis", tone: "ref", onClick: () => addFeature("datumAxis"), hint: "pomocná osa – hrana, válec, 2 body, průsečnice rovin…" },
+          { id: "datumPoint", label: "Bod", icon: "datumPoint", tone: "ref", onClick: () => addFeature("datumPoint"), hint: "pomocný bod – vrchol, střed, průsečík, odsazení…" },
+          { id: "csys", label: "Souř. systém", icon: "csys", tone: "ref", onClick: () => addFeature("csys"), hint: "souřadný systém z bodu a směrů" },
+        ],
+      },
       { label: "Knihovna", items: [{ id: "library", label: "Normálie", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}), hint: "šrouby, ložiska, ozubená kola, profily… – stačí napsat „M8x30“" }] },
     ],
     asm: [
@@ -2118,6 +2146,7 @@ export function CadApp() {
                 mesh={result?.mesh ?? null}
                 sketches={sketchesForView}
                 datums={datums}
+                datumGfx={datumGfx}
                 pickMode={pickMode}
                 selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
                 selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}

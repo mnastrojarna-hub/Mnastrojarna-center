@@ -2,6 +2,7 @@
 import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
+import type { DatumDisplay } from "./feat/refs-more";
 import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
 import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo } from "./types";
 
@@ -44,6 +45,8 @@ export const cad = {
   /** geometrie + otisk odkazu nad aktuálním tělesem (pro formuláře a náhledy) */
   refInfo: (doc: CadDoc, ref: Ref) => call<{ geo: Geo | null; sig: Sig | null; error?: string }>({ op: "refInfo", doc, ref }),
   planeDef: (doc: CadDoc, def: PlaneDef) => call<{ plane: ResolvedPlane | null; error?: string }>({ op: "planeDef", doc, def }),
+  /** pomocné osy / body / souřadné systémy k vykreslení */
+  datumGfx: (doc: CadDoc) => call<{ id: string; gfx: DatumDisplay }[]>({ op: "datumGfx", doc }),
   exportFile: (doc: CadDoc, format: ExportFormat) => call<ArrayBuffer>({ op: "export", doc, format }),
   asmParts: (parts: { key: string; source: ComponentSource }[]) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts }),
   asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),

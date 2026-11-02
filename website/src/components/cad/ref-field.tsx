@@ -462,6 +462,10 @@ export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefi
         return onChange({ kind, a: { kind: "vertex", index: -1 }, b: { kind: "vertex", index: -1 } });
       case "datum":
         return onChange({ kind, featureId: "" });
+      case "datumAxis":
+        return onChange({ kind, featureId: "" });
+      case "twoPlanes":
+        return onChange({ kind, a: { kind: "face", index: -1 }, b: { kind: "face", index: -1 } });
       case "cylFace":
         return onChange({ kind, ref: { kind: "face", index: -1 } });
       default:
@@ -508,16 +512,23 @@ export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefi
         </>
       )}
       {v.kind === "datum" && <DatumPick value={v.featureId} onChange={(featureId) => onChange({ kind: "datum", featureId })} />}
+      {v.kind === "datumAxis" && <DatumPick types={["datumAxis", "csys"]} placeholder="— vyberte pomocnou osu / souř. systém —" value={v.featureId} onChange={(featureId) => onChange({ kind: "datumAxis", featureId })} />}
+      {v.kind === "twoPlanes" && (
+        <>
+          <RefField label="1. rovina / plocha" value={v.a} want="face" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label="2. rovina / plocha" value={v.b} want="face" onChange={(b) => onChange({ ...v, b })} />
+        </>
+      )}
     </div>
   );
 }
 
-function DatumPick({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+function DatumPick({ value, onChange, types = ["datum"], placeholder = "— vyberte pomocnou rovinu —" }: { value: string; onChange: (id: string) => void; types?: string[]; placeholder?: string }) {
   const ctx = useContext(RefPickContext);
-  const datums = ctx?.doc.features.filter((f) => f.type === "datum") ?? [];
+  const datums = ctx?.doc.features.filter((f) => types.includes(f.type)) ?? [];
   return (
     <select className={selectCls} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">— vyberte pomocnou rovinu —</option>
+      <option value="">{placeholder}</option>
       {datums.map((d) => (
         <option key={d.id} value={d.id}>
           {d.name}

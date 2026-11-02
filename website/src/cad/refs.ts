@@ -149,6 +149,8 @@ export const AXIS_KINDS: { v: AxisDef["kind"]; l: string }[] = [
   { v: "twoPoints", l: "Dva body" },
   { v: "global", l: "Globální osa X / Y / Z" },
   { v: "datum", l: "Pomocná rovina (normála)" },
+  { v: "twoPlanes", l: "Průsečnice dvou rovin" },
+  { v: "datumAxis", l: "Pomocná osa / osa Z souř. systému" },
 ];
 
 export const PLANE_KINDS: { v: PlaneDef["kind"]; l: string }[] = [

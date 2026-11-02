@@ -8,6 +8,7 @@ import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOf
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
 import { refInfo, resolvePlaneDef } from "./ref-resolve";
+import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
 import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, MeshData } from "./types";
 
@@ -42,7 +43,8 @@ type Req =
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
   | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> }
   | { id: number; op: "refInfo"; doc: CadDoc; ref: Ref }
-  | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef };
+  | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
+  | { id: number; op: "datumGfx"; doc: CadDoc };
 
 /** Kontext řešení odkazů nad posledním postaveným tělesem a aktuálním dokumentem. */
 function refCtx(doc: CadDoc) {
@@ -83,6 +85,22 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       case "refInfo":
         ctx.postMessage({ id: m.id, ok: true, result: refInfo(refCtx(m.doc), m.ref) });
         break;
+      case "datumGfx": {
+        // pomocné osy / body / souřadné systémy k vykreslení (neřešitelné se přeskočí – chybu ukáže historie)
+        const out: { id: string; gfx: DatumDisplay }[] = [];
+        const rc = refCtx(m.doc);
+        for (const f of m.doc.features) {
+          if (f.suppressed || (f.type !== "datumAxis" && f.type !== "datumPoint" && f.type !== "csys")) continue;
+          try {
+            const g = datumDisplay(rc, f);
+            if (g) out.push({ id: f.id, gfx: g });
+          } catch {
+            /* přeskočit */
+          }
+        }
+        ctx.postMessage({ id: m.id, ok: true, result: out });
+        break;
+      }
       case "planeDef": {
         try {
           ctx.postMessage({ id: m.id, ok: true, result: { plane: resolvePlaneDef(refCtx(m.doc), m.def) } });
