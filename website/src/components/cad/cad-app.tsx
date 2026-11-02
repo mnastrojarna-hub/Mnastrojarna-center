@@ -38,7 +38,7 @@ import { EntityProps, FeatureProps, ParamContext } from "./props";
 import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Want } from "./ref-field";
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
-import { Sketcher, sketchRibbon, type SketchPatch, type SketchTool } from "./sketcher";
+import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool } from "./sketcher";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
@@ -1410,6 +1410,7 @@ export function CadApp() {
       ),
     [doc.features, activeId],
   );
+  const sketchSnaps = useSketchSnaps();
   const datums = useMemo<Datum[]>(
     () => doc.features.flatMap((f) => (f.type === "datum" && !f.suppressed ? [{ id: f.id, name: f.name, origin: f.origin, normal: f.normal, xDir: f.xDir, size: f.size }] : [])),
     [doc.features],
@@ -1725,6 +1726,8 @@ export function CadApp() {
       setSnapGrid: (v) => setSnapGrid(v),
       onExportDxf: () => sketch && download(`${safeName(sketch.name)}.dxf`, sketchToDxf(sketch.entities), "application/dxf"),
       onImportDxf: () => fileInput.current?.click(),
+      snaps: sketchSnaps,
+      setSnap: setSketchSnap,
     }),
     tools: [
       {
