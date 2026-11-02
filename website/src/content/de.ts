@@ -86,7 +86,7 @@ export const de: Dict = {
     services: "Leistungen",
     company: "Unternehmen",
     contact: "Kontakt",
-    links: { maintenance: "Für die Instandhaltung", about: "Über uns", machinery: "Maschinenpark", quality: "Qualität und Zertifikate", references: "Referenzen", cad: "Online-CAD kostenlos", careers: "Karriere", contact: "Kontakt", rfq: "Anfrage" },
+    links: { maintenance: "Für die Instandhaltung", about: "Über uns", machinery: "Maschinenpark", quality: "Qualität und Zertifikate", references: "Referenzen", cad: "Online-CAD kostenlos", cadDocs: "CAD-Dokumentation (cs)", careers: "Karriere", contact: "Kontakt", rfq: "Anfrage" },
     vat: "USt-IdNr. (DIČ)",
     id: "Firmen-Nr. (IČO)",
     dataBox: "Datenbox (ISDS)",

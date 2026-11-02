@@ -28,6 +28,8 @@ export default function CadPage() {
           offers: { "@type": "Offer", price: "0", priceCurrency: "CZK" },
           featureList: ["Parametrické 3D modelování", "Sestavy a vazby", "Generátor rámu vstřikovací formy", "Výkresy s kusovníkem PDF/DXF", "Proměnné a stavy (konfigurace)", "Import a export STEP, IGES, BREP, STL, 3MF, glTF, OBJ, DXF"],
           provider: { "@type": "Organization", name: SITE.name, url: SITE.url },
+          softwareHelp: { "@type": "CreativeWork", name: "Dokumentace Mnástrojárna CAD", url: `${SITE.url}/cad/dokumentace` },
+          softwareVersion: "5. vlna (listopad 2026)",
         }}
       />
     </>

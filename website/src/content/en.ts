@@ -86,7 +86,7 @@ export const en: Dict = {
     services: "Services",
     company: "Company",
     contact: "Contact",
-    links: { maintenance: "For maintenance", about: "About us", machinery: "Machinery", quality: "Quality & certificates", references: "References", cad: "Free online CAD", careers: "Careers", contact: "Contact", rfq: "Request a quote" },
+    links: { maintenance: "For maintenance", about: "About us", machinery: "Machinery", quality: "Quality & certificates", references: "References", cad: "Free online CAD", cadDocs: "CAD documentation (cs)", careers: "Careers", contact: "Contact", rfq: "Request a quote" },
     vat: "VAT ID",
     id: "Company reg. no.",
     dataBox: "Data box",

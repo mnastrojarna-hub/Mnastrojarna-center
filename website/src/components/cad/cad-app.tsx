@@ -1997,6 +1997,7 @@ export function CadApp() {
       { id: "p.settings", label: "Nastavení", group: "Program", icon: "settings", kbd: "Ctrl+,", run: () => setSettingsOpen(true) },
       { id: "p.start", label: "Úvodní obrazovka", group: "Program", icon: "home", run: () => setStartOpen(true) },
       { id: "p.help", label: "Klávesové zkratky a ovládání", group: "Program", icon: "help", run: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
+      { id: "p.docs", label: "Dokumentace a návod k obsluze (web, PDF)", group: "Program", icon: "info", run: () => window.open("/cad/dokumentace", "_blank", "noopener") },
       { id: "p.rfq", label: "Poptat výrobu (STEP + e-mail)", group: "Program", icon: "export", run: toRfq },
     );
     return out;
@@ -2087,6 +2088,7 @@ export function CadApp() {
                     { id: "library", label: "Knihovna normálií…", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { id: "help", label: "Klávesové zkratky a ovládání", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
+                    { id: "docs", label: "Dokumentace a návod (web, PDF)…", icon: "info", onClick: () => window.open("/cad/dokumentace", "_blank", "noopener") },
                   ]}
                 />
               </>
@@ -2625,9 +2627,10 @@ export function CadApp() {
               { id: "asm", label: "Nová sestava", desc: "Komponenty, vazby, podsestavy, kusovník.", icon: "layers", tone: "create", run: () => { setStartOpen(false); newAssembly(false); } },
               { id: "mold", label: "Rám vstřikovací formy", desc: "Kompletní rám z desek, vedení a normálií během minuty.", icon: "layers", tone: "pattern", run: () => { setStartOpen(false); setMoldOpen(true); } },
               { id: "open", label: "Otevřít / importovat", desc: "STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad", icon: "open", tone: "file", kbd: "Ctrl+O", run: () => { setStartOpen(false); fileInput.current?.click(); } },
-              { id: "lib", label: "Knihovna normálií", desc: "46 rodin: šrouby, matice, kolíky, ložiska, ozubená a řetězová kola, IPE/HEB/U/L, jäkly, pružiny… Stačí napsat „M8x30“.", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
+              { id: "lib", label: "Knihovna normálií", desc: "103 rodin: šrouby, matice, kolíky, ložiska, ozubená a řetězová kola, IPE/HEB/U/L, jäkly, pružiny, normálie forem… Stačí napsat „M8x30“.", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
               { id: "palette", label: "Paleta příkazů", desc: "Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…", icon: "measure", tone: "tool", kbd: "Ctrl+K", run: () => { setStartOpen(false); setPaletteOpen(true); } },
               { id: "settings", label: "Nastavení", desc: "Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.", icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },
+              { id: "docs", label: "Dokumentace a návod", desc: "Kompletní návod k obsluze: 23 kapitol, FAQ, příručka PDF ke stažení.", icon: "info", tone: "tool", run: () => window.open("/cad/dokumentace", "_blank", "noopener") },
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
             onOpenRecent={(r) => {

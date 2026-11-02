@@ -190,3 +190,11 @@ Referenční systém zadání (`cad/refs.ts`, `cad/ref-resolve.ts`, `components/
 
 Zbývá z plánu: vazby sestav (18 druhů + mate connector), výkresy (13 druhů pohledů, tolerance, tabulky), dělicí křivka úkosu,
 setback zaoblení, zvýraznění indexů kusů pole ve 3D, šipka začátku hrany pro R1→R2.
+
+## Dokumentace (2. 11. 2026)
+
+Jeden zdroj `src/content/cad-docs.ts` (23 kapitol, 14 FAQ, ~8 000 slov, 29 snímků) → **web** `/cad/dokumentace`
+(TechArticle + SoftwareApplication + HowTo + FAQ + Breadcrumb JSON-LD, OpenGraph, sitemapa, odkazy z patičky, úvodní obrazovky,
+nabídky Soubor a palety CADu), **PDF** `public/cad/mnastrojarna-cad-prirucka.pdf` (tisková stránka `/cad/prirucka`, noindex,
+Playwright) a **text pro AI** `public/cad/dokumentace.md` + `public/llms.txt`. Skripty: `docs:assets`, `docs:text`, `docs:pdf`.
+Při změně funkcí aktualizovat obsah a znovu vygenerovat (PDF vyžaduje běžící server).

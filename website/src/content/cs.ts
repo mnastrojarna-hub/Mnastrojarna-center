@@ -98,7 +98,7 @@ export const cs = {
     services: "Služby",
     company: "Firma",
     contact: "Kontakt",
-    links: { maintenance: "Pro údržbu", about: "O nás", machinery: "Strojový park", quality: "Kvalita a certifikáty", references: "Reference", cad: "Online CAD zdarma", careers: "Kariéra", contact: "Kontakt", rfq: "Poptávka" },
+    links: { maintenance: "Pro údržbu", about: "O nás", machinery: "Strojový park", quality: "Kvalita a certifikáty", references: "Reference", cad: "Online CAD zdarma", cadDocs: "Dokumentace CAD", careers: "Kariéra", contact: "Kontakt", rfq: "Poptávka" },
     vat: "DIČ",
     id: "IČO",
     dataBox: "Datová schránka",

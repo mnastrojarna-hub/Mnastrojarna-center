@@ -412,3 +412,255 @@ html.has-cursor [data-cursor] {
 @media (prefers-reduced-motion: reduce) {
   .photo-col, .logo-row { animation: none; }
 }
+
+/* ---------- dokumentace CADu (/cad/dokumentace a tisková verze) ---------- */
+.doc {
+  font-size: 16px;
+  line-height: 1.65;
+  color: #272425;
+}
+.doc .doc-section + .doc-section {
+  margin-top: 4rem;
+}
+.doc h2 {
+  font-family: var(--font-display, var(--font-sans));
+  font-weight: 700;
+  font-size: 1.9rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: #272425;
+  margin: 0 0 1rem;
+  scroll-margin-top: 7rem;
+}
+.doc h3 {
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin: 2rem 0 0.6rem;
+  color: #272425;
+}
+.doc .doc-lead {
+  font-size: 1.1rem;
+  color: rgba(39, 36, 37, 0.75);
+  margin-bottom: 1.25rem;
+}
+.doc p {
+  margin: 0 0 1rem;
+}
+.doc ul,
+.doc ol {
+  margin: 0 0 1.25rem 1.3rem;
+  padding: 0;
+}
+.doc ul {
+  list-style: disc;
+}
+.doc ol {
+  list-style: decimal;
+}
+.doc li {
+  margin: 0.3rem 0;
+}
+.doc li::marker {
+  color: #e03930;
+}
+.doc code,
+.doc kbd {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.86em;
+  background: #f1f4f7;
+  border: 1px solid rgba(39, 36, 37, 0.12);
+  border-radius: 5px;
+  padding: 0.05em 0.4em;
+  white-space: nowrap;
+}
+.doc kbd {
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(39, 36, 37, 0.25);
+  font-weight: 600;
+}
+.doc figure {
+  margin: 1.5rem 0 2rem;
+}
+.doc figure img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  height: auto;
+  border: 1px solid rgba(39, 36, 37, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px -18px rgba(15, 23, 42, 0.35);
+  background: #fff;
+}
+.doc figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.86rem;
+  color: rgba(39, 36, 37, 0.62);
+}
+.doc .doc-table {
+  overflow-x: auto;
+  margin: 1rem 0 1.5rem;
+  border: 1px solid rgba(39, 36, 37, 0.12);
+  border-radius: 10px;
+}
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.doc th,
+.doc td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid rgba(39, 36, 37, 0.1);
+}
+.doc th {
+  background: #f6f8fa;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(39, 36, 37, 0.7);
+}
+.doc tr:last-child td {
+  border-bottom: 0;
+}
+.doc .doc-note {
+  margin: 1.25rem 0;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid #e03930;
+  background: #fff5f4;
+  border-radius: 0 10px 10px 0;
+  font-size: 0.95rem;
+}
+.doc .doc-faq {
+  margin: 0 0 1.25rem;
+}
+.doc .doc-faq h3 {
+  margin-top: 1.25rem;
+}
+
+/* tisková verze → PDF */
+.doc-print {
+  max-width: 180mm;
+  margin: 0 auto;
+  padding: 10mm 0;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  font-family: var(--font-sans), Roboto, Arial, sans-serif;
+}
+.doc-print h2 {
+  font-size: 20pt;
+  break-before: page;
+  page-break-before: always;
+  margin-top: 0;
+  padding-top: 2mm;
+}
+.doc-print h3 {
+  font-size: 12.5pt;
+  break-after: avoid;
+}
+.doc-print .doc-lead {
+  font-size: 11.5pt;
+}
+.doc-print figure {
+  break-inside: avoid;
+  margin: 4mm 0 6mm;
+}
+.doc-print figure img {
+  box-shadow: none;
+  border-radius: 4px;
+  max-height: 150mm;
+}
+.doc-print .doc-table {
+  break-inside: auto;
+  border-radius: 4px;
+}
+.doc-print table {
+  font-size: 8.8pt;
+}
+.doc-print th,
+.doc-print td {
+  padding: 1.4mm 2.2mm;
+}
+.doc-print tr {
+  break-inside: avoid;
+}
+.doc-print .doc-cover {
+  min-height: 240mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 6px solid #e03930;
+  padding-left: 10mm;
+}
+.doc-print .doc-cover h1 {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: 44pt;
+  line-height: 1;
+  font-weight: 700;
+  margin: 6mm 0 4mm;
+  color: #272425;
+}
+.doc-print .doc-cover-brand {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 9pt;
+  color: #e03930;
+}
+.doc-print .doc-cover-sub {
+  font-size: 15pt;
+  color: #6c6d6f;
+}
+.doc-print .doc-cover-meta {
+  margin-top: 10mm;
+  font-size: 10pt;
+  color: #6c6d6f;
+}
+.doc-print .doc-cover-abstract {
+  margin-top: 14mm;
+  max-width: 150mm;
+  font-size: 10.5pt;
+}
+.doc-print .doc-toc {
+  break-before: page;
+  page-break-before: always;
+}
+.doc-print .doc-toc h2 {
+  break-before: auto;
+  page-break-before: auto;
+}
+.doc-print .doc-toc ol {
+  list-style: none;
+  margin: 0;
+  column-count: 2;
+  column-gap: 10mm;
+}
+.doc-print .doc-toc li {
+  margin: 1.2mm 0;
+}
+.doc-print .doc-toc a {
+  color: #272425;
+  text-decoration: none;
+}
+.doc-print .doc-section:first-of-type h2 {
+  break-before: page;
+}
+.doc-print .doc-end {
+  margin-top: 12mm;
+  padding-top: 4mm;
+  border-top: 1px solid rgba(39, 36, 37, 0.2);
+  font-size: 8.5pt;
+  color: #6c6d6f;
+}
+@page {
+  size: A4;
+  margin: 16mm 14mm;
+}
+@media print {
+  .doc-print a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

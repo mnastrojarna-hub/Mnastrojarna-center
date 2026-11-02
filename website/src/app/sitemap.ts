@@ -30,5 +30,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...SERVICE_IDS.flatMap((id) => entry("service", 0.85, "monthly", id)),
     ...CASES.flatMap((c) => entry("case", 0.75, "yearly", c.slug.cs)),
     { url: `${SITE.url}/cad`, lastModified: now, priority: 0.9, changeFrequency: "monthly" },
+    { url: `${SITE.url}/cad/dokumentace`, lastModified: now, priority: 0.85, changeFrequency: "monthly" },
   ];
 }

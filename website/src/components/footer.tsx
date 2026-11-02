@@ -16,6 +16,7 @@ export function Footer({ locale }: { locale: Locale }) {
     [href(locale, "quality"), f.links.quality],
     [href(locale, "references"), f.links.references],
     ["/cad", f.links.cad],
+    ["/cad/dokumentace", f.links.cadDocs],
     [href(locale, "careers"), f.links.careers],
     [href(locale, "contact"), f.links.contact],
   ];

@@ -1,0 +1,737 @@
+# Mnástrojárna CAD – kompletní dokumentace a návod k obsluze
+
+> Kompletní návod k online 3D/2D CADu Mnástrojárna CAD: ovládání, skicování s vazbami, tvorba dílů (vysunutí, rotace, díry, zaoblení, pole), plochy, plech, svařence, sestavy a vazby, výkresy do PDF/DXF/DWG, knihovna 103 rodin normálií, import a export STEP, IGES, STL, 3MF, DXF. Zdarma v prohlížeči, bez instalace, česky.
+
+- Aplikace: https://www.mnastrojarna.cz/cad
+- Webová dokumentace: https://www.mnastrojarna.cz/cad/dokumentace
+- Příručka PDF: https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf
+- Verze: 5. vlna (listopad 2026), aktualizováno 2026-11-02
+- Jazyk: čeština · Licence: zdarma, bez registrace · Vydavatel: Mnástrojárna s.r.o., https://www.mnastrojarna.cz
+
+## Hlavní funkce
+
+- Parametrické 3D modelování s historií prvků (vysunutí 8 ukončení, rotace, tažení, šablonování, díry podle ISO 273, závity, zaoblení 6 variant, sražení 5 variant, úkos, skořepina, žebro, pružina, text, pole 5 druhů, zrcadlení, přímé úpravy)
+- Skica s řešičem vazeb: 13 vazeb, 8 kót, automatické vazby, číselné zadání u kurzoru, stav určenosti, ořez, odsazení, projekce hran
+- Referenční systém zadání: 14 voleb bodu, 8 směrů, 12 definic rovin, 10 os, pomocná rovina / osa / bod / souřadný systém
+- Plochy (19 příkazů), plech s rozvinem DXF (12), svařence a rámy z profilů (10)
+- Sestavy: komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled, průvodce rámem vstřikovací formy
+- Výkresy: pohledy, řez, detail, kóty, drsnosti, geometrické tolerance, tabulka děr, kusovník; export PDF, DXF, DWG R2000–R2018, SVG
+- Knihovna 103 rodin normálií ve 13 skupinách zadávaných textem
+- Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML
+- Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
+- Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
+
+## Obsah
+
+- 1. Co je Mnástrojárna CAD
+- 2. Rychlý start – první díl za pět minut
+- 3. Obrazovka a ovládání
+- 4. Zadávání hodnot a odkazů na geometrii
+- 5. Skica
+- 6. Tvorba těles – prvky a jejich možnosti
+- 7. Plochy (plošné modelování)
+- 8. Plech
+- 9. Svařence a ocelové konstrukce
+- 10. Knihovna normálií
+- 11. Sestavy
+- 12. Formařské nástroje
+- 13. Výkresy
+- 14. Analýza a měření
+- 15. Proměnné, rovnice a stavy dílu
+- 16. Soubory, import a export
+- 17. Nastavení
+- 18. Klávesové zkratky
+- 19. Mobil a dotykové ovládání
+- 20. Omezení a poctivé srovnání s desktopovými CADy
+- 21. Vaše data a soukromí
+- 22. Slovníček pojmů
+- 23. Historie verzí
+- Časté otázky
+
+## 1. Co je Mnástrojárna CAD
+
+Profesionální parametrický 3D a 2D CAD, který běží přímo ve webovém prohlížeči – bez instalace, bez registrace a zdarma. Vytvořila ho nástrojárna Mnástrojárna s.r.o. pro konstruktéry, údržbu, vývojáře a studenty, kteří potřebují rychle vymodelovat díl, sestavu nebo výkres a případně rovnou poptat výrobu.
+
+![Úvodní obrazovka Mnástrojárna CAD s nedávnými soubory a rychlými akcemi](https://www.mnastrojarna.cz/cad/docs/start.webp)
+
+*Úvodní obrazovka: nedávné soubory s náhledy, nový díl, nová sestava, rám formy, import, knihovna normálií.*
+
+Jádrem je geometrický modelář OpenCascade (OCCT) přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se neodesílají na server; rozpracovaná práce se průběžně ukládá do úložiště prohlížeče a projekt si stáhnete jako soubor .mncad nebo exportujete do STEP.
+
+### Co umí
+
+- Díly: skica s vazbami a kótami → vysunutí, rotace, tažení, šablonování, díry (průvodce), závity, zaoblení, sražení, úkosy, skořepina, žebra, pružiny, text, přímé úpravy ploch, pole 5 druhů, zrcadlení, proměnné a stavy (konfigurace).
+- Plochy: plošné vysunutí a rotace, tažení a šablonování ploch, odsazení, prodloužení, ořez, sešití, uzavření do tělesa, záplaty, křivky průniku, šroubovice.
+- Plech: základní plech, ohyby z hrany, lemy, ohyb podle čáry, výřezy, rohové úlevy, prolisy, rozvin do DXF/SVG, tabulka ohybů.
+- Svařence: konstrukční profily (IPE, HEB, UPN, L, jäkl, trubky), rámy z profilů, desky, ořezy, víčka, styčníky, svarové housenky a značky, kusovník řezů.
+- Sestavy: komponenty, podsestavy, vazby, kontrola kolizí, kusovník, rozložený pohled, průvodce rámem vstřikovací formy.
+- Výkresy: pohledy, řezy, detaily, kóty, drsnosti, geometrické tolerance, tabulky děr, kusovník s pozicemi, razítko; export PDF, DXF, DWG (R2000–R2018) a SVG.
+- Knihovna normálií: 103 rodin ve 13 skupinách (šrouby, matice, podložky, kolíky, pera, ložiska, ozubená a řetězová kola, řemenice, ocelové a hliníkové profily, pružiny, O-kroužky, normálie forem, lineární technika, pneumatika, potrubí) – stačí napsat „ISO 4762 M8x30“ nebo „IPE 200 1500“.
+- Import a export: STEP, IGES, BREP (přesná geometrie), STL, OBJ, 3MF, glTF/GLB, PLY, OFF (sítě), DXF (skici a výkresy), DWG (výkresy); u nativních formátů (SolidWorks, Inventor, ZW3D, CATIA, Creo, Fusion…) poradí, jak je převést.
+- Formařské nástroje: analýza úkosů, zebra pruhy, mapa křivosti, tloušťka stěn, smrštění podle materiálu, návrh vyhazovačů a chladicích kanálů, dělicí rovina, rám formy s normáliemi.
+
+### Požadavky
+
+- Moderní prohlížeč s WebGL 2 a WebAssembly: Chrome, Edge, Firefox, Safari (desktop i mobil). Doporučeno 8 GB RAM pro větší sestavy.
+- Myš s kolečkem pro pohodlné otáčení; na dotykovém zařízení funguje jeden prst = otáčení, dva prsty = posun a přiblížení, dlouhý stisk = kontextová nabídka.
+- Spuštění: otevřete adresu mnastrojarna.cz/cad. Jádro (asi 10 MB) se stáhne jen poprvé, pak se načítá z mezipaměti.
+
+> Tip: Celý program je česky, včetně chybových hlášek, které vždy říkají, co udělat jinak („Vyberte rovinnou plochu…“, „Vzdálenost musí být kladná…“).
+
+## 2. Rychlý start – první díl za pět minut
+
+Postup, který vás provede od prázdného dílu k výkresu v PDF a souboru STEP.
+
+1. Nový díl: na úvodní obrazovce zvolte „Nový díl“ (nebo ikonu listu v titulní liště). Otevře se prázdný díl se třemi základními rovinami XY, XZ, YZ.
+2. Skica: v pásu Tvorba → Skica vyberte rovinu (XY = půdorys). Klávesou r nakreslete obdélník dvěma kliky, nebo začněte psát čísla: 60 Tab 40 Enter vytvoří obdélník 60 × 40 mm i s kótami.
+3. Dokončit skicu (tlačítko vpravo nahoře nebo Enter). Program rovnou nabídne Vysunutí – zadejte výšku (např. 20) a potvrďte Enter.
+4. Díra: h nebo Tvorba → Díra; klikněte na horní plochu – bod a osa se doplní samy. Zvolte typ (vrtaná, válcové / kuželové zahloubení, závit), např. „Pro šroub M8“, ukončení „Skrz vše“, Enter.
+5. Zaoblení: b, klikněte na hrany, zadejte poloměr, Enter. Hrany lze vybírat i přes filtr výběru „Hrana“ ve stavovém řádku.
+6. Výkres: pás Výkres → Nový výkres. Vznikne list s pohledy a izometrií; doplňte kóty a drsnosti, pak PDF (nebo DXF/DWG).
+7. Export: Soubor → Export 3D → STEP pro jiný CAD nebo CAM; Uložit projekt (.mncad) uchová celou historii prvků. Tlačítko Poptat výrobu připraví STEP a e-mail naší nástrojárně.
+
+![Formulář vysunutí s ukončením K ploše a rozbalenou sekcí Začátek, směr, tenká stěna](https://www.mnastrojarna.cz/cad/docs/vysunuti.webp)
+
+*Formulář prvku: hodnoty lze psát, vybírat klikem v modelu nebo zvolit pravým tlačítkem z nabídky způsobů zadání.*
+
+## 3. Obrazovka a ovládání
+
+Rozložení vychází ze ZW3D a SolidWorks: pás karet nahoře, správce historie vlevo, 3D okno uprostřed, formulář prvku vpravo a řádek výzev dole.
+
+![Pás karet Tvorba: Skica, Tvar, Primitiva, Konstrukční prvky, Úpravy, Přímé úpravy, Základní editace, Reference, Knihovna](https://www.mnastrojarna.cz/cad/docs/ribbon-tvorba.webp)
+
+### Titulní lišta
+
+Logo (zpět na web), rychlé akce Nový díl / Otevřít / Uložit, Zpět / Znovu (Ctrl+Z, Ctrl+Y), název dokumentu (klikněte a přepište), stav jádra (OCCT · doba poslední stavby v ms), přepínač světlého/tmavého vzhledu a tlačítko Poptat výrobu.
+
+### Pás karet (ribbon)
+
+| Záložka | Obsah |
+| --- | --- |
+| Soubor | Nový díl / sestava, otevřít a importovat, uložit projekt, export 3D, výkres, rám vstřikovací formy, ukázkové díly, knihovna normálií, nastavení, klávesové zkratky, poptávka výroby. |
+| Tvorba | Skica (11 způsobů volby roviny), Vysunout, Rotovat, Tažení, Šablonovat, Text; Kvádr, Válec, Trubka, Kužel, Koule; Díra, Závit, Rozříznout, Žebro, Pružina; Zaoblit, Srazit, Úkos, Skořepina; Vytáhnout / Zatlačit, Odsadit, Odstranit plochu, Zesílit, Barva plochy; Pole, Zrcadlit, Přesunout / otočit; Rovina, Osa, Bod, Souřadný systém; Normálie; pokročilé úpravy (proměnné a plné zaoblení, zaoblení řetězce, sražení D1×D2 / D×úhel, zrcadlení prvků, pole podél křivky, výplňové pole, zkrut, kopule, text na válci, úkos od dělicí roviny, lem / drážka, měřítko v bodě, díry v bodech, znovu použít nástroj). |
+| Plochy | 19 příkazů plošného modelování (viz kapitola 7). |
+| Plech | 12 příkazů plechových dílů včetně rozvinu (kapitola 8). |
+| Svařence | 10 příkazů pro rámy z profilů, svary a kusovník řezů (kapitola 9). |
+| Nástroje | Měřit, Vlastnosti, Hmotnost, Řez, Proměnné, Stavy dílu, Formařské nástroje, Kontrola geometrie, Sjednotit plochy, Tloušťka stěn. |
+| Zobrazení | Pohledy (izometrie, přední, horní, pravý, zadní, spodní, levý), styl zobrazení, kamera (přizpůsobit, perspektiva / pravoúhlá), mřížka a osy, barva tělesa, pozadí, schéma myši (ZW3D / SolidWorks / touchpad). |
+| Výkres | Nový výkres a výkresová dokumentace (kapitola 13). |
+| Data | Nastavení, paleta příkazů, úvodní obrazovka, otevřít / import, uložit, export, sestavy, ukázky. |
+| Skica | Zobrazí se při otevřené skice: uchopení, kreslení, vazby, kóty, úpravy, DXF (kapitola 5). |
+
+### Správce historie (vlevo)
+
+Záložka Historie ukazuje strom prvků v pořadí stavby: kliknutím prvek vyberete, dvojklikem nebo ikonou tužky upravíte, pravým tlačítkem otevřete nabídku (přejmenovat, potlačit, smazat, přesunout, vrátit se před prvek). Prvek s chybou má červený vykřičník a pod ním srozumitelnou hlášku. Záložka Proměnné spravuje parametry a rovnice, záložka Stavy konfigurace dílu. U sestavy je zde strom komponent a podsestav.
+
+### 3D okno
+
+- Navigační krychle (ViewCube) vpravo nahoře: klik na stěnu / hranu / roh = pohled, ikona domečku = izometrie.
+- Osový kříž vlevo dole, mřížka v základní rovině, informační štítky dole (rozměry obalového kvádru, objem, hmotnost podle materiálu).
+- Výběr: klik vybere entitu podle filtru (Vše / Prvek / Plocha / Hrana / Bod / Těleso; v sestavě Komponenta / Podsestava). Ctrl+klik přidává do výběru, Esc ruší.
+- Mini lišta: po výběru plochy, hrany, bodu nebo tělesa se u kurzoru objeví 3–4 nejčastější příkazy (např. plocha → Nová skica na ploše, Vytáhnout / Zatlačit, Odsadit plochu, Odstranit plochu); „⋯“ otevře úplnou kontextovou nabídku.
+- Pravé tlačítko: kontextová nabídka podle entity (zaoblit hranu, skica na ploše, měřit odsud, barva plochy, vlastnosti…) plus pohledy, styl a filtr výběru.
+- Inspektor: po výběru jedné entity se vpravo dole ukáže panel s údaji (typ plochy, obsah, střed, normála, poloměr, osa; u hrany délka, typ křivky; u tělesa objem, povrch, hmotnost, těžiště).
+
+![Mini lišta u kurzoru po kliknutí na válcovou plochu a inspektor s údaji o ploše](https://www.mnastrojarna.cz/cad/docs/mini-lista.webp)
+
+*Mini lišta a inspektor plochy – nejčastější příkazy na jeden klik, údaje bez hledání v nabídkách.*
+
+### Formulář prvku (vpravo)
+
+Každý prvek má formulář s názvem, parametry a tlačítky OK (Enter) a Storno (Esc). Během úprav se model živě přepočítává; u prvků pracujících s plochami nebo hranami se zobrazuje stav před prvkem, aby šlo pohodlně vybírat. Číselná pole přijímají výrazy (25/2, 10+5*2) i proměnné (=d*3, viz kapitola 15). Pokročilé volby jsou sbalené v sekci „Začátek, směr, tenká stěna…“.
+
+### Řádek výzev a stavový řádek (dole)
+
+Vlevo program říká, co očekává („Vyberte hrany v modelu (vybráno 3) · Enter = OK“), vpravo je filtr výběru, počet vybraných entit, souřadnice kurzoru, jednotky a schéma myši.
+
+### Paleta příkazů
+
+![Paleta příkazů Ctrl+K s fulltextovým hledáním příkazů](https://www.mnastrojarna.cz/cad/docs/paleta.webp)
+
+*Paleta příkazů (Ctrl+K): napište část názvu – „dír“, „zaobl“, „rozvin“ – a potvrďte Enter.*
+
+Ctrl+K otevře vyhledávání přes všechny příkazy, ukázky, nastavení i knihovnu. Funguje bez diakritiky a toleruje překlepy.
+
+### Ovládání myší
+
+| Schéma | Otáčení | Posun | Přiblížení |
+| --- | --- | --- | --- |
+| ZW3D (výchozí) | pravé tlačítko | prostřední tlačítko | kolečko (k místu pod kurzorem) |
+| SolidWorks | prostřední tlačítko | Ctrl + prostřední | kolečko |
+| Touchpad | levé tlačítko (tažení) | pravé tlačítko | kolečko / gesto |
+
+Schéma se přepíná v Zobrazení → Ovládání myši nebo v Nastavení → Myš a ovládání. Tam je i obrácení kolečka a přiblížení ke kurzoru.
+
+## 4. Zadávání hodnot a odkazů na geometrii
+
+To, co odlišuje profesionální CAD od jednoduchých modelářů, je počet způsobů, jak každý příkaz „nakrmit“. V Mnástrojárna CAD má každé pole bodu, směru, roviny nebo osy stejné možnosti jako v ZW3D nebo SolidWorks.
+
+![Nabídka pravého tlačítka v poli bodu se čtrnácti způsoby zadání](https://www.mnastrojarna.cz/cad/docs/volby-bodu.webp)
+
+*Pole odkazu: pravé tlačítko (nebo „⋯“) nabídne všechny způsoby zadání bodu.*
+
+### Pole odkazu
+
+- Klik v modelu: klikněte do pole (zvýrazní se a ve stavovém řádku je výzva) a pak na vrchol, hranu nebo plochu v 3D okně. Filtr výběru se přepne sám podle toho, co pole očekává.
+- Psaní: tlačítko xyz přijme souřadnice 10; 20; 0 (oddělovač středník, čárka nebo mezera) nebo relativně @5; 0; 0 od posledního zadaného bodu.
+- Nabídka „⋯“ / pravé tlačítko: další způsoby zadání (níže), „Použít aktuální výběr“, „Vybrat ze seznamu…“ a „Vymazat“. Na dotykovém zařízení nabídku otevře dlouhý stisk.
+- Otisk entity: odkaz si pamatuje typ, střed a velikost vybrané plochy či hrany. Když později změníte dřívější prvek a indexy se přečíslují, odkaz se znovu najde podle otisku – prvky se nerozbíjejí.
+
+### Způsoby zadání bodu (14 + 3)
+
+| Volba | Co se vybírá | Výsledek |
+| --- | --- | --- |
+| Vrchol / koncový bod | vrchol tělesa | bod ve vrcholu |
+| Střed hrany · Začátek hrany · Konec hrany | hrana | bod v polovině délky / na začátku / na konci |
+| Střed kružnice / oblouku | kruhová hrana | střed kružnice |
+| Střed plochy | plocha | těžiště plochy (u válce bod na ose) |
+| Bod na hraně v % délky | hrana + procento | bod v zadané části délky |
+| Střed mezi dvěma body | 2 body | aritmetický střed |
+| Mezi dvěma body (poměr) | 2 body + poměr 0–1 | bod na spojnici |
+| Odsazený bod podél hrany | bod + hrana + vzdálenost | bod posunutý ve směru hrany |
+| Průmět bodu na plochu | bod + plocha | kolmý průmět (u válce na osu) |
+| Průsečík hrany s plochou | přímá hrana + plocha | průsečík přímky s rovinou |
+| Počátek souřadnic | — | 0; 0; 0 |
+| Zadat souřadnice… | čísla | X; Y; Z nebo @dx; dy; dz |
+| Bod skici · Pomocný bod · Ze seznamu | entita skici / prvek Bod / seznam entit | asociativní odkaz |
+
+### Způsoby zadání směru (8)
+
+Kolmo na rovinu (normála), osa X / Y / Z, podél hrany nebo osy válcové plochy, dvěma body, normála plochy, vektor čísly, pod úhlem od normály (kolem osy Y skici), tečna křivky.
+
+### Definice roviny (12) – pro skicu, pomocnou rovinu, zrcadlení, řez i úkos
+
+Základní rovina + odsazení · rovnoběžně s plochou (+ odsazení, obráceně) · třemi body · bodem a přímkou · bodem a normálou · pod úhlem k ploše kolem hrany · střední mezi dvěma plochami (u různoběžných půlicí) · tečně k válci · kolmo na křivku v bodě · dvěma hranami · pomocná rovina (+ odsazení) · vlastní (počátek, normála, osa X). Rovina je asociativní – posune-li se plocha, na které skica leží, přepočítá se i skica a vše, co na ní stojí.
+
+![Formulář pomocné roviny s definicí Pod úhlem k ploše kolem hrany](https://www.mnastrojarna.cz/cad/docs/rovina-pod-uhlem.webp)
+
+*Pomocná rovina pod úhlem k ploše kolem hrany – jedna z dvanácti definic.*
+
+### Osa (10)
+
+Osa Y nebo X skici, čára ve skici, hrana modelu, osa válcové plochy, dva body, globální osa, normála pomocné roviny, průsečnice dvou rovin, pomocná osa nebo osa Z souřadného systému.
+
+### Výběr ze seznamu
+
+![Dialog Vybrat ze seznamu se záložkami Vrcholy, Hrany, Plochy a hledáním](https://www.mnastrojarna.cz/cad/docs/vyber-ze-seznamu.webp)
+
+*Všechny plochy, hrany a vrcholy tělesa s typem, středem a rozměrem – s filtrem a hledáním. Hodí se u malých entit a na mobilu.*
+
+## 5. Skica
+
+Skica je 2D profil na rovině, ze kterého vznikají tělesa. Skicář má vlastní pás karet, uchopení, automatické vazby, kóty a číselné zadání u kurzoru.
+
+![Pás karet Skica: uchopení, kreslení, vazby, kóty a úpravy](https://www.mnastrojarna.cz/cad/docs/skica-pas.webp)
+
+### Založení skici
+
+Tvorba → Skica nabídne: rovinu XY (půdorys), XZ (nárys), YZ (bokorys), rovinnou plochu modelu (klikněte na ni), XY / XZ / YZ s odsazením, rovnoběžně s vybranou plochou s odsazením, střední rovinu mezi dvěma plochami, rovinu třemi vybranými vrcholy a všechny pomocné roviny dokumentu. Existující skicu otevřete dvojklikem v historii; v jejím formuláři lze rovinu změnit na kteroukoli z 12 asociativních definic.
+
+### Nástroje kreslení
+
+| Nástroj | Klávesa | Zadání |
+| --- | --- | --- |
+| Úsečka · Lomená čára | l · k | dva body; nebo délka + úhel (50<45), x;y, @dx;dy; pravé tlačítko ukončí řetěz |
+| Osa (pomocná přímka) | x | dva body |
+| Obdélník · ze středu · 3 body | r | dva rohy; střed + roh; dva body základny + výška (natočený); nebo šířka × výška (30x20) |
+| Kružnice · 2 body · 3 body | c | střed + poloměr / průměr (přepínač Ø/R); průměr dvěma body; tři body |
+| Oblouk 3 body · středem · tečný | a | začátek, bod, konec; střed, začátek, konec (poloměr + úhel); tečný z konce úsečky |
+| Elipsa | e | střed, poloosa a + úhel, poloosa b |
+| Spline | n | řídicí body (hladká interpolační křivka) |
+| Bod | b | bod (např. pro pole podle skici nebo díry v bodech) |
+| Mnohoúhelník | p | střed, poloměr vepsaný / opsaný, počet stran |
+| Drážka · Drážka obloukem | s | délka + úhel + šířka; poloměr + úhel + šířka |
+
+### Číselné zadání u kurzoru
+
+![Kreslení úsečky s plovoucím polem Délka a Úhel u kurzoru a automatickými vazbami](https://www.mnastrojarna.cz/cad/docs/skica-zadani.webp)
+
+*Prostě začněte psát: Délka 50, Tab, Úhel 30, Enter. Zámek podrží hodnotu, dokud měníte druhou.*
+
+- Po prvním kliku (nebo hned) pište hodnoty do plovoucího pole: Tab přepne na další pole a hodnotu zamkne, Enter potvrdí, Esc zruší, Backspace maže. Šedé hodnoty ukazují živou polohu kurzoru.
+- První bod každého nástroje přijímá x;y absolutně nebo @dx;dy relativně k poslednímu bodu; fungují výrazy (2*10+5).
+- Kótovat při kreslení (přepínač „Kóty“): hodnoty zadané číslem rovnou vloží řídicí kótu (délka úsečky, Ø/R kružnice, šířka × výška obdélníku, R mnohoúhelníku).
+- d nad vybranou entitou vloží kótu okamžitě; další klik ji umístí.
+
+### Uchopení (11 druhů)
+
+Koncový bod, střed úsečky, střed křivky, kvadrant kružnice, průsečík, na křivce, kolmo, tečně, mřížka (krok nastavitelný), počátek a zarovnání (vodítka). Každé jde vypnout přepínačem ve skupině Uchopení v pásu nebo v panelu skicáře. Program ukáže značku uchopení u kurzoru.
+
+### Automatické vazby
+
+Při kreslení program rozpozná a s náhledem (žlutá ikona u kurzoru) vloží vazby vodorovně, svisle (do 3°), rovnoběžně, kolmo k sousední úsečce, tečně při navázání na oblouk, totožnost konce s existujícím bodem, bod na křivce a střed. Přepínač „AV“ / Nastavení → Skica → Automatické vazby.
+
+### Vazby (13) a kóty (8)
+
+Vazby: vodorovně, svisle, totožnost, rovnoběžně, kolmo, tečně, stejná velikost, pevně, soustředně, ve středu, bod na křivce, symetrie, kolineárně. Kóty: vzdálenost, vodorovná, svislá, poloměr, průměr, úhel, délka, délka oblouku – řídicí (mění geometrii) nebo referenční. Kótu upravíte dvojklikem, do hodnoty lze napsat výraz nebo proměnnou.
+
+### Stav určenosti
+
+Řešič vazeb (Levenberg–Marquardt) po každé změně spočítá stupně volnosti: modrá entita je nedourčená, černá plně určená, červená přeurčená nebo v konfliktu. Štítek dole říká „Nedourčeno (N st. volnosti)“, „Plně určeno“ nebo „Přeurčeno – nadbytečné vazby (n)“ a nadbytečnou vazbu označí.
+
+### Úpravy
+
+- Oříznout (t): klik na část křivky mezi průsečíky ji smaže; tažením se ořízne vše, přes co kurzor přejede (výkonný ořez).
+- Prodloužit k nejbližší křivce, Rozdělit v bodě (kružnici dvěma body).
+- Odsadit (o): entitu nebo celý řetězec o vzdálenost (klikem nebo číslem), strana podle kurzoru; úsečka–oblouk se řeší průsečíkem nebo spojovacím obloukem.
+- Zaoblit roh / Srazit roh číslem, Zrcadlit podle osy, Přesunout / Kopírovat / Otočit / Měřítko, Lineární a kruhové pole entit, Rozložit složené tvary na úsečky a oblouky.
+- Pomocná geometrie: přepne entitu na konstrukční (čárkovaně, netvoří profil) a zpět.
+- Promítnout hrany modelu: hrany ležící v rovině skici (±0,01 mm) nebo všechny viditelné jako kolmý průmět – vznikne normální nebo pomocná geometrie, plně určená (jako „převést entity“).
+- Import a export DXF: skicu lze načíst z DXF a uložit do DXF (např. pro řezání laserem).
+
+![Kontextová nabídka pravého tlačítka ve skice s vazbami a kótami pro vybranou entitu](https://www.mnastrojarna.cz/cad/docs/skica-kontext.webp)
+
+*Pravé tlačítko ve skice: vazby a kóty nabízené podle vybrané entity.*
+
+### Dokončení
+
+Dokončit skicu (Enter) zavře skicář. Je-li v Nastavení zapnuto „Po dokončení skici rovnou nabídnout vysunutí“, otevře se formulář vysunutí; Esc jej zruší a skica zůstane k dispozici pro jiné prvky. Skica může obsahovat více uzavřených profilů i otvory (vnoření se rozpozná automaticky).
+
+## 6. Tvorba těles – prvky a jejich možnosti
+
+Každý prvek je uložený v historii s parametry a lze ho kdykoli upravit, potlačit, přesunout nebo smazat. Booleovský režim Přidat / Odebrat / Průnik (a Nové těleso) je u všech tvarových prvků.
+
+### Vysunutí (E)
+
+| Volba | Možnosti |
+| --- | --- |
+| Ukončení (směr 1 a nezávisle směr 2) | Na vzdálenost · Skrz vše · K dalšímu (první stěna tělesa) · K vrcholu · K ploše (rovinné i zakřivené) · Odsazeně od plochy · K tělesu · Střední rovina (symetricky) |
+| Začátek | Rovina skici · Odsazení od roviny · Od plochy · Od vrcholu |
+| Směr | Kolmo na skicu · Osa X/Y/Z · Podél hrany / osy válce · Dvěma body · Normála plochy · Vektor · Pod úhlem · Tečna |
+| Tenká stěna | Ven · Dovnitř · Na střed · Dvě tloušťky; funguje i pro otevřený profil (čára se stane stěnou) |
+| Další | Úkos ±44° (obrys se zužuje, otvory rozšiřují), Kroucení (°), Měřítko konce (ZW3D smrštit / rozšířit), Jen vnější obrys (ignorovat otvory), Opačný směr |
+
+### Rotace
+
+Osa 10 způsoby (viz kap. 4), úhel 0,01–360°, jeden směr / střední rovina / dva směry s různými úhly, tenká stěna.
+
+### Tažení
+
+Profil = uzavřená skica nebo kružnice bez skici (zadáte jen průměr), dráha = skica s úsečkami, oblouky nebo lomenou čarou. Orientace profilu: sledovat dráhu, Frenet, pevná. Volitelně vodicí křivka, kroucení ve stupních nebo otáčkách, měřítko na konci, tenká stěna, přechod v rozích pravoúhlý / zaoblený / transformovaný.
+
+![Formulář tažení s kruhovým profilem bez skici, orientací profilu a pokročilými volbami](https://www.mnastrojarna.cz/cad/docs/tazeni.webp)
+
+*Tažení kružnicí bez skici – např. trubka nebo kabel podél dráhy.*
+
+### Šablonování
+
+Dva a více profilů v různých rovinách (hladce nebo přímkově), do bodu (kužel, jehlan), uzavřené, okrajové podmínky na začátku a konci (kolmo na profil / zadaný směr s délkou náběhu), osová křivka, vodicí křivka, tenká stěna. Otvory se šablonují, mají-li všechny profily stejný počet.
+
+### Text
+
+Vystouplý nebo gravírovaný text (písmo Roboto) na libovolné rovině (12 definic) s polohou odkazem; v pokročilých úpravách i text na válci.
+
+### Primitiva
+
+Kvádr, Válec, Trubka, Kužel, Koule – poloha čísly nebo odkazem (vrchol, střed kružnice, odvozený bod…), osa X/Y/Z nebo libovolným směrem.
+
+### Díra (H) – průvodce
+
+![Formulář díry s typem, řadou ISO 273, ukončením K dalšímu a polohami děr](https://www.mnastrojarna.cz/cad/docs/dira.webp)
+
+*Průvodce dírou: typ, norma, ukončení, více poloh naráz, osa libovolným směrem.*
+
+- Typ: vrtaná, válcové zahloubení (pro ISO 4762), kuželové zahloubení (úhel 90°), závitová (M2–M48, vrtá se jádrový průměr; závit se uvede ve výkrese).
+- Pro šroub: průchozí díra podle ISO 273 v řadě jemná / střední / hrubá; rozměry zahloubení podle normy.
+- Ukončení: slepá (úhel špičky vrtáku nastavitelný, výchozí 118°), skrz vše, k dalšímu, k ploše (+ odsazení).
+- Poloha: klik na plochu (bod i osa se doplní podle normály), nebo více poloh z vrcholů, středů kružnic, bodů skici a pomocných bodů – jedna díra se vyvrtá všude naráz. Osa libovolným směrem (8 způsobů).
+- Pokročilé úpravy obsahují i Díry v bodech (díry podle bodů skici).
+
+### Závit
+
+Vnější metrický závit na válcové ploše: kosmetický (jen ve výkrese, doporučeno pro výrobu) nebo modelovaný (drážky pro 3D tisk a vizualizaci), poloha odkazem.
+
+### Rozříznout, Žebro, Pružina
+
+Rozříznout libovolnou rovinou (12 definic) s volbou ponechané strany. Žebro z otevřené skici s tloušťkou, směrem (kolmo / v rovině) a dotažením k tělesu. Pružina / šroubovice s poloměrem, stoupáním, počtem závitů a průměrem drátu, poloha a osa odkazem.
+
+### Zaoblení (B) – 6 variant
+
+![Formulář zaoblení s druhem Plný rádius a výběrem bočních a prostřední plochy](https://www.mnastrojarna.cz/cad/docs/zaobleni-plny.webp)
+
+*Plný rádius: poloměr se dopočítá z vzdálenosti bočních ploch.*
+
+- Konstantní poloměr na vybraných nebo všech hranách.
+- R1 → R2: poloměr se mění lineárně podél hrany (tlačítko Prohodit).
+- Tabulka: jiný poloměr (na začátku i konci) pro každou vybranou hranu.
+- Plocha–plocha: zaoblí hrany společné dvěma sadám ploch.
+- Plný rádius: boční plocha 1, prostřední, boční plocha 2 → plný oblouk.
+- Tečné řetězení: výběr se rozšíří po tečně navazujících hranách.
+
+### Sražení (N) – 5 variant
+
+Stejné vzdálenosti · D1 × D2 (s referenční plochou) · D × úhel · sražení vrcholu třemi vzdálenostmi · tečné řetězení.
+
+### Úkos
+
+Úhel ±44°, neutrální rovina kteroukoli z 12 definic nebo směr tahu (neutrální rovina se odvodí), tečné řetězení ploch. V pokročilých úpravách úkos od dělicí roviny.
+
+### Skořepina
+
+Tloušťka dovnitř nebo ven (ostré vnější hrany), otevřené plochy klikem, rozdílná tloušťka vybraných rovinných stěn.
+
+### Přímé úpravy (bez historie skic)
+
+Vytáhnout / Zatlačit plochy o vzdálenost nebo k vrcholu / k ploše / odsazeně od plochy, Odsadit plochu, Odstranit plochu (zacelí těleso – odstraní zaoblení, díry), Zesílit plochy na skořepinu, Barva plochy. Hodí se i pro importované modely STEP bez historie.
+
+### Pole – 5 druhů
+
+![Formulář pole s druhem Výplň, obrysem ze skici, rozložením a okrajem](https://www.mnastrojarna.cz/cad/docs/pole-vypln.webp)
+
+*Výplňové pole: díry vyplní obrys skici v mřížce, střídavě nebo kruhově.*
+
+- Lineární: směr čísly nebo odkazem (hrana, 2 body, osa…), krok nebo celková délka, mřížka ve dvou směrech, střídavé řady, vynechané kusy (zaškrtávací mřížka).
+- Kruhové: osa odkazem (hrana, válec, 2 body, pomocná osa), rovnoměrně nebo krok, symetricky na obě strany, s natáčením nebo jen posun, vynechané kusy.
+- Po křivce: podél skici (úsečky, oblouky, kružnice), rovnoměrně nebo s roztečí, natáčení podle tečny.
+- Podle skici: kopie v bodech skici.
+- Výplňové: vyplní uzavřený obrys skici (mřížka / střídavě / kruhově) s okrajem.
+- Společné: více zdrojových prvků naráz, jedna booleovská operace pro rychlost, limit 400 kusů. V pokročilých úpravách i Zrcadlit prvky, Měřítko v bodě a Znovu použít nástroj.
+
+### Zrcadlit, Přesunout / otočit
+
+Zrcadlení podle základní roviny s posunem nebo kterékoli z 12 definic, s ponecháním originálu. Transformace tělesa: posun čísly nebo z bodu do bodu, otočení kolem osy X/Y/Z nebo hrany / osy válce / dvou bodů / pomocné osy, měřítko se středem odkazem; tažení gizmem přímo v 3D okně (G u tělesa či komponenty, R přepíná posun / otočení).
+
+### Reference: Rovina, Osa, Bod, Souřadný systém
+
+![Formulář pomocné osy s definicí Globální osa a živým popisem vyřešené osy](https://www.mnastrojarna.cz/cad/docs/pomocna-osa.webp)
+
+*Pomocná geometrie se zobrazuje v 3D okně a slouží jako odkaz v dalších prvcích.*
+
+Pomocná rovina (12 definic), osa (10 způsobů včetně průsečnice dvou rovin), bod (všechny způsoby zadání bodu) a souřadný systém (počátek + směry X a Z). Nevytvářejí geometrii, ale lze na ně odkazovat: osa rotace, osa kruhového pole, poloha díry, rovina skici.
+
+### Pokročilé tvary
+
+Zkrut tělesa kolem osy, Kopule na ploše, Text na válci, Lem / drážka podél hran. Dostupné v pásu Tvorba (skupiny Pokročilé úpravy, Pokročilé tvary, Pole a kopie) a v paletě příkazů.
+
+## 7. Plochy (plošné modelování)
+
+Devatenáct příkazů pro tvarově složité díly, opravy importovaných modelů a práci s volnými plochami.
+
+![Pás karet Plochy: Plochy, Úpravy ploch, Těleso ↔ plocha, Křivky](https://www.mnastrojarna.cz/cad/docs/ribbon-plochy.webp)
+
+| Skupina | Příkazy |
+| --- | --- |
+| Plochy | Plošné vysunutí · Plošná rotace · Rovinná plocha (z uzavřené skici) · Tažení plochy · Šablonování ploch |
+| Úpravy ploch | Odsazená plocha · Prodloužit plochu · Oříznout rovinou · Oříznout skicou · Sešít plochy · Záplata z hran |
+| Těleso ↔ plocha | Uzavřít do tělesa (z uzavřené skořepiny ploch) · Zesílit plochu · Rozdělit těleso plochou · Nahradit plochu (posun) |
+| Křivky | Křivka průniku · Promítnout skicu na plochu · Šroubovice · Tažení po šroubovici |
+
+> Volné plochy se zobrazují jako tenké skořepiny; booleovské operace vyžadují uzavřené těleso – použijte Sešít plochy a Uzavřít do tělesa. Chyba „Operace vrátila prázdné těleso“ obvykle znamená právě neuzavřenou skořepinu.
+
+## 8. Plech
+
+Modelování plechových dílů s ohyby a rozvinem pro laser, vysekávání a ohraňování.
+
+![Pás karet Plech: Parametry plechu, Základní plech, Ohyby, Výřez, Rohová úleva, Prolis, Rozvin](https://www.mnastrojarna.cz/cad/docs/ribbon-plech.webp)
+
+- Parametry plechu: tloušťka, vnitřní poloměr ohybu, faktor K (neutrální osa) – platí pro celý díl.
+- Základní plech z uzavřené skici; Ohyb z hrany (Shift+F) s délkou, úhlem a polohou; Lem podél hrany; Ohyb podle čáry ve skice.
+- Výřez skicou skrz plech, Rohová úleva, Prolis (žebro) pro vyztužení.
+- Rozvinout zobrazí rozvinutý tvar s čarami ohybů; Rozvin → DXF / SVG exportuje obrys (hladina OBRYS) a ohyby pro výrobu; Tabulka ohybů vypíše úhly, poloměry a odpočty.
+
+## 9. Svařence a ocelové konstrukce
+
+Rámy, stojany a konstrukce z válcovaných a uzavřených profilů včetně svarů a výkazu řezů.
+
+![Pás karet Svařence: Konstrukční profil, Rám z profilů, Deska, Ořezat rovinou, Víčko, Styčník, Svarová housenka, Značka svaru, Kusovník řezů, Tabulka svarů](https://www.mnastrojarna.cz/cad/docs/ribbon-svarence.webp)
+
+- Konstrukční profil (Shift+W) podél skici: IPE, HEA/HEB, UPN, úhelník L, jäkl čtvercový / obdélníkový, trubka, plochá a čtvercová tyč – rozměry podle norem z knihovny.
+- Rám z profilů vytvoří celý rám z obdélníkového půdorysu jedním příkazem; Deska (patka, příruba) s dírami.
+- Ořezat rovinou profily na pokos, Víčko uzavře konec profilu, Styčník spojí profily v uzlu.
+- Svarová housenka koutového svaru podél hran a Značka svaru (do výkresu).
+- Kusovník řezů: délky, úhly řezů a hmotnosti po profilech (pro pilu a nákup), Tabulka svarů.
+
+## 10. Knihovna normálií
+
+103 rodin normalizovaných dílů ve 13 skupinách. Díl vznikne napsáním označení – rozměry se doplní z tabulek norem.
+
+![Knihovna normálií: rozpoznané čelní ozubené kolo m2 z24 s parametry a náhledem](https://www.mnastrojarna.cz/cad/docs/knihovna-ozubene-kolo.webp)
+
+*Napište „ozubené kolo m2 z24“ – knihovna rozpozná rodinu, doplní parametry a ukáže náhled.*
+
+Otevření: Ctrl+L, pás Tvorba → Normálie, nebo paleta. Do pole napište označení: ISO 4762 M8x30, DIN 933 M10x40, 6205 2RS, 30206, IPE 200 1500, jäkl 40x40x3 2000, ozubené kolo m2 z24, řetězové kolo 08B z17, HTD 5M 30, vodicí sloupek 24x150, pružina 2x20x50, O-kroužek 20x2. Výsledek lze vložit jako nový díl, přidat do sestavy (s automatickou vazbou šroubu do díry) nebo upravit parametry ručně. Oblíbené a nedávné položky zůstávají uložené.
+
+| Skupina | Rodiny |
+| --- | --- |
+| Spojovací materiál | šrouby ISO 4762 / 7380 / 10642 (válcová, půlkulatá, zápustná hlava s vnitřním šestihranem), šrouby s křížovou drážkou, šestihranné šrouby a matice, pojistné a přírubové matice, křídlová matice, pružné a zubové podložky, podložky, závitová tyč, šroub s okem, nýt, samořezný šroub |
+| Kolíky a pera | válcový, pružný a kuželový kolík, těsné a úsečové pero, závlačka |
+| Pojistné kroužky | vnější a vnitřní Seeger |
+| Ložiska | kuličková jednořadá, kuželíková, axiální, jehlová HK, ložisková tělesa UCP, kluzná pouzdra |
+| Ozubení a řetězy | čelní kola s přímými a šikmými zuby, vnitřní ozubení, ozubený hřeben, kuželová kola, šnek a šnekové kolo, řetězová kola pro válečkové řetězy |
+| Řemenice | ozubené řemenice HTD, klínové řemenice |
+| Ocelové profily a trubky | IPE, HEA/HEB, UPN, L, jäkl, trubky, ploché a čtvercové tyče |
+| Pružiny a těsnění | tlačné, tažné, zkrutné a talířové pružiny, plynová vzpěra, O-kroužky |
+| Normálie forem | vodicí sloupky a pouzdra (s límcem i bez), vyhazovače válcové, ploché a trubkové, vratné kolíky, středicí kroužek, vtoková vložka, kanál, sedlo trysky, opěrný sloupek, dosedka, šikmý čep, temperační spojka, datumovka |
+| Lineární technika | kolejnice HGR, kuličkový šroub SFU s maticí, vodicí tyče W, domečky SHF, lineární pouzdra LM a SC |
+| Pneumatika a hydraulika | válce ISO 15552 a ISO 6432, nástrčná šroubení |
+| Hliníkové profily | konstrukční profily s T-drážkou, T-matice, úhelníky |
+| Potrubí a příruby | závitové trubky, příruby PN16 EN 1092-1, hadicové nátrubky |
+
+![Knihovna normálií: profil IPE 200 délky 1500 mm s tabulkou rozměrů](https://www.mnastrojarna.cz/cad/docs/knihovna-ipe.webp)
+
+*Ocelové profily s tabulkou rozměrů podle normy.*
+
+## 11. Sestavy
+
+Sestava skládá díly a podsestavy, drží je vazbami, kontroluje kolize a vytváří kusovník.
+
+![Sestava rámu vstřikovací formy s deskami, vodicími sloupky a pouzdry](https://www.mnastrojarna.cz/cad/docs/sestava-ram-formy.webp)
+
+*Rám vstřikovací formy vytvořený průvodcem – desky, vodicí sloupky a pouzdra, vyhazovací paket.*
+
+- Nová sestava nebo Sestava z aktuálního dílu (Soubor / pás Sestava). Komponenty: Vložit díl / model (soubor .mncad, STEP, STL…), Normálie z knihovny, kopie dílů; podsestavy lze vytvořit z vybraných komponent (Ctrl+klik), rozpustit nebo otevřít.
+- Strom vlevo: skrýt / zobrazit, barva, přejmenovat, zafixovat, duplikovat, zrcadlit, kruhové / lineární pole komponent, upravit díl v kontextu.
+- Přesun: gizmo (G) se šipkami pro posun a oblouky pro otočení; přesné hodnoty ve formuláři komponenty.
+- Vazby: Kontakt (shodné plochy), Zarovnat (rovnoběžně v rovině), Vystředit / Soustředně (válce), Vzdálenost, Úhel, Rovnoběžně, Pevně. Vazby jsou trvalé – při změně polohy se přepočítají; stav ukazuje strom. Šroub z knihovny vložený klikem do díry dostane vazby automaticky.
+- Kolize: kontrola průniků všech dílů (i v podsestavách) se zvýrazněním a objemem průniku.
+- Kusovník: položky, počty, materiál, hmotnost; export CSV; pozice se přenášejí do výkresu.
+- Rozložený pohled s nastavitelným odstupem pro prezentaci a montážní návody.
+- Rám vstřikovací formy: průvodce podle rozměrů dutiny vygeneruje desky, vodicí sloupky a pouzdra, středicí kroužek, vyhazovací paket a dosedky jako plnou sestavu s normáliemi.
+- Export sestavy do STEP (jeden soubor) a výkres sestavy s kusovníkem a pozicemi.
+
+![Kusovník sestavy s pozicemi, počty, materiálem a hmotností](https://www.mnastrojarna.cz/cad/docs/sestava-kusovnik.webp)
+
+*Kusovník sestavy – export do CSV, pozice do výkresu.*
+
+## 12. Formařské nástroje
+
+Nástroje pro konstrukci vstřikovacích forem a lisovacích nástrojů, které jinak najdete jen v drahých modulech.
+
+![Barevná mapa úkosů na výlisku s nastavením směru tahu a minimálního úkosu](https://www.mnastrojarna.cz/cad/docs/formy-ukosy.webp)
+
+*Analýza úkosů: zelená vyhovuje, červená pod minimálním úkosem, žlutá svislé stěny.*
+
+- Úkosy: barevná mapa podle směru tahu a minimálního úhlu, výpis problémových ploch.
+- Plochy: zebra pruhy (hladkost navazování), mapa křivosti, tloušťka stěn s limitem (odhalí tenká a tlustá místa výlisku).
+- Smrštění: zvětšení dutiny podle materiálu – PP, PE-HD, ABS, PC, PA6, PA66 GF30, POM, PMMA, PS, TPE (nebo vlastní %).
+- Vyhazovače: návrh rozmístění podle půdorysu, vložení jako díry nebo jako díly do sestavy.
+- Chlazení: návrh temperačního okruhu (průměr kanálu, hloubka pod dutinou, počet větví, přesah).
+- Dělicí rovina: návrh výšky dělení; Rozdělit těleso a Nahradit plochu pro tvarové vložky.
+- Rám formy (kapitola 11) a normálie forem (kapitola 10).
+
+## 13. Výkresy
+
+Výrobní výkres z modelu nebo sestavy během minuty – pohledy, kóty, tolerance, razítko a export do PDF, DXF, DWG nebo SVG.
+
+![Výkresový prostor s pohledy, izometrií, razítkem a nástroji pro kóty, poznámky, drsnosti a geometrické tolerance](https://www.mnastrojarna.cz/cad/docs/vykres.webp)
+
+*Výkres: pohledy podle ISO (evropské promítání) nebo americké, razítko s názvem, materiálem, hmotností, autorem a tolerancemi.*
+
+- Pohledy: přední, horní, levý, pravý, zadní, spodní a izometrie – zapínají se přepínači; měřítko a formát listu A4–A0 automaticky nebo ručně; promítání E (evropské) / A (americké).
+- Řez rovinou s šrafováním, Detail (zvětšený výřez), tabulka děr, skryté hrany čárkovaně.
+- Anotace: kóta (zarovnaná, vodorovná, svislá, s předponou / příponou / textem), poznámka s odkazovou čarou, drsnost Ra, geometrická tolerance (rovinnost, válcovitost, kolmost, rovnoběžnost, souosost, házení…), základna, volný text. Kóty se umisťují tažením.
+- Sestavy: kusovník na listu, pozice s odkazovými čarami, více listů.
+- Razítko: název, číslo, materiál, hmotnost, měřítko, autor (Nastavení → Výkres), nepředepsané tolerance (ISO 2768-mK výchozí), datum, logo.
+- Export: PDF (vektorový), DXF a DWG (verze R2000 až R2018, otevře AutoCAD, ZWCAD, BricsCAD, DraftSight), SVG. Výkres je uložený v projektu .mncad a při změně modelu se aktualizuje.
+
+> Pro CAM a laser exportujte DXF (skica, rozvin nebo výkres); pro zákazníky a výrobu PDF; pro úpravy v 2D CADu DWG.
+
+## 14. Analýza a měření
+
+![Měření vzdálenosti mezi dvěma entitami s kótou v 3D okně a tabulkou výsledků](https://www.mnastrojarna.cz/cad/docs/mereni.webp)
+
+*Měření mezi entitami: vzdálenost, úhel, poloměr, délka, přímo v 3D okně.*
+
+- Měřit (M): klikněte na jednu nebo dvě entity (bod, hrana, plocha, těleso) – vzdálenost (nejkratší), úhel, poloměr, délka, plocha; výsledek zůstane jako kóta v okně.
+- Vlastnosti / inspektor: typ plochy (rovinná, válcová, kuželová, kulová, toroidní, B-spline…), normála, osa, poloměr, obsah; u tělesa objem, povrch, hmotnost, těžiště, počet ploch a hran.
+- Hmotnost: materiál z 12 položek (ocel, nerez, hliník, mosaz, měď, titan, POM, nástrojové oceli 1.2311, 1.2343, 1.2738, 1.1730, 1.7131) nebo vlastní hustota.
+- Řez (X): dynamická rovina řezu podle osy s posunem, pro kontrolu vnitřku.
+- Kontrola geometrie: nalezne neplatné plochy a otevřené hrany importovaných modelů; Sjednotit plochy slučuje rozdělené plochy; Tloušťka stěn s barevnou mapou.
+
+## 15. Proměnné, rovnice a stavy dílu
+
+- Proměnné (záložka vlevo): název, hodnota nebo výraz (L/2, sqrt(a^2+b^2), max(d, 10)), jednotka a popis. Funkce: sin, cos, tan, sqrt, abs, min, max, round, floor, ceil, pi…
+- Navázání parametru: do kteréhokoli číselného pole napište =výraz (např. =d*3) – pole se přepočítá při každé změně proměnné. Vazba se ukládá s dokumentem a zobrazuje ikonou u pole.
+- Stavy (konfigurace): varianty dílu s jinými hodnotami proměnných a potlačenými prvky (např. „s přírubou / bez příruby“, velikosti M8 / M10). Aktivní stav se přepíná ve správci; výkres a export respektují aktivní stav.
+- Nedávné soubory a autosave: rozpracovaný díl se ukládá do prohlížeče každých pár sekund; úvodní obrazovka nabídne „Pokračovat v práci“ a náhledy posledních 12 dokumentů (počet lze změnit).
+
+## 16. Soubory, import a export
+
+![Nabídka Soubor: nový díl, otevřít, uložit projekt, export 3D, výkres, sestavy, ukázky, knihovna, nastavení](https://www.mnastrojarna.cz/cad/docs/menu-soubor.webp)
+
+*Nabídka Soubor.*
+
+| Formát | Import | Export | Poznámka |
+| --- | --- | --- | --- |
+| Mnástrojárna projekt (.mncad) | ano | ano | úplná historie prvků, skici, proměnné, stavy, výkresy, sestava |
+| STEP (.step/.stp) AP214 | ano | ano | přesná geometrie; doporučený formát pro výměnu se SolidWorks, Inventor, ZW3D, CATIA, Creo, Fusion, CAM |
+| IGES (.igs/.iges) | ano | — | starší přesný formát |
+| BREP (.brep) | ano | ano | nativní formát OpenCascade |
+| STL (.stl) | ano | ano | 3D tisk, síť |
+| 3MF (.3mf) | ano | ano | 3D tisk s jednotkami a barvami |
+| OBJ · glTF/GLB · PLY · OFF | ano | OBJ, GLB | vizualizace, web, AR |
+| VRML (.wrl) | — | ano | starší prohlížeče |
+| DXF | skica | skica, rozvin, výkres | laser, CAM, 2D CAD |
+| DWG | — | výkres (R2000–R2018) | AutoCAD a kompatibilní |
+| SVG · PDF | — | výkres, rozvin | dokumentace, tisk |
+
+Nativní formáty (SLDPRT, SLDASM, IPT, IAM, Z3, CATPART, PRT, X_T, F3D, SKP, 3DM, IFC, JT, SAT…) prohlížeč otevřít nemůže – program je rozpozná a ukáže přesný postup, jak soubor ve zdrojovém CADu uložit jako STEP. Síťové formáty se importují jako těleso ze sítě (lze měřit, řezat, exportovat; booleovské operace fungují omezeně).
+
+Poptat výrobu: tlačítko v titulní liště připraví STEP aktuálního dílu a předvyplněný e-mail pro nástrojárnu Mnástrojárna (prototypy, náhradní díly, nástroje, přípravky, 1–99 ks).
+
+## 17. Nastavení
+
+![Dialog Nastavení se záložkami Obecné, Zobrazení, Myš a ovládání, Skica, Výkres, Soubory a Klávesové zkratky](https://www.mnastrojarna.cz/cad/docs/nastaveni.webp)
+
+*Nastavení (Ctrl+,) – sedm záložek, změny se ukládají v prohlížeči.*
+
+| Záložka | Volby |
+| --- | --- |
+| Obecné | délkové jednotky, desetinná místa (délky, úhly), potvrzovat mazání, po dokončení skici nabídnout vysunutí, úvodní obrazovka, výchozí materiál |
+| Zobrazení | výchozí styl (stínovaný s hranami / drátový / průhledný), pozadí, kvalita sítě, tloušťka hran, pravoúhlé promítání, mřížka a osy, ViewCube, osový kříž, informační štítky, světlý / tmavý vzhled |
+| Myš a ovládání | schéma ZW3D / SolidWorks / touchpad, přiblížení ke kurzoru, obrácení kolečka |
+| Skica | přichytávání k mřížce, krok mřížky, automatické vazby, zobrazování značek vazeb |
+| Výkres | autor do razítka, výchozí formát listu, promítání E / A, nepředepsané tolerance (ISO 2768) |
+| Soubory | automatické ukládání, počet nedávných souborů |
+| Klávesové zkratky | každou zkratku lze přemapovat; obnovit výchozí |
+
+## 18. Klávesové zkratky
+
+| Zkratka | Akce |
+| --- | --- |
+| Ctrl+K | paleta příkazů |
+| Ctrl+L | knihovna normálií |
+| Ctrl+, | nastavení |
+| Ctrl+S / Ctrl+O | uložit projekt / otevřít |
+| Ctrl+Z / Ctrl+Y | zpět / znovu |
+| S | nová skica |
+| E | vysunutí |
+| H | díra |
+| B | zaoblení |
+| N | sražení |
+| M | měřit |
+| X | řez |
+| G | gizmo přesunu tělesa / komponenty (R přepne otočení) |
+| 0 · 1 · 2 · 3 · 4 · 5 · 6 | izometrie · přední · horní · pravý · zadní · spodní · levý |
+| F | přizpůsobit pohled |
+| P | perspektiva / pravoúhlá |
+| Enter / Esc | OK / Storno prvku; ve skice dokončit / zrušit krok |
+| Delete | smazat vybraný prvek, entitu skici nebo komponentu |
+| Ctrl+klik | přidat do výběru |
+| Skica: l k x r c a e n b p s | úsečka · lomená čára · osa · obdélník · kružnice · oblouk · elipsa · spline · bod · mnohoúhelník · drážka |
+| Skica: t o d m v | oříznout · odsadit · kóta · měřit · výběr |
+| Skica: Tab / Enter | další pole číselného zadání (zámek) / potvrdit |
+| Shift+F · Shift+W | ohyb z hrany (plech) · konstrukční profil (svařence) |
+
+Zkratky jsou v Nastavení → Klávesové zkratky a v přehledu Klávesové zkratky a ovládání (nabídka Soubor).
+
+## 19. Mobil a dotykové ovládání
+
+![Mnástrojárna CAD na mobilním telefonu: nabídka Skica jako spodní list](https://www.mnastrojarna.cz/cad/docs/mobil.webp)
+
+*Na telefonu se nabídky a formuláře otevírají jako spodní listy s velkými tlačítky.*
+
+- Jeden prst otáčí, dva prsty posouvají a přibližují, dlouhý stisk otevře kontextovou nabídku (jako pravé tlačítko).
+- Rozbalovací nabídky pásu a formuláře prvků se otevírají jako spodní listy, takže model zůstává vidět; výběr entit do pole odkazu funguje dotykem, dlouhý stisk na poli nabídne způsoby zadání a výběr ze seznamu.
+- Pás karet se posouvá prstem; paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.
+
+## 20. Omezení a poctivé srovnání s desktopovými CADy
+
+Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde je, kde dnes stojíme vůči ZW3D, SolidWorks, Inventor, Fusion 360 a Onshape.
+
+| Oblast | Mnástrojárna CAD | Desktopová špička |
+| --- | --- | --- |
+| Skica | číselné zadání u kurzoru, 13 vazeb + 8 kót, automatické vazby, stav určenosti, ořez / odsazení / projekce | srovnatelné; navíc spline s tečnami, bloky, vazba poměru |
+| Zadání prvků | 14 voleb bodu, 8 směrů, 12 rovin, 10 os, 8 ukončení vysunutí | srovnatelné |
+| Tvarové prvky | vysunutí, rotace, tažení, šablonování, díry, zaoblení 6 variant, sražení 5, pole 5 druhů, skořepina, úkos, žebro, přímé úpravy | navíc setback zaoblení, eliptické zaoblení, úkos s dělicí křivkou, variabilní pole z tabulky |
+| Plochy | 19 příkazů | více nástrojů pro třídu A (křivostní návaznost, úprava řídicích bodů) |
+| Plech / svařence | 12 / 10 příkazů, rozvin DXF, kusovník řezů | navíc formovací nástroje, křížové zlomy, konfigurátory profilů |
+| Sestavy | komponenty, podsestavy, 7 druhů vazeb, kolize, kusovník, rozložený pohled, rám formy | 18 druhů vazeb vč. mechanických (ozubení, vačka, šroub), pohybové studie |
+| Výkresy | 7 pohledů, řez, detail, kóty, drsnosti, GD&T, tabulka děr, kusovník, PDF / DXF / DWG / SVG | navíc pomocné, zalomené a částečné řezy, přerušené pohledy, tolerance uložení, revizní tabulky |
+| Formáty | STEP, IGES, BREP, STL, 3MF, OBJ, glTF, PLY, OFF, DXF, DWG | navíc nativní formáty konkurence (přes překladače) |
+| Knihovna | 103 rodin normálií textem | větší katalogy (Toolbox, Content Center), výrobci |
+| Výkon | díly a sestavy desítek až stovek komponent v prohlížeči | velké sestavy tisíců dílů |
+| Cena a instalace | zdarma, bez instalace, data v prohlížeči | licence v řádu desítek až stovek tisíc Kč ročně |
+
+Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, dělicí křivka a stupňovitý úkos, periodický (hladký) uzavřený loft a spline s tečnami nejsou k dispozici – jádro OpenCascade je nenabízí nebo vyžadují vlastní konstrukci. Okrajové podmínky šablonování se aproximují pomocným řezem. Výkresy z DWG byly ověřeny zápisem a zpětným čtením; u exotických verzí AutoCADu doporučujeme kontrolu. Plán dalšího vývoje (vazby sestav, další druhy pohledů výkresu) je veřejný v souboru CAD-ROADMAP.
+
+## 21. Vaše data a soukromí
+
+- Modelování, výpočty i export probíhají ve vašem prohlížeči; soubory se na server neodesílají. Výjimkou je tlačítko Poptat výrobu, které připraví e-mail – odesíláte ho sami.
+- Rozpracovaný dokument, nedávné soubory a nastavení se ukládají do úložiště prohlížeče (localStorage). Vymazání dat prohlížeče je smaže – projekty si ukládejte jako .mncad nebo STEP.
+- Anonymní statistika použití (otevření aplikace, typ prvku) slouží jen k vylepšování programu. Podrobnosti v zásadách ochrany osobních údajů na webu.
+
+## 22. Slovníček pojmů
+
+| Pojem | Význam |
+| --- | --- |
+| Prvek (feature) | jeden krok historie modelu – skica, vysunutí, díra… – s parametry, které lze kdykoli změnit. |
+| Skica | 2D profil na rovině tvořený úsečkami, oblouky, kružnicemi… s vazbami a kótami. |
+| Vazba | geometrický vztah (vodorovně, tečně, soustředně…) nebo vztah mezi komponentami sestavy. |
+| Kóta řídicí / referenční | řídicí mění geometrii, referenční jen zobrazuje hodnotu. |
+| Plně určená skica | všechny entity mají nulové stupně volnosti – geometrie je jednoznačná. |
+| Booleovská operace | Přidat (sjednocení), Odebrat (rozdíl), Průnik; Nové těleso = bez sloučení. |
+| Odkaz (reference) | vazba parametru na geometrii (vrchol, hrana, plocha, rovina) místo pevného čísla; s otiskem přežije změny historie. |
+| Pomocná geometrie | rovina, osa, bod, souřadný systém bez hmoty – slouží jako odkaz. |
+| Tenká stěna | profil se nevysune jako plný, ale jako stěna dané tloušťky. |
+| Rozvin | plechový díl rozložený do roviny s čarami ohybů. |
+| Kusovník (BOM) | seznam položek sestavy s počty, materiálem a hmotností. |
+| STEP | neutrální přesný formát pro výměnu 3D modelů mezi CADy (ISO 10303). |
+| OCCT | OpenCascade Technology – otevřené geometrické jádro, na kterém Mnástrojárna CAD běží. |
+
+## 23. Historie verzí
+
+| Vlna | Obsah |
+| --- | --- |
+| 1.–2. (2026) | jádro OCCT v prohlížeči, skica s řešičem vazeb, základní prvky, výkresy PDF/DXF, sestavy, rám formy, proměnné a stavy, import/export |
+| 3. | plochy (19), plech (12), svařence (10), pokročilé modelování, knihovna 103 rodin, výkresy s anotacemi a DWG, vazby sestav, formařské analýzy, nastavení a zkratky |
+| 4. | výběr entit a inspektor, měření mezi entitami, kontextové nabídky, gizmo, barvy ploch, podsestavy, SEO a výkon webu |
+| 5. (listopad 2026) | referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace |
+
+## Časté otázky
+
+**Je Mnástrojárna CAD opravdu zdarma a bez registrace?**
+
+Ano. Otevřete mnastrojarna.cz/cad a modelujete. Žádný účet, žádná instalace, žádné omezení počtu dílů. Provozuje ho nástrojárna Mnástrojárna s.r.o.; výdělek máme z výroby dílů, kterou si u nás můžete rovnou poptat, ale nemusíte.
+
+**Umí otevřít soubory ze SolidWorks, Inventoru nebo ZW3D?**
+
+Přímo nativní formáty (SLDPRT, IPT, Z3…) otevřít nelze – jsou uzavřené. Program vám u každého z nich ukáže, jak soubor ve zdrojovém CADu uložit jako STEP; STEP, IGES a BREP otevře s přesnou geometrií a lze na ně navazovat dalšími prvky (díry, zaoblení, přímé úpravy).
+
+**Jak udělám výrobní výkres do PDF nebo DWG?**
+
+Pás Výkres → Nový výkres. Zvolte pohledy a formát listu, doplňte kóty, drsnosti a tolerance tažením, případně řez a detail, a stiskněte PDF, DXF nebo DWG. U sestavy se přidá kusovník s pozicemi.
+
+**Zvládne sestavy a velké rámy forem?**
+
+Ano – komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled a průvodce rámem vstřikovací formy s normáliemi. Komfortně zvládá sestavy o desítkách až stovkách komponent; výkon závisí na vašem počítači.
+
+**Jak vložím šroub M8×30 nebo profil IPE 200?**
+
+Stiskněte Ctrl+L a napište „ISO 4762 M8x30“ nebo „IPE 200 1500“. Knihovna má 103 rodin normálií (šrouby, matice, podložky, kolíky, ložiska, ozubená a řetězová kola, řemenice, profily, pružiny, normálie forem, lineární technika, pneumatika, potrubí).
+
+**Funguje na mobilu a tabletu?**
+
+Ano. Nabídky a formuláře se na telefonu otevírají jako spodní listy, model otáčíte prstem, dlouhý stisk nahrazuje pravé tlačítko. Pro delší práci doporučujeme počítač nebo tablet s klávesnicí.
+
+**Funguje offline?**
+
+Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro načtení aplikace a knihovny písem je potřeba připojení; rozpracovaná práce se ukládá do úložiště prohlížeče.
+
+**Kde jsou moje soubory uložené?**
+
+V úložišti vašeho prohlížeče (automaticky) a tam, kam si je stáhnete jako .mncad nebo STEP. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu.
+
+**Co znamená, že odkazy „přežijí změnu historie“?**
+
+Když vyberete plochu nebo hranu jako cíl (např. vysunutí k ploše), program si uloží její otisk – typ, střed, velikost. Změníte-li dřívější prvek a plochy se přečíslují, odkaz se znovu najde podle otisku a prvek se nerozbije.
+
+**Jak zadám délku a úhel úsečky číslem?**
+
+Ve skice stiskněte l, klikněte na první bod a začněte psát: 50, Tab, 30, Enter – vznikne úsečka 50 mm pod 30° i s kótou (je-li zapnuto Kótovat při kreslení). Fungují také zápisy 50<30, x;y a @dx;dy.
+
+**Umí plechové díly a rozvin?**
+
+Ano – záložka Plech: základní plech, ohyby z hrany, lemy, ohyb podle čáry, výřezy, rohové úlevy, prolisy; Rozvinout a export rozvinu do DXF/SVG, tabulka ohybů.
+
+**Lze CAD použít komerčně a pro výuku?**
+
+Ano, bez omezení. Výstupy (STEP, PDF, DXF, DWG) jsou vaše. Školy a kroužky vítáme – dokumentace a program jsou kompletně česky.
+
+**Jak poptám výrobu dílu?**
+
+Tlačítkem Poptat výrobu v titulní liště: připraví se STEP aktuálního dílu a e-mail s předvyplněným předmětem. Vyrábíme prototypy, náhradní díly do jednoúčelových strojů, nástroje a přípravky, typicky 1–99 ks, včetně konsignace.
+
+**Co dělat, když prvek zčervená s chybou?**
+
+Klikněte na prvek v historii – pod ním je česká hláška, co je špatně (např. příliš velký poloměr zaoblení, otevřený profil skici, cílová plocha za rovinou skici). Upravte parametr nebo výběr; ostatní prvky se přestaví automaticky.

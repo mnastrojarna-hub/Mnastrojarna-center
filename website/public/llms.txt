@@ -1,0 +1,25 @@
+# Mnástrojárna s.r.o. – nástrojárna a online CAD
+
+> Mnástrojárna s.r.o. je česká nástrojárna (prototypy, náhradní díly do jednoúčelových strojů, nástroje, přípravky, 1–99 ks, konsignace) a autor bezplatného online 3D/2D CADu Mnástrojárna CAD, který běží v prohlížeči na jádru OpenCascade.
+
+## Mnástrojárna CAD
+- [Aplikace](https://www.mnastrojarna.cz/cad): spuštění bez instalace a registrace, česky.
+- [Kompletní dokumentace (HTML)](https://www.mnastrojarna.cz/cad/dokumentace): 23 kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.
+- [Dokumentace jako Markdown](https://www.mnastrojarna.cz/cad/dokumentace.md): stejný obsah v prostém textu pro strojové zpracování.
+- [Příručka PDF](https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf): tisková verze s obrázky.
+
+## Web
+- [Úvod](https://www.mnastrojarna.cz/), [Pro údržbu](https://www.mnastrojarna.cz/pro-udrzbu), [Služby](https://www.mnastrojarna.cz/sluzby), [Zakázky](https://www.mnastrojarna.cz/zakazky), [Strojový park](https://www.mnastrojarna.cz/strojovy-park), [Kvalita](https://www.mnastrojarna.cz/kvalita), [Kontakt](https://www.mnastrojarna.cz/kontakt).
+- Jazykové verze: https://www.mnastrojarna.cz/en, https://www.mnastrojarna.cz/de.
+
+## Krátce o CADu
+- Parametrické 3D modelování s historií prvků (vysunutí 8 ukončení, rotace, tažení, šablonování, díry podle ISO 273, závity, zaoblení 6 variant, sražení 5 variant, úkos, skořepina, žebro, pružina, text, pole 5 druhů, zrcadlení, přímé úpravy)
+- Skica s řešičem vazeb: 13 vazeb, 8 kót, automatické vazby, číselné zadání u kurzoru, stav určenosti, ořez, odsazení, projekce hran
+- Referenční systém zadání: 14 voleb bodu, 8 směrů, 12 definic rovin, 10 os, pomocná rovina / osa / bod / souřadný systém
+- Plochy (19 příkazů), plech s rozvinem DXF (12), svařence a rámy z profilů (10)
+- Sestavy: komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled, průvodce rámem vstřikovací formy
+- Výkresy: pohledy, řez, detail, kóty, drsnosti, geometrické tolerance, tabulka děr, kusovník; export PDF, DXF, DWG R2000–R2018, SVG
+- Knihovna 103 rodin normálií ve 13 skupinách zadávaných textem
+- Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML
+- Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
+- Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
