@@ -31,6 +31,8 @@ import {
   chainOf,
   chainSide,
   circleFrom2,
+  defaultOpts,
+  dynSpec,
   inferLine,
   offsetChain,
   parseInput,
@@ -48,6 +50,7 @@ import {
   tangentAt,
   type AutoKind,
   type AutoRef,
+  type DrawOpts,
 } from "@/cad/sketch-tools";
 import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -353,67 +356,12 @@ const sideDist = (p: Vec2, a: Vec2, b: Vec2) => {
 };
 
 /** Volby kreslení (pás skici je bez vlastního stavu, proto přepínače ve skicáři + localStorage). */
-type DrawOpts = { autoDim: boolean; diameter: boolean; sides: number; circumscribed: boolean; chain: boolean; projAll: boolean; projConstruction: boolean };
 const OPTS_KEY = "mn-cad-sketch-opts-v1";
-const defaultOpts: DrawOpts = { autoDim: true, diameter: true, sides: 6, circumscribed: false, chain: true, projAll: false, projConstruction: false };
 function loadOpts(): DrawOpts {
   try {
     return { ...defaultOpts, ...JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}") };
   } catch {
     return defaultOpts;
-  }
-}
-
-/** Pole číselného zadání u kurzoru podle nástroje a kroku (Tab přepíná, Enter potvrdí, Esc smaže). */
-type DynField = { key: string; label: string; suffix?: string };
-function dynSpec(tool: SketchTool, n: number, picks: number, phase: number, o: DrawOpts): DynField[] {
-  const XY: DynField[] = [{ key: "x", label: "X", suffix: "mm" }, { key: "y", label: "Y", suffix: "mm" }];
-  const LA: DynField[] = [{ key: "len", label: "Délka", suffix: "mm" }, { key: "ang", label: "Úhel", suffix: "°" }];
-  const F = (key: string, label: string, suffix = "mm"): DynField => ({ key, label, suffix });
-  switch (tool) {
-    case "line":
-    case "centerline":
-    case "polyline":
-    case "spline":
-      return n ? LA : XY;
-    case "rect":
-    case "rectCenter":
-      return n ? [F("w", "Šířka"), F("h", "Výška")] : XY;
-    case "rect3":
-      return n === 0 ? XY : n === 1 ? [F("w", "Šířka"), F("ang", "Úhel", "°")] : [F("h", "Výška")];
-    case "circle":
-      return n ? [F("r", o.diameter ? "Průměr" : "Poloměr")] : XY;
-    case "circle2":
-      return n ? [F("d", "Průměr")] : XY;
-    case "circle3":
-    case "point":
-      return n ? [] : XY;
-    case "arc":
-      return n === 0 ? XY : n === 1 ? LA : [F("r", "Poloměr")];
-    case "arcCenter":
-      return n === 0 ? XY : n === 1 ? [F("r", "Poloměr")] : [F("sweep", "Úhel", "°")];
-    case "arcTangent":
-      return n ? [F("r", "Poloměr")] : [];
-    case "polygon":
-      return n ? [F("r", o.circumscribed ? "Poloměr vepsané" : "Poloměr opsané"), F("sides", "Stran", "")] : XY;
-    case "slot":
-      return n === 0 ? XY : n === 1 ? LA : [F("w", "Šířka")];
-    case "slotArc":
-      return n === 0 ? XY : n === 1 ? [F("r", "Poloměr osy")] : n === 2 ? [F("sweep", "Úhel", "°")] : [F("w", "Šířka")];
-    case "ellipse":
-      return n === 0 ? XY : n === 1 ? [F("rx", "Poloosa a"), F("ang", "Úhel", "°")] : [F("ry", "Poloosa b")];
-    case "offset":
-      return picks ? [F("d", "Vzdálenost")] : [];
-    case "move":
-    case "copy":
-    case "patternLinear":
-      return phase && n ? LA : [];
-    case "rotate":
-      return phase && n === 2 ? [F("ang", "Úhel", "°")] : [];
-    case "scale":
-      return phase && n === 2 ? [F("k", "Měřítko", "×")] : [];
-    default:
-      return [];
   }
 }
 
@@ -2036,15 +1984,19 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (k === "f") return fit();
       if (k === "g" && setSnapGrid) return setSnapGrid(!snapGrid);
       if (k === "h" && sel.size) return applyConstraintToSelection("horizontal");
-      if (k === "d" && tool === "select" && sel.size === 1) {
-        // D nad vybranou entitou = kóta hned (úsečka → délka, kružnice → průměr, oblouk → poloměr)
+      if (k === "d" && sel.size === 1 && !pts.length && !picks.length) {
+        // D nad vybranou (právě nakreslenou) entitou = kóta hned: úsečka → délka, kružnice → průměr, oblouk → poloměr,
+        // obdélník / mnohoúhelník → délka první strany; další klik kótu umístí
         const e = emap.get([...sel][0]);
-        if (e && (e.type === "line" || e.type === "circle" || e.type === "arc")) {
+        if (e && e.type !== "point" && e.type !== "spline" && e.type !== "ellipse") {
           const kp = keyPoints(e);
-          const pk = pickOfEntity(e, kp.mid ?? kp.center ?? (e.type === "line" ? e.a : [0, 0]));
-          setTool("dimension");
-          setTimeout(() => setPicks([pk]), 0);
-          return;
+          const at = e.type === "line" ? kp.mid : e.type === "rect" ? kp.m0 : e.type === "polygon" ? ([(kp.c0[0] + kp.c1[0]) / 2, (kp.c0[1] + kp.c1[1]) / 2] as Vec2) : e.type === "polyline" ? ([(e.points[0][0] + e.points[1][0]) / 2, (e.points[0][1] + e.points[1][1]) / 2] as Vec2) : kp.center;
+          const pk = pickOfEntity(e, at ?? [0, 0]);
+          if (pk.kind !== "entity") {
+            setTool("dimension");
+            setTimeout(() => setPicks([pk]), 0);
+            return;
+          }
         }
       }
       if (KEYS[k]) setTool(KEYS[k]);
