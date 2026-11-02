@@ -263,5 +263,3 @@ describe("šablonování – chybové hlášky", () => {
     expect(await err([circle("a", 10), circle("b", 10, XY(10)), loft({ endPoint: { kind: "vertex", index: -1 } })])).toMatch(/vyžaduje těleso|Vyberte/);
   });
 });
-
-
