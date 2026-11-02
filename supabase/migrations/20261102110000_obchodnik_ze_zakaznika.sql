@@ -15,6 +15,7 @@
 --  3) trg_customers_owner_sync (AFTER UPDATE OF owner_id na customers): nový obchodník zákazníka se propíše do
 --     jeho zakázek bez ručního obchodníka — kromě uzavřených / fakturovaných / zaplacených (provize za ně už
 --     vznikla a přepočet by ji přesunul jinému obchodníkovi). Odebrání obchodníka zákazníka zakázky nemění.
+--     Ruční zakázka, jejíž obchodník se shoduje s novým obchodníkem zákazníka, přestane být ruční.
 --  4) Jednorázově (značka owner_from_customer_v1):
 --       a) zákazník bez obchodníka, jehož zakázky mají právě jednoho aktivního obchodníka / super admina
 --          → ten se stane obchodníkem zákazníka,
@@ -93,6 +94,9 @@ begin
      and not o.owner_override
      and o.owner_id is distinct from new.owner_id
      and order_follows_customer_owner(o.status::text, o.paid_at);
+  -- ruční výjimka, která se teď shoduje s obchodníkem zákazníka, přestává být výjimkou (zase jde se zákazníkem)
+  update orders o set owner_override = false
+   where o.customer_id = new.id and o.owner_override and o.owner_id = new.owner_id;
   perform set_config('app.owner_sync', '', true);
   return new;
 end $$;

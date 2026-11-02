@@ -90,7 +90,9 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     n += 1;
     const { data, error } = await svc.from("orders").insert({
       number: `${PREFIX}-${n}`, title: `Schvalování ${n}`, source: "manual", status: "naceneni", inquiry_date: "2026-10-20",
-      customer_id: CUSTOMER, customer_contact_email: MAIL_TO, owner_id: id("sales"), ...patch,
+      customer_id: CUSTOMER, customer_contact_email: MAIL_TO, owner_id: id("sales"),
+      // 2. 11.: výslovný obchodník zakázky = ruční výjimka super admina (jinak DB dá obchodníka zákazníka)
+      ...("owner_id" in patch ? { owner_override: true } : {}), ...patch,
     }).select("id").single();
     if (error) throw new Error(error.message);
     jobIds.push((data as { id: string }).id);
@@ -762,6 +764,59 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     customerIds.push(self.id!);
     expect((await svc.from("customers").select("owner_id").eq("id", self.id!).single()).data).toMatchObject({ owner_id: null });
     as("admin");
+  }, 60_000);
+
+  it("2. 11. obchodník podle zákazníka: karta zákazníka → jeho otevřené zakázky (ne uzavřené, ne ruční); změna zákazníka → jeho obchodník; ruční jen super admin", async () => {
+    const crm = await import("@/app/actions/crm");
+    const { EMPTY_CUSTOMER_FORM } = await import("@/components/customers/model");
+    const owner = async (jobId: string) =>
+      (await svc.from("orders").select("owner_id, owner_override").eq("id", jobId).single()).data as { owner_id: string | null; owner_override: boolean };
+    as("admin");
+    const cust = await crm.createCustomer({ ...EMPTY_CUSTOMER_FORM, name: `E2E QAPPR ${TAG} owner-sync`, ownerId: id("sales") });
+    expect(cust.ok, cust.error).toBe(true);
+    customerIds.push(cust.id!);
+
+    // nová zakázka i se zadaným jiným obchodníkem (pošta / fotka / ne-admin) → obchodník zákazníka
+    as("worker");
+    const auto = await jobs.createJob({ title: `E2E ${TAG} sync auto`, customerId: cust.id! });
+    expect(auto.ok, auto.error).toBe(true);
+    jobIds.push(auto.id!);
+    expect(await owner(auto.id!)).toMatchObject({ owner_id: id("sales"), owner_override: false });
+    const viaDb = await newJob({ customer_id: cust.id! });
+    expect((await owner(viaDb)).owner_id).toBe(id("sales"));
+    // super admin výslovně jiný → ruční výjimka
+    as("admin");
+    const manual = await jobs.createJob({ title: `E2E ${TAG} sync ruční`, customerId: cust.id!, ownerId: id("admin") });
+    expect(manual.ok, manual.error).toBe(true);
+    jobIds.push(manual.id!);
+    expect(await owner(manual.id!)).toMatchObject({ owner_id: id("admin"), owner_override: true });
+    // uzavřená zakázka (provize vznikla)
+    const closed = await newJob({ customer_id: cust.id!, owner_id: id("sales"), owner_override: false, status: "dokonceno", paid_at: "2026-10-30" });
+
+    // karta zákazníka: nový obchodník → otevřené ne-ruční zakázky, s historií
+    const upd = await crm.updateCustomer(cust.id!, { ...EMPTY_CUSTOMER_FORM, name: `E2E QAPPR ${TAG} owner-sync`, ownerId: id("admin") });
+    expect(upd.ok, upd.error).toBe(true);
+    expect(upd.ownerJobs).toBe(2);
+    expect((await owner(auto.id!)).owner_id).toBe(id("admin"));
+    expect((await owner(viaDb)).owner_id).toBe(id("admin"));
+    expect((await owner(manual.id!)).owner_id).toBe(id("admin"));
+    expect((await owner(closed)).owner_id).toBe(id("sales"));
+    const { data: ev } = await svc.from("job_events").select("message").eq("job_id", auto.id!).ilike("message", "%podle obchodníka zákazníka%");
+    expect(ev?.length).toBe(1);
+
+    // ruční zakázka se změnou zákazníka nehýbe; vrácení na obchodníka zákazníka výjimku zruší
+    expect((await jobs.updateJob(manual.id!, { ownerId: id("sales") })).ok).toBe(true);
+    expect(await owner(manual.id!)).toMatchObject({ owner_id: id("sales"), owner_override: true });
+    expect((await crm.updateCustomer(cust.id!, { ...EMPTY_CUSTOMER_FORM, name: `E2E QAPPR ${TAG} owner-sync`, ownerId: id("sales") })).ok).toBe(true);
+    expect(await owner(manual.id!)).toMatchObject({ owner_id: id("sales"), owner_override: false });
+    expect((await owner(auto.id!)).owner_id).toBe(id("sales"));
+
+    // ne-admin: obchodníka nezmění, ale změna zákazníka mu dá obchodníka nového zákazníka (+ historie)
+    as("sales");
+    expect((await jobs.updateJob(auto.id!, { ownerId: id("admin") })).error).toBe("Obchodníka zakázky mění jen super admin.");
+    const { data: other } = await svc.from("customers").select("owner_id").eq("id", OTHER_CUSTOMER).single();
+    expect((await jobs.updateJob(auto.id!, { customerId: OTHER_CUSTOMER })).ok).toBe(true);
+    expect((await owner(auto.id!)).owner_id).toBe((other as { owner_id: string | null }).owner_id);
   }, 60_000);
 
   it("přílohy e-mailu v Dokumentech: vystavitel podle e-mailu — doklad dodavatele zamčený, poptávka zákazníka ne; faktura dodavatele jen do Faktur dodavatelů", async () => {
