@@ -13,6 +13,14 @@ export type SketchPlane =
   | { kind: "base"; name: PlaneName; offset: number }
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
+import type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
+export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
+
+/** Ukončení díry. */
+export type HoleEnd = { kind: "blind" } | { kind: "throughAll" } | { kind: "toNext" } | { kind: "toFace"; ref: Ref; offset?: number };
+/** Řada průchozích děr ISO 273 (jemná / střední / hrubá). */
+export type HoleFit = "fine" | "medium" | "coarse";
+
 /** Entita skici. `construction` = pomocná geometrie (nevytváří profil). */
 export type SketchEntity = { construction?: boolean } & (
   | { id: string; type: "rect"; cx: number; cy: number; w: number; h: number; r: number; angle: number }
@@ -64,9 +72,16 @@ export type ExportFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wr
 
 /** Cílové těleso prvku (`body`): název tělesa v dílu; chybí-li, použije se aktivní (naposledy vytvořené/upravené) těleso. */
 export type Feature = { id: string; name: string; suppressed?: boolean; body?: string } & (
-  | { type: "sketch"; plane: SketchPlane; entities: SketchEntity[]; constraints?: SketchConstraint[]; dims?: SketchDim[] }
-  | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number }
-  | { type: "revolve"; sketchId: string; angle: number; axis: "x" | "y"; mode: BoolMode }
+  /** `planeDef` = asociativní definice roviny (15 způsobů); `plane` je její poslední vyřešená podoba (pro UI a stavbu bez tělesa). */
+  | { type: "sketch"; plane: SketchPlane; entities: SketchEntity[]; constraints?: SketchConstraint[]; dims?: SketchDim[]; planeDef?: PlaneDef }
+  /**
+   * Vysunutí. Ukončení `extent` (slepé / skrz vše / k dalšímu / k vrcholu / k ploše / odsazeně / k tělesu / střední rovina),
+   * nezávislý druhý směr `extent2`, začátek `from`, směr `dir`, tenká stěna `thin`, kroucení `twist` (°), změna měřítka na konci
+   * `endScale` (ZW3D smrštit/rozšířit), `outerOnly` = ignorovat otvory profilu. Starší pole `distance/symmetric` platí, když `extent` chybí.
+   */
+  | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number; extent?: Extent; extent2?: Extent; from?: StartFrom; dir?: Direction; thin?: Thin; twist?: number; endScale?: number; outerOnly?: boolean }
+  /** Rotace. Osa `axisDef` (8 způsobů; starší `axis` = osa skici), druhý směr `angle2`, `symmetric` (střední rovina), tenká stěna. */
+  | { type: "revolve"; sketchId: string; angle: number; axis: "x" | "y"; mode: BoolMode; axisDef?: AxisDef; angle2?: number; symmetric?: boolean; thin?: Thin }
   | { type: "box"; size: Vec3; position: Vec3; centered: boolean; mode: BoolMode }
   | { type: "cylinder"; radius: number; height: number; position: Vec3; axis: Axis; mode: BoolMode }
   | { type: "sphere"; radius: number; position: Vec3; mode: BoolMode }
@@ -89,10 +104,23 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** závit, např. "M8" (u kind = "tapped" se vrtá jádrový průměr) */
       thread?: string;
       threadDepth?: number;
+      /** ukončení (chybí-li: depth > 0 = slepá, jinak skrz) */
+      end?: HoleEnd;
+      /** více poloh naráz (odkazy na vrcholy, středy kružnic, body skici…); chybí-li, platí `position` */
+      points?: Ref[];
+      /** osa díry libovolným směrem (chybí-li, platí `axis`) */
+      dirDef?: Direction;
+      /** úhel špičky vrtáku (°), výchozí 118 */
+      tipAngle?: number;
+      /** řada ISO 273 pro průchozí díru (informativní – průměr se dopočítá v UI) */
+      fit?: HoleFit;
     }
-  | { type: "fillet"; radius: number; edges: number[] | "all" }
-  | { type: "chamfer"; distance: number; edges: number[] | "all" }
-  | { type: "shell"; thickness: number; faces: number[] }
+  /** Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné; `tangentChain` = šířit po tečných hranách. */
+  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; faces?: number[]; faces2?: number[]; tangentChain?: boolean; setback?: number }
+  /** Zkosení: stejné vzdálenosti / dvě vzdálenosti (d2 + referenční plocha) / vzdálenost + úhel / vrchol (3 vzdálenosti). */
+  | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; tangentChain?: boolean }
+  /** Skořepina: `thicknesses` = jiná tloušťka pro vybrané plochy (index → mm), `outward` = zesílit ven. */
+  | { type: "shell"; thickness: number; faces: number[]; thicknesses?: Record<string, number>; outward?: boolean }
   | {
       type: "pattern";
       featureId: string;
@@ -104,22 +132,39 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       count2?: number;
       spacing2?: number;
       direction2?: Vec3;
+      /** směr podle hrany / osy / dvou bodů (má přednost před `direction`) */
+      dirDef?: Direction;
+      dirDef2?: Direction;
+      /** přeskočené instance (index a*count2+b) */
+      skip?: number[];
+      /** rozteč jako celková délka „až k referenci“ (místo kroku) */
+      spacingMode?: "step" | "total";
+      /** střídavé řady (každá druhá řada posunutá o půl kroku) */
+      stagger?: boolean;
+      /** opakovat jen zdrojové těleso (bez booleovské operace) – rychlejší náhled */
+      geometryOnly?: boolean;
+      /** více zdrojových prvků naráz */
+      featureIds?: string[];
     }
-  | { type: "pattern"; featureId: string; kind: "circular"; count: number; angle: number; axis: Axis; center: Vec3 }
-  | { type: "mirror"; plane: PlaneName; offset: number; keepOriginal: boolean }
+  | { type: "pattern"; featureId: string; kind: "circular"; count: number; angle: number; axis: Axis; center: Vec3; axisDef?: AxisDef; skip?: number[]; symmetric?: boolean; equalSpacing?: boolean; radial?: boolean; featureIds?: string[] }
+  /** Pole po křivce (skica s otevřenou/uzavřenou křivkou), podle bodů skici, nebo výplňové (plocha / skica obrysu). */
+  | { type: "pattern"; featureId: string; kind: "curve"; count: number; sketchId: string; align: "tangent" | "fixed"; spacing?: number; skip?: number[]; featureIds?: string[] }
+  | { type: "pattern"; featureId: string; kind: "sketch"; sketchId: string; skip?: number[]; featureIds?: string[] }
+  | { type: "pattern"; featureId: string; kind: "fill"; sketchId: string; spacing: number; margin: number; layout: "grid" | "stagger" | "circular"; skip?: number[]; featureIds?: string[] }
+  | { type: "mirror"; plane: PlaneName; offset: number; keepOriginal: boolean; planeDef?: PlaneDef; featureIds?: string[] }
   | { type: "import"; fileName: string; format: KernelImportFormat | "iges"; data: string /* base64 */ }
   /** Tažení profilu po křivce (profil = uzavřená skica, dráha = skica s otevřenou/uzavřenou křivkou). */
-  | { type: "sweep"; profileId: string; pathId: string; mode: BoolMode; frenet: boolean }
+  | { type: "sweep"; profileId: string; pathId: string; mode: BoolMode; frenet: boolean; guideId?: string; twist?: number; twistTurns?: number; thin?: Thin; circleRadius?: number; keepNormal?: boolean; transition?: "right" | "round" | "transformed"; scaleEnd?: number }
   /** Šablonování mezi 2+ skicami (profily v různých rovinách). */
-  | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode }
-  /** Úkos vybraných ploch vůči neutrální rovině. */
-  | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number }
-  /** Rozříznutí tělesa rovinou, ponechá se jedna strana. */
-  | { type: "split"; plane: PlaneName; offset: number; keep: "positive" | "negative" }
+  | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
+  /** Úkos vybraných ploch vůči neutrální rovině (`planeDef` = libovolná rovina; `pull` = směr tahu; `partingSketchId` = dělicí křivka). */
+  | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean }
+  /** Rozříznutí tělesa rovinou, ponechá se jedna strana (`planeDef` = libovolná rovina, `faceRef` = řez plochou). */
+  | { type: "split"; plane: PlaneName; offset: number; keep: "positive" | "negative"; planeDef?: PlaneDef; faceRef?: Ref }
   /** Přesun / otočení / měřítko tělesa. */
   | { type: "transform"; translate: Vec3; rotateAxis: Axis; rotateAngle: number; scale: number }
   /** Pomocná (referenční) rovina – nevytváří geometrii, slouží pro skici. */
-  | { type: "datum"; origin: Vec3; normal: Vec3; xDir: Vec3; size: number }
+  | { type: "datum"; origin: Vec3; normal: Vec3; xDir: Vec3; size: number; planeDef?: PlaneDef }
   /** Text – vystouplý (add) nebo gravírovaný (cut) do tělesa. */
   | { type: "text"; text: string; height: number; depth: number; plane: SketchPlane; position: Vec2; angle: number; mode: "add" | "cut" }
   /** Přímé úpravy: posunout (vytáhnout/zatlačit) vybrané plochy o vzdálenost podél normály. */
@@ -141,7 +186,7 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */
   | { type: "combine"; target: string; tool: string; op: "add" | "cut" | "intersect"; keepTool: boolean }
   /** Více těles: rozříznutí tělesa rovinou na dvě samostatná tělesa (kladná strana si nechá název, záporná = `nameB`). */
-  | { type: "splitBodies"; plane: PlaneName; offset: number; nameB?: string }
+  | { type: "splitBodies"; plane: PlaneName; offset: number; nameB?: string; planeDef?: PlaneDef }
   /** Více těles: kopie tělesa jako nové těleso s posunutím. */
   | { type: "copyBody"; source: string; translate: Vec3; newName?: string }
 );
@@ -239,6 +284,8 @@ export type BuildResult = {
   vertices?: Float32Array;
   /** tělesa dílu (více těles) s globálními indexy ploch a hran */
   bodies?: BodyInfo[];
+  /** asociativně vyřešené roviny skic (`planeDef`) a pomocných rovin – UI je promítne do dokumentu */
+  resolved?: { planes: Record<string, SketchPlane>; datums: Record<string, { origin: Vec3; normal: Vec3; xDir: Vec3 }> };
   ms: number;
 };
 

@@ -2,6 +2,7 @@
 import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
+import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
 import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo } from "./types";
 
 let worker: Worker | null = null;
@@ -40,6 +41,9 @@ export const cad = {
   init: () => call<void>({ op: "init" }),
   build: (doc: CadDoc) => call<BuildResult>({ op: "build", doc }),
   face: (index: number) => call<FaceInfo | null>({ op: "face", index }),
+  /** geometrie + otisk odkazu nad aktuálním tělesem (pro formuláře a náhledy) */
+  refInfo: (doc: CadDoc, ref: Ref) => call<{ geo: Geo | null; sig: Sig | null; error?: string }>({ op: "refInfo", doc, ref }),
+  planeDef: (doc: CadDoc, def: PlaneDef) => call<{ plane: ResolvedPlane | null; error?: string }>({ op: "planeDef", doc, def }),
   exportFile: (doc: CadDoc, format: ExportFormat) => call<ArrayBuffer>({ op: "export", doc, format }),
   asmParts: (parts: { key: string; source: ComponentSource }[]) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts }),
   asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),

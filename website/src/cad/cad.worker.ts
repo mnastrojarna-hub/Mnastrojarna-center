@@ -7,6 +7,8 @@ import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
+import { refInfo, resolvePlaneDef } from "./ref-resolve";
+import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, MeshData } from "./types";
 
 let ready: Promise<void> | null = null;
@@ -38,7 +40,15 @@ type Req =
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
-  | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> };
+  | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> }
+  | { id: number; op: "refInfo"; doc: CadDoc; ref: Ref }
+  | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef };
+
+/** Kontext řešení odkazů nad posledním postaveným tělesem a aktuálním dokumentem. */
+function refCtx(doc: CadDoc) {
+  const sketches = new Map(doc.features.filter((f): f is Extract<typeof f, { type: "sketch" }> => f.type === "sketch").map((f) => [f.id, f]));
+  return { body, sketches, features: doc.features };
+}
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -70,6 +80,17 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       case "face":
         ctx.postMessage({ id: m.id, ok: true, result: body ? faceInfo(body, m.index) : null });
         break;
+      case "refInfo":
+        ctx.postMessage({ id: m.id, ok: true, result: refInfo(refCtx(m.doc), m.ref) });
+        break;
+      case "planeDef": {
+        try {
+          ctx.postMessage({ id: m.id, ok: true, result: { plane: resolvePlaneDef(refCtx(m.doc), m.def) } });
+        } catch (e) {
+          ctx.postMessage({ id: m.id, ok: true, result: { plane: null, error: e instanceof Error ? e.message : String(e) } });
+        }
+        break;
+      }
       case "asmParts": {
         const out = [];
         const t: Transferable[] = [];

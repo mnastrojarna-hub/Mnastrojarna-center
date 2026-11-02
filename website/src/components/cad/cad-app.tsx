@@ -35,6 +35,8 @@ import { AsmProps, AsmTree, BomTable, MoldWizard, type MateMode } from "./asm-pa
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { FEATURE_TONE, Manager } from "./manager";
 import { EntityProps, FeatureProps, ParamContext } from "./props";
+import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Want } from "./ref-field";
+import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, sketchRibbon, type SketchPatch, type SketchTool } from "./sketcher";
 import { Viewport, type AsmView, type Datum, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
@@ -115,6 +117,9 @@ export function CadApp() {
   // výběr entit, inspektor, měření
   const [selFilter, setSelFilter] = useState<SelFilter>("all");
   const [selection, setSelection] = useState<SelItem[]>([]);
+  /** čekající výběr do pole odkazu ve formuláři prvku (bod / hrana / plocha…) */
+  const [refPick, setRefPick] = useState<RefPickTarget | null>(null);
+  const [lastPoint, setLastPoint] = useState<Vec3 | null>(null);
   const [inspect, setInspect] = useState<{ item: SelItem; info: EntityInfo } | null>(null);
   const [inspectOpen, setInspectOpen] = useState(true);
   const [measureSel, setMeasureSel] = useState<SelItem[]>([]);
@@ -286,6 +291,35 @@ export function CadApp() {
   }, [buildDocView, core, runBuild]);
 
   const resolved = useMemo(() => resolveDoc(doc), [doc]);
+  // asociativní roviny skic a pomocných rovin: po stavbě promítnout vyřešené roviny do dokumentu (bez záznamu do historie)
+  useEffect(() => {
+    const planes = result?.resolved?.planes;
+    const dts = result?.resolved?.datums;
+    if (!planes && !dts) return;
+    const same = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+    let changed = false;
+    const features = doc.features.map((f) => {
+      if (f.type === "sketch" && planes?.[f.id]) {
+        const np = planes[f.id];
+        const op = f.plane;
+        const eq = np.kind === "base" && op.kind === "base" ? np.name === op.name && Math.abs(np.offset - op.offset) < 1e-6 : np.kind === "custom" && op.kind === "custom" ? same(np.origin, op.origin) && same(np.normal, op.normal) && same(np.xDir, op.xDir) : false;
+        if (!eq) {
+          changed = true;
+          return { ...f, plane: np };
+        }
+      }
+      if (f.type === "datum" && dts?.[f.id]) {
+        const d = dts[f.id];
+        if (!same(f.origin, d.origin) || !same(f.normal, d.normal) || !same(f.xDir, d.xDir)) {
+          changed = true;
+          return { ...f, origin: d.origin, normal: d.normal, xDir: d.xDir };
+        }
+      }
+      return f;
+    });
+    if (changed) live({ ...doc, features });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
 
   // ---------- sestava: sítě dílů (mezipaměť podle obsahu) ----------
   const leaves = useMemo(() => (isAsm ? flattenLeaves(doc) : []), [isAsm, doc]);
@@ -681,6 +715,11 @@ export function CadApp() {
     runMeasure([it]);
   };
   const onPick = (it: SelItem | null, additive: boolean) => {
+    if (refPick) {
+      if (!it) return;
+      void deliverRef(it, refPick);
+      return;
+    }
     if (boltPick) {
       if (it?.kind === "face" && it.compId) void addBoltAt(it.compId, it.index, it.point);
       return;
@@ -719,6 +758,31 @@ export function CadApp() {
     setGizmoOn(null);
   }, [isAsm]);
 
+  /** položka výběru → odkaz s otiskem (přežije změnu indexů) → do čekajícího pole */
+  const deliverRef = async (it: SelItem, target: RefPickTarget) => {
+    const base = selToRef(it, target.want);
+    if (!base) return flash("Tuto entitu nelze použít – vyberte " + (target.want === "face" || target.want === "plane" ? "plochu" : target.want === "edge" || target.want === "axis" ? "hranu" : "bod, hranu nebo plochu") + ".");
+    if (target.want === "vertex" && base.kind !== "vertex") return flash("Vyberte vrchol (filtr Bod).");
+    if ((target.want === "face" || target.want === "plane") && base.kind !== "face") return flash("Vyberte plochu.");
+    if (target.want === "edge" && base.kind !== "edge") return flash("Vyberte hranu.");
+    let ref: Ref = base;
+    try {
+      const info = await cad.refInfo(doc, base);
+      if (info.sig && (base.kind === "vertex" || base.kind === "edge" || base.kind === "face")) ref = { ...base, sig: info.sig };
+      if (info.geo?.point) setLastPoint(info.geo.point);
+    } catch {
+      /* bez otisku */
+    }
+    target.onPick(ref);
+  };
+  const refFilter = (w: Want): SelFilter => (w === "vertex" ? "vertex" : w === "edge" ? "edge" : w === "face" || w === "plane" ? "face" : "all");
+  const selectionRefs = useMemo<Ref[]>(
+    () => selection.flatMap((x) => (x.kind === "feature" || x.compId ? [] : x.kind === "vertex" ? [{ kind: "vertex", index: x.index } as Ref] : x.kind === "edge" ? [{ kind: "edge", index: x.index } as Ref] : x.kind === "face" ? [{ kind: "face", index: x.index } as Ref] : [])),
+    [selection],
+  );
+  useRefPickEscape(refPick, () => setRefPick(null));
+  useEffect(() => setRefPick(null), [activeId]);
+  const refCtxValue = useMemo(() => ({ doc, target: refPick, request: setRefPick, selectionRefs, lastPoint }), [doc, refPick, selectionRefs, lastPoint]);
   const selFaces = selection.filter((x): x is Extract<SelItem, { kind: "face" }> => x.kind === "face" && !x.compId).map((x) => x.index);
   const selEdges = selection.filter((x): x is Extract<SelItem, { kind: "edge" }> => x.kind === "edge" && !x.compId).map((x) => x.index);
   /** nový prvek přímých úprav z vybraných ploch / hran */
@@ -1039,7 +1103,9 @@ export function CadApp() {
 
   // ---------- výběr v modelu ----------
   const FACE_PICK = new Set<string>(["shell", "hole", "draft", "pushPull", "deleteFace", "offsetFace", "thicken"]);
-  const pickMode: PickMode = isAsm
+  const pickMode: PickMode = refPick
+    ? "select"
+    : isAsm
     ? mate || boltPick
       ? "asmFace"
       : "select"
@@ -1075,6 +1141,7 @@ export function CadApp() {
     return pk && pk.kind === kind ? ((active.data[pk.key] as number[] | undefined) ?? []) : [];
   };
   const onPickEdge = (i: number) => {
+    if (refPick) return void deliverRef({ kind: "edge", index: i }, refPick);
     if (toggleExtPick(i, "edges")) return;
     if (!active || (active.type !== "fillet" && active.type !== "chamfer") || active.edges === "all") return;
     const edges = active.edges.includes(i) ? active.edges.filter((x) => x !== i) : [...active.edges, i];
@@ -1086,10 +1153,12 @@ export function CadApp() {
     createSketch({ kind: "custom", origin: info.origin, normal: info.normal, xDir: info.xDir, label: `Plocha ${i + 1}` });
   };
   const onPickFace = async (i: number, point?: [number, number, number]) => {
+    if (refPick) return void deliverRef({ kind: "face", index: i, point }, refPick);
     if (planePick) return sketchOnFace(i);
     if (toggleExtPick(i, "faces")) return;
-    if (active && "faces" in active && FACE_PICK.has(active.type)) {
-      const faces = active.faces.includes(i) ? active.faces.filter((x) => x !== i) : [...active.faces, i];
+    if (active && FACE_PICK.has(active.type)) {
+      const cur = ((active as { faces?: number[] }).faces ?? []);
+      const faces = cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i];
       updateFeature(active.id, { faces } as Partial<Feature>);
     }
     if (active?.type === "hole" && point) {
@@ -1772,7 +1841,9 @@ export function CadApp() {
   const curTab: Tab = isAsm ? (tab === "create" || tab === "sketch" || tab === "surface" || tab === "sheet" || tab === "weld" ? "asm" : tab) : sketch ? (tab === "create" || tab === "asm" ? "sketch" : tab) : tab === "sketch" || tab === "asm" ? "create" : tab;
 
   // ---------- výzva v řádku příkazů ----------
-  const prompt = isAsm
+  const prompt = refPick
+    ? `${refPick.label} · nebo zadejte hodnotu v poli · pravé tlačítko v poli = další způsoby · Esc zruší`
+    : isAsm
     ? boltPick
       ? "Šroubový spoj: klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu) · Esc zruší"
       : mate
@@ -1895,6 +1966,7 @@ export function CadApp() {
   // ---------- UI ----------
   return (
     <ParamContext.Provider value={paramCtx}>
+      <RefPickContext.Provider value={refCtxValue}>
       <div className="fixed inset-0 flex flex-col bg-[#e9edf1] font-sans text-[#1f2933]">
         {/* Titulní lišta */}
         <header className="flex h-10 shrink-0 items-center gap-1 bg-gradient-to-b from-[#262b31] to-[#1c2025] px-2 text-white/85">
@@ -2033,10 +2105,10 @@ export function CadApp() {
                 datums={datums}
                 pickMode={pickMode}
                 selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
-                selectedFaces={active && "faces" in active ? active.faces : extPicked("faces")}
+                selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
                 onPickEdge={onPickEdge}
                 onPickFace={onPickFace}
-                selFilter={selFilter}
+                selFilter={refPick ? refFilter(refPick.want) : selFilter}
                 selection={measure ? measureSel : selection}
                 onPick={onPick}
                 measure={measureGfx}
@@ -2539,6 +2611,7 @@ export function CadApp() {
           />
         )}
       </div>
+      </RefPickContext.Provider>
     </ParamContext.Provider>
   );
 }

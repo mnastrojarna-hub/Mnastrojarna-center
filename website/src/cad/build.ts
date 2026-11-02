@@ -8,6 +8,8 @@ import { getExt } from "./ext/index";
 import { importBody } from "./formats/kernel-import";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
+import { entityIndex, planeDefToSketchPlane, pointOf, resolveAxis, resolveDirection, resolvePlaneDef, resolveRef, V, type ResolveCtx } from "./ref-resolve";
+import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
 import { findLoops, nestLoops, shapeSegs, type Loop, type Seg } from "./sketch";
 import type { Axis, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
 
@@ -20,13 +22,14 @@ export function planeOf(p: SketchPlane): r.Plane {
 
 const vec = (v: r.Vector): Vec3 => [v.x, v.y, v.z];
 
-/** Uzavřené profily skici → replicad Drawing (s otvory dle vnoření). */
-export function sketchDrawing(f: Extract<Feature, { type: "sketch" }>): r.Drawing | null {
+/** Uzavřené profily skici → replicad Drawing (s otvory dle vnoření). `outerOnly` = bez otvorů. */
+export function sketchDrawing(f: Extract<Feature, { type: "sketch" }>, outerOnly = false): r.Drawing | null {
   const { loops } = findLoops(f.entities);
   if (!loops.length) return null;
   const nested = nestLoops(loops).sort((a, b) => b.area - a.area);
   let result: r.Drawing | null = null;
   for (const { loop, depth } of nested) {
+    if (outerOnly && depth > 0) continue;
     const d = loopDrawing(loop);
     if (!d) continue;
     if (!result) result = d;
@@ -96,7 +99,65 @@ function bboxDiag(s: Shape) {
 }
 
 type SketchF = Extract<Feature, { type: "sketch" }>;
-type Ctx = { sketches: Map<string, SketchF>; body: Shape | null };
+type Ctx = { sketches: Map<string, SketchF>; body: Shape | null; features: Feature[] };
+const rctx = (ctx: Ctx): ResolveCtx => ({ body: ctx.body, sketches: ctx.sketches, features: ctx.features });
+const planeFrom = (p: { origin: Vec3; normal: Vec3; xDir: Vec3 }) => new r.Plane(p.origin, p.xDir, p.normal);
+
+/** Tenká stěna z uzavřeného profilu: prstenec kolem obrysu (ven / dovnitř / na střed / dvě tloušťky). */
+function thinDrawing(d: r.Drawing, thin: Thin): r.Drawing {
+  const t1 = Math.abs(thin.t1);
+  const t2 = Math.abs(thin.t2 ?? thin.t1);
+  if (!(t1 > 0)) throw new Error("Tloušťka tenké stěny musí být kladná.");
+  switch (thin.side) {
+    case "one":
+      return d.offset(t1).cut(d);
+    case "in":
+      return d.cut(d.offset(-t1));
+    case "mid":
+      return d.offset(t1 / 2).cut(d.offset(-t1 / 2));
+    case "two":
+      return d.offset(t1).cut(d.offset(-t2));
+  }
+}
+
+/** Profil skici jako replicad skica v dané rovině (volitelně bez otvorů / jako tenká stěna; otevřený profil jen s tenkou stěnou). */
+function profileSketch(sk: SketchF, plane: r.Plane, o: { outerOnly?: boolean; thin?: Thin }, shift: Vec3 = [0, 0, 0]): r.SketchInterface {
+  const d = sketchDrawing(sk, o.outerOnly);
+  if (d) return (o.thin ? thinDrawing(d, o.thin) : d).sketchOnPlane(plane) as r.SketchInterface;
+  if (!o.thin) throw new Error("Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu).");
+  const t1 = Math.abs(o.thin.t1);
+  const t = o.thin.side === "two" ? (t1 + Math.abs(o.thin.t2 ?? t1)) / 2 : o.thin.side === "mid" ? t1 / 2 : t1;
+  let w = sketchPathWire(sk);
+  if (shift.some((v) => v)) w = w.translate(shift) as r.Wire;
+  const ow = w.offset2D(t, "arc");
+  return new r.Sketch(ow, { defaultOrigin: plane.origin, defaultDirection: plane.zDir });
+}
+
+/** Tělesa složeného tvaru (po booleovské operaci může vzniknout více kusů). */
+function solidsOf(s: Shape): Shape[] {
+  const list = (s as unknown as { solids?: Shape[] }).solids;
+  return list && list.length ? list : [s];
+}
+const corners = (s: Shape): Vec3[] => {
+  const [[x0, y0, z0], [x1, y1, z1]] = s.boundingBox.bounds as [Vec3, Vec3];
+  return [x0, x1].flatMap((x) => [y0, y1].flatMap((y) => [z0, z1].map((z): Vec3 => [x, y, z])));
+};
+const minProj = (s: Shape, o: Vec3, d: Vec3) => Math.min(...corners(s).map((c) => V.dot(V.sub(c, o), d)));
+const maxProj = (s: Shape, o: Vec3, d: Vec3) => Math.max(...corners(s).map((c) => V.dot(V.sub(c, o), d)));
+/** Kus nejblíže počátku ve směru d (pro „k dalšímu“). */
+function nearestSolid(parts: Shape, o: Vec3, d: Vec3): { solid: Shape; far: number } {
+  let best: Shape | null = null;
+  let bestT = Infinity;
+  for (const sl of solidsOf(parts)) {
+    const t = minProj(sl, o, d);
+    if (t < bestT) {
+      bestT = t;
+      best = sl;
+    }
+  }
+  if (!best) throw new Error("Ve směru operace není žádné těleso.");
+  return { solid: best, far: maxProj(best, o, d) };
+}
 
 function needSketch(ctx: Ctx, id: string, role = "skica"): SketchF {
   const sk = ctx.sketches.get(id);
@@ -105,10 +166,9 @@ function needSketch(ctx: Ctx, id: string, role = "skica"): SketchF {
 }
 
 /** Uzavřené smyčky skici jako dráty v prostoru, s hloubkou vnoření (0 = vnější obrys, 1 = otvor…). */
-function sketchWires(sk: SketchF): { wire: r.Wire; depth: number; area: number }[] {
+function sketchWires(sk: SketchF, plane: r.Plane = planeOf(sk.plane)): { wire: r.Wire; depth: number; area: number }[] {
   const { loops } = findLoops(sk.entities);
   if (!loops.length) throw new Error(`Skica „${sk.name}“ neobsahuje uzavřený profil.`);
-  const plane = planeOf(sk.plane);
   return nestLoops(loops).map(({ loop, depth, area }) => {
     const d = loopDrawing(loop);
     if (!d) throw new Error(`Skica „${sk.name}“ obsahuje neplatný profil.`);
@@ -247,7 +307,10 @@ function ensureFont(): Promise<void> {
 /** Hloubka kuželového zahloubení. */
 const csDepthOf = (csD: number, d: number, angle: number) => Math.max(0, (csD / 2 - d / 2) / Math.tan(((angle || 90) * Math.PI) / 360));
 
-function holeTool(f: Extract<Feature, { type: "hole" }>, body: Shape | null): Shape {
+type HoleF = Extract<Feature, { type: "hole" }>;
+
+/** Nástroj jedné díry v bodě `at`, vrtané ve směru `dir` (jednotkový). `end.flat` = rovné dno (ukončení k ploše). */
+function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { through: boolean; depth: number; flat: boolean }): Shape {
   const kind = f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
   let d = f.diameter;
   if (kind === "tapped") {
@@ -256,9 +319,7 @@ function holeTool(f: Extract<Feature, { type: "hole" }>, body: Shape | null): Sh
     d = t.tap;
   }
   if (!(d > 0)) throw new Error("Průměr díry musí být kladný.");
-  const dir = axisVec(f.axis).map((v) => (f.flip ? v : -v)) as Vec3; // výchozí: vrtání proti ose (shora dolů)
-  const big = body ? bboxDiag(body) * 2 + 10 : 1000;
-  const through = !(f.depth > 0);
+  const big = body ? bboxDiag(body) * 2 + V.len(V.sub(at, body.boundingBox.center as Vec3)) * 2 + 10 : 1000;
   const rd = d / 2;
   const B = big; // přesah nad povrch
   const pts: [number, number][] = [[0, -B]];
@@ -271,12 +332,62 @@ function holeTool(f: Extract<Feature, { type: "hole" }>, body: Shape | null): Sh
     const angle = Math.min(170, Math.max(30, f.csAngle ?? 90));
     pts.push([csD / 2, -B], [csD / 2, 0], [rd, csDepthOf(csD, d, angle)]);
   } else pts.push([rd, -B]);
-  if (through) pts.push([rd, big], [0, big]);
+  if (end.through) pts.push([rd, big], [0, big]);
   else {
-    if (kind === "counterbore" && f.depth <= f.cbDepth) throw new Error("Hloubka díry musí být větší než hloubka zahloubení.");
-    pts.push([rd, f.depth], [0, f.depth + rd / Math.tan((59 * Math.PI) / 180)]); // špička vrtáku 118°
+    if (!(end.depth > 0)) throw new Error("Hloubka díry musí být kladná.");
+    if (kind === "counterbore" && end.depth <= f.cbDepth) throw new Error("Hloubka díry musí být větší než hloubka zahloubení.");
+    const tip = Math.min(170, Math.max(60, f.tipAngle ?? 118));
+    pts.push([rd, end.depth], [0, end.flat ? end.depth : end.depth + rd / Math.tan((tip * Math.PI) / 360)]);
   }
-  return revolvedAlong(pts, dir, f.position);
+  return revolvedAlongAny(pts, dir, at);
+}
+
+/** Rotační profil (r, t) kolem +Z → natočený do libovolného jednotkového směru `dir`, posunutý do `at`. */
+function revolvedAlongAny(profile: [number, number][], dir: Vec3, at: Vec3): Shape {
+  let pen = r.draw(profile[0]);
+  for (const p of profile.slice(1)) pen = pen.lineTo(p);
+  let s = pen.close().sketchOnPlane("XZ").revolve([0, 0, 1]) as Shape;
+  const z: Vec3 = [0, 0, 1];
+  const c = V.dot(z, dir);
+  if (c < -0.999999) s = s.rotate(180, [0, 0, 0], [1, 0, 0]);
+  else if (c < 0.999999) {
+    const ax = V.norm(V.cross(z, dir));
+    s = s.rotate((Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI, [0, 0, 0], ax);
+  }
+  return s.translate(at);
+}
+
+/** Všechny díry prvku (více poloh), s ukončením slepá / skrz / k dalšímu / k ploše. */
+function holeTools(f: HoleF, ctx: Ctx): Shape {
+  const rc = rctx(ctx);
+  const body = ctx.body;
+  const pts: Vec3[] = f.points?.length ? f.points.map((p) => pointOf(rc, p, "bod díry")) : [f.position];
+  let dir: Vec3;
+  if (f.dirDef) {
+    const d = resolveDirection(rc, f.dirDef, { normal: axisVec(f.axis) });
+    dir = f.flip ? d : V.mul(d, -1); // výchozí: vrtání proti směru (shora dolů)
+  } else dir = axisVec(f.axis).map((v) => (f.flip ? v : -v)) as Vec3;
+  const end = f.end ?? (f.depth > 0 ? { kind: "blind" as const } : { kind: "throughAll" as const });
+  const tools = pts.map((at) => {
+    if (end.kind === "blind") return holeToolAt(f, body, at, dir, { through: false, depth: f.depth, flat: false });
+    if (end.kind === "throughAll") return holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false });
+    if (end.kind === "toFace") {
+      const g = resolveRef(rc, end.ref);
+      if (!g.plane || g.radius) throw new Error("Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu.");
+      const n = g.plane.normal;
+      const den = V.dot(dir, n);
+      if (Math.abs(den) < 1e-9) throw new Error("Cílová plocha je rovnoběžná s osou díry.");
+      const o2 = V.add(g.plane.origin, V.mul(n, (end.offset ?? 0) * (den > 0 ? -1 : 1)));
+      const t = V.dot(V.sub(o2, at), n) / den;
+      if (!(t > 1e-6)) throw new Error("Cílová plocha neleží ve směru vrtání (zkuste obrátit směr).");
+      return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true });
+    }
+    if (!body) throw new Error("Ukončení „k dalšímu“ potřebuje těleso.");
+    const T = holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false });
+    const inside = T.intersect(body);
+    return nearestSolid(inside, at, dir).solid;
+  });
+  return tools.reduce((a, b) => a.fuse(b));
 }
 
 /** Zjednodušený modelovaný závit: soustava V-drážek (vizuálně i hmotnostně odpovídá závitu). */
@@ -294,46 +405,141 @@ function threadTool(f: Extract<Feature, { type: "thread" }>): Shape {
   return revolved(pts, f.axis, f.position);
 }
 
-/** Nástrojové těleso prvku (pro pole/zrcadlení) — null u prvků, které nástroj nemají. */
-async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
-  switch (f.type) {
-    case "extrude": {
-      const sk = needSketch(ctx, f.sketchId);
-      if (!(f.distance > 0)) throw new Error("Vzdálenost musí být kladná.");
-      const plane = planeOf(sk.plane);
-      const dist = f.reverse ? -f.distance : f.distance;
-      const n = plane.zDir;
-      let s: Shape;
-      const draft = f.draftAngle ?? 0;
+type ExtrudeF = Extract<Feature, { type: "extrude" }>;
+
+/**
+ * Vysunutí se všemi způsoby zadání: začátek (rovina skici / odsazení / od plochy / od vrcholu), směr (normála / osa /
+ * hrana / 2 body / normála plochy / vektor / úhel), ukončení (na vzdálenost / skrz vše / k dalšímu / k vrcholu /
+ * k ploše / odsazeně od plochy / k tělesu / střední rovina), nezávislý druhý směr, tenká stěna, úkos, kroucení, měřítko konce.
+ */
+function extrudeTool(f: ExtrudeF, ctx: Ctx): Shape {
+  const sk = needSketch(ctx, f.sketchId);
+  const rc = rctx(ctx);
+  let plane = planeOf(sk.plane);
+  const n0 = V.norm(vec(plane.zDir));
+  const xDir = vec(plane.xDir);
+  const origin0 = vec(plane.origin);
+  // začátek
+  let shift = 0;
+  if (f.from?.kind === "offset") shift = f.from.d;
+  else if (f.from?.kind === "face" || f.from?.kind === "vertex") shift = V.dot(V.sub(pointOf(rc, f.from.ref, f.from.kind === "face" ? "plochu začátku" : "vrchol začátku"), origin0), n0);
+  const shiftV = V.mul(n0, shift);
+  if (shift) plane = plane.translate(shiftV);
+  const origin = V.add(origin0, shiftV);
+  // směr
+  const dirV = resolveDirection(rc, f.dir, { normal: n0, xDir });
+  if (Math.abs(V.dot(dirV, n0)) < 1e-6) throw new Error("Směr vysunutí nesmí ležet v rovině skici.");
+  const d1 = f.reverse ? V.mul(dirV, -1) : dirV;
+  const ext1: Extent = f.extent ?? (f.symmetric ? { kind: "midPlane", d: f.distance } : { kind: "blind", d: f.distance });
+  const sketch = () => profileSketch(sk, plane, { outerOnly: f.outerOnly, thin: f.thin }, shiftV);
+  const body = ctx.body;
+  const big = body ? bboxDiag(body) * 2 + V.len(V.sub(origin, body.boundingBox.center as Vec3)) * 2 + 10 : 1000;
+  const draft = f.draftAngle ?? 0;
+
+  const side = (dir: Vec3, ext: Extent): Shape => {
+    const blind = (dist: number): Shape => {
+      if (!(dist > 1e-9)) throw new Error("Vzdálenost vysunutí musí být kladná.");
       if (Math.abs(draft) > 1e-6) {
         if (Math.abs(draft) >= 45) throw new Error("Úkos vysunutí musí být menší než 45°.");
-        // úkos: šablonování mezi profilem a odsazeným profilem na konci
-        const off = Math.abs(dist) * Math.tan((draft * Math.PI) / 180);
-        const shift: Vec3 = [n.x * dist, n.y * dist, n.z * dist];
-        s = combine(
-          sketchWires(sk).map(({ wire, depth }) => {
+        if (Math.abs(Math.abs(V.dot(dir, n0)) - 1) > 1e-6) throw new Error("Úkos lze použít jen při vysunutí kolmo na skicu.");
+        if (f.thin) throw new Error("Úkos a tenkou stěnu nelze kombinovat.");
+        const off = dist * Math.tan((draft * Math.PI) / 180);
+        const sh = V.mul(dir, dist);
+        return combine(
+          sketchWires(sk, plane).map(({ wire, depth }) => {
             const inward = depth % 2 === 0 ? -off : off; // vnější obrys se zužuje, otvory rozšiřují
-            const top = wire.clone().offset2D(inward).translate(shift);
+            const top = wire.clone().offset2D(inward).translate(sh);
             return { solid: r.loft([wire, top], { ruled: true }), depth };
           }),
         );
-      } else {
-        const d = sketchDrawing(sk);
-        if (!d) throw new Error("Skica neobsahuje uzavřený profil.");
-        s = d.sketchOnPlane(plane).extrude(dist) as Shape;
       }
-      if (f.symmetric) s = s.translate([(-n.x * dist) / 2, (-n.y * dist) / 2, (-n.z * dist) / 2]);
-      return s;
+      const opts: { extrusionDirection: Vec3; twistAngle?: number; extrusionProfile?: { profile: "linear"; endFactor: number } } = { extrusionDirection: dir };
+      if (f.twist) opts.twistAngle = f.twist;
+      if (f.endScale && Math.abs(f.endScale - 1) > 1e-9) opts.extrusionProfile = { profile: "linear", endFactor: f.endScale };
+      return sketch().extrude(dist, opts) as Shape;
+    };
+    switch (ext.kind) {
+      case "blind":
+        return blind(ext.d);
+      case "midPlane":
+        return blind(ext.d).translate(V.mul(dir, -ext.d / 2)) as Shape;
+      case "throughAll":
+        return blind(big);
+      case "toVertex": {
+        const p = pointOf(rc, ext.ref, "vrchol ukončení");
+        const t = V.dot(V.sub(p, origin), dir);
+        if (!(t > 1e-6)) throw new Error("Vybraný bod neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).");
+        return blind(t);
+      }
+      case "toFace":
+      case "offsetFromFace": {
+        const off = ext.kind === "toFace" ? (ext.offset ?? 0) : ext.d;
+        const g = resolveRef(rc, ext.ref);
+        if (g.plane && !g.radius) {
+          // rovinná plocha / pomocná rovina: přesně rovinným řezem (platí i pro šikmou plochu)
+          const nn = g.plane.normal;
+          const den = V.dot(dir, nn);
+          if (Math.abs(den) < 1e-9) throw new Error("Cílová plocha je rovnoběžná se směrem vysunutí.");
+          const toward = V.mul(nn, den > 0 ? -1 : 1); // normála mířící zpět k profilu
+          const o2 = V.add(g.plane.origin, V.mul(toward, off));
+          const tC = V.dot(V.sub(o2, origin), nn) / den;
+          if (!(tC > 1e-6)) throw new Error("Cílová plocha neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).");
+          const T = blind(big);
+          const res = T.split(new r.Plane(o2, V.perp(nn), nn));
+          const keep = asShape(V.dot(V.sub(origin, o2), nn) >= 0 ? res.positive : res.negative);
+          if (!keep) throw new Error("Vysunutí k ploše nevytvořilo těleso.");
+          return keep;
+        }
+        if (off) throw new Error("Odsazení lze použít jen u rovinné plochy nebo pomocné roviny.");
+        if (!body || ext.ref.kind !== "face") throw new Error("Vyberte plochu tělesa.");
+        const i = entityIndex(body, "face", ext.ref.index, ext.ref.sig);
+        try {
+          return sketch().extrudeUntil(body.faces[i], { extrusionDirection: dir }) as Shape;
+        } catch {
+          throw new Error("Vysunutí k zakřivené ploše se nezdařilo – plocha musí celý profil zakrýt. Zkuste „K dalšímu“ nebo rovinnou plochu.");
+        }
+      }
+      case "toNext":
+      case "toBody": {
+        if (!body) throw new Error("Ukončení „k dalšímu“ potřebuje stávající těleso.");
+        const T = blind(big);
+        const removing = f.mode === "cut" || f.mode === "intersect";
+        const parts = removing ? T.intersect(body) : T.cut(body);
+        const near = nearestSolid(parts, origin, dir);
+        if (!removing && near.far > big * 0.95) throw new Error("Ve směru vysunutí není další plocha tělesa (použijte Na vzdálenost nebo Skrz vše).");
+        return near.solid;
+      }
     }
-    case "revolve": {
-      const sk = needSketch(ctx, f.sketchId);
-      const d = sketchDrawing(sk);
-      if (!d) throw new Error("Skica neobsahuje uzavřený profil.");
-      const plane = planeOf(sk.plane);
-      const ax = f.axis === "x" ? plane.xDir : plane.yDir;
-      const angle = Math.max(1, Math.min(360, f.angle || 360));
-      return d.sketchOnPlane(plane).revolve(vec(ax), { origin: vec(plane.origin), angle }) as Shape;
-    }
+  };
+  let tool = side(d1, ext1);
+  if (f.extent2) tool = tool.fuse(side(V.mul(d1, -1), f.extent2));
+  return tool;
+}
+
+type RevolveF = Extract<Feature, { type: "revolve" }>;
+
+/** Rotace: osa 8 způsoby, úhel v jednom / obou směrech / symetricky, tenká stěna. */
+function revolveTool(f: RevolveF, ctx: Ctx): Shape {
+  const sk = needSketch(ctx, f.sketchId);
+  const rc = rctx(ctx);
+  const plane = planeOf(sk.plane);
+  const ax = resolveAxis(rc, f.axisDef, sk, f.axis);
+  const prof = () => profileSketch(sk, plane, { thin: f.thin });
+  const a1 = Math.max(0.01, Math.min(360, f.angle || 360));
+  const rev = (dir: Vec3, angle: number) => prof().revolve(dir, { origin: ax.origin, angle }) as Shape;
+  let s = rev(ax.dir, a1);
+  if (f.symmetric && a1 < 360) s = s.rotate(-a1 / 2, ax.origin, ax.dir) as Shape;
+  else if (f.angle2 && f.angle2 > 0 && a1 < 360) s = s.fuse(rev(V.mul(ax.dir, -1), Math.min(360 - a1, f.angle2)));
+  return s;
+}
+
+/** Nástrojové těleso prvku (pro pole/zrcadlení) — null u prvků, které nástroj nemají. */
+async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
+  switch (f.type) {
+    case "extrude":
+      return extrudeTool(f, ctx);
+    case "revolve":
+      return revolveTool(f, ctx);
     case "sweep": {
       const prof = needSketch(ctx, f.profileId, "skica profilu");
       const path = needSketch(ctx, f.pathId, "skica dráhy");
@@ -386,7 +592,7 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
       return oriented(t, f.axis, f.position);
     }
     case "hole":
-      return holeTool(f, ctx.body);
+      return holeTools(f, ctx);
     case "thread":
       return f.modeled ? threadTool(f) : null;
     case "text": {
@@ -435,12 +641,17 @@ function asShape(s: unknown): Shape | null {
 }
 
 /** Vrátí výsledné těleso po prvek `untilIndex` (vč.) + stav prvků. Proměnné, vazby a aktivní stav se uplatní předem. */
-export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<{ body: Shape | null; status: FeatureStatus[]; paramErrors: string[] }> {
+export type Resolved = NonNullable<BuildResult["resolved"]>;
+
+export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<{ body: Shape | null; status: FeatureStatus[]; paramErrors: string[]; resolved: Resolved }> {
   const { doc, errors: paramErrors } = resolveDoc(input);
   const sketches = new Map<string, SketchF>();
   const tools = new Map<string, { tool: Shape; mode: BoolMode }>();
   const status: FeatureStatus[] = [];
+  const features: Feature[] = doc.features.slice(); // vyřešené skici / pomocné roviny nahrazují původní (pro odkazy)
+  const resolved: Resolved = { planes: {}, datums: {} };
   let body: Shape | null = null;
+  const ctxOf = (): Ctx => ({ sketches, body, features });
 
   for (let i = 0; i < doc.features.length && i <= untilIndex; i++) {
     const f = doc.features[i];
@@ -452,12 +663,32 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
     try {
       let next: Shape | null = body;
       switch (f.type) {
-        case "sketch":
-          sketches.set(f.id, f);
+        case "sketch": {
+          if (!f.planeDef) {
+            sketches.set(f.id, f);
+            break;
+          }
+          try {
+            const plane = planeDefToSketchPlane(rctx(ctxOf()), f.planeDef, planeDefLabel(f.planeDef));
+            const sk: SketchF = { ...f, plane };
+            sketches.set(f.id, sk);
+            features[i] = sk;
+            resolved.planes[f.id] = plane;
+          } catch (e) {
+            sketches.set(f.id, f); // rovinu nelze vyřešit – použije se poslední známá
+            throw e;
+          }
           break;
-        case "datum":
+        }
+        case "datum": {
+          if (f.planeDef) {
+            const p = resolvePlaneDef(rctx(ctxOf()), f.planeDef);
+            features[i] = { ...f, origin: p.origin, normal: p.normal, xDir: p.xDir };
+            resolved.datums[f.id] = p;
+          }
           if (Math.hypot(...f.normal) < 1e-9) throw new Error("Normála roviny nesmí být nulová.");
           break;
+        }
         case "import": {
           const s = await importBody(f);
           next = body ? body.fuse(s) : s;
@@ -488,12 +719,13 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           const all = body.faces;
           const picked = f.faces.map((k) => all[k]).filter(Boolean);
           if (!picked.length) throw new Error("Vyberte plochy, které se mají zkosit.");
-          next = body.clone().draft(f.angle, (ff) => ff.when(({ element }) => picked.some((p) => p.isSame(element as r.Face))), axisPlane(f.plane, f.offset));
+          const neutral = f.planeDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef)) : axisPlane(f.plane, f.offset);
+          next = body.clone().draft(f.angle, (ff) => ff.when(({ element }) => picked.some((p) => p.isSame(element as r.Face))), neutral);
           break;
         }
         case "split": {
           if (!body) throw new Error("Není co rozříznout.");
-          const res = body.clone().split(axisPlane(f.plane, f.offset));
+          const res = body.clone().split(f.planeDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef)) : axisPlane(f.plane, f.offset));
           const keep = asShape(f.keep === "positive" ? res.positive : res.negative);
           if (!keep) throw new Error("Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí.");
           next = keep;
@@ -532,13 +764,13 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
                 const off: Vec3 = [0, 1, 2].map((k) => d1[k] * f.spacing * a + d2[k] * s2 * b) as Vec3;
                 acc = applyMode(acc, src.tool.clone().translate(off), src.mode);
               }
-          } else {
+          } else if (f.kind === "circular") {
             if (f.count > 400) throw new Error("Pole má příliš mnoho kusů (max. 400).");
             for (let k = 1; k < Math.max(1, Math.round(f.count)); k++) {
               const step = (f.angle >= 360 ? 360 / f.count : f.angle / Math.max(1, f.count - 1)) * k;
               acc = applyMode(acc, src.tool.clone().rotate(step, f.center, axisVec(f.axis)), src.mode);
             }
-          }
+          } else throw new Error("Tento typ pole (po křivce / podle skici / výplňové) zatím není v jádře k dispozici.");
           next = acc;
           break;
         }
@@ -562,14 +794,14 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
         }
         case "rib": {
           if (!body) throw new Error("Žebro potřebuje těleso, ke kterému se připojí.");
-          const sk = needSketch({ sketches, body }, f.sketchId, "skica žebra");
+          const sk = needSketch(ctxOf(), f.sketchId, "skica žebra");
           next = body.fuse(ribTool(body, sk, sketchChain(sk), planeOf(sk.plane), f.thickness, f.direction, f.flip));
           break;
         }
         case "mirror": {
           if (!body) throw new Error("Není co zrcadlit.");
           const origin: Vec3 = f.plane === "YZ" ? [f.offset, 0, 0] : f.plane === "XZ" ? [0, f.offset, 0] : [0, 0, f.offset];
-          const m = body.clone().mirror(f.plane, origin) as Shape;
+          const m = (f.planeDef ? body.clone().mirror(planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef))) : body.clone().mirror(f.plane, origin)) as Shape;
           next = f.keepOriginal ? body.fuse(m) : m;
           break;
         }
@@ -583,7 +815,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
         }
         default: {
           if (f.type === "thread" && !body) throw new Error("Závit potřebuje těleso (válcovou plochu).");
-          const tool = await toolOf(f, { sketches, body });
+          const tool = await toolOf(f, ctxOf());
           if (!tool) break;
           const mode = modeOf(f);
           tools.set(f.id, { tool: tool.clone(), mode });
@@ -596,7 +828,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
       status.push({ id: f.id, ok: false, error: humanError(e) });
     }
   }
-  return { body, status, paramErrors };
+  return { body, status, paramErrors, resolved };
 }
 
 function humanError(e: unknown): string {
@@ -610,8 +842,8 @@ function humanError(e: unknown): string {
 
 export async function buildDoc(doc: CadDoc, opts: { tolerance?: number } = {}): Promise<BuildResult & { body: Shape | null }> {
   const t0 = Date.now();
-  const { body, status, paramErrors } = await buildShape(doc);
-  return shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance });
+  const { body, status, paramErrors, resolved } = await buildShape(doc);
+  return { ...shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance }), resolved };
 }
 
 /** Síť, hrany, vrcholy a metriky libovolného tělesa (i složeného – např. podsestavy). */
