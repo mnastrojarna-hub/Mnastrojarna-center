@@ -10,6 +10,7 @@ import { SearchSelect, type SearchOption } from "@/components/jobs/detail/search
 import { formatMoney, formatPercent } from "@/components/jobs/detail/detail-helpers";
 import { cn } from "@/lib/utils";
 import { PurchaseItemsEditor } from "./purchase-items-editor";
+import { PoDeviationsEditor } from "./po-deviations-editor";
 import { Field } from "./ui-bits";
 import { purchaseDraftsTotal, type PurchaseOrderFormState } from "./purchasing-model";
 
@@ -92,6 +93,8 @@ export function PurchaseOrderForm({
       </div>
 
       <PurchaseItemsEditor drafts={form.items} onChange={(items) => set("items", items)} currency={currency} />
+
+      <PoDeviationsEditor drafts={form.items} onChange={(items) => set("items", items)} />
 
       {margin && (
         <div

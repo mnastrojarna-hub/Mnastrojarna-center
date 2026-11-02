@@ -324,11 +324,14 @@ for (const mobile of [false, true]) {
     await snap(page, `06b-banner-nova-revize${mobile ? "-390" : ""}`);
     if (!mobile) {
       await banner.getByRole("button", { name: "Poslat dodavateli novou revizi" }).click();
-      const compose = page.getByRole("dialog").filter({ hasText: "Nová zpráva" });
+      // e-mail objednávky (změna s PDF a novou revizí výkresu položky v příloze — neutrální název, anonymizovaně)
+      const compose = page.getByRole("dialog").filter({ hasText: `Nová revize výkresu — objednávka OV-E2E36-${TAG}` });
       await compose.waitFor({ timeout: 15_000 });
+      await compose.getByTestId("po-mail-attachments").waitFor({ timeout: 30_000 });
       await eventually(async () => expect((await recipients(compose, "Komu")).includes(`kooperant36-${TAG.toLowerCase()}@local.test`), "Komu = e-mail dodavatele"));
-      expect((await compose.getByLabel("Předmět").inputValue()).includes(`Změna výkresu F0N603W88 — rev. ${rev}`), "předmět");
+      expect((await compose.getByLabel("Předmět").inputValue()).includes(`Změna objednávky OV-E2E36-${TAG}`), "předmět");
       expect(norm(await compose.innerText()).includes(`F0N603W88_${rev}.pdf`), "příloha = nová revize");
+      expect((await compose.locator("textarea").first().inputValue()).includes(`Výkres F0N603W88: platí nová revize ${rev}`), "text: nová revize");
       await snap(page, "06c-poslat-dodavateli");
       await page.keyboard.press("Escape");
       await eventually(() => expect(sql(`select drawing_changed_at is not null from purchase_orders where id = ${lit(PO6)}`) === "t", "objednávka označena „změna výkresu“"));

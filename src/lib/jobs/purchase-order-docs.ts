@@ -23,6 +23,13 @@ import { operationFamily } from "@/lib/jobs/production-suggest";
 import { pragueToday } from "@/lib/jobs/flow-status";
 import { czDate } from "@/lib/pdf/types";
 import { recipientsFor, toneFor } from "@/lib/contacts/server";
+import { enqueueSend } from "@/lib/anonymize/send-queue";
+import { appOrigin, kick } from "@/lib/anonymize/queue";
+import { pickPoAttachments, type ItemDeviationsRef } from "@/lib/jobs/po-deviations";
+import {
+  collectPoAttachments, deviationRefs, lineDeviations, loadDeviationContext, loadPoAttachmentPlan, poAttachmentMailLines,
+  purchaseOrderDeviationLines, type PoAttachmentData,
+} from "@/lib/jobs/po-deviations-store";
 
 /**
  * Objednávka dodavateli — jádro PDF a odeslání bez session (sdílí akce Nákupu, předání do výroby,
@@ -139,7 +146,13 @@ export async function storePurchaseOrderPdfCore(
   const kinds = ((opRows ?? []) as { kind: string; status: string }[])
     .filter((o) => o.status !== "preskoceno" && isOperationKind(o.kind)).map((o) => o.kind as OperationKind);
   const revision = Number((poRow as { revision?: number | null } | null)?.revision ?? 1) || 1;
+  // odchylky od výkresu (pokyny zákazníka z e-mailu, oprava, nová revize) — pod položku, bez údajů zákazníka
+  const deviations = await purchaseOrderDeviationLines(db, po).catch((err) => {
+    console.error(`[purchase-order] Odchylky od výkresu se nepodařilo sestavit: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  });
   const data = await buildPurchaseOrderDoc(job, po, po.supplier, {
+    deviations,
     // bez kontaktu s právem na ceny = firma (nikdy autor bez práva — zaměstnanec)
     preparedBy: contactId ? contact.name ?? author.fullName : "Obchodní oddělení",
     contactEmail: contact.email,
@@ -208,18 +221,60 @@ export function purchasePriceOnlyChanges(
 
 export type PoMailKind = "issue" | "change" | "cancel" | "hold";
 
+type MailPo = Pick<PurchaseOrderView, "number" | "supplierQuote" | "requiredDate" | "confirmedDate" | "supplier"> & {
+  revision?: number | null;
+  /** Zakázka objednávky (odchylky od výkresu a přílohy ze zdrojů zakázky). */
+  jobId?: string;
+  /** Odesláno (změna: nové revize od té doby). */
+  sentAt?: string | null;
+  /** Položky (poznámky pro dodavatele, odchylky od výkresu → souhrn v e-mailu). */
+  items?: (Pick<PurchaseItem, "drawingNumber" | "name" | "note"> & Partial<Pick<PurchaseItem, "orderItemId" | "quantity" | "unit" | "deviations">>)[];
+};
+
+/** Odchylky od výkresu, přílohy e-mailu (výkresy / modely dílů objednávky) a řádky textu o nich. */
+export interface PoMailExtras {
+  deviations: ItemDeviationsRef[];
+  attachments: PoAttachmentData | null;
+  attachmentLines: string[];
+}
+
+/**
+ * Souhrn do e-mailu objednávky (vystavení / změna): odchylky od výkresu po položkách a řádek o přiložených
+ * výkresech / modelech (u změny po nové revizi i „revize B je nahrazena"). Chyba zdrojů = bez souhrnu.
+ */
+export async function purchaseOrderMailExtras(
+  db: JobsDb, po: MailPo, kind: PoMailKind, address: "ty" | "vy" | null | undefined, attachmentIds?: string[] | null,
+): Promise<PoMailExtras> {
+  const empty: PoMailExtras = { deviations: [], attachments: null, attachmentLines: [] };
+  if ((kind !== "issue" && kind !== "change") || !po.jobId || !po.items?.length) return empty;
+  try {
+    const ctx = await loadDeviationContext(db, po.jobId);
+    if (!ctx) return empty;
+    const items = po.items.map((it) => ({ ...it, quantity: it.quantity ?? 1, unit: it.unit ?? "ks" }));
+    const deviations = deviationRefs(lineDeviations(ctx, items), items);
+    const since = kind === "change" ? po.sentAt ?? null : undefined;
+    const attachments = await loadPoAttachmentPlan(db, { jobId: po.jobId, number: po.number, items }, { ctx, focusSince: kind === "change" ? po.sentAt ?? null : null });
+    const picked = pickPoAttachments(attachments.plan, attachmentIds);
+    const attachmentLines = poAttachmentMailLines(ctx, attachments, picked, address, { since });
+    return { deviations, attachments, attachmentLines };
+  } catch (err) {
+    console.error(`[purchase-order] Odchylky / přílohy e-mailu se nepodařilo sestavit: ${err instanceof Error ? err.message : String(err)}`);
+    return empty;
+  }
+}
+
 /** Návrh e-mailu dodavateli s podpisem skutečného odesílatele (jméno, telefon, e-mail z profilu). */
 export async function purchaseOrderMailFor(
   db: JobsDb,
-  po: Pick<PurchaseOrderView, "number" | "supplierQuote" | "requiredDate" | "confirmedDate" | "supplier"> & {
-    revision?: number | null;
-    /** Položky (poznámky pro dodavatele → souhrn v e-mailu). */
-    items?: Pick<PurchaseOrderView["items"][number], "drawingNumber" | "name" | "note">[];
-  },
+  po: MailPo,
   signerId: string | null,
   kind: PoMailKind = "issue",
-  extra: { previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null } = {},
-): Promise<PurchaseOrderMail & { attachmentName: string; recipientReason: string }> {
+  extra: {
+    previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null;
+    /** Vybrané přílohy (výkresy / modely); undefined = výchozí výběr. */
+    attachmentIds?: string[] | null;
+  } = {},
+): Promise<PurchaseOrderMail & { attachmentName: string; recipientReason: string; extras: PoMailExtras }> {
   await refreshCompanyFromSettings();
   const [me, signatureText, pick] = await Promise.all([
     signerId ? fetchProfileContact(db, signerId) : Promise.resolve({ name: null, email: null, phone: null }),
@@ -242,19 +297,24 @@ export async function purchaseOrderMailFor(
     address: tone?.setting.address ?? null,
     salutation: tone?.salutation ?? null,
   };
+  const extras = await purchaseOrderMailExtras(db, po, kind, sender.address, extra.attachmentIds);
   const mail = kind === "change"
-    ? purchaseOrderChangeEmail({ ...sender, revision: Math.max(2, po.revision ?? 2), requiredDate: po.requiredDate, previousRequiredDate: extra.previousRequiredDate, reason: extra.reason })
+    ? purchaseOrderChangeEmail({
+      ...sender, revision: Math.max(2, po.revision ?? 2), requiredDate: po.requiredDate, previousRequiredDate: extra.previousRequiredDate, reason: extra.reason,
+      deviations: extras.deviations, attachmentLines: extras.attachmentLines,
+    })
     : kind === "cancel"
       ? purchaseOrderCancelEmail({ ...sender, reason: extra.reason })
       : kind === "hold"
         ? purchaseOrderHoldEmail({ ...sender, reason: extra.reason })
         : purchaseOrderEmail({
           ...sender, supplierQuoteNumber: po.supplierQuote?.number, requiredDate: po.confirmedDate ?? po.requiredDate, drawingsSeparately: !po.supplierQuote,
-          itemNotes: supplierNotesOfItems(po.items ?? []),
+          itemNotes: supplierNotesOfItems(po.items ?? []), deviations: extras.deviations, attachmentLines: extras.attachmentLines,
         });
   return {
     to, ...(pick?.cc.length ? { cc: pick.cc.join(", ") } : {}), ...mail,
     attachmentName: purchaseOrderFileName(po.number), recipientReason: pick?.to.length ? pick.reason : to ? "E-mail dodavatele" : "",
+    extras,
   };
 }
 
@@ -268,6 +328,25 @@ export interface SendPoOptions {
   eventData?: Row;
   /** Autor auditu (výchozí přihlášený uživatel požadavku). */
   auditActor?: ActorContext | null;
+  /**
+   * Výkresy / 3D modely dílů objednávky v příloze (vystavení / změna): výběr z dialogu; undefined / null =
+   * výchozí (aktuální výkres + model každé položky); false = bez výkresů (jen PDF).
+   */
+  attachmentIds?: string[] | null | false;
+}
+
+/** Limit příloh jednoho e-mailu (shodný s frontou odeslání po anonymizaci). */
+const MAX_MAIL_BYTES = 20 * 1024 * 1024;
+
+function copies(to: string[], cc: string[]): string[] {
+  return cc.filter((x) => !to.some((t) => t.toLowerCase() === x.toLowerCase()));
+}
+
+/** Šťouchnout do fronty anonymizace (čekající výkresy objednávky) — chyba nevadí, fronta běží i cronem. */
+async function kickAnonymization(ids: string[], userId: string): Promise<void> {
+  const origin = appOrigin(null);
+  if (!origin || !ids.length) return;
+  await kick({ origin, table: "job_files", ids: ids.slice(0, 5), manualBy: userId }).catch(() => undefined);
 }
 
 const KIND_TEXT: Record<PoMailKind, string> = {
@@ -288,8 +367,9 @@ export async function sendPurchaseOrderCore(
   poId: string,
   mail: PurchaseOrderMail,
   opts: SendPoOptions,
-): Promise<{ ok: true; emailId?: string; mailboxId?: string | null } | { ok: false; error: string }> {
+): Promise<{ ok: true; emailId?: string; mailboxId?: string | null; queued?: boolean; queueId?: string } | { ok: false; error: string }> {
   const kind = opts.kind ?? "issue";
+  let attachedFileIds: string[] = [];
   if (!mail || typeof mail !== "object") return { ok: false, error: "Chybí e-mail." };
   const to = parseEmailList(mail.to);
   if (!to || !to.length) return { ok: false, error: "Zadej platný e-mail dodavatele." };
@@ -322,13 +402,44 @@ export async function sendPurchaseOrderCore(
     const { data: blob, error: dlErr } = await db.storage.from(BUCKET).download(f.storage_path);
     if (dlErr || !blob) return { ok: false, error: `PDF objednávky se nepodařilo načíst: ${dlErr?.message ?? "prázdný soubor"}` };
     attachments.push({ filename: f.filename || purchaseOrderFileName(po.number), content: Buffer.from(await blob.arrayBuffer()), contentType: "application/pdf" });
+
+    // výkresy (anonymizované) a 3D modely dílů objednávky — jen soubory položek této objednávky
+    if (opts.attachmentIds !== false) {
+      const plan = await loadPoAttachmentPlan(db, po, { focusSince: kind === "change" ? po.sentAt ?? null : null });
+      const files = await collectPoAttachments(db, plan.plan, opts.attachmentIds ?? null);
+      if (files.blocked.length && opts.attachmentIds) return { ok: false, error: `Výkres nejde poslat: ${files.blocked[0].message}` };
+      const total = attachments[0].content.length + files.ready.reduce((s, x) => s + x.content.length, 0);
+      if (total > MAX_MAIL_BYTES) return { ok: false, error: "Přílohy se nevejdou do e-mailu (> 20 MB) — odškrtni některé výkresy nebo modely." };
+      if (files.pending.length) {
+        // některý výkres se ještě anonymizuje → fronta odeslání (odejde sám po dokončení, se stejnými přílohami)
+        const q = await enqueueSend(db as never, {
+          kind: "purchase_order", jobId: po.jobId, refId: po.id, createdBy: sender.id,
+          payload: {
+            to, cc: copies(to, cc), subject, body, extraFileIds: [po.fileId as string], purchaseOrderId: po.id,
+            recipientLabel: `dodavateli ${po.supplier?.name ?? ""} (objednávka ${po.number})`.replace(/\s+/g, " "),
+            neutralNames: { ...files.names, [po.fileId as string]: f.filename || purchaseOrderFileName(po.number) },
+          },
+          fileIds: [...files.ready.map((x) => x.fileId), ...files.pending],
+        });
+        if (!q.ok) return { ok: false, error: q.error };
+        await logJobEvent(db, {
+          jobId: po.jobId, type: "email", entity: "purchase_order", entityId: poId, actorId: sender.id,
+          message: `Objednávka ${po.number} čeká na anonymizaci výkresů — odejde dodavateli sama po dokončení`,
+          data: { purchaseOrderId: poId, sendQueueId: q.id, mailKind: kind, pending: files.pending.length, ...(opts.eventData ?? {}) },
+        });
+        await kickAnonymization(files.pending, sender.id);
+        return { ok: true, queued: true, queueId: q.id, mailboxId: null };
+      }
+      for (const x of files.ready) attachments.push({ filename: x.filename, content: x.content, contentType: x.contentType });
+      attachedFileIds = files.ready.map((x) => x.fileId);
+    }
   }
 
-  const copies = cc.filter((x) => !to.some((t) => t.toLowerCase() === x.toLowerCase()));
-  const recipients = [...to, ...copies];
+  const copiesList = copies(to, cc);
+  const recipients = [...to, ...copiesList];
   const res = await sendMail({
     to: to.join(", "),
-    cc: copies.length ? copies.join(", ") : undefined,
+    cc: copiesList.length ? copiesList.join(", ") : undefined,
     subject,
     text: body,
     ...(attachments.length ? { attachments } : {}),
@@ -375,7 +486,8 @@ export async function sendPurchaseOrderCore(
     message: `Objednávka ${po.number} ${KIND_TEXT[kind]}${kind === "issue" && supplier ? ` ${supplier}` : ""} (${recipients.join(", ")})${mailboxEmail ? ` z ${mailboxEmail}` : ""}`.replace(/\s{2,}/g, " "),
     data: {
       purchaseOrderId: poId, number: po.number, to: recipients, emailId: res.emailId ?? null, fileId: po.fileId,
-      mailKind: kind, mailboxId, ...(opts.via ? { via: opts.via } : {}), ...(opts.eventData ?? {}),
+      mailKind: kind, mailboxId, ...(attachedFileIds.length ? { drawingFileIds: attachedFileIds } : {}),
+      ...(opts.via ? { via: opts.via } : {}), ...(opts.eventData ?? {}),
     },
     actorId: sender.id, entity: "purchase_order", entityId: poId,
   });

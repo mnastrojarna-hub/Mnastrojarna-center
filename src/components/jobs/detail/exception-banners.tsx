@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { AlertTriangle, Check, FileDiff, Factory, Loader2, Send, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ComposeDialog, type ComposeRequest } from "@/components/mail/compose-dialog";
+import { SendPurchaseOrderDialog } from "@/components/jobs/purchasing/purchase-order-dialogs";
 import { acknowledgeDrawingChanges, markPurchaseOrdersDrawingChanged } from "@/app/actions/flow-exceptions";
 import { awaitingPoDays, claimOpen, czPlural, relativeStampTime, type FlowActionKey } from "@/lib/jobs/flow-status";
 import { CLAIM_REASONS, CLAIM_RESOLUTIONS, exceptionFlags, isClaimReason, isClaimResolution } from "@/lib/jobs/flow-exceptions";
@@ -31,7 +31,7 @@ export function ExceptionBanners({ job }: { job: JobDetail }) {
   const { notify, perms } = useJobDetail();
   const settle = useSettledRefresh();
   const [busy, setBusy] = React.useState<string | null>(null);
-  const [compose, setCompose] = React.useState<ComposeRequest | null>(null);
+  const [revisionPo, setRevisionPo] = React.useState<{ id: string; number: string; supplierName: string | null } | null>(null);
   const facts = flow?.facts ?? null;
   if (!facts) return null;
   const run = (k: FlowActionKey) => flow?.run(k);
@@ -58,13 +58,8 @@ export function ExceptionBanners({ job }: { job: JobDetail }) {
     const res = await markPurchaseOrdersDrawingChanged(job.id, { purchaseOrderIds: [po.id], note }).catch(() => ({ ok: false, error: "Spojení se nepovedlo." }));
     setBusy(null);
     if (!res.ok) return notify("error", res.error ?? "Nepovedlo se.");
-    const file = c.fileId ? job.files.find((f) => f.id === c.fileId) : null;
-    setCompose({
-      mode: "new", jobId: job.id, to: po.supplierEmail ? [po.supplierEmail] : [],
-      subject: `Změna výkresu ${c.drawingNumber ?? ""} — rev. ${c.revTo ?? ""} k objednávce ${po.number}`.replace(/\s+/g, " "),
-      body: `Dobrý den,\n\nk naší objednávce ${po.number} posíláme novou revizi výkresu ${c.drawingNumber ?? ""} (rev. ${c.revFrom ?? "—"} → ${c.revTo ?? "—"}). Prosíme, vyrábějte podle nové revize a potvrďte, zda se mění cena nebo termín.\n`,
-      jobAttachments: file ? [{ id: file.id, filename: file.filename }] : [],
-    });
+    // e-mail objednávky (změna s PDF a novou revizí výkresu v příloze — jen díly této objednávky, anonymizovaně)
+    setRevisionPo({ id: po.id, number: po.number, supplierName: po.supplier });
     settle();
   }
 
@@ -172,12 +167,15 @@ export function ExceptionBanners({ job }: { job: JobDetail }) {
         </div>
       )}
 
-      <ComposeDialog
-        request={compose}
-        onClose={() => setCompose(null)}
-        onSent={(r) => {
-          setCompose(null);
-          notify(r.sentCopy === "failed" ? "error" : "success", `Nová revize odeslána dodavateli${r.fromAddress ? ` z ${r.fromAddress}` : ""}.`);
+      {/* nová revize dodavateli: změna objednávky (PDF s novou revizí) + nový výkres anonymizovaně, stará revize „nahrazena" */}
+      <SendPurchaseOrderDialog
+        open={Boolean(revisionPo)}
+        onOpenChange={(o) => { if (!o) setRevisionPo(null); }}
+        order={revisionPo}
+        drawingChange
+        notify={notify}
+        onSent={() => {
+          setRevisionPo(null);
           settle();
         }}
       />

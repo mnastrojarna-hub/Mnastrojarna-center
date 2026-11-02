@@ -15,7 +15,7 @@ import {
  * Prodejní cena sem nikdy nepatří — jen nákupní cena za MJ.
  */
 
-type Field = keyof Omit<PurchaseItemDraft, "key">;
+type Field = keyof Omit<PurchaseItemDraft, "key" | "orderItemId" | "deviations">;
 
 const cell =
   // nápověda prázdného pole: kurzívou, šedě, bez ukázkových hodnot (nikdo ji nesmí číst jako data)

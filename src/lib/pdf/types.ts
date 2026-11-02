@@ -29,6 +29,8 @@ export interface DocItem {
   note?: string;
   /** Cena zatím nestanovena — v tabulce „—" místo 0 Kč. */
   unpriced?: boolean;
+  /** Objednávka dodavateli: odchylky od výkresu (platí místo výkresu) — zvýrazněně pod položkou. */
+  deviations?: string[];
 }
 
 /** Položka dodacího listu — bez cen. */

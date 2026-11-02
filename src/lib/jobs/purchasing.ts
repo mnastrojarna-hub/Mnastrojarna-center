@@ -13,6 +13,7 @@ import { STAGES, isJobStage, stageRank } from "@/lib/jobs/stages";
 import { isOperationKind } from "@/lib/jobs/operations";
 import { czDate, czWeekday } from "@/lib/pdf/types";
 import { stampFromRow, type ChangeStamp, type PurchaseExtraState } from "@/lib/jobs/flow-status";
+import { cleanDeviations, deviationMailSection, type ItemDeviationsRef, type PoDeviation } from "@/lib/jobs/po-deviations";
 
 /**
  * Nákupní strana zakázky — čistá logika (bez DB): stavy objednávek vydaných,
@@ -162,6 +163,8 @@ export interface PurchaseItemRowInput {
   note: string | null;
   /** Vazba na díl zakázky — jen u objednávky dodavateli (purchase_order_items), klíč chybí, když vazba není. */
   order_item_id?: string;
+  /** Potvrzené odchylky od výkresu — jen u objednávky dodavateli; klíč chybí = automaticky (sloupec NULL). */
+  drawing_deviations?: PoDeviation[];
 }
 
 export const MAX_PURCHASE_ITEMS = 300;
@@ -205,6 +208,7 @@ export function cleanPurchaseItems(
       unit_price: price,
       note: cleanText(raw.note, 1000),
       ...(isUuid(raw.orderItemId) ? { order_item_id: raw.orderItemId.toLowerCase() } : {}),
+      ...(Array.isArray(raw.deviations) ? { drawing_deviations: cleanDeviations(raw.deviations) ?? [] } : {}),
     });
   }
   if (!rows.length && !opts.allowEmpty) return { error: "Přidej alespoň jednu položku." };
@@ -417,7 +421,7 @@ export interface DraftJob {
   number: string;
   title: string;
   currency: string;
-  items: (Pick<JobItem, "drawingNumber" | "revision" | "name" | "description" | "material" | "quantity" | "unit" | "purchaseUnitPrice"> & Partial<Pick<JobItem, "tech">>)[];
+  items: (Pick<JobItem, "drawingNumber" | "revision" | "name" | "description" | "material" | "quantity" | "unit" | "purchaseUnitPrice"> & Partial<Pick<JobItem, "tech" | "id">>)[];
   drawingNumbers: string[];
   totalQuantity: number;
   purchaseCost: number | null;
@@ -435,6 +439,7 @@ function textOrUndef(v: string | null | undefined): string | undefined {
 export function itemsFromSupplierQuote(quote: Pick<SupplierQuoteView, "items">, job: Pick<DraftJob, "items">): PurchaseItemInput[] {
   return quote.items.map((it) => {
     const match = it.drawingNumber ? job.items.find((j) => j.drawingNumber === it.drawingNumber) : undefined;
+    const matchId = match?.id;
     return {
       drawingNumber: textOrUndef(it.drawingNumber),
       name: textOrUndef(it.name) ?? textOrUndef(match?.name) ?? textOrUndef(match?.description),
@@ -444,6 +449,8 @@ export function itemsFromSupplierQuote(quote: Pick<SupplierQuoteView, "items">, 
       unitPrice: it.unitPrice,
       // poznámka pro dodavatele z Technologie (podle čísla výkresu) — v PDF zvýrazněná „Pozor: …"
       note: joinNote(supplierNoteSegment(match?.tech?.supplierNote), splitItemNote(it.note).rest),
+      // vazba na díl zakázky (výkresy a odchylky položky v objednávce / e-mailu)
+      ...(isUuid(it.orderItemId) ? { orderItemId: it.orderItemId } : isUuid(matchId) ? { orderItemId: matchId } : {}),
     };
   });
 }
@@ -466,6 +473,7 @@ export function itemsFromJob(job: Pick<DraftJob, "items">): PurchaseItemInput[] 
       unit: textOrUndef(it.unit) ?? "ks",
       unitPrice: it.purchaseUnitPrice ?? null,
       note: joinNote(supplierNoteSegment(it.tech?.supplierNote), name && desc && desc !== name ? desc : undefined),
+      ...(isUuid(it.id) ? { orderItemId: it.id } : {}),
     };
   });
 }
@@ -659,6 +667,8 @@ export function draftToPurchaseOrderView(
       unit: r.unit,
       unitPrice: r.unit_price,
       note: r.note,
+      ...(r.order_item_id ? { orderItemId: r.order_item_id } : {}),
+      ...(r.drawing_deviations ? { deviations: r.drawing_deviations } : {}),
     })),
   };
 }
@@ -865,6 +875,10 @@ export function purchaseOrderEmail(input: {
   drawingsSeparately?: boolean;
   /** Poznámky pro dodavatele u položek („pozor popsat na čele") — souhrn v e-mailu (v PDF jsou u položky). */
   itemNotes?: SupplierItemNote[];
+  /** Odchylky od výkresu po položkách (platí místo výkresu) — krátký souhrn v e-mailu, v PDF u položky. */
+  deviations?: ItemDeviationsRef[];
+  /** Řádky o přiložených výkresech / modelech (a nahrazené revizi) — místo „pošleme samostatně". */
+  attachmentLines?: string[];
   /** Podpis odesílatele z Nastavení pošty (text s pozdravem → při odeslání grafický s logem). */
   signatureText?: string | null;
   /** Tykání / vykání odesílatele s adresátem a hotový první řádek (src/lib/contacts/tone.ts). */
@@ -886,7 +900,11 @@ export function purchaseOrderEmail(input: {
     lines.push("", v("Prosíme, věnujte pozornost poznámkám u položek:", "Prosím, věnuj pozornost poznámkám u položek:"));
     for (const n of notes.slice(0, 20)) lines.push(`– ${n.ref}: ${n.note.trim()}`);
   }
-  if (input.drawingsSeparately && !quote) lines.push(`Výkresovou dokumentaci k položkám ${v("Vám pošleme samostatně, pokud ji od nás ještě nemáte", "ti pošleme samostatně, pokud ji od nás ještě nemáš")}.`);
+  const deviations = deviationMailSection(input.deviations ?? [], input.address);
+  if (deviations.length) lines.push("", ...deviations);
+  const attach = (input.attachmentLines ?? []).filter((s) => s.trim());
+  if (attach.length) lines.push("", ...attach);
+  else if (input.drawingsSeparately && !quote) lines.push(`Výkresovou dokumentaci k položkám ${v("Vám pošleme samostatně, pokud ji od nás ještě nemáte", "ti pošleme samostatně, pokud ji od nás ještě nemáš")}.`);
   lines.push(
     "",
     `${v("Prosíme o potvrzení", "Prosím o potvrzení")} objednávky a termínu dodání do ${days} ${days === 1 ? "pracovního dne" : "pracovních dnů"} — stačí odpovědět na tento e-mail.`,
@@ -944,6 +962,10 @@ export function purchaseOrderChangeEmail(input: SupplierMailSender & {
   requiredDate?: string | null;
   previousRequiredDate?: string | null;
   reason?: string | null;
+  /** Odchylky od výkresu po položkách (platí místo výkresu). */
+  deviations?: ItemDeviationsRef[];
+  /** Řádky o přiložených výkresech a nahrazené revizi („revize B je nahrazena a neplatí"). */
+  attachmentLines?: string[];
 }): { subject: string; body: string } {
   const req = cleanDate(input.requiredDate);
   const prev = cleanDate(input.previousRequiredDate);
@@ -957,6 +979,10 @@ export function purchaseOrderChangeEmail(input: SupplierMailSender & {
   if (req && prev && req !== prev) lines.push(`Požadovaný termín dodání se mění z ${czDate(prev)} na ${czDate(req)} (${czWeekday(req)}).`);
   else if (req) lines.push(`Požadovaný termín dodání: ${czDate(req)} (${czWeekday(req)}).`);
   if (reason) lines.push(`Důvod: ${reason}`);
+  const attach = (input.attachmentLines ?? []).filter((s) => s.trim());
+  if (attach.length) lines.push("", ...attach);
+  const deviations = deviationMailSection(input.deviations ?? [], input.address);
+  if (deviations.length) lines.push("", ...deviations);
   lines.push(
     "",
     `${ty ? "Prosím o" : "Prosíme o"} potvrzení změny — stačí odpovědět na tento e-mail.`,
@@ -1094,6 +1120,7 @@ export interface PurchaseItemDbRow {
   receipt_closed?: boolean | null;
   receipt_closed_reason?: string | null;
   order_item_id?: string | null;
+  drawing_deviations?: unknown;
   receiver?: Embed<PersonEmbed>;
 }
 
@@ -1224,6 +1251,7 @@ export function rowToPurchaseItem(row: PurchaseItemDbRow): PurchaseItem {
     receiptClosed: Boolean(row.receipt_closed),
     receiptClosedReason: row.receipt_closed_reason ?? null,
     orderItemId: row.order_item_id ?? null,
+    ...(row.drawing_deviations !== undefined && row.drawing_deviations !== null ? { deviations: cleanDeviations(row.drawing_deviations) } : {}),
   };
 }
 

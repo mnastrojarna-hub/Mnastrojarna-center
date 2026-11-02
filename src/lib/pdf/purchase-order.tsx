@@ -137,6 +137,15 @@ function PurchaseItemsTable({ items, currency }: { items: DocItem[]; currency: s
                 </>
               );
             })()}
+            {it.deviations?.length ? (
+              // odchylky od výkresu (pokyn zákazníka, oprava, nová revize) — platí místo výkresu
+              <View style={{ marginTop: 2.5, borderLeftWidth: 1.6, borderLeftColor: C.red, paddingLeft: 4 }}>
+                <Text style={{ fontSize: 7.8, fontWeight: "bold", color: C.red }}>Odchylka od výkresu — platí místo výkresu:</Text>
+                {it.deviations.map((dv, k) => (
+                  <Text key={k} style={{ fontSize: 8, lineHeight: 1.35, color: C.ink }}>• {dv}</Text>
+                ))}
+              </View>
+            ) : null}
           </View>
           <Text style={[styles.cellRight, { width: W.qty }]}>
             {czNumber(it.quantity)} <Text style={styles.cellUnit}>{it.unit}</Text>
@@ -159,6 +168,9 @@ function Instructions({ data, hasDrawing }: { data: PurchaseOrderData; hasDrawin
     data.workInstruction !== undefined
       ? data.workInstruction || null
       : hasDrawing ? "Vyrábějte dle výkresové dokumentace v uvedené revizi, odchylky předem konzultujte." : null,
+    data.items.some((i) => i.deviations?.length)
+      ? "Odchylky od výkresu uvedené u položek mají přednost před výkresem."
+      : null,
   ].filter((p): p is string => Boolean(p));
   return (
     <View

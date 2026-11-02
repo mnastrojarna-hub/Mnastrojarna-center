@@ -46,6 +46,11 @@ export const ACCOUNTS = [
   { user: "podpis25@nastrojarstvi.test", pass: "Podpis25-Heslo-1", imap: true, pop3: true },
   // E2E 39: poptávky dodavatelům — schránka zaměstnance se „Smí poptávat dodavatele" (odpověď dodavatele s PD-…)
   { user: "poptavky39@nastrojarstvi.test", pass: "Poptavky39-Heslo-1", imap: true, pop3: true },
+  // blokace po odmítnutém hesle (src/lib/email/mail-lockout.integration.test.ts) a E2E 40 (rozložení Pošty + blokace)
+  { user: "zamek@nastrojarstvi.test", pass: "Zamek-Heslo-1", imap: true, pop3: true },
+  { user: "zamek40@nastrojarstvi.test", pass: "Zamek40-Heslo-1", imap: true, pop3: true },
+  // E2E 41: objednávka dodavateli — odchylky od výkresu, výkresy a modely položek v příloze e-mailu
+  { user: "objednavky41@nastrojarstvi.test", pass: "Objednavky41-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {

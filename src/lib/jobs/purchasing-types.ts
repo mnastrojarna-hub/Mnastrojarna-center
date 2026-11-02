@@ -3,6 +3,7 @@
 import type { CommissionStatus, JobStage, PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type { PersonRef } from "@/lib/jobs/types";
 import type { ChangeStamp } from "@/lib/jobs/flow-status";
+import type { PoDeviation } from "@/lib/jobs/po-deviations";
 
 export type SupplierQuoteSource = "manual" | "foto" | "email" | "ai" | "telefon";
 
@@ -25,6 +26,8 @@ export interface PurchaseItem {
   receiptClosedReason?: string | null;
   /** Vazba na položku zakázky (order_items.id). */
   orderItemId?: string | null;
+  /** Objednávka dodavateli: potvrzené odchylky od výkresu (null = automaticky ze zdrojů zakázky). */
+  deviations?: PoDeviation[] | null;
 }
 
 /** Dodavatel z adresáře (pro objednávku, PDF a e-mail). */
@@ -239,6 +242,8 @@ export interface PurchaseItemInput {
   note?: string;
   /** Díl zakázky (order_items.id) — jen u objednávky dodavateli. */
   orderItemId?: string | null;
+  /** Odchylky od výkresu potvrzené v dialogu (null / chybí = automaticky). */
+  deviations?: PoDeviation[] | null;
 }
 
 export interface SupplierQuoteInput {
