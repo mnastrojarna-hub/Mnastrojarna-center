@@ -996,8 +996,8 @@ await T("27b · karta Technologie na mobilu 390 px: sbalené kroky, rozbalení p
   await shot(page, S("27b-tech-card-mobile"));
 }, { mobile: true });
 
-// 28. Vystavení objednávky v Nákupu = předání do výroby (majitel 2. 11.: „‚Předat do výroby' v případě, že jsem už
-// vystavil objednávku, je zbytečný"): krok s objednávkou, kdo = dodavatel, termín z objednávky — bez dialogu předání.
+// 28. Odeslání objednávky = předání do výroby (majitel 3. 11.: „až odeslání objednávky bude ve výrobě"): vystavení
+// jen připraví PDF (zakázka zůstává, žádný krok); „Poslat dodavateli" → krok s objednávkou, kdo = dodavatel, termín z ní.
 const OVJ = job("objednávka = výroba");
 quote(OVJ, NOVAK, [4000, 4200], { lead: 21, note: "frézování", selected: true });
 const OVJM = job("objednávka = výroba mobil");
@@ -1011,41 +1011,47 @@ async function issueFromNakup(page, j, required) {
   await date.waitFor({ timeout: 30_000 });
   await date.fill(required);
   await dlg.getByRole("button", { name: "Vystavit objednávku", exact: true }).click();
-  const prod = page.locator('[data-testid="issue-production"]');
-  await prod.waitFor({ timeout: 60_000 });
-  return prod;
+  const hint = page.locator('[data-testid="issue-hint"]');
+  await hint.waitFor({ timeout: 60_000 });
+  return hint;
 }
 for (const [label, j, mobile] of [["desktop", OVJ, false], ["390 px", OVJM, true]]) {
-  await T(`28 · ${label}: „Vystavit objednávku“ v Nákupu předá zakázku do výroby sama (krok s objednávkou a jejím termínem), bez dialogu „Předat do výroby“`, async (ctx) => {
+  await T(`28 · ${label}: „Vystavit objednávku“ jen připraví PDF; „Poslat dodavateli“ předá zakázku do výroby sama (krok s objednávkou a jejím termínem), bez dialogu „Předat do výroby“`, async (ctx) => {
     const page = await ctx.newPage();
     await login(page, USERS.obchod);
     const required = isoDays(18);
-    const prod = await issueFromNakup(page, j, required);
-    const t = norm(await prod.innerText());
-    expect(/Předáno do výroby automaticky: Kompletní dodávka · .*Frézy Novák/.test(t), `výsledek vystavení (${t})`);
+    const stageBefore = stage(j);
+    const hint = await issueFromNakup(page, j, required);
+    const t = norm(await hint.innerText());
+    expect(t.includes("Po odeslání objednávky dodavateli se zakázka sama předá do výroby"), `po vystavení: výroba až odesláním (${t})`);
+    expect(await page.locator('[data-testid="issue-production"]').count() === 0, "vystavení nepředalo do výroby");
     expect(await page.locator('[data-testid="issue-handoff"]').count() === 0, "žádné „Předat do výroby…“ po vystavení");
-    expect(await page.locator('[data-testid="issue-replan"]').count() === 1, "„Upravit plán výroby…“ k dispozici");
-    expect(await dialog(page).count() === 0, "dialog předání se neotevřel");
-    await eventually(async () => expect(stage(j) === "ve_vyrobe", `zakázka Ve výrobě (${stage(j)})`), { timeout: 20_000 });
+    expect(stage(j) === stageBefore && ops(j).length === 0, `zakázka zůstává (${stage(j)}), žádný krok`);
+    if (mobile) await expectNoOverflow(page, "výsledek vystavení 390 px");
+    await hint.scrollIntoViewIfNeeded();
+    await shot(page, S(`28-issue-awaiting-send-${mobile ? "mobile" : "desktop"}`));
+    // odeslání → do výroby
+    await page.getByRole("button", { name: /Poslat dodavateli e-mailem/ }).click();
+    const sendDlg = page.getByRole("dialog").filter({ hasText: /Poslat objednávku .* dodavateli/ });
+    await sendDlg.waitFor({ timeout: 20_000 });
+    const sendBtn = sendDlg.getByRole("button", { name: /Odeslat dodavateli/ });
+    await sendBtn.waitFor({ timeout: 30_000 });
+    await eventually(async () => expect(await sendBtn.isEnabled(), "Odeslat dodavateli povolené"), { timeout: 30_000 });
+    await sendBtn.click();
+    await eventually(async () => expect(stage(j) === "ve_vyrobe", `zakázka Ve výrobě po odeslání (${stage(j)})`), { timeout: 60_000 });
     const [po] = pos(j);
     const [o] = ops(j);
+    expect(po.status === "odeslana", `objednávka odeslaná (${po.status})`);
     expect(ops(j).length === 1 && o.kind === "kompletni_dodavka" && o.status === "probiha" && o.supplier_id === NOVAK, `krok běží u Nováka (${JSON.stringify(o)})`);
     expect(o.purchase_order_id === po.id && o.planned_end === required && o.po_mode === "existujici", `krok s objednávkou a jejím termínem (${o.planned_end})`);
-    const ev = one(`select message from job_events where job_id = ${lit(j.id)} and message like 'Předáno do výroby automaticky vystavením objednávky%' and actor_id = ${lit(ID.obchod)} limit 1`);
-    expect(ev.includes(po.number), `historie: předáno automaticky vystavením ${po.number} (${ev})`);
-    if (mobile) await expectNoOverflow(page, "výsledek vystavení 390 px");
-    await prod.scrollIntoViewIfNeeded();
-    await shot(page, S(`28-issue-auto-handoff-${mobile ? "mobile" : "desktop"}`));
-    // „Upravit plán výroby…" otevře plán (ne předání); hlavní akce zakázky už není „Předat do výroby…"
-    await page.locator('[data-testid="issue-replan"]').click();
-    await submit(page).waitFor({ timeout: 20_000 });
-    const dt = await dialogText(page);
-    expect(!/^Předat do výroby/.test(dt) && dt.includes(SUP_NAME[NOVAK]), `plán výroby s krokem u Nováka (${dt.slice(0, 200)})`);
-    await page.keyboard.press("Escape");
+    const ev = one(`select message from job_events where job_id = ${lit(j.id)} and message like 'Předáno do výroby automaticky odesláním objednávky%' and actor_id = ${lit(ID.obchod)} limit 1`);
+    expect(ev.includes(po.number), `historie: předáno automaticky odesláním ${po.number} (${ev})`);
+    expect(await dialog(page).count() === 0, "dialog předání se neotevřel");
     await openJob(page, j);
     const head = page.locator('main section[aria-label="Zakázka"]');
     expect(await head.getByRole("button", { name: "Předat do výroby…", exact: true }).count() === 0, "v hlavičce není „Předat do výroby…“");
     if (mobile) await expectNoOverflow(page, "detail zakázky 390 px");
+    await shot(page, S(`28-sent-auto-handoff-${mobile ? "mobile" : "desktop"}`));
   }, mobile ? { mobile: true } : undefined);
 }
 

@@ -549,17 +549,26 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await events(X.id)).some((e) => String(e.message).startsWith(`Objednávka ${iss.number} přiřazena ke kroku`))).toBe(true);
   }, 90_000);
 
-  it("vystavení objednávky = předání do výroby (krok s objednávkou, termín z ní); ve výrobě se další objednávka naváže na krok; zrušení → krok zpět na výběr", async () => {
+  it("odeslání objednávky = předání do výroby (vystavení jen PDF; krok s objednávkou, termín z ní); ve výrobě se další objednávka naváže na krok; zrušení → krok zpět na výběr", async () => {
     as("sales");
     const V = await newJob();
     const qv = await newQuote(V.id, novak, [40, 42]);
     const dr = await pur.draftPurchaseOrder(V.id, { supplierQuoteId: qv });
+    const statusBefore = (await job(V.id)).status;
     const iss = await pur.issuePurchaseOrder(V.id, { ...dr.draft!, requiredDate: "2026-11-25" });
     expect(iss.ok, iss.error).toBe(true);
-    expect(iss.production).toMatchObject({ moved: true, attached: true });
-    expect(iss.production?.message).toMatch(/^Předáno do výroby automaticky: Kompletní dodávka · .*Novák.* · termín 25\. 11\./);
-    expect(iss.hint).toBeUndefined();
-    expect(iss.suggestStage).toBeUndefined();
+    // vystavení: do výroby ještě ne (majitel 3. 11.: „až odeslání objednávky bude ve výrobě")
+    expect(iss.production).toBeUndefined();
+    expect(iss.hint).toMatch(/Po odeslání objednávky dodavateli se zakázka sama předá do výroby/);
+    expect((await job(V.id)).status).toBe(statusBefore);
+    expect(await ops(V.id)).toHaveLength(0);
+    // odeslání → předání do výroby
+    const mail = await pur.draftPurchaseOrderEmail(String(iss.id));
+    expect(mail.ok, mail.error).toBe(true);
+    const sentV = await pur.sendPurchaseOrder(String(iss.id), { to: mailOf("novak"), subject: mail.subject!, body: mail.body! });
+    expect(sentV.ok, sentV.error).toBe(true);
+    expect(sentV.production).toMatchObject({ moved: true, attached: true });
+    expect(sentV.production?.message).toMatch(/^Předáno do výroby automaticky: Kompletní dodávka · .*Novák.* · termín 25\. 11\./);
     expect((await job(V.id)).status).toBe("ve_vyrobe");
     expect(await pos(V.id)).toHaveLength(1);
     const [o1] = await ops(V.id);
@@ -568,9 +577,9 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
       planned_end: "2026-11-25", deadline_source: "rucne", created_by: id("sales"),
     });
     const ev = await events(V.id);
-    const handed = ev.find((e) => String(e.message).startsWith(`Předáno do výroby automaticky vystavením objednávky ${iss.number}`));
+    const handed = ev.find((e) => String(e.message).startsWith(`Předáno do výroby automaticky odesláním objednávky ${iss.number}`));
     expect(handed?.actor_id).toBe(id("sales"));
-    // odeslání ani druhé vystavení nic nezdvojí (idempotentní)
+    // opakované předání nic nezdvojí (idempotentní)
     const again = await (await import("@/lib/jobs/production-po-auto")).autoHandoffForPurchaseOrder(
       (await import("@/test/local-supabase")).localAdmin((await import("@/lib/supabase/actor-headers")).userActor({ id: id("sales") })),
       { id: id("sales"), fullName: "Petr Obchodník", margins: true, mailAll: false, via: "rucne" }, String(iss.id));
@@ -586,7 +595,11 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const d2 = await pur.draftPurchaseOrder(V.id, { supplierQuoteId: qt });
     const i2 = await pur.issuePurchaseOrder(V.id, { ...d2.draft!, items: d2.draft!.items.slice(0, 1), requiredDate: "2026-12-02" });
     expect(i2.ok, i2.error).toBe(true);
-    expect(i2.production).toMatchObject({ moved: false, attached: true });
+    expect(i2.production).toBeUndefined();
+    const m2 = await pur.draftPurchaseOrderEmail(String(i2.id));
+    const s2 = await pur.sendPurchaseOrder(String(i2.id), { to: mailOf("tepkal"), subject: m2.subject!, body: m2.body! });
+    expect(s2.ok, s2.error).toBe(true);
+    expect(s2.production).toMatchObject({ moved: false, attached: true });
     const o2 = (await ops(V.id)).find((o) => o.id === (ins.data as { id: string }).id)!;
     expect(o2).toMatchObject({ status: "ceka", supplier_id: tepkal, purchase_order_id: i2.id, po_mode: "existujici", planned_end: "2026-12-02" });
     expect(await ops(V.id)).toHaveLength(2);

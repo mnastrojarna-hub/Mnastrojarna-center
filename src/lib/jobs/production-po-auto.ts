@@ -210,7 +210,7 @@ export async function autoHandoffForPurchaseOrder(db: JobsDb, actor: HandoffActo
       po: { id: po.id, supplierId: po.supplierId, supplierName: po.supplierName, status: po.status, kinds: poKinds(ctx, po), itemIds: po.items.map((i) => i.orderItemId) },
     });
     const opOf = (id: string | null) => (id ? live.find((o) => o.id === id) ?? null : null);
-    const prefix = `Předáno do výroby automaticky vystavením objednávky ${po.number}`;
+    const prefix = `Předáno do výroby automaticky odesláním objednávky ${po.number}`;
 
     if (decision.action === "none") return NOTHING;
     if (decision.action === "link") {
@@ -243,9 +243,9 @@ export async function autoHandoffForPurchaseOrder(db: JobsDb, actor: HandoffActo
       input = {
         token: randomUUID(), kind: start ? "doplneni" : "plan", expectedStage: ctx.job.status, expectedRouteVersion: ctx.routeVersion,
         steps: [poStep(ctx, po, null, decision.kind, decision.orderItemIds, start, true)], acceptLate: true,
-        note: `Krok výroby přidán automaticky vystavením objednávky ${po.number}`,
+        note: `Krok výroby přidán automaticky odesláním objednávky ${po.number}`,
       };
-      summaryPrefix = `Krok přidán automaticky vystavením objednávky ${po.number}`;
+      summaryPrefix = `Krok přidán automaticky odesláním objednávky ${po.number}`;
     }
     const res = await productionHandoffCore(db, actor, jobId, input, { source: "automatika", ctx, summaryPrefix });
     if (!res.ok) {

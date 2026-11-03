@@ -489,7 +489,7 @@ async function storePurchaseOrderPdf(c: Ctx, po: PurchaseOrderView, replaceFileI
  * Vystaví objednávku dodavateli: číslo OV-RRRR-NNN, položky, PDF do Dokumentů zakázky,
  * do zakázky dodavatele a číslo objednávky (když chybí). Zakázka před výrobou se tím předá do výroby
  * (krok s touto objednávkou, kdo = dodavatel, termín z objednávky — majitel 2. 11.); ve výrobě se objednávka
- * naváže na krok. `opts.handoff: false` = jen vystavit (předání ručně dialogem). Provize se přepočte v DB.
+ * naváže na krok. do výroby až odesláním (`opts.handoff: true` = předat hned). Provize se přepočte v DB.
  */
 export async function issuePurchaseOrder(
   jobId: string,
@@ -632,9 +632,13 @@ export async function issuePurchaseOrder(
     }
     if (pdfError) console.error(`[purchasing] PDF objednávky ${poNumber}: ${pdfError}`);
 
-    // objednávka dodavateli = předání do výroby (ve výrobě: objednávka ke kroku); chyba vystavení nevrací
-    const production = opts.handoff === false ? null : await autoHandoffForPurchaseOrder(db, poActor(c), id);
-    const hint = production?.attached ? null : isJobStage(job.status) ? issueStageHint(job.status) : null;
+    // do výroby se zakázka předá až ODESLÁNÍM objednávky (majitel 3. 11.) — vystavení jen připraví PDF;
+    // opts.handoff === true (výslovně) předá hned (zachováno pro volající, kteří vystavují i odesílají najednou)
+    const production = opts.handoff === true ? await autoHandoffForPurchaseOrder(db, poActor(c), id) : null;
+    const awaitingSend = !production && (job.status === "objednavka" || job.status === "potvrzeno");
+    const hint = production?.attached ? null
+      : awaitingSend ? { message: "Po odeslání objednávky dodavateli se zakázka sama předá do výroby.", suggestStage: null }
+      : isJobStage(job.status) ? issueStageHint(job.status) : null;
     revalidatePurchasing(jobId);
     return {
       ok: true, id, number: poNumber, fileId,
@@ -832,8 +836,8 @@ export async function updatePurchaseOrder(
       });
       if (reset.hint) hint = [hint, reset.hint].filter(Boolean).join(" ");
     }
-    // ručně „Odeslána" / „Potvrzena" / obnovená objednávka: předání do výroby jako při vystavení (idempotentní)
-    if (to !== from && (to === "vystavena" || to === "odeslana" || to === "potvrzena")) {
+    // ručně „Odeslána" / „Potvrzena": předání do výroby jako při odeslání (idempotentní)
+    if (to !== from && (to === "odeslana" || to === "potvrzena")) {
       const prodRes = await autoHandoffForPurchaseOrder(db, poActor(c), id);
       if (prodRes.message) hint = [hint, prodRes.message].filter(Boolean).join(" ");
     }
