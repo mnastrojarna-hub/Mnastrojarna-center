@@ -93,7 +93,7 @@ function detail(over: Partial<JobDetail> = {}): JobDetail {
     aiFilled: false, source: "manual", createdAt: "2026-10-01T08:00:00Z", updatedAt: "2026-10-10T08:00:00Z", stageChangedAt: ago(5),
     note: null, tags: [], technology: null, manufacturingLocation: null, specificRequirements: null, deliveryMethod: null,
     supplierOrderNumber: null, invoiceNumber: null, deliveryNoteNumber: null, customerContact: null, customerContactEmail: null,
-    customerContactPhone: null, pricedBy: null, approvedBy: null, approvedAt: null, confirmedAt: null, productionStartedAt: null,
+    customerContactPhone: null, customerContactId: null, pricedBy: null, approvedBy: null, approvedAt: null, confirmedAt: null, productionStartedAt: null,
     shippedAt: null, invoicedAt: null, emailId: null, aiConfidence: null, acceptedQuoteId: null, margin: null, customerDetail: null,
     items: [{ id: "i1", position: 0, drawingNumber: "PR-1", revision: null, name: "Příruba", description: null, material: null, quantity: 10, unit: "ks", unitPrice: 1000, purchaseUnitPrice: null, note: null, deliveredQuantity: 4, deliveryClosed: false }],
     quotes: [], files: [], events: [],

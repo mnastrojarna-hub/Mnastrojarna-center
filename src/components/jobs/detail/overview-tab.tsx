@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  Building2, UserRound, Mail, Phone, Hash, FileDigit, Users, Factory, Truck, StickyNote, Tag, Calculator, Percent,
+  Building2, UserRound, Hash, FileDigit, Users, Factory, Truck, StickyNote, Tag, Calculator, Percent,
   ShoppingCart, ReceiptText, MessageSquareQuote, Banknote, MapPin, ClipboardList, X, Plus, Loader2,
   CalendarDays, BadgeCheck, PenLine, ExternalLink, Handshake, Lock, type LucideIcon,
 } from "lucide-react";
@@ -21,6 +21,7 @@ import { ownInvoiceFile } from "@/components/jobs/production/invoice-dialog";
 import type { JobProductionData } from "@/components/jobs/production/production-tab";
 import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
 import { TechnologyCard } from "./technology-card";
+import { JobContactPicker } from "./contact-picker";
 import { PrintButton } from "@/components/print/print-button";
 
 /** „změna · J. Novák · před 2 dny" pod klíčovým polem (M12). */
@@ -280,29 +281,9 @@ export function OverviewTab({ job, fieldStamps, production, purchasing }: {
             </Link>
           </div>
         )}
-        <JobField field="customerContact" label="Kontaktní osoba" value={job.customerContact} icon={UserRound} iconClass="text-sky-500" placeholder="Doplnit jméno" hint={!job.customerContact && cd?.contactPerson ? `Kontakt firmy: ${cd.contactPerson}` : undefined} />
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
-          <JobField
-            field="customerContactEmail" kind="email" label="E-mail" value={job.customerContactEmail} icon={Mail} iconClass="text-sky-500"
-            placeholder="Doplnit e-mail" hint={!job.customerContactEmail && cd?.email ? `Firemní: ${cd.email}` : undefined}
-            display={(v) => <span className="break-all text-sky-700 dark:text-sky-400">{v}</span>}
-          />
-          <JobField field="customerContactPhone" kind="tel" label="Telefon" value={job.customerContactPhone} icon={Phone} iconClass="text-sky-500" placeholder="Doplnit telefon" hint={!job.customerContactPhone && cd?.phone ? `Firemní: ${cd.phone}` : undefined} />
-        </div>
-        {(job.customerContactEmail || job.customerContactPhone) && (
-          <div className="flex flex-wrap gap-2 text-xs">
-            {job.customerContactEmail && (
-              <a href={`mailto:${job.customerContactEmail}`} className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 font-medium text-sky-800 hover:brightness-95 dark:bg-sky-500/15 dark:text-sky-300">
-                <Mail className="h-3 w-3" /> Napsat
-              </a>
-            )}
-            {job.customerContactPhone && (
-              <a href={`tel:${job.customerContactPhone.replace(/\s+/g, "")}`} className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-800 hover:brightness-95 dark:bg-green-500/15 dark:text-green-300">
-                <Phone className="h-3 w-3" /> Zavolat
-              </a>
-            )}
-          </div>
-        )}
+        {/* kontaktní osoba z Karty zákazníka — e-mail a telefon jdou s ní (majitel 3. 11.) */}
+        <JobContactPicker job={job} />
+        <FieldStamp stamps={fieldStamps} column="customer_contact" />
       </InfoCard>
 
       <InfoCard icon={FileDigit} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="Čísla dokladů" subtitle="Podle nich zakázku najdeš i v poště">

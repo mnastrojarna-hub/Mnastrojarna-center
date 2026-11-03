@@ -287,6 +287,8 @@ export interface Order {
   customer_contact: string | null;
   customer_contact_email: string | null;
   customer_contact_phone: string | null;
+  /** Kontaktní osoba z Karty zákazníka (20261103100000) — tři texty výše plní DB z ní. */
+  customer_contact_id?: string | null;
   inquiry_date: string | null;
   order_date: string | null;
   customer_required_date: string | null;

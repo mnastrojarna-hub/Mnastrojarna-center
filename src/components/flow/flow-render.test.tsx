@@ -79,13 +79,13 @@ function detail(over: Partial<JobDetail> = {}): JobDetail {
     ...job(),
     note: null, tags: [], technology: null, manufacturingLocation: null, specificRequirements: null, deliveryMethod: null,
     supplierOrderNumber: null, invoiceNumber: null, deliveryNoteNumber: null,
-    customerContact: null, customerContactEmail: null, customerContactPhone: null,
+    customerContact: null, customerContactEmail: null, customerContactPhone: null, customerContactId: null,
     pricedBy: null, approvedBy: null, approvedAt: null, confirmedAt: null, productionStartedAt: null, shippedAt: null, invoicedAt: null,
     emailId: null, aiConfidence: null, acceptedQuoteId: null, margin: null,
     customerDetail: {
       id: "c1", name: "Strojmetal a.s.", customerNumber: "ZK0007", supplierNumberAtCustomer: null, ico: null, dic: null,
       street: null, city: null, zip: null, country: "CZ", email: "nakup@strojmetal.cz", phone: null, contactPerson: null,
-      deliveryAddress: null, paymentTermsDays: 30,
+      deliveryAddress: null, paymentTermsDays: 30, contacts: [],
     },
     items: [{
       id: "i1", position: 0, drawingNumber: "VK-2291", revision: "B", name: "Hřídel", description: null, material: "C45",

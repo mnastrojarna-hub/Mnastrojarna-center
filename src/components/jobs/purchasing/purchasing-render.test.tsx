@@ -63,7 +63,7 @@ function job(over: Partial<JobDetail> = {}): JobDetail {
     fileCount: 0, aiFilled: false, source: "manual", createdAt: "2026-10-01T08:00:00Z", updatedAt: "2026-10-20T08:00:00Z",
     stageChangedAt: null, note: null, tags: [], technology: null, manufacturingLocation: null, specificRequirements: null,
     deliveryMethod: null, supplierOrderNumber: null, invoiceNumber: null, deliveryNoteNumber: null, customerContact: null,
-    customerContactEmail: null, customerContactPhone: null, pricedBy: null, approvedBy: null, approvedAt: null, confirmedAt: null,
+    customerContactEmail: null, customerContactPhone: null, customerContactId: null, pricedBy: null, approvedBy: null, approvedAt: null, confirmedAt: null,
     productionStartedAt: null, shippedAt: null, invoicedAt: null, emailId: null, aiConfidence: null, acceptedQuoteId: null,
     margin: null, customerDetail: null,
     items: [{ id: "i1", position: 0, drawingNumber: "VL-12", revision: null, name: "Vodicí lišta", description: null, material: "1.2379", quantity: 12, unit: "ks", unitPrice: 4000, purchaseUnitPrice: null, note: null }],

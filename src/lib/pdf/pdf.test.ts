@@ -266,6 +266,7 @@ function fixtureJob(): JobDetail {
     customerContact: "Ing. Petra Svobodová",
     customerContactEmail: "svobodova@strojmetal.cz",
     customerContactPhone: null,
+    customerContactId: null,
     pricedBy: person("u2", "Jan Dvořák"),
     approvedBy: person("u1", "Ing. Martin Novotný"),
     approvedAt: null,
@@ -293,6 +294,7 @@ function fixtureJob(): JobDetail {
       contactPerson: "Ing. Petra Svobodová",
       deliveryAddress: null,
       paymentTermsDays: 30,
+      contacts: [],
     },
     items: [
       {
