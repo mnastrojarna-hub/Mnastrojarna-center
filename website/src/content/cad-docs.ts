@@ -45,7 +45,7 @@ export const CAD_DOCS_META = {
   version: "5. vlna (listopad 2026)",
   appUrl: "/cad",
   docsUrl: "/cad/dokumentace",
-  pdfUrl: "/cad/mnastrojarna-cad-prirucka.pdf",
+  pdfUrl: "/cad/mnastrojarna-cad-prirucka.pdf", // shodné s CAD_LINKS v cad-links.ts (tady bez importu kvůli Node skriptu)
   mdUrl: "/cad/dokumentace.md",
 };
 

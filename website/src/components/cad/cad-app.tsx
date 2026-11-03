@@ -17,6 +17,7 @@ import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { CAD_LINKS } from "@/content/cad-links";
 import { SALES } from "@/content/site";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
@@ -141,6 +142,7 @@ export function CadApp() {
   /** úvodní obrazovka „Nový výkres“: po načtení souboru rovnou otevřít výkres */
   const drawAfterImport = useRef(false);
   const [appMenu, setAppMenu] = useState(false);
+  const [helpMenu, setHelpMenu] = useState(false);
   const [ctx, setCtx] = useState<{ x: number; y: number; entries: RMenuEntry[] } | null>(null);
   const [cursor, setCursor] = useState<Vec3 | null>(null);
   // sestavy
@@ -2266,7 +2268,8 @@ export function CadApp() {
       { id: "p.settings", label: "Nastavení", group: "Program", icon: "settings", kbd: "Ctrl+,", run: () => setSettingsOpen(true) },
       { id: "p.start", label: "Úvodní obrazovka", group: "Program", icon: "home", run: () => setStartOpen(true) },
       { id: "p.help", label: "Klávesové zkratky a ovládání", group: "Program", icon: "help", run: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
-      { id: "p.docs", label: "Dokumentace a návod k obsluze (web, PDF)", group: "Program", icon: "info", run: () => window.open("/cad/dokumentace", "_blank", "noopener") },
+      { id: "p.docs", label: "Dokumentace a návod k obsluze (web)", group: "Program", icon: "info", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+      { id: "p.pdf", label: "Příručka PDF – stáhnout", group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
       { id: "p.rfq", label: "Poptat výrobu (STEP + e-mail)", group: "Program", icon: "export", run: toRfq },
     );
     return out;
@@ -2346,6 +2349,39 @@ export function CadApp() {
           </span>
           <QBtn icon="measure" title="Paleta příkazů (Ctrl+K)" onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title="Nastavení (Ctrl+,)" onClick={() => setSettingsOpen(true)} />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setHelpMenu((v) => !v)}
+              title="Nápověda: dokumentace a návod k obsluze, příručka PDF, klávesové zkratky"
+              aria-label="Nápověda"
+              aria-expanded={helpMenu}
+              className={cn("flex h-7 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-white/85 hover:bg-white/10", helpMenu && "bg-white/10")}
+            >
+              <CadIcon name="help" className="h-4 w-4" />
+              <span className="hidden md:inline">Nápověda</span>
+            </button>
+            {helpMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setHelpMenu(false)} />
+                <Dropdown
+                  close={() => setHelpMenu(false)}
+                  className="left-auto right-0 z-50 w-[320px]"
+                  entries={[
+                    { divider: true, label: "Dokumentace" },
+                    { id: "docs", label: "Dokumentace a návod k obsluze (web)", icon: "info", hint: "23 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce", onClick: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+                    { id: "pdf", label: "Příručka PDF – stáhnout", icon: "drawing", hint: "kompletní příručka k tisku a offline čtení", onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
+                    { divider: true, label: "Ovládání" },
+                    { id: "help", label: "Klávesové zkratky a ovládání myší", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
+                    { id: "palette", label: "Paleta příkazů", icon: "palette", kbd: "Ctrl+K", hint: "napište název příkazu („díra“, „výkres“, „zaoblit“…)", onClick: () => setPaletteOpen(true) },
+                    { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
+                    { divider: true },
+                    { id: "web", label: "Zpět na web mnastrojarna.cz", icon: "home", onClick: () => window.location.assign("/") },
+                  ]}
+                />
+              </>
+            )}
+          </div>
           <button type="button" onClick={toRfq} className="ml-2 whitespace-nowrap rounded bg-brand px-3 py-1 text-[12px] font-semibold text-white shadow hover:bg-brand-600">
             Poptat<span className="hidden sm:inline"> výrobu</span>
           </button>
@@ -2393,7 +2429,8 @@ export function CadApp() {
                     { id: "library", label: "Knihovna normálií…", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { id: "help", label: "Klávesové zkratky a ovládání", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
-                    { id: "docs", label: "Dokumentace a návod (web, PDF)…", icon: "info", onClick: () => window.open("/cad/dokumentace", "_blank", "noopener") },
+                    { id: "docs", label: "Dokumentace a návod k obsluze (web)…", icon: "info", onClick: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+                    { id: "pdf", label: "Příručka PDF – stáhnout", icon: "drawing", onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
                   ]}
                 />
               </>
@@ -2933,7 +2970,8 @@ export function CadApp() {
               { id: "lib", label: "Knihovna normálií", desc: "103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
               { id: "palette", label: "Paleta příkazů", desc: "Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…", icon: "measure", tone: "tool", kbd: "Ctrl+K", run: () => { setStartOpen(false); setPaletteOpen(true); } },
               { id: "settings", label: "Nastavení", desc: "Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.", icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },
-              { id: "docs", label: "Dokumentace", desc: "Kompletní návod k obsluze: 23 kapitol, FAQ, příručka PDF.", icon: "info", tone: "tool", run: () => window.open("/cad/dokumentace", "_blank", "noopener") },
+              { id: "docs", label: "Dokumentace a návod", desc: "Kompletní návod k obsluze: 23 kapitol, postupy, FAQ (otevře se v nové záložce).", icon: "info", tone: "tool", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+              { id: "pdf", label: "Příručka PDF", desc: "Celá dokumentace jako PDF k tisku a offline čtení.", icon: "drawing", tone: "tool", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
             onOpenRecent={(r) => {
