@@ -434,11 +434,18 @@ await T("14 · zakázka s objednávkou z Nákupu: „Použije se vystavená obje
   await openJob(page, D);
   await openHandoffFromNext(page);
   expect((await dialogText(page)).includes(`Použije se vystavená objednávka OV-E2E14-${TAG}`), "použije se vystavená objednávka");
+  // termín kroku = požadovaný termín objednávky (majitel 2. 11.: „mám termín dohodnutý"), ne AI odhad +5 dní
+  const cap = norm(await dialog(page).locator('[data-testid="handoff-deadline-caption"]').first().innerText());
+  expect(cap.includes(`z objednávky OV-E2E14-${TAG} (požadováno)`) && !/odhad|AI/.test(cap), `termín z objednávky (${cap})`);
+  const dateVal = await dialog(page).locator('input[type="date"][aria-describedby$="-cap"]').first().inputValue();
+  const poRequired = one(`select required_date from purchase_orders where id = ${lit(PO_D)}`);
+  expect(dateVal === poRequired, `datum z objednávky (${dateVal} ≠ ${poRequired})`);
   await submit(page).click();
   // bez nové objednávky se dialog zavře rovnou (výsledek jen oznámením)
   await eventually(async () => expect(stage(D) === "ve_vyrobe", "předáno"), { timeout: 30_000 });
   expect(pos(D).length === 1, `jedna objednávka celkem (${pos(D).length})`);
   expect(ops(D)[0].purchase_order_id === PO_D, "krok navázaný na objednávku z Nákupu");
+  expect(ops(D)[0].planned_end === one(`select required_date from purchase_orders where id = ${lit(PO_D)}`), `termín kroku z objednávky (${ops(D)[0].planned_end})`);
 });
 
 // ── 15. Vrátit předání ───────────────────────────────────────
@@ -988,6 +995,59 @@ await T("27b · karta Technologie na mobilu 390 px: sbalené kroky, rozbalení p
   await card.scrollIntoViewIfNeeded();
   await shot(page, S("27b-tech-card-mobile"));
 }, { mobile: true });
+
+// 28. Vystavení objednávky v Nákupu = předání do výroby (majitel 2. 11.: „‚Předat do výroby' v případě, že jsem už
+// vystavil objednávku, je zbytečný"): krok s objednávkou, kdo = dodavatel, termín z objednávky — bez dialogu předání.
+const OVJ = job("objednávka = výroba");
+quote(OVJ, NOVAK, [4000, 4200], { lead: 21, note: "frézování", selected: true });
+const OVJM = job("objednávka = výroba mobil");
+quote(OVJM, NOVAK, [4000, 4200], { lead: 21, note: "frézování", selected: true });
+async function issueFromNakup(page, j, required) {
+  await openJob(page, j, "?tab=nakup");
+  await page.getByRole("button", { name: /^Vystavit objednávku/ }).first().click();
+  const dlg = page.getByRole("dialog").filter({ hasText: "Vystavit objednávku dodavateli" });
+  await dlg.waitFor({ timeout: 20_000 });
+  const date = dlg.getByLabel(/Požadovaný termín dodání/);
+  await date.waitFor({ timeout: 30_000 });
+  await date.fill(required);
+  await dlg.getByRole("button", { name: "Vystavit objednávku", exact: true }).click();
+  const prod = page.locator('[data-testid="issue-production"]');
+  await prod.waitFor({ timeout: 60_000 });
+  return prod;
+}
+for (const [label, j, mobile] of [["desktop", OVJ, false], ["390 px", OVJM, true]]) {
+  await T(`28 · ${label}: „Vystavit objednávku“ v Nákupu předá zakázku do výroby sama (krok s objednávkou a jejím termínem), bez dialogu „Předat do výroby“`, async (ctx) => {
+    const page = await ctx.newPage();
+    await login(page, USERS.obchod);
+    const required = isoDays(18);
+    const prod = await issueFromNakup(page, j, required);
+    const t = norm(await prod.innerText());
+    expect(/Předáno do výroby automaticky: Kompletní dodávka · .*Frézy Novák/.test(t), `výsledek vystavení (${t})`);
+    expect(await page.locator('[data-testid="issue-handoff"]').count() === 0, "žádné „Předat do výroby…“ po vystavení");
+    expect(await page.locator('[data-testid="issue-replan"]').count() === 1, "„Upravit plán výroby…“ k dispozici");
+    expect(await dialog(page).count() === 0, "dialog předání se neotevřel");
+    await eventually(async () => expect(stage(j) === "ve_vyrobe", `zakázka Ve výrobě (${stage(j)})`), { timeout: 20_000 });
+    const [po] = pos(j);
+    const [o] = ops(j);
+    expect(ops(j).length === 1 && o.kind === "kompletni_dodavka" && o.status === "probiha" && o.supplier_id === NOVAK, `krok běží u Nováka (${JSON.stringify(o)})`);
+    expect(o.purchase_order_id === po.id && o.planned_end === required && o.po_mode === "existujici", `krok s objednávkou a jejím termínem (${o.planned_end})`);
+    const ev = one(`select message from job_events where job_id = ${lit(j.id)} and message like 'Předáno do výroby automaticky vystavením objednávky%' and actor_id = ${lit(ID.obchod)} limit 1`);
+    expect(ev.includes(po.number), `historie: předáno automaticky vystavením ${po.number} (${ev})`);
+    if (mobile) await expectNoOverflow(page, "výsledek vystavení 390 px");
+    await prod.scrollIntoViewIfNeeded();
+    await shot(page, S(`28-issue-auto-handoff-${mobile ? "mobile" : "desktop"}`));
+    // „Upravit plán výroby…" otevře plán (ne předání); hlavní akce zakázky už není „Předat do výroby…"
+    await page.locator('[data-testid="issue-replan"]').click();
+    await submit(page).waitFor({ timeout: 20_000 });
+    const dt = await dialogText(page);
+    expect(!/^Předat do výroby/.test(dt) && dt.includes(SUP_NAME[NOVAK]), `plán výroby s krokem u Nováka (${dt.slice(0, 200)})`);
+    await page.keyboard.press("Escape");
+    await openJob(page, j);
+    const head = page.locator('main section[aria-label="Zakázka"]');
+    expect(await head.getByRole("button", { name: "Předat do výroby…", exact: true }).count() === 0, "v hlavičce není „Předat do výroby…“");
+    if (mobile) await expectNoOverflow(page, "detail zakázky 390 px");
+  }, mobile ? { mobile: true } : undefined);
+}
 
 const ok = summary(errors.filter((e) => !/HTTP 5\d\d .*\/_next\/|favicon/.test(e)));
 if (!process.env.KEEP) await cleanup();

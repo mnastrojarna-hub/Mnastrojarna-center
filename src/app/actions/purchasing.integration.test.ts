@@ -135,6 +135,9 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
 
   afterAll(async () => {
     if (!db) return;
+    // krok výroby, který přidalo vystavení objednávky (zakázka ze seedu je ve výrobě bez kroků)
+    await db.from("job_operations").delete().eq("job_id", JOB).gte("created_at", startedAt);
+    await db.from("production_handoffs").delete().eq("job_id", JOB).gte("created_at", startedAt);
     if (poId) await db.from("purchase_orders").delete().eq("id", poId);
     await db.from("purchase_orders").delete().eq("job_id", JOB).gte("created_at", startedAt);
     if (quoteIds.length) await db.from("supplier_quotes").delete().in("id", quoteIds);
@@ -147,7 +150,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     }
     await db.from("job_events").delete().eq("job_id", JOB).gte("created_at", startedAt);
     await db.from("emails").delete().eq("order_id", JOB).gte("created_at", startedAt);
-    await db.from("audit_log").delete().gte("created_at", startedAt).in("entity", ["purchase_orders", "supplier_quotes", "orders", "job_files", "suppliers"]);
+    await db.from("audit_log").delete().gte("created_at", startedAt).in("entity", ["purchase_orders", "supplier_quotes", "orders", "job_files", "suppliers", "job_operations", "production_handoffs"]);
     const restore: Record<string, unknown> = {};
     for (const k of ["supplier_id", "supplier_order_number", "purchase_cost", "supplier_promised_date", "owner_id", "status", "received_at", "stage_changed_at"]) {
       restore[k] = snapshot[k];
@@ -202,6 +205,10 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     expect(res.pdfError).toBeUndefined();
     expect(res.fileId).toBeTruthy();
     poId = res.id!;
+    // zakázka ve výrobě bez kroků → krok s touto objednávkou (dodavatel, termín z objednávky) přibude sám
+    expect(res.production).toMatchObject({ attached: true });
+    const { data: stepRows } = await db.from("job_operations").select("supplier_id, purchase_order_id, planned_end, status").eq("job_id", JOB).eq("purchase_order_id", poId);
+    expect(stepRows).toEqual([{ supplier_id: HRUBY, purchase_order_id: poId, planned_end: QUOTE_DELIVERY, status: "probiha" }]);
 
     const { data: po } = await db.from("purchase_orders").select("*, items:purchase_order_items(*)").eq("id", poId).single();
     expect(po).toMatchObject({ status: "vystavena", total: 24000, supplier_id: HRUBY, file_id: res.fileId, created_by: OWNER });

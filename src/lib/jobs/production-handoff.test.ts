@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   autoSendBlockers, calendarDaysBetween, canSubmitHandoff, daysText, deadlinePill, deadlineStateFor, deadlineText,
-  groupPurchaseOrders, handoffErrorCode, performerRole, productionRowText, replanRoute, routeHealth, stageMoveIntent,
+  groupPurchaseOrders, handoffErrorCode, isPurchaseOrderCaption, performerRole, productionRowText, purchaseOrderDeadline, replanRoute, routeHealth, stageMoveIntent,
   stepSummaryText, validateHandoff, workingDaysBetween,
   type DeadlineOp, type HandoffValidationContext, type HandoffValidationStep, type RouteOp,
 } from "./production-handoff";
@@ -416,5 +416,24 @@ describe("objednávky kroků a automatické odeslání", () => {
     expect(handoffErrorCode({ code: "42501" })).toBe("FORBIDDEN");
     expect(handoffErrorCode({ hint: "jiné" })).toBeNull();
     expect(handoffErrorCode(null)).toBeNull();
+  });
+});
+
+describe("termín kroku z objednávky dodavateli (purchaseOrderDeadline)", () => {
+  it("potvrzený dodavatelem má přednost, jinak požadovaný; po řádcích nejpozdější; bez data null", () => {
+    expect(purchaseOrderDeadline({ number: "OV-2026-010", requiredDate: "2026-11-20", confirmedDate: "2026-11-27" }))
+      .toEqual({ date: "2026-11-27", source: "potvrzeni_dodavatele", confirmed: true, caption: "z objednávky OV-2026-010 (potvrzeno dodavatelem)" });
+    expect(purchaseOrderDeadline({ number: "OV-2026-010", requiredDate: "2026-11-20", confirmedDate: null }))
+      .toEqual({ date: "2026-11-20", source: "rucne", confirmed: false, caption: "z objednávky OV-2026-010 (požadováno)" });
+    expect(purchaseOrderDeadline({ number: "OV-1", requiredDate: "2026-11-20", lineDates: ["2026-11-18", null, "2026-11-25"] })?.date).toBe("2026-11-25");
+    expect(purchaseOrderDeadline({ number: "OV-1", requiredDate: "2026-11-20", confirmedDate: "2026-11-21", lineDates: ["2026-11-25"] })?.date).toBe("2026-11-21");
+    expect(purchaseOrderDeadline({ number: "OV-1", requiredDate: null, confirmedDate: null })).toBeNull();
+    expect(purchaseOrderDeadline({ requiredDate: "nesmysl" })).toBeNull();
+    expect(purchaseOrderDeadline(null)).toBeNull();
+    // stav termínu: požadovaný u odeslané = požadováno, potvrzený = potvrzeno
+    expect(deadlineStateFor({ who: { type: "supplier", id: "s" }, deadlineSource: "rucne", purchaseOrderStatus: "odeslana" })).toBe("pozadovano");
+    expect(deadlineStateFor({ who: { type: "supplier", id: "s" }, deadlineSource: "potvrzeni_dodavatele", purchaseOrderStatus: "vystavena" })).toBe("potvrzeno");
+    expect(isPurchaseOrderCaption("z objednávky OV-1 (požadováno)")).toBe(true);
+    expect(isPurchaseOrderCaption("odhad (+5 pracovních dní) — uprav podle dohody")).toBe(false);
   });
 });

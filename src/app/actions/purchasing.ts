@@ -31,7 +31,8 @@ import {
 } from "@/lib/jobs/purchase-order-docs";
 import { lineDeviations, loadDeviationContext } from "@/lib/jobs/po-deviations-store";
 import type { PoDeviation } from "@/lib/jobs/po-deviations";
-import { nextStepAfterConfirmedHint, purchaseOrderSender } from "@/lib/jobs/production-handoff-store";
+import { nextStepAfterConfirmedHint, purchaseOrderSender, type HandoffActor } from "@/lib/jobs/production-handoff-store";
+import { autoHandoffForPurchaseOrder, resetStepsOfCancelledPurchaseOrder, type PoAutoResult } from "@/lib/jobs/production-po-auto";
 import { getAccess } from "@/lib/auth/session";
 import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
 import type {
@@ -73,6 +74,11 @@ async function begin(): Promise<Ctx | { error: string }> {
   if ("error" in access) return { error: access.error };
   const db = await createOperatorClient({ actor: userActor(access.user) });
   return { db, user: access.user };
+}
+
+/** Kdo předává do výroby po vystavení / odeslání objednávky (Nákup = obchodník / admin). */
+function poActor(c: Ctx): HandoffActor {
+  return { id: c.user.id, fullName: c.user.fullName, margins: true, mailAll: false, via: "rucne" };
 }
 
 function fail(err: unknown): { ok: false; error: string } {
@@ -481,13 +487,18 @@ async function storePurchaseOrderPdf(c: Ctx, po: PurchaseOrderView, replaceFileI
 
 /**
  * Vystaví objednávku dodavateli: číslo OV-RRRR-NNN, položky, PDF do Dokumentů zakázky,
- * do zakázky dodavatele a číslo objednávky (když chybí). Stav zakázky se NEmění —
- * vrací jen doporučení (hint / suggestStage). Provize se přepočte v DB.
+ * do zakázky dodavatele a číslo objednávky (když chybí). Zakázka před výrobou se tím předá do výroby
+ * (krok s touto objednávkou, kdo = dodavatel, termín z objednávky — majitel 2. 11.); ve výrobě se objednávka
+ * naváže na krok. `opts.handoff: false` = jen vystavit (předání ručně dialogem). Provize se přepočte v DB.
  */
 export async function issuePurchaseOrder(
   jobId: string,
   draft: PurchaseOrderDraftInput,
-): Promise<ActionResult<{ id: string; number: string; fileId: string | null; pdfError?: string; hint?: string; suggestStage?: JobStage | null }>> {
+  opts: { handoff?: boolean } = {},
+): Promise<ActionResult<{
+  id: string; number: string; fileId: string | null; pdfError?: string; hint?: string; suggestStage?: JobStage | null;
+  production?: PoAutoResult;
+}>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(JOB_NOT_FOUND);
@@ -621,12 +632,15 @@ export async function issuePurchaseOrder(
     }
     if (pdfError) console.error(`[purchasing] PDF objednávky ${poNumber}: ${pdfError}`);
 
-    const hint = isJobStage(job.status) ? issueStageHint(job.status) : null;
+    // objednávka dodavateli = předání do výroby (ve výrobě: objednávka ke kroku); chyba vystavení nevrací
+    const production = opts.handoff === false ? null : await autoHandoffForPurchaseOrder(db, poActor(c), id);
+    const hint = production?.attached ? null : isJobStage(job.status) ? issueStageHint(job.status) : null;
     revalidatePurchasing(jobId);
     return {
       ok: true, id, number: poNumber, fileId,
       ...(pdfError ? { pdfError } : {}),
       ...(hint ? { hint: hint.message, suggestStage: hint.suggestStage } : {}),
+      ...(production?.message ? { production } : {}),
     };
   } catch (err) {
     return fail(err);
@@ -809,6 +823,19 @@ export async function updatePurchaseOrder(
     if ("confirmed_date" in row && confirmed) {
       const late = await nextStepAfterConfirmedHint(db, po.jobId, id, confirmed);
       if (late) hint = [hint, late].filter(Boolean).join(" ");
+    }
+    // zrušená objednávka: její krok výroby zpět na „Vybrat, kdo to dělá" (vrácení z výroby jen nabídnout)
+    if (to === "zrusena" && from !== "zrusena") {
+      const reset = await resetStepsOfCancelledPurchaseOrder(db, user.id, id).catch((e: unknown) => {
+        console.error(`[purchasing] Krok po zrušení objednávky ${po.number}: ${e instanceof Error ? e.message : String(e)}`);
+        return { hint: null };
+      });
+      if (reset.hint) hint = [hint, reset.hint].filter(Boolean).join(" ");
+    }
+    // ručně „Odeslána" / „Potvrzena" / obnovená objednávka: předání do výroby jako při vystavení (idempotentní)
+    if (to !== from && (to === "vystavena" || to === "odeslana" || to === "potvrzena")) {
+      const prodRes = await autoHandoffForPurchaseOrder(db, poActor(c), id);
+      if (prodRes.message) hint = [hint, prodRes.message].filter(Boolean).join(" ");
     }
     if (to === "dodana" && from !== "dodana") {
       const eff = await applyPurchaseDelivered(db, user.id, { id, jobId: po.jobId, number: po.number }, { markItems: true });
@@ -1019,7 +1046,7 @@ export async function sendPurchaseOrder(
   id: string,
   mail: PurchaseOrderMail,
   opts: { attachmentIds?: string[]; drawingChange?: boolean } = {},
-): Promise<ActionResult<{ sent: boolean; emailId?: string; queued?: boolean }>> {
+): Promise<ActionResult<{ sent: boolean; emailId?: string; queued?: boolean; production?: PoAutoResult }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(PO_NOT_FOUND);
@@ -1051,9 +1078,14 @@ export async function sendPurchaseOrder(
       ...(opts?.drawingChange ? { eventData: { drawingChange: true } } : {}),
     });
     if (!res.ok) return fail(res.error);
+    // odeslaná objednávka = předání do výroby, pokud se nepředalo už při vystavení (idempotentní)
+    const production = change ? null : await autoHandoffForPurchaseOrder(db, poActor(c), po.id);
     revalidatePurchasing(po.jobId);
     revalidatePath("/sent");
-    return { ok: true, sent: !res.queued, ...(res.queued ? { queued: true } : {}), ...(res.emailId ? { emailId: res.emailId } : {}) };
+    return {
+      ok: true, sent: !res.queued, ...(res.queued ? { queued: true } : {}), ...(res.emailId ? { emailId: res.emailId } : {}),
+      ...(production?.message ? { production } : {}),
+    };
   } catch (err) {
     return fail(err);
   }

@@ -142,6 +142,42 @@ export function deadlineStateFor(step: {
   return "odhad";
 }
 
+// ── Termín z objednávky dodavateli (majitel 2. 11.) ─────────
+export interface PurchaseOrderDeadline {
+  date: string;
+  /** Potvrzený dodavatelem → „potvrzeni_dodavatele"; požadovaný na objednávce (zadal ho člověk) → „rucne". */
+  source: DeadlineSource;
+  confirmed: boolean;
+  caption: string;
+}
+
+/**
+ * Termín kroku, který používá objednávku dodavateli: potvrzený termín dodavatele, jinak požadovaný termín
+ * objednávky (liší-li se termíny řádků kroku, nejpozdější z nich). Bez data → null (pak AI odhad).
+ */
+export function purchaseOrderDeadline(po: {
+  number?: string | null;
+  requiredDate?: string | null;
+  confirmedDate?: string | null;
+  /** Termíny řádků objednávky, které krok dělá (jen když je objednávka má po řádcích). */
+  lineDates?: (string | null | undefined)[] | null;
+} | null | undefined): PurchaseOrderDeadline | null {
+  if (!po) return null;
+  const no = (po.number ?? "").trim();
+  const of = `z objednávky${no ? ` ${no}` : ""}`;
+  const confirmed = cleanDate(po.confirmedDate);
+  if (confirmed) return { date: confirmed, source: "potvrzeni_dodavatele", confirmed: true, caption: `${of} (potvrzeno dodavatelem)` };
+  const lines = (po.lineDates ?? []).map((d) => cleanDate(d)).filter((d): d is string => Boolean(d)).sort();
+  const required = lines.length ? lines[lines.length - 1] : cleanDate(po.requiredDate);
+  if (required) return { date: required, source: "rucne", confirmed: false, caption: `${of} (požadováno)` };
+  return null;
+}
+
+/** Popisek termínu převzatý z objednávky (v dialogu bez štítku „AI"). */
+export function isPurchaseOrderCaption(caption: string | null | undefined): boolean {
+  return /^z objednávky/.test(caption ?? "");
+}
+
 // ── Texty termínu (A.4) ─────────────────────────────────────
 export interface DeadlineOp {
   plannedEnd: string | null;

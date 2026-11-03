@@ -246,7 +246,11 @@ export interface HandoffPlanClient {
   }[];
   /** Kontext kontroly mimo dialog (ostatní kroky, otevřené objednávky, běžící krok před dialogem). */
   otherSteps: { kind: OperationKind; status: OperationStatus; orderItemIds?: string[] | null }[];
-  openPurchaseOrders: { id: string; number: string; supplierId: string | null; supplierName: string; linked: boolean }[];
+  /** Termíny objednávky (požadovaný / potvrzený dodavatelem) → termín kroku, který ji použije. */
+  openPurchaseOrders: {
+    id: string; number: string; supplierId: string | null; supplierName: string; linked: boolean;
+    requiredDate?: string | null; confirmedDate?: string | null;
+  }[];
   previousEnd: { date: string; label: string } | null;
   /** Návrhy kdo pro přidaný krok podle druhu. */
   kindSuggestions: Partial<Record<OperationKind, KindSuggestion>>;
