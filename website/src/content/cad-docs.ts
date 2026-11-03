@@ -594,8 +594,38 @@ export const CAD_DOCS: DocSection[] = [
     ],
   },
   {
+    id: "agenti",
+    title: "21. Pro AI agenty a automatizaci",
+    lead: "Vše, co jde v CADu udělat myší, jde udělat i textem. Konzole Textové příkazy, JSON formát dokumentu a JavaScript API dávají AI agentům (ChatGPT Agent, Claude, vlastní skripty) přístup ke všemu – a zpětnou vazbu jako text, bez čtení obrázku. Pro člověka se nic nemění: stejná obrazovka, stejné nabídky.",
+    blocks: [
+      { t: "h3", text: "Konzole Textové příkazy" },
+      { t: "p", text: "Nápověda → Textové příkazy, zkratka **Ctrl+Shift+K**, nebo paleta Ctrl+K → „text“. Do pole se napíší příkazy (jeden na řádek, česky i anglicky) nebo JSON, tlačítko **Provést** (Ctrl+Enter) je vykoná a protokol ukáže ✓ / ✗ s důvodem pro každý řádek plus textový **stav dokumentu**: rozměry v X/Y/Z, objem, počet ploch a hran, seznam prvků se stavem a chybami. Příkazy se připojují k otevřenému dokumentu; „smazat poslední“ vrátí poslední prvek. Paleta Ctrl+K přímo nabídne „Provést příkaz“, když do ní napíšete platný příkaz (např. „díra 8,5 skrz v 20 30“)." },
+      { t: "table", head: ["Příkaz", "Význam"], rows: [
+        ["nový díl [název] · nová sestava", "nový dokument v nové záložce"],
+        ["kvádr X Y Z [střed] [v x y z] · válec D H [osa Z] · koule D · kužel D1 D2 H · trubka D d H", "primitiva (průměry); „odebrat“, „průnik“, „nové“ = booleovský režim"],
+        ["skica XY|XZ|YZ [odsazení N]: kružnice 165; obdélník 60 40 …", "skica s entitami (obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa; „pomocná“ = konstrukční)"],
+        ["vysunout H [symetricky] [skrz] [odebrat] [úkos a] · rotovat [úhel] [osa X|Y|Z]", "tvarové prvky z poslední skici"],
+        ["díra D [hloubka H|skrz] v x y [z] [zahloubení D2 H2] [kuželové D2] [závit M8]", "bez z = na horní plochu tělesa"],
+        ["zaoblit R [hrany svislé|horní|kruhové|+Z…] · srazit C [hrany …] · skořepina T [otevřít +Z]", "výběr hran a ploch **pravidlem** – bez klikání do 3D"],
+        ["pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N · zrcadlit YZ · text \"ABC\" výška 8 hloubka 1 v x y", "pole, zrcadlení, nápis"],
+        ["stav · smazat poslední · zobraz iso", "zpětná vazba a správa"],
+        ["{ … } / [ … ]", "JSON: celý dokument .mncad, pole prvků nebo jeden prvek – všech 36 typů prvků včetně ploch, plechu, sestav"],
+      ] },
+      { t: "h3", text: "Příklad: příruba DN50 sedmi řádky" },
+      { t: "p", text: "`nový díl Příruba DN50` · `skica XY: kružnice 165` · `vysunout 18` · `trubka 88 61 30 v 0 0 18` · `díra 18 skrz v 62,5 0` · `pole kruhové 4` · `srazit 1,5`. Protokol pak vrátí rozměry 165 × 165 × 48 mm a objem – agent si ověří shodu s výkresem bez obrázku." },
+      { t: "h3", text: "JSON a JavaScript API" },
+      { t: "ul", items: [
+        "JSON dokumentu (formát .mncad) dává přístup ke **všem** typům prvků a sestavám; `id` a `name` lze vynechat, `sketchId: \"$last\"` odkazuje na poslední skicu. Vložit ho lze do konzole, přes Soubor → Otevřít nebo přetažením.",
+        "`window.mncad` pro skripty a rozšíření: `run(text)`, `getDocument()`, `setDocument(json)`, `status()`, `guide()`, `commands()`, `openConsole()` – pro Playwright, Selenium nebo Claude in Chrome.",
+        "Úplný návod se schématem (TypeScript typy přímo ze zdrojového kódu): **/cad/schema-pro-ai.md** – stačí ho dát agentovi do zadání (tlačítko „Kopírovat návod pro AI“ v konzoli). Odkaz je i v llms.txt webu.",
+        "Všechny prvky stránky mají textové popisky (title / aria-label) a historie prvků je textový seznam, takže agent, který čte stránku místo obrázku, se orientuje. Nic z toho neodesílá data mimo prohlížeč – ochrana dokumentace platí beze změny.",
+      ] },
+      { t: "note", text: "Doporučený postup pro agenta: otevřít /cad → Nápověda → Textové příkazy → vložit příkazy → Provést → přečíst protokol a stav → opravit řádky ✗ → export STEP / výkres / sdílení odkazem." },
+    ],
+  },
+  {
     id: "srovnani",
-    title: "21. Omezení a poctivé srovnání s desktopovými CADy",
+    title: "22. Omezení a poctivé srovnání s desktopovými CADy",
     lead: "Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde je, kde dnes stojíme vůči ZW3D, SolidWorks, Inventor, Fusion 360 a Onshape.",
     blocks: [
       { t: "table", head: ["Oblast", "Mnástrojárna CAD", "Desktopová špička"], rows: [
@@ -616,7 +646,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "data",
-    title: "22. Vaše data a soukromí",
+    title: "23. Vaše data a soukromí",
     blocks: [
       { t: "ul", items: [
         "Modelování, výpočty i export probíhají **ve vašem prohlížeči**; soubory se na server neodesílají. Výjimkou je tlačítko **Poptat výrobu**, které připraví e-mail – odesíláte ho sami.",
@@ -629,7 +659,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "slovnicek",
-    title: "23. Slovníček pojmů",
+    title: "24. Slovníček pojmů",
     blocks: [
       { t: "table", head: ["Pojem", "Význam"], rows: [
         ["Prvek (feature)", "jeden krok historie modelu – skica, vysunutí, díra… – s parametry, které lze kdykoli změnit."],
@@ -650,7 +680,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "verze",
-    title: "24. Historie verzí",
+    title: "25. Historie verzí",
     blocks: [
       { t: "table", head: ["Vlna", "Obsah"], rows: [
         ["1.–2. (2026)", "jádro OCCT v prohlížeči, skica s řešičem vazeb, základní prvky, výkresy PDF/DXF, sestavy, rám formy, proměnné a stavy, import/export"],
@@ -680,6 +710,7 @@ export const CAD_FAQ: { q: string; a: string }[] = [
   { q: "Co dělat, když prvek zčervená s chybou?", a: "Klikněte na prvek v historii – pod ním je česká hláška, co je špatně (např. příliš velký poloměr zaoblení, otevřený profil skici, cílová plocha za rovinou skici). Upravte parametr nebo výběr; ostatní prvky se přestaví automaticky." },
   { q: "Jak pošlu díl kolegovi nebo zákazníkovi, aby se na něj jen podíval?", a: "Tlačítko Sdílet (horní lišta) → Kopírovat odkaz, nebo rovnou WhatsApp / E-mail. Příjemce odkaz otevře v prohlížeči bez instalace – vidí snímek dílu, sestavy i výkresů, může měřit, řezat a uložit si kopii. Platnost nastavíte na 1–90 dní (výchozí 10), volitelně s heslem. Dokument je uložený jen v odkazu (část za #, kterou prohlížeč neposílá na server); velké importované modely jdou do šifrovaného úložiště nebo jako příloha .mncad/STEP." },
   { q: "Program hlásí „3D okno nelze spustit“ – co s tím?", a: "Prohlížeč neposkytl WebGL (grafickou akceleraci), kterou 3D zobrazení potřebuje. Zapněte v prohlížeči grafickou akceleraci (Chrome/Edge: Nastavení → Systém; Firefox: Výkon) a restartujte ho, nepracujte přes vzdálenou plochu či virtuální stroj, aktualizujte ovladač grafiky, případně zkuste jiný prohlížeč nebo zařízení. Zbytek programu (nabídky, soubory, 2D skica, výkresy) funguje dál; tlačítko Zkopírovat diagnostiku připraví pro podporu údaje o prostředí bez dat dokumentu." },
+  { q: "Může CAD ovládat AI agent (ChatGPT Agent, Claude) nebo skript?", a: "Ano. Nápověda → Textové příkazy (Ctrl+Shift+K): příkazy jako „kvádr 100 60 20“, „díra 8,5 skrz v 20 30“, „zaoblit 2 hrany svislé“ nebo rovnou JSON dokumentu; protokol vrátí ✓/✗ s důvodem a textový stav dokumentu (rozměry, objem, prvky), takže agent nepotřebuje číst obrázek. Pro skripty je k dispozici window.mncad (run, getDocument, setDocument, status). Návod a úplné schéma: /cad/schema-pro-ai.md. Pro člověka se nic nemění." },
 ];
 
 /** Hlavní rysy pro strukturovaná data (SoftwareApplication.featureList). */
@@ -695,6 +726,7 @@ export const CAD_FEATURES = [
   "Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení",
   "Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání",
   "Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic",
+  "Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba",
 ];
 
 /** Rychlý start jako HowTo pro strukturovaná data. */

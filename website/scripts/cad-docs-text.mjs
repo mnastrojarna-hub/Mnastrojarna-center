@@ -1,6 +1,6 @@
 // Textová verze dokumentace CADu pro vyhledávače a AI: public/cad/dokumentace.md + public/llms.txt
 // Spuštění: node --experimental-strip-types scripts/cad-docs-text.mjs
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const mod = await import(new URL("../src/content/cad-docs.ts", import.meta.url).href);
@@ -42,6 +42,7 @@ const llms = [
   `- [Kompletní dokumentace (HTML)](${SITE}${CAD_DOCS_META.docsUrl}): ${CAD_DOCS.length} kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.`,
   `- [Dokumentace jako Markdown](${SITE}${CAD_DOCS_META.mdUrl}): stejný obsah v prostém textu pro strojové zpracování.`,
   `- [Příručka PDF](${SITE}${CAD_DOCS_META.pdfUrl}): tisková verze s obrázky.`,
+  `- [Rozhraní pro AI agenty a automatizaci](${SITE}/cad/schema-pro-ai.md): CAD lze celý ovládat textem – konzole Textové příkazy (Ctrl+Shift+K), JSON formát dokumentu se schématem, JavaScript API window.mncad; zpětná vazba jako text.`,
   "",
   "## Web",
   `- [Úvod](${SITE}/), [Pro údržbu](${SITE}/pro-udrzbu), [Služby](${SITE}/sluzby), [Zakázky](${SITE}/zakazky), [Strojový park](${SITE}/strojovy-park), [Kvalita](${SITE}/kvalita), [Kontakt](${SITE}/kontakt).`,
@@ -52,4 +53,31 @@ const llms = [
   "",
 ].join("\n");
 writeFileSync(resolve("public/llms.txt"), llms, "utf8");
+
+// Návod pro AI agenty + úplné schéma (TypeScript typy přímo ze zdrojového kódu – vždy platné)
+const guide = (await import(new URL("../src/cad/agent-guide.ts", import.meta.url).href)).AGENT_GUIDE;
+const cut = (file, from, to) => {
+  const src = readFileSync(new URL(file, import.meta.url), "utf8");
+  const a = src.indexOf(from);
+  const b = src.indexOf(to, a);
+  return a >= 0 && b > a ? src.slice(a, b).trimEnd() : "";
+};
+const schema = [
+  guide.trimEnd(),
+  "",
+  "## Úplné schéma (TypeScript typy ze zdrojového kódu)",
+  "",
+  "Dokument `.mncad` je `CadDoc`; `features` je pole `Feature`. Volitelná pole lze vynechat.",
+  "",
+  "```ts",
+  cut("../src/cad/types.ts", "export type Vec2", "export type FeatureType"),
+  "",
+  cut("../src/cad/types.ts", "export type CadDoc", "export type BodyMeta"),
+  "",
+  cut("../src/cad/refs.ts", "export type Sig", "export type ResolvedPlane"),
+  "```",
+  "",
+].join("\n");
+writeFileSync(resolve("public/cad/schema-pro-ai.md"), schema, "utf8");
+console.log(`schema-pro-ai.md: ${schema.length} znaků`);
 console.log(`dokumentace.md: ${md.join("\n").length} znaků, llms.txt: ${llms.length} znaků`);

@@ -4,9 +4,10 @@
 
 ## Mnástrojárna CAD
 - [Aplikace](https://www.mnastrojarna.cz/cad): spuštění bez instalace a registrace, česky.
-- [Kompletní dokumentace (HTML)](https://www.mnastrojarna.cz/cad/dokumentace): 24 kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.
+- [Kompletní dokumentace (HTML)](https://www.mnastrojarna.cz/cad/dokumentace): 25 kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.
 - [Dokumentace jako Markdown](https://www.mnastrojarna.cz/cad/dokumentace.md): stejný obsah v prostém textu pro strojové zpracování.
 - [Příručka PDF](https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf): tisková verze s obrázky.
+- [Rozhraní pro AI agenty a automatizaci](https://www.mnastrojarna.cz/cad/schema-pro-ai.md): CAD lze celý ovládat textem – konzole Textové příkazy (Ctrl+Shift+K), JSON formát dokumentu se schématem, JavaScript API window.mncad; zpětná vazba jako text.
 
 ## Web
 - [Úvod](https://www.mnastrojarna.cz/), [Pro údržbu](https://www.mnastrojarna.cz/pro-udrzbu), [Služby](https://www.mnastrojarna.cz/sluzby), [Zakázky](https://www.mnastrojarna.cz/zakazky), [Strojový park](https://www.mnastrojarna.cz/strojovy-park), [Kvalita](https://www.mnastrojarna.cz/kvalita), [Kontakt](https://www.mnastrojarna.cz/kontakt).
@@ -24,3 +25,4 @@
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
 - Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
 - Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic
+- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba
