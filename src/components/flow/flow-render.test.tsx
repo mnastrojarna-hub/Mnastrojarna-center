@@ -127,6 +127,8 @@ const data = {
   ),
   // Nacenění / Potvrzení čtou detaily dávkově (stejné detaily jako getJob)
   getJobsForPanels: vi.fn(async (ids: string[]) => Promise.all(ids.map((id) => data.getJob(id)))),
+  // výkresy k položkám na Nacenění (náhled u položky)
+  getJobDrawingFiles: vi.fn(async () => ({})),
   // #25: párování pošty proti všem zakázkám (Potvrzení objednávek)
   listJobOrderRefs: vi.fn(async () => [{ id: "j4", number: "Z-2026-104", customerOrderNumber: "PO-4500021877" }]),
   getJobFormOptions: vi.fn(async () => ({ users: [], customers: [{ id: "c1", name: "Strojmetal a.s.", customerNumber: "ZK0007", ico: null }], suppliers: [] })),

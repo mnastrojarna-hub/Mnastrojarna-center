@@ -7,6 +7,7 @@
  * Čistý modul (bez nativních závislostí).
  */
 
+import { companyLeaks, crossTextTermHits, discoverCompanyNames, withCompanyNames } from "./company-names";
 import { isSuspiciousLiteral, ruleLine, containsTerm, type RuleContext } from "./rules";
 
 export interface DxfResult {
@@ -22,6 +23,9 @@ export interface DxfResult {
   verified: boolean;
   problems: string[];
 }
+
+/** Začátek problému kontroly DXF: ve výstupu zůstal název firmy (service → důvod selhání). */
+export const DXF_COMPANY_LEAK = "zůstal název firmy";
 
 const NAME_CODES = new Set([2, 5, 6, 7, 8, 9, 1001, 1003, 1005]);
 function isStringCode(c: number): boolean {
@@ -107,6 +111,29 @@ export function dxfPlainText(s: string): string {
 
 function hasFormatting(s: string): boolean {
   return /\\[A-Za-z~\\{}]|%%|[{}]/.test(s);
+}
+
+/** Textové entity, jejichž hodnoty (kód 1 a pokračování 3) tvoří viditelný text výkresu. */
+const TEXT_ENTITIES = new Set(["TEXT", "MTEXT", "ATTRIB", "ATTDEF", "DIMENSION", "MULTILEADER", "MLEADER", "RTEXT", "ARCALIGNEDTEXT", "TOLERANCE"]);
+
+/**
+ * Viditelné texty v pořadí souboru (ENTITIES a BLOCKS): index páru a prostý text — pro název firmy
+ * rozdělený do více entit (prostrkaná písmena, „STROJ" + „METAL", MTEXT po kusech).
+ */
+function visibleTextUnits(pairs: readonly Pair[], decode: (s: string) => string): { at: number; text: string }[] {
+  const out: { at: number; text: string }[] = [];
+  let sec = "";
+  let ent = "";
+  for (let i = 0; i < pairs.length; i++) {
+    const p = pairs[i];
+    if (p.drop) continue;
+    if (p.code === 0) { ent = p.raw.trim(); continue; }
+    if (p.code === 2 && ent === "SECTION") { sec = p.raw.trim(); continue; }
+    if ((sec !== "ENTITIES" && sec !== "BLOCKS") || !TEXT_ENTITIES.has(ent) || (p.code !== 1 && p.code !== 3)) continue;
+    const text = dxfPlainText(decode(p.raw));
+    if (text.trim()) out.push({ at: i, text });
+  }
+  return out;
 }
 
 export function parseDxfPairs(text: string): { pairs: Pair[]; eol: string } | null {
@@ -199,7 +226,8 @@ export function binaryDxfToAscii(bytes: Uint8Array): Uint8Array | null {
   return fromLatin1(out.join("\r\n") + "\r\n");
 }
 
-export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
+export function anonymizeDxf(bytesIn: Uint8Array, ctxIn: RuleContext): DxfResult {
+  let ctx = ctxIn;
   const res: DxfResult = { ok: false, bytes: null, redacted: 0, removedImages: 0, warnings: [], texts: [], verified: false, problems: [] };
   let bytes = bytesIn;
   const head = toLatin1(bytes.subarray(0, 32));
@@ -228,6 +256,19 @@ export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
   }
   const verNum = Number(acadver.replace(/^AC/, "")) || 0;
   const codec = verNum >= 1021 ? utf8Codec() : singleByteCodec(CODEPAGES[codepage] ?? "windows-1252");
+
+  // názvy firem přímo z výkresu (razítko s jinou firmou než zákazník z CRM, doložka) → termíny pro celý soubor
+  // (holé jméno v jiné entitě, název hladiny / bloku) a pro výstupní kontrolu
+  {
+    const texts: { text: string; zone: "title_block" }[] = [];
+    for (const p of pairs) {
+      if (!isStringCode(p.code) || NAME_CODES.has(p.code) || p.code === 999) continue;
+      const t = dxfPlainText(codec.decode(p.raw));
+      if (t.trim() && t.length <= 400) texts.push({ text: t, zone: "title_block" });
+      if (texts.length >= 20_000) break;
+    }
+    ctx = withCompanyNames(ctx, discoverCompanyNames(texts, ctx));
+  }
 
   // názvy (hladiny, bloky, styly…) s údajem o firmě → jednotné přejmenování všude, kde se na ně odkazuje
   // (DXF odkazuje názvem, ne id) — „RAZITKO_STROJMETAL" → „RAZITKO"; kolize → „_2"
@@ -373,6 +414,29 @@ export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
     p.raw = enc ?? "";
   }
 
+  // název firmy rozdělený do více textů (prostrkaná písmena jako samostatné entity, dvě buňky, kusy MTEXT)
+  {
+    const units = visibleTextUnits(pairs, codec.decode);
+    const byUnit = new Map<number, [number, number][]>();
+    for (const h of crossTextTermHits(units.map((u) => u.text), ctx.terms)) byUnit.set(h.index, [...(byUnit.get(h.index) ?? []), [h.start, h.end]]);
+    for (const [idx, ranges] of byUnit) {
+      const u = units[idx];
+      const p = pairs[u.at];
+      const plain = codec.decode(p.raw);
+      for (const [a, b] of ranges) res.texts.push({ category: "company", text: u.text.slice(a, b) });
+      res.redacted++;
+      if (hasFormatting(plain) || plain !== u.text) { p.raw = ""; continue; }
+      let kept = "";
+      let last = 0;
+      for (const [a, b] of [...ranges].sort((x, y) => x[0] - y[0])) {
+        if (a > last) kept += u.text.slice(last, a);
+        last = Math.max(last, b);
+      }
+      kept += u.text.slice(last);
+      p.raw = codec.encode(kept.replace(/\s{2,}/g, " ").trim()) ?? "";
+    }
+  }
+
   const out = serialize(pairs, eol);
   res.bytes = fromLatin1(out);
 
@@ -395,13 +459,17 @@ export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
         if (FORBIDDEN_DXF.has(sec)) res.problems.push(`zůstal náhled výkresu (${sec})`);
       }
       if (RENAME_CODES.has(p.code) && containsTerm(codec.decode(p.raw.trim()), ctx.terms) && !/\s{2,}|\\P|[{}]/.test(codec.decode(p.raw))) {
-        res.problems.push(`zůstal název s údajem o firmě (${sec || "?"})`);
+        res.problems.push(`${DXF_COMPANY_LEAK} v názvu hladiny / bloku (${sec || "?"})`);
         break;
       }
       if (!isStringCode(p.code) || NAME_CODES.has(p.code)) continue;
       const t = dxfPlainText(codec.decode(p.raw));
       if (!t.trim()) continue;
-      if (containsTerm(t, ctx.terms) || ruleLine(t, "title_block", ctx).hits.length) {
+      if (containsTerm(t, ctx.terms) || companyLeaks(t, "title_block", ctx).length) {
+        res.problems.push(`${DXF_COMPANY_LEAK} (${sec || "?"})`);
+        break;
+      }
+      if (ruleLine(t, "title_block", ctx).hits.length) {
         res.problems.push(`zbyl citlivý text (${sec || "?"})`);
         break;
       }
@@ -409,6 +477,7 @@ export function anonymizeDxf(bytesIn: Uint8Array, ctx: RuleContext): DxfResult {
         res.warnings.push({ code: "step_suspicious", message: "V DXF zůstal text s právní formou, e-mailem nebo doménou (není to známý zákazník)." });
       }
     }
+    if (crossTextTermHits(visibleTextUnits(again.pairs, codec.decode).map((u) => u.text), ctx.terms).length) res.problems.push(`${DXF_COMPANY_LEAK} (rozdělený do více textů)`);
   }
   if (binaryLeft) res.warnings.push({ code: "dxf_graphics", message: "DXF obsahuje binární data (proxy grafika, XDATA)." });
   res.verified = res.problems.length === 0;

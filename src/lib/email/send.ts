@@ -303,6 +303,8 @@ export interface SendMailInput {
   /** Vazby záznamu v odeslané poště. */
   customerId?: string | null;
   supplierId?: string | null;
+  /** Objednávka dodavateli, ke které e-mail patří (emails.purchase_order_id). */
+  purchaseOrderId?: string | null;
   /**
    * Grafický podpis uživatele `userId` pro schránku, ze které zpráva odchází (Pošta → Nastavení pošty):
    * „inline" = podpis už je v textu (okno psaní, dialog dokladu) → převést na grafický s logem,
@@ -394,6 +396,56 @@ async function storeAttachments(emailId: string, attachments: OutgoingAttachment
       // jedna příloha nesmí shodit ostatní
     }
   }
+}
+
+/** Vazby záznamu odeslané pošty, bez kterých jde záznam uložit i tak (cizí klíče, kategorie). */
+const SENT_LINK_COLUMNS = ["order_id", "customer_id", "supplier_id", "purchase_order_id"] as const;
+
+/**
+ * Zápis odeslaného e-mailu do `emails` (Pošta → Odeslané). E-mail už odešel, takže záznam musí vzniknout:
+ *  1) celý řádek,
+ *  2) stejná zpráva už uložená (stažení složky Odeslané ji uložilo dřív — stejná schránka + Message-ID)
+ *     → doplnit k ní odesílatele a vazby,
+ *  3) jiná chyba (např. smazaná zakázka / dodavatel mezitím) → znovu bez vazeb, kategorie podle předmětu.
+ * Každé selhání jde do logu (dřív se tiše zahodilo a odeslaný e-mail v Odeslaných chyběl). Vrací id záznamu.
+ */
+export async function recordSentMail(row: Record<string, unknown>): Promise<string | undefined> {
+  let db: ReturnType<typeof createAdminClient>;
+  try {
+    db = createAdminClient();
+  } catch (err) {
+    console.error(`[mail:send] Odeslaný e-mail se nezapsal do Odeslaných (klient DB): ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  }
+  const insert = async (r: Record<string, unknown>) => {
+    try {
+      const { data, error } = await db.from("emails").insert(r as never).select("id").maybeSingle();
+      return { id: (data as { id: string } | null)?.id, error: error ? { code: error.code, message: error.message } : null };
+    } catch (err) {
+      return { id: undefined, error: { code: undefined as string | undefined, message: err instanceof Error ? err.message : String(err) } };
+    }
+  };
+  const subject = String(row.subject ?? "");
+  const first = await insert(row);
+  if (first.id) return first.id;
+  if (first.error?.code === "23505" && row.message_id) {
+    // stejná zpráva už je uložená (kopie ze složky Odeslané) → přisvojit: odesílatel a vazby z aplikace
+    const patch: Record<string, unknown> = { direction: "out", is_read: true, category: row.category };
+    for (const k of ["owner_id", "body_html", "bcc_email", ...SENT_LINK_COLUMNS] as const) if (row[k] !== null && row[k] !== undefined) patch[k] = row[k];
+    let q = db.from("emails").update(patch as never).eq("message_id", String(row.message_id));
+    q = row.mailbox_id ? q.eq("mailbox_id", String(row.mailbox_id)) : q.is("mailbox_id", null);
+    const { data, error } = await q.select("id");
+    const id = ((data ?? []) as { id: string }[])[0]?.id;
+    if (id) return id;
+    if (error) console.error(`[mail:send] Odeslaný e-mail „${subject}" — existující záznam se nepodařilo doplnit: ${error.message}`);
+  }
+  console.error(`[mail:send] Odeslaný e-mail „${subject}" se nezapsal do Odeslaných (${first.error?.code ?? "?"}: ${first.error?.message ?? "bez id"}) — zkouším bez vazeb.`);
+  const bare: Record<string, unknown> = { ...row, category: outgoingCategory({ subject }) };
+  for (const k of SENT_LINK_COLUMNS) delete bare[k];
+  const second = await insert(bare);
+  if (second.id) return second.id;
+  console.error(`[mail:send] Odeslaný e-mail „${subject}" se do Odeslaných nezapsal ani bez vazeb: ${second.error?.code ?? "?"}: ${second.error?.message ?? "bez id"}`);
+  return undefined;
 }
 
 export async function sendMail(input: SendMailInput): Promise<SendResult> {
@@ -506,60 +558,65 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
     }
   }
 
+  // Odeslaná pošta (emails, direction out) — zapsat HNED po odeslání, ještě před kopií na server:
+  // stažení složky Odeslané (synchronizace / živá pošta) by jinak mohlo kopii uložit dřív a záznam
+  // aplikace (zakázka, odesílatel, dodavatel) by narazil na stejné Message-ID. Selhání neshodí
+  // odeslání (e-mail už odešel), ale zapíše se do logu a zkusí se znovu bez vazeb — viz recordSentMail.
+  const appendPlanned = Boolean(s.box && input.appendToSent !== false);
+  let emailId: string | undefined;
+  if (input.log !== false && isSupabaseConfigured() && hasServiceKey()) {
+    emailId = await recordSentMail({
+      mailbox_id: s.mailboxId ?? null,
+      direction: "out",
+      message_id: s.graph ? null : messageId,
+      in_reply_to: inReplyTo ?? null,
+      message_refs: references.length ? references : null,
+      from_name: name,
+      from_email: fromAddress,
+      to_email: to.join(", "),
+      cc_email: cc.length ? cc.join(", ") : null,
+      bcc_email: bcc.length ? bcc.join(", ") : null,
+      subject: input.subject,
+      body_text: text,
+      // v aplikaci logo z webu (cid: znamená jen „příloha této zprávy")
+      body_html: html ? signatureHtmlForApp(html) : null,
+      // náhled v seznamu bez podpisu (oddělovač „-- ")
+      snippet: (text.split(/\r?\n-- \r?\n/)[0] || text).replace(/\s+/g, " ").trim().slice(0, 200),
+      owner_id: input.senderId ?? s.ownerId ?? null,
+      order_id: input.jobId ?? null,
+      customer_id: input.customerId ?? null,
+      supplier_id: input.supplierId ?? null,
+      ...(input.purchaseOrderId ? { purchase_order_id: input.purchaseOrderId } : {}),
+      category: input.category ?? outgoingCategory({ subject: input.subject, jobId: input.jobId ?? null }),
+      is_read: true,
+      has_draft: false,
+      has_attachments: Boolean(input.attachments?.length),
+      // kopie na serveru se dopíše níže (po APPEND); bez schránky = globální SMTP, kopie není kam uložit
+      sent_copy: "skipped",
+      sent_copy_error: s.box ? null : "odesláno přes globální SMTP (bez schránky)",
+      received_at: new Date().toISOString(),
+    });
+    if (emailId && input.attachments?.length) await storeAttachments(emailId, input.attachments);
+  }
+
   // Kopie do složky Odeslané na serveru (IMAP APPEND) — selhání jen nahlásit
   let sentCopy: SentCopyState = "skipped";
   let sentCopyError: string | undefined = s.box ? undefined : "odesláno přes globální SMTP (bez schránky)";
-  if (s.box && input.appendToSent !== false) {
+  if (appendPlanned && s.box) {
     const r = await appendToSent(s.box, raw).catch((e: unknown) => ({ state: "failed" as const, error: e instanceof Error ? e.message : "chyba" }));
     sentCopy = r.state;
     sentCopyError = r.error;
+    if (emailId) {
+      try {
+        const { error } = await createAdminClient().from("emails")
+          .update({ sent_copy: sentCopy, sent_copy_error: sentCopyError ?? null } as never).eq("id", emailId);
+        if (error) console.error(`[mail:send] Stav kopie v Odeslaných se nepodařilo uložit: ${error.message}`);
+      } catch (err) {
+        console.error(`[mail:send] Stav kopie v Odeslaných se nepodařilo uložit: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
   } else if (input.appendToSent === false) {
     sentCopyError = undefined;
-  }
-
-  // Odeslaná pošta — best-effort (záznam nesmí shodit odeslání)
-  let emailId: string | undefined;
-  if (input.log !== false && isSupabaseConfigured() && hasServiceKey()) {
-    try {
-      const db = createAdminClient();
-      const { data } = await db
-        .from("emails")
-        .insert({
-          mailbox_id: s.mailboxId ?? null,
-          direction: "out",
-          message_id: s.graph ? null : messageId,
-          in_reply_to: inReplyTo ?? null,
-          message_refs: references.length ? references : null,
-          from_name: name,
-          from_email: fromAddress,
-          to_email: to.join(", "),
-          cc_email: cc.length ? cc.join(", ") : null,
-          bcc_email: bcc.length ? bcc.join(", ") : null,
-          subject: input.subject,
-          body_text: text,
-          // v aplikaci logo z webu (cid: znamená jen „příloha této zprávy")
-          body_html: html ? signatureHtmlForApp(html) : null,
-          // náhled v seznamu bez podpisu (oddělovač „-- ")
-          snippet: (text.split(/\r?\n-- \r?\n/)[0] || text).replace(/\s+/g, " ").trim().slice(0, 200),
-          owner_id: input.senderId ?? s.ownerId ?? null,
-          order_id: input.jobId ?? null,
-          customer_id: input.customerId ?? null,
-          supplier_id: input.supplierId ?? null,
-          category: input.category ?? outgoingCategory({ subject: input.subject, jobId: input.jobId ?? null }),
-          is_read: true,
-          has_draft: false,
-          has_attachments: Boolean(input.attachments?.length),
-          sent_copy: sentCopy,
-          sent_copy_error: sentCopyError ?? null,
-          received_at: new Date().toISOString(),
-        } as never)
-        .select("id")
-        .maybeSingle();
-      emailId = (data as { id: string } | null)?.id;
-      if (emailId && input.attachments?.length) await storeAttachments(emailId, input.attachments);
-    } catch {
-      // log odeslané pošty je best-effort
-    }
   }
   return { sent: true, messageId: s.graph ? undefined : messageId, emailId, fromAddress, sentCopy, sentCopyError };
 }

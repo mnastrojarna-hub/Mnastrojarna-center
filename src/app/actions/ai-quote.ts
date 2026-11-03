@@ -96,6 +96,8 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
     // PDF do archivu (Supabase Storage)
     let archived = false;
     let storagePath: string | null = null;
+    // PDF nabídky jde i jako příloha e-mailu zákazníkovi (a do Pošta → Odeslané)
+    let pdfBuffer: Buffer | null = null;
     try {
       const pdf = await renderQuotePdf({
         number,
@@ -113,6 +115,7 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
         })),
         note: input.coverEmail,
       });
+      pdfBuffer = Buffer.from(pdf);
       storagePath = `nabidky/${number}.pdf`;
       const up = await db.storage.from("documents").upload(storagePath, pdf, {
         contentType: "application/pdf",
@@ -153,6 +156,7 @@ export async function submitAiQuote(input: SubmitQuoteInput): Promise<SubmitQuot
         to: input.customerEmail,
         subject: `Cenová nabídka ${number} — ${COMPANY.name}`,
         text: input.coverEmail,
+        ...(pdfBuffer ? { attachments: [{ filename: `Nabidka_${number.replace(/[^\w.-]+/g, "_")}.pdf`, content: pdfBuffer, contentType: "application/pdf" }] } : {}),
         from: { ownerId: auth.user.id }, // ze schránky obchodníka, který nabídku vytvořil
         senderId: auth.user.id,
         // průvodní text napsala AI bez podpisu → podpis obchodníka s logem

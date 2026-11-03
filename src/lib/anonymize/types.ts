@@ -155,6 +155,8 @@ export interface AnonSummary {
   method?: AnonMethod;
   ms?: number;
   aiCalls?: number;
+  /** Verze detektoru, kterou kopie vznikla (starší kopie migrace vrátí do fronty). */
+  detector?: string;
 }
 
 export interface AnonPages {

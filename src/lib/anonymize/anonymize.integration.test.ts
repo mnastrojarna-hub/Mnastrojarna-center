@@ -254,7 +254,10 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     fake.resetFakeAnonCalls();
     const r2 = await run(f2.id as string);
     expect(r2.status).toBe("done");
-    expect(fake.fakeAnonCalls()).toBe(0);
+    // detekce z cache (bez volání); nové vypálení se ale vždy ověří výstupní kontrolou obrazem (anon-v2.0)
+    expect(fake.fakeAnonCalls("vector")).toBe(0);
+    expect(fake.fakeAnonCalls("company_check")).toBeGreaterThan(0);
+    const callsAfterR2 = fake.fakeAnonCalls();
     const row2 = await row(f2.id as string);
     expect((row2.anon_summary as { cachedFrom?: string }).cachedFrom).toBeUndefined();
     // stejná zakázka a termíny → kopie hotového výstupu
@@ -265,7 +268,7 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     expect((row3.anon_summary as { cachedFrom?: string }).cachedFrom).toBe(f2.id);
     expect(row3.anon_sha256).toBe(row2.anon_sha256);
     expect(row3.anon_path).not.toBe(row2.anon_path);
-    expect(fake.fakeAnonCalls()).toBe(0);
+    expect(fake.fakeAnonCalls()).toBe(callsAfterR2); // kopie dvojčete: žádné volání AI
   }, 120_000);
 
   it("fallback modelu → done s poznámkou v historii (nic ke kontrole); faktura → skipped (Není výkres); smíšené PDF → jen stránky výkresů", async () => {
@@ -595,7 +598,8 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace výkresů ↔ lokální Supabase", 
     const { data: texts } = await svc.from("drawing_anon_texts").select("region_id").eq("job_file_id", f.id as string);
     expect(new Set((texts ?? []).map((t) => String((t as { region_id: string }).region_id).split("-")[0])).size).toBe(12);
     // útrata sečtená přes dávky
-    expect((fin.anon_usage as { calls: number }).calls).toBe(2);
+    // (2 detekce + výstupní kontrola obrazem na každé z 12 stran)
+    expect((fin.anon_usage as { calls: number }).calls).toBe(14);
     const { data } = await svc.storage.from("job-files").download(String(fin.anon_path));
     const { openPdf } = await import("./pdf-node");
     const out = await openPdf(new Uint8Array(await data!.arrayBuffer()));

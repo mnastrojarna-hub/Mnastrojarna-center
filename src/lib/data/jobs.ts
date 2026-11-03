@@ -24,6 +24,7 @@ import type { FlowScope } from "@/lib/auth/flow-scope";
 import { fileLocks } from "@/lib/jobs/job-file-access";
 import { documentedQuantities, issuedNoteRefs } from "@/lib/jobs/delivery-notes-db";
 import { loadDrawingChanges } from "@/lib/data/flow-exceptions";
+import type { PricingDrawingSource } from "@/lib/jobs/pricing-drawings";
 
 /**
  * Datová vrstva Knihy zakázek — čte servisním klíčem (obchází RLS),
@@ -377,6 +378,44 @@ export async function getJobsForPanels(ids: string[]): Promise<JobDetail[]> {
   } catch (err) {
     console.error(`[data:jobs:panels] ${err instanceof Error ? err.message : String(err)}`);
     return [];
+  }
+}
+
+/**
+ * Výkresy a 3D modely zakázek pro náhled u položek na Nacenění (jeden dávkový dotaz, jen nearchivované,
+ * bez souborů zamčených pro uživatele). Id zakázek musí už projít rozsahem (getJobsForPanels).
+ */
+export async function getJobDrawingFiles(ids: string[]): Promise<Record<string, PricingDrawingSource[]>> {
+  const wanted = Array.from(new Set(ids.filter(isUuid)));
+  const out: Record<string, PricingDrawingSource[]> = {};
+  if (!wanted.length) return out;
+  const s = await session("orders");
+  if (!s) return out;
+  try {
+    type Row = { id: string; job_id: string; kind: string; filename: string | null; mime_type: string | null; order_item_id: string | null; created_at: string; issuer: string | null; origin: string | null; quote_id: string | null };
+    const rows: Row[] = [];
+    for (const part of chunkIds(wanted)) {
+      const r = await s.db.from("job_files")
+        .select("id, job_id, kind, filename, mime_type, order_item_id, created_at, issuer, origin, quote_id")
+        .in("job_id", part).in("kind", ["vykres", "model_3d"]).eq("archived", false).not("storage_path", "is", null)
+        .order("created_at", { ascending: false });
+      warn("drawings", r.error);
+      if (r.error) return out;
+      rows.push(...((r.data ?? []) as unknown as Row[]));
+    }
+    const locks = await fileLocks(s.db, rows.map((f) => ({
+      id: f.id, kind: f.kind, issuer: f.issuer, origin: f.origin, quoteId: f.quote_id, createdAt: f.created_at,
+    })), s.access);
+    for (const f of rows) {
+      if (locks.get(f.id)) continue;
+      (out[f.job_id] ??= []).push({
+        id: f.id, kind: f.kind, filename: f.filename ?? "výkres", mimeType: f.mime_type, itemId: f.order_item_id, createdAt: f.created_at,
+      });
+    }
+    return out;
+  } catch (err) {
+    console.error(`[data:jobs:drawings] ${err instanceof Error ? err.message : String(err)}`);
+    return out;
   }
 }
 
