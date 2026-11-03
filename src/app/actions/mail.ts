@@ -9,7 +9,8 @@ import { cleanMailText, itemHintsFromMail } from "@/lib/email/job-instructions";
 import { checkFeature } from "@/lib/auth/session";
 import { getVisibleEmailRow } from "@/lib/data/mail";
 import { logAudit } from "@/lib/audit";
-import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { logJobEvent } from "@/lib/jobs/events";
+import { customerOwnerOf, mailboxOwnerOf } from "@/lib/email/mail-job-people";
 import { translateDbError } from "@/lib/jobs/mapping";
 import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
 import {
@@ -204,25 +205,6 @@ export async function linkEmailToJob(emailId: string, jobId: string): Promise<{ 
   } catch (err) {
     return fail(err);
   }
-}
-
-/** Vlastník schránky e-mailu (emails.owner_id, jinak vlastník schránky) — jen aktivní účet. */
-async function mailboxOwnerOf(db: JobsDb, ownerId: string | null, mailboxId: string | null): Promise<{ id: string; role: string } | null> {
-  let id = ownerId;
-  if (!id && mailboxId) {
-    const { data } = await db.from("mailboxes").select("owner_id").eq("id", mailboxId).maybeSingle();
-    id = (data as { owner_id: string | null } | null)?.owner_id ?? null;
-  }
-  if (!id) return null;
-  const { data: p } = await db.from("profiles").select("id, role, active").eq("id", id).maybeSingle();
-  const prof = p as { id: string; role: string; active: boolean } | null;
-  return prof && prof.active !== false ? { id: prof.id, role: prof.role } : null;
-}
-
-async function customerOwnerOf(db: JobsDb, customerId: string | null): Promise<string | null> {
-  if (!customerId) return null;
-  const { data } = await db.from("customers").select("owner_id").eq("id", customerId).maybeSingle();
-  return (data as { owner_id: string | null } | null)?.owner_id ?? null;
 }
 
 /**

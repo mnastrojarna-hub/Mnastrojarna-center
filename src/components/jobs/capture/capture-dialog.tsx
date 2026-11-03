@@ -4,7 +4,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ClipboardCheck, Eye, EyeOff, LayoutGrid, Loader2,
-  Sparkles, X,
+  Paperclip, Sparkles, X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -104,12 +104,24 @@ function Steps({ step, aiSkipped, withSort, partial, className }: { step: Captur
   );
 }
 
+/** Vstup „z e-mailu": přílohy e-mailu zkopíruje a roztřídí server (stejná dávka jako focení). */
+export interface CaptureMailSource {
+  emailId: string;
+  subject?: string;
+  /** Nad kontrolou dávky (kontakt odesílatele …). */
+  reviewHeader?: React.ReactNode;
+  /** Uložená dávka (i částečně) — dokončení na straně pošty (vlákno ↔ zakázka, kontakt). */
+  onBatchSaved?: (result: BatchResult, captureId: string) => void;
+}
+
 export interface CaptureDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   jobId?: string;
   expectedKind?: CaptureDocKind;
   onSaved?: (result: CaptureResult) => void;
+  /** Přílohy e-mailu místo focení (Pošta → Založit zakázku / Přidat k zakázce). */
+  mail?: CaptureMailSource;
 }
 
 interface ExtractJob {
@@ -135,7 +147,7 @@ function batchToCaptureResult(r: BatchResult): CaptureResult {
  * víc dokladů najednou (dávka) navíc krok Roztřídění a kontrola po zakázkách.
  * Na mobilu přes celou obrazovku, na počítači velké okno.
  */
-export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved }: CaptureDialogProps) {
+export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved, mail }: CaptureDialogProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { can } = useAccess();
@@ -170,6 +182,8 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
   const reviewInFlight = React.useRef(false);
   const assignRef = React.useRef<Record<string, string>>({});
   const closingByButton = React.useRef(false);
+  const mailRef = React.useRef<CaptureMailSource | undefined>(mail);
+  mailRef.current = mail;
 
   const revokeAll = React.useCallback(() => {
     for (const p of stateRef.current.pages) if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
@@ -188,8 +202,9 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
     };
   }, [revokeAll]);
 
-  // Rozpracované focení (jen v prvním kroku, ověřené na serveru)
+  // Rozpracované focení (jen v prvním kroku, ověřené na serveru) — e-mail převezme svou dávku sám (server)
   React.useEffect(() => {
+    if (mail) return;
     const rec = readResume();
     if (!rec) return;
     let alive = true;
@@ -201,7 +216,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
     return () => {
       alive = false;
     };
-  }, []);
+  }, [mail]);
 
   React.useEffect(() => {
     if (!notice) return;
@@ -376,8 +391,11 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
       return;
     }
     dispatch({ type: "batchSaved", result: res });
-    if (res.status === "done") clearResume();
-    else writeResume({ captureId: s.batch.captureId, step: "done-partial", pages: s.batch.pages.length });
+    if (!mailRef.current) {
+      if (res.status === "done") clearResume();
+      else writeResume({ captureId: s.batch.captureId, step: "done-partial", pages: s.batch.pages.length });
+    }
+    mailRef.current?.onBatchSaved?.(res, s.batch.captureId);
     router.refresh();
     onSaved?.(batchToCaptureResult(res));
   }, [router, onSaved]);
@@ -471,14 +489,14 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
 
   async function read() {
     const refs = readyRefs(stateRef.current.pages);
-    if (!refs.length || busy.current) return;
+    if ((!refs.length && !mail) || busy.current) return;
     busy.current = true;
     setResume(null);
     dispatch({ type: "read" });
     const ctrl = new AbortController();
     abort.current = ctrl;
     try {
-      const res = await analyzeCaptureRequest({ files: refs, jobId, expectedKind }, ctrl.signal);
+      const res = await analyzeCaptureRequest({ files: refs, jobId, expectedKind, ...(mail ? { mail: { emailId: mail.emailId } } : {}) }, ctrl.signal);
       if (closed.current || ctrl.signal.aborted) return;
       if (!res.ok) {
         dispatch({ type: "failed", error: res.error, step: "pick" });
@@ -491,7 +509,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         autoAllowed.current = b.mode === "full";
         dispatch({ type: "batchAnalyzed", batch: b });
         if (b.mode === "full" && !b.skipSort) dispatch({ type: "waitExtracts", on: true });
-        writeResume({ captureId: b.captureId, step: "sort", pages: b.pages.length });
+        if (!mail) writeResume({ captureId: b.captureId, step: "sort", pages: b.pages.length });
         return;
       }
       dispatch({ type: "analyzed", model: res.model, applied: res.applied });
@@ -507,6 +525,17 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
       if (abort.current === ctrl) abort.current = null;
     }
   }
+
+  // e-mail: přílohy roztřídí server hned po otevření (časovač kvůli dvojímu efektu v React StrictMode)
+  React.useEffect(() => {
+    if (!mail) return;
+    const t = window.setTimeout(() => {
+      if (stateRef.current.step === "pick" && !stateRef.current.batch && !busy.current) void read();
+    }, 0);
+    return () => window.clearTimeout(t);
+    // jen při otevření dialogu
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function cancelReading() {
     const s = stateRef.current;
@@ -708,6 +737,17 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
     const partial = s.step === "done" && s.batchResult && s.batchResult.status !== "done";
     const pending = s.step !== "done" && (s.pages.length > 0 || s.model !== null || s.batch !== null);
     const orphans = Boolean(partial && s.batchResult?.groups.some((g) => !g.ok));
+    if (mail && !partial && (batchOpen || s.step === "reading")) {
+      // e-mail: rozpracované roztřídění zůstává (další „Založit zakázku" ho převezme bez nového čtení AI)
+      abort.current?.abort();
+      extractQueue.current = [];
+      if (isCaptureHistoryTop()) {
+        closingByButton.current = true;
+        popCaptureHistory();
+      }
+      onOpenChange(false);
+      return;
+    }
     if (batchOpen && !window.confirm(DISCARD_BATCH_CONFIRM)) return;
     if (!batchOpen && pending && s.step === "review" && !window.confirm("Zahodit doklad? Nahrané fotky se smažou a nic se neuloží.")) return;
     if (partial && !window.confirm(orphans ? CLOSE_PARTIAL_ORPHANS_CONFIRM : CLOSE_PARTIAL_CONFIRM)) return;
@@ -773,9 +813,11 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
   const target = currentTarget(state);
   const uploading = pages.some((p) => p.status === "uploading");
   const fixedNumber = model?.fixedJobId ? model.targets[0]?.number : batch?.fixedJobNumber ?? null;
-  const subtitle = jobId
-    ? `Doklad k zakázce${fixedNumber ? ` ${fixedNumber}` : ""} — AI doplní, co na něm najde.`
-    : aiHint ? "AI přečte a roztřídí doklady, najde zákazníka i zakázku — ty jen zkontroluješ." : "Vyfoť, doplň pár údajů a ulož do knihy.";
+  const subtitle = mail
+    ? `${mail.subject ? `„${mail.subject}“ — ` : ""}${jobId ? `přílohy k zakázce${fixedNumber ? ` ${fixedNumber}` : ""}` : "AI roztřídí přílohy, najde zákazníka i zakázku"} — ty jen zkontroluješ.`
+    : jobId
+      ? `Doklad k zakázce${fixedNumber ? ` ${fixedNumber}` : ""} — AI doplní, co na něm najde.`
+      : aiHint ? "AI přečte a roztřídí doklady, najde zákazníka i zakázku — ty jen zkontroluješ." : "Vyfoť, doplň pár údajů a ulož do knihy.";
 
   const localByPath = new Map(pages.filter((p) => p.ref).map((p) => [p.ref!.path, p.previewUrl]));
   const local: LocalUrls = localByPath;
@@ -832,10 +874,10 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
       >
         <div className="flex shrink-0 items-center gap-3 border-b px-3 py-2.5 sm:px-5 sm:py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-md shadow-rose-600/25">
-            <Camera className="h-5 w-5" />
+            {mail ? <Paperclip className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
           </span>
           <div className="min-w-0 flex-1">
-            <DialogTitle className="leading-tight">Vyfotit doklad</DialogTitle>
+            <DialogTitle className="leading-tight">{mail ? "Přílohy e-mailu" : "Vyfotit doklad"}</DialogTitle>
             <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
           </div>
           <Steps step={step} aiSkipped={Boolean((model && !model.aiUsed) || (batch && !batch.aiUsed))} withSort={withSort} partial={partialDone} className="hidden md:flex" />
@@ -854,6 +896,11 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         {/* tělo */}
         {(step === "pick" || step === "reading" || step === "done" || step === "sort" || (batch && (step === "review" || step === "saving"))) && (
           <div ref={bodyScroll} data-step={scrollStep} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 scrollbar-thin sm:p-5">
+            {step === "pick" && mail && (
+              <p className="mb-3 rounded-lg border border-sky-200 bg-sky-50 p-2.5 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200" data-testid="capture-mail-hint">
+                Přílohy e-mailu načte a roztřídí server sám — sem můžeš přidat další soubory, které v e-mailu chybí.
+              </p>
+            )}
             {step === "pick" && (
               <CapturePick
                 pages={pages}
@@ -898,6 +945,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
             )}
             {(step === "review" || step === "saving") && batch && state.batchReview && state.batchState && (
               <fieldset disabled={step === "saving"} className="min-w-0">
+                {mail?.reviewHeader}
                 <CaptureBatchReview
                   review={state.batchReview}
                   state={state.batchState}
@@ -946,7 +994,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
                 onEditRetry={() => dispatch({ type: "editAfterPartial" })}
                 onRetry={() => state.batchState && void applyBatch(state.batchState)}
                 onFileOnly={fileOnlyAndRetry}
-                onAnother={another}
+                onAnother={mail ? undefined : another}
                 onClose={requestClose}
                 onLink={closeForLink}
               />
@@ -1027,12 +1075,12 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
                   type="button"
                   size="lg"
                   onClick={read}
-                  disabled={!canRead(pages)}
+                  disabled={mail ? uploading : !canRead(pages)}
                   className="min-w-0 flex-1 bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/20 hover:bg-fuchsia-700 sm:flex-none"
                   data-testid="capture-read"
                 >
                   {uploading ? <Loader2 className="animate-spin" /> : aiHint ? <Sparkles /> : <ArrowRight />}
-                  <span className="truncate">{uploading ? "Nahrávám…" : aiHint ? pickLabel : "Pokračovat k vyplnění"}</span>
+                  <span className="truncate">{uploading ? "Nahrávám…" : mail ? "Roztřídit přílohy e-mailu" : aiHint ? pickLabel : "Pokračovat k vyplnění"}</span>
                 </Button>
               ) : step === "sort" ? (
                 <Button

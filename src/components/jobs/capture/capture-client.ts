@@ -169,7 +169,7 @@ async function postJson<T extends { ok: boolean; error?: string }>(
 }
 
 export function analyzeCaptureRequest(
-  input: { files: CaptureFileRef[]; jobId?: string; expectedKind?: CaptureDocKind },
+  input: { files: CaptureFileRef[]; jobId?: string; expectedKind?: CaptureDocKind; mail?: { emailId: string } },
   signal?: AbortSignal,
 ): Promise<AnalyzeCaptureResponse> {
   return postJson<AnalyzeCaptureResponse>("/api/jobs/capture/analyze", input, signal);

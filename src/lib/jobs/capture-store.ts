@@ -1,4 +1,5 @@
 import "server-only";
+import type { MailCaptureContext } from "@/lib/email/mail-capture-input";
 import type { JobsDb } from "@/lib/jobs/events";
 import type {
   AiFailure, AiUsage, BatchDocExtract, BatchDocType, BatchFile, BatchPage, BatchSort, BatchWarning, DocExtractStatus,
@@ -47,6 +48,8 @@ export interface BatchSession {
   sortSource?: "ai" | "default";
   /** Poslední ukládaný stav (skupiny a doklady) — pro přiložení neuložených dokladů. */
   lastApply?: { groups: { key: string; docIds: string[] }[]; docs: { id: string; type: BatchDocType; pageIds: string[]; title: string; excluded?: boolean }[] } | null;
+  /** Přílohy e-mailu (Pošta → zakázka): kontext e-mailu, propojení příloh po uložení. */
+  mail?: MailCaptureContext | null;
 }
 
 export type SessionStatus = "open" | "partial" | "done" | "discarded";

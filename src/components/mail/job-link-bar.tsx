@@ -45,7 +45,7 @@ export interface JobLinkChange {
  */
 export function JobLinkBar({
   threadId, jobId, jobNumber, jobTitle, linkSource, linkActor, suggestion, category = "Ostatní", direction = "in", actionsDisabled, busyAction = null,
-  onAction, choices, onChoicesDone, onChanged, onError,
+  onAction, onAssign, choices, onChoicesDone, onChanged, onError,
 }: {
   threadId: string;
   jobId?: string | null;
@@ -62,6 +62,11 @@ export function JobLinkBar({
   busyAction?: MailActionKey | null;
   /** Akce se serverovým krokem (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu, Založit zakázku). */
   onAction: (key: MailActionKey) => void;
+  /**
+   * „Přiřadit k zakázce" s vybranou zakázkou: přílohy e-mailu se roztřídí dávkou „Přidat doklad (foto)"
+   * (useMailActionRunner.assign); bez něj jen přiřazení vlákna.
+   */
+  onAssign?: (job: JobPick) => void;
   /** „Zpracovat objednávku" našla víc možných zakázek → výběr. */
   choices?: OrderChoice[] | null;
   onChoicesDone?: () => void;
@@ -125,6 +130,11 @@ export function JobLinkBar({
   };
   const pick = (j: JobPick) => {
     setPicker(false);
+    // jen přiřazení vlákna bez zakázky (změna zakázky už přiřazeného vlákna přílohy znovu netřídí)
+    if (onAssign && !jobId) {
+      onAssign(j);
+      return;
+    }
     void run("pick", () => setThreadJobAction(threadId, j.id), (r) => onChanged({
       jobId: r.jobId ?? j.id, jobNumber: r.jobNumber ?? j.number, suggestionDone: true,
       text: `Vlákno přiřazeno k ${r.jobNumber ?? j.number}${r.changes ? ` — z e-mailu zapsáno ${r.changes} změn(y)` : ""}.`,

@@ -22,6 +22,8 @@ import { extractMailChanges, pickJobForEmail } from "@/lib/ai/mail-job";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { kickInBackground } from "@/lib/anonymize/queue";
 import { guessFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
+import { detectFileKind } from "@/lib/jobs/file-kind-detect";
+import { isSignatureImage } from "@/lib/email/mail-capture-input";
 import { jobFilePath } from "@/lib/jobs/mapping";
 import type { JobsDb } from "@/lib/jobs/events";
 import { noteRfqReply } from "@/lib/rfq/reply";
@@ -1030,6 +1032,8 @@ export async function supplierInvoicesFromMail(
 // ── Přílohy → dokumenty zakázky (jednou) ────────────────────
 
 const MIN_INLINE_IMAGE = 15 * 1024;
+/** Kategorie e-mailu, jejichž přílohy jsou podklady zákazníka (výkres pojmenovaný číslem = výkres). */
+const CUSTOMER_DOC_CATEGORIES = new Set<string>(["poptavka", "objednavka", "potvrzeni_objednavky", "reklamace", "technicka_dokumentace", "k_zakazce"]);
 
 /**
  * Přílohy e-mailu do dokumentů zakázky: každá jen jednou (email_attachments.job_file_id), stejný obsah
@@ -1075,6 +1079,8 @@ export async function copyEmailAttachmentsToJob(a: MailJobActor, emailId: string
         continue;
       }
       if ((att.mime_type ?? "").startsWith("image/") && (att.size_bytes ?? 0) > 0 && (att.size_bytes ?? 0) < MIN_INLINE_IMAGE) continue;
+      // logo / obrázek z podpisu (image001.png, Outlook-…, logo…) do dokumentů zakázky nepatří
+      if (isSignatureImage(name, att.mime_type, att.size_bytes)) continue;
       if (att.size_bytes && att.size_bytes > JOB_FILE_MAX_BYTES) continue;
       const loaded = await loadEmailAttachment(att.id);
       if (!loaded.ok) continue;
@@ -1090,9 +1096,16 @@ export async function copyEmailAttachmentsToJob(a: MailJobActor, emailId: string
       }
       const key = drawingFileKey(name);
       const drawingNo = drawingNumberFromFilename(name);
-      const isDrawing = Boolean(key && (itemDrawings.has(key) || /\.(dxf|dwg|step|stp)$/i.test(name) || jobFiles.some((f) => f.kind === "vykres" && drawingFileKey(f.filename) === key)));
       const prevRev = key ? jobFiles.filter((f) => !f.archived && drawingFileKey(f.filename) === key).sort((x, y) => (y.version ?? 1) - (x.version ?? 1))[0] ?? null : null;
-      const kind = isDrawing ? (guessFileKind(name, loaded.file.contentType) === "model_3d" ? "model_3d" : "vykres") : guessFileKind(name, loaded.file.contentType);
+      // druh bez AI stejnou deterministikou jako dávka focení (CAD podle obsahu, PDF z CAD programu, číslo
+      // výkresu v názvu u podkladů zákazníka / položek zakázky); roztřídění s AI = „Založit zakázku" z pošty
+      const detected = detectFileKind({
+        filename: name, mime: loaded.file.contentType, bytes: content, size: content.length, itemDrawingKeys: itemDrawings,
+        customerDocs: issuer === "zakaznik" || (issuer !== "dodavatel" && CUSTOMER_DOC_CATEGORIES.has(mail?.category ?? "")),
+        normalize: normToken,
+      });
+      const sameDrawing = Boolean(key && jobFiles.some((f) => f.kind === "vykres" && drawingFileKey(f.filename) === key));
+      const kind = sameDrawing && (detected === "ostatni" || detected === "foto") ? "vykres" : detected;
       const path = jobFilePath(jobId, randomUUID(), name);
       const { error: upErr } = await db.storage.from("job-files").upload(path, content, { contentType: loaded.file.contentType || "application/octet-stream", upsert: false });
       if (upErr) continue;

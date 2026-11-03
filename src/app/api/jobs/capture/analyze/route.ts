@@ -20,6 +20,9 @@ export async function POST(req: Request) {
     files: body.files as CaptureFileRef[],
     jobId: typeof body.jobId === "string" ? body.jobId : null,
     expectedKind: typeof body.expectedKind === "string" ? (body.expectedKind as CaptureDocKind) : null,
+    // přílohy e-mailu (Pošta → zakázka): server je zkopíruje do dávky sám
+    mail: body.mail && typeof body.mail === "object" && typeof (body.mail as { emailId?: unknown }).emailId === "string"
+      ? { emailId: (body.mail as { emailId: string }).emailId } : null,
   }, req.signal);
   return respond(res);
 }

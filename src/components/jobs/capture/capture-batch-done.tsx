@@ -36,7 +36,8 @@ export function CaptureBatchDone({
   onRetry: () => void;
   /** U obchodního dokladu, který se neuložil: uložit ho jen jako soubor. */
   onFileOnly: (docId: string) => void;
-  onAnother: () => void;
+  /** Bez něj (přílohy e-mailu) se „Vyfotit další doklad" nenabízí. */
+  onAnother?: () => void;
   onClose: () => void;
   /** Klik na odkaz (zakázka, Dokumenty, Nákup) — dialog se zavře, navigace pokračuje. */
   onLink: () => void;
@@ -159,7 +160,7 @@ export function CaptureBatchDone({
             </Link>
           </Button>
         )}
-        {!partial && (
+        {!partial && onAnother && (
           <Button type="button" size="lg" onClick={onAnother} className="bg-rose-600 text-white hover:bg-rose-700 sm:min-w-44">
             <Camera /> Vyfotit další doklad
           </Button>
