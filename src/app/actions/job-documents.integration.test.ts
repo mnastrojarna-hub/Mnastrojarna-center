@@ -278,6 +278,44 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     expect((await d.generateJobDocument(jobId, "nabidka", { quoteId: "00000000-0000-0000-0000-000000000000" })).error).toBe("Nabídka k této zakázce nepatří.");
   }, 60_000);
 
+  it("3. 11.: kontakt pro obchod a ceny odesílatele → text nabídky technologa (draftJobDocumentEmail i draftQuoteEmail)", async () => {
+    const SENDER = "156c7996-b488-4c53-a3f5-e51dd004f4ad"; // přihlášený (mock) uživatel
+    const { data: contactRow } = await db.from("profiles").select("id, full_name, email, phone").eq("email", "vit.volny@mnastrojarna.cz").maybeSingle();
+    const contact = (contactRow as { id: string; full_name: string; email: string; phone: string | null } | null)
+      ?? await (async () => {
+        const { data } = await db.from("profiles").select("id, full_name, email, phone").eq("email", "admin@local.test").single();
+        return data as { id: string; full_name: string; email: string; phone: string | null };
+      })();
+    const { data: before } = await db.from("profiles").select("sales_contact_id").eq("id", SENDER).single();
+    const original = (before as { sales_contact_id: string | null }).sales_contact_id;
+    const { data: qf } = await db.from("job_files").select("id").eq("job_id", jobId).eq("kind", "nabidka").eq("quote_id", quoteId)
+      .eq("archived", false).order("version", { ascending: false }).limit(1).single();
+    const fileId = (qf as { id: string }).id;
+    try {
+      const plain = await d.draftJobDocumentEmail(jobId, fileId);
+      expect(plain.ok, plain.error).toBe(true);
+      expect(plain.body).not.toContain("Ohledně obchodních");
+
+      expect((await db.from("profiles").update({ sales_contact_id: contact.id }).eq("id", SENDER)).error).toBeNull();
+      for (const draft of [await d.draftJobDocumentEmail(jobId, fileId), await d.draftQuoteEmail(jobId, quoteId)]) {
+        expect(draft.ok, draft.error).toBe(true);
+        expect(draft.body).toContain("děkujeme za hezkou poptávku.\nV příloze Vám zasíláme cenovou nabídku");
+        expect(draft.body).toContain("V případě jakýchkoli výrobních, technologických dotazů nebo úprav mě neváhejte kontaktovat.");
+        expect(draft.body).toContain(`Ohledně obchodních záležitostí a cen se s Vámi rád spojí kolega pan ${contact.full_name}.`);
+        expect(draft.body).toContain(`e-mail: ${contact.email}`);
+        expect((draft.body ?? "").includes("tel. ")).toBe(Boolean(contact.phone));
+        expect(draft.body).toContain("• Platnost nabídky: do 21. 11. 2026");
+        expect(draft.body).toContain("Přeji krásný den.");
+        expect(draft.body).toContain("Petr Obchodník"); // podpis zůstává odesílatele
+      }
+      // ostatní doklady kontakt pro obchod nepoužijí
+      const conf = await d.draftJobDocumentEmail(jobId, confirmationFileId);
+      expect(conf.body).not.toContain("Ohledně obchodních");
+    } finally {
+      await db.from("profiles").update({ sales_contact_id: original }).eq("id", SENDER);
+    }
+  }, 60_000);
+
   // A2 (sk. 2): DL bez dodávky už nevzniká — jediná cesta je „Zapsat dodání a dodací list" (delivery-notes /
   // closing-flow integrační testy); dřív Doklady vystavily DL „na celou zakázku" s vlastním číslem
   it("dodací list bez dodávky: odmítnuto s návodem, číslo z řady se nespotřebuje", async () => {

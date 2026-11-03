@@ -24,7 +24,7 @@ import { UserManagement } from "./user-management";
 import { AddUserDialog } from "./add-user-dialog";
 import { AiAccessCard } from "./ai-access-card";
 import { RolePicker } from "./role-picker";
-import { QuoteApprovalToggle, QuoteApproverToggle, pendingQuotesNote } from "./user-dialogs";
+import { QuoteApprovalToggle, QuoteApproverToggle, SalesContactSelect, pendingQuotesNote, salesContactOptions } from "./user-dialogs";
 import { ProfileForm } from "@/components/account/profile-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { AuthShell } from "@/components/account/auth-shell";
@@ -58,6 +58,28 @@ function render(node: React.ReactNode): string {
 }
 
 describe("správa uživatelů — render", () => {
+  it("3. 11.: kontakt pro obchod a ceny — štítek v seznamu, volba a kandidáti", () => {
+    const list: ManagedUser[] = [
+      users[0],
+      { ...users[1], id: "u-vit", fullName: "Vít Volný" },
+      { ...users[2], id: "u-dom", fullName: "Dominik Šponer", active: true, salesContactId: "u-vit" },
+      { ...users[2], id: "u-off", fullName: "Ota Neaktivní", role: "obchodnik", active: false },
+      { ...users[2], id: "u-full", fullName: "Petr Plný", active: true, fullAccess: true },
+    ];
+    const html = render(<UserManagement users={list} mailboxes={mailboxes} currentUserId="u-admin" aiForAll={false} />);
+    expect(html.match(/data-sales-contact-chip="/g) ?? []).toHaveLength(1);
+    expect(html).toContain('data-sales-contact-chip="u-vit"');
+    expect(html).toContain("obchod a ceny: Vít Volný");
+    // kandidáti: aktivní s přístupem k cenám, bez sebe; neaktivní jen jako aktuální volba
+    expect(salesContactOptions(list, "u-dom", "u-vit").map((o) => o.id)).toEqual(["u-admin", "u-full", "u-vit"]);
+    expect(salesContactOptions(list, "u-vit", null).map((o) => o.id)).toEqual(["u-admin", "u-full"]);
+    expect(salesContactOptions(list, "u-dom", "u-off").find((o) => o.id === "u-off")?.name).toBe("Ota Neaktivní (neaktivní)");
+    const select = render(<SalesContactSelect id="sc" value="u-vit" onChange={() => undefined} options={salesContactOptions(list, "u-dom", "u-vit")} />);
+    expect(select).toContain("Kontakt pro obchod a ceny");
+    expect(select).toContain("— žádný —");
+    expect(select).toContain('data-sales-contact="u-vit"');
+    expect(render(<SalesContactSelect id="sc" value="" onChange={() => undefined} options={[]} />)).toContain('data-sales-contact="none"');
+  });
   it("seznam uživatelů s rolemi, schránkami a přepínači", () => {
     const html = render(<UserManagement users={users} mailboxes={mailboxes} currentUserId="u-admin" aiForAll={false} />);
     expect(html).toContain("Jan Šéf");

@@ -60,6 +60,8 @@ export interface Profile {
   /** Kdo a kdy naposledy změnil can_approve_quotes (píše trigger). */
   quote_approver_changed_by?: string | null;
   quote_approver_changed_at?: string | null;
+  /** „Kontakt pro obchod a ceny" — kolega, na kterého e-mail k nabídce odkáže obchod a ceny (20261103130000). */
+  sales_contact_id?: string | null;
   created_at: string;
   updated_at: string;
 }

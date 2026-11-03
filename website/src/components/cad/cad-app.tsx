@@ -17,6 +17,8 @@ import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, type EdgeLite, type FaceLite } from "@/cad/agent";
+import { AGENT_GUIDE } from "@/cad/agent-guide";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
 import { copyText } from "@/lib/clipboard";
@@ -35,6 +37,7 @@ import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { SettingsDialog } from "./settings-dialog";
+import { AgentConsole } from "./agent-console";
 import { ShareDialog } from "./share-dialog";
 import { Btn, Modal as UiModal } from "./ui";
 import { StartScreen } from "./start-screen";
@@ -158,6 +161,8 @@ export function CadApp() {
   const [glError, setGlError] = useState<RenderFailure | null>(null);
   const [glKey, setGlKey] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
+  /** konzole Textové příkazy (AI agenti, automatizace) */
+  const [agentOpen, setAgentOpen] = useState(false);
   /** dokument otevřený ze sdíleného odkazu (informační pruh nad pracovní plochou) */
   const [shared, setShared] = useState<{ tabId: string; from?: string; exp: number | null } | null>(null);
   /** sdílený odkaz chráněný heslem – dotaz na heslo */
@@ -380,6 +385,170 @@ export function CadApp() {
   };
   const openSharedRef = useRef(openShared);
   openSharedRef.current = openShared;
+  /**
+   * Textové rozhraní (AI agenti, automatizace): provede příkazy / JSON nad otevřeným dokumentem a vrátí protokol
+   * + textový stav. Prvky s pravidlem (zaoblit hrany svislé…) se vyhodnotí nad aktuálním tělesem přes jádro.
+   */
+  const runAgentText = async (text: string): Promise<string> => {
+    const prog = parseAgentText(text);
+    const log: string[] = prog.errors.map((e) => `✗ řádek ${e.line}: ${e.message}${e.text ? ` ← „${e.text}“` : ""}`);
+    let d: CadDoc = JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc;
+    let openNew = false;
+    let changed = false;
+    const SOLID = new Set(["extrude", "revolve", "box", "cylinder", "sphere", "cone", "tube", "import", "sweep", "loft", "spring", "thicken", "text", "ext"]);
+    const hasSolid = () => d.features.some((f) => SOLID.has(f.type) && !f.suppressed);
+    const lastSketch = () => [...d.features].reverse().find((f) => f.type === "sketch");
+    const lastFeature = () => d.features[d.features.length - 1];
+    const prepare = (f: Feature): Feature => {
+      const g = { ...f } as Feature & { sketchId?: string; featureId?: string; profileId?: string; mode?: string };
+      if (g.sketchId === "$last" || g.profileId === "$last") {
+        const sk = lastSketch();
+        if (!sk) throw new Error("není žádná skica – nejdřív „skica XY: …“");
+        if (g.sketchId === "$last") g.sketchId = sk.id;
+        if (g.profileId === "$last") g.profileId = sk.id;
+      }
+      if (g.featureId === "$last") {
+        const lf = lastFeature();
+        if (!lf) throw new Error("není žádný prvek, na který by se pole / zrcadlení vztahovalo");
+        g.featureId = lf.id;
+      }
+      if (g.mode === "$auto" || (g.mode === "add" && !hasSolid())) g.mode = hasSolid() ? "add" : "new";
+      if (d.features.some((x) => x.id === g.id)) g.id = uid();
+      return g as Feature;
+    };
+    const build = () => cad.build(d);
+    const topology = async () => {
+      const r = await build();
+      if (!r.metrics) throw new Error("žádné těleso – nejdřív vytvořte tvar (kvádr, vysunutí…)");
+      const faces: FaceLite[] = [];
+      for (let i = 0; i < r.metrics.faces; i++) {
+        try {
+          const info = await cad.inspect({ kind: "part" }, { kind: "face", index: i }); // zvládne i válcové / kuželové plochy
+          faces.push({ index: i, planar: info.surface === "PLANE", normal: info.normal, center: info.center, area: info.area, surface: info.surface });
+        } catch {
+          faces.push({ index: i, planar: false });
+        }
+      }
+      const edges: EdgeLite[] = [];
+      for (let i = 0; i < r.metrics.edges; i++) {
+        try {
+          const info = await cad.inspect({ kind: "part" }, { kind: "edge", index: i });
+          edges.push({ index: i, curve: info.curve ?? info.title, dir: info.dir, center: info.center ?? info.mid ?? info.point, radius: info.radius, length: info.length });
+        } catch {
+          edges.push({ index: i });
+        }
+      }
+      return { r, faces, edges, bbox: r.metrics.bbox };
+    };
+    for (const op of prog.ops) {
+      try {
+        switch (op.k) {
+          case "doc": {
+            const incoming = op.doc.features;
+            d = { ...op.doc, features: [] };
+            openNew = true;
+            changed = true;
+            for (const raw of incoming) d.features.push(prepare(raw)); // $last, režim, duplicitní id – prvek po prvku
+            log.push(`✓ dokument „${d.name}“ (${d.features.length} prvků) – otevře se v nové záložce`);
+            break;
+          }
+          case "new":
+            d = op.assembly ? emptyAssembly(op.name) : emptyDoc(op.name);
+            openNew = true;
+            changed = true;
+            log.push(`✓ ${op.assembly ? "nová sestava" : "nový díl"} „${op.name}“ – nová záložka`);
+            break;
+          case "meta":
+            d = { ...d, ...op.patch };
+            changed = true;
+            log.push(`✓ ${Object.entries(op.patch).map(([k, v]) => `${k === "name" ? "název" : k === "material" ? "materiál" : "barva"} = ${v}`).join(", ")}`);
+            break;
+          case "features":
+            for (const raw of op.features) {
+              const f = prepare(raw);
+              d.features.push(f);
+              log.push(`✓ ${f.name} (${f.type})`);
+            }
+            changed = true;
+            break;
+          case "feature": {
+            const f = prepare(op.feature);
+            if (op.fillTop) {
+              const r = await build();
+              if (!r.metrics) throw new Error("není těleso, na jehož horní plochu by se prvek umístil – zadejte i souřadnici z");
+              if (f.type === "hole") {
+                const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
+                f.position[ai] = r.metrics.bbox[1][ai];
+              } else if (f.type === "text" && f.plane.kind === "base") f.plane.offset = r.metrics.bbox[1][f.plane.name === "XY" ? 2 : f.plane.name === "XZ" ? 1 : 0];
+            }
+            d.features.push(f);
+            changed = true;
+            log.push(`✓ ${f.name} (${f.type})`);
+            break;
+          }
+          case "entities": {
+            const sk = lastSketch();
+            if (!sk || sk.type !== "sketch") throw new Error("není žádná skica – nejdřív „skica XY: …“");
+            sk.entities.push(...op.entities);
+            changed = true;
+            log.push(`✓ ${op.entities.length} ${op.entities.length === 1 ? "entita" : op.entities.length < 5 ? "entity" : "entit"} do skici „${sk.name}“`);
+            break;
+          }
+          case "select": {
+            const f = prepare(op.feature);
+            const t = await topology();
+            if (f.type === "fillet" || f.type === "chamfer") {
+              const idx = selectEdges(op.rule, t.edges, t.bbox);
+              if (!idx.length) throw new Error(`žádná hrana neodpovídá pravidlu „${op.rule.join(" ")}“ (hran celkem ${t.edges.length})`);
+              f.edges = idx;
+              log.push(`✓ ${f.name} (${f.type}) – ${idx.length} hran podle pravidla „${op.rule.join(" ")}“`);
+            } else if (f.type === "shell") {
+              const idx = selectFaces(op.rule, t.faces, t.bbox);
+              if (!idx.length) throw new Error(`žádná plocha neodpovídá pravidlu „${op.rule.join(" ")}“ (ploch celkem ${t.faces.length})`);
+              f.faces = idx;
+              log.push(`✓ ${f.name} (shell) – otevřeno ploch: ${idx.length}`);
+            } else throw new Error("pravidlo výběru podporují zaoblení, sražení a skořepina");
+            d.features.push(f);
+            changed = true;
+            break;
+          }
+          case "pop": {
+            const f = d.features.pop();
+            changed = changed || !!f;
+            log.push(f ? `✓ odstraněn prvek „${f.name}“` : "✗ není co odstranit");
+            break;
+          }
+          case "view":
+            vp.current?.setView(op.view as ViewName);
+            log.push(`✓ pohled ${op.view}`);
+            break;
+          case "status": {
+            const r = await build();
+            log.push(docStatusText(d, r));
+            break;
+          }
+        }
+      } catch (e) {
+        log.push(`✗ řádek ${op.line}: ${(e as Error).message}`);
+      }
+    }
+    if (changed) {
+      if (openNew) openDocInTab(d);
+      else commit(d);
+      setStartOpen(false);
+      track("cad_agent_run");
+    }
+    const res = await build().catch(() => null);
+    if (res) {
+      const bad = d.features.filter((f) => res.status.find((s) => s.id === f.id)?.ok === false);
+      for (const f of bad) log.push(`✗ ${f.name}: ${res.status.find((s) => s.id === f.id)?.error ?? "chyba stavby"}`);
+    }
+    log.push("", docStatusText(d, res));
+    return log.join("\n");
+  };
+  const runAgentRef = useRef(runAgentText);
+  runAgentRef.current = runAgentText;
+  const agentStatus = async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null));
   /** diagnostika prostředí pro podporu (bez dat dokumentu) do schránky */
   const copyDiagnostics = async () => {
     const ok = await copyText(collectDiagnostics({ error: glError?.error ?? null, probe: glError?.probe ?? probeWebGL(), core, lost: glError?.lost }));
@@ -487,7 +656,21 @@ export function CadApp() {
       /* ignore */
     }
     track("cad_open");
-    return () => window.removeEventListener(VAULT_EVENT, onVault);
+    // JavaScript API pro automatizaci a AI agenty (Playwright, rozšíření prohlížeče…)
+    window.mncad = {
+      version: AGENT_API_VERSION,
+      guide: () => AGENT_GUIDE,
+      commands: () => AGENT_COMMANDS.map((c) => c.cmd),
+      run: (text) => runAgentRef.current(text),
+      getDocument: () => JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc,
+      setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
+      status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null)),
+      openConsole: () => setAgentOpen(true),
+    };
+    return () => {
+      window.removeEventListener(VAULT_EVENT, onVault);
+      delete window.mncad;
+    };
   }, []);
   useEffect(() => {
     if (!loaded.current) return;
@@ -1656,6 +1839,11 @@ export function CadApp() {
       }
       const mod = e.ctrlKey || e.metaKey;
       const k = e.key.toLowerCase();
+      if (mod && e.shiftKey && k === "k") {
+        e.preventDefault();
+        setAgentOpen(true);
+        return;
+      }
       if (mod && k === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -2342,6 +2530,7 @@ export function CadApp() {
       { id: "p.docs", label: "Dokumentace a návod k obsluze (web)", group: "Program", icon: "info", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
       { id: "p.pdf", label: "Příručka PDF – stáhnout", group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
       { id: "p.share", label: "Sdílet odkazem (WhatsApp, e-mail, Teams…)", group: "Program", icon: "share", run: () => setShareOpen(true) },
+      { id: "p.agent", label: "Textové příkazy – pro AI agenty a automatizaci", group: "Program", icon: "palette", kbd: "Ctrl+Shift+K", run: () => setAgentOpen(true) },
       { id: "p.rfq", label: "Poptat výrobu (STEP + e-mail)", group: "Program", icon: "export", run: toRfq },
     );
     return out;
@@ -2472,6 +2661,7 @@ export function CadApp() {
                     { id: "palette", label: "Paleta příkazů", icon: "palette", kbd: "Ctrl+K", hint: "napište název příkazu („díra“, „výkres“, „zaoblit“…)", onClick: () => setPaletteOpen(true) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { divider: true },
+                    { id: "agent", label: "Textové příkazy – pro AI agenty i rychlé zadání", icon: "palette", kbd: "Ctrl+Shift+K", hint: "kvádr 100 60 20 · díra 8,5 skrz v 20 30 · zaoblit 2 hrany svislé · JSON dokumentu · window.mncad", onClick: () => setAgentOpen(true) },
                     { id: "diag", label: "Zkopírovat diagnostiku (bez dat dokumentu)", icon: "info", hint: "verze programu, prohlížeč, WebGL, jádro, chyba – pro e-mail podpoře", onClick: () => void copyDiagnostics() },
                     { id: "web", label: "Zpět na web mnastrojarna.cz", icon: "home", onClick: () => window.location.assign("/") },
                   ]}
@@ -3123,6 +3313,7 @@ export function CadApp() {
         )}
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
         {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
+        {agentOpen && <AgentConsole onClose={() => setAgentOpen(false)} run={(t) => runAgentRef.current(t)} getDocJson={() => JSON.stringify(histRef.current.present, null, 1)} status={agentStatus} />}
         {sharePass && (
           <UiModal
             title="Sdílený dokument je chráněný heslem"
@@ -3152,7 +3343,17 @@ export function CadApp() {
             {sharePass.error && <p className="mt-1 text-[12px] text-brand">{sharePass.error}</p>}
           </UiModal>
         )}
-        {paletteOpen && <CommandPalette commands={buildCommands()} onClose={() => setPaletteOpen(false)} />}
+        {paletteOpen && (
+          <CommandPalette
+            commands={buildCommands()}
+            onClose={() => setPaletteOpen(false)}
+            extra={(q) => {
+              if (!/^[a-zá-ž]+\s+\S/i.test(q) && !/^[[{]/.test(q)) return [];
+              const p = parseAgentText(q);
+              return p.ops.length && !p.errors.length ? [{ id: "agent-run", label: `Provést příkaz: ${q}`, group: "Textové příkazy", icon: "palette" as CadIconName, hint: "textový příkaz (Nápověda → Textové příkazy)", run: () => void runAgentRef.current(q).then((log) => flash(log.split("\n")[0] ?? "Hotovo")) }] : [];
+            }}
+          />
+        )}
         {startOpen && (
           <StartScreen
             actions={[
@@ -3167,6 +3368,7 @@ export function CadApp() {
               { id: "settings", label: "Nastavení", desc: "Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.", icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },
               { id: "docs", label: "Dokumentace a návod", desc: "Kompletní návod k obsluze: 24 kapitol, postupy, FAQ (otevře se v nové záložce).", icon: "info", tone: "tool", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
               { id: "pdf", label: "Příručka PDF", desc: "Celá dokumentace jako PDF k tisku a offline čtení.", icon: "drawing", tone: "tool", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
+              { id: "agent", label: "Textové příkazy (AI)", desc: "Díl zadaný textem nebo JSON – pro AI agenty, automatizaci i rychlé modelování.", icon: "palette", tone: "tool", kbd: "Ctrl+Shift+K", run: () => { setStartOpen(false); setAgentOpen(true); } },
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
             onOpenRecent={(r) => {

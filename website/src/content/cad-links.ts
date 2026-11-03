@@ -4,4 +4,6 @@ export const CAD_LINKS = {
   docs: "/cad/dokumentace",
   pdf: "/cad/mnastrojarna-cad-prirucka.pdf",
   md: "/cad/dokumentace.md",
+  /** návod a schéma pro AI agenty a automatizaci */
+  agent: "/cad/schema-pro-ai.md",
 } as const;

@@ -27,6 +27,8 @@ export type EntityInfo = {
   point?: Vec3;
   /** směr přímé hrany */
   dir?: Vec3;
+  /** střed přímé hrany (pro výběr hran pravidlem) */
+  mid?: Vec3;
   surface?: string;
   curve?: string;
 };
@@ -203,6 +205,7 @@ export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInf
   const info: EntityInfo = { title: `Hrana ${ref.index + 1}`, rows: [["Typ", CURV[type] ?? type], ["Délka", `${f(length)} mm`]], length, curve: type };
   if (type === "LINE") {
     info.dir = norm(sub(b, a));
+    info.mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
     info.rows.push(["Začátek", fv(a, 2)], ["Konec", fv(b, 2)], ["Směr", fv(info.dir, 4)]);
   }
   if (type === "CIRCLE") {

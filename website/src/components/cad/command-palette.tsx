@@ -38,7 +38,7 @@ export function fuzzyScore(query: string, text: string): number {
 }
 
 /** Paleta příkazů (Ctrl+K): vyhledávání všech příkazů CAD s klávesnicí. */
-export function CommandPalette({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
+export function CommandPalette({ commands, onClose, extra }: { commands: Command[]; onClose: () => void; extra?: (query: string) => Command[] }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -50,7 +50,9 @@ export function CommandPalette({ commands, onClose }: { commands: Command[]; onC
       .map((c) => ({ c, s: Math.max(fuzzyScore(q, c.label), fuzzyScore(q, `${c.group} ${c.label}`) * 0.8, c.hint ? fuzzyScore(q, c.hint) * 0.5 : 0) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s);
-    return (q ? scored : scored.sort((a, b) => a.c.group.localeCompare(b.c.group, "cs"))).slice(0, 60).map((x) => x.c);
+    const list = (q ? scored : scored.sort((a, b) => a.c.group.localeCompare(b.c.group, "cs"))).slice(0, 60).map((x) => x.c);
+    const ex = q.trim() && extra ? extra(q.trim()) : []; // např. textový příkaz „díra 8,5 skrz v 20 30“ → Provést
+    return [...ex, ...list];
   }, [commands, q]);
 
   useEffect(() => setSel(0), [q]);
