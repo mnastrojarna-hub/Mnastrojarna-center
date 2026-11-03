@@ -31,6 +31,10 @@ AddDefaultCharset utf-8
   AddType font/woff2 .woff2
   AddType text/x-component .txt
 </IfModule>
+# .txt je text/x-component kvůli RSC datům Next.js; soubory pro roboty a AI musí být text/plain
+<FilesMatch "^(robots|llms|llms-full|humans|security)\\.txt$">
+  ForceType text/plain
+</FilesMatch>
 <Files "opengraph-image">
   ForceType image/png
 </Files>

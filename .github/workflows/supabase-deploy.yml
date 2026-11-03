@@ -35,6 +35,17 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.guard.outputs.ready == 'true'
 
+      # Supabase ukládá verzi migrace (časové razítko) jako primární klíč: dvě migrace se stejným razítkem
+      # (souběžné větve) shodí nasazení chybou „duplicate key … schema_migrations_pkey“ a nic dalšího se nenasadí.
+      - name: Kontrola duplicitních verzí migrací
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          dups=$(ls supabase/migrations | grep -E '^[0-9]+_' | cut -d_ -f1 | sort | uniq -d)
+          if [ -n "$dups" ]; then
+            echo "::error::Duplicitní verze migrací: $dups — přejmenujte novější soubor na jiné časové razítko (verze je v Supabase primární klíč)."
+            exit 1
+          fi
+
       - name: Setup Supabase CLI
         if: steps.guard.outputs.ready == 'true'
         uses: supabase/setup-cli@v1

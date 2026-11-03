@@ -1,5 +1,7 @@
 "use client";
 
+import { disableEncrypted, enableEncrypted, isUnlocked, lock, notifyVault, persistMode, unlock, VAULT_EVENT, wipeStoredDocuments } from "@/cad/vault";
+import { useEffect, useState as useLocalState } from "react";
 import { useRef, useState } from "react";
 import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, exportSettings, importSettings, keyCombo, type Settings } from "@/cad/settings";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -229,7 +231,7 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
 
           {tab === "files" && (
             <>
-              <Toggle label="Automatické ukládání rozpracovaného modelu" hint="do prohlížeče, obnoví se při příštím otevření" checked={draft.autosave} onChange={(v) => set("autosave", v)} />
+              <StorageSettings />
               <Field label="Počet nedávných souborů">
                 <input type="number" min={4} max={30} value={draft.recentLimit} onChange={(e) => set("recentLimit", Number(e.target.value))} className={inputCls} />
               </Field>
@@ -285,4 +287,100 @@ function download(name: string, text: string) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Režim ukládání rozpracované práce (ochrana dokumentace / NDA) – mění se okamžitě, nezávisle na tlačítku OK. */
+function StorageSettings() {
+  const [mode, setMode] = useLocalState<"none" | "encrypted">("none");
+  const [unlocked, setUnlocked] = useLocalState(false);
+  const [pass, setPass] = useLocalState("");
+  const [pass2, setPass2] = useLocalState("");
+  const [msg, setMsg] = useLocalState<string | null>(null);
+  const refresh = () => {
+    setMode(persistMode());
+    setUnlocked(isUnlocked());
+  };
+  useEffect(() => {
+    refresh();
+    window.addEventListener(VAULT_EVENT, refresh);
+    return () => window.removeEventListener(VAULT_EVENT, refresh);
+  }, []);
+  const enable = async () => {
+    if (pass.length < 4) return setMsg("Heslo musí mít alespoň 4 znaky.");
+    if (pass !== pass2) return setMsg("Hesla se neshodují.");
+    await enableEncrypted(pass);
+    setPass("");
+    setPass2("");
+    setMsg("Šifrované úložiště je zapnuté a odemčené. Heslo si zapamatujte – bez něj data nelze obnovit.");
+    notifyVault();
+  };
+  const disable = () => {
+    if (!window.confirm("Vypnout úložiště a smazat všechny dokumenty uložené v tomto prohlížeči?")) return;
+    disableEncrypted();
+    setMsg("Úložiště vypnuto, uložené dokumenty smazány.");
+    notifyVault();
+  };
+  const tryUnlock = async () => {
+    if (await unlock(pass)) {
+      setPass("");
+      setMsg(null);
+      notifyVault();
+    } else setMsg("Nesprávné heslo.");
+  };
+  const wipe = () => {
+    if (!window.confirm("Smazat všechny dokumenty uložené v tomto prohlížeči? Nastavení zůstane.")) return;
+    wipeStoredDocuments();
+    setMsg("Uložené dokumenty byly smazány.");
+    notifyVault();
+  };
+  return (
+    <div className="space-y-3 rounded-lg border border-[#d5dbe2] bg-white p-3">
+      <p className="text-[12px] font-semibold uppercase tracking-wider text-[#6b7785]">Rozpracovaná práce v prohlížeči (ochrana dokumentace)</p>
+      <p className="text-[12px] leading-relaxed text-[#4a5664]">
+        <strong>Výchozí: neukládat.</strong> Modely a výkresy zůstávají jen v otevřené kartě a v souborech, které si sami uložíte do počítače. Po zavření karty v prohlížeči nic nezůstane – vhodné pro dokumentaci pod NDA i na sdílených počítačích.
+      </p>
+      {mode === "none" ? (
+        <div className="space-y-2">
+          <p className="text-[12px] text-[#4a5664]">Volitelně lze zapnout <strong>šifrované úložiště s heslem</strong> (AES-256): nedávné soubory, záložky a rozpracovaný model se uloží v tomto prohlížeči tak, že je bez hesla nikdo nepřečte.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Nové heslo (min. 4 znaky)" aria-label="Nové heslo" className="rounded border border-[#cfd6de] px-2 py-1.5 text-[13px] outline-none focus:border-brand" />
+            <input type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} placeholder="Heslo znovu" aria-label="Heslo znovu" className="rounded border border-[#cfd6de] px-2 py-1.5 text-[13px] outline-none focus:border-brand" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void enable()} className="rounded bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-brand-600">
+              Zapnout šifrované úložiště
+            </button>
+            <button type="button" onClick={wipe} className="rounded border border-[#cfd6de] px-3 py-1.5 text-[12.5px] hover:bg-[#f3f6f9]">
+              Vymazat vše uložené v prohlížeči
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[12px] text-[#4a5664]">
+            Šifrované úložiště je <strong>zapnuté</strong> · {unlocked ? "odemčeno pro tuto kartu" : "zamčeno"}.
+          </p>
+          {!unlocked && (
+            <div className="flex gap-2">
+              <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void tryUnlock()} placeholder="Heslo úložiště" aria-label="Heslo úložiště" className="min-w-0 flex-1 rounded border border-[#cfd6de] px-2 py-1.5 text-[13px] outline-none focus:border-brand" />
+              <button type="button" onClick={() => void tryUnlock()} className="rounded bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-brand-600">
+                Odemknout
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {unlocked && (
+              <button type="button" onClick={() => { lock(); notifyVault(); }} className="rounded border border-[#cfd6de] px-3 py-1.5 text-[12.5px] hover:bg-[#f3f6f9]">
+                Zamknout (do zavření karty)
+              </button>
+            )}
+            <button type="button" onClick={disable} className="rounded border border-brand/40 px-3 py-1.5 text-[12.5px] text-brand hover:bg-brand/5">
+              Vypnout a smazat uložené
+            </button>
+          </div>
+        </div>
+      )}
+      {msg && <p className="text-[12px] text-[#1f2933]">{msg}</p>}
+    </div>
+  );
 }

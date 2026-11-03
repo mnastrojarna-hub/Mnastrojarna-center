@@ -9,13 +9,18 @@ import type { MateFaceInfo } from "@/cad/asm-kernel";
 import { solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
 import { cad } from "@/cad/client";
 import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
-import { keyCombo, loadRecent, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
+import { isUnlocked, notifyVault, persistMode, restoreSession, VAULT_EVENT, vaultGet, vaultSet, wipeStoredDocuments } from "@/cad/vault";
+import { keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
+import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
+import { copyText } from "@/lib/clipboard";
+import { CAD_LINKS } from "@/content/cad-links";
 import { SALES } from "@/content/site";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
@@ -30,6 +35,8 @@ import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { SettingsDialog } from "./settings-dialog";
+import { ShareDialog } from "./share-dialog";
+import { Btn, Modal as UiModal } from "./ui";
 import { StartScreen } from "./start-screen";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
@@ -41,6 +48,7 @@ import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Wa
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool } from "./sketcher";
+import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
@@ -140,6 +148,20 @@ export function CadApp() {
   /** úvodní obrazovka „Nový výkres“: po načtení souboru rovnou otevřít výkres */
   const drawAfterImport = useRef(false);
   const [appMenu, setAppMenu] = useState(false);
+  const appMenuRef = useRef<HTMLDivElement>(null);
+  /** úzká obrazovka (mobil): záložky dokumentů mají vlastní řádek pod lištou a seznam v dolním listu */
+  const narrow = useNarrow();
+  const [tabMenu, setTabMenu] = useState(false);
+  const tabMenuRef = useRef<HTMLButtonElement>(null);
+  const [helpMenu, setHelpMenu] = useState(false);
+  /** selhání 3D okna (WebGL): místo pádu chybová obrazovka, zbytek programu funguje; glKey = nový pokus */
+  const [glError, setGlError] = useState<RenderFailure | null>(null);
+  const [glKey, setGlKey] = useState(0);
+  const [shareOpen, setShareOpen] = useState(false);
+  /** dokument otevřený ze sdíleného odkazu (informační pruh nad pracovní plochou) */
+  const [shared, setShared] = useState<{ tabId: string; from?: string; exp: number | null } | null>(null);
+  /** sdílený odkaz chráněný heslem – dotaz na heslo */
+  const [sharePass, setSharePass] = useState<{ parsed: ParsedShare; value: string; error?: string; busy?: boolean } | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; entries: RMenuEntry[] } | null>(null);
   const [cursor, setCursor] = useState<Vec3 | null>(null);
   // sestavy
@@ -193,7 +215,23 @@ export function CadApp() {
   };
 
   // ---------- historie ----------
-  const commit = useCallback((next: CadDoc) => setHist((h) => ({ past: [...h.past.slice(-80), h.present], present: next, future: [] })), []);
+  /** neuložené změny (v režimu „neukládat“ varuje prohlížeč před zavřením karty) */
+  const dirty = useRef(false);
+  const commit = useCallback((next: CadDoc) => {
+    dirty.current = true;
+    setHist((h) => ({ past: [...h.past.slice(-80), h.present], present: next, future: [] }));
+  }, []);
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => {
+      const d = histRef.current.present;
+      if (persistMode() === "none" && dirty.current && (d.features.length || d.components?.length)) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, []);
   const live = useCallback((next: CadDoc) => setHist((h) => ({ ...h, present: next })), []);
   const undo = () => setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
   const redo = () => setHist((h) => (h.future.length ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) } : h));
@@ -261,13 +299,14 @@ export function CadApp() {
     setTimeout(() => vp.current?.setView("iso"), 400);
   };
   /** otevře dokument: do prázdné aktivní záložky, jinak do nové záložky */
-  const openDocInTab = (d: CadDoc, opts: { docId?: string } = {}) => {
+  const openDocInTab = (d: CadDoc, opts: { docId?: string } = {}): string => {
     const kind: DocTab["kind"] = d.kind === "assembly" ? "assembly" : "part";
     const curTabs = docTabsRef.current;
     const curId = tabIdRef.current;
     const curDoc = histRef.current.present;
     const cur = curTabs.find((t) => t.id === curId);
     const reuse = !curDoc.features.length && !curDoc.components?.length && cur?.kind !== "drawing";
+    let openedId = curId;
     if (reuse) {
       docId.current = opts.docId ?? uid();
       commit(d);
@@ -278,13 +317,23 @@ export function CadApp() {
       setHist(entry.hist);
       docId.current = entry.docId;
       setTabId(entry.id);
+      openedId = entry.id;
     }
     resetUiForDoc();
     setDrawingOpen(false);
     setTab(kind === "assembly" ? "asm" : "create");
     setTimeout(() => vp.current?.setView("iso"), 700);
+    return openedId;
   };
   const closeTab = (id: string) => {
+    if (shared && id === shared.tabId) {
+      setShared(null);
+      try {
+        sessionStorage.removeItem("mn-cad-share");
+      } catch {
+        /* ignore */
+      }
+    }
     const all = docTabsRef.current.length ? docTabsRef.current : fallbackTabs();
     const idx = all.findIndex((t) => t.id === id);
     const snap = snapshotTabs(all).filter((t) => t.id !== id && t.srcTabId !== id);
@@ -320,14 +369,35 @@ export function CadApp() {
   };
   const openDrawingTabRef = useRef(openDrawingTab);
   openDrawingTabRef.current = openDrawingTab;
+  /** dokument ze sdíleného odkazu (snímek): nová záložka + informační pruh; nic se neukládá */
+  const openShared = (p: SharePayload) => {
+    const id = openDocInTab(p.doc);
+    setShared({ tabId: id, from: p.from, exp: p.exp });
+    setStartOpen(false);
+    flash(`Otevřen sdílený dokument „${p.doc.name}“${p.from ? ` od ${p.from}` : ""}.`);
+    track("cad_share_open");
+    if (p.view === "drawing") setTimeout(() => openDrawingTabRef.current(), 1500);
+  };
+  const openSharedRef = useRef(openShared);
+  openSharedRef.current = openShared;
+  /** diagnostika prostředí pro podporu (bez dat dokumentu) do schránky */
+  const copyDiagnostics = async () => {
+    const ok = await copyText(collectDiagnostics({ error: glError?.error ?? null, probe: glError?.probe ?? probeWebGL(), core, lost: glError?.lost }));
+    flash(ok ? "Diagnostika zkopírována do schránky – vložte ji do e-mailu pro podporu." : "Kopírování se nezdařilo.");
+  };
+  const unlockShared = async () => {
+    if (!sharePass || sharePass.busy) return;
+    setSharePass({ ...sharePass, busy: true, error: undefined });
+    const r = await openShareLink(sharePass.parsed, sharePass.value);
+    if (r.ok) {
+      setSharePass(null);
+      openShared(r.payload);
+    } else setSharePass({ ...sharePass, busy: false, error: openErrorText(r.reason, r.exp) });
+  };
   // rozložení záložek uložit i při jejich změně (ne jen při změně dokumentu)
   useEffect(() => {
-    if (!loaded.current || !docTabs.length) return;
-    try {
-      localStorage.setItem(TABS_KEY, JSON.stringify({ active: tabId, tabs: docTabs.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(docTabs, tabId) ? docId.current : did, srcTabId })) }));
-    } catch {
-      /* ignore */
-    }
+    if (!loaded.current || !docTabs.length || persistMode() !== "encrypted" || !isUnlocked()) return;
+    void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: docTabs.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(docTabs, tabId) ? docId.current : did, srcTabId })) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docTabs, tabId]);
   const tabStrip: DocTab[] = (docTabs.length ? docTabs : fallbackTabs()).map((t) =>
@@ -340,14 +410,20 @@ export function CadApp() {
       () => setCore("ready"),
       () => setCore("error"),
     );
-    try {
-      const raw = localStorage.getItem(STORE);
+    const restore = async () => {
+      // ochrana dokumentace (NDA): v režimu „neukládat“ se nic neobnovuje a dřívější uložené dokumenty se smažou
+      if (persistMode() === "none") {
+        wipeStoredDocuments();
+        return;
+      }
+      if (!isUnlocked() && !(await restoreSession())) return; // zamčeno – odemkne se z úvodní obrazovky / nastavení
+      const raw = await vaultGet(STORE);
       const d = raw ? (JSON.parse(raw) as CadDoc) : null;
       const present = d?.app === "mnastrojarna-cad" && Array.isArray(d.features) ? d : emptyDoc();
       setHist({ past: [], present, future: [] });
       // obnova záložek z minulé návštěvy (dokumenty jsou uložené v nedávných souborech)
       try {
-        const meta = JSON.parse(localStorage.getItem(TABS_KEY) ?? "null") as { active: string; tabs: Omit<DocTab, "hist">[] } | null;
+        const meta = JSON.parse((await vaultGet(TABS_KEY)) ?? "null") as { active: string; tabs: Omit<DocTab, "hist">[] } | null;
         if (meta?.tabs?.length) {
           const list: DocTab[] = [];
           for (const t of meta.tabs) {
@@ -356,7 +432,7 @@ export function CadApp() {
             else if (t.kind === "drawing") {
               if (meta.tabs.some((x) => x.id === t.srcTabId)) list.push({ ...t, hist: { past: [], present, future: [] } });
             } else {
-              const json = readRecentDoc(t.docId);
+              const json = await readRecentDoc(t.docId);
               // prázdné záložky se neukládají – obnoví se jako prázdný díl / sestava se stejným názvem
               const pd = json ? (JSON.parse(json) as CadDoc) : t.kind === "assembly" ? emptyAssembly(t.title) : emptyDoc(t.title);
               list.push({ ...t, hist: { past: [], present: pd, future: [] } });
@@ -375,9 +451,34 @@ export function CadApp() {
       } catch {
         /* bez obnovy záložek */
       }
-    } catch {
-      setHist({ past: [], present: emptyDoc(), future: [] });
-    }
+    };
+    restore()
+      .catch(() => setHist({ past: [], present: emptyDoc(), future: [] }))
+      .finally(() => {
+        loaded.current = true;
+        // sdílený odkaz (#s=… / #r=…): část za # odložil skript stránky do sessionStorage a z adresy ji odstranil
+        // (app/(cs)/cad/page.tsx) – dokument pod NDA nesmí zůstat v historii prohlížeče ani jít do měření návštěvnosti
+        let hash = "";
+        try {
+          hash = sessionStorage.getItem("mn-cad-share") || location.hash;
+        } catch {
+          hash = location.hash;
+        }
+        const parsed = parseShareHash(hash);
+        if (!parsed) return;
+        if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+        void openShareLink(parsed).then((r) => {
+          if (r.ok) openSharedRef.current(r.payload);
+          else if (r.reason === "password") setSharePass({ parsed, value: "" });
+          else setNotice({ title: "Sdílený odkaz nelze otevřít", body: openErrorText(r.reason, r.exp) });
+        });
+      });
+    // odemčení / vypnutí úložiště z úvodní obrazovky nebo nastavení
+    const onVault = () => {
+      if (persistMode() === "none") return;
+      if (isUnlocked()) void restore();
+    };
+    window.addEventListener(VAULT_EVENT, onVault);
     loaded.current = true;
     try {
       if (loadSettings().startScreen && !sessionStorage.getItem("mn-cad-started")) setStartOpen(true);
@@ -386,17 +487,20 @@ export function CadApp() {
       /* ignore */
     }
     track("cad_open");
+    return () => window.removeEventListener(VAULT_EVENT, onVault);
   }, []);
   useEffect(() => {
     if (!loaded.current) return;
     const t = setTimeout(() => {
       try {
+        // ochrana dokumentace: bez zapnutého šifrovaného úložiště se do prohlížeče nic nezapisuje
+        if (persistMode() !== "encrypted" || !isUnlocked()) return;
         const json = JSON.stringify(doc);
-        localStorage.setItem(STORE, json);
+        void vaultSet(STORE, json);
         const strip: DocTab[] = docTabs.length ? docTabs : fallbackTabs();
-        localStorage.setItem(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
+        void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
         if (doc.features.length || doc.components?.length) {
-          storeRecentDoc(docId.current, json);
+          void storeRecentDoc(docId.current, json);
           const entry = { id: docId.current, name: doc.name, kind: (doc.kind === "assembly" ? "assembly" : "part") as "assembly" | "part", at: Date.now(), features: doc.kind === "assembly" ? (doc.components?.length ?? 0) : doc.features.length };
           const limit = loadSettings().recentLimit;
           // náhled nejvýš jednou za 10 s (snímek 3D okna zmenšený na 160×120)
@@ -404,8 +508,8 @@ export function CadApp() {
             lastThumb.current = Date.now();
             const snap = vp.current.snapshot();
             if (snap) thumbnail(snap).then((thumb) => pushRecent({ ...entry, thumb }, limit)).catch(() => pushRecent(entry, limit));
-            else pushRecent(entry, limit);
-          } else pushRecent({ ...entry, thumb: loadRecentThumb(docId.current) }, limit);
+            else void pushRecent(entry, limit);
+          } else void pushRecent(entry, limit);
         }
       } catch {
         /* příliš velké / soukromý režim */
@@ -1409,6 +1513,7 @@ export function CadApp() {
     if (!t) return;
     await writeSaved(t, JSON.stringify(doc, null, 1), "application/json");
     projectTarget.current = t.handle ? t : null;
+    dirty.current = false;
     flash(`Uloženo: ${t.name}`);
   };
   const saveProject = async () => {
@@ -1416,6 +1521,7 @@ export function CadApp() {
     if (t?.handle) {
       try {
         await writeSaved(t, JSON.stringify(doc, null, 1), "application/json");
+        dirty.current = false;
         flash(`Uloženo: ${t.name}`);
         return;
       } catch {
@@ -2233,13 +2339,58 @@ export function CadApp() {
       { id: "p.settings", label: "Nastavení", group: "Program", icon: "settings", kbd: "Ctrl+,", run: () => setSettingsOpen(true) },
       { id: "p.start", label: "Úvodní obrazovka", group: "Program", icon: "home", run: () => setStartOpen(true) },
       { id: "p.help", label: "Klávesové zkratky a ovládání", group: "Program", icon: "help", run: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
-      { id: "p.docs", label: "Dokumentace a návod k obsluze (web, PDF)", group: "Program", icon: "info", run: () => window.open("/cad/dokumentace", "_blank", "noopener") },
+      { id: "p.docs", label: "Dokumentace a návod k obsluze (web)", group: "Program", icon: "info", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+      { id: "p.pdf", label: "Příručka PDF – stáhnout", group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
+      { id: "p.share", label: "Sdílet odkazem (WhatsApp, e-mail, Teams…)", group: "Program", icon: "share", run: () => setShareOpen(true) },
       { id: "p.rfq", label: "Poptat výrobu (STEP + e-mail)", group: "Program", icon: "export", run: toRfq },
     );
     return out;
   };
 
   // ---------- UI ----------
+  /** chipy záložek dokumentů (společné pro hlavičku na počítači a řádek na mobilu) */
+  const tabChips = (
+    <>
+      {tabStrip.map((t) => (
+        <div
+          key={t.id}
+          role="tab"
+          aria-selected={t.id === tabId}
+          className={cn("group flex h-8 min-w-0 max-w-[280px] shrink-0 items-center gap-1.5 rounded-t-md border-x border-t px-2 text-[12.5px]", t.id === tabId ? "border-white/15 bg-white/[0.09] text-white" : "border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/85")}
+          onMouseDown={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              closeTab(t.id);
+            }
+          }}
+        >
+          <button type="button" className="flex min-w-0 items-center gap-1.5" onClick={() => activateTab(t.id)} title={t.id === tabId ? "Aktivní dokument – název lze přepsat" : `Přepnout na: ${t.title}`}>
+            <CadIcon name={t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube"} className="h-3.5 w-3.5 shrink-0 text-brand" />
+            {t.id === tabId && t.kind !== "drawing" ? (
+              <input
+                value={doc.name}
+                onChange={(e) => live({ ...doc, name: e.target.value })}
+                onBlur={() => commit(doc)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === "Escape") && (e.target as HTMLInputElement).blur()}
+                className="w-[min(32vw,200px)] min-w-0 bg-transparent font-medium text-white outline-none"
+                aria-label="Název dokumentu"
+              />
+            ) : (
+              <span className="truncate font-medium">{t.title}</span>
+            )}
+          </button>
+          {t.id === tabId && doc.activeConfig && <span className="rounded bg-[#0e7490] px-1.5 text-[10px] font-semibold">{doc.configs?.find((c) => c.id === doc.activeConfig)?.name}</span>}
+          <button type="button" aria-label={`Zavřít ${t.title}`} title="Zavřít záložku (prostřední tlačítko)" onClick={() => closeTab(t.id)} className="rounded px-1 text-[14px] leading-none text-white/40 hover:bg-white/15 hover:text-white">
+            ×
+          </button>
+        </div>
+      ))}
+      <button type="button" title="Nový díl v nové záložce" aria-label="Nová záložka" onClick={newDoc} className="mb-1 grid h-6 w-6 shrink-0 place-items-center rounded text-[16px] leading-none text-white/60 hover:bg-white/10 hover:text-white">
+        +
+      </button>
+    </>
+  );
+
   return (
     <ParamContext.Provider value={paramCtx}>
       <RefPickContext.Provider value={refCtxValue}>
@@ -2261,58 +2412,73 @@ export function CadApp() {
             </span>
           </Link>
           <div className="mx-1 h-5 w-px bg-white/15" />
-          <QBtn icon="new" title="Nový díl" onClick={newDoc} />
-          <QBtn icon="open" title="Otevřít / importovat (Ctrl+O)" onClick={() => fileInput.current?.click()} />
-          <QBtn icon="save" title="Uložit projekt (Ctrl+S)" onClick={() => void saveProject()} />
-          <div className="mx-1 h-5 w-px bg-white/15" />
+          <div className="hidden items-center gap-1 sm:flex">
+            <QBtn icon="new" title="Nový díl" onClick={newDoc} />
+            <QBtn icon="open" title="Otevřít / importovat (Ctrl+O)" onClick={() => fileInput.current?.click()} />
+            <QBtn icon="save" title="Uložit projekt (Ctrl+S)" onClick={() => void saveProject()} />
+            <div className="mx-1 h-5 w-px bg-white/15" />
+          </div>
           <QBtn icon="undo" title="Zpět (Ctrl+Z)" onClick={undo} disabled={!hist.past.length} />
           <QBtn icon="redo" title="Znovu (Ctrl+Y)" onClick={redo} disabled={!hist.future.length} />
-          {/* záložky otevřených dokumentů (díly, sestavy, výkresy) */}
-          <div className="flex min-w-0 flex-1 items-end gap-0.5 self-stretch overflow-x-auto px-1 pt-1 [scrollbar-width:none]" role="tablist" aria-label="Otevřené dokumenty">
-            {tabStrip.map((t) => (
-              <div
-                key={t.id}
-                role="tab"
-                aria-selected={t.id === tabId}
-                className={cn("group flex h-8 min-w-0 max-w-[280px] shrink-0 items-center gap-1.5 rounded-t-md border-x border-t px-2 text-[12.5px]", t.id === tabId ? "border-white/15 bg-white/[0.09] text-white" : "border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/85")}
-                onMouseDown={(e) => {
-                  if (e.button === 1) {
-                    e.preventDefault();
-                    closeTab(t.id);
-                  }
-                }}
-              >
-                <button type="button" className="flex min-w-0 items-center gap-1.5" onClick={() => activateTab(t.id)} title={t.id === tabId ? "Aktivní dokument – název lze přepsat" : `Přepnout na: ${t.title}`}>
-                  <CadIcon name={t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube"} className="h-3.5 w-3.5 shrink-0 text-brand" />
-                  {t.id === tabId && t.kind !== "drawing" ? (
-                    <input
-                      value={doc.name}
-                      onChange={(e) => live({ ...doc, name: e.target.value })}
-                      onBlur={() => commit(doc)}
-                      onKeyDown={(e) => (e.key === "Enter" || e.key === "Escape") && (e.target as HTMLInputElement).blur()}
-                      className="w-[min(32vw,200px)] min-w-0 bg-transparent font-medium text-white outline-none"
-                      aria-label="Název dokumentu"
-                    />
-                  ) : (
-                    <span className="truncate font-medium">{t.title}</span>
-                  )}
-                </button>
-                {t.id === tabId && doc.activeConfig && <span className="rounded bg-[#0e7490] px-1.5 text-[10px] font-semibold">{doc.configs?.find((c) => c.id === doc.activeConfig)?.name}</span>}
-                <button type="button" aria-label={`Zavřít ${t.title}`} title="Zavřít záložku (prostřední tlačítko)" onClick={() => closeTab(t.id)} className="rounded px-1 text-[14px] leading-none text-white/40 hover:bg-white/15 hover:text-white">
-                  ×
-                </button>
-              </div>
-            ))}
-            <button type="button" title="Nový díl v nové záložce" aria-label="Nová záložka" onClick={newDoc} className="mb-1 grid h-6 w-6 shrink-0 place-items-center rounded text-[16px] leading-none text-white/60 hover:bg-white/10 hover:text-white">
-              +
-            </button>
-          </div>
-          <span className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" ? "text-brand" : "text-white/55")}>
+          {/* záložky otevřených dokumentů (díly, sestavy, výkresy) – na mobilu ve vlastním řádku pod lištou */}
+          {narrow ? (
+            <span className="flex-1" />
+          ) : (
+            <div className="flex min-w-0 flex-1 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden px-1 pt-1 [scrollbar-width:none] [touch-action:pan-x]" role="tablist" aria-label="Otevřené dokumenty">
+              {tabChips}
+            </div>
+          )}
+          <span className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" || glError ? "text-brand" : "text-white/55")}>
             <span className={cn("h-2 w-2 rounded-full", core === "ready" ? (busy ? "animate-pulse bg-amber-400" : "bg-emerald-400") : core === "loading" ? "animate-pulse bg-amber-400" : "bg-brand")} />
-            {core === "loading" ? "Načítám jádro OpenCascade…" : core === "error" ? "Jádro se nenačetlo" : busy ? "Přepočítávám…" : `OCCT · ${result ? `${result.ms} ms` : "připraveno"}`}
+            {glError ? "3D okno: nedostupné (WebGL)" : core === "loading" ? "Načítám jádro OpenCascade…" : core === "error" ? "Jádro se nenačetlo" : busy ? "Přepočítávám…" : `OCCT · ${result ? `${result.ms} ms` : "připraveno"}`}
           </span>
           <QBtn icon="measure" title="Paleta příkazů (Ctrl+K)" onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title="Nastavení (Ctrl+,)" onClick={() => setSettingsOpen(true)} />
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            disabled={!doc.features.length && !doc.components?.length}
+            title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči"
+            aria-label="Sdílet"
+            className="flex h-7 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-white/85 hover:bg-white/10 disabled:opacity-40"
+          >
+            <CadIcon name="share" className="h-4 w-4" />
+            <span className="hidden md:inline">Sdílet</span>
+          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setHelpMenu((v) => !v)}
+              title="Nápověda: dokumentace a návod k obsluze, příručka PDF, klávesové zkratky"
+              aria-label="Nápověda"
+              aria-expanded={helpMenu}
+              className={cn("flex h-7 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-white/85 hover:bg-white/10", helpMenu && "bg-white/10")}
+            >
+              <CadIcon name="help" className="h-4 w-4" />
+              <span className="hidden md:inline">Nápověda</span>
+            </button>
+            {helpMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setHelpMenu(false)} />
+                <Dropdown
+                  close={() => setHelpMenu(false)}
+                  className="left-auto right-0 z-50 w-[320px]"
+                  entries={[
+                    { divider: true, label: "Dokumentace" },
+                    { id: "docs", label: "Dokumentace a návod k obsluze (web)", icon: "info", hint: "24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce", onClick: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+                    { id: "pdf", label: "Příručka PDF – stáhnout", icon: "drawing", hint: "kompletní příručka k tisku a offline čtení", onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
+                    { divider: true, label: "Ovládání" },
+                    { id: "help", label: "Klávesové zkratky a ovládání myší", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
+                    { id: "palette", label: "Paleta příkazů", icon: "palette", kbd: "Ctrl+K", hint: "napište název příkazu („díra“, „výkres“, „zaoblit“…)", onClick: () => setPaletteOpen(true) },
+                    { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
+                    { divider: true },
+                    { id: "diag", label: "Zkopírovat diagnostiku (bez dat dokumentu)", icon: "info", hint: "verze programu, prohlížeč, WebGL, jádro, chyba – pro e-mail podpoře", onClick: () => void copyDiagnostics() },
+                    { id: "web", label: "Zpět na web mnastrojarna.cz", icon: "home", onClick: () => window.location.assign("/") },
+                  ]}
+                />
+              </>
+            )}
+          </div>
           <button type="button" onClick={toRfq} className="ml-2 whitespace-nowrap rounded bg-brand px-3 py-1 text-[12px] font-semibold text-white shadow hover:bg-brand-600">
             Poptat<span className="hidden sm:inline"> výrobu</span>
           </button>
@@ -2328,10 +2494,45 @@ export function CadApp() {
             }}
           />
         </header>
+        {narrow && (
+          <div className="flex h-9 shrink-0 items-stretch bg-[#1c2025] text-white/85">
+            <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto overflow-y-hidden px-1 pt-1 [scrollbar-width:none] [touch-action:pan-x]" role="tablist" aria-label="Otevřené dokumenty">
+              {tabChips}
+            </div>
+            <div className="relative flex shrink-0 items-center border-l border-white/10 px-1">
+              <button
+                ref={tabMenuRef}
+                type="button"
+                onClick={() => setTabMenu((v) => !v)}
+                aria-label="Seznam otevřených dokumentů"
+                title="Seznam otevřených dokumentů"
+                className="flex h-7 items-center gap-1 rounded px-2 text-[12px] font-semibold hover:bg-white/10"
+              >
+                <CadIcon name="layers" className="h-4 w-4" />
+                {tabStrip.length}
+                <span className="text-[8px]">▼</span>
+              </button>
+              {tabMenu && (
+                <Dropdown
+                  anchor={tabMenuRef.current}
+                  close={() => setTabMenu(false)}
+                  entries={[
+                    { divider: true, label: "Otevřené dokumenty" },
+                    ...tabStrip.map((t) => ({ id: t.id, label: t.id === tabId ? doc.name : t.title, icon: (t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube") as CadIconName, active: t.id === tabId, onClick: () => activateTab(t.id) })),
+                    { divider: true },
+                    { id: "new", label: "Nový díl v nové záložce", icon: "new", tone: "create", onClick: newDoc },
+                    { id: "close", label: `Zavřít: ${tabStrip.find((t) => t.id === tabId)?.title ?? doc.name}`, icon: "x", onClick: () => closeTab(tabId) },
+                  ]}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Záložky pásu */}
-        <div className="flex h-8 shrink-0 items-end gap-0.5 border-b border-[#d5dbe2] bg-[#dfe5eb] px-1">
-          <div className="relative self-stretch py-1">
+        {/* řádek záložek pásu: na úzké obrazovce vodorovně posuvný (jen vodorovně – žádné svislé „plavání“) */}
+        <div className="flex h-8 shrink-0 items-stretch gap-0.5 overflow-x-auto overflow-y-hidden bg-[#dfe5eb] px-1 [scrollbar-width:none] [touch-action:pan-x]">
+          <div ref={appMenuRef} className="relative shrink-0 border-b border-[#d5dbe2] py-1">
             <button type="button" onClick={() => setAppMenu((v) => !v)} className="h-full rounded-sm bg-brand px-3 text-[12px] font-semibold text-white hover:bg-brand-600">
               Soubor
             </button>
@@ -2339,6 +2540,7 @@ export function CadApp() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setAppMenu(false)} />
                 <Dropdown
+                  anchor={appMenuRef.current}
                   close={() => setAppMenu(false)}
                   className="z-50 w-[300px]"
                   entries={[
@@ -2346,6 +2548,7 @@ export function CadApp() {
                     { id: "open", label: "Otevřít / importovat…", icon: "open", tone: "file", kbd: "Ctrl+O", onClick: () => fileInput.current?.click() },
                     { id: "save", label: "Uložit projekt (.mncad)", icon: "save", tone: "file", kbd: "Ctrl+S", onClick: () => void saveProject() },
                     { id: "saveAs", label: "Uložit jako…", icon: "save", tone: "file", onClick: () => void saveProjectAs() },
+                    { id: "share", label: "Sdílet odkazem…", icon: "share", tone: "file", disabled: !doc.features.length && !doc.components?.length, hint: "WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní", onClick: () => setShareOpen(true) },
                     { divider: true, label: "Export 3D" },
                     ...exportEntries,
                     { divider: true, label: "Výkres" },
@@ -2360,7 +2563,8 @@ export function CadApp() {
                     { id: "library", label: "Knihovna normálií…", icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { id: "help", label: "Klávesové zkratky a ovládání", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
-                    { id: "docs", label: "Dokumentace a návod (web, PDF)…", icon: "info", onClick: () => window.open("/cad/dokumentace", "_blank", "noopener") },
+                    { id: "docs", label: "Dokumentace a návod k obsluze (web)…", icon: "info", onClick: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+                    { id: "pdf", label: "Příručka PDF – stáhnout", icon: "drawing", onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
                   ]}
                 />
               </>
@@ -2372,14 +2576,15 @@ export function CadApp() {
               type="button"
               onClick={() => setTab(t)}
               className={cn(
-                "rounded-t-md border-x border-t px-3.5 py-1 text-[12px] font-medium",
-                curTab === t ? "relative top-px border-[#d5dbe2] bg-[#fbfcfd] text-[#1f2933]" : "border-transparent text-[#4a5664] hover:bg-white/50",
+                "mt-auto shrink-0 whitespace-nowrap rounded-t-md border px-3.5 py-1 text-[12px] font-medium",
+                curTab === t ? "border-b-[#fbfcfd] border-x-[#d5dbe2] border-t-[#d5dbe2] bg-[#fbfcfd] text-[#1f2933]" : "border-x-transparent border-t-transparent border-b-[#d5dbe2] text-[#4a5664] hover:bg-white/50",
                 t === "sketch" && "text-[#2563eb]",
               )}
             >
               {l}
             </button>
           ))}
+          <div className="min-w-2 flex-1 border-b border-[#d5dbe2]" aria-hidden />
         </div>
 
         <Ribbon
@@ -2418,41 +2623,56 @@ export function CadApp() {
             onWheelCapture={() => setHud(null)}
           >
             <div className={cn("absolute inset-0", sketch && "invisible")} style={{ background: bg.css }}>
-              <Viewport
-                ref={vp}
-                mesh={result?.mesh ?? null}
-                sketches={sketchesForView}
-                datums={datums}
-                datumGfx={datumGfx}
-                pickMode={pickMode}
-                selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
-                selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
-                onPickEdge={onPickEdge}
-                onPickFace={onPickFace}
-                selFilter={refPick ? refFilter(refPick.want) : selFilter}
-                snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
-                selection={measure ? measureSel : selection}
-                onPick={onPick}
-                measure={measureGfx}
-                vertices={result?.vertices ?? null}
-                faceColors={doc.faceColors}
-                bodyHidden={bodyHidden}
-                bodyOpacity={bodyOpacity}
-                gizmo={gizmo}
-                onGizmo={onGizmo}
-                onContext={vpContext}
-                onCursor={setCursor}
-                display={prefs.display}
-                ortho={prefs.ortho}
-                section={section}
-                bodyColor={doc.color}
-                mouse={prefs.mouse}
-                vertexColors={vertexColors}
-                surface={surface.mode === "zebra" ? "zebra" : "none"}
-                showGrid={showGrid}
-                assembly={isAsm ? asmViews : undefined}
-              />
+              <ViewportBoundary resetKey={glKey} onError={(error) => setGlError({ error, probe: probeWebGL() })}>
+                <Viewport
+                  key={glKey}
+                  ref={vp}
+                  onRenderError={setGlError}
+                  mesh={result?.mesh ?? null}
+                  sketches={sketchesForView}
+                  datums={datums}
+                  datumGfx={datumGfx}
+                  pickMode={pickMode}
+                  selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
+                  selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
+                  onPickEdge={onPickEdge}
+                  onPickFace={onPickFace}
+                  selFilter={refPick ? refFilter(refPick.want) : selFilter}
+                  snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
+                  selection={measure ? measureSel : selection}
+                  onPick={onPick}
+                  measure={measureGfx}
+                  vertices={result?.vertices ?? null}
+                  faceColors={doc.faceColors}
+                  bodyHidden={bodyHidden}
+                  bodyOpacity={bodyOpacity}
+                  gizmo={gizmo}
+                  onGizmo={onGizmo}
+                  onContext={vpContext}
+                  onCursor={setCursor}
+                  display={prefs.display}
+                  ortho={prefs.ortho}
+                  section={section}
+                  bodyColor={doc.color}
+                  mouse={prefs.mouse}
+                  vertexColors={vertexColors}
+                  surface={surface.mode === "zebra" ? "zebra" : "none"}
+                  showGrid={showGrid}
+                  assembly={isAsm ? asmViews : undefined}
+                />
+              </ViewportBoundary>
             </div>
+            {glError && !sketch && (
+              <ViewportFallback
+                failure={glError}
+                core={core}
+                onRetry={() => {
+                  setGlError(null);
+                  setGlKey((k) => k + 1);
+                }}
+                onCopy={() => void copyDiagnostics()}
+              />
+            )}
             {sketch && (
               <>
                 <Sketcher key={sketch.id} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} modelLines={result?.mesh?.lines ?? null} />
@@ -2631,6 +2851,21 @@ export function CadApp() {
                   })}
                 </div>
               </FloatPanel>
+            )}
+            {shared && (tabId === shared.tabId || tabStrip.find((t) => t.id === tabId)?.srcTabId === shared.tabId) && (
+              <div role="status" className="absolute left-1/2 top-2 z-30 flex max-w-[94%] -translate-x-1/2 items-center gap-3 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 px-3 py-1.5 text-[12px] text-[#26303b] shadow">
+                <CadIcon name="share" className="h-4 w-4 shrink-0 text-brand" />
+                <span>
+                  <strong>Sdílený dokument</strong>
+                  {shared.from ? ` od ${shared.from}` : ""} · {shared.exp ? `platí do ${new Date(shared.exp).toLocaleDateString("cs-CZ")}` : "bez omezení platnosti"} · snímek – vaše úpravy se odesílateli nepromítnou
+                </span>
+                <button type="button" onClick={() => void saveProjectAs()} className="whitespace-nowrap rounded border border-[#cfd6de] bg-white px-2 py-0.5 hover:border-brand/50">
+                  Uložit kopii…
+                </button>
+                <button type="button" onClick={() => setShared(null)} aria-label="Skrýt" className="rounded p-0.5 text-[#6b7785] hover:bg-white">
+                  <CadIcon name="x" className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
 
@@ -2887,6 +3122,36 @@ export function CadApp() {
           />
         )}
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
+        {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
+        {sharePass && (
+          <UiModal
+            title="Sdílený dokument je chráněný heslem"
+            icon="lock"
+            tone="file"
+            onClose={() => setSharePass(null)}
+            width="max-w-md"
+            footer={
+              <>
+                <Btn onClick={() => setSharePass(null)}>Zrušit</Btn>
+                <Btn primary disabled={!!sharePass.busy || !sharePass.value} onClick={() => void unlockShared()}>
+                  Otevřít
+                </Btn>
+              </>
+            }
+          >
+            <p className="text-[12.5px] text-[#26303b]">Zadejte heslo, které vám odesílatel poslal zvlášť (SMS, telefon…).</p>
+            <input
+              type="password"
+              autoFocus
+              value={sharePass.value}
+              onChange={(e) => setSharePass({ ...sharePass, value: e.target.value, error: undefined })}
+              onKeyDown={(e) => e.key === "Enter" && void unlockShared()}
+              aria-label="Heslo sdíleného dokumentu"
+              className="mt-2 w-full rounded border border-[#cfd6de] px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
+            />
+            {sharePass.error && <p className="mt-1 text-[12px] text-brand">{sharePass.error}</p>}
+          </UiModal>
+        )}
         {paletteOpen && <CommandPalette commands={buildCommands()} onClose={() => setPaletteOpen(false)} />}
         {startOpen && (
           <StartScreen
@@ -2900,19 +3165,21 @@ export function CadApp() {
               { id: "lib", label: "Knihovna normálií", desc: "103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
               { id: "palette", label: "Paleta příkazů", desc: "Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…", icon: "measure", tone: "tool", kbd: "Ctrl+K", run: () => { setStartOpen(false); setPaletteOpen(true); } },
               { id: "settings", label: "Nastavení", desc: "Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.", icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },
-              { id: "docs", label: "Dokumentace", desc: "Kompletní návod k obsluze: 23 kapitol, FAQ, příručka PDF.", icon: "info", tone: "tool", run: () => window.open("/cad/dokumentace", "_blank", "noopener") },
+              { id: "docs", label: "Dokumentace a návod", desc: "Kompletní návod k obsluze: 24 kapitol, postupy, FAQ (otevře se v nové záložce).", icon: "info", tone: "tool", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+              { id: "pdf", label: "Příručka PDF", desc: "Celá dokumentace jako PDF k tisku a offline čtení.", icon: "drawing", tone: "tool", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
             onOpenRecent={(r) => {
-              const json = readRecentDoc(r.id);
-              if (!json) return flash("Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.");
-              try {
-                const d = JSON.parse(json) as CadDoc;
-                setStartOpen(false);
-                openDocInTab(d, { docId: r.id });
-              } catch {
-                flash("Soubor se nepodařilo načíst.");
-              }
+              void readRecentDoc(r.id).then((json) => {
+                if (!json) return flash("Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.");
+                try {
+                  const d = JSON.parse(json) as CadDoc;
+                  setStartOpen(false);
+                  openDocInTab(d, { docId: r.id });
+                } catch {
+                  flash("Soubor se nepodařilo načíst.");
+                }
+              });
             }}
             onClose={() => setStartOpen(false)}
             onDisable={() => setPref("startScreen", false)}
@@ -2927,6 +3194,7 @@ export function CadApp() {
         {drawingOpen && (isAsm || result?.metrics) && (
           <DrawingWorkspace
             doc={doc}
+            onShare={() => setShareOpen(true)}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? "dle kusovníku" : mat.label}
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
@@ -2967,6 +3235,19 @@ function statusOf(result: BuildResult | null, id: string) {
 }
 
 // ---------- drobné komponenty ----------
+
+/** true na úzké obrazovce (< 640 px) – přepočítá se při otočení / změně velikosti */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
 
 function QBtn({ icon, title, onClick, disabled }: { icon: CadIconName; title: string; onClick: () => void; disabled?: boolean }) {
   return (
@@ -3055,6 +3336,3 @@ function thumbnail(dataUrl: string): Promise<string> {
   });
 }
 
-function loadRecentThumb(id: string): string | undefined {
-  return loadRecent().find((r) => r.id === id)?.thumb;
-}

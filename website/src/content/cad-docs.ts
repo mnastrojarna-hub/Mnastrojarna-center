@@ -41,11 +41,11 @@ export const CAD_DOCS_META = {
     "alternativa ZW3D online",
     "OpenCascade CAD",
   ],
-  updated: "2026-11-02",
+  updated: "2026-11-03",
   version: "5. vlna (listopad 2026)",
   appUrl: "/cad",
   docsUrl: "/cad/dokumentace",
-  pdfUrl: "/cad/mnastrojarna-cad-prirucka.pdf",
+  pdfUrl: "/cad/mnastrojarna-cad-prirucka.pdf", // shodné s CAD_LINKS v cad-links.ts (tady bez importu kvůli Node skriptu)
   mdUrl: "/cad/dokumentace.md",
 };
 
@@ -58,7 +58,7 @@ export const CAD_DOCS: DocSection[] = [
     lead: "Profesionální parametrický 3D a 2D CAD, který běží přímo ve webovém prohlížeči – bez instalace, bez registrace a zdarma. Vytvořila ho nástrojárna Mnástrojárna s.r.o. pro konstruktéry, údržbu, vývojáře a studenty, kteří potřebují rychle vymodelovat díl, sestavu nebo výkres a případně rovnou poptat výrobu.",
     blocks: [
       { t: "img", src: `${IMG}/start.webp`, alt: "Úvodní obrazovka Mnástrojárna CAD s nedávnými soubory a rychlými akcemi", caption: "Úvodní obrazovka: Nový díl, Nová sestava, Nový výkres, nedávné soubory s náhledy, otevřít / importovat, knihovna normálií." },
-      { t: "p", text: "Jádrem je geometrický modelář **OpenCascade (OCCT)** přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se **neodesílají na server**; rozpracovaná práce se průběžně ukládá do úložiště prohlížeče a projekt si stáhnete jako soubor `.mncad` nebo exportujete do STEP." },
+      { t: "p", text: "Jádrem je geometrický modelář **OpenCascade (OCCT)** přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se **neodesílají na server** a ve výchozím nastavení se **neukládají ani do prohlížeče** – rozpracovaná práce žije jen v otevřené kartě a v souborech, které si uložíte do svého počítače (`.mncad`, STEP). To je důležité pro dokumentaci pod NDA." },
       { t: "h3", text: "Co umí" },
       { t: "ul", items: [
         "**Díly:** skica s vazbami a kótami → vysunutí, rotace, tažení, šablonování, díry (průvodce), závity, zaoblení, sražení, úkosy, skořepina, žebra, pružiny, text, přímé úpravy ploch, pole 5 druhů, zrcadlení, proměnné a stavy (konfigurace).",
@@ -146,6 +146,15 @@ export const CAD_DOCS: DocSection[] = [
         ["Touchpad", "levé tlačítko (tažení)", "pravé tlačítko", "kolečko / gesto"],
       ] },
       { t: "p", text: "Schéma se přepíná v **Zobrazení → Ovládání myši** nebo v Nastavení → Myš a ovládání. Tam je i obrácení kolečka a přiblížení ke kurzoru." },
+      { t: "h3", text: "Když se 3D okno nespustí (WebGL)" },
+      { t: "p", text: "3D zobrazení potřebuje WebGL – hardwarově akcelerovanou grafiku prohlížeče. Když ji prohlížeč neposkytne (vypnutá grafická akcelerace, vzdálená plocha nebo virtuální stroj bez grafické karty, zastaralý ovladač, firemní zásady), program nespadne: místo modelu zobrazí česky příčinu a postup a ostatní části – nabídky, nápověda, soubory, 2D skica, výkresy – fungují dál. Jádro OCCT model počítá i bez 3D okna." },
+      { t: "ul", items: [
+        "Chrome / Edge: Nastavení → Systém → „Použít grafickou akceleraci, je-li k dispozici“, restart prohlížeče; stav ukáže chrome://gpu nebo edge://gpu.",
+        "Firefox: Nastavení → Obecné → Výkon → doporučená nastavení výkonu; about:config → webgl.disabled = false.",
+        "Vzdálená plocha (RDP), Citrix nebo virtuální stroj: otevřete CAD přímo na počítači s grafickou kartou.",
+        "Aktualizujte ovladač grafické karty, zkuste jiný prohlížeč v aktuální verzi nebo jiné zařízení.",
+        "**Zkopírovat diagnostiku** (na chybové obrazovce i v Nápovědě) zkopíruje verzi programu, prohlížeč, stav WebGL, stav jádra a chybové hlášení – bez jakýchkoli dat dokumentu – k poslání podpoře.",
+      ] },
     ],
   },
   {
@@ -459,7 +468,7 @@ export const CAD_DOCS: DocSection[] = [
         "**Proměnné** (záložka vlevo): název, hodnota nebo výraz (`L/2`, `sqrt(a^2+b^2)`, `max(d, 10)`), jednotka a popis. Funkce: sin, cos, tan, sqrt, abs, min, max, round, floor, ceil, pi…",
         "**Navázání parametru:** do kteréhokoli číselného pole napište `=výraz` (např. `=d*3`) – pole se přepočítá při každé změně proměnné. Vazba se ukládá s dokumentem a zobrazuje ikonou u pole.",
         "**Stavy (konfigurace):** varianty dílu s jinými hodnotami proměnných a potlačenými prvky (např. „s přírubou / bez příruby“, velikosti M8 / M10). Aktivní stav se přepíná ve správci; výkres a export respektují aktivní stav.",
-        "**Nedávné soubory** a **autosave**: rozpracovaný díl se ukládá do prohlížeče každých pár sekund; úvodní obrazovka nabídne „Pokračovat v práci“ a náhledy posledních 12 dokumentů (počet lze změnit).",
+        "**Nedávné soubory a rozpracovaná práce:** ve výchozím režimu se nic neukládá (ochrana dokumentace). Zapnete-li v Nastavení → Soubory **šifrované úložiště s heslem**, ukládá se rozpracovaný model, záložky a nedávné soubory s náhledy (až 12) do tohoto prohlížeče zašifrovaně (AES-256) – bez hesla je nikdo nepřečte; odemčení platí do zavření karty.",
       ] },
     ],
   },
@@ -487,8 +496,62 @@ export const CAD_DOCS: DocSection[] = [
     ],
   },
   {
+    id: "sdileni",
+    title: "17. Sdílení odkazem",
+    lead: "Jedno tlačítko a díl, sestava nebo výkres je u kolegy, zákazníka či dodavatele – kdekoli na světě, bez instalace a registrace. Odkaz pošlete WhatsAppem, e-mailem, přes Teams nebo jakkoli jinak.",
+    blocks: [
+      {
+        t: "p",
+        text: "Tlačítko Sdílet je v horní liště vedle Nápovědy, v nabídce Soubor → Sdílet odkazem… a v paletě příkazů (Ctrl+K → „sdílet“). Dialog vytvoří odkaz okamžitě s výchozí platností 10 dní – stačí Kopírovat odkaz a vložit ho do zprávy, nebo použít tlačítka WhatsApp, E-mail či Sdílet… (systémová nabídka na mobilu: Teams, Messenger, Signal…). Tlačítko Kopírovat zprávu zkopíruje hotový text s názvem dílu, platností a odkazem.",
+      },
+      { t: "img", src: `${IMG}/sdileni.webp`, alt: "Dialog Sdílet odkazem: platnost 10 dní, heslo, odesílatel, hotový odkaz a tlačítka Kopírovat odkaz, WhatsApp, E-mail", caption: "Dialog Sdílet odkazem: odkaz je hotový hned po otevření; volby platnosti, hesla a odesílatele ho přegenerují." },
+      { t: "h3", text: "Co příjemce uvidí" },
+      { t: "img", src: `${IMG}/sdileni-prijemce.webp`, alt: "Sdílený díl otevřený u příjemce s pruhem Sdílený dokument od Vít Volný, platí do data, snímek", caption: "U příjemce: díl se otevře v nové záložce s pruhem „Sdílený dokument“ – vidí odesílatele i platnost, může měřit, řezat a uložit kopii." },
+      {
+        t: "ul",
+        items: [
+          "Odkaz otevře Mnástrojárna CAD v prohlížeči (Chrome, Edge, Firefox, Safari, i na mobilu) se snímkem dokumentu: lze otáčet, měřit, řezat, procházet historii prvků, prohlížet výkresy, exportovat STEP nebo uložit kopii .mncad.",
+          "Nad pracovní plochou je pruh „Sdílený dokument od … · platí do …“. Jde o snímek – úpravy příjemce se vám nepromítnou a vaše pozdější úpravy se do odkazu nedostanou; v takovém případě pošlete nový odkaz.",
+          "Stejný odkaz může otevřít libovolný počet lidí současně (například technolog, nákupčí a dodavatel na třech místech).",
+          "Sdílíte-li z výkresové záložky, příjemci se po otevření rovnou zobrazí výkres; model s historií má také.",
+          "Otevřený sdílený dokument přežije obnovení stránky (F5) v téže kartě; po zavření karty je pryč – nic se neukládá.",
+        ],
+      },
+      { t: "h3", text: "Platnost, heslo, odesílatel" },
+      {
+        t: "ul",
+        items: [
+          "Platnost 1, 7, 10, 30 nebo 90 dní, případně bez omezení. Po vypršení se odkaz neotevře („Platnost sdíleného odkazu vypršela“) – dokument prostě sdílejte znovu.",
+          "Heslo (volitelné): bez něj je odkaz nečitelný. Heslo pošlete jiným kanálem (SMS, telefon); příjemce ho zadá při otevření.",
+          "Odesílatel: jméno nebo firma, které příjemce uvidí v pruhu nad modelem. Program si ho pamatuje pro příště.",
+        ],
+      },
+      { t: "h3", text: "Jak je to s ochranou dokumentace (NDA)" },
+      {
+        t: "p",
+        text: "Dokument je zkomprimovaný přímo v odkazu, v části za znakem „#“. Tuto část prohlížeč nikdy neposílá na server – ani na hosting webu, ani do měření návštěvnosti; po otevření ji program z adresy hned odstraní, takže nezůstane v historii prohlížeče. Dokument tedy existuje jen ve zprávě, kterou sami pošlete, a v paměti karty příjemce. U příjemce platí výchozí režim bez ukládání.",
+      },
+      {
+        t: "p",
+        text: "Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkazu nevejdou – dialog na to upozorní. Pro ně lze zapnout šifrované úložiště sdílení: dokument se zašifruje (AES-256) ještě v prohlížeči, na server jde jen šifrovaný soubor a klíč je pouze v odkazu; soubor se po vypršení platnosti smaže. Bez úložiště pošlete soubor .mncad nebo STEP klasicky jako přílohu.",
+      },
+      {
+        t: "table",
+        head: ["Situace", "Doporučení"],
+        rows: [
+          ["Parametrický díl nebo sestava", "Odkaz (jednotky až desítky kB) – WhatsApp, e-mail, Teams, Slack"],
+          ["Dlouhý odkaz (nad 8 kB)", "Kopírovat odkaz a vložit do zprávy; SMS odkaz nepřenese"],
+          ["Importovaný STEP, velká sestava", "Šifrované úložiště sdílení, nebo soubor .mncad / STEP jako příloha"],
+          ["Citlivá dokumentace", "Heslo + krátká platnost; heslo pošlete jiným kanálem"],
+          ["Živá porada nad modelem", "Všichni otevřou týž odkaz; změny pošlete jako nový odkaz nebo sdílejte obrazovku"],
+        ],
+      },
+      { t: "note", text: "Odkaz je snímek: kdo ho má, otevře dokument do konce platnosti. Pro citlivé díly použijte heslo a kratší platnost." },
+    ],
+  },
+  {
     id: "nastaveni",
-    title: "17. Nastavení",
+    title: "18. Nastavení",
     blocks: [
       { t: "img", src: `${IMG}/nastaveni.webp`, alt: "Dialog Nastavení se záložkami Obecné, Zobrazení, Myš a ovládání, Skica, Výkres, Soubory a Klávesové zkratky", caption: "Nastavení (Ctrl+,) – sedm záložek, změny se ukládají v prohlížeči." },
       { t: "table", head: ["Záložka", "Volby"], rows: [
@@ -497,14 +560,14 @@ export const CAD_DOCS: DocSection[] = [
         ["Myš a ovládání", "schéma ZW3D / SolidWorks / touchpad, přiblížení ke kurzoru, obrácení kolečka"],
         ["Skica", "přichytávání k mřížce, krok mřížky, automatické vazby, zobrazování značek vazeb"],
         ["Výkres", "autor do razítka, výchozí formát listu, promítání E / A, nepředepsané tolerance (ISO 2768)"],
-        ["Soubory", "automatické ukládání, počet nedávných souborů"],
+        ["Soubory", "rozpracovaná práce v prohlížeči: neukládat (výchozí) nebo šifrované úložiště s heslem; vymazání všeho uloženého; počet nedávných souborů"],
         ["Klávesové zkratky", "každou zkratku lze přemapovat; obnovit výchozí"],
       ] },
     ],
   },
   {
     id: "zkratky",
-    title: "18. Klávesové zkratky",
+    title: "19. Klávesové zkratky",
     blocks: [
       { t: "kbd", rows: [
         ["Ctrl+K", "paleta příkazů"], ["Ctrl+L", "knihovna normálií"], ["Ctrl+,", "nastavení"], ["Ctrl+S / Ctrl+O", "uložit projekt / otevřít"], ["Ctrl+Z / Ctrl+Y", "zpět / znovu"],
@@ -519,19 +582,20 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "mobil",
-    title: "19. Mobil a dotykové ovládání",
+    title: "20. Mobil a dotykové ovládání",
     blocks: [
       { t: "img", src: `${IMG}/mobil.webp`, alt: "Mnástrojárna CAD na mobilním telefonu: nabídka Skica jako spodní list", caption: "Na telefonu se nabídky a formuláře otevírají jako spodní listy s velkými tlačítky." },
       { t: "ul", items: [
         "Jeden prst otáčí, dva prsty posouvají a přibližují, **dlouhý stisk** otevře kontextovou nabídku (jako pravé tlačítko).",
         "Rozbalovací nabídky pásu a formuláře prvků se otevírají jako **spodní listy**, takže model zůstává vidět; výběr entit do pole odkazu funguje dotykem, dlouhý stisk na poli nabídne způsoby zadání a výběr ze seznamu.",
+        "**Záložky otevřených dokumentů** (díly, sestavy, výkresy) mají na telefonu vlastní řádek pod horní lištou, takže jsou vždy vidět. Tlačítko s počtem dokumentů vpravo otevře seznam všech otevřených záložek s přepnutím, novou záložkou a zavřením. Výkres se otevírá pod tímto řádkem – mezi dílem a výkresem lze přepínat kdykoli.",
         "Pás karet se posouvá prstem; paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.",
       ] },
     ],
   },
   {
     id: "srovnani",
-    title: "20. Omezení a poctivé srovnání s desktopovými CADy",
+    title: "21. Omezení a poctivé srovnání s desktopovými CADy",
     lead: "Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde je, kde dnes stojíme vůči ZW3D, SolidWorks, Inventor, Fusion 360 a Onshape.",
     blocks: [
       { t: "table", head: ["Oblast", "Mnástrojárna CAD", "Desktopová špička"], rows: [
@@ -552,18 +616,20 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "data",
-    title: "21. Vaše data a soukromí",
+    title: "22. Vaše data a soukromí",
     blocks: [
       { t: "ul", items: [
         "Modelování, výpočty i export probíhají **ve vašem prohlížeči**; soubory se na server neodesílají. Výjimkou je tlačítko **Poptat výrobu**, které připraví e-mail – odesíláte ho sami.",
-        "Rozpracovaný dokument, nedávné soubory a nastavení se ukládají do úložiště prohlížeče (localStorage). Vymazání dat prohlížeče je smaže – projekty si ukládejte jako .mncad nebo STEP.",
-        "Anonymní statistika použití (otevření aplikace, typ prvku) slouží jen k vylepšování programu. Podrobnosti v zásadách ochrany osobních údajů na webu.",
+        "**Výchozí režim „neukládat“ (NDA):** modely, výkresy ani jejich názvy se do prohlížeče neukládají. Rozpracovaná práce existuje jen v otevřené kartě a v souborech, které si uložíte do svého počítače tlačítkem Uložit (kam a pod jakým názvem si vyberete). Po zavření karty v prohlížeči nic nezůstane; při zavírání s neuloženými změnami prohlížeč varuje. Dokumenty uložené staršími verzemi programu se při prvním spuštění smažou.",
+        "**Volitelné šifrované úložiště:** kdo chce mít nedávné soubory a obnovu rozpracované práce, zapne v Nastavení → Soubory úložiště s heslem. Data se ukládají zašifrovaně (AES-GCM 256, klíč z hesla přes PBKDF2) jen v tomto prohlížeči na tomto počítači – bez hesla je nepřečte ani jiný uživatel téhož PC. Odemčení platí do zavření karty; „Vypnout a smazat uložené“ vše odstraní.",
+        "Nastavení programu (jednotky, myš, zkratky, formát listu) se ukládá nešifrovaně – neobsahuje žádná data z dokumentů.",
+        "Anonymní statistika použití (otevření aplikace, typ prvku) neobsahuje geometrii ani názvy souborů. Podrobnosti v zásadách ochrany osobních údajů na webu.",
       ] },
     ],
   },
   {
     id: "slovnicek",
-    title: "22. Slovníček pojmů",
+    title: "23. Slovníček pojmů",
     blocks: [
       { t: "table", head: ["Pojem", "Význam"], rows: [
         ["Prvek (feature)", "jeden krok historie modelu – skica, vysunutí, díra… – s parametry, které lze kdykoli změnit."],
@@ -584,13 +650,14 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "verze",
-    title: "23. Historie verzí",
+    title: "24. Historie verzí",
     blocks: [
       { t: "table", head: ["Vlna", "Obsah"], rows: [
         ["1.–2. (2026)", "jádro OCCT v prohlížeči, skica s řešičem vazeb, základní prvky, výkresy PDF/DXF, sestavy, rám formy, proměnné a stavy, import/export"],
         ["3.", "plochy (19), plech (12), svařence (10), pokročilé modelování, knihovna 103 rodin, výkresy s anotacemi a DWG, vazby sestav, formařské analýzy, nastavení a zkratky"],
         ["4.", "výběr entit a inspektor, měření mezi entitami, kontextové nabídky, gizmo, barvy ploch, podsestavy, SEO a výkon webu"],
         ["5. (listopad 2026)", "referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace"],
+        ["5. – dodatky (listopad 2026)", "sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu"],
       ] },
     ],
   },
@@ -603,14 +670,16 @@ export const CAD_FAQ: { q: string; a: string }[] = [
   { q: "Zvládne sestavy a velké rámy forem?", a: "Ano – komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled a průvodce rámem vstřikovací formy s normáliemi. Komfortně zvládá sestavy o desítkách až stovkách komponent; výkon závisí na vašem počítači." },
   { q: "Jak vložím šroub M8×30 nebo profil IPE 200?", a: "Stiskněte Ctrl+L a napište „ISO 4762 M8x30“ nebo „IPE 200 1500“. Knihovna má 103 rodin normálií (šrouby, matice, podložky, kolíky, ložiska, ozubená a řetězová kola, řemenice, profily, pružiny, normálie forem, lineární technika, pneumatika, potrubí)." },
   { q: "Funguje na mobilu a tabletu?", a: "Ano. Nabídky a formuláře se na telefonu otevírají jako spodní listy, model otáčíte prstem, dlouhý stisk nahrazuje pravé tlačítko. Pro delší práci doporučujeme počítač nebo tablet s klávesnicí." },
-  { q: "Funguje offline?", a: "Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro načtení aplikace a knihovny písem je potřeba připojení; rozpracovaná práce se ukládá do úložiště prohlížeče." },
-  { q: "Kde jsou moje soubory uložené?", a: "V úložišti vašeho prohlížeče (automaticky) a tam, kam si je stáhnete jako .mncad nebo STEP. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu." },
+  { q: "Funguje offline?", a: "Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro načtení aplikace a knihovny písem je potřeba připojení; rozpracovanou práci si ukládejte do souboru (ve výchozím režimu se v prohlížeči nic neuchovává)." },
+  { q: "Kde jsou moje soubory uložené? Uvidí je někdo jiný?", a: "Jen tam, kam si je sami uložíte (.mncad, STEP, PDF…). Ve výchozím režimu CAD do prohlížeče nic neukládá – po zavření karty rozpracovaná práce zmizí, takže dokumentaci pod NDA neuvidí nikdo další ani na sdíleném počítači. Kdo chce obnovu práce a nedávné soubory, zapne šifrované úložiště s heslem; bez hesla jsou data nečitelná. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu." },
   { q: "Co znamená, že odkazy „přežijí změnu historie“?", a: "Když vyberete plochu nebo hranu jako cíl (např. vysunutí k ploše), program si uloží její otisk – typ, střed, velikost. Změníte-li dřívější prvek a plochy se přečíslují, odkaz se znovu najde podle otisku a prvek se nerozbije." },
   { q: "Jak zadám délku a úhel úsečky číslem?", a: "Ve skice stiskněte l, klikněte na první bod a začněte psát: 50, Tab, 30, Enter – vznikne úsečka 50 mm pod 30° i s kótou (je-li zapnuto Kótovat při kreslení). Fungují také zápisy 50<30, x;y a @dx;dy." },
   { q: "Umí plechové díly a rozvin?", a: "Ano – záložka Plech: základní plech, ohyby z hrany, lemy, ohyb podle čáry, výřezy, rohové úlevy, prolisy; Rozvinout a export rozvinu do DXF/SVG, tabulka ohybů." },
   { q: "Lze CAD použít komerčně a pro výuku?", a: "Ano, bez omezení. Výstupy (STEP, PDF, DXF, DWG) jsou vaše. Školy a kroužky vítáme – dokumentace a program jsou kompletně česky." },
   { q: "Jak poptám výrobu dílu?", a: "Tlačítkem Poptat výrobu v titulní liště: připraví se STEP aktuálního dílu a e-mail s předvyplněným předmětem. Vyrábíme prototypy, náhradní díly do jednoúčelových strojů, nástroje a přípravky, typicky 1–99 ks, včetně konsignace." },
   { q: "Co dělat, když prvek zčervená s chybou?", a: "Klikněte na prvek v historii – pod ním je česká hláška, co je špatně (např. příliš velký poloměr zaoblení, otevřený profil skici, cílová plocha za rovinou skici). Upravte parametr nebo výběr; ostatní prvky se přestaví automaticky." },
+  { q: "Jak pošlu díl kolegovi nebo zákazníkovi, aby se na něj jen podíval?", a: "Tlačítko Sdílet (horní lišta) → Kopírovat odkaz, nebo rovnou WhatsApp / E-mail. Příjemce odkaz otevře v prohlížeči bez instalace – vidí snímek dílu, sestavy i výkresů, může měřit, řezat a uložit si kopii. Platnost nastavíte na 1–90 dní (výchozí 10), volitelně s heslem. Dokument je uložený jen v odkazu (část za #, kterou prohlížeč neposílá na server); velké importované modely jdou do šifrovaného úložiště nebo jako příloha .mncad/STEP." },
+  { q: "Program hlásí „3D okno nelze spustit“ – co s tím?", a: "Prohlížeč neposkytl WebGL (grafickou akceleraci), kterou 3D zobrazení potřebuje. Zapněte v prohlížeči grafickou akceleraci (Chrome/Edge: Nastavení → Systém; Firefox: Výkon) a restartujte ho, nepracujte přes vzdálenou plochu či virtuální stroj, aktualizujte ovladač grafiky, případně zkuste jiný prohlížeč nebo zařízení. Zbytek programu (nabídky, soubory, 2D skica, výkresy) funguje dál; tlačítko Zkopírovat diagnostiku připraví pro podporu údaje o prostředí bez dat dokumentu." },
 ];
 
 /** Hlavní rysy pro strukturovaná data (SoftwareApplication.featureList). */
@@ -625,6 +694,7 @@ export const CAD_FEATURES = [
   "Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML",
   "Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení",
   "Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání",
+  "Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic",
 ];
 
 /** Rychlý start jako HowTo pro strukturovaná data. */
@@ -636,4 +706,5 @@ export const CAD_HOWTO = [
   { name: "Zaoblení", text: "Klávesa b, vyberte hrany, zadejte poloměr, Enter." },
   { name: "Výkres", text: "Výkres → Nový výkres → doplňte kóty → PDF nebo DWG." },
   { name: "Export", text: "Soubor → Export 3D → STEP; projekt uložte jako .mncad." },
+  { name: "Sdílení", text: "Tlačítko Sdílet → Kopírovat odkaz nebo WhatsApp / E-mail; platnost 10 dní, volitelné heslo." },
 ];

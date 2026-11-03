@@ -17,6 +17,8 @@ type Props = {
   massKg?: number;
   materialLabel: string;
   onClose: () => void;
+  /** sdílení odkazem (dialog otevírá aplikace) */
+  onShare?: () => void;
   /** kusovník sestavy (volitelné) */
   bom?: BomItem[];
   /** obálka modelu – pro výchozí polohu řezu */
@@ -79,7 +81,7 @@ function loadOpts(): DrawingOptions {
   return defaultDrawingOptions;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(defaultDrawingOptions);
   const [meta, setMeta] = useState<DrawingMeta>(() => ({
     name: doc.name,
@@ -459,9 +461,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
   const scaleValue = opts.scale === "auto" ? "auto" : String(opts.scale);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#4b5058] text-[12.5px] text-ink-700">
+    <div data-drawing-workspace className="fixed inset-x-0 bottom-0 top-[76px] z-30 flex flex-col bg-[#4b5058] text-[12.5px] text-ink-700 sm:top-10">
       {/* horní lišta */}
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-black/10 bg-white px-3">
+      <header className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap border-b border-black/10 bg-white px-3 [scrollbar-width:none] [touch-action:pan-x]">
         <svg viewBox="0 0 24 24" className="h-5 w-5 text-brand" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
           <rect x="3" y="4" width="18" height="16" rx="1" />
           <path d="M3 15h18M13 15v5M6 8h6M6 11h4" />
@@ -514,13 +516,21 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
         <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res}>
           Tisk
         </Btn>
+        {onShare && (
+          <>
+            <div className="mx-1 h-6 w-px bg-ink-700/10" />
+            <Btn onClick={onShare} title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres">
+              Sdílet
+            </Btn>
+          </>
+        )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
         <Btn onClick={onClose} title="Zpět do 3D (Esc)">
           Zavřít
         </Btn>
       </header>
       {/* listy výkresu */}
-      <div className="flex h-8 shrink-0 items-end gap-1 border-b border-black/10 bg-[#dfe5eb] px-3">
+      <div className="flex h-8 shrink-0 items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-black/10 bg-[#dfe5eb] px-3 [scrollbar-width:none] [touch-action:pan-x]">
         {(sheets.length ? sheets : [{ id: "main", name: sheetName }]).map((sh, i) => (
           <div key={sh.id} className={cn("group flex items-center gap-1 rounded-t-md border-x border-t px-3 py-1 text-[12px]", i === sheetIdx ? "relative top-px border-black/10 bg-white font-semibold" : "border-transparent text-ink-700/60 hover:bg-white/60")}>
             <button
@@ -1011,7 +1021,7 @@ function Btn({ children, onClick, primary, disabled, title }: { children: React.
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "rounded-md px-3 py-1.5 text-[12.5px] font-medium transition disabled:opacity-40",
+        "shrink-0 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition disabled:opacity-40",
         primary ? "bg-brand text-white hover:bg-brand-600" : "border border-ink-700/12 bg-white text-ink-700 hover:bg-steel-100",
       )}
     >

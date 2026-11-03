@@ -12,7 +12,7 @@ const base = (p: P) => ({
   "aria-hidden": true,
 });
 
-const paths: Record<IconName | "arrow" | "check" | "phone" | "mail" | "upload" | "shield" | "clock" | "pin" | "x" | "menu" | "cube" | "sparkle" | "file" | "lock", React.ReactNode> = {
+const paths: Record<IconName | "arrow" | "check" | "phone" | "mail" | "upload" | "shield" | "clock" | "pin" | "x" | "menu" | "cube" | "sparkle" | "file" | "lock" | "book" | "download", React.ReactNode> = {
   mill: (<><path d="M9 2h6v4H9z" /><path d="M10 6v6l-2 3h8l-2-3V6" /><path d="M8 15l1 7M16 15l-1 7M12 15v7" /></>),
   axes: (<><path d="M12 12V3M12 12l7.8 4.5M12 12l-7.8 4.5" /><path d="M9.5 4.5 12 2l2.5 2.5M18 18.5l1.8-2-3.2-.6M3.4 15.4l.8 3.1 3-1" /><circle cx="12" cy="12" r="2" /></>),
   wire: (<><path d="M6 2v20M18 2v20" /><path d="M6 6h12M6 18h12" /><path d="M10 9l2 3-2 3M14 9l-2 3 2 3" /></>),
@@ -37,6 +37,8 @@ const paths: Record<IconName | "arrow" | "check" | "phone" | "mail" | "upload" |
   sparkle: (<><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" /></>),
   file: (<><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></>),
   lock: (<><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>),
+  book: (<><path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z" /><path d="M4 21a2 2 0 0 1 2-2h14" /><path d="M9 7h7M9 10.5h7" /></>),
+  download: (<><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M4 19h16" /></>),
 };
 
 export type AnyIcon = keyof typeof paths;

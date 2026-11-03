@@ -4,7 +4,7 @@
 
 ## Mnástrojárna CAD
 - [Aplikace](https://www.mnastrojarna.cz/cad): spuštění bez instalace a registrace, česky.
-- [Kompletní dokumentace (HTML)](https://www.mnastrojarna.cz/cad/dokumentace): 23 kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.
+- [Kompletní dokumentace (HTML)](https://www.mnastrojarna.cz/cad/dokumentace): 24 kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.
 - [Dokumentace jako Markdown](https://www.mnastrojarna.cz/cad/dokumentace.md): stejný obsah v prostém textu pro strojové zpracování.
 - [Příručka PDF](https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf): tisková verze s obrázky.
 
@@ -23,3 +23,4 @@
 - Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
 - Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
+- Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic

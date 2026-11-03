@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { MeshData } from "@/cad/types";
@@ -13,9 +14,16 @@ export function MiniViewport({ mesh, color = "#b9c2cc", className, spin = true }
   const host = useRef<HTMLDivElement>(null);
   const S = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; group: THREE.Group; pivot: THREE.Group; dist: number; render: () => void } | null>(null);
 
+  const [glOk, setGlOk] = useState(true);
   useEffect(() => {
     const el = host.current!;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      setGlOk(false); // náhled vyžaduje WebGL – zbytek dialogu funguje dál
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     el.appendChild(renderer.domElement);
@@ -139,5 +147,9 @@ export function MiniViewport({ mesh, color = "#b9c2cc", className, spin = true }
     s.render();
   }, [mesh, color]);
 
-  return <div ref={host} className={className ?? "h-full w-full"} />;
+  return (
+    <div ref={host} className={cn(className ?? "h-full w-full", !glOk && "grid place-items-center")}>
+      {!glOk && <span className="px-2 text-center text-[11px] text-[#6b7785]">Náhled 3D vyžaduje WebGL – vložit lze i tak.</span>}
+    </div>
+  );
 }

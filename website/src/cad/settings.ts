@@ -1,3 +1,4 @@
+import { vaultGet, vaultRemove, vaultSet } from "./vault";
 /** Uživatelské nastavení CAD – uložené v prohlížeči (localStorage), s exportem/importem JSON. */
 import type { DisplayMode, MouseScheme } from "@/components/cad/viewport";
 
@@ -155,51 +156,48 @@ export function fmtLen(mm: number, s: Pick<Settings, "units" | "decimals">): str
 export const toMm = (v: number, units: Settings["units"]) => (units === "inch" ? v * INCH : v);
 export const fromMm = (mm: number, units: Settings["units"]) => (units === "inch" ? mm / INCH : mm);
 
-// ---------------- nedávné soubory ----------------
+// ---------------- nedávné soubory (jen v šifrovaném úložišti – viz vault.ts) ----------------
 
 export type RecentDoc = { id: string; name: string; kind: "part" | "assembly"; at: number; features: number; thumb?: string };
 const RECENT = "mn-cad-recent-v1";
 
-export function loadRecent(): RecentDoc[] {
+export async function loadRecent(): Promise<RecentDoc[]> {
   try {
-    return JSON.parse(localStorage.getItem(RECENT) ?? "[]") as RecentDoc[];
+    const t = await vaultGet(RECENT);
+    return t ? (JSON.parse(t) as RecentDoc[]) : [];
   } catch {
     return [];
   }
 }
 
-export function pushRecent(r: RecentDoc, limit = 12) {
+/** Přidá / aktualizuje záznam; bez nového náhledu zůstane dosavadní. */
+export async function pushRecent(r: RecentDoc, limit = 12) {
   try {
-    const list = loadRecent().filter((x) => x.id !== r.id);
-    list.unshift(r);
-    localStorage.setItem(RECENT, JSON.stringify(list.slice(0, limit)));
+    const list = await loadRecent();
+    const prev = list.find((x) => x.id === r.id);
+    const next = list.filter((x) => x.id !== r.id);
+    next.unshift({ ...r, thumb: r.thumb ?? prev?.thumb });
+    await vaultSet(RECENT, JSON.stringify(next.slice(0, limit)));
   } catch {
     /* ignore */
   }
 }
 
-export function removeRecent(id: string) {
+export async function removeRecent(id: string) {
   try {
-    localStorage.setItem(RECENT, JSON.stringify(loadRecent().filter((x) => x.id !== id)));
+    await vaultSet(RECENT, JSON.stringify((await loadRecent()).filter((x) => x.id !== id)));
+    vaultRemove(`mn-cad-doc-${id}`);
   } catch {
     /* ignore */
   }
 }
 
-/** Kompaktní uložení dokumentu k nedávnému záznamu (pro opětovné otevření). */
-export function storeRecentDoc(id: string, json: string) {
-  try {
-    localStorage.setItem(`mn-cad-doc-${id}`, json);
-  } catch {
-    /* příliš velké */
-  }
+/** Uložení dokumentu k nedávnému záznamu (šifrovaně; v režimu „neukládat“ se nic nezapíše). */
+export async function storeRecentDoc(id: string, json: string) {
+  await vaultSet(`mn-cad-doc-${id}`, json);
 }
-export function readRecentDoc(id: string): string | null {
-  try {
-    return localStorage.getItem(`mn-cad-doc-${id}`);
-  } catch {
-    return null;
-  }
+export async function readRecentDoc(id: string): Promise<string | null> {
+  return vaultGet(`mn-cad-doc-${id}`);
 }
 
 /** Normalizace zkratky z KeyboardEvent na tvar „Ctrl+Shift+K“. */
