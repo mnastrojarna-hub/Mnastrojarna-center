@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { AGENT_COMMANDS, docStatusText, FEATURE_TYPES, normalizeFeatures, parseAgentText, parseEntity, selectEdges, selectFaces, type Bbox } from "./agent";
+import { AGENT_COMMANDS, docStatusText, FEATURE_TYPES, normalizeFeatures, parseAgentText, parseEntity, selectEdges, selectFaces, topAt, type Bbox } from "./agent";
 import { emptyDoc, type CadDoc, type Feature } from "./types";
 
 const feat = (p: ReturnType<typeof parseAgentText>, i: number) => {
@@ -96,6 +96,16 @@ zobraz horní`);
     expect(p.ops[9]).toMatchObject({ k: "view", view: "top" });
   });
 
+  it("materiál: známá třída → hustota, jiný text → označení do razítka", () => {
+    const p = parseAgentText("materiál nerez\nmateriál ČSN 11 423\nmaterial Hliník");
+    expect(p.errors).toEqual([]);
+    expect(p.ops[0]).toMatchObject({ k: "meta", patch: { material: "nerez" } });
+    expect(p.ops[1]).toMatchObject({ k: "meta", patch: { materialName: "ČSN 11 423" } });
+    expect(p.ops[2]).toMatchObject({ k: "meta", patch: { material: "hlinik" } });
+    const t = docStatusText({ ...emptyDoc("X"), material: "ocel", materialName: "ČSN 11 423" }, null);
+    expect(t).toContain("materiál ČSN 11 423 (hustota podle: Ocel)");
+  });
+
   it("chyby jsou po řádcích se srozumitelným textem, ostatní řádky se provedou", () => {
     const p = parseAgentText(`kvádr 10 10
 blabla 5
@@ -186,7 +196,7 @@ describe("stav dokumentu jako text", () => {
       { id: "h1", name: "Díra 1", type: "hole", position: [30, 25, 20], axis: "Z", flip: false, diameter: 18, depth: 0, cbDiameter: 0, cbDepth: 0 },
     ] };
     const t = docStatusText(doc, { status: [{ id: "s1", ok: true }, { id: "x1", ok: true }, { id: "h1", ok: false, error: "Díra je mimo těleso." }], mesh: null, metrics: { volume: 97456, area: 1, bbox: [[-50, -25, 0], [50, 25, 20]], faces: 8, edges: 18 }, bodies: [{ name: "Těleso 1", faces: [], edges: [], volume: 1, area: 1, createdBy: "x1" }], ms: 3 });
-    expect(t).toContain("Dokument: „Deska“ · díl · materiál ocel · prvků 3 (2 ✓, 1 ✗) · těles 1");
+    expect(t).toContain("Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗) · těles 1");
     expect(t).toContain("Rozměry: 100 × 50 × 20 mm");
     expect(t).toContain("objem 97,46 cm³ · ploch 8 · hran 18");
     expect(t).toContain("1. Skica 1 [sketch, id s1] ✓ – rovina XY, 1 entit: obdélník 100×50");
@@ -196,5 +206,17 @@ describe("stav dokumentu jako text", () => {
   it("seznam příkazů existuje pro nápovědu", () => {
     expect(AGENT_COMMANDS.length).toBeGreaterThan(15);
     expect(AGENT_COMMANDS.some((c) => c.cmd.startsWith("díra"))).toBe(true);
+  });
+});
+
+describe("povrch tělesa v daném místě (síť)", () => {
+  // deska 0..100 × 0..60 ve výšce z=10 (2 trojúhelníky) + „náboj“ 40..60 × 20..40 ve výšce z=30
+  const V = new Float32Array([0, 0, 10, 100, 0, 10, 100, 60, 10, 0, 60, 10, 40, 20, 30, 60, 20, 30, 60, 40, 30, 40, 40, 30]);
+  const T = new Uint32Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+  it("vrátí výšku desky vedle náboje, výšku náboje nad ním a null mimo těleso", () => {
+    expect(topAt({ vertices: V, triangles: T }, "Z", 20, 30)).toBe(10);
+    expect(topAt({ vertices: V, triangles: T }, "Z", 50, 30)).toBe(30);
+    expect(topAt({ vertices: V, triangles: T }, "Z", 150, 30)).toBeNull();
+    expect(topAt(null, "Z", 1, 1)).toBeNull();
   });
 });

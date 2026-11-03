@@ -10,6 +10,8 @@ export type Settings = {
   bg: string;
   ortho: boolean;
   showGrid: boolean;
+  /** při ukládání a exportu se zeptat na místo a název (vypnuto = přímé stažení pod výchozím názvem – automatizace, AI agenti) */
+  askWhereToSave: boolean;
   showViewCube: boolean;
   showTriad: boolean;
   showChips: boolean;
@@ -74,6 +76,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bg: "blue",
   ortho: false,
   showGrid: false,
+  askWhereToSave: true,
   showViewCube: true,
   showTriad: true,
   showChips: true,

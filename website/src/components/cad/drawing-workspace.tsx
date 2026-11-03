@@ -8,6 +8,8 @@ import { saveFile } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import { bomToCsv, defaultDrawingOptions, GDT_LABEL, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type RevisionItem, type SheetName, type ViewKey } from "@/cad/drawing";
+import { threadByName } from "@/cad/defaults";
+import { dimCheck } from "@/cad/dim-check";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -19,6 +21,8 @@ type Props = {
   onClose: () => void;
   /** sdílení odkazem (dialog otevírá aplikace) */
   onShare?: () => void;
+  /** změna označení materiálu v razítku – uloží se do dokumentu (sdílí se s odkazem i souborem) */
+  onMaterialChange?: (name: string) => void;
   /** kusovník sestavy (volitelné) */
   bom?: BomItem[];
   /** obálka modelu – pro výchozí polohu řezu */
@@ -43,6 +47,8 @@ const ANN_TOOLS: { id: AnnTool; label: string; kbd: string; hint: string }[] = [
   { id: "text", label: "Text", kbd: "T", hint: "volný text na listu" },
   { id: "detail", label: "Detail", kbd: "L", hint: "detailní pohled: střed, poloměr, umístění" },
 ];
+/** nástroje, které se po jednom vložení vypnou (kóty a detaily zůstávají aktivní pro sérii) */
+const ONE_SHOT = new Set<DrawingAnnotation["type"]>(["text", "note", "roughness", "gdt", "datum"]);
 const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: "Kóta", note: "Poznámka", roughness: "Drsnost", gdt: "Tolerance", datum: "Základna", text: "Text" };
 
 const OPTS_KEY = "mn-cad-drawing-opts-v1";
@@ -81,7 +87,7 @@ function loadOpts(): DrawingOptions {
   return defaultDrawingOptions;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(defaultDrawingOptions);
   const [meta, setMeta] = useState<DrawingMeta>(() => ({
     name: doc.name,
@@ -91,9 +97,22 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     author: doc.props?.author ?? "",
     revision: doc.props?.revision ?? "",
     date: new Date().toLocaleDateString("cs-CZ"),
-    tolerance: "ISO 2768-mK",
+    tolerance: "", // výrobní požadavky (tolerance, hrany) se nedoplňují automaticky – uvedou se jen zadané
   }));
   const [showBom, setShowBom] = useState(!!bom?.length);
+  /** závitové díry: Ø jádra → označení závitu (místo „Ø5“ se kótuje „M6 hl. 12“) */
+  const threads = useMemo(() => {
+    const out: { r: number; label: string }[] = [];
+    for (const f of doc.features) {
+      if (f.type !== "hole" || f.suppressed || f.kind !== "tapped" || !f.thread) continue;
+      const t = threadByName(f.thread);
+      if (!t) continue;
+      out.push({ r: t.tap / 2, label: `${t.name}${f.depth > 0 ? ` hl. ${String(Math.round(f.depth * 100) / 100).replace(".", ",")}` : ""}` });
+    }
+    return out;
+  }, [doc.features]);
+  const [repeatTool, setRepeatTool] = useState(false);
+  const [checkOpen, setCheckOpen] = useState(false);
   const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
     try {
       const v = localStorage.getItem("mn-cad-dwg-version") as DwgVersion | null;
@@ -203,7 +222,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const t = setTimeout(async () => {
       const t0 = performance.now();
       try {
-        const d = await cad.drawing(doc, { ...meta, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length) }, opts);
+        const d = await cad.drawing(doc, { ...meta, threads, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length) }, opts);
         if (id !== seq.current) return;
         setRes(d);
         setError(null);
@@ -215,7 +234,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       }
     }, 220);
     return () => clearTimeout(t);
-  }, [doc, meta, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
+  }, [doc, meta, threads, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
 
   const set = <K extends keyof DrawingOptions>(k: K, v: DrawingOptions[K]) => {
     markDirty();
@@ -371,6 +390,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     setAnn((list) => [...list, a]);
     markDirty();
     setAnnPts([]);
+    if (ONE_SHOT.has(a.type) && !repeatTool) setAnnTool(null); // jednorázové vložení – nástroj se po vložení vypne
   };
   /** převod bodů listu do souřadnic pohledu (asociativní) – podle prvního bodu */
   const localize = (pts: Vec2[]): { view: string; pts: Vec2[] } => {
@@ -519,7 +539,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         {onShare && (
           <>
             <div className="mx-1 h-6 w-px bg-ink-700/10" />
-            <Btn onClick={onShare} title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres">
+            <Btn
+              onClick={() => {
+                if (dirty.current) persistNow(); // rozpracované razítko / poznámky do dokumentu ještě před vytvořením odkazu
+                onShare?.();
+              }}
+              title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres">
               Sdílet
             </Btn>
           </>
@@ -593,15 +618,66 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 ))}
               </div>
             )}
+            {annTool && (
+              <div data-active-tool className="mt-2 flex items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-2 py-1 text-[11px]">
+                <span>
+                  <strong className="text-brand">Aktivní nástroj: {ANN_TOOLS.find((t) => t.id === annTool)?.label ?? annTool}</strong> · Esc ukončí
+                </span>
+                <label className="flex shrink-0 items-center gap-1 text-ink-700/70" title="Po vložení zůstat v nástroji (jinak se po jednom vložení vypne)">
+                  <input type="checkbox" checked={repeatTool} onChange={(e) => setRepeatTool(e.target.checked)} /> opakovat
+                </label>
+              </div>
+            )}
             <p className="mt-2 text-[11px] leading-snug text-ink-700/55">
               {annTool ? (annTool === "detail" ? `Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu (${annPts.length}/3).` : annTool === "dim" ? `Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno ${annPts.length}/3.` : annTool === "note" || annTool === "gdt" ? `1. klik = kam šipka ukazuje, 2. klik = umístění. (${annPts.length}/2)` : "Klikněte na místo ve výkresu.") : "Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu."}
             </p>
+            <div className="mt-2">
+              <button type="button" onClick={() => setCheckOpen((v) => !v)} className="w-full rounded-md border border-ink-700/15 px-2 py-1 text-[11.5px] hover:bg-steel-100">
+                {checkOpen ? "Skrýt kontrolu kót" : "Kontrola kót – co chybí"}
+              </button>
+              {checkOpen &&
+                (() => {
+                  const items = dimCheck(doc, bbox ?? null, out?.texts ?? []);
+                  const missing = items.filter((i) => !i.present);
+                  return (
+                    <div data-dim-check className="mt-1 rounded-md border border-ink-700/10 bg-steel-100/60 p-2 text-[11px]">
+                      <p className="font-semibold">{missing.length ? `Chybí ${missing.length} z ${items.length} očekávaných kót` : `Všech ${items.length} očekávaných kót je na listu`}</p>
+                      {missing.length > 0 && (
+                        <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+                          {missing.map((m, i) => (
+                            <li key={i} className="flex gap-1">
+                              <span className="text-brand">✗</span>
+                              <span className="min-w-0 flex-1 truncate">{m.label}</span>
+                              <span className="shrink-0 text-ink-700/45">{m.source}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="mt-1 leading-snug text-ink-700/55">Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.</p>
+                    </div>
+                  );
+                })()}
+            </div>
             {ann.length > 0 && (
               <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">
                 {ann.map((a, i) => (
                   <li key={a.id} className="flex items-center gap-2 rounded px-1.5 py-0.5 text-[11.5px] hover:bg-steel-100">
                     <span className="w-16 shrink-0 text-ink-700/50">{ANN_LABEL[a.type]}</span>
                     <span className="min-w-0 flex-1 truncate">{a.type === "dim" ? `${a.kind === "horizontal" ? "↔" : a.kind === "vertical" ? "↕" : "⤢"} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.label}</span>
+                    {a.type === "dim" && (
+                      <input
+                        value={a.suffix ?? ""}
+                        placeholder="H8 / ±0,1"
+                        title="Tolerance nebo přípona kóty (zobrazí se za hodnotou)"
+                        aria-label="Přípona kóty"
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setAnn((l) => l.map((x) => (x.id === a.id && x.type === "dim" ? { ...x, suffix: v } : x)));
+                          markDirty();
+                        }}
+                        className="w-16 shrink-0 rounded border border-ink-700/15 px-1 py-0.5 font-mono text-[10.5px]"
+                      />
+                    )}
                     <button
                       type="button"
                       title="Smazat"
@@ -702,6 +778,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Row label="Kóty">
               <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "none", l: "Žádné" }, { v: "overall", l: "Celkové" }, { v: "auto", l: "Auto + Ø" }]} />
             </Row>
+            <p className="-mt-1 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.</p>
             {bom?.length ? (
               <Check checked={showBom} onChange={setShowBom}>
                 Kusovník nad razítkem ({bom.length} pol.)
@@ -760,12 +837,23 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <Row label="Datum">
                 <TextInput value={meta.date ?? ""} onChange={(v) => setM({ date: v })} />
               </Row>
-              <Row label="Tolerance">
-                <TextInput value={meta.tolerance ?? ""} onChange={(v) => setM({ tolerance: v })} />
+              <Row label="Nepředepsané tolerance">
+                <TextInput value={meta.tolerance ?? ""} onChange={(v) => setM({ tolerance: v })} placeholder="např. ISO 2768-mK" />
               </Row>
             </div>
+            <Row label="Opracování hran">
+              <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder="např. srazit 0,5×45°" />
+            </Row>
+            <p className="-mt-0.5 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">
+              Výrobní požadavky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.{" "}
+              {!meta.tolerance && !meta.edges && (
+                <button type="button" className="text-brand underline-offset-2 hover:underline" onClick={() => setM({ tolerance: "ISO 2768-mK", edges: "srazit 0,5×45°" })}>
+                  Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°)
+                </button>
+              )}
+            </p>
             <Row label="Materiál">
-              <TextInput value={meta.material} onChange={(v) => setM({ material: v })} />
+              <TextInput value={meta.material} onChange={(v) => setM({ material: v })} onBlur={() => onMaterialChange?.(meta.material)} placeholder="označení do razítka, např. ČSN 11 423" />
             </Row>
           </Section>
 
@@ -805,6 +893,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         {/* náhled listu */}
         <main
           ref={canvas}
+          data-sheet
           className={cn("relative min-w-0 flex-1 touch-none overflow-hidden", annTool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}
           onPointerDown={(e) => {
             if (annTool && e.button === 0) {

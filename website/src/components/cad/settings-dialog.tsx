@@ -231,6 +231,12 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
 
           {tab === "files" && (
             <>
+              <Toggle
+                label="Při ukládání a exportu se zeptat na místo a název souboru"
+                checked={draft.askWhereToSave}
+                onChange={(v) => setDraft({ ...draft, askWhereToSave: v })}
+                hint="Vypnuto = soubory se rovnou stáhnou pod výchozím názvem do složky Stažené (bez dialogu) – vhodné pro automatizaci a AI agenty."
+              />
               <StorageSettings />
               <Field label="Počet nedávných souborů">
                 <input type="number" min={4} max={30} value={draft.recentLimit} onChange={(e) => set("recentLimit", Number(e.target.value))} className={inputCls} />

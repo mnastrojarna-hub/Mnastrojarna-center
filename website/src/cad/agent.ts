@@ -9,6 +9,7 @@
  * Čisté funkce bez prohlížeče (testovatelné v Node). Operace, které potřebují topologii tělesa
  * (výběr hran/ploch pravidlem, poloha díry „na horní ploše“), nechávají doplnění na aplikaci.
  */
+import { MATERIALS } from "@/lib/mesh-metrics";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec3 } from "./types";
 
 export const AGENT_API_VERSION = 1;
@@ -28,7 +29,7 @@ export type AgentOp =
   | { k: "doc"; doc: CadDoc; line: number }
   | { k: "features"; features: Feature[]; line: number }
   | { k: "new"; name: string; assembly: boolean; line: number }
-  | { k: "meta"; patch: { name?: string; material?: string; color?: string }; line: number }
+  | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
   /** prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text) */
   | { k: "feature"; feature: Feature; line: number; fillTop?: boolean }
   /** entity do poslední skici */
@@ -254,9 +255,13 @@ export function parseAgentText(text: string): AgentProgram {
         case "name":
           ops.push({ k: "meta", patch: { name: tokens.join(" ") }, line: no });
           return;
-        case "material":
-          ops.push({ k: "meta", patch: { material: tokens.join(" ") }, line: no });
+        case "material": {
+          // známá třída (hustota) → material; cokoli jiného (ČSN 11 423, 1.0503, EN AW-6082) = označení do razítka
+          const q = tokens.join(" ").trim();
+          const known = MATERIALS.find((x) => fold(x.id) === fold(q) || fold(x.label) === fold(q));
+          ops.push({ k: "meta", patch: known ? { material: known.id } : { materialName: q }, line: no });
           return;
+        }
         case "color":
           ops.push({ k: "meta", patch: { color: tokens[0] }, line: no });
           return;
@@ -618,7 +623,7 @@ export function featureSummary(f: Feature): string {
     case "tube":
       return `Ø${fmt(f.outer)}/Ø${fmt(f.inner)} × ${fmt(f.height)} mm, ${f.mode}`;
     case "hole":
-      return `Ø${fmt(f.diameter, 2)}${f.thread ? ` ${f.thread}` : ""}${f.depth > 0 ? ` hloubka ${fmt(f.depth)}` : " skrz"}${f.cbDiameter > 0 ? ` zahl. Ø${fmt(f.cbDiameter)}×${fmt(f.cbDepth)}` : ""} v [${f.position.map((v) => fmt(v)).join("; ")}], osa ${f.axis}`;
+      return `${f.kind === "tapped" && f.thread ? `${f.thread.toUpperCase()}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"} (jádro Ø${fmt(f.diameter, 2)})` : `Ø${fmt(f.diameter, 2)}${f.depth > 0 ? ` hloubka ${fmt(f.depth)}` : " skrz"}`}${f.cbDiameter > 0 ? ` zahl. Ø${fmt(f.cbDiameter)}×${fmt(f.cbDepth)}` : ""}${f.csDiameter ? ` kuž. Ø${fmt(f.csDiameter)}` : ""} v [${f.position.map((v) => fmt(v)).join("; ")}], osa ${f.axis}`;
     case "fillet":
       return `R${fmt(f.radius, 2)}, hrany ${f.edges === "all" ? "vše" : f.edges.length}`;
     case "chamfer":
@@ -642,7 +647,9 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null): string {
   const st = new Map((res?.status ?? []).map((s) => [s.id, s]));
   const okCount = doc.features.filter((f) => st.get(f.id)?.ok !== false).length;
   const lines: string[] = [];
-  lines.push(`Dokument: „${doc.name}“ · ${doc.kind === "assembly" ? "sestava" : "díl"} · materiál ${doc.material || "–"} · prvků ${doc.features.length} (${okCount} ✓, ${doc.features.length - okCount} ✗)${res?.bodies?.length ? ` · těles ${res.bodies.length}` : ""}`);
+  const matClass = MATERIALS.find((x) => x.id === doc.material);
+  const matText = doc.materialName?.trim() ? `${doc.materialName.trim()} (hustota podle: ${matClass?.label ?? doc.material})` : (matClass ? `${matClass.label} (${matClass.density} g/cm³)` : doc.material || "–");
+  lines.push(`Dokument: „${doc.name}“ · ${doc.kind === "assembly" ? "sestava" : "díl"} · materiál ${matText} · prvků ${doc.features.length} (${okCount} ✓, ${doc.features.length - okCount} ✗)${res?.bodies?.length ? ` · těles ${res.bodies.length}` : ""}`);
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
     lines.push(`Rozměry: ${fmt(b[0] - a[0])} × ${fmt(b[1] - a[1])} × ${fmt(b[2] - a[2])} mm (X ${fmt(a[0])}…${fmt(b[0])}, Y ${fmt(a[1])}…${fmt(b[1])}, Z ${fmt(a[2])}…${fmt(b[2])}) · objem ${fmt(res.metrics.volume / 1000, 2)} cm³ · ploch ${res.metrics.faces} · hran ${res.metrics.edges}`);
@@ -663,7 +670,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null): string {
 /** Seznam příkazů (pro nápovědu v konzoli a paletu). */
 export const AGENT_COMMANDS: { cmd: string; en: string; desc: string }[] = [
   { cmd: "nový díl [název] / nová sestava [název]", en: "new part / new assembly", desc: "nový dokument v nové záložce" },
-  { cmd: "název …, materiál …, barva #hex", en: "name, material, color", desc: "popis dokumentu" },
+  { cmd: "název …, materiál …, barva #hex", en: "name, material, color", desc: "materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)" },
   { cmd: "kvádr X Y Z [střed] [v x y z] [odebrat]", en: "box", desc: "kvádr; výchozí roh v počátku, „střed“ = vystředit" },
   { cmd: "válec D H [osa Z] [v x y z] [odebrat]", en: "cylinder", desc: "válec průměr × výška" },
   { cmd: "koule D [v x y z]", en: "sphere", desc: "koule průměr" },
@@ -677,7 +684,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; desc: string }[] = [
   { cmd: "úsečka x1 y1 x2 y2 · čára x1 y1 x2 y2 … [uzavřít] · bod x y · elipsa rx ry", en: "line, polyline, point, ellipse", desc: "další entity; předpona „pomocná“ = konstrukční" },
   { cmd: "vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]", en: "extrude", desc: "vysune poslední skicu" },
   { cmd: "rotovat [úhel] [osa X|Y|Z]", en: "revolve", desc: "orotuje poslední skicu (výchozí osa Y skici, 360°)" },
-  { cmd: "díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", desc: "bez z = z nejvyššího bodu tělesa dolů (skrz vše / hloubka)" },
+  { cmd: "díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", desc: "bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů" },
   { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z… ] [poloměr N] [delší N]", en: "fillet", desc: "pravidla lze kombinovat (horní kruhové)" },
   { cmd: "srazit C [hrany …]", en: "chamfer", desc: "sražení hran" },
   { cmd: "skořepina T [otevřít +Z|horní|boční…]", en: "shell", desc: "vydlabání, otevřené plochy pravidlem" },
@@ -705,9 +712,48 @@ export type MncadApi = {
   status: () => Promise<string>;
   /** otevře konzoli Textové příkazy */
   openConsole: () => void;
+  /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL nebo projekt .mncad – vrátí název, MIME, velikost a base64 */
+  exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad") => Promise<{ name: string; mime: string; bytes: number; base64: string }>;
 };
 declare global {
   interface Window {
     mncad?: MncadApi;
   }
+}
+
+/**
+ * Souřadnice povrchu tělesa v daném místě podle sítě modelu: nejvyšší bod sítě (podél osy) nad bodem (u, v)
+ * v rovině kolmé na osu. Díra „v x y“ bez z tak začíná na skutečném povrchu (deska i vedle vyššího náboje),
+ * ne na obálce celého tělesa. Vrací null, když nad bodem žádná plocha není.
+ */
+export function topAt(mesh: { vertices: Float32Array | number[]; triangles: Uint32Array | number[] } | null | undefined, axis: "X" | "Y" | "Z", u: number, v: number): number | null {
+  if (!mesh) return null;
+  const V = mesh.vertices;
+  const T = mesh.triangles;
+  const ai = axis === "X" ? 0 : axis === "Y" ? 1 : 2;
+  const ui = axis === "X" ? 1 : 0;
+  const vi = axis === "Z" ? 1 : 2;
+  let best: number | null = null;
+  for (let t = 0; t + 2 < T.length; t += 3) {
+    const a = T[t] * 3;
+    const b = T[t + 1] * 3;
+    const c = T[t + 2] * 3;
+    const ax = V[a + ui] - u;
+    const ay = V[a + vi] - v;
+    const bx = V[b + ui] - u;
+    const by = V[b + vi] - v;
+    const cx = V[c + ui] - u;
+    const cy = V[c + vi] - v;
+    // barycentrické souřadnice bodu (0,0) v promítnutém trojúhelníku
+    const det = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+    if (Math.abs(det) < 1e-12) continue;
+    const l1 = ((bx - 0) * (cy - 0) - (cx - 0) * (by - 0)) / det;
+    const l2 = ((cx - 0) * (ay - 0) - (ax - 0) * (cy - 0)) / det;
+    const l3 = 1 - l1 - l2;
+    const eps = -1e-6;
+    if (l1 < eps || l2 < eps || l3 < eps) continue;
+    const h = l1 * V[a + ai] + l2 * V[b + ai] + l3 * V[c + ai];
+    if (best === null || h > best) best = h;
+  }
+  return best;
 }

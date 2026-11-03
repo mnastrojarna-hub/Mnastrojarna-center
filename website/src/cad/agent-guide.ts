@@ -23,7 +23,8 @@ do 3D okna (výběr hran a ploch pravidlem).
    \`await window.mncad.run(text)\` provede příkazy / JSON a vrátí protokol; \`window.mncad.getDocument()\` vrátí
    dokument; \`await window.mncad.setDocument(docOrJson)\` ho nahradí; \`await window.mncad.status()\` vrátí stav
    jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
-   \`window.mncad.openConsole()\` otevře konzoli.
+   \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
+   3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor.
 
 Všechny rozměry jsou v **milimetrech**, úhly ve stupních, desetinná čárka i tečka jsou povolené, „Ø“ před číslem
 se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu kvádru (bez „střed“) nebo ve středu válce.
@@ -43,7 +44,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`mnohoúhelník N D [v x y]\` · \`drážka L W [úhel a]\` · \`úsečka x1 y1 x2 y2\` · \`čára x1 y1 x2 y2 … [uzavřít]\` · \`bod x y\` · \`elipsa rx ry\` | další entity; předpona \`pomocná\` = konstrukční |
 | \`vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]\` | vysune poslední skicu |
 | \`rotovat [úhel] [osa X|Y|Z]\` | orotuje poslední skicu (výchozí osa Y skici, 360°) |
-| \`díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]\` | bez z = z nejvyššího bodu tělesa (obálka) dolů; u odstupňovaných dílů zadejte z výslovně; \`závit M8\` vrtá jádro |
+| \`díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]\` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; \`závit M6\` vrtá jádro |
 | \`zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]\` | pravidla lze kombinovat: \`hrany horní kruhové\` |
 | \`srazit C [hrany …]\` | sražení hran, stejná pravidla |
 | \`skořepina T [otevřít +Z|horní|boční|největší]\` | vydlabání; otevřené plochy pravidlem |
@@ -111,6 +112,21 @@ Dokument je JSON objekt:
   pro agenty je jednodušší použít textové příkazy s pravidly (\`hrany svislé\`, \`otevřít +Z\`).
 - Sestava: \`"kind": "assembly"\`, \`"components": [ { "name": "Díl", "source": { "kind": "part", "doc": { …dokument dílu… } },
   "placement": { "position": [0,0,0], "rotation": [0,0,0] } } ]\`, vazby \`"mates"\`.
+
+## Materiál, výkres a export – co je dobré vědět
+
+- \`materiál ocel|nerez|hliník|mosaz|měď|plast|titan|litina|bronz\` nastaví **třídu materiálu (hustotu)** pro hmotnost.
+  Jakýkoli jiný text (\`materiál ČSN 11 423\`, \`materiál 1.0503\`) se uloží jako **označení materiálu do razítka**
+  a hustota zůstává podle třídy – protokol to vždy napíše. V JSON jsou to pole \`material\` (id třídy) a \`materialName\`.
+- Výkres **nedoplňuje žádné výrobní požadavky sám**: nepředepsané tolerance (např. ISO 2768-mK) a opracování hran
+  (např. srazit 0,5×45°) se na list dostanou jen vyplněním polí v razítku (každé zvlášť, lze smazat). Výchozí text je
+  jen „Rozměry v mm“.
+- Závitové díry (\`díra 5 závit M6 hloubka 12\`) se na výkrese kótují jako \`M6 hl. 12\` (s počtem), ne jako Ø jádra.
+- Automatické kóty („Auto + Ø“) jsou pomocný základ. Tlačítko **Kontrola kót** ve výkresu porovná kóty na listu
+  s historií prvků a vypíše, co chybí (Ø, závity, drážky, zaoblení…); tolerance (H8, ±0,1) se píší u kóty do pole
+  „přípona“.
+- Ukládání a export se standardně ptají na místo a název (systémový dialog – pro agenta „blokující“). V Nastavení →
+  Soubory lze zapnout **přímé stažení pod výchozím názvem**; pro skripty je nejjednodušší \`window.mncad.exportFile()\`.
 
 ## Zpětná vazba a doporučený postup pro agenta
 

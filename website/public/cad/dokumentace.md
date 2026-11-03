@@ -717,7 +717,7 @@ nový díl Příruba DN50 · skica XY: kružnice 165 · vysunout 18 · trubka 88
 ### JSON a JavaScript API
 
 - JSON dokumentu (formát .mncad) dává přístup ke všem typům prvků a sestavám; id a name lze vynechat, sketchId: "$last" odkazuje na poslední skicu. Vložit ho lze do konzole, přes Soubor → Otevřít nebo přetažením.
-- window.mncad pro skripty a rozšíření: run(text), getDocument(), setDocument(json), status(), guide(), commands(), openConsole() – pro Playwright, Selenium nebo Claude in Chrome.
+- window.mncad pro skripty a rozšíření: run(text), getDocument(), setDocument(json), status(), guide(), commands(), openConsole(), exportFile("step") (soubor jako base64 bez dialogu) – pro Playwright, Selenium nebo Claude in Chrome. Kdo chce i z nabídek ukládat bez dialogu, zapne v Nastavení → Soubory přímé stažení pod výchozím názvem.
 - Úplný návod se schématem (TypeScript typy přímo ze zdrojového kódu): /cad/schema-pro-ai.md – stačí ho dát agentovi do zadání (tlačítko „Kopírovat návod pro AI“ v konzoli). Odkaz je i v llms.txt webu.
 - Všechny prvky stránky mají textové popisky (title / aria-label) a historie prvků je textový seznam, takže agent, který čte stránku místo obrázku, se orientuje. Nic z toho neodesílá data mimo prohlížeč – ochrana dokumentace platí beze změny.
 
@@ -848,3 +848,15 @@ Prohlížeč neposkytl WebGL (grafickou akceleraci), kterou 3D zobrazení potře
 **Může CAD ovládat AI agent (ChatGPT Agent, Claude) nebo skript?**
 
 Ano. Nápověda → Textové příkazy (Ctrl+Shift+K): příkazy jako „kvádr 100 60 20“, „díra 8,5 skrz v 20 30“, „zaoblit 2 hrany svislé“ nebo rovnou JSON dokumentu; protokol vrátí ✓/✗ s důvodem a textový stav dokumentu (rozměry, objem, prvky), takže agent nepotřebuje číst obrázek. Pro skripty je k dispozici window.mncad (run, getDocument, setDocument, status). Návod a úplné schéma: /cad/schema-pro-ai.md. Pro člověka se nic nemění.
+
+**Proč výkres neuvádí ISO 2768 ani sražení hran? Dříve tam byly.**
+
+Výrobní požadavky jsou konkrétní technické údaje, které by na výkres neměly přijít bez vědomí konstruktéra. Výkres proto standardně uvádí jen „Rozměry v mm“; nepředepsané tolerance (např. ISO 2768-mK) a opracování hran (např. srazit 0,5×45°) vyplníte v razítku – každé zvlášť, kdykoli lze smazat. Tlačítko „Doplnit obvyklé“ je vyplní jedním klikem.
+
+**Jak dostanu do razítka materiál jako „ČSN 11 423“, když v nabídce je jen Ocel, Nerez…?**
+
+Nabídka Materiál určuje třídu (hustotu) pro hmotnost. Pod ní je pole „Označení materiálu (razítko)“ – volný text, který se uloží do dokumentu, přenese sdíleným odkazem i souborem .mncad a zobrazí v razítku výkresu. Stejné pole je přímo v razítku výkresu. Textový příkaz „materiál ČSN 11 423“ dělá totéž a protokol napíše, podle které třídy se počítá hustota.
+
+**Stačí automatické kótování pro výrobní výkres?**
+
+Ne – „Auto + Ø“ je pomocný základ (celkové rozměry, průměry děr, závity). Funkční kóty, tolerance (H8, ±0,1) a drsnosti doplní konstruktér. Tlačítko „Kontrola kót“ ve výkresu porovná kóty na listu s historií prvků a vypíše, co chybí; toleranci zapíšete u kóty do pole „přípona“.

@@ -33,8 +33,12 @@ export type DrawingMeta = {
   date?: string;
   number?: string;
   revision?: string;
-  /** poznámka k tolerancím (výchozí ISO 2768-mK) */
+  /** nepředepsané tolerance (např. „ISO 2768-mK“); prázdné = na výkrese se neuvádí – výrobní požadavek musí zadat uživatel */
   tolerance?: string;
+  /** opracování hran (např. „srazit 0,5×45°“); prázdné = neuvádí se */
+  edges?: string;
+  /** závitové díry: poloměr jádrového vrtání → popis (např. „M6 hl. 12“) – místo Ø jádra se kótuje označení závitu */
+  threads?: { r: number; label: string }[];
   /** kusovník (sestava) – vykreslí se nad razítkem dle ISO 7573 */
   bom?: BomItem[];
   /** komponenty sestavy pro pozice (balónky) – světový obalový kvádr každé komponenty */
@@ -301,7 +305,17 @@ const proj = (c: Cam, p: Vec3): Vec2 => [dot(p, c.x), -dot(p, upOf(c))];
 const toSheet = (v: Placed, q: Vec2): Vec2 => [v.px + (q[0] - v.x0) * v.s, v.py + (q[1] - v.y0) * v.s];
 const at = (v: Placed, p: Vec3) => toSheet(v, proj(v.cam, p));
 
+/** mezipaměť projekcí (HLR je nejdražší krok) – pro totéž těleso se pohled počítá jen jednou; změny razítka a poznámek jsou pak okamžité */
+const viewCache = new WeakMap<object, Map<string, View>>();
 function projectView(shape: r.Shape3D, key: string, cam: Cam, withHidden: boolean, layer: Layer = "visible"): View {
+  let m = viewCache.get(shape);
+  if (!m) viewCache.set(shape, (m = new Map()));
+  const ck = `${key}|${cam.d.join(",")}|${cam.x.join(",")}|${withHidden}|${layer}`;
+  let v = m.get(ck);
+  if (!v) m.set(ck, (v = projectViewRaw(shape, key, cam, withHidden, layer)));
+  return { ...v };
+}
+function projectViewRaw(shape: r.Shape3D, key: string, cam: Cam, withHidden: boolean, layer: Layer = "visible"): View {
   const camera = new r.ProjectionCamera([0, 0, 0], cam.d, cam.x);
   const p = r.drawProjection(shape, camera);
   const polys: Poly[] = [];
@@ -357,7 +371,15 @@ function circleOf(e: r.Edge): Omit<Circle, "cyl"> | null {
 
 const circleKey = (c: Omit<Circle, "cyl">) => `${c.c.map((v) => k3(v, 3)).join()}|${k3(c.r, 3)}`;
 
+const circleCache = new WeakMap<object, Circle[]>();
 function circlesOf(shape: r.Shape3D): Circle[] {
+  const c = circleCache.get(shape);
+  if (c) return c;
+  const out = circlesOfRaw(shape);
+  circleCache.set(shape, out);
+  return out;
+}
+function circlesOfRaw(shape: r.Shape3D): Circle[] {
   const out: Circle[] = [];
   const onCyl = new Set<string>();
   try {
@@ -415,7 +437,17 @@ const SECTION_CAM: Record<PlaneName, Cam> = {
 
 type SectionData = { view: View; loops: Vec2[][] };
 
+const sectionCache = new WeakMap<object, Map<string, SectionData | null>>();
 function makeSection(shape: r.Shape3D, plane: PlaneName, offset: number): SectionData | null {
+  let m = sectionCache.get(shape);
+  if (!m) sectionCache.set(shape, (m = new Map()));
+  const k = `${plane}|${offset}`;
+  if (m.has(k)) return m.get(k) ?? null;
+  const s = makeSectionRaw(shape, plane, offset);
+  m.set(k, s);
+  return s;
+}
+function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number): SectionData | null {
   const n = PLANE_N[plane];
   const cam = SECTION_CAM[plane];
   const [[x0, y0, z0], [x1, y1, z1]] = shape.boundingBox.bounds as [Vec3, Vec3];
@@ -705,7 +737,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   const ortho = [...placed.values()];
   if (opts.centerLines) for (const p of ortho) centerLines(p, circles, polys);
   if (opts.dimensions !== "none") overallDims(placed, polys, texts, opts.projection);
-  if (opts.dimensions === "auto") diameterDims(ortho, circles, polys, texts);
+  if (opts.dimensions === "auto") diameterDims(ortho, circles, polys, texts, meta.threads ?? []);
 
   // tabulka děr: značky v pohledu
   if (holeRows.length) {
@@ -883,7 +915,7 @@ function centerLines(p: Placed, circles: Circle[], polys: Poly[]) {
  * Průměry. Soustružené díly (na jedné ose 3+ různých průměrů) se kótují z boku „Ø“ přes válec
  * (válcová plocha = dvě stejné kružnice na ose); ostatní kružnice (díry, čepy) odkazovou čarou „n× Ø d“ v čelném pohledu.
  */
-function diameterDims(views: Placed[], circles: Circle[], polys: Poly[], texts: DText[]) {
+function diameterDims(views: Placed[], circles: Circle[], polys: Poly[], texts: DText[], threads: { r: number; label: string }[] = []) {
   const lineKey = (c: Circle) => {
     const base = sub(c.c, mul(c.a, dot(c.c, c.a)));
     return `${c.a.map((v) => k3(v, 3)).join()}|${base.map((v) => k3(v, 2)).join()}`;
@@ -968,7 +1000,8 @@ function diameterDims(views: Placed[], circles: Circle[], polys: Poly[], texts: 
       const R = c.r * p.s;
       const e: Vec2 = [q[0] + ux * R, q[1] + uy * R];
       const knee: Vec2 = [e[0] + ux * 9, e[1] + uy * 9];
-      const label = `${list.length > 1 ? `${list.length}× ` : ""}Ø${fmt(2 * c.r)}`;
+      const thread = threads.find((t) => Math.abs(t.r - c.r) < 0.03); // závit: označení místo Ø jádra
+      const label = `${list.length > 1 ? `${list.length}× ` : ""}${thread ? thread.label : `Ø${fmt(2 * c.r)}`}`;
       const tw = label.length * 2.05 + 2;
       const right = ux >= 0;
       polys.push({ layer: "dim", pts: [e, knee, [knee[0] + (right ? tw : -tw), knee[1]]] });
@@ -1148,7 +1181,8 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
   cell(166, r2, "Rev.", meta.revision ?? "–");
   // poznámka nad razítkem a list
   const ny = y - bomHeight(meta.bom) - extraAbove;
-  T(x, ny - 5.5, `Nepředepsané tolerance ${meta.tolerance || "ISO 2768-mK"} · Rozměry v mm · Ostré hrany srazit 0,5×45°`, 2.5);
+  // výrobní požadavky (tolerance, hrany) jen když je uživatel zadal – nic se nedoplňuje automaticky
+  T(x, ny - 5.5, ["Rozměry v mm", meta.tolerance?.trim() ? `Nepředepsané tolerance ${meta.tolerance.trim()}` : "", meta.edges?.trim() ? `Hrany: ${meta.edges.trim()}` : ""].filter(Boolean).join(" · "), 2.5);
   T(x, ny - 1.8, `Nekótované rozměry dle 3D modelu (STEP) · List ${meta.sheetIndex ?? 1}/${meta.sheetCount ?? 1}`, 2.5);
 }
 
