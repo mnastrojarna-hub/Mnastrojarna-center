@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { logAudit } from "@/lib/audit";
 import { userActor } from "@/lib/supabase/actor-headers";
+import type { EmailCategory } from "@/lib/supabase/database.types";
 import { pickShareFile, SHARE_FILE_SELECT, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "./share";
 
 /**
@@ -190,6 +191,8 @@ export type Sender = (args: {
   to: string; cc?: string; subject: string; text: string; html?: string;
   attachments: { filename: string; content: Buffer; contentType?: string }[];
   ownerId: string | null; jobId: string | null;
+  /** Vazby záznamu v Pošta → Odeslané (dodavatel, objednávka, kategorie) — odvozené na serveru z řádku fronty. */
+  supplierId?: string | null; customerId?: string | null; purchaseOrderId?: string | null; category?: EmailCategory | null;
 }) => Promise<{ sent: boolean; reason?: string; emailId?: string }>;
 
 async function defaultSender(): Promise<Sender> {
@@ -197,9 +200,39 @@ async function defaultSender(): Promise<Sender> {
   return async (a) => sendMail({
     to: a.to, cc: a.cc, subject: a.subject, text: a.text, html: a.html, attachments: a.attachments,
     from: a.ownerId ? { ownerId: a.ownerId } : { system: true }, jobId: a.jobId ?? undefined, senderId: a.ownerId ?? undefined,
+    supplierId: a.supplierId ?? null, customerId: a.customerId ?? null, purchaseOrderId: a.purchaseOrderId ?? null, category: a.category ?? null,
     // text z dialogu (objednávka / výkresy) nese podpis autora → grafický s logem
     signature: a.ownerId ? { userId: a.ownerId, mode: "inline" } : null,
   });
+}
+
+/**
+ * Vazby odeslaného e-mailu pro Pošta → Odeslané — z DB, ne z payloadu: objednávka dodavateli (dodavatel,
+ * objednávka) a poptávka dodavateli (dodavatel příjemce kola). Chyba vazby odeslání nezastaví.
+ */
+async function sentMailLinks(db: AnonDb, row: SendQueueRow): Promise<{ supplierId?: string | null; customerId?: string | null; purchaseOrderId?: string | null; category?: EmailCategory | null }> {
+  try {
+    if (row.kind === "purchase_order" && row.payload.purchaseOrderId) {
+      const { data } = await db.from("purchase_orders").select("id, supplier_id, job_id").eq("id", row.payload.purchaseOrderId).maybeSingle();
+      const po = data as { id: string; supplier_id: string | null; job_id: string | null } | null;
+      if (po && row.job_id && String(po.job_id ?? "").toLowerCase() === row.job_id.toLowerCase()) {
+        return { supplierId: po.supplier_id, purchaseOrderId: po.id, category: "objednavka" };
+      }
+      return { category: "objednavka" };
+    }
+    if (row.kind === "supplier_inquiry") {
+      const { data } = await db.from("rfq_recipients").select("supplier_id").eq("send_queue_id", row.id).limit(1);
+      const rec = ((data ?? []) as { supplier_id: string | null }[])[0];
+      return { supplierId: rec?.supplier_id ?? null, category: "k_zakazce" };
+    }
+    if (row.kind === "job_document" && row.job_id) {
+      const { data } = await db.from("orders").select("customer_id").eq("id", row.job_id).maybeSingle();
+      return { customerId: (data as { customer_id: string | null } | null)?.customer_id ?? null };
+    }
+  } catch {
+    // vazby jsou doplněk — e-mail odejde i bez nich
+  }
+  return {};
 }
 
 /** Odešle jeden řádek fronty (už claimnutý → status sending). */
@@ -241,7 +274,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
   if (total > MAX_ATTACHMENTS_BYTES) return { status: "failed", reason: "Přílohy se nevejdou do e-mailu (> 20 MB) — pošli odkaz nebo ZIP." };
   const res = await sender({
     to: p.to.join(", "), cc: p.cc?.length ? p.cc.join(", ") : undefined, subject: p.subject, text: p.body, html: p.html,
-    attachments, ownerId: row.created_by, jobId: row.job_id,
+    attachments, ownerId: row.created_by, jobId: row.job_id, ...(await sentMailLinks(db, row)),
   });
   if (!res.sent) return { status: row.attempts >= MAX_ATTEMPTS ? "failed" : "waiting", reason: res.reason ?? "E-mail se nepodařilo odeslat." };
 

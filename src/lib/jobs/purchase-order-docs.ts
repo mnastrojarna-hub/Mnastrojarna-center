@@ -446,6 +446,9 @@ export async function sendPurchaseOrderCore(
     from: opts.from,
     jobId: po.jobId,
     senderId: sender.id,
+    // Pošta → Odeslané: u dodavatele i objednávky (karta dodavatele, vlákno objednávky)
+    supplierId: po.supplier?.id ?? null,
+    purchaseOrderId: po.id,
     // podpis vlastníka schránky (podepisující návrhu) je v textu → grafický s logem; systém bez podpisu
     signature: "ownerId" in opts.from && opts.from.ownerId ? { userId: opts.from.ownerId, mode: "inline" } : null,
     category: "objednavka",
