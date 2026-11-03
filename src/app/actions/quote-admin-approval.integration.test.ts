@@ -1144,6 +1144,38 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
       expect((await q(own.id)).state).toBe("rozpracovana");
     }, 60_000);
 
+    // ── 3. 11.: „Kontakt pro obchod a ceny" (profiles.sales_contact_id) ──
+    it("kontakt pro obchod a ceny: nastaví jen super admin; sám sebe, neplatný a neaktivní kolega ne; „žádný“ smaže", async () => {
+      const contactOf = async (uid: string) =>
+        ((await svc.from("profiles").select("sales_contact_id").eq("id", uid).single()).data as { sales_contact_id: string | null }).sales_contact_id;
+      as("sales");
+      expect((await users.updateUser(id("needy"), { salesContactId: id("free") })).ok).toBe(false);
+      expect(await contactOf(id("needy"))).toBeNull();
+
+      as("admin");
+      expect(await users.updateUser(id("needy"), { salesContactId: id("free") })).toEqual({ ok: true });
+      expect(await contactOf(id("needy"))).toBe(id("free"));
+      const { data: audit } = await svc.from("audit_log").select("actor_id, diff").eq("action", "user_updated").eq("entity_id", id("needy"))
+        .order("created_at", { ascending: false }).limit(1);
+      expect((audit ?? [])[0]).toMatchObject({ actor_id: id("admin"), diff: { sales_contact_id: id("free") } });
+      expect(await users.updateUser(id("needy"), { salesContactId: id("free") })).toEqual({ ok: true }); // beze změny
+      expect((await users.updateUser(id("needy"), { salesContactId: id("needy") })).error).toBe("Kontaktem pro obchod a ceny nemůže být uživatel sám.");
+      expect((await users.updateUser(id("needy"), { salesContactId: "nesmysl" })).error).toBe("Neplatný kontakt pro obchod a ceny.");
+      expect((await users.updateUser(id("needy"), { salesContactId: "00000000-0000-4000-8000-000000000000" })).error).toBe("Kontakt pro obchod a ceny nenalezen.");
+      expect((await svc.from("profiles").update({ active: false } as never).eq("id", id("freeWorker"))).error).toBeNull();
+      try {
+        expect((await users.updateUser(id("needy"), { salesContactId: id("freeWorker") })).error).toBe("Kontaktem pro obchod a ceny může být jen aktivní uživatel.");
+      } finally {
+        await svc.from("profiles").update({ active: true } as never).eq("id", id("freeWorker"));
+      }
+      expect(await contactOf(id("needy"))).toBe(id("free"));
+      expect(await users.updateUser(id("needy"), { salesContactId: null })).toEqual({ ok: true });
+      expect(await contactOf(id("needy"))).toBeNull();
+      // DB: kontakt nesmí být sám na sebe
+      expect((await svc.from("profiles").update({ sales_contact_id: id("needy") } as never).eq("id", id("needy"))).error?.message)
+        .toContain("profiles_sales_contact_not_self");
+    }, 60_000);
+
     // ── 31. 10.: schvalovatel nabídek ostatních (profiles.can_approve_quotes) ──
     it("schvalovatel (Volný) dostane upozornění, vidí nabídku Šponera v „Ke schválení“, schválí ji; Šponer ji pak odešle zákazníkovi; razítko nese schvalovatele", async () => {
       const queries = await import("@/lib/data/queries");

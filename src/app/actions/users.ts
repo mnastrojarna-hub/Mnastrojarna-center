@@ -232,6 +232,35 @@ export interface UpdateUserChanges {
   canRfq?: boolean;
   /** „Plný přístup" (2. 11.; ne u super admina) — vše kromě pošty ostatních schránek a správy uživatelů. */
   fullAccess?: boolean;
+  /**
+   * „Kontakt pro obchod a ceny" (3. 11.): kolega, na kterého e-mail k nabídce odkáže obchod a ceny (id aktivního
+   * uživatele, ne sám sebe); null = žádný.
+   */
+  salesContactId?: string | null;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Ověří a připraví změnu „Kontakt pro obchod a ceny" (undefined = beze změny, string = chyba pro uživatele). */
+async function salesContactChange(
+  db: AdminDb, id: string, value: string | null | undefined,
+): Promise<{ value: string | null } | { error: string } | undefined> {
+  if (value === undefined) return undefined;
+  const next = value === null || value === "" ? null : value;
+  if (next !== null && (typeof next !== "string" || !UUID_RE.test(next))) return { error: "Neplatný kontakt pro obchod a ceny." };
+  const { data: cur, error } = await db.from("profiles").select("sales_contact_id").eq("id", id).maybeSingle();
+  // DB bez migrace 20261103130000 — nastavení nejde uložit (bez něj „žádný" nic nemění)
+  if (error) return next === null ? undefined : { error: "Kontakt pro obchod a ceny vyžaduje aktualizaci databáze (migrace 20261103130000)." };
+  const current = ((cur as { sales_contact_id?: string | null } | null)?.sales_contact_id ?? null);
+  const normalized = next?.toLowerCase() ?? null;
+  if (normalized === current) return undefined;
+  if (normalized === null) return { value: null };
+  if (normalized === id.toLowerCase()) return { error: "Kontaktem pro obchod a ceny nemůže být uživatel sám." };
+  const { data: contact } = await db.from("profiles").select("id, active").eq("id", normalized).maybeSingle();
+  const row = contact as { id: string; active?: boolean | null } | null;
+  if (!row) return { error: "Kontakt pro obchod a ceny nenalezen." };
+  if (row.active === false) return { error: "Kontaktem pro obchod a ceny může být jen aktivní uživatel." };
+  return { value: normalized };
 }
 
 /** Neodeslané nabídky autora, které čekají na schválení (přepočet po změně schvalování dělá DB trigger). */
@@ -313,6 +342,9 @@ export async function updateUser(
       const next = finalRole !== "super_admin" && changes.fullAccess;
       if (next !== (target.full_access === true)) update.full_access = next;
     }
+    const salesContact = await salesContactChange(db, id, changes.salesContactId);
+    if (salesContact && "error" in salesContact) return { ok: false, error: salesContact.error };
+    if (salesContact) update.sales_contact_id = salesContact.value;
     if (Object.keys(update).length === 0) return { ok: true };
 
     if (update.role !== undefined || update.active !== undefined) {
