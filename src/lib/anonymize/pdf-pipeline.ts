@@ -3,7 +3,10 @@ import { addUsage } from "@/lib/ai/ai-call";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { boxInsideSent, fitForClaude } from "./claude-image";
 import { refineCut } from "./cut-refine";
-import { asArray, asNumber, detectVector, isCategory, type AiCallConfig, type AiImageSpec, type VectorPageResult } from "./detect-ai";
+import { COMPANY_LEAK_WARNING } from "./decide";
+import { checkAndHealCompanies, checkRasterCompanies, type CompanyCheckOutcome } from "./company-check";
+import { companyLeaks, crossTextTermHits, discoverCompanyNames, mergeNames, withCompanyNames } from "./company-names";
+import { asArray, asNumber, detectVector, isCategory, isRemovableCompany, type AiCallConfig, type AiImageSpec, type CompanyItem, type VectorPageResult } from "./detect-ai";
 import { maybeGray, rasterToJpeg } from "./image";
 import { itemFrame, lineRangeToItems, quadBox, substringQuad } from "./lines";
 import { openPdf, PDF_MAX_IMAGE_PX, PdfUnsupportedError, type PdfDocument, type PdfPage } from "./pdf-node";
@@ -17,10 +20,10 @@ import {
   applyManual, areaCapWarning, burnable, intersection, intersects, mergeRegions, normalizeRegion, padRegion, protectKeep, sortRegions,
   type RawKeep, type RawRegion,
 } from "./regions";
-import { containsTerm, filterToggles, isTechnicalText, rulePage, type RuleContext } from "./rules";
+import { containsTerm, crossLineTermHits, filterToggles, isTechnicalText, rulePage, type RuleContext } from "./rules";
 import { normalizeText, sha256Hex } from "./text";
 import { runVision, type VisionAiCache } from "./vision";
-import type { AnonCategory, AnonRegion, AnonWarning, Box, KeepField, LineHit, TextItem } from "./types";
+import type { AnonCategory, AnonRegion, AnonWarning, Box, KeepField, LineHit, TextItem, TextLine } from "./types";
 
 /**
  * Anonymizace PDF (vektor i sken): příprava (zploštění tištěných anotací, kontrola velkých obrázků),
@@ -40,6 +43,8 @@ export interface PdfAiCache {
   confidence: number;
   /** Jistota AI po stránkách. */
   pageConf?: Record<number, number>;
+  /** Názvy firem nalezené na výkresu (pravidla + AI) — termíny i pro navazující dávky stran. */
+  found?: string[];
 }
 
 export interface PdfAnonInput {
@@ -62,6 +67,8 @@ export interface PdfAnonInput {
   pixelBudget?: number;
   /** Druh neznámý (Ostatní / Fotka): stránka je výkres jen s potvrzením (AI, kotvy razítka, CAD producent). */
   requireDrawing?: boolean;
+  /** Výstupní kontrola kopie obrazem přes AI (výchozí ano, když je AI). */
+  checkCompanies?: boolean;
 }
 
 export interface PdfRegionText {
@@ -92,6 +99,8 @@ export interface PdfPageResult {
   blank?: boolean;
   /** Nalezené keep hodnoty (číslo výkresu, revize) — pro anonymní název souboru. */
   keepValues?: Partial<Record<KeepField, string>>;
+  /** Výstupní kontrola: v kopii stránky zůstal název firmy (kopie se nepoužije). */
+  companyLeak?: boolean;
 }
 
 /** Keep hodnoty z nalezených polí (jen rozumně vypadající číslo výkresu / revize). */
@@ -130,6 +139,8 @@ export interface PdfAnonResult {
    */
   unsupported?: boolean;
   isCad: boolean;
+  /** Názvy firem nalezené na výkresu (jen v paměti — texty smazaných oblastí). */
+  companyNames: string[];
 }
 
 const RENDER_FAIL = "Písmo se nevykreslilo (chybí fonty pdf.js) — anonymizace PDF selhala.";
@@ -203,7 +214,7 @@ function renderedBlank(r: Raster, info: PdfPageInfo): boolean {
 export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> {
   const res: PdfAnonResult = {
     totalPages: 0, pages: [], next: null, aiUsed: false, fallback: false, usage: null, calls: 0, confidence: 1, warnings: [],
-    customerStandard: false, termInKeep: false, partPdf: null, outputProblems: [], cache: null, failure: null, isCad: false,
+    customerStandard: false, termInKeep: false, partPdf: null, outputProblems: [], cache: null, failure: null, isCad: false, companyNames: [],
   };
   // příprava: tištěné anotace do obsahu (pravidla čtou, co se vykreslí), velké obrázky
   // (pdf-lib nepřečte PDF s heslem vlastníka ani některé opravitelné vady → originál pro pdf.js, ke kontrole)
@@ -309,6 +320,20 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
       }
     }
 
+    // 2b) Názvy firem Z VÝKRESU (ne jen zákazník z CRM — v razítku bývá koncový zákazník / OEM / konstrukce):
+    //     pravidla (právní forma v razítku a rámu, samostatný řádek s firmou, doložka) + AI (i křivky / logo) →
+    //     termíny pro všechny stránky dávky (druhý list, rozsypané po znacích) i navazující dávky (cache)
+    const ruleNames = discoverCompanyNames(pages.flatMap((p) => p.info.lines), input.ctx);
+    const aiNames: string[] = [];
+    for (const pg of Object.values(cache.vector)) {
+      for (const c of asArray<CompanyItem>(pg?.companies)) {
+        if (isRemovableCompany(c.role) && /\p{L}{2,}/u.test(String(c.text ?? "")) && !isTechnicalText(String(c.text))) aiNames.push(String(c.text));
+      }
+    }
+    cache.found = mergeNames(cache.found, ruleNames, aiNames);
+    res.companyNames = [...cache.found];
+    const run: PdfAnonInput = { ...input, ctx: withCompanyNames(input.ctx, cache.found) };
+
     // 3) Stránky (před každou další kontrola času — zbytek naváže další běh s cache)
     const outPages: OutPage[] = [];
     for (let i = 0; i < pages.length; i++) {
@@ -319,8 +344,8 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
         break;
       }
       const pr = p.vision
-        ? await visionPage(p, input, cache, res)
-        : await vectorPage(p, input, cache, res);
+        ? await visionPage(p, run, cache, res)
+        : await vectorPage(p, run, cache, res);
       res.pages.push(pr);
       if (pr.included && pr.out) outPages.push(pr.out);
       p.page.cleanup();
@@ -333,7 +358,12 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     const included = res.pages.filter((p) => p.included);
     res.aiUsed = included.length ? included.every((p) => p.aiUsed) : Boolean(input.ai) || Object.keys(cache.vector).length > 0;
     res.confidence = included.filter((p) => p.aiUsed).reduce((m, p) => Math.min(m, p.aiConfidence), 1);
-    res.cache = Object.keys(cache.vector).length || Object.keys(cache.vision).length ? cache : null;
+    res.cache = Object.keys(cache.vector).length || Object.keys(cache.vision).length || (cache.found?.length ?? 0) ? cache : null;
+    // výstupní kontrola: v kopii zůstal název firmy → kopie se nikdy nepoužije
+    for (const p of included.filter((x) => x.companyLeak)) {
+      res.outputProblems.push(`strana ${p.page}: zůstal název firmy`);
+      res.warnings.push({ code: "verify_leak", message: `${COMPANY_LEAK_WARNING} (strana ${p.page}).`, page: p.page });
+    }
     if (res.pages.some((p) => p.inkFailed)) res.failure = RENDER_FAIL;
     else if (res.pages.some((p) => p.blank)) {
       const b = res.pages.find((p) => p.blank)!;
@@ -345,7 +375,7 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     if (outPages.length) {
       res.partPdf = await buildRasterPdf(outPages);
       const chk = await checkPdfOutput(res.partPdf, outPages.map((o) => ({ widthPt: o.widthPt, heightPt: o.heightPt })));
-      res.outputProblems = chk.problems;
+      res.outputProblems.push(...chk.problems);
     }
     return res;
   } finally {
@@ -450,6 +480,28 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
       const box: Box = { x: spec.crop.x + b.x / spec.s, y: spec.crop.y + b.y / spec.s, w: b.w / spec.s, h: b.h / spec.s };
       aiRegions.push({ page: info.page, box, category: b.category, source: aiSource, zone: zoneOfBox(box, info), textHeight: 0, confidence: asNumber(b.confidence, 0.8) });
     }
+    // názvy firem z AI: čitelné v textové vrstvě smaže přesně termín (výše); bez textové vrstvy (křivky, logo,
+    // Type3 / CID bez Unicode) se vypálí box z obrazu
+    if (input.ctx.redact.company) {
+      for (const c of asArray<CompanyItem>(aiPage.companies)) {
+        if (!isRemovableCompany(c.role)) continue;
+        const txt = String(c.text ?? "");
+        if (txt && !/\p{L}{2,}/u.test(txt) && c.form === "logo" && !input.ctx.redact.logo) continue;
+        if (txt && isTechnicalText(txt)) continue;
+        if (txt && input.ctx.keepTerms.some((k) => normalizeText(txt).replace(/[^\p{L}\p{N}]+/gu, "").includes(normalizeText(k).replace(/[^\p{L}\p{N}]+/gu, "")))) continue;
+        const spec = cache.specs.find((s) => s.index === c.img && s.page === info.page);
+        if (!spec) continue;
+        if (!boxInsideSent(spec, c.x, c.y, c.w, c.h)) {
+          res.warnings.push({ code: "coords_out_of_image", message: "AI vrátila souřadnice mimo obrázek — zkontroluj.", page: info.page });
+          continue;
+        }
+        const box: Box = { x: spec.crop.x + c.x / spec.s, y: spec.crop.y + c.y / spec.s, w: c.w / spec.s, h: c.h / spec.s };
+        const own = txt ? withCompanyNames({ ...input.ctx, terms: [] }, [txt]).terms : [];
+        const inTextLayer = c.form === "text" && own.length > 0 && info.lines.some((l) => intersects(l.box, box) && containsTerm(l.text, own));
+        if (inTextLayer) continue;
+        aiRegions.push({ page: info.page, box, category: "company", source: aiSource, zone: zoneOfBox(box, info), textHeight: 0, confidence: 0.9 });
+      }
+    }
     if (info.titleBlock === null && aiPage.titleBlock && aiPage.titleBlock.w > 0) result.titleBlockFound = true;
   }
 
@@ -514,6 +566,12 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
 
   // render + vypálení
   let dpi = targetDpi(W, H, input.maxDpi, input.maxMpx);
+  /** Výstupní kontrola obrazem (AI) proběhne jednou; doplněné oblasti (body) se při menším DPI vypálí znovu. */
+  let aiCheck: CompanyCheckOutcome | null = null;
+  let aiHealPt: Box[] = [];
+  /** Řádky s názvem firmy (před vypálením) — jen ty se po vypálení kontrolují znak po znaku. */
+  const crossIds = new Set(crossTextLeaks(info.lines, input.ctx).map((x) => x.lineId));
+  const leakLines = info.lines.filter((l) => l.text.trim() && (crossIds.has(l.id) || companyLeaks(l.text, l.zone, input.ctx).length > 0));
   for (let attempt = 0; attempt < 6; attempt++) {
     const s = dpi / 72;
     const raster = await renderPageRaster(p.page, s, p.color);
@@ -649,6 +707,43 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     }
     if (result.residue) res.warnings.push({ code: "residue", message: "Kolem smazaného místa byly zbytky — vyplněno celé okolí.", page: info.page });
 
+    // ── výstupní kontrola: v kopii nesmí zůstat název firmy (majitel 2. 11.) ──
+    // a) textová vrstva: co z každého řádku po vypálení ZBYLO, nesmí být termín ani firma podle pravidel;
+    //    nález se doplní (vypálí) a zkontroluje znovu
+    const protectedPt = [...keep.map((k) => k.box), ...manual.filter((r) => r.manual === "removed").map((r) => ({ x: r.x * W, y: r.y * H, w: r.w * W, h: r.h * H }))];
+    for (let round = 0; round < 3; round++) {
+      const burnedPt = pxRects.map((r) => ({ x: r.box.x / s, y: r.box.y / s, w: r.box.w / s, h: r.box.h / s }));
+      const leaks = textCompanyLeaks(leakLines, input.ctx, burnedPt, protectedPt, itemById);
+      if (!leaks.length) break;
+      if (round === 2) { result.companyLeak = true; break; }
+      for (const l of leaks) {
+        const pad = 0.2 * l.em;
+        const box = toPx({ x: l.box.x - pad, y: l.box.y - pad, w: l.box.w + 2 * pad, h: l.box.h + 2 * pad }, s);
+        fillRect(raster, box, fill);
+        pxRects.push({ box, em: l.em * s, text: true, kind: "manual" });
+      }
+    }
+    // b) obraz (AI, když je k dispozici): název jako křivky / logo / nečitelné písmo; nález se vypálí a ověří znovu
+    for (const b of aiHealPt) fillRect(raster, toPx(b, s), fill);
+    if (input.ai && input.checkCompanies !== false && !aiCheck) {
+      const tb = info.titleBlock ?? info.titleBlockGuess;
+      const focus = [{ box: toPx({ x: tb.x - 0.03 * W, y: tb.y - 0.05 * H, w: tb.w + 0.06 * W, h: tb.h + 0.1 * H }, s), label: "razítko" }];
+      // velký formát: okraje listu zvlášť (doložka, natočený text v rámu) — v přehledu by byly nečitelné
+      if (W * H > 1.2 * 1191 * 842) {
+        focus.push({ box: { x: 0, y: raster.height * 0.92, w: raster.width, h: raster.height * 0.08 }, label: "dolní okraj listu" });
+        focus.push({ box: { x: 0, y: 0, w: raster.width * 0.06, h: raster.height }, label: "levý okraj listu" });
+      }
+      aiCheck = await checkAndHealCompanies({
+        raster, page: info.page, ai: input.ai, focus, keepTerms: input.ctx.keepTerms, terms: input.ctx.terms, keepBoxes: keep.map((k) => toPx(k.box, s)), fill, logo: input.ctx.redact.logo,
+      });
+      res.usage = addUsage(res.usage, aiCheck.usage);
+      res.calls += aiCheck.calls;
+      if (aiCheck.fallback) res.fallback = true;
+      aiHealPt = aiCheck.healed.map((b) => ({ x: b.x / s, y: b.y / s, w: b.w / s, h: b.h / s }));
+      if (aiCheck.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: info.page });
+    }
+    if (aiCheck && !aiCheck.clean) result.companyLeak = true;
+
     // kódování v rozpočtu 2,5 MB / strana; barva jen když po vypálení zůstala (červené logo zmizelo → šedá)
     const enc = raster.channels === 3 ? maybeGray(raster, { minPixels: 40 }) : raster;
     let img = await encodeFlate(enc);
@@ -664,6 +759,108 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     return result;
   }
   return result;
+}
+
+/**
+ * Výstupní kontrola textové vrstvy: ze zadaných řádků se po vypálení poskládá, co ZŮSTALO (znak, jehož střed
+ * leží ve vypálené / chráněné oblasti, je pryč) — a když je to pořád název firmy (termín z CRM, z výkresu,
+ * firma podle právní formy / doložky), vrátí se boxy zbylých znaků (body). Bez ohledu na diakritiku,
+ * velikost písmen a prostrkání (findTermRanges), i název rozdělený na dva řádky („STROJ-" / „METAL")
+ * nebo do více položek na jednom účaří (buňky, prostrkaná písmena jako samostatné položky).
+ * Chráněné = keep pole (číslo výkresu se zkratkou firmy se nemaže) a ručně zrušené zásahy (rozhodnutí člověka).
+ * Znak bez dohledatelného boxu → box celého řádku (únik se nikdy tiše nepřehlédne).
+ */
+export function textCompanyLeaks(
+  lines: readonly TextLine[], ctx: RuleContext, burned: readonly Box[], protectedPt: readonly Box[], itemById: ReadonlyMap<string, TextItem>,
+): { box: Box; em: number }[] {
+  const out: { box: Box; em: number }[] = [];
+  const inside = (x: number, y: number, b: Box) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+  const rem = new Map<string, { line: TextLine; text: string; boxes: (Box | null)[] }>();
+  for (const l of lines) {
+    let text = "";
+    const boxes: (Box | null)[] = [];
+    for (let k = 0; k < l.text.length; k++) {
+      const ch = l.text[k];
+      let b: Box | null = null;
+      for (const part of lineRangeToItems(l, k, k + 1)) {
+        const it = itemById.get(part.itemId);
+        if (it && part.to > part.from) { b = quadBox(substringQuad(it, part.from, part.to, 0)); break; }
+      }
+      boxes.push(b);
+      if (!b || /\s/u.test(ch)) { text += ch; continue; }
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      text += burned.some((r) => inside(cx, cy, r)) || protectedPt.some((r) => inside(cx, cy, r)) ? " " : ch;
+    }
+    rem.set(l.id, { line: l, text, boxes });
+  }
+  const seen = new Set<string>();
+  const emit = (lineId: string, start: number, end: number) => {
+    const r = rem.get(lineId);
+    if (!r || end <= start || seen.has(`${lineId}:${start}:${end}`)) return;
+    seen.add(`${lineId}:${start}:${end}`);
+    let u: Box | null = null;
+    let unknown = false;
+    for (let k = start; k < end; k++) {
+      if (/\s/u.test(r.text[k] ?? " ")) continue;
+      const b = r.boxes[k];
+      if (!b) { unknown = true; continue; }
+      u = u ? { x: Math.min(u.x, b.x), y: Math.min(u.y, b.y), w: Math.max(u.x + u.w, b.x + b.w) - Math.min(u.x, b.x), h: Math.max(u.y + u.h, b.y + b.h) - Math.min(u.y, b.y) } : b;
+    }
+    if (unknown) u = u ? { x: Math.min(u.x, r.line.box.x), y: Math.min(u.y, r.line.box.y), w: Math.max(u.x + u.w, r.line.box.x + r.line.box.w) - Math.min(u.x, r.line.box.x), h: Math.max(u.y + u.h, r.line.box.y + r.line.box.h) - Math.min(u.y, r.line.box.y) } : r.line.box;
+    if (u) out.push({ box: u, em: Math.max(1, r.line.fontSize) });
+  };
+  // a) v jednom řádku
+  for (const r of rem.values()) for (const h of companyLeaks(r.text, r.line.zone, ctx)) emit(r.line.id, h.start, h.end);
+  // b) přes řádky / položky (zbytek po vypálení jako nové řádky se stejnou geometrií)
+  for (const x of crossTextLeaks([...rem.values()].map((r) => ({ ...r.line, text: r.text })), ctx)) emit(x.lineId, x.start, x.end);
+  return out;
+}
+
+/**
+ * Termíny rozdělené mezi řádky: zalomení pod sebou (crossLineTermHits) a položky na jednom účaří zleva
+ * doprava (mezera ≤ 3 em) — „B R I S K" jako pět položek, „STROJ" | „METAL" ve dvou buňkách.
+ */
+export function crossTextLeaks(lines: readonly TextLine[], ctx: RuleContext): { lineId: string; start: number; end: number }[] {
+  const out = [...crossLineTermHits(lines, ctx.terms)];
+  // řádky na stejném účaří (stejná stránka a natočení, účaří do 0,45 em)
+  const groups = new Map<string, TextLine[]>();
+  for (const l of lines) {
+    if (!l.text.trim() || Math.abs(l.rot) > 0.5) continue;
+    const k = `${l.page}|${l.rot}`;
+    groups.set(k, [...(groups.get(k) ?? []), l]);
+  }
+  const rows: TextLine[][] = [];
+  for (const g of groups.values()) {
+    g.sort((a, b) => (a.box.y + a.box.h) - (b.box.y + b.box.h));
+    let cur: TextLine[] = [];
+    for (const l of g) {
+      const ref = cur[0];
+      if (ref && Math.abs((l.box.y + l.box.h) - (ref.box.y + ref.box.h)) < 0.45 * Math.max(ref.fontSize, ref.box.h, 0.5)) cur.push(l);
+      else { if (cur.length) rows.push(cur); cur = [l]; }
+    }
+    if (cur.length) rows.push(cur);
+  }
+  for (const row of rows) {
+    if (row.length < 2) continue;
+    row.sort((a, b) => a.box.x - b.box.x);
+    // souvislé úseky (mezera mezi položkami ≤ 3 em)
+    let seg: TextLine[] = [row[0]];
+    const flush = () => {
+      if (seg.length >= 2) for (const h of crossTextTermHits(seg.map((l) => l.text), ctx.terms)) out.push({ lineId: seg[h.index].id, start: h.start, end: h.end });
+    };
+    for (let i = 1; i < row.length; i++) {
+      const prev = seg[seg.length - 1], cur = row[i];
+      const gap = cur.box.x - (prev.box.x + prev.box.w);
+      if (gap <= 3 * Math.max(prev.fontSize, cur.fontSize, 0.5)) seg.push(cur);
+      else { flush(); seg = [cur]; }
+    }
+    flush();
+  }
+  const seen = new Set<string>();
+  return out.filter((x) => {
+    const k = `${x.lineId}:${x.start}:${x.end}`;
+    return seen.has(k) ? false : (seen.add(k), true);
+  });
 }
 
 function zoneOfBox(b: Box, info: PdfPageInfo) {
@@ -738,6 +935,15 @@ async function visionPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
   // v runVision → při ruční úpravě se proto vždy vypaluje znovu z čistého renderu
   const out = manual.length ? await reburn(v, final, input.fillPhoto) : v.raster;
   result.regions = sortRegions(final);
+  // výstupní kontrola obrazem: zbyl v kopii název firmy? (nález se vypálí a ověří znovu, jinak kopie neprošla)
+  if (input.ai && input.checkCompanies !== false) {
+    const cc = await checkRasterCompanies(out, info.page, input.ai, input.ctx, v.keep.map((k) => k.box), input.fillPhoto);
+    res.usage = addUsage(res.usage, cc.usage);
+    res.calls += cc.calls;
+    if (cc.fallback) res.fallback = true;
+    if (cc.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: info.page });
+    if (!cc.clean) result.companyLeak = true;
+  }
   const img = maybeGray(out);
   const jpeg = await encodeJpeg(img, 85);
   result.out = { widthPt: W, heightPt: H, image: jpeg };

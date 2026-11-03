@@ -52,8 +52,12 @@ describe("výchozí nastavení: jen název firmy", () => {
     // se zapnutými osobami (volitelně v Nastavení) se jméno maže dál
     expect(hits("Kreslil: J. Novák", "title_block", ctx(ALL_REDACT))).toContain("J. Novák");
   });
-  it("© doložka: s vypnutou kategorií se maže jen název firmy zákazníka (termín), zbytek doložky zůstane", () => {
-    expect(hits("© Strojmetal 2024 — rozmnožování zakázáno", "title_block")).toEqual(["Strojmetal"]);
+  it("© doložka: s vypnutou kategorií se maže jen název firmy (zákazník i jiná firma), zbytek doložky zůstane", () => {
+    expect([...new Set(hits("© Strojmetal 2024 — rozmnožování zakázáno", "title_block"))]).toEqual(["Strojmetal"]);
+    // 2. 11.: vlastník v doložce NENÍ zákazník z CRM (koncový zákazník / konstrukce) → jeho jméno pryč i tak
+    expect(hits("© BRISK Tábor a.s. - Výkres je duševním vlastnictvím.", "body")).toEqual([]); // mimo razítko jen kandidát pro AI
+    expect(hits("© BRISK Tábor a.s. - Výkres je duševním vlastnictvím.", "title_block")).toEqual(expect.arrayContaining(["BRISK Tábor a.s."]));
+    expect(hits("Copyright 2025 Robert Bosch GmbH — all rights reserved", "title_block")).toEqual(expect.arrayContaining(["Robert Bosch GmbH"]));
   });
 });
 

@@ -46,6 +46,22 @@ export interface Decision {
   warnings: AnonWarning[];
 }
 
+/** Varování výstupní kontroly: v kopii zůstal název firmy (začátek hlášky — za ním strana). */
+export const COMPANY_LEAK_WARNING = "V anonymizované kopii zůstal název firmy";
+/** Důvod selhání, když v kopii zůstal název firmy — kopie se nikdy nepoužije. */
+export const COMPANY_LEAK_TEXT = "V anonymizované kopii zůstal název firmy — kopie se nepoužije. Klikni Anonymizovat znovu (nebo pošli výkres jako PDF přímo z CAD).";
+/** Totéž při automatickém opakování (nová detekce AI). */
+export const COMPANY_LEAK_RETRY_TEXT = "V anonymizované kopii zůstal název firmy — kopie se nepoužije, zkusí se znovu automaticky.";
+
+/**
+ * Zůstal v kopii název firmy a má smysl jeden automatický pokus znovu? Jen s AI (nová detekce a kontrola
+ * obrazem — pravidla bez AI by dopadla stejně), ne po ručním uložení editoru a jen při prvním pokusu
+ * (claim zvyšuje anon_attempts; druhý únik = selhalo s důvodem).
+ */
+export function companyLeakRetry(i: { status: AnonStatus; reason: string | null; aiUsed: boolean; manualSave: boolean; attempts: number | null | undefined }): boolean {
+  return i.status === "failed" && i.reason === COMPANY_LEAK_TEXT && i.aiUsed && !i.manualSave && (i.attempts ?? 1) < 2;
+}
+
 export const DONE_MIN_CONFIDENCE = 0.85;
 export const NO_TITLE_MIN_CONFIDENCE = 0.9;
 export const MIN_PX_PER_MM = 6;
@@ -147,6 +163,7 @@ export function decideAnonStatus(i: DecideInput): Decision {
   // „s jistotou": výstup, který neprošel kontrolou (v kopii zůstal text, metadata, název firmy v DXF),
   // se nikdy nepoužije — místo kontroly člověkem selhání s důvodem
   if (!i.outputChecksPassed) {
+    if (warnings.some((w) => w.code === "verify_leak" && w.message.startsWith(COMPANY_LEAK_WARNING))) return { status: "failed", reason: COMPANY_LEAK_TEXT, warnings };
     return { status: "failed", reason: "Kontrola anonymizované kopie neprošla (zůstal text nebo metadata) — kopie se nepoužije, zkus Anonymizovat znovu.", warnings };
   }
 
