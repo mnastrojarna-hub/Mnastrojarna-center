@@ -45,7 +45,7 @@ function mayResolve(row: Pick<QueueRow, "type" | "owner_id">, userId: string, ca
  * Vyřízení položky fronty ke schválení (kdo vyřídil zapíše DB do resolved_by z hlavičky autora).
  * Schválení odchozí akce (odpověď, nabídka, upomínka…) e-mail SKUTEČNĚ odešle; schválení AI
  * nabídky zapíše quotes.approved_by (stejná pravidla jako „Schválit" u nabídky — R10).
- * Objednávka dodavateli (předání do výroby): odešle se ze schránky obchodníka zakázky, když ji schvaluje
+ * Objednávka dodavateli (předání do výroby): super admin posílá ze své schránky (má-li ji); jinak ze schránky obchodníka zakázky, když ji schvaluje
  * admin a obchodník schránku má (odpověď dodavatele dojde jemu); zamítnutí ji nechá vystavenou.
  */
 export async function resolveApproval(
