@@ -145,6 +145,7 @@ export function CadApp() {
   /** úvodní obrazovka „Nový výkres“: po načtení souboru rovnou otevřít výkres */
   const drawAfterImport = useRef(false);
   const [appMenu, setAppMenu] = useState(false);
+  const appMenuRef = useRef<HTMLDivElement>(null);
   /** úzká obrazovka (mobil): záložky dokumentů mají vlastní řádek pod lištou a seznam v dolním listu */
   const narrow = useNarrow();
   const [tabMenu, setTabMenu] = useState(false);
@@ -2412,7 +2413,7 @@ export function CadApp() {
           {narrow ? (
             <span className="flex-1" />
           ) : (
-            <div className="flex min-w-0 flex-1 items-end gap-0.5 self-stretch overflow-x-auto px-1 pt-1 [scrollbar-width:none]" role="tablist" aria-label="Otevřené dokumenty">
+            <div className="flex min-w-0 flex-1 items-end gap-0.5 self-stretch overflow-x-auto overflow-y-hidden px-1 pt-1 [scrollbar-width:none] [touch-action:pan-x]" role="tablist" aria-label="Otevřené dokumenty">
               {tabChips}
             </div>
           )}
@@ -2483,7 +2484,7 @@ export function CadApp() {
         </header>
         {narrow && (
           <div className="flex h-9 shrink-0 items-stretch bg-[#1c2025] text-white/85">
-            <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto px-1 pt-1 [scrollbar-width:none]" role="tablist" aria-label="Otevřené dokumenty">
+            <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto overflow-y-hidden px-1 pt-1 [scrollbar-width:none] [touch-action:pan-x]" role="tablist" aria-label="Otevřené dokumenty">
               {tabChips}
             </div>
             <div className="relative flex shrink-0 items-center border-l border-white/10 px-1">
@@ -2517,8 +2518,9 @@ export function CadApp() {
         )}
 
         {/* Záložky pásu */}
-        <div className="flex h-8 shrink-0 items-end gap-0.5 border-b border-[#d5dbe2] bg-[#dfe5eb] px-1">
-          <div className="relative self-stretch py-1">
+        {/* řádek záložek pásu: na úzké obrazovce vodorovně posuvný (jen vodorovně – žádné svislé „plavání“) */}
+        <div className="flex h-8 shrink-0 items-stretch gap-0.5 overflow-x-auto overflow-y-hidden bg-[#dfe5eb] px-1 [scrollbar-width:none] [touch-action:pan-x]">
+          <div ref={appMenuRef} className="relative shrink-0 border-b border-[#d5dbe2] py-1">
             <button type="button" onClick={() => setAppMenu((v) => !v)} className="h-full rounded-sm bg-brand px-3 text-[12px] font-semibold text-white hover:bg-brand-600">
               Soubor
             </button>
@@ -2526,6 +2528,7 @@ export function CadApp() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setAppMenu(false)} />
                 <Dropdown
+                  anchor={appMenuRef.current}
                   close={() => setAppMenu(false)}
                   className="z-50 w-[300px]"
                   entries={[
@@ -2561,14 +2564,15 @@ export function CadApp() {
               type="button"
               onClick={() => setTab(t)}
               className={cn(
-                "rounded-t-md border-x border-t px-3.5 py-1 text-[12px] font-medium",
-                curTab === t ? "relative top-px border-[#d5dbe2] bg-[#fbfcfd] text-[#1f2933]" : "border-transparent text-[#4a5664] hover:bg-white/50",
+                "mt-auto shrink-0 whitespace-nowrap rounded-t-md border px-3.5 py-1 text-[12px] font-medium",
+                curTab === t ? "border-b-[#fbfcfd] border-x-[#d5dbe2] border-t-[#d5dbe2] bg-[#fbfcfd] text-[#1f2933]" : "border-x-transparent border-t-transparent border-b-[#d5dbe2] text-[#4a5664] hover:bg-white/50",
                 t === "sketch" && "text-[#2563eb]",
               )}
             >
               {l}
             </button>
           ))}
+          <div className="min-w-2 flex-1 border-b border-[#d5dbe2]" aria-hidden />
         </div>
 
         <Ribbon
