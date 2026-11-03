@@ -12,13 +12,13 @@ import { CATEGORY_STYLE, INBOX_CATEGORIES, categoryCodeFromLabel, categoryStyle 
 import type { EmailCategory } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 
-export function CategoryPill({ category, className }: { category: EmailCategory; className?: string }) {
+export function CategoryPill({ category, className, labelClassName }: { category: EmailCategory; className?: string; labelClassName?: string }) {
   const st = categoryStyle(category);
   const Icon = st.icon;
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", st.chip, className)} data-testid="category-pill">
+    <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", st.chip, className)} title={st.label} data-testid="category-pill">
       <Icon className="h-3 w-3" />
-      {st.label}
+      {labelClassName ? <span className={labelClassName}>{st.label}</span> : st.label}
     </span>
   );
 }
@@ -32,7 +32,7 @@ export function pickableCategories(direction: "in" | "out"): EmailCategory[] {
  * Štítek kategorie, který jde jedním ťuknutím opravit (přijatá i odeslaná zpráva): ťuk → seznam
  * kategorií → ťuk = uloženo (kdo a kdy, korekce pro AI). Okamžitě se přebarví, při chybě vrátí.
  */
-export function CategoryPicker({ emailId, category, direction = "in", onChange, onError, className }: {
+export function CategoryPicker({ emailId, category, direction = "in", onChange, onError, className, labelClassName }: {
   emailId: string;
   category: EmailCategory;
   direction?: "in" | "out";
@@ -40,6 +40,8 @@ export function CategoryPicker({ emailId, category, direction = "in", onChange, 
   onChange: (c: EmailCategory) => void;
   onError?: (text: string) => void;
   className?: string;
+  /** Popisek kategorie (hustý seznam Pošty: v úzkém sloupci jen ikona — globals.css .thread-cat-label). */
+  labelClassName?: string;
 }) {
   const [saving, setSaving] = React.useState(false);
   const st = categoryStyle(category);
@@ -67,12 +69,12 @@ export function CategoryPicker({ emailId, category, direction = "in", onChange, 
             st.chip, className,
           )}
           aria-label={`Kategorie: ${st.label}. Změnit`}
-          title="Změnit kategorii"
+          title={`${st.label} — změnit kategorii`}
           data-testid="category-picker"
           data-category={st.label}
         >
           {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Icon className="h-3 w-3" />}
-          {st.label}
+          {labelClassName ? <span className={labelClassName}>{st.label}</span> : st.label}
           <ChevronDown className="h-3 w-3 opacity-60" aria-hidden />
         </button>
       </DropdownMenuTrigger>

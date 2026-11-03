@@ -145,6 +145,36 @@ describe("Přijatá pošta — render", () => {
   });
 });
 
+describe("Pošta na počítači — kompaktní lišta a seznam (majitel 3. 11.)", () => {
+  beforeEach(() => {
+    accessState.features = [];
+  });
+
+  it("lišta: Nová zpráva, Přijmout a odeslat, ozubené kolo a ⋯ (Import z Outlooku, hustota); seznam kompaktní", () => {
+    const html = render(<InboxView initial={page(threads)} counts={counts} mailboxes={[mailboxes[0]]} scope="own" mailboxId={null} folder="inbox" />);
+    expect(html).toContain('data-testid="mail-toolbar"');
+    expect(html).toContain('data-testid="btn-compose"');
+    expect(html).toContain('data-testid="btn-send-receive"');
+    expect(html).toContain('data-testid="btn-mail-settings"');
+    expect(html).toContain('data-testid="mail-more"');
+    expect(html).toContain('data-density="compact"');
+    expect(html).toContain("thread-row-compact");
+    // vlastní schránka: na počítači tenký text v liště (stejný prvek jako modrý pruh na mobilu — text jen jednou)
+    expect(html.match(/Tvoje schránka: /g)?.length).toBe(1);
+    expect(html.match(/data-testid="mail-updated"/g)?.length).toBe(1);
+  });
+
+  it("Pohodlné (uložená volba): řádky jako dřív; super admin: jeden výběr schránky (mailbox-switcher)", () => {
+    const comfy = render(<InboxView initial={page(threads)} counts={counts} mailboxes={[mailboxes[0]]} scope="own" mailboxId={null} folder="inbox" uiPrefs={{ "mail.comfortable": true }} />);
+    expect(comfy).toContain('data-density="comfortable"');
+    expect(comfy).not.toContain("thread-row-compact");
+    accessState.features = ["mail", "mail_all", "dashboard"];
+    const admin = render(<InboxView initial={page(threads)} counts={counts} mailboxes={mailboxes} scope="all" mailboxId={null} folder="inbox" />);
+    expect(admin.match(/data-testid="mailbox-switcher"/g)?.length).toBe(1);
+    expect(admin).toContain('data-testid="mailbox-tiles"');
+  });
+});
+
 describe("Odeslaná pošta — render", () => {
   const items: SentItem[] = [
     {

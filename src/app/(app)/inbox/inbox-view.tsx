@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import {
   Mail, RefreshCw, Upload, Search, Loader2, Inbox as InboxIcon, UserRound, AlertCircle, CheckCircle2, X, PenSquare,
   Send, Flag, Layers, Ban, Share2, SlidersHorizontal, MailOpen, FolderKanban, FolderOpen, Wand2, Settings, Trash2, Clock,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, MoreHorizontal, Rows3, Rows2,
 } from "lucide-react";
-import { useUiPrefs } from "@/components/ui-prefs/use-ui-prefs";
+import { useSharedUiPrefs } from "@/components/ui-prefs/use-ui-prefs";
+import {
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { retryClock } from "@/lib/email/auth-lockout";
 import {
   MAIL_DETAIL_MIN, MAIL_LIST_DEFAULT_RATIO, MAIL_LIST_MIN, clampListWidth, listWidthForKey, type UiPrefs,
 } from "@/lib/ui-prefs";
 import { MailSettingsPanel, type MailSettingsTab } from "@/components/mail/mail-settings-panel";
-import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,7 +102,10 @@ function folderCount(f: MailFolder, c: FolderCounts): number {
 export function InboxView({ initial, counts: initialCounts, mailboxes, scope, mailboxId: initialMailbox, folder: initialFolder, uiPrefs: serverPrefs }: InboxViewProps) {
   const { can, userId } = useAccess();
   // rozložení (šířka seznamu × detail, sbalené složky): uloží se hned, bez potvrzení, pro tohoto uživatele
-  const [prefs, setPref] = useUiPrefs(userId, serverPrefs ?? {});
+  // (sdílené s hlavním menu přes UiPrefsProvider v layoutu; bez něj — testy — vlastní kopie)
+  const [prefs, setPref] = useSharedUiPrefs(userId, serverPrefs ?? {});
+  // hustota seznamu: Kompaktní (výchozí, na počítači ≥ 10 vláken na obrazovce) / Pohodlné; mobil beze změny
+  const compact = !prefs["mail.comfortable"];
   const canAi = can("dashboard"); // AI třídění, návrhy odpovědí a korekce — jen AI přehled
   const live = useMailLive();
   // otevřená Pošta: nová pošta se kontroluje každých 30 s (skrytá karta nekontroluje) a objeví se sama
@@ -512,52 +517,155 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   return (
     // mobil: menší mezery — seznam vláken má začít co nejvýš (čipy kategorií přibyly)
     // počítač: Pošta na celou výšku okna — složky, seznam a vlákno rolují každé samo (globals.css: main:has([data-mail-layout]))
-    <div className="space-y-3 sm:space-y-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0" data-mail-layout>
-      <div className="relative">
-      {/* mobil: stav živé pošty vpravo vedle nadpisu (bez dalšího řádku nad seznamem) */}
-      {updatedLabel && (
-        <span
-          className={cn("absolute right-0 top-1.5 text-[11px] sm:hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
-          data-testid="mail-updated-mobile"
-          suppressHydrationWarning
-        >
-          {updatedLabel}
-        </span>
-      )}
-      <PageHeader
-        title="Pošta"
-        description={description}
-        // mobil: bez popisu — seznam vláken má začít co nejvýš
-        className="[&>div>p]:hidden sm:[&>div>p]:block"
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowImport((s) => !s)} className="hidden sm:inline-flex">
-              <Upload className="h-4 w-4" /> Import z Outlooku
-            </Button>
-            <Button
-              variant="outline" size="sm" onClick={() => void sendReceive()} disabled={progress.running || sendBusy}
-              title="Přijme novou poštu ze všech tvých schránek a odešle, co čeká na odeslání" data-testid="btn-send-receive"
-            >
-              <RefreshCw className={cn("h-4 w-4", (progress.running || sendBusy) && "animate-spin")} />
-              {sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}
-            </Button>
-            <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose">
-              <PenSquare className="h-4 w-4" /> Nová zpráva
-            </Button>
-            <Button
-              size="sm" variant="outline" onClick={() => openSettings("schranka")}
-              aria-label="Nastavení pošty" title="Nastavení pošty (schránka, servery, heslo, podpis)" data-testid="btn-mail-settings"
-              className="px-2.5"
-            >
-              <Settings className="h-4 w-4" /><span className="hidden sm:inline">Nastavení pošty</span>
-            </Button>
+    <div className="space-y-3 sm:space-y-4 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-2 lg:space-y-0" data-mail-layout data-density={compact ? "compact" : "comfortable"}>
+      {/*
+        Hlavička Pošty. Mobil a tablet beze změny (nadpis + tlačítka, pod nimi schránka); počítač (≥ 1024 px,
+        majitel 3. 11.: „nastavení používám jednou — zmenšit"): jedna tenká lišta — Pošta · schránka · stav ·
+        Přijmout a odeslat · Nová zpráva · ozubené kolo · ⋯ (Import z Outlooku, hustota seznamu).
+      */}
+      <div
+        className="relative flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-4 lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-3 lg:gap-y-1.5"
+        data-testid="mail-toolbar"
+      >
+        {/* mobil: stav živé pošty vpravo vedle nadpisu (bez dalšího řádku nad seznamem) */}
+        {updatedLabel && (
+          <span
+            className={cn("absolute right-0 top-1.5 text-[11px] sm:hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+            data-testid="mail-updated-mobile"
+            suppressHydrationWarning
+          >
+            {updatedLabel}
+          </span>
+        )}
+        <div className="space-y-1 lg:order-1 lg:shrink-0 lg:space-y-0">
+          <h1 className="text-xl font-semibold tracking-tight lg:text-lg lg:leading-8">Pošta</h1>
+          {/* mobil: bez popisu — seznam vláken má začít co nejvýš; počítač: bez popisu (lišta) */}
+          <p className="hidden text-sm text-muted-foreground sm:block lg:hidden">{description}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 lg:order-3 lg:ml-auto lg:flex-nowrap lg:gap-1.5">
+          {/* stav: počet vláken (počítač) a „Aktualizováno před …" (od tabletu; telefon ho má vedle nadpisu) */}
+          {/* (1024–1279 px: v liště není místo — počet je v seznamu složek, stav kontroluje živá pošta sama) */}
+          <span className="hidden items-center gap-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:inline-flex lg:mr-1 lg:hidden xl:inline-flex">
+            {loading && <Loader2 className="hidden h-3.5 w-3.5 animate-spin lg:block" aria-label="Načítám" />}
+            {page.total > 0 && <span className="hidden tabular-nums xl:inline">{threadCountLabel(page.total)}</span>}
+            {page.total > 0 && updatedLabel && <span className="hidden xl:inline" aria-hidden>·</span>}
+            {updatedLabel && (
+              <span
+                className={cn(live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+                title={live.error ? `Poslední kontrola: ${live.error}` : "Nová pošta se kontroluje sama každých 30 s"}
+                data-testid="mail-updated"
+                suppressHydrationWarning
+              >
+                {updatedLabel}
+              </span>
+            )}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setShowImport((s) => !s)} className="hidden sm:inline-flex lg:hidden">
+            <Upload className="h-4 w-4" /> Import z Outlooku
+          </Button>
+          <Button
+            variant="outline" size="sm" onClick={() => void sendReceive()} disabled={progress.running || sendBusy}
+            title="Přijme novou poštu ze všech tvých schránek a odešle, co čeká na odeslání" data-testid="btn-send-receive"
+            className="lg:h-8 lg:px-2.5"
+          >
+            <RefreshCw className={cn("h-4 w-4", (progress.running || sendBusy) && "animate-spin")} />
+            {sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}
+          </Button>
+          <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose" className="lg:h-8 lg:px-2.5">
+            <PenSquare className="h-4 w-4" /> Nová zpráva
+          </Button>
+          <Button
+            size="sm" variant="outline" onClick={() => openSettings("schranka")}
+            aria-label="Nastavení pošty" title="Nastavení pošty (schránka, servery, heslo, podpis)" data-testid="btn-mail-settings"
+            className="px-2.5 lg:h-8 lg:w-8 lg:px-0"
+          >
+            <Settings className="h-4 w-4" /><span className="hidden sm:inline lg:hidden">Nastavení pošty</span>
+          </Button>
+          {/* počítač: zřídka používané věci schované pod ⋯ */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="hidden h-8 w-8 px-0 lg:inline-flex" aria-label="Další volby pošty" title="Další volby" data-testid="mail-more">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem onSelect={() => setShowImport((s) => !s)} data-testid="mail-more-import">
+                <Upload className="h-4 w-4" /> Import z Outlooku
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openSettings("schranka")}>
+                <Settings className="h-4 w-4" /> Nastavení pošty
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openSettings("podpis")}>
+                <PenSquare className="h-4 w-4" /> Podpis
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Seznam vláken</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem checked={compact} onCheckedChange={() => setPref("mail.comfortable", null)} data-testid="mail-density-compact">
+                <Rows3 className="h-4 w-4" /> Kompaktní (víc zpráv)
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={!compact} onCheckedChange={() => setPref("mail.comfortable", true)} data-testid="mail-density-comfortable">
+                <Rows2 className="h-4 w-4" /> Pohodlné (náhled a štítky)
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* schránka: mobil / tablet samostatný řádek pod hlavičkou, počítač uvnitř lišty */}
+        {scope === "all" ? (
+          // počítač: výběr schránky v liště, chyby schránek jeden tenký řádek pod ní (celá šířka)
+          <div className="flex flex-col gap-3 sm:col-span-2 lg:contents">
+            <MailboxSwitcher mailboxes={mailboxes} mailboxId={mailboxId} onSwitch={switchMailbox} />
+            {/* neúplné nastavení ukazují jen dlaždice schránek (bez trvalého červeného řádku) */}
+            <MailboxHealth mailboxes={mailboxes.filter((m) => !m.incomplete && m.lastSyncError)} className="lg:order-4 lg:basis-full" />
           </div>
-        }
-      />
+        ) : noMailbox ? (
+          <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:col-span-2 lg:order-4 lg:basis-full lg:items-center lg:px-3 lg:py-2 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white lg:h-8 lg:w-8"><Mail className="h-5 w-5 lg:h-4 lg:w-4" /></div>
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-semibold text-amber-900 dark:text-amber-200">Zatím nemáš připojenou e-mailovou schránku.</p>
+              <p className="text-amber-800/80 dark:text-amber-300/80">Připoj si ji sám tady v Nastavení pošty — stačí e-mail a heslo, nastavení se najde samo (nebo ho vyplníš ručně).</p>
+            </div>
+            <Button size="sm" variant="success" onClick={() => openSettings("schranka")} data-testid="btn-connect-mailbox">Připojit schránku</Button>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 sm:col-span-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10",
+              // počítač: jen tenký text v liště (bez rámečku a podbarvení)
+              "lg:order-2 lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:rounded-none lg:border-0 lg:bg-none lg:p-0 lg:dark:bg-none",
+            )}
+            data-testid="own-mailbox-bar"
+          >
+            <InboxIcon className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300 lg:h-3.5 lg:w-3.5" />
+            <div className="min-w-0 flex-1 text-sm lg:flex lg:items-center lg:gap-2 lg:text-xs">
+              <span className="lg:min-w-0 lg:truncate" title="Tvoje schránka">
+                <span className="text-blue-900/70 dark:text-blue-200/70 lg:hidden lg:text-muted-foreground xl:inline">Tvoje schránka: </span>
+                {ownMailboxes.length > 1 ? (
+                  <span className="inline-flex flex-wrap gap-1 align-middle">
+                    <button type="button" onClick={() => switchMailbox(null)} className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", !mailboxId ? "bg-blue-500 text-white" : "bg-white/60 text-blue-900 dark:bg-white/10 dark:text-blue-100 lg:bg-muted lg:text-foreground")}>všechny</button>
+                    {ownMailboxes.map((m) => (
+                      <button key={m.id} type="button" onClick={() => switchMailbox(m.id)} className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", mailboxId === m.id ? "bg-blue-500 text-white" : "bg-white/60 text-blue-900 dark:bg-white/10 dark:text-blue-100 lg:bg-muted lg:text-foreground")}>{m.email}</button>
+                    ))}
+                  </span>
+                ) : (
+                  ownMailboxes.map((m) => <span key={m.id} className="font-semibold text-blue-900 dark:text-blue-100 lg:text-foreground">{m.email}</span>)
+                )}
+              </span>
+              <MailboxHealth mailboxes={ownMailboxes} onFix={(id) => openSettings("schranka", id)} />
+            </div>
+            <button
+              type="button" onClick={() => openSettings("schranka")} data-testid="btn-mailbox-settings"
+              className="inline-flex min-h-8 items-center text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300 lg:hidden"
+            >
+              Nastavení schránky
+            </button>
+          </div>
+        )}
       </div>
 
       {progress.running && (
-        <div className="rounded-lg border bg-card px-3 py-2 text-sm" data-testid="sync-progress" aria-live="polite">
+        <div className="rounded-lg border bg-card px-3 py-2 text-sm lg:py-1.5" data-testid="sync-progress" aria-live="polite">
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             <span className="font-medium">{progress.total ? progressText(progress.total, progress.remaining) : "Stahuji poštu…"}</span>
@@ -574,7 +682,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
       {syncMsg && (
         <div
           className={cn(
-            "flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
+            "flex items-start gap-2 rounded-lg border px-3 py-2 text-sm lg:py-1.5",
             syncMsg.ok
               ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
               : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300",
@@ -602,47 +710,6 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           onDiscard={(i) => void discardOutbox(i)}
           onSettings={() => openSettings("schranka")}
         />
-      )}
-
-      {scope === "all" ? (
-        <>
-          <MailboxSwitcher mailboxes={mailboxes} mailboxId={mailboxId} onSwitch={switchMailbox} />
-          {/* neúplné nastavení ukazují jen dlaždice schránek (bez trvalého červeného řádku) */}
-          <MailboxHealth mailboxes={mailboxes.filter((m) => !m.incomplete && m.lastSyncError)} />
-        </>
-      ) : noMailbox ? (
-        <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white"><Mail className="h-5 w-5" /></div>
-          <div className="min-w-0 flex-1 text-sm">
-            <p className="font-semibold text-amber-900 dark:text-amber-200">Zatím nemáš připojenou e-mailovou schránku.</p>
-            <p className="text-amber-800/80 dark:text-amber-300/80">Připoj si ji sám tady v Nastavení pošty — stačí e-mail a heslo, nastavení se najde samo (nebo ho vyplníš ručně).</p>
-          </div>
-          <Button size="sm" variant="success" onClick={() => openSettings("schranka")} data-testid="btn-connect-mailbox">Připojit schránku</Button>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10">
-          <InboxIcon className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" />
-          <div className="min-w-0 flex-1 text-sm">
-            <span className="text-blue-900/70 dark:text-blue-200/70">Tvoje schránka: </span>
-            {ownMailboxes.length > 1 ? (
-              <span className="inline-flex flex-wrap gap-1 align-middle">
-                <button type="button" onClick={() => switchMailbox(null)} className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", !mailboxId ? "bg-blue-500 text-white" : "bg-white/60 text-blue-900 dark:bg-white/10 dark:text-blue-100")}>všechny</button>
-                {ownMailboxes.map((m) => (
-                  <button key={m.id} type="button" onClick={() => switchMailbox(m.id)} className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", mailboxId === m.id ? "bg-blue-500 text-white" : "bg-white/60 text-blue-900 dark:bg-white/10 dark:text-blue-100")}>{m.email}</button>
-                ))}
-              </span>
-            ) : (
-              ownMailboxes.map((m) => <span key={m.id} className="font-semibold text-blue-900 dark:text-blue-100">{m.email}</span>)
-            )}
-            <MailboxHealth mailboxes={ownMailboxes} onFix={(id) => openSettings("schranka", id)} />
-          </div>
-          <button
-            type="button" onClick={() => openSettings("schranka")} data-testid="btn-mailbox-settings"
-            className="inline-flex min-h-8 items-center text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300"
-          >
-            Nastavení schránky
-          </button>
-        </div>
       )}
 
       {showImport && (
@@ -710,13 +777,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             style={{ "--mail-list-w": listWidthPref ? `${listWidthPref}px` : `${MAIL_LIST_DEFAULT_RATIO * 100}%` } as React.CSSProperties}
             data-testid="mail-list-pane"
           >
-            <div className="space-y-2 lg:shrink-0 lg:pb-2">
-            <div className="flex gap-2">
+            <div className="space-y-2 lg:shrink-0 lg:space-y-1.5 lg:pb-1.5">
+            <div className="flex gap-2 lg:gap-1.5">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Hledat (předmět, odesílatel, text)…" className="pl-9" aria-label="Hledat v poště" data-testid="mail-search" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground lg:left-2.5 lg:h-3.5 lg:w-3.5" />
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Hledat (předmět, odesílatel, text)…" className="pl-9 lg:h-8 lg:pl-8" aria-label="Hledat v poště" data-testid="mail-search" />
               </div>
-              <Button variant={filtersOn ? "secondary" : "outline"} size="icon" onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters} aria-label="Filtry a řazení" data-testid="mail-filters-toggle">
+              <Button variant={filtersOn ? "secondary" : "outline"} size="icon" onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters} aria-label="Filtry a řazení" title="Filtry a řazení" data-testid="mail-filters-toggle" className="lg:h-8 lg:w-8">
                 <SlidersHorizontal className="h-4 w-4" />
               </Button>
             </div>
@@ -749,12 +816,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             )}
             {chipCategories.length > 0 && (
               // kategorie vždy na očích: jeden řádek čipů (na mobilu se posouvá do strany)
-              <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin" role="group" aria-label="Filtr kategorie" data-testid="category-chips">
+              // počítač: menší čipy v jednom řádku (posouvá se do strany kolečkem / Shift+kolečkem)
+              <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin lg:gap-1 lg:pb-0.5" role="group" aria-label="Filtr kategorie" data-testid="category-chips">
                 {/* mobil: řádek s počtem vláken není (seznam začne výš) — načítání ukáže kolečko tady */}
                 {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground sm:hidden" aria-label="Načítám" />}
                 <button
                   type="button" onClick={() => setCategory(null)} aria-pressed={category === null}
-                  className={cn("min-h-8 shrink-0 rounded-full border px-2.5 text-xs font-medium", category === null ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-accent")}
+                  className={cn("min-h-8 shrink-0 rounded-full border px-2.5 text-xs font-medium lg:min-h-6 lg:px-2 lg:text-[11px]", category === null ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-accent")}
                   data-testid="category-chip-all"
                 >
                   Všechny
@@ -764,42 +832,33 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                   return (
                     <button
                       key={c} type="button" onClick={() => setCategory(category === c ? null : c)} aria-pressed={category === c}
-                      className={cn("inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", category === c ? CATEGORY_STYLE[c].active : CATEGORY_STYLE[c].chip)}
+                      className={cn("inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium lg:min-h-6 lg:px-2 lg:text-[11px]", category === c ? CATEGORY_STYLE[c].active : CATEGORY_STYLE[c].chip)}
                       data-testid={`category-chip-${categoryCodeFromLabel(c)}`}
                     >
-                      <Icon className="h-3.5 w-3.5" /> {c}
+                      <Icon className="h-3.5 w-3.5 lg:h-3 lg:w-3" /> {c}
                     </button>
                   );
                 })}
               </div>
             )}
-            {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu */}
-            <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground", chipCategories.length ? "hidden sm:flex" : "flex")}>
+            {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu; počítač: počet
+                vláken a stav jsou v liště nahoře (řádek navíc by ubral místo seznamu) */}
+            <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground lg:hidden", chipCategories.length ? "hidden sm:flex" : "flex")}>
               <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
               <span className="ml-auto inline-flex items-center gap-1.5">
                 {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {updatedLabel && (
-                  <span
-                    className={cn("text-[11px]", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
-                    title={live.error ? `Poslední kontrola: ${live.error}` : "Nová pošta se kontroluje sama každých 30 s"}
-                    data-testid="mail-updated"
-                    suppressHydrationWarning
-                  >
-                    {updatedLabel}
-                  </span>
-                )}
               </span>
             </div>
             {folder === "sent" && scope === "all" && (
-              <p className="px-1 text-xs text-muted-foreground">
+              <p className="px-1 text-xs text-muted-foreground lg:truncate lg:text-[11px]" title="Starší odeslané z fronty schvalování">
                 Starší odeslané z fronty schvalování: <Link href="/sent?archiv=1" className="text-primary underline-offset-4 hover:underline">archiv odeslané pošty</Link>
               </p>
             )}
             {folder === "jobs" && (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-xs text-fuchsia-900 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-200" data-testid="jobs-folder-hint">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-xs text-fuchsia-900 lg:flex-nowrap lg:py-1 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-200" data-testid="jobs-folder-hint">
                 <FolderKanban className="h-4 w-4 shrink-0" />
-                <span className="min-w-0 flex-1">Pošta k běžícím zakázkám a poptávkám — přiřazuje se sama. Nejisté má otázku „Patří k…?“.</span>
-                <Button size="sm" variant="outline" className="h-7 bg-background text-xs" onClick={() => void backfill()} disabled={backfilling} data-testid="jobs-backfill">
+                <span className="min-w-0 flex-1 lg:truncate" title="Pošta k běžícím zakázkám a poptávkám — přiřazuje se sama. Nejisté má otázku „Patří k…?“.">Pošta k běžícím zakázkám a poptávkám — přiřazuje se sama. Nejisté má otázku „Patří k…?“.</span>
+                <Button size="sm" variant="outline" className="h-7 bg-background text-xs lg:h-6 lg:shrink-0" onClick={() => void backfill()} disabled={backfilling} data-testid="jobs-backfill">
                   {backfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} Přiřadit starou poštu
                 </Button>
               </div>
@@ -809,7 +868,8 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
               {items.length === 0 ? (
                 <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} onConnect={() => openSettings("schranka")} />
               ) : (
-                <div className="space-y-2" data-testid="thread-list">
+                // kompaktní seznam na počítači: řádky těsně pod sebou (oddělené čarou) jako v Outlooku
+                <div className={cn("space-y-2", compact && "lg:space-y-0 lg:overflow-hidden lg:rounded-lg lg:border lg:bg-card")} data-testid="thread-list">
                   {items.map((t, i) => (
                     <React.Fragment key={t.threadId}>
                       {folder === "jobs" && (i === 0 || groupKey(items[i - 1]) !== groupKey(t)) && <JobGroupHeader t={t} />}
@@ -828,12 +888,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                         onError={(text) => setSyncMsg({ ok: false, text })}
                         onAction={(key) => void rowActions.run(key, { threadId: t.threadId, emailId: t.emailId, jobId: t.jobId })}
                         actionBusy={rowActions.busy?.threadId === t.threadId ? rowActions.busy.key : null}
+                        compact={compact}
                       />
                     </React.Fragment>
                   ))}
                   <div ref={sentinel} />
                   {page.hasMore && (
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => void loadMore()} disabled={loadingMore} data-testid="load-more">
+                    <Button variant="outline" size="sm" className={cn("w-full", compact && "lg:rounded-none lg:border-0")} onClick={() => void loadMore()} disabled={loadingMore} data-testid="load-more">
                       {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Načíst další ({Math.max(0, page.total - items.length)})
                     </Button>
                   )}
@@ -926,6 +987,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         isAdmin={scope === "all"}
         onMailboxesChanged={() => { mailboxesChanged.current = true; }}
       />
+      {rowActions.dialog}
     </div>
   );
 }
@@ -975,7 +1037,7 @@ function lockActive(m: MailboxOption): boolean {
 }
 
 /** Stav stahování schránek (poslední stažení / chyba / neúplné nastavení); vlastní schránku jde opravit hned. */
-function MailboxHealth({ mailboxes, onFix }: { mailboxes: MailboxOption[]; onFix?: (mailboxId: string) => void }) {
+function MailboxHealth({ mailboxes, onFix, className }: { mailboxes: MailboxOption[]; onFix?: (mailboxId: string) => void; className?: string }) {
   const items = mailboxes
     .map((m) =>
       m.incomplete
@@ -1003,15 +1065,21 @@ function MailboxHealth({ mailboxes, onFix }: { mailboxes: MailboxOption[]; onFix
     );
   }
   if (!items.length) return null;
+  // počítač (lišta Pošty): jen chyby, jeden tenký řádek (celý text v bublině); „staženo před …" ukazuje stav vpravo
   return (
-    <div className="mt-0.5 space-y-0.5 text-xs" data-testid="mailbox-health">
+    <div className={cn("mt-0.5 space-y-0.5 text-xs lg:mt-0 lg:flex lg:min-w-0 lg:flex-1 lg:items-center lg:gap-3 lg:space-y-0 lg:overflow-hidden", !items.some((x) => x.bad) && "lg:hidden", className)} data-testid="mailbox-health">
       {items.map((x) => (
-        <p key={x.id} suppressHydrationWarning className={cn("break-words", x.bad ? "text-red-700 dark:text-red-300" : "text-blue-900/60 dark:text-blue-200/60")}>
-          {x.text}
+        <p
+          key={x.id} suppressHydrationWarning title={x.text}
+          // každá chyba aspoň 14 rem (víc chyb = další vpravo, co se nevejde, je v bublině / v Nastavení pošty)
+          className={cn("break-words lg:flex lg:min-w-[14rem] lg:max-w-full lg:items-center lg:gap-1.5", x.bad ? "text-red-700 dark:text-red-300" : "text-blue-900/60 dark:text-blue-200/60 lg:hidden")}
+        >
+          {x.bad && <AlertCircle className="hidden h-3.5 w-3.5 shrink-0 lg:block" aria-hidden />}
+          <span className="lg:min-w-0 lg:truncate">{x.text}</span>
           {x.fix && onFix && (
             <button
               type="button" onClick={() => onFix(x.id)} data-testid="mailbox-health-fix"
-              className="ml-1.5 inline-flex min-h-7 items-center rounded-md border border-red-300 bg-background px-2 font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
+              className="ml-1.5 inline-flex min-h-7 items-center rounded-md border border-red-300 bg-background px-2 font-semibold text-red-700 hover:bg-red-50 lg:order-first lg:ml-0 lg:min-h-6 lg:shrink-0 lg:whitespace-nowrap dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
             >
               Opravit nastavení
             </button>
@@ -1033,14 +1101,15 @@ function MailboxSwitcher({ mailboxes, mailboxId, onSwitch }: { mailboxes: Mailbo
     );
   return (
     <>
-    {/* mobil: kompaktní výběr místo řady dlaždic */}
-    <label className="flex items-center gap-2 sm:hidden">
-      <InboxIcon className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" />
+    {/* mobil a počítač (lišta Pošty): kompaktní výběr místo řady dlaždic; tablet dlaždice */}
+    <label className="flex items-center gap-2 sm:hidden lg:order-2 lg:mr-auto lg:flex lg:min-w-0 lg:shrink lg:gap-1.5" data-testid="mailbox-switcher">
+      <InboxIcon className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300 lg:h-3.5 lg:w-3.5" />
       <span className="sr-only">Schránka</span>
       <select
         value={mailboxId ?? ""}
         onChange={(e) => onSwitch(e.target.value || null)}
-        className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
+        className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm lg:h-8 lg:w-auto lg:max-w-[22rem] lg:flex-none lg:text-xs"
+        title="Schránka"
         data-testid="mailbox-select"
       >
         <option value="">Všechny schránky</option>
@@ -1048,7 +1117,7 @@ function MailboxSwitcher({ mailboxes, mailboxId, onSwitch }: { mailboxes: Mailbo
         <option value={NO_MAILBOX}>Bez schránky</option>
       </select>
     </label>
-    <div className="-mx-1 hidden gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin sm:flex sm:flex-wrap" data-testid="mailbox-switcher">
+    <div className="-mx-1 hidden gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin sm:flex sm:flex-wrap lg:hidden" data-testid="mailbox-tiles">
       <button className={pill(mailboxId === null)} onClick={() => onSwitch(null)}>
         <InboxIcon className="h-3.5 w-3.5" /><span className="font-semibold">Všechny schránky</span>
       </button>

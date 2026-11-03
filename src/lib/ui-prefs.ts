@@ -6,14 +6,20 @@
  * Klíče:
  *   mail.listWidth        — šířka seznamu vláken v Poště (px) vedle detailu zprávy (null = výchozí ~30 %)
  *   mail.foldersCollapsed — sloupec složek jen s ikonami (null = automaticky podle šířky okna)
+ *   mail.comfortable      — seznam vláken „Pohodlné" (vyšší řádky s náhledem a štítky); null = Kompaktní
+ *                           (na počítači ≥ 10 vláken na obrazovce, majitel 3. 11.); mobil vždy beze změny
+ *   app.sidebarCollapsed  — hlavní menu vlevo jen s ikonami (null = automaticky: v Poště pod 1440 px sbalené,
+ *                           jinde rozbalené)
  */
 
-export const UI_PREF_KEYS = ["mail.listWidth", "mail.foldersCollapsed"] as const;
+export const UI_PREF_KEYS = ["mail.listWidth", "mail.foldersCollapsed", "mail.comfortable", "app.sidebarCollapsed"] as const;
 export type UiPrefKey = (typeof UI_PREF_KEYS)[number];
 
 export interface UiPrefs {
   "mail.listWidth"?: number;
   "mail.foldersCollapsed"?: boolean;
+  "mail.comfortable"?: boolean;
+  "app.sidebarCollapsed"?: boolean;
 }
 
 /** Seznam vláken: nejužší / nejširší povolená šířka (px). */

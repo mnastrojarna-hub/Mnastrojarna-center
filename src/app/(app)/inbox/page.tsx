@@ -4,7 +4,6 @@ import { getFolderCounts, listThreads } from "@/lib/data/mail-threads";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { NO_MAILBOX } from "@/lib/email/visibility";
 import { isMailFolder } from "@/lib/email/mail-types";
-import { getUiPrefs } from "@/lib/data/ui-prefs";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +13,8 @@ export default async function InboxPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireFeature("mail");
-  // rozložení Pošty (šířka seznamu, sbalené složky) — uložené pro uživatele, platí hned při vykreslení
-  const uiPrefs = getUiPrefs(user.id);
+  // rozložení Pošty (šířka seznamu, sbalené složky, hustota) přichází z layoutu (UiPrefsProvider)
+  await requireFeature("mail");
   const sp = await searchParams;
   const raw = typeof sp.schranka === "string" ? sp.schranka : undefined;
   const folder = isMailFolder(sp.slozka) ? sp.slozka : "inbox";
@@ -37,7 +35,6 @@ export default async function InboxPage({
 
   return (
     <InboxView
-      uiPrefs={await uiPrefs}
       initial={initial}
       counts={counts}
       mailboxes={mailboxes}

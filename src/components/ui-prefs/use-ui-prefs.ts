@@ -108,3 +108,26 @@ export function useUiPrefs(userId: string | null | undefined, server: UiPrefs): 
 
   return [prefs, setPref];
 }
+
+type UiPrefsValue = [UiPrefs, (key: UiPrefKey, value: number | boolean | null) => void];
+const UiPrefsContext = React.createContext<UiPrefsValue | null>(null);
+
+/**
+ * Jedny předvolby pro celou aplikaci (layout): hlavní menu (sbalené) i Pošta (šířka seznamu, složky, hustota)
+ * sdílí stejný stav i mezipaměť — dvě nezávislé kopie by si v localStorage přepisovaly nepotvrzené změny.
+ */
+export function UiPrefsProvider({ userId, server, children }: { userId: string | null | undefined; server: UiPrefs; children?: React.ReactNode }) {
+  const [prefs, setPref] = useUiPrefs(userId, server);
+  const value = React.useMemo<UiPrefsValue>(() => [prefs, setPref], [prefs, setPref]);
+  return React.createElement(UiPrefsContext.Provider, { value }, children);
+}
+
+/**
+ * Předvolby z UiPrefsProvider (layout aplikace); bez něj (samostatný render, testy) vlastní kopie
+ * se serverovými hodnotami `fallback`.
+ */
+export function useSharedUiPrefs(userId: string | null | undefined, fallback: UiPrefs): UiPrefsValue {
+  const ctx = React.useContext(UiPrefsContext);
+  const local = useUiPrefs(ctx ? null : userId, fallback);
+  return ctx ?? local;
+}
