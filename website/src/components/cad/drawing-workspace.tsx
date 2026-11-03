@@ -461,7 +461,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const scaleValue = opts.scale === "auto" ? "auto" : String(opts.scale);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#4b5058] text-[12.5px] text-ink-700">
+    <div data-drawing-workspace className="fixed inset-x-0 bottom-0 top-[76px] z-30 flex flex-col bg-[#4b5058] text-[12.5px] text-ink-700 sm:top-10">
       {/* horní lišta */}
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-black/10 bg-white px-3">
         <svg viewBox="0 0 24 24" className="h-5 w-5 text-brand" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>

@@ -488,7 +488,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "sdileni",
-    title: "Sdílení odkazem",
+    title: "17. Sdílení odkazem",
     lead: "Jedno tlačítko a díl, sestava nebo výkres je u kolegy, zákazníka či dodavatele – kdekoli na světě, bez instalace a registrace. Odkaz pošlete WhatsAppem, e-mailem, přes Teams nebo jakkoli jinak.",
     blocks: [
       {
@@ -542,7 +542,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "nastaveni",
-    title: "17. Nastavení",
+    title: "18. Nastavení",
     blocks: [
       { t: "img", src: `${IMG}/nastaveni.webp`, alt: "Dialog Nastavení se záložkami Obecné, Zobrazení, Myš a ovládání, Skica, Výkres, Soubory a Klávesové zkratky", caption: "Nastavení (Ctrl+,) – sedm záložek, změny se ukládají v prohlížeči." },
       { t: "table", head: ["Záložka", "Volby"], rows: [
@@ -558,7 +558,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "zkratky",
-    title: "18. Klávesové zkratky",
+    title: "19. Klávesové zkratky",
     blocks: [
       { t: "kbd", rows: [
         ["Ctrl+K", "paleta příkazů"], ["Ctrl+L", "knihovna normálií"], ["Ctrl+,", "nastavení"], ["Ctrl+S / Ctrl+O", "uložit projekt / otevřít"], ["Ctrl+Z / Ctrl+Y", "zpět / znovu"],
@@ -573,19 +573,20 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "mobil",
-    title: "19. Mobil a dotykové ovládání",
+    title: "20. Mobil a dotykové ovládání",
     blocks: [
       { t: "img", src: `${IMG}/mobil.webp`, alt: "Mnástrojárna CAD na mobilním telefonu: nabídka Skica jako spodní list", caption: "Na telefonu se nabídky a formuláře otevírají jako spodní listy s velkými tlačítky." },
       { t: "ul", items: [
         "Jeden prst otáčí, dva prsty posouvají a přibližují, **dlouhý stisk** otevře kontextovou nabídku (jako pravé tlačítko).",
         "Rozbalovací nabídky pásu a formuláře prvků se otevírají jako **spodní listy**, takže model zůstává vidět; výběr entit do pole odkazu funguje dotykem, dlouhý stisk na poli nabídne způsoby zadání a výběr ze seznamu.",
+        "**Záložky otevřených dokumentů** (díly, sestavy, výkresy) mají na telefonu vlastní řádek pod horní lištou, takže jsou vždy vidět. Tlačítko s počtem dokumentů vpravo otevře seznam všech otevřených záložek s přepnutím, novou záložkou a zavřením. Výkres se otevírá pod tímto řádkem – mezi dílem a výkresem lze přepínat kdykoli.",
         "Pás karet se posouvá prstem; paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.",
       ] },
     ],
   },
   {
     id: "srovnani",
-    title: "20. Omezení a poctivé srovnání s desktopovými CADy",
+    title: "21. Omezení a poctivé srovnání s desktopovými CADy",
     lead: "Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde je, kde dnes stojíme vůči ZW3D, SolidWorks, Inventor, Fusion 360 a Onshape.",
     blocks: [
       { t: "table", head: ["Oblast", "Mnástrojárna CAD", "Desktopová špička"], rows: [
@@ -606,7 +607,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "data",
-    title: "21. Vaše data a soukromí",
+    title: "22. Vaše data a soukromí",
     blocks: [
       { t: "ul", items: [
         "Modelování, výpočty i export probíhají **ve vašem prohlížeči**; soubory se na server neodesílají. Výjimkou je tlačítko **Poptat výrobu**, které připraví e-mail – odesíláte ho sami.",
@@ -619,7 +620,7 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "slovnicek",
-    title: "22. Slovníček pojmů",
+    title: "23. Slovníček pojmů",
     blocks: [
       { t: "table", head: ["Pojem", "Význam"], rows: [
         ["Prvek (feature)", "jeden krok historie modelu – skica, vysunutí, díra… – s parametry, které lze kdykoli změnit."],
@@ -640,13 +641,14 @@ export const CAD_DOCS: DocSection[] = [
   },
   {
     id: "verze",
-    title: "23. Historie verzí",
+    title: "24. Historie verzí",
     blocks: [
       { t: "table", head: ["Vlna", "Obsah"], rows: [
         ["1.–2. (2026)", "jádro OCCT v prohlížeči, skica s řešičem vazeb, základní prvky, výkresy PDF/DXF, sestavy, rám formy, proměnné a stavy, import/export"],
         ["3.", "plochy (19), plech (12), svařence (10), pokročilé modelování, knihovna 103 rodin, výkresy s anotacemi a DWG, vazby sestav, formařské analýzy, nastavení a zkratky"],
         ["4.", "výběr entit a inspektor, měření mezi entitami, kontextové nabídky, gizmo, barvy ploch, podsestavy, SEO a výkon webu"],
         ["5. (listopad 2026)", "referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace"],
+        ["5. – dodatky (listopad 2026)", "sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu"],
       ] },
     ],
   },

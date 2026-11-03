@@ -145,6 +145,10 @@ export function CadApp() {
   /** úvodní obrazovka „Nový výkres“: po načtení souboru rovnou otevřít výkres */
   const drawAfterImport = useRef(false);
   const [appMenu, setAppMenu] = useState(false);
+  /** úzká obrazovka (mobil): záložky dokumentů mají vlastní řádek pod lištou a seznam v dolním listu */
+  const narrow = useNarrow();
+  const [tabMenu, setTabMenu] = useState(false);
+  const tabMenuRef = useRef<HTMLButtonElement>(null);
   const [helpMenu, setHelpMenu] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   /** dokument otevřený ze sdíleného odkazu (informační pruh nad pracovní plochou) */
@@ -2332,6 +2336,49 @@ export function CadApp() {
   };
 
   // ---------- UI ----------
+  /** chipy záložek dokumentů (společné pro hlavičku na počítači a řádek na mobilu) */
+  const tabChips = (
+    <>
+      {tabStrip.map((t) => (
+        <div
+          key={t.id}
+          role="tab"
+          aria-selected={t.id === tabId}
+          className={cn("group flex h-8 min-w-0 max-w-[280px] shrink-0 items-center gap-1.5 rounded-t-md border-x border-t px-2 text-[12.5px]", t.id === tabId ? "border-white/15 bg-white/[0.09] text-white" : "border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/85")}
+          onMouseDown={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              closeTab(t.id);
+            }
+          }}
+        >
+          <button type="button" className="flex min-w-0 items-center gap-1.5" onClick={() => activateTab(t.id)} title={t.id === tabId ? "Aktivní dokument – název lze přepsat" : `Přepnout na: ${t.title}`}>
+            <CadIcon name={t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube"} className="h-3.5 w-3.5 shrink-0 text-brand" />
+            {t.id === tabId && t.kind !== "drawing" ? (
+              <input
+                value={doc.name}
+                onChange={(e) => live({ ...doc, name: e.target.value })}
+                onBlur={() => commit(doc)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === "Escape") && (e.target as HTMLInputElement).blur()}
+                className="w-[min(32vw,200px)] min-w-0 bg-transparent font-medium text-white outline-none"
+                aria-label="Název dokumentu"
+              />
+            ) : (
+              <span className="truncate font-medium">{t.title}</span>
+            )}
+          </button>
+          {t.id === tabId && doc.activeConfig && <span className="rounded bg-[#0e7490] px-1.5 text-[10px] font-semibold">{doc.configs?.find((c) => c.id === doc.activeConfig)?.name}</span>}
+          <button type="button" aria-label={`Zavřít ${t.title}`} title="Zavřít záložku (prostřední tlačítko)" onClick={() => closeTab(t.id)} className="rounded px-1 text-[14px] leading-none text-white/40 hover:bg-white/15 hover:text-white">
+            ×
+          </button>
+        </div>
+      ))}
+      <button type="button" title="Nový díl v nové záložce" aria-label="Nová záložka" onClick={newDoc} className="mb-1 grid h-6 w-6 shrink-0 place-items-center rounded text-[16px] leading-none text-white/60 hover:bg-white/10 hover:text-white">
+        +
+      </button>
+    </>
+  );
+
   return (
     <ParamContext.Provider value={paramCtx}>
       <RefPickContext.Provider value={refCtxValue}>
@@ -2353,52 +2400,22 @@ export function CadApp() {
             </span>
           </Link>
           <div className="mx-1 h-5 w-px bg-white/15" />
-          <QBtn icon="new" title="Nový díl" onClick={newDoc} />
-          <QBtn icon="open" title="Otevřít / importovat (Ctrl+O)" onClick={() => fileInput.current?.click()} />
-          <QBtn icon="save" title="Uložit projekt (Ctrl+S)" onClick={() => void saveProject()} />
-          <div className="mx-1 h-5 w-px bg-white/15" />
+          <div className="hidden items-center gap-1 sm:flex">
+            <QBtn icon="new" title="Nový díl" onClick={newDoc} />
+            <QBtn icon="open" title="Otevřít / importovat (Ctrl+O)" onClick={() => fileInput.current?.click()} />
+            <QBtn icon="save" title="Uložit projekt (Ctrl+S)" onClick={() => void saveProject()} />
+            <div className="mx-1 h-5 w-px bg-white/15" />
+          </div>
           <QBtn icon="undo" title="Zpět (Ctrl+Z)" onClick={undo} disabled={!hist.past.length} />
           <QBtn icon="redo" title="Znovu (Ctrl+Y)" onClick={redo} disabled={!hist.future.length} />
-          {/* záložky otevřených dokumentů (díly, sestavy, výkresy) */}
-          <div className="flex min-w-0 flex-1 items-end gap-0.5 self-stretch overflow-x-auto px-1 pt-1 [scrollbar-width:none]" role="tablist" aria-label="Otevřené dokumenty">
-            {tabStrip.map((t) => (
-              <div
-                key={t.id}
-                role="tab"
-                aria-selected={t.id === tabId}
-                className={cn("group flex h-8 min-w-0 max-w-[280px] shrink-0 items-center gap-1.5 rounded-t-md border-x border-t px-2 text-[12.5px]", t.id === tabId ? "border-white/15 bg-white/[0.09] text-white" : "border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white/85")}
-                onMouseDown={(e) => {
-                  if (e.button === 1) {
-                    e.preventDefault();
-                    closeTab(t.id);
-                  }
-                }}
-              >
-                <button type="button" className="flex min-w-0 items-center gap-1.5" onClick={() => activateTab(t.id)} title={t.id === tabId ? "Aktivní dokument – název lze přepsat" : `Přepnout na: ${t.title}`}>
-                  <CadIcon name={t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube"} className="h-3.5 w-3.5 shrink-0 text-brand" />
-                  {t.id === tabId && t.kind !== "drawing" ? (
-                    <input
-                      value={doc.name}
-                      onChange={(e) => live({ ...doc, name: e.target.value })}
-                      onBlur={() => commit(doc)}
-                      onKeyDown={(e) => (e.key === "Enter" || e.key === "Escape") && (e.target as HTMLInputElement).blur()}
-                      className="w-[min(32vw,200px)] min-w-0 bg-transparent font-medium text-white outline-none"
-                      aria-label="Název dokumentu"
-                    />
-                  ) : (
-                    <span className="truncate font-medium">{t.title}</span>
-                  )}
-                </button>
-                {t.id === tabId && doc.activeConfig && <span className="rounded bg-[#0e7490] px-1.5 text-[10px] font-semibold">{doc.configs?.find((c) => c.id === doc.activeConfig)?.name}</span>}
-                <button type="button" aria-label={`Zavřít ${t.title}`} title="Zavřít záložku (prostřední tlačítko)" onClick={() => closeTab(t.id)} className="rounded px-1 text-[14px] leading-none text-white/40 hover:bg-white/15 hover:text-white">
-                  ×
-                </button>
-              </div>
-            ))}
-            <button type="button" title="Nový díl v nové záložce" aria-label="Nová záložka" onClick={newDoc} className="mb-1 grid h-6 w-6 shrink-0 place-items-center rounded text-[16px] leading-none text-white/60 hover:bg-white/10 hover:text-white">
-              +
-            </button>
-          </div>
+          {/* záložky otevřených dokumentů (díly, sestavy, výkresy) – na mobilu ve vlastním řádku pod lištou */}
+          {narrow ? (
+            <span className="flex-1" />
+          ) : (
+            <div className="flex min-w-0 flex-1 items-end gap-0.5 self-stretch overflow-x-auto px-1 pt-1 [scrollbar-width:none]" role="tablist" aria-label="Otevřené dokumenty">
+              {tabChips}
+            </div>
+          )}
           <span className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" ? "text-brand" : "text-white/55")}>
             <span className={cn("h-2 w-2 rounded-full", core === "ready" ? (busy ? "animate-pulse bg-amber-400" : "bg-emerald-400") : core === "loading" ? "animate-pulse bg-amber-400" : "bg-brand")} />
             {core === "loading" ? "Načítám jádro OpenCascade…" : core === "error" ? "Jádro se nenačetlo" : busy ? "Přepočítávám…" : `OCCT · ${result ? `${result.ms} ms` : "připraveno"}`}
@@ -2464,6 +2481,40 @@ export function CadApp() {
             }}
           />
         </header>
+        {narrow && (
+          <div className="flex h-9 shrink-0 items-stretch bg-[#1c2025] text-white/85">
+            <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto px-1 pt-1 [scrollbar-width:none]" role="tablist" aria-label="Otevřené dokumenty">
+              {tabChips}
+            </div>
+            <div className="relative flex shrink-0 items-center border-l border-white/10 px-1">
+              <button
+                ref={tabMenuRef}
+                type="button"
+                onClick={() => setTabMenu((v) => !v)}
+                aria-label="Seznam otevřených dokumentů"
+                title="Seznam otevřených dokumentů"
+                className="flex h-7 items-center gap-1 rounded px-2 text-[12px] font-semibold hover:bg-white/10"
+              >
+                <CadIcon name="layers" className="h-4 w-4" />
+                {tabStrip.length}
+                <span className="text-[8px]">▼</span>
+              </button>
+              {tabMenu && (
+                <Dropdown
+                  anchor={tabMenuRef.current}
+                  close={() => setTabMenu(false)}
+                  entries={[
+                    { divider: true, label: "Otevřené dokumenty" },
+                    ...tabStrip.map((t) => ({ id: t.id, label: t.id === tabId ? doc.name : t.title, icon: (t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube") as CadIconName, active: t.id === tabId, onClick: () => activateTab(t.id) })),
+                    { divider: true },
+                    { id: "new", label: "Nový díl v nové záložce", icon: "new", tone: "create", onClick: newDoc },
+                    { id: "close", label: `Zavřít: ${tabStrip.find((t) => t.id === tabId)?.title ?? doc.name}`, icon: "x", onClick: () => closeTab(tabId) },
+                  ]}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Záložky pásu */}
         <div className="flex h-8 shrink-0 items-end gap-0.5 border-b border-[#d5dbe2] bg-[#dfe5eb] px-1">
@@ -3153,6 +3204,19 @@ function statusOf(result: BuildResult | null, id: string) {
 }
 
 // ---------- drobné komponenty ----------
+
+/** true na úzké obrazovce (< 640 px) – přepočítá se při otočení / změně velikosti */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
 
 function QBtn({ icon, title, onClick, disabled }: { icon: CadIconName; title: string; onClick: () => void; disabled?: boolean }) {
   return (

@@ -95,7 +95,7 @@ const linkValue = async (dlg, page, notEqual) => {
   await p.getByRole('button', { name: 'Soubor', exact: true }).click();
   await p.getByRole('button', { name: /Výkres PDF/ }).click(); await p.waitForTimeout(2500);
   ok(/Výkres/.test(await p.locator('[role=tab][aria-selected="true"]').innerText()), 'odesílatel: aktivní výkresová záložka');
-  await p.locator('div.fixed.inset-0.z-50').getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await p.locator('[data-drawing-workspace]').getByRole('button', { name: 'Sdílet', exact: true }).click();
   const urlDrw = await linkValue(dlg, p);
   ok(/příjemci se otevře rovnou výkres/.test(await dlg.innerText()), 'dialog: sdílí se včetně výkresu');
   await dlg.getByRole('button', { name: 'Zavřít', exact: true }).last().click();

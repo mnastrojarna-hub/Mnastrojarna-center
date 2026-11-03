@@ -40,14 +40,14 @@
 - 14. Analýza a měření
 - 15. Proměnné, rovnice a stavy dílu
 - 16. Soubory, import a export
-- Sdílení odkazem
-- 17. Nastavení
-- 18. Klávesové zkratky
-- 19. Mobil a dotykové ovládání
-- 20. Omezení a poctivé srovnání s desktopovými CADy
-- 21. Vaše data a soukromí
-- 22. Slovníček pojmů
-- 23. Historie verzí
+- 17. Sdílení odkazem
+- 18. Nastavení
+- 19. Klávesové zkratky
+- 20. Mobil a dotykové ovládání
+- 21. Omezení a poctivé srovnání s desktopovými CADy
+- 22. Vaše data a soukromí
+- 23. Slovníček pojmů
+- 24. Historie verzí
 - Časté otázky
 
 ## 1. Co je Mnástrojárna CAD
@@ -577,7 +577,7 @@ Nativní formáty (SLDPRT, SLDASM, IPT, IAM, Z3, CATPART, PRT, X_T, F3D, SKP, 3D
 
 Poptat výrobu: tlačítko v titulní liště připraví STEP aktuálního dílu a předvyplněný e-mail pro nástrojárnu Mnástrojárna (prototypy, náhradní díly, nástroje, přípravky, 1–99 ks).
 
-## Sdílení odkazem
+## 17. Sdílení odkazem
 
 Jedno tlačítko a díl, sestava nebo výkres je u kolegy, zákazníka či dodavatele – kdekoli na světě, bez instalace a registrace. Odkaz pošlete WhatsAppem, e-mailem, přes Teams nebo jakkoli jinak.
 
@@ -621,7 +621,7 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 
 > Odkaz je snímek: kdo ho má, otevře dokument do konce platnosti. Pro citlivé díly použijte heslo a kratší platnost.
 
-## 17. Nastavení
+## 18. Nastavení
 
 ![Dialog Nastavení se záložkami Obecné, Zobrazení, Myš a ovládání, Skica, Výkres, Soubory a Klávesové zkratky](https://www.mnastrojarna.cz/cad/docs/nastaveni.webp)
 
@@ -637,7 +637,7 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 | Soubory | rozpracovaná práce v prohlížeči: neukládat (výchozí) nebo šifrované úložiště s heslem; vymazání všeho uloženého; počet nedávných souborů |
 | Klávesové zkratky | každou zkratku lze přemapovat; obnovit výchozí |
 
-## 18. Klávesové zkratky
+## 19. Klávesové zkratky
 
 | Zkratka | Akce |
 | --- | --- |
@@ -667,7 +667,7 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 
 Zkratky jsou v Nastavení → Klávesové zkratky a v přehledu Klávesové zkratky a ovládání (nabídka Soubor).
 
-## 19. Mobil a dotykové ovládání
+## 20. Mobil a dotykové ovládání
 
 ![Mnástrojárna CAD na mobilním telefonu: nabídka Skica jako spodní list](https://www.mnastrojarna.cz/cad/docs/mobil.webp)
 
@@ -675,9 +675,10 @@ Zkratky jsou v Nastavení → Klávesové zkratky a v přehledu Klávesové zkra
 
 - Jeden prst otáčí, dva prsty posouvají a přibližují, dlouhý stisk otevře kontextovou nabídku (jako pravé tlačítko).
 - Rozbalovací nabídky pásu a formuláře prvků se otevírají jako spodní listy, takže model zůstává vidět; výběr entit do pole odkazu funguje dotykem, dlouhý stisk na poli nabídne způsoby zadání a výběr ze seznamu.
+- Záložky otevřených dokumentů (díly, sestavy, výkresy) mají na telefonu vlastní řádek pod horní lištou, takže jsou vždy vidět. Tlačítko s počtem dokumentů vpravo otevře seznam všech otevřených záložek s přepnutím, novou záložkou a zavřením. Výkres se otevírá pod tímto řádkem – mezi dílem a výkresem lze přepínat kdykoli.
 - Pás karet se posouvá prstem; paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.
 
-## 20. Omezení a poctivé srovnání s desktopovými CADy
+## 21. Omezení a poctivé srovnání s desktopovými CADy
 
 Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde je, kde dnes stojíme vůči ZW3D, SolidWorks, Inventor, Fusion 360 a Onshape.
 
@@ -697,7 +698,7 @@ Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde j
 
 Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, dělicí křivka a stupňovitý úkos, periodický (hladký) uzavřený loft a spline s tečnami nejsou k dispozici – jádro OpenCascade je nenabízí nebo vyžadují vlastní konstrukci. Okrajové podmínky šablonování se aproximují pomocným řezem. Výkresy z DWG byly ověřeny zápisem a zpětným čtením; u exotických verzí AutoCADu doporučujeme kontrolu. Plán dalšího vývoje (vazby sestav, další druhy pohledů výkresu) je veřejný v souboru CAD-ROADMAP.
 
-## 21. Vaše data a soukromí
+## 22. Vaše data a soukromí
 
 - Modelování, výpočty i export probíhají ve vašem prohlížeči; soubory se na server neodesílají. Výjimkou je tlačítko Poptat výrobu, které připraví e-mail – odesíláte ho sami.
 - Výchozí režim „neukládat“ (NDA): modely, výkresy ani jejich názvy se do prohlížeče neukládají. Rozpracovaná práce existuje jen v otevřené kartě a v souborech, které si uložíte do svého počítače tlačítkem Uložit (kam a pod jakým názvem si vyberete). Po zavření karty v prohlížeči nic nezůstane; při zavírání s neuloženými změnami prohlížeč varuje. Dokumenty uložené staršími verzemi programu se při prvním spuštění smažou.
@@ -705,7 +706,7 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 - Nastavení programu (jednotky, myš, zkratky, formát listu) se ukládá nešifrovaně – neobsahuje žádná data z dokumentů.
 - Anonymní statistika použití (otevření aplikace, typ prvku) neobsahuje geometrii ani názvy souborů. Podrobnosti v zásadách ochrany osobních údajů na webu.
 
-## 22. Slovníček pojmů
+## 23. Slovníček pojmů
 
 | Pojem | Význam |
 | --- | --- |
@@ -723,7 +724,7 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 | STEP | neutrální přesný formát pro výměnu 3D modelů mezi CADy (ISO 10303). |
 | OCCT | OpenCascade Technology – otevřené geometrické jádro, na kterém Mnástrojárna CAD běží. |
 
-## 23. Historie verzí
+## 24. Historie verzí
 
 | Vlna | Obsah |
 | --- | --- |
@@ -731,6 +732,7 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 | 3. | plochy (19), plech (12), svařence (10), pokročilé modelování, knihovna 103 rodin, výkresy s anotacemi a DWG, vazby sestav, formařské analýzy, nastavení a zkratky |
 | 4. | výběr entit a inspektor, měření mezi entitami, kontextové nabídky, gizmo, barvy ploch, podsestavy, SEO a výkon webu |
 | 5. (listopad 2026) | referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace |
+| 5. – dodatky (listopad 2026) | sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu |
 
 ## Časté otázky
 
