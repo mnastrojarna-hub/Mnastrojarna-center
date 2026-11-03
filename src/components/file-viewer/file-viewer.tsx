@@ -28,6 +28,8 @@ export interface ViewerRequest {
   filename?: string | null;
   /** Už stažený obsah (např. náhled PDF vytvořený na serveru) — nestahuje se znovu. */
   blob?: Blob;
+  /** Vlastní tlačítka v hlavičce (jen při otevření z kódu, např. „Mít vedle" na Nacenění). */
+  toolbar?: React.ReactNode;
 }
 
 interface Loaded {
@@ -80,7 +82,17 @@ function filenameFromUrl(url: string): string | null {
  * Prohlížeč souboru přes celou obrazovku: PDF (i 3D PDF), obrázky, 3D modely (STEP, IGES, STL…),
  * text; ostatní ke stažení. Nahoře vždy velké „Zpět" (i na telefonu).
  */
-export function FileViewer({ request, onBack, standalone = false }: { request: ViewerRequest; onBack: () => void; standalone?: boolean }) {
+export function FileViewer({
+  request, onBack, standalone = false, backLabel = "Zpět", toolbar,
+}: {
+  request: ViewerRequest;
+  onBack: () => void;
+  standalone?: boolean;
+  /** Text tlačítka vlevo nahoře (panel vedle stránky: „Zavřít"). */
+  backLabel?: string;
+  /** Vlastní tlačítka v hlavičce (před tiskem a stažením). */
+  toolbar?: React.ReactNode;
+}) {
   const [state, setState] = React.useState<{ loading: true; done: number; total: number } | { loading: false; error: string } | { loading: false; data: Loaded }>({ loading: true, done: 0, total: 0 });
   const [mode, setMode] = React.useState<"3d" | "pages">("3d");
 
@@ -170,7 +182,7 @@ export function FileViewer({ request, onBack, standalone = false }: { request: V
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-[0.98]"
           data-testid="viewer-back"
         >
-          <ArrowLeft className="h-5 w-5" /> Zpět
+          <ArrowLeft className="h-5 w-5" /> {backLabel}
         </button>
         <div className="min-w-0 flex-1 px-1">
           <p className="truncate text-sm font-semibold" title={title}>{title}</p>
@@ -186,6 +198,7 @@ export function FileViewer({ request, onBack, standalone = false }: { request: V
             </button>
           </div>
         )}
+        {toolbar ?? request.toolbar}
         {printable && (
           <button
             type="button"
