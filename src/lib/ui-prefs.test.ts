@@ -51,4 +51,15 @@ describe("předvolby vzhledu (Pošta: šířka seznamu, sbalené složky)", () =
     expect(parseUiPrefsCache("{rozbité")).toEqual({ prefs: {}, pending: [] });
     expect(uiPrefsStorageKey("u1")).not.toBe(uiPrefsStorageKey("u2"));
   });
+
+  it("sbalené hlavní menu a hustota seznamu Pošty: ano / ne, null = výchozí (automaticky / Kompaktní)", () => {
+    expect(sanitizeUiPref("app.sidebarCollapsed", true)).toEqual({ ok: true, key: "app.sidebarCollapsed", value: true });
+    expect(sanitizeUiPref("app.sidebarCollapsed", null)).toEqual({ ok: true, key: "app.sidebarCollapsed", value: null });
+    expect(sanitizeUiPref("app.sidebarCollapsed", 1).ok).toBe(false);
+    expect(sanitizeUiPref("mail.comfortable", false)).toEqual({ ok: true, key: "mail.comfortable", value: false });
+    expect(sanitizeUiPref("mail.comfortable", "pohodlne").ok).toBe(false);
+    expect(normalizeUiPrefs({ "app.sidebarCollapsed": false, "mail.comfortable": true, "app.x": true })).toEqual({ "app.sidebarCollapsed": false, "mail.comfortable": true });
+    // klíč projde i kontrolou v DB (ui_prefs_merge: „modul.nazev")
+    for (const k of ["app.sidebarCollapsed", "mail.comfortable"]) expect(/^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+)+$/.test(k)).toBe(true);
+  });
 });

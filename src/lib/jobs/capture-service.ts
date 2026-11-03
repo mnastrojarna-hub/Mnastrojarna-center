@@ -12,7 +12,8 @@ import { getModuleMode } from "@/lib/automation";
 import { isDocumentReaderConfigured, readBusinessDocument, type ReadDocumentFile } from "@/lib/ai/document-reader";
 import { aiFailureMessage, routeDeadline } from "@/lib/ai/ai-call";
 import { findOrCreateSupplierByParty, loadSupplierCandidates } from "@/lib/jobs/purchasing-store";
-import { analyzeBatch, discardBatch } from "@/lib/jobs/capture-batch-service";
+import { analyzeBatch, batchSession, discardBatch } from "@/lib/jobs/capture-batch-service";
+import { copyMailAttachmentsToCapture, findMailCaptureSession, visibleMailForCapture } from "@/lib/email/mail-capture";
 import { liveSessionPaths } from "@/lib/jobs/capture-store";
 import { recordTrainingExample } from "@/lib/jobs/training";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
@@ -83,6 +84,11 @@ export interface AnalyzeCaptureInput {
   /** Nahrává se u konkrétní zakázky (cíl je pevný). */
   jobId?: string | null;
   expectedKind?: CaptureDocKind | null;
+  /**
+   * Přílohy e-mailu (Pošta → „Založit zakázku" / „Přidat k zakázce"): server je sám zkopíruje do dávky
+   * (files pak jen ruční doplnění, i prázdné) a rozpracovanou dávku téhož e-mailu převezme.
+   */
+  mail?: { emailId: string } | null;
 }
 
 /** Rozpracovaný doklad uložený vedle stránek (capture/<uživatel>/<captureId>.json). */
@@ -404,6 +410,7 @@ export function newTarget(session: Pick<CaptureSession, "aiUsed" | "doc">, margi
 export async function analyzeCapture(raw: AnalyzeCaptureInput, signal?: AbortSignal | null): Promise<AnalyzeCaptureResponse> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
+  if (raw?.mail) return analyzeMailCapture(c, raw, signal ?? null);
   const files = cleanFileRefs(c.user.id, raw?.files, hasServiceKey() ? CAPTURE_BATCH_MAX_FILES : CAPTURE_MAX_PAGES);
   if (typeof files === "string") return fail(files);
   const fixedJobId = raw?.jobId ? (isUuid(raw.jobId) ? raw.jobId.toLowerCase() : "") : null;
@@ -412,6 +419,38 @@ export async function analyzeCapture(raw: AnalyzeCaptureInput, signal?: AbortSig
   if (!hasServiceKey()) return analyzeSingle(c, files, { fixedJobId, expectedKind, signal });
   try {
     return await analyzeBatch(c, files, { fixedJobId, expectedKind, signal: signal ?? null });
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+const NO_MAIL_ATTACHMENTS = "V e-mailu nejsou přílohy k roztřídění (loga z podpisu se vynechávají).";
+
+/** Přílohy e-mailu → dávka (rozpracovaná dávka téhož e-mailu a cíle se převezme bez nového čtení AI). */
+async function analyzeMailCapture(c: Ctx, raw: AnalyzeCaptureInput, signal: AbortSignal | null): Promise<AnalyzeCaptureResponse> {
+  if (!hasServiceKey()) return fail("Roztřídění příloh e-mailu potřebuje servisní klíč Supabase (Nastavení → Integrace).");
+  const emailId = typeof raw.mail?.emailId === "string" ? raw.mail.emailId.toLowerCase() : "";
+  const fixedJobId = raw.jobId ? (isUuid(raw.jobId) ? raw.jobId.toLowerCase() : "") : null;
+  if (fixedJobId === "") return fail("Zakázka nenalezena.");
+  const expectedKind = isCaptureDocKind(raw.expectedKind) ? raw.expectedKind : null;
+  try {
+    const email = await visibleMailForCapture(emailId);
+    if (!email) return fail("E-mail nenalezen (nebo k němu nemáš přístup).");
+    const extra = Array.isArray(raw.files) && raw.files.length ? cleanFileRefs(c.user.id, raw.files, CAPTURE_BATCH_MAX_FILES) : [];
+    if (typeof extra === "string") return fail(extra);
+    if (!extra.length) {
+      const resumeId = await findMailCaptureSession(c.db, c.user.id, email.id, fixedJobId);
+      if (resumeId) {
+        const res = await batchSession(c, resumeId);
+        if (res.ok) return { ok: true, batch: { ...res.batch, extracts: res.extracts } };
+      }
+    }
+    const copied = await copyMailAttachmentsToCapture(c.db, c.user.id, email);
+    if ("error" in copied) return fail(copied.error);
+    if (!copied.refs.length && !extra.length) return fail(NO_MAIL_ATTACHMENTS);
+    const res = await analyzeBatch(c, [...copied.refs, ...extra].slice(0, CAPTURE_BATCH_MAX_FILES), { fixedJobId, expectedKind, signal, mail: copied.ctx });
+    if (!res.ok && copied.refs.length) await bucket(c.db).remove(copied.refs.map((r) => r.path));
+    return res;
   } catch (err) {
     return fail(err);
   }

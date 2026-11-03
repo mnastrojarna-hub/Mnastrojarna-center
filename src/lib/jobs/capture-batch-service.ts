@@ -75,6 +75,7 @@ import { businessDocFromInvoice } from "@/lib/supplier-invoices/extract";
 import { createInvoiceFromBatchDoc, isSupplierInvoiceDoc } from "@/lib/supplier-invoices/capture-bridge";
 import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
 import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
+import { applyMailContextToReview, mailClassifyContext, type MailCaptureContext } from "@/lib/email/mail-capture-input";
 
 /**
  * Dávkové focení — serverová orchestrace (relace v DB, servisní klíč, oprávnění hlídá každá funkce):
@@ -242,6 +243,11 @@ export interface AnalyzeBatchOptions {
   fixedJobId: string | null;
   expectedKind: CaptureDocKind | null;
   signal: AbortSignal | null;
+  /**
+   * Přílohy e-mailu (Pošta → „Založit zakázku" / „Přidat k zakázce"): balík „mail:<id>" (1 odesílatel =
+   * 1 zákazník), text e-mailu jako kontext roztřídění, vždy dávka s kontrolou (bez toku jednoho dokladu).
+   */
+  mail?: MailCaptureContext | null;
 }
 
 function refsOf(prep: PreparedBatch): CaptureFileRef[] {
@@ -297,12 +303,15 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
     opts.fixedJobId ? getJob(opts.fixedJobId) : Promise.resolve(null),
   ]);
   if (opts.fixedJobId && !fixedJob) return fail("Zakázka nenalezena.");
-  const prep = await prepareBatchFiles(db, user.id, files);
+  const mail = opts.mail ?? null;
+  const prep = await prepareBatchFiles(db, user.id, mail ? files.map((f) => ({ ...f, bundle: `mail:${mail.emailId}` })) : files);
   if (!prep.files.length) return fail("Soubory se nepodařilo načíst z úložiště — nahraj je prosím znovu.");
   const expectedType = opts.expectedKind ? batchTypeFor(opts.expectedKind, opts.expectedKind === "poptavka" || opts.expectedKind === "objednavka" ? "zakaznik" : "neznamy") : null;
   const visual = prep.pages.filter((p) => p.source !== "file");
   const readable = visual.filter((p) => prep.files.find((f) => f.id === p.fileId)?.aiReadable);
   const hasZip = prep.files.some((f) => f.fromZip) || prep.removePaths.length > 0;
+  // e-mail: vždy dávka (balík, kontext e-mailu, kontrola s výběrem zakázky a kontaktem odesílatele)
+  const allowSingle = !mail;
   const single = (preread: PrereadDoc | null) => analyzeSingle(c, refsOf(prep), { fixedJobId: opts.fixedJobId, expectedKind: opts.expectedKind, signal: opts.signal, preread });
 
   let sort: BatchSort;
@@ -321,7 +330,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
     sort = defaultSortWithoutAi(prep.files, prep.pages, "manual", { expectedType });
     const only = activeDocs(sort);
     const loose = only.length === 1 && (isBusinessType(only[0].type) || only[0].type === "ostatni") && only[0].type !== "nabidka_dodavatel";
-    if (loose && !prep.pages.some((p) => p.source === "file") && !hasZip && prep.files.length <= CAPTURE_MAX_PAGES) return single(null);
+    if (allowSingle && loose && !prep.pages.some((p) => p.source === "file") && !hasZip && prep.files.length <= CAPTURE_MAX_PAGES) return single(null);
   } else if (readable.length <= 1 && !hasZip) {
     sort = defaultSortWithoutAi(prep.files, prep.pages, "manual", { expectedType });
     const tag = readable.length === 1 ? fakeTagFor(docFilenames(prep, [readable[0].id])) : null;
@@ -335,7 +344,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
       const onlyVisual = visual.length === 1 && !prep.pages.some((p) => p.source === "file") && prep.files.length === 1;
       if (res.ok) {
         const type = batchTypeFor(res.doc.docKind, res.doc.issuer);
-        if (onlyVisual && isBusinessType(type) && type !== "nabidka_dodavatel" && !isSupplierInvoiceDoc(type)) {
+        if (allowSingle && onlyVisual && isBusinessType(type) && type !== "nabidka_dodavatel" && !isSupplierInvoiceDoc(type)) {
           return single({ doc: res.doc, aiUsed: true, reason: null, notes: res.notes });
         }
         const d = sort.docs.find((x) => x.pageIds.includes(readable[0].id));
@@ -351,17 +360,20 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
         sortSource = "ai";
       } else {
         aiFailure = res.failure;
-        if (onlyVisual) return single({ doc: emptyExtracted(), aiUsed: false, reason: `AI doklad nepřečetla (${res.error.replace(/\.$/, "")}). Vyplň údaje ručně podle náhledu.`, notes: [] });
+        if (allowSingle && onlyVisual) return single({ doc: emptyExtracted(), aiUsed: false, reason: `AI doklad nepřečetla (${res.error.replace(/\.$/, "")}). Vyplň údaje ručně podle náhledu.`, notes: [] });
         warnings.push(makeWarning("ai_failed", "warn", [], `AI doklad nepřečetla — ${res.error}`));
       }
-    } else if (visual.length === 1 && !prep.pages.some((p) => p.source === "file") && prep.files.length === 1) {
+    } else if (allowSingle && visual.length === 1 && !prep.pages.some((p) => p.source === "file") && prep.files.length === 1) {
       return single(null);
     }
   } else {
     const cls = await classifyPages(prep, CLASSIFY_MAX_PAGES);
     const concurrent = readable.length >= 2 && readable.length <= 4 && !hasZip;
     const [res, wholeRes] = await Promise.all([
-      classifyBatch({ files: prep.files, pages: prep.pages, sent: cls.sent, fileNotes: cls.notes, deadline, clientSignal: opts.signal }),
+      classifyBatch({
+        files: prep.files, pages: prep.pages, sent: cls.sent, fileNotes: cls.notes, deadline, clientSignal: opts.signal,
+        ...(mail ? { mailContext: mailClassifyContext(mail) } : {}),
+      }),
       concurrent ? readWhole(prep, readable.map((p) => p.id), { deadline, signal: opts.signal, hintKind: opts.expectedKind, hintJob }) : Promise.resolve(null),
     ]);
     const md = await getMd();
@@ -392,7 +404,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
       if (res.failure === "spend_limit" || res.failure === "auth") reason = AI_FAILURE_MESSAGE[res.failure];
     }
     // jeden obchodní doklad → dnešní tok (s hotovým vytěžením, je-li)
-    if (isSingleBusiness(sort, prep) && activeDocs(sort)[0].pageIds.length === visual.length && aiFailure === null) {
+    if (allowSingle && isSingleBusiness(sort, prep) && activeDocs(sort)[0].pageIds.length === visual.length && aiFailure === null) {
       if (wholeRes?.ok) return single({ doc: wholeRes.doc, aiUsed: true, reason: null, notes: wholeRes.notes });
       if (wholeRes && !wholeRes.ok) {
         return single({ doc: emptyExtracted(), aiUsed: false, reason: `AI doklad nepřečetla (${wholeRes.error.replace(/\.$/, "")}). Vyplň údaje ručně podle náhledu.`, notes: [] });
@@ -429,6 +441,7 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
     lastSort: null,
     headNumbers: prep.headNumbers,
     sortSource,
+    ...(mail ? { mail } : {}),
   };
   const err = await createSession(db, session);
   if (err) return fail(`Dávku se nepodařilo připravit: ${message(err)}`);
@@ -956,7 +969,8 @@ async function reviewModel(
   const keepCustomers = new Set<string>();
   for (const g of grouped.groups) {
     const gdocs = g.docIds.map((id) => ctx.docs.find((d) => d.id === id)!).filter(Boolean);
-    const override = opts.targets[g.key] ?? null;
+    // e-mail (Založit zakázku / Vytvořit nabídku): skupina bez dokladu a bez shody → nová zakázka (ne „vyber")
+    const override = opts.targets[g.key] ?? (session.mail && g.targetRequired && !g.targetJobId && !session.fixedJobId ? "new" : null);
     const jobs = await candidateJobs(ctx, gdocs, g.targetJobId, override, session.fixedJobId, db);
     const jobMap = new Map(jobs.map((j) => [j.job.id, j.job as JobDetail]));
     const { data: winners } = jobs.length
@@ -988,6 +1002,9 @@ async function reviewModel(
   // pořadí dokladů jako v roztřídění
   const order = new Map(activeDocs(sort).map((d, i) => [d.id, i]));
   docReviews.sort((a, b) => (order.get(a.docId) ?? 0) - (order.get(b.docId) ?? 0));
+  // přílohy e-mailu: zákazník odesílatele, kontaktní osoba, předmět a počty kusů z textu (jen prázdná místa)
+  const mailCtx = session.mail ?? null;
+  if (mailCtx?.customerId) keepCustomers.add(mailCtx.customerId);
   const recentJobs = [...ctx.md.jobs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 300);
   for (const j of recentJobs.slice(0, 50)) if (j.customerId) keepCustomers.add(j.customerId);
   const options = trimOptions({
@@ -995,7 +1012,7 @@ async function reviewModel(
     suppliers: formOptions.suppliers,
     jobs: recentJobs.map((j) => ({ id: j.id, number: j.number, title: j.title, customerName: j.customerName, stage: j.stage })),
   }, keepCustomers);
-  return {
+  const out: BatchReviewModel = {
     captureId: session.captureId,
     aiUsed: session.aiUsed,
     mode: mode === "full" ? "full" : "approval",
@@ -1009,6 +1026,8 @@ async function reviewModel(
     initial: { sort, groups: states, docs: docStates },
     ...(invoiceDocs.length ? { supplierInvoices: supplierInvoiceLane(c, sort, invoiceDocs, ctxAll.rows) } : {}),
   };
+  if (mailCtx) applyMailContextToReview(out, mailCtx, session.files.map((f) => f.filename));
+  return out;
 }
 
 /** Pruh „Faktura dodavatele → Faktury dodavatelů" (údaje jen s právem na faktury). */

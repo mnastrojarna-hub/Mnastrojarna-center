@@ -5,10 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, FilePlus2, FolderPlus, Link2, Loader2, Mail, MailOpen, PackageCheck, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAccess } from "@/components/access-provider";
-import { createJobFromEmail, linkEmailToJob } from "@/app/actions/mail";
-import { processOrderFromEmailAction } from "@/app/actions/mail-actions";
-import { flowActionHref } from "@/components/flow/flow-state";
+import { useMailActionRunner } from "@/components/mail/mail-action-runner";
 import { cn, relativeTime } from "@/lib/utils";
 
 /** E-mail z pošty pro stránky toku (jen čistá data ze serveru). */
@@ -52,27 +49,29 @@ export function FlowMailList({ emails }: { emails: FlowEmail[] }) {
 
 function MailRow({ email: e }: { email: FlowEmail }) {
   const router = useRouter();
-  const { can } = useAccess();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [created, setCreated] = React.useState<{ id: string; number: string | null } | null>(null);
   const jobId = created?.id ?? e.jobId;
   const jobNumber = created?.number ?? e.jobNumber;
+  // stejné akce jako Pošta: e-mail s přílohami → roztřídění dávkou „Přidat doklad (foto)", jinak z textu
+  const actions = useMailActionRunner({
+    onLinked: (_t, id, number) => {
+      setCreated({ id, number: number ?? null });
+      router.refresh();
+    },
+    onNotice: (n) => {
+      if (!n.ok) setError(n.text);
+    },
+    onChoices: (_t, c) => setError(`Objednávka může patřit k ${c.map((x) => x.number).join(", ")} — otevři ji v poště a vyber zakázku.`),
+  });
 
   async function link(target: { id: string; number: string }) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await linkEmailToJob(e.id, target.id);
-      if (!res.ok) {
-        setError(res.error ?? "E-mail se nepodařilo přiřadit.");
-        return;
-      }
-      setCreated({ id: target.id, number: target.number });
-      router.refresh();
-    } catch {
-      setError("Spojení se nepovedlo — zkus to znovu.");
+      await actions.assign({ threadId: "", emailId: e.id, jobId: null }, target);
     } finally {
       setBusy(false);
     }
@@ -86,23 +85,7 @@ function MailRow({ email: e }: { email: FlowEmail }) {
     setBusy(true);
     setError(null);
     try {
-      if (!inquiry && !force) {
-        const r = await processOrderFromEmailAction(e.id);
-        if (!r.ok) return setError(r.error);
-        if (r.mode === "choose") return setError(`Objednávka může patřit k ${r.choices.map((c) => c.number).join(", ")} — otevři ji v poště a vyber zakázku.`);
-        setCreated({ id: r.jobId, number: r.number ?? null });
-        router.push(`/orders/${r.jobId}`);
-        return;
-      }
-      const res = await createJobFromEmail(e.id);
-      if (!res.ok || !res.id) {
-        setError(res.error ?? "Zakázku se nepodařilo založit.");
-        return;
-      }
-      setCreated({ id: res.id, number: res.number ?? null });
-      router.push(inquiry ? flowActionHref("quote.create", res.id, { canPrice: can("pricing") }) ?? `/orders/${res.id}` : `/orders/${res.id}`);
-    } catch {
-      setError("Spojení se nepovedlo — zkus to znovu.");
+      await actions.run(inquiry ? "quote.create" : force ? "job.create" : "order.process", { threadId: "", emailId: e.id, jobId: null });
     } finally {
       setBusy(false);
     }
@@ -163,6 +146,7 @@ function MailRow({ email: e }: { email: FlowEmail }) {
           </Button>
         )}
       </div>
+      {actions.dialog}
     </li>
   );
 }
