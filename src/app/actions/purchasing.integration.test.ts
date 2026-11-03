@@ -205,10 +205,10 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     expect(res.pdfError).toBeUndefined();
     expect(res.fileId).toBeTruthy();
     poId = res.id!;
-    // zakázka ve výrobě bez kroků → krok s touto objednávkou (dodavatel, termín z objednávky) přibude sám
-    expect(res.production).toMatchObject({ attached: true });
-    const { data: stepRows } = await db.from("job_operations").select("supplier_id, purchase_order_id, planned_end, status").eq("job_id", JOB).eq("purchase_order_id", poId);
-    expect(stepRows).toEqual([{ supplier_id: HRUBY, purchase_order_id: poId, planned_end: QUOTE_DELIVERY, status: "probiha" }]);
+    // vystavení jen připraví PDF — krok výroby přibude až odesláním objednávky (majitel 3. 11.)
+    expect(res.production).toBeUndefined();
+    const { data: noSteps } = await db.from("job_operations").select("id").eq("job_id", JOB).eq("purchase_order_id", poId);
+    expect(noSteps).toEqual([]);
 
     const { data: po } = await db.from("purchase_orders").select("*, items:purchase_order_items(*)").eq("id", poId).single();
     expect(po).toMatchObject({ status: "vystavena", total: 24000, supplier_id: HRUBY, file_id: res.fileId, created_by: OWNER });
@@ -293,6 +293,9 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     const { data: po } = await db.from("purchase_orders").select("status, sent_at").eq("id", poId).single();
     expect(po!.status).toBe("odeslana");
     expect(po!.sent_at).toBeTruthy();
+    // odesláním: zakázka ve výrobě bez kroků → krok s touto objednávkou (dodavatel, termín z objednávky)
+    const { data: stepRows } = await db.from("job_operations").select("supplier_id, purchase_order_id, planned_end, status").eq("job_id", JOB).eq("purchase_order_id", poId);
+    expect(stepRows).toEqual([{ supplier_id: HRUBY, purchase_order_id: poId, planned_end: QUOTE_DELIVERY, status: "probiha" }]);
     expect((await a.updatePurchaseOrder(poId, { items: [{ name: "x", quantity: 1 }] })).error).toMatch(/už odešla/);
   }, 60_000);
 
