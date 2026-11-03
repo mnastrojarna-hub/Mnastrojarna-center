@@ -4,7 +4,9 @@
 import { OPERATION_KINDS, type OperationKind, type OperationStatus } from "@/lib/jobs/operations";
 import { stepLabel } from "@/lib/jobs/production";
 import { addCalendarDays, addWorkingDays } from "@/lib/jobs/purchasing";
-import { canSubmitHandoff, stepHasWho, validateHandoff, type HandoffValidationStep } from "@/lib/jobs/production-handoff";
+import {
+  canSubmitHandoff, isPurchaseOrderCaption, purchaseOrderDeadline, stepHasWho, validateHandoff, type HandoffValidationStep,
+} from "@/lib/jobs/production-handoff";
 import { coveredHint, coveringStep, isMachiningKind, leadTimeLabel, money, shortDay, suggestStepDeadline } from "@/lib/jobs/production-suggest";
 import { stageMeta } from "@/lib/jobs/stages";
 import type {
@@ -98,7 +100,9 @@ function fromPlanStep(p: StepPlan): DraftStep {
     key: p.key, operationId: p.operationId ?? null, status: p.status, locked: p.locked, kind: p.kind, title: p.title ?? null,
     who: p.who, whoSource: p.whoSource ?? null, supplierQuoteId: p.supplierQuoteId ?? null, plannedEnd: p.plannedEnd ?? "",
     deadlineSource: p.deadlineSource ?? null, deadlineCaption: p.deadlineCaption,
-    autoDeadline: Boolean(p.deadlineCaption) && p.deadlineSource !== "rucne" && p.deadlineSource !== "potvrzeni_dodavatele",
+    // termín z objednávky se drží objednávky (přepočet ho vrátí na její termín, změna firmy ho uvolní)
+    autoDeadline: isPurchaseOrderCaption(p.deadlineCaption)
+      || (Boolean(p.deadlineCaption) && p.deadlineSource !== "rucne" && p.deadlineSource !== "potvrzeni_dodavatele"),
     deadlineAgreed: Boolean(p.deadlineAgreed), endsAtCustomerDate: Boolean(p.endsAtCustomerDate), orderItemIds: p.orderItemIds ?? null,
     start: Boolean(p.start), done: Boolean(p.done), po: { ...p.po }, note: p.note ?? null,
     suggestions: p.suggestions, serverPreview: p.poPreview, previewKey: "", added: false,
@@ -353,6 +357,11 @@ function quoteOfWho(s: Pick<DraftStep, "suggestions" | "supplierQuoteId">, who: 
 /** Předvyplněný termín kroku (z nabídky, obvyklé lhůty, konečného termínu, jinak odhad). */
 export function suggestedDeadline(plan: HandoffPlan, state: HandoffState, steps: DraftStep[], i: number): { date: string; source: DeadlineSource; caption: string } {
   const s = steps[i];
+  // krok použije vystavenou objednávku: termín z ní (potvrzený dodavatelem, jinak požadovaný) — ne AI odhad
+  const po = s.who.type !== "u_nas" && s.po.mode === "existujici" && s.po.existingId
+    ? plan.client?.openPurchaseOrders.find((p) => p.id === s.po.existingId) ?? null : null;
+  const poDl = purchaseOrderDeadline(po);
+  if (poDl) return { date: poDl.date, source: poDl.source, caption: poDl.caption };
   const prev = prevOf(plan, steps, i);
   const q = quoteOfWho(s, s.who);
   const sid = s.who.type === "supplier" ? s.who.id : null;
@@ -418,7 +427,8 @@ export function setStepWho(plan: HandoffPlan, state: HandoffState, i: number, wh
   const next: DraftStep = {
     ...s, who, whoSource, supplierQuoteId: sug?.supplierQuoteId ?? (whoKey(who) === whoKey(s.who) ? s.supplierQuoteId : null),
     po, deadlineAgreed: whoKey(who) === whoKey(s.who) ? s.deadlineAgreed : false,
-    autoDeadline: s.autoDeadline || !s.plannedEnd,
+    // firma s vystavenou objednávkou: termín z objednávky (i přes dřívější ruční termín)
+    autoDeadline: s.autoDeadline || !s.plannedEnd || Boolean(usesPo),
   };
   let steps = state.steps.map((x, k) => (k === i ? next : x));
   steps = reflow(plan, state, steps, i);
@@ -877,6 +887,7 @@ export function deadlineLine(plan: HandoffPlan, state: HandoffState, i: number):
   if (!firm) return "Termín · odhad — firma zatím nevybrána";
   if (s.deadlineSource === "potvrzeni_dodavatele") return `Mezitermín · potvrdil ${firm}`;
   if (s.deadlineAgreed) return `Mezitermín · dohodnuto s ${firm}`;
+  if (isPurchaseOrderCaption(s.deadlineCaption)) return `Mezitermín · požadovaný v objednávce — ${firm} ho zatím nepotvrdil`;
   return "Mezitermín · odhad — zatím nedohodnuto";
 }
 

@@ -14,6 +14,7 @@ import type { JobOperation } from "@/lib/jobs/production-types";
 import {
   autoSendBlockers, deadlineStateFor, groupPurchaseOrders, handoffErrorCode, performerRole, routeHealth, stepHasWho, stepSummaryText,
   validateHandoff, canSubmitHandoff, type HandoffValidationStep,
+  purchaseOrderDeadline,
 } from "@/lib/jobs/production-handoff";
 import {
   coveringStep, familyScopeOf, isCompleteQuote, isMachiningKind, normalizeDrawingNumber, operationFamily, operationKindsOfSupplier, purchaseItemsForStep, quoteKinds, quoteValue,
@@ -69,7 +70,7 @@ export interface CtxPurchaseOrder {
   id: string; number: string; status: PurchaseOrderStatus; supplierId: string | null; supplierName: string;
   supplierEmail: string | null; supplierQuoteId: string | null; requiredDate: string | null; confirmedDate: string | null;
   handoffId: string | null; fileId: string | null; revision: number; linked: boolean;
-  items: { id: string; label: string; quantity: number; received: number; unit: string; unitPrice: number | null }[];
+  items: { id: string; label: string; quantity: number; received: number; unit: string; unitPrice: number | null; orderItemId?: string | null }[];
 }
 
 export interface HandoffContext {
@@ -165,7 +166,7 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
     db.from("job_operations").select(OPERATION_SELECT).eq("job_id", jobId).order("position").order("created_at"),
     fetchSupplierQuotes(db, jobId),
     db.from("supplier_quotes").select("id, operation_kinds").eq("job_id", jobId),
-    db.from("purchase_orders").select("id, number, status, supplier_id, supplier_quote_id, required_date, confirmed_date, handoff_id, file_id, revision, supplier:suppliers!supplier_id(id, name, email), items:purchase_order_items!purchase_order_id(id, position, drawing_number, name, quantity, received_quantity, unit, unit_price)").eq("job_id", jobId).order("created_at"),
+    db.from("purchase_orders").select("id, number, status, supplier_id, supplier_quote_id, required_date, confirmed_date, handoff_id, file_id, revision, supplier:suppliers!supplier_id(id, name, email), items:purchase_order_items!purchase_order_id(id, position, drawing_number, name, quantity, received_quantity, unit, unit_price, order_item_id)").eq("job_id", jobId).order("created_at"),
     db.rpc("production_route_version", { p_job: jobId }),
     db.from("job_files").select("id", { count: "exact", head: true }).eq("job_id", jobId).eq("archived", false).eq("ai_extracted->>purchasingPending", "true"),
     db.from("production_handoffs").select("id, kind, stage_from, created_by, created_at, undone_at").eq("job_id", jobId).order("created_at", { ascending: false }).limit(50),
@@ -224,6 +225,7 @@ export async function loadHandoffContext(db: JobsDb, jobId: string): Promise<Han
         id: String(it.id), label: String(it.drawing_number || it.name || "položka"), quantity: num(it.quantity),
         received: num(it.received_quantity), unit: String(it.unit || "ks"),
         unitPrice: it.unit_price === null || it.unit_price === undefined ? null : num(it.unit_price),
+        orderItemId: (it.order_item_id as string | null) ?? null,
       })),
     };
   });
@@ -593,7 +595,16 @@ export function buildHandoffPlan(ctx: HandoffContext, opts: PlanOptions): Handof
       // předchozí krok se posunul (dodavatel potvrdil později): čekající krok nesmí skončit dřív, než díl dorazí
       const minEnd = prevEnd ? (changedHands ? addWorkingDays(prevEnd, 1) : prevEnd) : null;
       const impossible = Boolean(plannedEnd && minEnd && plannedEnd < minEnd && b.op?.status === "ceka" && (i > 0 || running));
-      if (!plannedEnd || impossible || (plannedEnd < today && !(b.op && RUNNING.has(b.op.status)))) {
+      // krok použije objednávku dodavateli: termín z objednávky (potvrzený, jinak požadovaný) — ne AI odhad.
+      // Dohodnutý termín kroku a konečný termín (zákazník) zůstávají (ruční změna termínu kroku mění i objednávku).
+      const poRow = existingPoId ? ctx.purchaseOrders.find((p) => p.id === existingPoId) ?? null : null;
+      const poDl = poRow && who.type !== "u_nas" ? purchaseOrderDeadline(poRow) : null;
+      const keepOwn = Boolean(plannedEnd && (b.op?.endsAtCustomerDate || b.op?.deadlineState === "dohodnuto"));
+      if (poDl && !keepOwn) {
+        plannedEnd = poDl.date;
+        deadlineSource = poDl.source;
+        caption = poDl.caption;
+      } else if (!plannedEnd || impossible || (plannedEnd < today && !(b.op && RUNNING.has(b.op.status)))) {
         const d = suggestStepDeadline({
           today, previousEnd: prevEnd, performerChanged: changedHands,
           quote: quote && sameSupplierQuote(quote, who) ? { deliveryDate: quote.deliveryDate, leadTimeDays: quote.leadTimeDays } : null,
@@ -822,7 +833,10 @@ function validationContext(ctx: HandoffContext, dialogOpIds: (string | null)[], 
     items: ctx.items.map((i) => ({ id: i.id, drawingNumber: i.drawingNumber, name: i.name })),
     otherSteps: ctx.ops.filter((o) => !inDialog.has(o.id)).map((o) => ({ kind: o.kind, status: o.status, orderItemIds: o.orderItemIds ?? null })),
     openPurchaseOrders: ctx.purchaseOrders.filter((p) => OPEN_PO.includes(p.status))
-      .map((p) => ({ id: p.id, number: p.number, supplierId: p.supplierId, supplierName: p.supplierName, linked: p.linked })),
+      .map((p) => ({
+        id: p.id, number: p.number, supplierId: p.supplierId, supplierName: p.supplierName, linked: p.linked,
+        requiredDate: p.requiredDate, confirmedDate: p.confirmedDate,
+      })),
   };
 }
 
@@ -950,7 +964,7 @@ function normName(s: string): string {
  * (nikdy z prohlížeče). Firma mimo adresář s objednávkou: shoda ≥ 80 → id, jinak ji založí RPC.
  */
 export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: HandoffInput, actor: HandoffActor,
-  opts: { relaxFinal?: boolean } = {}): Promise<PayloadResult> {
+  opts: { relaxFinal?: boolean; summaryPrefix?: string | null } = {}): Promise<PayloadResult> {
   const shape = checkHandoffInputShape(input);
   if (shape) return bad(shape);
   if (!actor.margins) {
@@ -1298,6 +1312,8 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
   const lateIssue = input.acceptLate ? issues.find((x) => x.acceptLate) ?? null : null;
   const finalForLate = ctx.job.dueDate ?? ctx.job.customerRequiredDate ?? cleanDate(input.finalDate?.date) ?? null;
   const lateText = lateIssue && finalForLate ? ` · po konečném termínu (zákazník) ${shortDay(finalForLate)} — přijal ${actor.fullName || "uživatel"}` : "";
+  // automatika (vystavení objednávky) říká v historii, proč se předalo samo
+  if (opts.summaryPrefix) prefix[kind] = opts.summaryPrefix;
   const summary = prefix[kind] && parts.length ? `${prefix[kind]}: ${parts.join(" → ")}${lateText}`.slice(0, 1900) : prefix[kind] ?? null;
 
   const payload: ProductionApplyPayload = {
@@ -1635,7 +1651,7 @@ export type CoreResult = { ok: true; result: HandoffResult } | { ok: false; erro
  * Opakování stejného tokenu (dvojklik, síť) jen doplní dokumenty — nikdy neposílá podruhé.
  */
 export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, jobId: string, input: HandoffInput,
-  opts: { source?: "ui" | "capture" | "ai" | "automatika"; ctx?: HandoffContext } = {}): Promise<CoreResult> {
+  opts: { source?: "ui" | "capture" | "ai" | "automatika"; ctx?: HandoffContext; summaryPrefix?: string | null } = {}): Promise<CoreResult> {
   if (!isUuid(jobId)) return { ok: false, error: "Zakázka nenalezena.", code: "VALIDATION" };
   const ctx = opts.ctx ?? await loadHandoffContext(db, jobId);
   if (!ctx) return { ok: false, error: "Zakázka nenalezena.", code: "VALIDATION" };
@@ -1644,7 +1660,7 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
   const { data: prev } = await db.from("production_handoffs").select("id, job_id").eq("token", input?.token ?? "").maybeSingle();
   let built: Awaited<ReturnType<typeof buildApplyPayload>> | null = null;
   if (!prev) {
-    built = await buildApplyPayload(db, ctx, input, actor, { relaxFinal: opts.source !== undefined && opts.source !== "ui" });
+    built = await buildApplyPayload(db, ctx, input, actor, { relaxFinal: opts.source !== undefined && opts.source !== "ui", summaryPrefix: opts.summaryPrefix });
     if ("error" in built) return { ok: false, error: built.error, code: built.code, ...(built.issues ? { issues: built.issues } : {}) };
     // focení / AI objednávku dodavateli NIKDY nevystaví (B.4) — jen použije existující nebo „objednáno jinak"
     if ((opts.source === "capture" || opts.source === "ai") && built.payload.purchaseOrders?.length) {

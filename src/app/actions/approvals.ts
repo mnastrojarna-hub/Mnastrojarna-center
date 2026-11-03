@@ -12,6 +12,7 @@ import { checkFeature, getAccess } from "@/lib/auth/session";
 import { userActor } from "@/lib/supabase/actor-headers";
 import { approveJobQuote } from "@/app/actions/jobs";
 import { resolvePurchaseOrderQueue } from "@/lib/jobs/production-handoff-store";
+import { autoHandoffForPurchaseOrder } from "@/lib/jobs/production-po-auto";
 
 type Result = { ok: boolean; error?: string; sent?: boolean };
 
@@ -77,6 +78,12 @@ export async function resolveApproval(
     if (row.type === "purchase_order") {
       const res = await resolvePurchaseOrderQueue(supabase, { id: auth.user.id, fullName: auth.user.fullName, mailAll: can("mail_all") }, id, action);
       if (!res.ok) return { ok: false, error: res.error };
+      // odeslaná objednávka = zakázka ve výrobě (objednávky z předání už u kroku jsou → nic se nestane)
+      if (res.sent && row.purchase_order_id) {
+        await autoHandoffForPurchaseOrder(supabase, {
+          id: auth.user.id, fullName: auth.user.fullName, margins: can("margins"), mailAll: can("mail_all"), via: "rucne",
+        }, row.purchase_order_id);
+      }
       await logAudit({ action: `approval_${action}`, entity: "approval_queue", entityId: id, diff: { type: row.type, title: row.title, sent: res.sent }, actor });
       revalidatePath("/dashboard");
       revalidatePath("/purchasing");

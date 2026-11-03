@@ -191,6 +191,38 @@ describe("ProductionHandoffDialog — předání do výroby", () => {
     expect(JSON.stringify(input)).not.toMatch(/12200|price/);
   });
 
+  it("vystavená objednávka: termín kroku z ní (požadovaný / potvrzený), ne AI odhad — i když firmu s objednávkou vybereš ručně", () => {
+    const poSug = sug({
+      source: "objednavka", supplierQuoteId: null, price: null, purchaseOrder: { id: "po1", number: "OV-2026-010", status: "odeslana" },
+      deliveryDate: "2026-11-18", reason: "Použije se vystavená objednávka OV-2026-010 (Frézy Novák s.r.o., odeslaná)",
+    });
+    const base = plan();
+    const p = plan({
+      steps: [step({
+        kind: "kompletni_dodavka", po: { mode: "existujici", existingId: "po1" }, whoSource: "objednavka", supplierQuoteId: null,
+        plannedEnd: "2026-11-18", deadlineSource: "rucne", deadlineCaption: "z objednávky OV-2026-010 (požadováno)", deadlineState: "pozadovano",
+        suggestions: { primary: poSug, alternatives: [] },
+      })],
+      openPurchaseOrders: [{ id: "po1", number: "OV-2026-010", supplierName: "Frézy Novák s.r.o.", status: "odeslana" }],
+      client: { ...base.client!, openPurchaseOrders: [{ id: "po1", number: "OV-2026-010", supplierId: NOVAK, supplierName: "Frézy Novák s.r.o.", linked: false, requiredDate: "2026-11-18", confirmedDate: null }] },
+    });
+    const h = dialog(p);
+    expect(h).toContain("z objednávky OV-2026-010 (požadováno)");
+    expect(h).not.toContain("odhad (+5 pracovních dní)");
+    expect(h).toContain("Mezitermín · požadovaný v objednávce");
+    const st = stateFromPlan(p);
+    expect(st.steps[0]).toMatchObject({ plannedEnd: "2026-11-18", autoDeadline: true });
+    // ručně jiná firma → termín se uvolní (odhad); zpět firma s objednávkou → termín z objednávky
+    const other = setStepWho(p, st, 0, { type: "supplier", id: HRUBY, name: "Kovoobrábění Hrubý s.r.o." });
+    expect(other.steps[0].deadlineCaption).not.toMatch(/z objednávky/);
+    const back = setStepWho(p, other, 0, poSug.who, poSug);
+    expect(back.steps[0]).toMatchObject({ plannedEnd: "2026-11-18", deadlineCaption: "z objednávky OV-2026-010 (požadováno)", po: { mode: "existujici", existingId: "po1" } });
+    // potvrzený termín dodavatele má přednost
+    const conf = { ...p, client: { ...p.client!, openPurchaseOrders: [{ ...p.client!.openPurchaseOrders[0], confirmedDate: "2026-11-24" }] } };
+    expect(setStepWho(conf, other, 0, poSug.who, poSug).steps[0]).toMatchObject({ plannedEnd: "2026-11-24", deadlineSource: "potvrzeni_dodavatele" });
+    expect(inputFromState(p, st).steps[0]).toMatchObject({ plannedEnd: "2026-11-18", po: { mode: "existujici", existingId: "po1" } });
+  });
+
   it("varování: postup končí po konečném termínu → „Vím o tom“ je povinné", () => {
     const p = plan();
     let s = stateFromPlan(p);

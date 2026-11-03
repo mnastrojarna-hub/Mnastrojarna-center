@@ -37,6 +37,8 @@ interface Issued {
   suggestStage?: JobStage | null;
   total: number;
   supplierName: string;
+  /** Předáno do výroby / objednávka u kroku automaticky (vystavení = předání, majitel 2. 11.). */
+  production?: { moved: boolean; attached: boolean; message: string | null } | null;
 }
 
 /**
@@ -163,6 +165,7 @@ export function IssueOrderDialog({
       setIssued({
         id: res.id, number: res.number, fileId: res.fileId ?? null, pdfError: res.pdfError, hint: res.hint,
         suggestStage: res.suggestStage ?? null, total: purchaseDraftsTotal(form.items).total, supplierName: supplierName || "dodavatel",
+        production: res.production ?? null,
       });
       setStep("done");
       notify("success", `Objednávka ${res.number} vystavena — marže a provize se přepočítaly.`);
@@ -278,6 +281,19 @@ export function IssueOrderDialog({
               </Button>
             </div>
 
+            {issued.production?.message && (
+              <div className="flex flex-col gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-950 sm:flex-row sm:items-center dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-100" data-testid="issue-production">
+                <Factory className="h-4 w-4 shrink-0 text-green-700" />
+                <span className="flex-1">{issued.production.message}</span>
+                {issued.production.attached && (
+                  // plán výroby jde upravit (kdo / termín / další kroky) — předání do výroby už není potřeba
+                  <Button size="sm" variant="outline" onClick={() => setHandoffOpen(true)} disabled={busy !== null} data-testid="issue-replan">
+                    <Factory className="h-4 w-4" /> Upravit plán výroby…
+                  </Button>
+                )}
+              </div>
+            )}
+
             {(issued.hint || issued.suggestStage) && (
               <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-950 sm:flex-row sm:items-center dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
                 <Info className="h-4 w-4 shrink-0 text-sky-600" />
@@ -367,8 +383,7 @@ export function IssueOrderDialog({
           open
           onOpenChange={(o) => { if (!o) setHandoffOpen(false); }}
           jobId={job.id}
-          kind="predani"
-          existingPurchaseOrderId={issued.id}
+          {...(issued.production?.attached ? { kind: "plan" as const, replan: true } : { kind: "predani" as const, existingPurchaseOrderId: issued.id })}
           onDone={(d) => {
             notify("success", d.message);
             setIssued((i) => (i ? { ...i, suggestStage: null, hint: undefined } : i));

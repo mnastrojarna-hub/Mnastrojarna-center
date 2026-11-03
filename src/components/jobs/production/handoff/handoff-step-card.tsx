@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { recordPhoneQuote } from "@/app/actions/production-handoff";
 import { OPERATION_KINDS, type OperationKind } from "@/lib/jobs/operations";
 import { money, shortDay } from "@/lib/jobs/production-suggest";
+import { isPurchaseOrderCaption } from "@/lib/jobs/production-handoff";
 import type { HandoffPlan, StepWho, WhoSuggestion } from "@/lib/jobs/production-handoff-types";
 import { cn } from "@/lib/utils";
 import { KindGrid } from "../operation-dialog";
@@ -383,8 +384,8 @@ export function HandoffStepCard({
             aria-describedby={`${ids.date}-cap`}
           />
           {step.deadlineCaption && (
-            <span id={`${ids.date}-cap`} className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              {step.autoDeadline && <AiLabel text="AI" className="px-1.5" />} {step.deadlineCaption}
+            <span id={`${ids.date}-cap`} className="inline-flex items-center gap-1 text-xs text-muted-foreground" data-testid="handoff-deadline-caption">
+              {step.autoDeadline && !isPurchaseOrderCaption(step.deadlineCaption) && <AiLabel text="AI" className="px-1.5" />} {step.deadlineCaption}
             </span>
           )}
         </div>

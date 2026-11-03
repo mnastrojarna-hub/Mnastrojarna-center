@@ -527,11 +527,16 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const qid = await newQuote(X.id, novak, [40, 42]);
     const dr = await pur.draftPurchaseOrder(X.id, { supplierQuoteId: qid });
     expect(dr.ok, dr.error).toBe(true);
-    const iss = await pur.issuePurchaseOrder(X.id, { ...dr.draft!, requiredDate: "2026-11-20" });
+    // jen vystavit (bez automatického předání) — dialog „Předat do výroby" s vystavenou objednávkou
+    const iss = await pur.issuePurchaseOrder(X.id, { ...dr.draft!, requiredDate: "2026-11-20" }, { handoff: false });
     expect(iss.ok, iss.error).toBe(true);
+    expect(iss.production).toBeUndefined();
     const p = await plan(X.id);
     expect(p.steps[0].po).toMatchObject({ mode: "existujici", existingId: iss.id });
     expect(p.steps[0].whoSource).toBe("objednavka");
+    // termín kroku = požadovaný termín objednávky (ne AI odhad)
+    expect(p.steps[0]).toMatchObject({ plannedEnd: "2026-11-20", deadlineSource: "rucne", deadlineCaption: `z objednávky ${iss.number} (požadováno)` });
+    expect(p.client?.openPurchaseOrders.find((o) => o.id === iss.id)).toMatchObject({ requiredDate: "2026-11-20", confirmedDate: null });
     // vynucená nová objednávka u stejné firmy → po_duplicate
     const dup = await act.submitProductionHandoff(X.id, inputOf(p, {}, [{ ...p.steps[0], po: { mode: "vystavit" } }]));
     expect(dup).toMatchObject({ ok: false, code: "VALIDATION" });
@@ -543,6 +548,59 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await ops(X.id))[0]).toMatchObject({ purchase_order_id: iss.id, po_mode: "existujici" });
     expect((await events(X.id)).some((e) => String(e.message).startsWith(`Objednávka ${iss.number} přiřazena ke kroku`))).toBe(true);
   }, 90_000);
+
+  it("vystavení objednávky = předání do výroby (krok s objednávkou, termín z ní); ve výrobě se další objednávka naváže na krok; zrušení → krok zpět na výběr", async () => {
+    as("sales");
+    const V = await newJob();
+    const qv = await newQuote(V.id, novak, [40, 42]);
+    const dr = await pur.draftPurchaseOrder(V.id, { supplierQuoteId: qv });
+    const iss = await pur.issuePurchaseOrder(V.id, { ...dr.draft!, requiredDate: "2026-11-25" });
+    expect(iss.ok, iss.error).toBe(true);
+    expect(iss.production).toMatchObject({ moved: true, attached: true });
+    expect(iss.production?.message).toMatch(/^Předáno do výroby automaticky: Kompletní dodávka · .*Novák.* · termín 25\. 11\./);
+    expect(iss.hint).toBeUndefined();
+    expect(iss.suggestStage).toBeUndefined();
+    expect((await job(V.id)).status).toBe("ve_vyrobe");
+    expect(await pos(V.id)).toHaveLength(1);
+    const [o1] = await ops(V.id);
+    expect(o1).toMatchObject({
+      kind: "kompletni_dodavka", status: "probiha", supplier_id: novak, purchase_order_id: iss.id, po_mode: "existujici", who_source: "objednavka",
+      planned_end: "2026-11-25", deadline_source: "rucne", created_by: id("sales"),
+    });
+    const ev = await events(V.id);
+    const handed = ev.find((e) => String(e.message).startsWith(`Předáno do výroby automaticky vystavením objednávky ${iss.number}`));
+    expect(handed?.actor_id).toBe(id("sales"));
+    // odeslání ani druhé vystavení nic nezdvojí (idempotentní)
+    const again = await (await import("@/lib/jobs/production-po-auto")).autoHandoffForPurchaseOrder(
+      (await import("@/test/local-supabase")).localAdmin((await import("@/lib/supabase/actor-headers")).userActor({ id: id("sales") })),
+      { id: id("sales"), fullName: "Petr Obchodník", margins: true, mailAll: false, via: "rucne" }, String(iss.id));
+    expect(again).toMatchObject({ moved: false, attached: false });
+    expect(await ops(V.id)).toHaveLength(1);
+    // akce dalšího kroku: ne „Předat do výroby" (zakázka už je ve výrobě)
+    expect((await plan(V.id)).kind).toBe("dalsi_krok");
+
+    // ve výrobě: kalírna (připravený krok bez firmy) dostane objednávku TepKalu i s termínem
+    const ins = await svc.from("job_operations").insert({ job_id: V.id, kind: "tepelne_zpracovani", status: "ceka", position: 5, order_item_ids: [V.items[0]] } as never).select("id").single();
+    expect(ins.error).toBeNull();
+    const qt = await newQuote(V.id, tepkal, [10, null], { note: "kalení" });
+    const d2 = await pur.draftPurchaseOrder(V.id, { supplierQuoteId: qt });
+    const i2 = await pur.issuePurchaseOrder(V.id, { ...d2.draft!, items: d2.draft!.items.slice(0, 1), requiredDate: "2026-12-02" });
+    expect(i2.ok, i2.error).toBe(true);
+    expect(i2.production).toMatchObject({ moved: false, attached: true });
+    const o2 = (await ops(V.id)).find((o) => o.id === (ins.data as { id: string }).id)!;
+    expect(o2).toMatchObject({ status: "ceka", supplier_id: tepkal, purchase_order_id: i2.id, po_mode: "existujici", planned_end: "2026-12-02" });
+    expect(await ops(V.id)).toHaveLength(2);
+
+    // zrušení objednávky v Nákupu → krok zpět na „Vybrat, kdo to dělá" (vrácení z výroby jen nabídne)
+    const cancel = await pur.updatePurchaseOrder(String(iss.id), { status: "zrusena", cancelReason: "dodavatel odmítl" });
+    expect(cancel.ok, cancel.error).toBe(true);
+    expect(cancel.hint).toMatch(/čeká na výběr, kdo to dělá/);
+    expect(cancel.hint).toMatch(/Vrátit předání do výroby/);
+    const back = (await ops(V.id)).find((o) => o.id === o1.id)!;
+    expect(back).toMatchObject({ status: "ceka", supplier_id: null, supplier_name: null, purchase_order_id: null, po_mode: null });
+    expect((await job(V.id)).status).toBe("ve_vyrobe");
+    expect((await plan(V.id)).kind).toBe("doplneni");
+  }, 150_000);
 
   it("změna termínu / dodavatele po vystavení: neodeslaná → požadovaný termín + nové PDF; zaměstnanec dodavatele nezmění; odeslaná → změna ve frontě (jedna)", async () => {
     as("sales");
@@ -720,7 +778,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const K = await newJob();
     const qk = await newQuote(K.id, novak, [40, 42]);
     const dr = await pur.draftPurchaseOrder(K.id, { supplierQuoteId: qk });
-    const iss = await pur.issuePurchaseOrder(K.id, { ...dr.draft!, requiredDate: "2026-11-20" });
+    const iss = await pur.issuePurchaseOrder(K.id, { ...dr.draft!, requiredDate: "2026-11-20" }, { handoff: false });
     expect(iss.ok, iss.error).toBe(true);
     const h1 = await flow.captureProductionHandoff(db, salesActor, K.id, { customerOrderNumber: iss.number, promisedDeliveryDate: "2026-11-27", supplier: null }, "auto");
     expect(h1, h1.warning).toMatchObject({ moved: true, stage: "ve_vyrobe" });
@@ -730,7 +788,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const K2 = await newJob();
     const q2 = await newQuote(K2.id, tepkal, [10, 10], { note: "kalení" });
     const d2 = await pur.draftPurchaseOrder(K2.id, { supplierQuoteId: q2 });
-    const i2 = await pur.issuePurchaseOrder(K2.id, { ...d2.draft!, requiredDate: "2026-11-20" });
+    const i2 = await pur.issuePurchaseOrder(K2.id, { ...d2.draft!, requiredDate: "2026-11-20" }, { handoff: false });
     expect(i2.ok, i2.error).toBe(true);
     const party = { name: `${SUP} TepKal s.r.o.`, ico: "", dic: "", street: "", city: "", zip: "", country: "", email: "", phone: "", contactPerson: "" };
     const h2 = await flow.captureProductionHandoff(db, salesActor, K2.id, { customerOrderNumber: null, promisedDeliveryDate: "2026-11-27", supplier: party }, "auto");
@@ -1146,7 +1204,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const hq = await newQuote(P.id, hruby, [45, 45]);
     await handoffOne(P.id, novak, { sendNow: ["*"] });
     const dr = await pur.draftPurchaseOrder(P.id, { supplierQuoteId: hq });
-    expect((await pur.issuePurchaseOrder(P.id, { ...dr.draft!, requiredDate: "2026-11-20" })).ok).toBe(true);
+    expect((await pur.issuePurchaseOrder(P.id, { ...dr.draft!, requiredDate: "2026-11-20" }, { handoff: false })).ok).toBe(true);
     const opP = (await ops(P.id))[0];
     const before = await pos(P.id);
     const bad = await prod.updateJobOperation(String(opP.id), { supplierId: hruby }, { confirmReplace: true, notifySupplier: true });
@@ -1172,7 +1230,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     // jiná objednávka u jiného dodavatele k tomuto kroku nepatří
     const hq = await newQuote(G.id, hruby, [45, 45]);
     const dr = await pur.draftPurchaseOrder(G.id, { supplierQuoteId: hq });
-    const iss = await pur.issuePurchaseOrder(G.id, { ...dr.draft!, requiredDate: "2026-11-20" });
+    const iss = await pur.issuePurchaseOrder(G.id, { ...dr.draft!, requiredDate: "2026-11-20" }, { handoff: false });
     expect(iss.ok, iss.error).toBe(true);
     const relink = await prod.updateJobOperation(String(op.id), { purchaseOrderId: iss.id });
     expect(relink.ok).toBe(false);
@@ -1502,7 +1560,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const dr = await pur.draftPurchaseOrder(N.id, { supplierQuoteId: q });
     expect(dr.ok, dr.error).toBe(true);
     expect(dr.draft!.items[0].note).toBe("Pozor: popsat na čele");
-    const iss = await pur.issuePurchaseOrder(N.id, { ...dr.draft!, requiredDate: "2026-11-20" });
+    const iss = await pur.issuePurchaseOrder(N.id, { ...dr.draft!, requiredDate: "2026-11-20" }, { handoff: false });
     expect(iss.ok, iss.error).toBe(true);
     const fileBefore = String((await pos(N.id))[0].file_id);
     // dodatečná poznámka v Technologii → vystavená (neodeslaná) objednávka se doplní, nové PDF

@@ -177,6 +177,7 @@ export function SendPurchaseOrderDialog({
       }
       if (res.queued) notify("info", `Objednávka ${order.number} odejde na ${to.join(", ")}, jakmile se dokončí anonymizace výkresů.`);
       else notify("success", `${mode === "change" ? "Změna objednávky" : "Objednávka"} ${order.number} odeslána na ${to.join(", ")}.`);
+      if (res.production?.message) notify("info", res.production.message);
       onOpenChange(false);
       onSent();
     } catch {
