@@ -5,7 +5,7 @@
 - Aplikace: https://www.mnastrojarna.cz/cad
 - Webová dokumentace: https://www.mnastrojarna.cz/cad/dokumentace
 - Příručka PDF: https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf
-- Verze: 5. vlna (listopad 2026), aktualizováno 2026-11-02
+- Verze: 5. vlna (listopad 2026), aktualizováno 2026-11-03
 - Jazyk: čeština · Licence: zdarma, bez registrace · Vydavatel: Mnástrojárna s.r.o., https://www.mnastrojarna.cz
 
 ## Hlavní funkce
@@ -20,6 +20,7 @@
 - Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
 - Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
+- Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic
 
 ## Obsah
 
@@ -39,6 +40,7 @@
 - 14. Analýza a měření
 - 15. Proměnné, rovnice a stavy dílu
 - 16. Soubory, import a export
+- Sdílení odkazem
 - 17. Nastavení
 - 18. Klávesové zkratky
 - 19. Mobil a dotykové ovládání
@@ -575,6 +577,50 @@ Nativní formáty (SLDPRT, SLDASM, IPT, IAM, Z3, CATPART, PRT, X_T, F3D, SKP, 3D
 
 Poptat výrobu: tlačítko v titulní liště připraví STEP aktuálního dílu a předvyplněný e-mail pro nástrojárnu Mnástrojárna (prototypy, náhradní díly, nástroje, přípravky, 1–99 ks).
 
+## Sdílení odkazem
+
+Jedno tlačítko a díl, sestava nebo výkres je u kolegy, zákazníka či dodavatele – kdekoli na světě, bez instalace a registrace. Odkaz pošlete WhatsAppem, e-mailem, přes Teams nebo jakkoli jinak.
+
+Tlačítko Sdílet je v horní liště vedle Nápovědy, v nabídce Soubor → Sdílet odkazem… a v paletě příkazů (Ctrl+K → „sdílet“). Dialog vytvoří odkaz okamžitě s výchozí platností 10 dní – stačí Kopírovat odkaz a vložit ho do zprávy, nebo použít tlačítka WhatsApp, E-mail či Sdílet… (systémová nabídka na mobilu: Teams, Messenger, Signal…). Tlačítko Kopírovat zprávu zkopíruje hotový text s názvem dílu, platností a odkazem.
+
+![Dialog Sdílet odkazem: platnost 10 dní, heslo, odesílatel, hotový odkaz a tlačítka Kopírovat odkaz, WhatsApp, E-mail](https://www.mnastrojarna.cz/cad/docs/sdileni.webp)
+
+*Dialog Sdílet odkazem: odkaz je hotový hned po otevření; volby platnosti, hesla a odesílatele ho přegenerují.*
+
+### Co příjemce uvidí
+
+![Sdílený díl otevřený u příjemce s pruhem Sdílený dokument od Vít Volný, platí do data, snímek](https://www.mnastrojarna.cz/cad/docs/sdileni-prijemce.webp)
+
+*U příjemce: díl se otevře v nové záložce s pruhem „Sdílený dokument“ – vidí odesílatele i platnost, může měřit, řezat a uložit kopii.*
+
+- Odkaz otevře Mnástrojárna CAD v prohlížeči (Chrome, Edge, Firefox, Safari, i na mobilu) se snímkem dokumentu: lze otáčet, měřit, řezat, procházet historii prvků, prohlížet výkresy, exportovat STEP nebo uložit kopii .mncad.
+- Nad pracovní plochou je pruh „Sdílený dokument od … · platí do …“. Jde o snímek – úpravy příjemce se vám nepromítnou a vaše pozdější úpravy se do odkazu nedostanou; v takovém případě pošlete nový odkaz.
+- Stejný odkaz může otevřít libovolný počet lidí současně (například technolog, nákupčí a dodavatel na třech místech).
+- Sdílíte-li z výkresové záložky, příjemci se po otevření rovnou zobrazí výkres; model s historií má také.
+- Otevřený sdílený dokument přežije obnovení stránky (F5) v téže kartě; po zavření karty je pryč – nic se neukládá.
+
+### Platnost, heslo, odesílatel
+
+- Platnost 1, 7, 10, 30 nebo 90 dní, případně bez omezení. Po vypršení se odkaz neotevře („Platnost sdíleného odkazu vypršela“) – dokument prostě sdílejte znovu.
+- Heslo (volitelné): bez něj je odkaz nečitelný. Heslo pošlete jiným kanálem (SMS, telefon); příjemce ho zadá při otevření.
+- Odesílatel: jméno nebo firma, které příjemce uvidí v pruhu nad modelem. Program si ho pamatuje pro příště.
+
+### Jak je to s ochranou dokumentace (NDA)
+
+Dokument je zkomprimovaný přímo v odkazu, v části za znakem „#“. Tuto část prohlížeč nikdy neposílá na server – ani na hosting webu, ani do měření návštěvnosti; po otevření ji program z adresy hned odstraní, takže nezůstane v historii prohlížeče. Dokument tedy existuje jen ve zprávě, kterou sami pošlete, a v paměti karty příjemce. U příjemce platí výchozí režim bez ukládání.
+
+Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkazu nevejdou – dialog na to upozorní. Pro ně lze zapnout šifrované úložiště sdílení: dokument se zašifruje (AES-256) ještě v prohlížeči, na server jde jen šifrovaný soubor a klíč je pouze v odkazu; soubor se po vypršení platnosti smaže. Bez úložiště pošlete soubor .mncad nebo STEP klasicky jako přílohu.
+
+| Situace | Doporučení |
+| --- | --- |
+| Parametrický díl nebo sestava | Odkaz (jednotky až desítky kB) – WhatsApp, e-mail, Teams, Slack |
+| Dlouhý odkaz (nad 8 kB) | Kopírovat odkaz a vložit do zprávy; SMS odkaz nepřenese |
+| Importovaný STEP, velká sestava | Šifrované úložiště sdílení, nebo soubor .mncad / STEP jako příloha |
+| Citlivá dokumentace | Heslo + krátká platnost; heslo pošlete jiným kanálem |
+| Živá porada nad modelem | Všichni otevřou týž odkaz; změny pošlete jako nový odkaz nebo sdílejte obrazovku |
+
+> Odkaz je snímek: kdo ho má, otevře dokument do konce platnosti. Pro citlivé díly použijte heslo a kratší platnost.
+
 ## 17. Nastavení
 
 ![Dialog Nastavení se záložkami Obecné, Zobrazení, Myš a ovládání, Skica, Výkres, Soubory a Klávesové zkratky](https://www.mnastrojarna.cz/cad/docs/nastaveni.webp)
@@ -743,3 +789,7 @@ Tlačítkem Poptat výrobu v titulní liště: připraví se STEP aktuálního d
 **Co dělat, když prvek zčervená s chybou?**
 
 Klikněte na prvek v historii – pod ním je česká hláška, co je špatně (např. příliš velký poloměr zaoblení, otevřený profil skici, cílová plocha za rovinou skici). Upravte parametr nebo výběr; ostatní prvky se přestaví automaticky.
+
+**Jak pošlu díl kolegovi nebo zákazníkovi, aby se na něj jen podíval?**
+
+Tlačítko Sdílet (horní lišta) → Kopírovat odkaz, nebo rovnou WhatsApp / E-mail. Příjemce odkaz otevře v prohlížeči bez instalace – vidí snímek dílu, sestavy i výkresů, může měřit, řezat a uložit si kopii. Platnost nastavíte na 1–90 dní (výchozí 10), volitelně s heslem. Dokument je uložený jen v odkazu (část za #, kterou prohlížeč neposílá na server); velké importované modely jdou do šifrovaného úložiště nebo jako příloha .mncad/STEP.

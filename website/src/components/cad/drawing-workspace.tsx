@@ -17,6 +17,8 @@ type Props = {
   massKg?: number;
   materialLabel: string;
   onClose: () => void;
+  /** sdílení odkazem (dialog otevírá aplikace) */
+  onShare?: () => void;
   /** kusovník sestavy (volitelné) */
   bom?: BomItem[];
   /** obálka modelu – pro výchozí polohu řezu */
@@ -79,7 +81,7 @@ function loadOpts(): DrawingOptions {
   return defaultDrawingOptions;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(defaultDrawingOptions);
   const [meta, setMeta] = useState<DrawingMeta>(() => ({
     name: doc.name,
@@ -514,6 +516,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, bom, bbo
         <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res}>
           Tisk
         </Btn>
+        {onShare && (
+          <>
+            <div className="mx-1 h-6 w-px bg-ink-700/10" />
+            <Btn onClick={onShare} title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres">
+              Sdílet
+            </Btn>
+          </>
+        )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
         <Btn onClick={onClose} title="Zpět do 3D (Esc)">
           Zavřít

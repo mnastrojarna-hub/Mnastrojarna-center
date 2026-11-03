@@ -17,6 +17,7 @@ import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
 import { CAD_LINKS } from "@/content/cad-links";
 import { SALES } from "@/content/site";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
@@ -32,6 +33,8 @@ import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { SettingsDialog } from "./settings-dialog";
+import { ShareDialog } from "./share-dialog";
+import { Btn, Modal as UiModal } from "./ui";
 import { StartScreen } from "./start-screen";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
@@ -143,6 +146,11 @@ export function CadApp() {
   const drawAfterImport = useRef(false);
   const [appMenu, setAppMenu] = useState(false);
   const [helpMenu, setHelpMenu] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  /** dokument otevřený ze sdíleného odkazu (informační pruh nad pracovní plochou) */
+  const [shared, setShared] = useState<{ tabId: string; from?: string; exp: number | null } | null>(null);
+  /** sdílený odkaz chráněný heslem – dotaz na heslo */
+  const [sharePass, setSharePass] = useState<{ parsed: ParsedShare; value: string; error?: string; busy?: boolean } | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; entries: RMenuEntry[] } | null>(null);
   const [cursor, setCursor] = useState<Vec3 | null>(null);
   // sestavy
@@ -280,13 +288,14 @@ export function CadApp() {
     setTimeout(() => vp.current?.setView("iso"), 400);
   };
   /** otevře dokument: do prázdné aktivní záložky, jinak do nové záložky */
-  const openDocInTab = (d: CadDoc, opts: { docId?: string } = {}) => {
+  const openDocInTab = (d: CadDoc, opts: { docId?: string } = {}): string => {
     const kind: DocTab["kind"] = d.kind === "assembly" ? "assembly" : "part";
     const curTabs = docTabsRef.current;
     const curId = tabIdRef.current;
     const curDoc = histRef.current.present;
     const cur = curTabs.find((t) => t.id === curId);
     const reuse = !curDoc.features.length && !curDoc.components?.length && cur?.kind !== "drawing";
+    let openedId = curId;
     if (reuse) {
       docId.current = opts.docId ?? uid();
       commit(d);
@@ -297,13 +306,23 @@ export function CadApp() {
       setHist(entry.hist);
       docId.current = entry.docId;
       setTabId(entry.id);
+      openedId = entry.id;
     }
     resetUiForDoc();
     setDrawingOpen(false);
     setTab(kind === "assembly" ? "asm" : "create");
     setTimeout(() => vp.current?.setView("iso"), 700);
+    return openedId;
   };
   const closeTab = (id: string) => {
+    if (shared && id === shared.tabId) {
+      setShared(null);
+      try {
+        sessionStorage.removeItem("mn-cad-share");
+      } catch {
+        /* ignore */
+      }
+    }
     const all = docTabsRef.current.length ? docTabsRef.current : fallbackTabs();
     const idx = all.findIndex((t) => t.id === id);
     const snap = snapshotTabs(all).filter((t) => t.id !== id && t.srcTabId !== id);
@@ -339,6 +358,26 @@ export function CadApp() {
   };
   const openDrawingTabRef = useRef(openDrawingTab);
   openDrawingTabRef.current = openDrawingTab;
+  /** dokument ze sdíleného odkazu (snímek): nová záložka + informační pruh; nic se neukládá */
+  const openShared = (p: SharePayload) => {
+    const id = openDocInTab(p.doc);
+    setShared({ tabId: id, from: p.from, exp: p.exp });
+    setStartOpen(false);
+    flash(`Otevřen sdílený dokument „${p.doc.name}“${p.from ? ` od ${p.from}` : ""}.`);
+    track("cad_share_open");
+    if (p.view === "drawing") setTimeout(() => openDrawingTabRef.current(), 1500);
+  };
+  const openSharedRef = useRef(openShared);
+  openSharedRef.current = openShared;
+  const unlockShared = async () => {
+    if (!sharePass || sharePass.busy) return;
+    setSharePass({ ...sharePass, busy: true, error: undefined });
+    const r = await openShareLink(sharePass.parsed, sharePass.value);
+    if (r.ok) {
+      setSharePass(null);
+      openShared(r.payload);
+    } else setSharePass({ ...sharePass, busy: false, error: openErrorText(r.reason, r.exp) });
+  };
   // rozložení záložek uložit i při jejich změně (ne jen při změně dokumentu)
   useEffect(() => {
     if (!loaded.current || !docTabs.length || persistMode() !== "encrypted" || !isUnlocked()) return;
@@ -401,6 +440,22 @@ export function CadApp() {
       .catch(() => setHist({ past: [], present: emptyDoc(), future: [] }))
       .finally(() => {
         loaded.current = true;
+        // sdílený odkaz (#s=… / #r=…): část za # odložil skript stránky do sessionStorage a z adresy ji odstranil
+        // (app/(cs)/cad/page.tsx) – dokument pod NDA nesmí zůstat v historii prohlížeče ani jít do měření návštěvnosti
+        let hash = "";
+        try {
+          hash = sessionStorage.getItem("mn-cad-share") || location.hash;
+        } catch {
+          hash = location.hash;
+        }
+        const parsed = parseShareHash(hash);
+        if (!parsed) return;
+        if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+        void openShareLink(parsed).then((r) => {
+          if (r.ok) openSharedRef.current(r.payload);
+          else if (r.reason === "password") setSharePass({ parsed, value: "" });
+          else setNotice({ title: "Sdílený odkaz nelze otevřít", body: openErrorText(r.reason, r.exp) });
+        });
       });
     // odemčení / vypnutí úložiště z úvodní obrazovky nebo nastavení
     const onVault = () => {
@@ -2270,6 +2325,7 @@ export function CadApp() {
       { id: "p.help", label: "Klávesové zkratky a ovládání", group: "Program", icon: "help", run: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
       { id: "p.docs", label: "Dokumentace a návod k obsluze (web)", group: "Program", icon: "info", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
       { id: "p.pdf", label: "Příručka PDF – stáhnout", group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
+      { id: "p.share", label: "Sdílet odkazem (WhatsApp, e-mail, Teams…)", group: "Program", icon: "share", run: () => setShareOpen(true) },
       { id: "p.rfq", label: "Poptat výrobu (STEP + e-mail)", group: "Program", icon: "export", run: toRfq },
     );
     return out;
@@ -2349,6 +2405,17 @@ export function CadApp() {
           </span>
           <QBtn icon="measure" title="Paleta příkazů (Ctrl+K)" onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title="Nastavení (Ctrl+,)" onClick={() => setSettingsOpen(true)} />
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            disabled={!doc.features.length && !doc.components?.length}
+            title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči"
+            aria-label="Sdílet"
+            className="flex h-7 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-white/85 hover:bg-white/10 disabled:opacity-40"
+          >
+            <CadIcon name="share" className="h-4 w-4" />
+            <span className="hidden md:inline">Sdílet</span>
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -2369,7 +2436,7 @@ export function CadApp() {
                   className="left-auto right-0 z-50 w-[320px]"
                   entries={[
                     { divider: true, label: "Dokumentace" },
-                    { id: "docs", label: "Dokumentace a návod k obsluze (web)", icon: "info", hint: "23 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce", onClick: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+                    { id: "docs", label: "Dokumentace a návod k obsluze (web)", icon: "info", hint: "24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce", onClick: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
                     { id: "pdf", label: "Příručka PDF – stáhnout", icon: "drawing", hint: "kompletní příručka k tisku a offline čtení", onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
                     { divider: true, label: "Ovládání" },
                     { id: "help", label: "Klávesové zkratky a ovládání myší", icon: "help", onClick: () => setNotice({ title: "Ovládání a zkratky", body: HELP }) },
@@ -2415,6 +2482,7 @@ export function CadApp() {
                     { id: "open", label: "Otevřít / importovat…", icon: "open", tone: "file", kbd: "Ctrl+O", onClick: () => fileInput.current?.click() },
                     { id: "save", label: "Uložit projekt (.mncad)", icon: "save", tone: "file", kbd: "Ctrl+S", onClick: () => void saveProject() },
                     { id: "saveAs", label: "Uložit jako…", icon: "save", tone: "file", onClick: () => void saveProjectAs() },
+                    { id: "share", label: "Sdílet odkazem…", icon: "share", tone: "file", disabled: !doc.features.length && !doc.components?.length, hint: "WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní", onClick: () => setShareOpen(true) },
                     { divider: true, label: "Export 3D" },
                     ...exportEntries,
                     { divider: true, label: "Výkres" },
@@ -2702,6 +2770,21 @@ export function CadApp() {
                 </div>
               </FloatPanel>
             )}
+            {shared && (tabId === shared.tabId || tabStrip.find((t) => t.id === tabId)?.srcTabId === shared.tabId) && (
+              <div role="status" className="absolute left-1/2 top-2 z-30 flex max-w-[94%] -translate-x-1/2 items-center gap-3 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 px-3 py-1.5 text-[12px] text-[#26303b] shadow">
+                <CadIcon name="share" className="h-4 w-4 shrink-0 text-brand" />
+                <span>
+                  <strong>Sdílený dokument</strong>
+                  {shared.from ? ` od ${shared.from}` : ""} · {shared.exp ? `platí do ${new Date(shared.exp).toLocaleDateString("cs-CZ")}` : "bez omezení platnosti"} · snímek – vaše úpravy se odesílateli nepromítnou
+                </span>
+                <button type="button" onClick={() => void saveProjectAs()} className="whitespace-nowrap rounded border border-[#cfd6de] bg-white px-2 py-0.5 hover:border-brand/50">
+                  Uložit kopii…
+                </button>
+                <button type="button" onClick={() => setShared(null)} aria-label="Skrýt" className="rounded p-0.5 text-[#6b7785] hover:bg-white">
+                  <CadIcon name="x" className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
 
             {!sketch && (
@@ -2957,6 +3040,36 @@ export function CadApp() {
           />
         )}
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
+        {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
+        {sharePass && (
+          <UiModal
+            title="Sdílený dokument je chráněný heslem"
+            icon="lock"
+            tone="file"
+            onClose={() => setSharePass(null)}
+            width="max-w-md"
+            footer={
+              <>
+                <Btn onClick={() => setSharePass(null)}>Zrušit</Btn>
+                <Btn primary disabled={!!sharePass.busy || !sharePass.value} onClick={() => void unlockShared()}>
+                  Otevřít
+                </Btn>
+              </>
+            }
+          >
+            <p className="text-[12.5px] text-[#26303b]">Zadejte heslo, které vám odesílatel poslal zvlášť (SMS, telefon…).</p>
+            <input
+              type="password"
+              autoFocus
+              value={sharePass.value}
+              onChange={(e) => setSharePass({ ...sharePass, value: e.target.value, error: undefined })}
+              onKeyDown={(e) => e.key === "Enter" && void unlockShared()}
+              aria-label="Heslo sdíleného dokumentu"
+              className="mt-2 w-full rounded border border-[#cfd6de] px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
+            />
+            {sharePass.error && <p className="mt-1 text-[12px] text-brand">{sharePass.error}</p>}
+          </UiModal>
+        )}
         {paletteOpen && <CommandPalette commands={buildCommands()} onClose={() => setPaletteOpen(false)} />}
         {startOpen && (
           <StartScreen
@@ -2970,7 +3083,7 @@ export function CadApp() {
               { id: "lib", label: "Knihovna normálií", desc: "103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
               { id: "palette", label: "Paleta příkazů", desc: "Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…", icon: "measure", tone: "tool", kbd: "Ctrl+K", run: () => { setStartOpen(false); setPaletteOpen(true); } },
               { id: "settings", label: "Nastavení", desc: "Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.", icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },
-              { id: "docs", label: "Dokumentace a návod", desc: "Kompletní návod k obsluze: 23 kapitol, postupy, FAQ (otevře se v nové záložce).", icon: "info", tone: "tool", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
+              { id: "docs", label: "Dokumentace a návod", desc: "Kompletní návod k obsluze: 24 kapitol, postupy, FAQ (otevře se v nové záložce).", icon: "info", tone: "tool", run: () => window.open(CAD_LINKS.docs, "_blank", "noopener") },
               { id: "pdf", label: "Příručka PDF", desc: "Celá dokumentace jako PDF k tisku a offline čtení.", icon: "drawing", tone: "tool", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
@@ -2999,6 +3112,7 @@ export function CadApp() {
         {drawingOpen && (isAsm || result?.metrics) && (
           <DrawingWorkspace
             doc={doc}
+            onShare={() => setShareOpen(true)}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? "dle kusovníku" : mat.label}
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}

@@ -127,7 +127,7 @@ export function StartScreen({
               <a href={CAD_LINKS.docs} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-2 hover:underline">
                 Dokumentace a návod k obsluze
               </a>{" "}
-              (23 kapitol, postupy krok za krokem, FAQ) ·{" "}
+              (24 kapitol, postupy krok za krokem, FAQ) ·{" "}
               <a href={CAD_LINKS.pdf} download className="font-medium text-brand underline-offset-2 hover:underline">
                 příručka PDF ke stažení
               </a>{" "}
