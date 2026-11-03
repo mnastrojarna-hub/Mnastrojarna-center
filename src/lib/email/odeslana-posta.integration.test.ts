@@ -392,7 +392,7 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
       values ('${jobId}', 'email', 'Faktura odeslána zákazníkovi', jsonb_build_object('fileId', gen_random_uuid(), 'kind', 'faktura', 'number', 'FV-${TAG}', 'to', jsonb_build_array('${CUST_MAIL}'), 'cc', '[]'::jsonb, 'subject', 'Faktura FV-${TAG}'),
         '${users.a.id}', 'user', now() - interval '70 minutes')`);
 
-    const migration = path.resolve(__dirname, "../../../supabase/migrations/20261103120000_odeslana_posta_doplneni.sql");
+    const migration = path.resolve(__dirname, "../../../supabase/migrations/20261103121000_odeslana_posta_doplneni.sql");
     const run = () => execFileSync(path.resolve(__dirname, "../../../tools/local-supabase/psql.sh"), ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-f", migration], { stdio: ["ignore", "pipe", "pipe"] });
     run();
     run(); // podruhé nic nepřibude
