@@ -56,7 +56,7 @@ Profesionální parametrický 3D a 2D CAD, který běží přímo ve webovém pr
 
 *Úvodní obrazovka: Nový díl, Nová sestava, Nový výkres, nedávné soubory s náhledy, otevřít / importovat, knihovna normálií.*
 
-Jádrem je geometrický modelář OpenCascade (OCCT) přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se neodesílají na server; rozpracovaná práce se průběžně ukládá do úložiště prohlížeče a projekt si stáhnete jako soubor .mncad nebo exportujete do STEP.
+Jádrem je geometrický modelář OpenCascade (OCCT) přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se neodesílají na server a ve výchozím nastavení se neukládají ani do prohlížeče – rozpracovaná práce žije jen v otevřené kartě a v souborech, které si uložíte do svého počítače (.mncad, STEP). To je důležité pro dokumentaci pod NDA.
 
 ### Co umí
 
@@ -547,7 +547,7 @@ Výrobní výkres z modelu nebo sestavy během minuty – pohledy, kóty, tolera
 - Proměnné (záložka vlevo): název, hodnota nebo výraz (L/2, sqrt(a^2+b^2), max(d, 10)), jednotka a popis. Funkce: sin, cos, tan, sqrt, abs, min, max, round, floor, ceil, pi…
 - Navázání parametru: do kteréhokoli číselného pole napište =výraz (např. =d*3) – pole se přepočítá při každé změně proměnné. Vazba se ukládá s dokumentem a zobrazuje ikonou u pole.
 - Stavy (konfigurace): varianty dílu s jinými hodnotami proměnných a potlačenými prvky (např. „s přírubou / bez příruby“, velikosti M8 / M10). Aktivní stav se přepíná ve správci; výkres a export respektují aktivní stav.
-- Nedávné soubory a autosave: rozpracovaný díl se ukládá do prohlížeče každých pár sekund; úvodní obrazovka nabídne „Pokračovat v práci“ a náhledy posledních 12 dokumentů (počet lze změnit).
+- Nedávné soubory a rozpracovaná práce: ve výchozím režimu se nic neukládá (ochrana dokumentace). Zapnete-li v Nastavení → Soubory šifrované úložiště s heslem, ukládá se rozpracovaný model, záložky a nedávné soubory s náhledy (až 12) do tohoto prohlížeče zašifrovaně (AES-256) – bez hesla je nikdo nepřečte; odemčení platí do zavření karty.
 
 ## 16. Soubory, import a export
 
@@ -588,7 +588,7 @@ Poptat výrobu: tlačítko v titulní liště připraví STEP aktuálního dílu
 | Myš a ovládání | schéma ZW3D / SolidWorks / touchpad, přiblížení ke kurzoru, obrácení kolečka |
 | Skica | přichytávání k mřížce, krok mřížky, automatické vazby, zobrazování značek vazeb |
 | Výkres | autor do razítka, výchozí formát listu, promítání E / A, nepředepsané tolerance (ISO 2768) |
-| Soubory | automatické ukládání, počet nedávných souborů |
+| Soubory | rozpracovaná práce v prohlížeči: neukládat (výchozí) nebo šifrované úložiště s heslem; vymazání všeho uloženého; počet nedávných souborů |
 | Klávesové zkratky | každou zkratku lze přemapovat; obnovit výchozí |
 
 ## 18. Klávesové zkratky
@@ -654,8 +654,10 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 ## 21. Vaše data a soukromí
 
 - Modelování, výpočty i export probíhají ve vašem prohlížeči; soubory se na server neodesílají. Výjimkou je tlačítko Poptat výrobu, které připraví e-mail – odesíláte ho sami.
-- Rozpracovaný dokument, nedávné soubory a nastavení se ukládají do úložiště prohlížeče (localStorage). Vymazání dat prohlížeče je smaže – projekty si ukládejte jako .mncad nebo STEP.
-- Anonymní statistika použití (otevření aplikace, typ prvku) slouží jen k vylepšování programu. Podrobnosti v zásadách ochrany osobních údajů na webu.
+- Výchozí režim „neukládat“ (NDA): modely, výkresy ani jejich názvy se do prohlížeče neukládají. Rozpracovaná práce existuje jen v otevřené kartě a v souborech, které si uložíte do svého počítače tlačítkem Uložit (kam a pod jakým názvem si vyberete). Po zavření karty v prohlížeči nic nezůstane; při zavírání s neuloženými změnami prohlížeč varuje. Dokumenty uložené staršími verzemi programu se při prvním spuštění smažou.
+- Volitelné šifrované úložiště: kdo chce mít nedávné soubory a obnovu rozpracované práce, zapne v Nastavení → Soubory úložiště s heslem. Data se ukládají zašifrovaně (AES-GCM 256, klíč z hesla přes PBKDF2) jen v tomto prohlížeči na tomto počítači – bez hesla je nepřečte ani jiný uživatel téhož PC. Odemčení platí do zavření karty; „Vypnout a smazat uložené“ vše odstraní.
+- Nastavení programu (jednotky, myš, zkratky, formát listu) se ukládá nešifrovaně – neobsahuje žádná data z dokumentů.
+- Anonymní statistika použití (otevření aplikace, typ prvku) neobsahuje geometrii ani názvy souborů. Podrobnosti v zásadách ochrany osobních údajů na webu.
 
 ## 22. Slovníček pojmů
 
@@ -712,11 +714,11 @@ Ano. Nabídky a formuláře se na telefonu otevírají jako spodní listy, model
 
 **Funguje offline?**
 
-Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro načtení aplikace a knihovny písem je potřeba připojení; rozpracovaná práce se ukládá do úložiště prohlížeče.
+Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro načtení aplikace a knihovny písem je potřeba připojení; rozpracovanou práci si ukládejte do souboru (ve výchozím režimu se v prohlížeči nic neuchovává).
 
-**Kde jsou moje soubory uložené?**
+**Kde jsou moje soubory uložené? Uvidí je někdo jiný?**
 
-V úložišti vašeho prohlížeče (automaticky) a tam, kam si je stáhnete jako .mncad nebo STEP. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu.
+Jen tam, kam si je sami uložíte (.mncad, STEP, PDF…). Ve výchozím režimu CAD do prohlížeče nic neukládá – po zavření karty rozpracovaná práce zmizí, takže dokumentaci pod NDA neuvidí nikdo další ani na sdíleném počítači. Kdo chce obnovu práce a nedávné soubory, zapne šifrované úložiště s heslem; bez hesla jsou data nečitelná. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu.
 
 **Co znamená, že odkazy „přežijí změnu historie“?**
 

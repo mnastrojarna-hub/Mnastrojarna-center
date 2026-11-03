@@ -9,7 +9,8 @@ import type { MateFaceInfo } from "@/cad/asm-kernel";
 import { solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
 import { cad } from "@/cad/client";
 import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
-import { keyCombo, loadRecent, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
+import { isUnlocked, notifyVault, persistMode, restoreSession, VAULT_EVENT, vaultGet, vaultSet, wipeStoredDocuments } from "@/cad/vault";
+import { keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
@@ -193,7 +194,23 @@ export function CadApp() {
   };
 
   // ---------- historie ----------
-  const commit = useCallback((next: CadDoc) => setHist((h) => ({ past: [...h.past.slice(-80), h.present], present: next, future: [] })), []);
+  /** neuložené změny (v režimu „neukládat“ varuje prohlížeč před zavřením karty) */
+  const dirty = useRef(false);
+  const commit = useCallback((next: CadDoc) => {
+    dirty.current = true;
+    setHist((h) => ({ past: [...h.past.slice(-80), h.present], present: next, future: [] }));
+  }, []);
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => {
+      const d = histRef.current.present;
+      if (persistMode() === "none" && dirty.current && (d.features.length || d.components?.length)) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, []);
   const live = useCallback((next: CadDoc) => setHist((h) => ({ ...h, present: next })), []);
   const undo = () => setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
   const redo = () => setHist((h) => (h.future.length ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) } : h));
@@ -322,12 +339,8 @@ export function CadApp() {
   openDrawingTabRef.current = openDrawingTab;
   // rozložení záložek uložit i při jejich změně (ne jen při změně dokumentu)
   useEffect(() => {
-    if (!loaded.current || !docTabs.length) return;
-    try {
-      localStorage.setItem(TABS_KEY, JSON.stringify({ active: tabId, tabs: docTabs.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(docTabs, tabId) ? docId.current : did, srcTabId })) }));
-    } catch {
-      /* ignore */
-    }
+    if (!loaded.current || !docTabs.length || persistMode() !== "encrypted" || !isUnlocked()) return;
+    void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: docTabs.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(docTabs, tabId) ? docId.current : did, srcTabId })) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docTabs, tabId]);
   const tabStrip: DocTab[] = (docTabs.length ? docTabs : fallbackTabs()).map((t) =>
@@ -340,14 +353,20 @@ export function CadApp() {
       () => setCore("ready"),
       () => setCore("error"),
     );
-    try {
-      const raw = localStorage.getItem(STORE);
+    const restore = async () => {
+      // ochrana dokumentace (NDA): v režimu „neukládat“ se nic neobnovuje a dřívější uložené dokumenty se smažou
+      if (persistMode() === "none") {
+        wipeStoredDocuments();
+        return;
+      }
+      if (!isUnlocked() && !(await restoreSession())) return; // zamčeno – odemkne se z úvodní obrazovky / nastavení
+      const raw = await vaultGet(STORE);
       const d = raw ? (JSON.parse(raw) as CadDoc) : null;
       const present = d?.app === "mnastrojarna-cad" && Array.isArray(d.features) ? d : emptyDoc();
       setHist({ past: [], present, future: [] });
       // obnova záložek z minulé návštěvy (dokumenty jsou uložené v nedávných souborech)
       try {
-        const meta = JSON.parse(localStorage.getItem(TABS_KEY) ?? "null") as { active: string; tabs: Omit<DocTab, "hist">[] } | null;
+        const meta = JSON.parse((await vaultGet(TABS_KEY)) ?? "null") as { active: string; tabs: Omit<DocTab, "hist">[] } | null;
         if (meta?.tabs?.length) {
           const list: DocTab[] = [];
           for (const t of meta.tabs) {
@@ -356,7 +375,7 @@ export function CadApp() {
             else if (t.kind === "drawing") {
               if (meta.tabs.some((x) => x.id === t.srcTabId)) list.push({ ...t, hist: { past: [], present, future: [] } });
             } else {
-              const json = readRecentDoc(t.docId);
+              const json = await readRecentDoc(t.docId);
               // prázdné záložky se neukládají – obnoví se jako prázdný díl / sestava se stejným názvem
               const pd = json ? (JSON.parse(json) as CadDoc) : t.kind === "assembly" ? emptyAssembly(t.title) : emptyDoc(t.title);
               list.push({ ...t, hist: { past: [], present: pd, future: [] } });
@@ -375,9 +394,18 @@ export function CadApp() {
       } catch {
         /* bez obnovy záložek */
       }
-    } catch {
-      setHist({ past: [], present: emptyDoc(), future: [] });
-    }
+    };
+    restore()
+      .catch(() => setHist({ past: [], present: emptyDoc(), future: [] }))
+      .finally(() => {
+        loaded.current = true;
+      });
+    // odemčení / vypnutí úložiště z úvodní obrazovky nebo nastavení
+    const onVault = () => {
+      if (persistMode() === "none") return;
+      if (isUnlocked()) void restore();
+    };
+    window.addEventListener(VAULT_EVENT, onVault);
     loaded.current = true;
     try {
       if (loadSettings().startScreen && !sessionStorage.getItem("mn-cad-started")) setStartOpen(true);
@@ -386,17 +414,20 @@ export function CadApp() {
       /* ignore */
     }
     track("cad_open");
+    return () => window.removeEventListener(VAULT_EVENT, onVault);
   }, []);
   useEffect(() => {
     if (!loaded.current) return;
     const t = setTimeout(() => {
       try {
+        // ochrana dokumentace: bez zapnutého šifrovaného úložiště se do prohlížeče nic nezapisuje
+        if (persistMode() !== "encrypted" || !isUnlocked()) return;
         const json = JSON.stringify(doc);
-        localStorage.setItem(STORE, json);
+        void vaultSet(STORE, json);
         const strip: DocTab[] = docTabs.length ? docTabs : fallbackTabs();
-        localStorage.setItem(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
+        void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
         if (doc.features.length || doc.components?.length) {
-          storeRecentDoc(docId.current, json);
+          void storeRecentDoc(docId.current, json);
           const entry = { id: docId.current, name: doc.name, kind: (doc.kind === "assembly" ? "assembly" : "part") as "assembly" | "part", at: Date.now(), features: doc.kind === "assembly" ? (doc.components?.length ?? 0) : doc.features.length };
           const limit = loadSettings().recentLimit;
           // náhled nejvýš jednou za 10 s (snímek 3D okna zmenšený na 160×120)
@@ -404,8 +435,8 @@ export function CadApp() {
             lastThumb.current = Date.now();
             const snap = vp.current.snapshot();
             if (snap) thumbnail(snap).then((thumb) => pushRecent({ ...entry, thumb }, limit)).catch(() => pushRecent(entry, limit));
-            else pushRecent(entry, limit);
-          } else pushRecent({ ...entry, thumb: loadRecentThumb(docId.current) }, limit);
+            else void pushRecent(entry, limit);
+          } else void pushRecent(entry, limit);
         }
       } catch {
         /* příliš velké / soukromý režim */
@@ -1409,6 +1440,7 @@ export function CadApp() {
     if (!t) return;
     await writeSaved(t, JSON.stringify(doc, null, 1), "application/json");
     projectTarget.current = t.handle ? t : null;
+    dirty.current = false;
     flash(`Uloženo: ${t.name}`);
   };
   const saveProject = async () => {
@@ -1416,6 +1448,7 @@ export function CadApp() {
     if (t?.handle) {
       try {
         await writeSaved(t, JSON.stringify(doc, null, 1), "application/json");
+        dirty.current = false;
         flash(`Uloženo: ${t.name}`);
         return;
       } catch {
@@ -2904,15 +2937,16 @@ export function CadApp() {
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
             onOpenRecent={(r) => {
-              const json = readRecentDoc(r.id);
-              if (!json) return flash("Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.");
-              try {
-                const d = JSON.parse(json) as CadDoc;
-                setStartOpen(false);
-                openDocInTab(d, { docId: r.id });
-              } catch {
-                flash("Soubor se nepodařilo načíst.");
-              }
+              void readRecentDoc(r.id).then((json) => {
+                if (!json) return flash("Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.");
+                try {
+                  const d = JSON.parse(json) as CadDoc;
+                  setStartOpen(false);
+                  openDocInTab(d, { docId: r.id });
+                } catch {
+                  flash("Soubor se nepodařilo načíst.");
+                }
+              });
             }}
             onClose={() => setStartOpen(false)}
             onDisable={() => setPref("startScreen", false)}
@@ -3055,6 +3089,3 @@ function thumbnail(dataUrl: string): Promise<string> {
   });
 }
 
-function loadRecentThumb(id: string): string | undefined {
-  return loadRecent().find((r) => r.id === id)?.thumb;
-}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { loadRecent, removeRecent, type RecentDoc } from "@/cad/settings";
+import { isUnlocked, notifyVault, persistMode, unlock, VAULT_EVENT } from "@/cad/vault";
 import { cn } from "@/lib/cn";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
@@ -27,7 +28,28 @@ export function StartScreen({
   onClose: () => void;
   onDisable: () => void;
 }) {
-  const [recent, setRecent] = useState<RecentDoc[]>(() => loadRecent());
+  const [recent, setRecent] = useState<RecentDoc[]>([]);
+  const [mode, setMode] = useState<"none" | "encrypted">("none");
+  const [unlocked, setUnlocked] = useState(false);
+  const [pass, setPass] = useState("");
+  const [passErr, setPassErr] = useState<string | null>(null);
+  useEffect(() => {
+    const refresh = () => {
+      setMode(persistMode());
+      setUnlocked(isUnlocked());
+      void loadRecent().then(setRecent);
+    };
+    refresh();
+    window.addEventListener(VAULT_EVENT, refresh);
+    return () => window.removeEventListener(VAULT_EVENT, refresh);
+  }, []);
+  const tryUnlock = async () => {
+    if (await unlock(pass)) {
+      setPass("");
+      setPassErr(null);
+      notifyVault();
+    } else setPassErr("Nesprávné heslo.");
+  };
   return (
     <div className="fixed inset-0 z-[65] flex flex-col bg-[#eef1f5] text-[#1f2933]">
       <header className="flex h-12 shrink-0 items-center gap-3 bg-gradient-to-b from-[#262b31] to-[#1c2025] px-5 text-white">
@@ -102,7 +124,24 @@ export function StartScreen({
 
         <aside>
           <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Nedávné</h2>
-          {recent.length === 0 && <p className="rounded-md border border-dashed border-[#cdd5de] bg-white/60 p-4 text-[12.5px] text-[#6b7785]">Zatím žádné soubory. Vše, co uložíte nebo otevřete, se objeví tady.</p>}
+          {mode === "none" && (
+            <p className="rounded-md border border-dashed border-[#cdd5de] bg-white/60 p-4 text-[12.5px] leading-relaxed text-[#6b7785]">
+              <strong className="text-[#1f2933]">Ochrana dokumentace:</strong> v prohlížeči se nic neukládá – rozpracovaná práce žije jen v této kartě a v souborech, které si uložíte do svého počítače (<code>.mncad</code>, STEP). Po zavření karty nic nezůstane. Šifrované úložiště s heslem lze zapnout v Nastavení → Soubory.
+            </p>
+          )}
+          {mode === "encrypted" && !unlocked && (
+            <div className="rounded-md border border-[#d5dbe2] bg-white p-4">
+              <p className="text-[12.5px] text-[#3c4856]">Rozpracovaná práce je uložená šifrovaně. Zadejte heslo úložiště:</p>
+              <div className="mt-2 flex gap-2">
+                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void tryUnlock()} placeholder="Heslo úložiště" aria-label="Heslo úložiště" className="min-w-0 flex-1 rounded border border-[#cfd6de] px-2 py-1.5 text-[13px] outline-none focus:border-brand" />
+                <button type="button" onClick={() => void tryUnlock()} className="rounded bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-brand-600">
+                  Odemknout
+                </button>
+              </div>
+              {passErr && <p className="mt-1 text-[12px] text-brand">{passErr}</p>}
+            </div>
+          )}
+          {mode === "encrypted" && unlocked && recent.length === 0 && <p className="rounded-md border border-dashed border-[#cdd5de] bg-white/60 p-4 text-[12.5px] text-[#6b7785]">Zatím žádné soubory. Vše, co uložíte nebo otevřete, se objeví tady (šifrovaně, jen pro vás).</p>}
           <ul className="space-y-1.5">
             {recent.map((r) => (
               <li key={r.id} className="group flex items-center gap-3 rounded-md border border-[#e3e8ee] bg-white p-2 hover:border-brand/40">
@@ -122,8 +161,7 @@ export function StartScreen({
                   type="button"
                   title="Odebrat ze seznamu"
                   onClick={() => {
-                    removeRecent(r.id);
-                    setRecent(loadRecent());
+                    void removeRecent(r.id).then(loadRecent).then(setRecent);
                   }}
                   className="hidden rounded p-1 text-[#8a95a3] hover:text-brand group-hover:block"
                 >
