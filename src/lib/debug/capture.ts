@@ -84,6 +84,9 @@ export function installDebugCapture(): void {
 
   window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) => {
     const reason = e.reason;
+    // chyby rozšíření prohlížeče (kryptopeněženky: JSON-RPC {code, message}, skripty chrome-extension://)
+    // nejsou chyby aplikace — do debug lišty nepatří
+    if (isExtensionNoise(reason)) return;
     add({
       level: "error",
       source: "unhandledrejection",
@@ -285,4 +288,16 @@ export function bodyPreview(body: unknown, isAction: boolean): string | undefine
   } catch {
     return String(body).slice(0, 2000);
   }
+}
+
+/** Neošetřený reject, který nepochází z aplikace, ale z rozšíření prohlížeče (peněženka, …). */
+export function isExtensionNoise(reason: unknown): boolean {
+  if (reason && typeof reason === "object" && !(reason instanceof Error)) {
+    const r = reason as { code?: unknown; message?: unknown };
+    // JSON-RPC 2.0 chyby (EIP-1193 peněženky): -32700…-32000, 4001 (uživatel odmítl), 4100–4902
+    if (typeof r.code === "number" && typeof r.message === "string"
+      && ((r.code <= -32000 && r.code >= -32768) || (r.code >= 4001 && r.code <= 4902))) return true;
+  }
+  const stack = reason instanceof Error ? reason.stack ?? "" : "";
+  return /(?:chrome|moz|safari)-extension:\/\//.test(stack);
 }
