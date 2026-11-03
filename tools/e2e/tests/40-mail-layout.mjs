@@ -7,6 +7,7 @@
 //  - oddělovač seznam | detail: tažení myší → šířka hned v DB (profiles.ui_prefs), po obnovení i v novém
 //    prohlížeči stejná, jiný uživatel nedotčen; klávesnice (šipky), dvojklik = výchozí; sbalení složek,
 //  - šířky 1024 / 1440 / 1920 bez vodorovného rolování, telefon 390 px beze změny (seznam → detail),
+//  - kompaktní Pošta (3. 11.): ≥ 10 vláken na 1366×768 / ≥ 7 na 1093×614, sbalitelné menu vlevo (uloží se), hustota,
 //  - blokace po odmítnutém hesle: Otestovat připojení → další pokusy zablokované s časem; časový limit na
 //    známém serveru po odmítnutí → „Hosting pravděpodobně dočasně zablokoval přihlášení…".
 // Spuštění (aplikace musí znát testovací poštovní server — viz 12-mailbox-setup.mjs):
@@ -296,6 +297,63 @@ await T("šířky 1024 / 1440 / 1920: bez vodorovného rolování, seznam ≥ 26
   expect(Math.abs(w1 - Math.max(260, w0 - 40)) <= 2, `dotyk: ${w0} → ${w1}`);
   await page.getByTestId("mail-divider").dblclick();
   await eventually(() => prefOf(obchodId, "mail.listWidth") === "", "výchozí po dvojkliku", 5_000);
+});
+
+await T("kompaktní Pošta (majitel 3. 11.): ≥ 10 vláken na 1366×768, ≥ 7 na 1093×614; menu vlevo jde sbalit (uloží se); ⋯ Pohodlné / Kompaktní", async (open) => {
+  sql(`update profiles set ui_prefs = '{}' where id = '${obchodId}'`);
+  const context = await open();
+  const page = await context.newPage();
+  await login(page, USERS.obchod);
+  // celé řádky vláken viditelné v seznamu (bez rolování)
+  const visibleRows = () => page.evaluate(() => {
+    const lr = document.querySelector('[data-testid="thread-list-scroll"]').getBoundingClientRect();
+    return [...document.querySelectorAll('[data-testid="thread-row"]')].filter((r) => {
+      const b = r.getBoundingClientRect();
+      return b.height > 0 && b.top >= lr.top - 1 && b.bottom <= lr.bottom + 1;
+    }).length;
+  });
+  const sidebarW = () => page.getByTestId("app-sidebar").evaluate((el) => Math.round(el.getBoundingClientRect().width));
+
+  // bez volby: v Poště pod 1440 px menu samo jen ikony, seznam kompaktní
+  await openInbox(page, { width: 1366, height: 768 });
+  expect((await sidebarW()) <= 64, `1366: menu automaticky sbalené (${await sidebarW()} px)`);
+  const n1366 = await visibleRows();
+  expect(n1366 >= 10, `1366×768: ${n1366} vláken na obrazovce (≥ 10)`);
+  expect(await page.getByTestId("btn-mail-settings").isVisible() && await page.getByTestId("mail-more").isVisible(), "lišta: ozubené kolo a ⋯");
+  await snap(page, "40-10-compact-1366");
+  await openInbox(page, { width: 1093, height: 614 });
+  const n1093 = await visibleRows();
+  expect(n1093 >= 7, `1093×614 (125 %): ${n1093} vláken (≥ 7)`);
+  const s = await panes(page);
+  expect(s.pageW <= s.winW && s.main.sh <= s.main.ch + 2, "1093: bez vodorovného rolování, stránka neroluje");
+  await snap(page, "40-11-compact-1093");
+
+  // rozbalit menu → uloží se hned pro uživatele, platí i na jiných stránkách; znovu sbalit
+  await page.getByTestId("sidebar-toggle").click();
+  await eventually(() => prefOf(obchodId, "app.sidebarCollapsed") === "false", "rozbalené menu v DB", 5_000);
+  expect((await sidebarW()) >= 250, "menu rozbalené");
+  expect((await visibleRows()) >= 7, "1093 s rozbaleným menu: stále ≥ 7 vláken");
+  await page.getByTestId("sidebar-toggle").click();
+  await eventually(() => prefOf(obchodId, "app.sidebarCollapsed") === "true", "sbalené menu v DB", 5_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto(`${BASE}/orders`);
+  await page.getByTestId("app-sidebar").waitFor();
+  expect((await sidebarW()) <= 64, "uložená volba platí i jinde a na široké obrazovce");
+  expect(prefOf(adminId, "app.sidebarCollapsed") === "", "jiný uživatel nedotčen");
+
+  // hustota seznamu: ⋯ → Pohodlné (uloží se) → Kompaktní (výchozí, klíč pryč)
+  await openInbox(page, { width: 1366, height: 768 });
+  await page.getByTestId("mail-more").click();
+  await page.getByTestId("mail-density-comfortable").click();
+  await eventually(() => prefOf(obchodId, "mail.comfortable") === "true", "Pohodlné v DB", 5_000);
+  const tall = await page.getByTestId("thread-row").first().evaluate((el) => el.getBoundingClientRect().height);
+  expect(tall > 80, `Pohodlné: vyšší řádky (${tall} px)`);
+  await page.getByTestId("mail-more").click();
+  await page.getByTestId("mail-density-compact").click();
+  await eventually(() => prefOf(obchodId, "mail.comfortable") === "", "Kompaktní = výchozí", 5_000);
+  const short = await page.getByTestId("thread-row").first().evaluate((el) => el.getBoundingClientRect().height);
+  expect(short <= 56, `Kompaktní: nízké řádky (${short} px)`);
+  sql(`update profiles set ui_prefs = '{}' where id = '${obchodId}'`);
 });
 
 await T("telefon 390 px beze změny: seznam přes celou šířku, ťuknutí → detail přes obrazovku, zpět na seznam", async (open) => {

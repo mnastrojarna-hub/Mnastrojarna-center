@@ -17,7 +17,9 @@ import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
+import { copyText } from "@/lib/clipboard";
 import { CAD_LINKS } from "@/content/cad-links";
 import { SALES } from "@/content/site";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
@@ -46,6 +48,7 @@ import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Wa
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool } from "./sketcher";
+import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
@@ -151,6 +154,9 @@ export function CadApp() {
   const [tabMenu, setTabMenu] = useState(false);
   const tabMenuRef = useRef<HTMLButtonElement>(null);
   const [helpMenu, setHelpMenu] = useState(false);
+  /** selhání 3D okna (WebGL): místo pádu chybová obrazovka, zbytek programu funguje; glKey = nový pokus */
+  const [glError, setGlError] = useState<RenderFailure | null>(null);
+  const [glKey, setGlKey] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
   /** dokument otevřený ze sdíleného odkazu (informační pruh nad pracovní plochou) */
   const [shared, setShared] = useState<{ tabId: string; from?: string; exp: number | null } | null>(null);
@@ -374,6 +380,11 @@ export function CadApp() {
   };
   const openSharedRef = useRef(openShared);
   openSharedRef.current = openShared;
+  /** diagnostika prostředí pro podporu (bez dat dokumentu) do schránky */
+  const copyDiagnostics = async () => {
+    const ok = await copyText(collectDiagnostics({ error: glError?.error ?? null, probe: glError?.probe ?? probeWebGL(), core, lost: glError?.lost }));
+    flash(ok ? "Diagnostika zkopírována do schránky – vložte ji do e-mailu pro podporu." : "Kopírování se nezdařilo.");
+  };
   const unlockShared = async () => {
     if (!sharePass || sharePass.busy) return;
     setSharePass({ ...sharePass, busy: true, error: undefined });
@@ -2417,9 +2428,9 @@ export function CadApp() {
               {tabChips}
             </div>
           )}
-          <span className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" ? "text-brand" : "text-white/55")}>
+          <span className={cn("hidden items-center gap-1.5 font-mono text-[10.5px] lg:flex", core === "error" || glError ? "text-brand" : "text-white/55")}>
             <span className={cn("h-2 w-2 rounded-full", core === "ready" ? (busy ? "animate-pulse bg-amber-400" : "bg-emerald-400") : core === "loading" ? "animate-pulse bg-amber-400" : "bg-brand")} />
-            {core === "loading" ? "Načítám jádro OpenCascade…" : core === "error" ? "Jádro se nenačetlo" : busy ? "Přepočítávám…" : `OCCT · ${result ? `${result.ms} ms` : "připraveno"}`}
+            {glError ? "3D okno: nedostupné (WebGL)" : core === "loading" ? "Načítám jádro OpenCascade…" : core === "error" ? "Jádro se nenačetlo" : busy ? "Přepočítávám…" : `OCCT · ${result ? `${result.ms} ms` : "připraveno"}`}
           </span>
           <QBtn icon="measure" title="Paleta příkazů (Ctrl+K)" onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title="Nastavení (Ctrl+,)" onClick={() => setSettingsOpen(true)} />
@@ -2461,6 +2472,7 @@ export function CadApp() {
                     { id: "palette", label: "Paleta příkazů", icon: "palette", kbd: "Ctrl+K", hint: "napište název příkazu („díra“, „výkres“, „zaoblit“…)", onClick: () => setPaletteOpen(true) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { divider: true },
+                    { id: "diag", label: "Zkopírovat diagnostiku (bez dat dokumentu)", icon: "info", hint: "verze programu, prohlížeč, WebGL, jádro, chyba – pro e-mail podpoře", onClick: () => void copyDiagnostics() },
                     { id: "web", label: "Zpět na web mnastrojarna.cz", icon: "home", onClick: () => window.location.assign("/") },
                   ]}
                 />
@@ -2611,41 +2623,56 @@ export function CadApp() {
             onWheelCapture={() => setHud(null)}
           >
             <div className={cn("absolute inset-0", sketch && "invisible")} style={{ background: bg.css }}>
-              <Viewport
-                ref={vp}
-                mesh={result?.mesh ?? null}
-                sketches={sketchesForView}
-                datums={datums}
-                datumGfx={datumGfx}
-                pickMode={pickMode}
-                selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
-                selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
-                onPickEdge={onPickEdge}
-                onPickFace={onPickFace}
-                selFilter={refPick ? refFilter(refPick.want) : selFilter}
-                snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
-                selection={measure ? measureSel : selection}
-                onPick={onPick}
-                measure={measureGfx}
-                vertices={result?.vertices ?? null}
-                faceColors={doc.faceColors}
-                bodyHidden={bodyHidden}
-                bodyOpacity={bodyOpacity}
-                gizmo={gizmo}
-                onGizmo={onGizmo}
-                onContext={vpContext}
-                onCursor={setCursor}
-                display={prefs.display}
-                ortho={prefs.ortho}
-                section={section}
-                bodyColor={doc.color}
-                mouse={prefs.mouse}
-                vertexColors={vertexColors}
-                surface={surface.mode === "zebra" ? "zebra" : "none"}
-                showGrid={showGrid}
-                assembly={isAsm ? asmViews : undefined}
-              />
+              <ViewportBoundary resetKey={glKey} onError={(error) => setGlError({ error, probe: probeWebGL() })}>
+                <Viewport
+                  key={glKey}
+                  ref={vp}
+                  onRenderError={setGlError}
+                  mesh={result?.mesh ?? null}
+                  sketches={sketchesForView}
+                  datums={datums}
+                  datumGfx={datumGfx}
+                  pickMode={pickMode}
+                  selectedEdges={active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all" ? active.edges : extPicked("edges")}
+                  selectedFaces={active && Array.isArray((active as { faces?: number[] }).faces) ? ((active as { faces?: number[] }).faces as number[]) : extPicked("faces")}
+                  onPickEdge={onPickEdge}
+                  onPickFace={onPickFace}
+                  selFilter={refPick ? refFilter(refPick.want) : selFilter}
+                  snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
+                  selection={measure ? measureSel : selection}
+                  onPick={onPick}
+                  measure={measureGfx}
+                  vertices={result?.vertices ?? null}
+                  faceColors={doc.faceColors}
+                  bodyHidden={bodyHidden}
+                  bodyOpacity={bodyOpacity}
+                  gizmo={gizmo}
+                  onGizmo={onGizmo}
+                  onContext={vpContext}
+                  onCursor={setCursor}
+                  display={prefs.display}
+                  ortho={prefs.ortho}
+                  section={section}
+                  bodyColor={doc.color}
+                  mouse={prefs.mouse}
+                  vertexColors={vertexColors}
+                  surface={surface.mode === "zebra" ? "zebra" : "none"}
+                  showGrid={showGrid}
+                  assembly={isAsm ? asmViews : undefined}
+                />
+              </ViewportBoundary>
             </div>
+            {glError && !sketch && (
+              <ViewportFallback
+                failure={glError}
+                core={core}
+                onRetry={() => {
+                  setGlError(null);
+                  setGlKey((k) => k + 1);
+                }}
+                onCopy={() => void copyDiagnostics()}
+              />
+            )}
             {sketch && (
               <>
                 <Sketcher key={sketch.id} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} modelLines={result?.mesh?.lines ?? null} />

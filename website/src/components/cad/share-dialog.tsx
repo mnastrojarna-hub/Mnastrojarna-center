@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createShareLink, LINK_WARN_CHARS, SHARE_DAYS, SHARE_DEFAULT_DAYS, shareMessage, shareStoreConfigured, type ShareMode, type ShareResult, type ShareView } from "@/cad/share";
 import type { CadDoc } from "@/cad/types";
+import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
 import { Btn, Modal } from "./ui";
@@ -11,27 +12,6 @@ const FROM_KEY = "mn-cad-share-from"; // jen jméno odesílatele (není to dokum
 
 const fmtDate = (t: number | null) => (t ? new Date(t).toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" }) : "bez omezení");
 const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} kB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      ta.remove();
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-}
 
 /**
  * Dialog „Sdílet odkazem“: jeden odkaz pro WhatsApp, e-mail, Teams… Odkaz se vytvoří hned po otevření

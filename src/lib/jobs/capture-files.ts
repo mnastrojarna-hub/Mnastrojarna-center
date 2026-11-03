@@ -319,7 +319,8 @@ function sizeLabel(bytes: number): string {
 export async function prepareBatchFiles(
   db: JobsDb,
   userId: string,
-  refs: CaptureFileRef[],
+  /** bundle = balík souborů (e-mail s přílohami „mail:<id>"); ZIP uvnitř balíku zůstává v balíku. */
+  refs: (CaptureFileRef & { bundle?: string | null })[],
   opts: { cap?: number } = {},
 ): Promise<PreparedBatch> {
   const cap = opts.cap ?? ANALYZE_DOWNLOAD_CAP;
@@ -375,7 +376,7 @@ export async function prepareBatchFiles(
           const { error } = await bucket(db).upload(path, e.data, { contentType: mimeType, upsert: false });
           if (error) { failed = true; break; }
           // balík = tento ZIP (podle cesty v úložišti, ne názvu — dva „vykresy.zip" jsou dva balíky)
-          uploaded.push({ path, filename: e.name, mimeType, size: e.data.length, fromZip: ref.filename, bundle: `zip:${ref.path}`, bytes: e.data });
+          uploaded.push({ path, filename: e.name, mimeType, size: e.data.length, fromZip: ref.filename, bundle: ref.bundle ?? `zip:${ref.path}`, bytes: e.data });
         }
         if (!failed) {
           queue.unshift(...uploaded);

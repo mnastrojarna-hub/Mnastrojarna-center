@@ -1381,6 +1381,11 @@ export async function usableMailbox(db: JobsDb, userId: string | null | undefine
  */
 export async function purchaseOrderSender(db: JobsDb, approver: { id: string; mailAll?: boolean }, jobOwnerId: string | null):
   Promise<{ from: SmtpPreference; signerId: string; mailboxEmail: string | null }> {
+  // super admin posílá ze SVÉ schránky (majitel 3. 11.), má-li ji použitelnou — ne ze schránky obchodníka
+  if (jobOwnerId && jobOwnerId !== approver.id && await isSuperAdmin(db, approver.id)) {
+    const own = await usableMailbox(db, approver.id);
+    if (own) return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: own.email };
+  }
   if (jobOwnerId && jobOwnerId !== approver.id && await hasPriceRole(db, jobOwnerId)) {
     const box = await usableMailbox(db, jobOwnerId);
     if (box) return { from: { mailboxId: box.id, ownerId: jobOwnerId }, signerId: jobOwnerId, mailboxEmail: box.email };
@@ -1391,6 +1396,11 @@ export async function purchaseOrderSender(db: JobsDb, approver: { id: string; ma
   if (own) return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: own.email };
   const fallback = await senderAddress({ ownerId: approver.id });
   return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: fallback };
+}
+
+async function isSuperAdmin(db: JobsDb, userId: string): Promise<boolean> {
+  const { data } = await db.from("profiles").select("role").eq("id", userId).maybeSingle();
+  return (data as { role: string | null } | null)?.role === "super_admin";
 }
 
 /** Adresa, ze které by send.ts e-mail opravdu odeslal (null = odeslat nejde). */

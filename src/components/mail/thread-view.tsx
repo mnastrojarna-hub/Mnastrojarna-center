@@ -347,6 +347,10 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
             actionsDisabled={!target}
             busyAction={actions.busy?.threadId === threadId ? actions.busy.key : null}
             onAction={runAction}
+            onAssign={target ? (j) => {
+              setNotice(null);
+              void actions.assign({ threadId, emailId: target.id, jobId }, j);
+            } : undefined}
             choices={choices}
             onChoicesDone={() => setChoices(null)}
             onError={(text) => setNotice({ ok: false, text })}
@@ -377,6 +381,8 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           void openThreadAction(threadId, { markRead: false }).then(setDetail);
         }}
       />
+      {/* roztřídění příloh e-mailu dávkou „Přidat doklad (foto)" (Založit zakázku / Přidat k zakázce) */}
+      {actions.dialog}
     </Card>
   );
 }

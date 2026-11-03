@@ -54,6 +54,26 @@ describe("řádek vlákna — hlavní akce podle kategorie (Pošta E)", () => {
 });
 
 describe("řádek vlákna", () => {
+  it("kompaktní (Pošta na počítači): dvouřádkový řádek od lg, otevírací tlačítko první, akce až po najetí, mobil beze změny", () => {
+    const h = html(<ThreadRow t={t} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} onAction={() => {}} compact />);
+    expect(h).toContain("thread-row-compact");
+    expect(h).toContain("lg:grid");
+    // první tlačítko řádku otevírá vlákno (E2E klikají na locator("button").first())
+    expect(/<button[^>]*>/.exec(h.slice(h.indexOf('data-testid="thread-row"')))?.[0]).toContain("lg:row-span-2");
+    // čas vpravo vedle vlaječky (od lg), náhled na řádku předmětu
+    expect(h).toContain('data-testid="row-time"');
+    expect(h).toContain("— Dobrý den");
+    // hlavní akce: v DOM (data-action), zobrazí se po najetí myší
+    expect(h).toMatch(/data-testid="row-action" data-action="quote.create"/);
+    expect(h).toContain("lg:group-hover:inline-flex");
+    // jeden řádek = jedna vlaječka a jeden výběr priority (žádné zdvojené testid)
+    expect(h.match(/data-testid="row-flag"/g)?.length).toBe(1);
+    expect(h.match(/data-testid="priority-select"/g)?.length).toBe(1);
+    // bez compact (Komunikace zakázky, Pohodlné) žádné třídy hustého řádku
+    const plain = html(<ThreadRow t={t} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} />);
+    expect(plain).not.toContain("thread-row-compact");
+    expect(plain).not.toContain('data-testid="row-time"');
+  });
   it("vlaječka, priorita, počet zpráv, příloha, poznámka kolegy, nepřečtené", () => {
     const h = html(<ThreadRow t={t} active={false} canAi={false} showMailbox={false} onOpen={() => {}} onFlag={() => {}} onPriority={() => {}} />);
     expect(h).toContain('data-flagged="1"');

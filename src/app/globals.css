@@ -127,6 +127,8 @@
     flex-direction: column;
     /* trvalá debug lišta dole (md:h-9) — sloupce končí nad ní */
     padding-bottom: 3rem;
+    /* majitel 3. 11.: co nejvíc pošty na obrazovce — tenčí okraj nahoře */
+    padding-top: 0.75rem;
   }
   main:has([data-mail-layout]) > div {
     max-width: none;
@@ -143,6 +145,13 @@
   .mail-list-pane {
     flex: none;
     width: clamp(260px, var(--mail-list-w, 30%), calc(100% - 492px));
+    /* hustý řádek vlákna: popisek kategorie jen v dost širokém seznamu (jinak ikona + bublina) */
+    container: maillist / inline-size;
+  }
+  @container maillist (max-width: 479.98px) {
+    .thread-row-compact .thread-cat-label {
+      display: none;
+    }
   }
   .mail-folders {
     width: 11rem;
@@ -194,6 +203,106 @@
 @media (min-width: 1536px) {
   .mail-folders {
     width: 12rem;
+  }
+}
+
+/*
+ * Hlavní menu vlevo (majitel 3. 11.: „levý sloupec ať jde sbalit"): rozbalené 16 rem, sbalené jen ikony 3,75 rem
+ * (popisky jako bublina, počty jako malé odznaky u ikony). data-sidebar: collapsed / expanded = volba uživatele
+ * (profiles.ui_prefs app.sidebarCollapsed), auto = Pošta bez volby → pod 1440 px sbalené (víc místa pro poštu).
+ */
+@media (min-width: 768px) {
+  .app-sidebar {
+    width: 16rem;
+    transition: width 150ms ease;
+  }
+  .app-sidebar[data-sidebar="collapsed"] {
+    width: 3.75rem;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-header {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-logo > :not(svg),
+  .app-sidebar[data-sidebar="collapsed"] .sb-section-label,
+  .app-sidebar[data-sidebar="collapsed"] .sb-label {
+    display: none;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-nav,
+  .app-sidebar[data-sidebar="collapsed"] .sb-footer {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-nav {
+    scrollbar-width: none;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-section + .sb-section {
+    border-top: 1px solid hsl(var(--border));
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-link,
+  .app-sidebar[data-sidebar="collapsed"] .sb-toggle,
+  .app-sidebar[data-sidebar="collapsed"] .sb-account {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .app-sidebar[data-sidebar="collapsed"] .sb-count {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 1rem;
+    padding: 0 0.25rem;
+    font-size: 9px;
+    line-height: 1rem;
+    text-align: center;
+  }
+}
+@media (min-width: 768px) and (max-width: 1439.98px) {
+  .app-sidebar[data-sidebar="auto"] {
+    width: 3.75rem;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-header {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-logo > :not(svg),
+  .app-sidebar[data-sidebar="auto"] .sb-section-label,
+  .app-sidebar[data-sidebar="auto"] .sb-label {
+    display: none;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-nav,
+  .app-sidebar[data-sidebar="auto"] .sb-footer {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-nav {
+    scrollbar-width: none;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-section + .sb-section {
+    border-top: 1px solid hsl(var(--border));
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-link,
+  .app-sidebar[data-sidebar="auto"] .sb-toggle,
+  .app-sidebar[data-sidebar="auto"] .sb-account {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .app-sidebar[data-sidebar="auto"] .sb-count {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 1rem;
+    padding: 0 0.25rem;
+    font-size: 9px;
+    line-height: 1rem;
+    text-align: center;
   }
 }
 

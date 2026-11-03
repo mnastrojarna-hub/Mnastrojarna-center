@@ -9,6 +9,8 @@ import { listQuoteApprovers } from "@/lib/data/current-user";
 import { MailLiveProvider } from "@/components/mail/mail-live-provider";
 import { FileViewerProvider } from "@/components/file-viewer/file-viewer-provider";
 import { TabChunkPreload } from "@/components/jobs/detail/tab-chunk-preload";
+import { UiPrefsProvider } from "@/components/ui-prefs/use-ui-prefs";
+import { getUiPrefs } from "@/lib/data/ui-prefs";
 
 // Každý požadavek ověřuje přihlášení a oprávnění — nikdy statické předrenderování
 // (bez env při buildu by se jinak stránky aplikace „zapekly" jako statické).
@@ -17,7 +19,10 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Login-first: bez aktivního účtu se do aplikace nedostane nikdo.
   const user = await requireUser();
-  const [{ features }, counts, quoteApprovers] = await Promise.all([getAccess(), getBadgeCounts(), listQuoteApprovers()]);
+  // osobní předvolby vzhledu (sbalené menu, rozložení Pošty) — sdílené celou aplikací, platí hned při vykreslení
+  const [{ features }, counts, quoteApprovers, uiPrefs] = await Promise.all([
+    getAccess(), getBadgeCounts(), listQuoteApprovers(), getUiPrefs(user.id),
+  ]);
 
   // AccessBridge obaluje vše: oprávnění platí už při vykreslení na serveru a při hydrataci (viz access-provider)
   return (
@@ -25,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       features={features} role={user.role} userId={user.id} quoteNeedsApproval={user.quoteNeedsApproval !== false}
       quoteApprovers={quoteApprovers}
     >
+      <UiPrefsProvider userId={user.id} server={uiPrefs}>
       <MailLiveProvider enabled={features.includes("mail")} initialUnread={counts?.inbox}>
         <FileViewerProvider>
           <div className="flex h-screen overflow-hidden">
@@ -41,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </FileViewerProvider>
       </MailLiveProvider>
+      </UiPrefsProvider>
     </AccessBridge>
   );
 }
