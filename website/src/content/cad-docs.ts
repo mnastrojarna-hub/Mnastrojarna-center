@@ -146,6 +146,15 @@ export const CAD_DOCS: DocSection[] = [
         ["Touchpad", "levé tlačítko (tažení)", "pravé tlačítko", "kolečko / gesto"],
       ] },
       { t: "p", text: "Schéma se přepíná v **Zobrazení → Ovládání myši** nebo v Nastavení → Myš a ovládání. Tam je i obrácení kolečka a přiblížení ke kurzoru." },
+      { t: "h3", text: "Když se 3D okno nespustí (WebGL)" },
+      { t: "p", text: "3D zobrazení potřebuje WebGL – hardwarově akcelerovanou grafiku prohlížeče. Když ji prohlížeč neposkytne (vypnutá grafická akcelerace, vzdálená plocha nebo virtuální stroj bez grafické karty, zastaralý ovladač, firemní zásady), program nespadne: místo modelu zobrazí česky příčinu a postup a ostatní části – nabídky, nápověda, soubory, 2D skica, výkresy – fungují dál. Jádro OCCT model počítá i bez 3D okna." },
+      { t: "ul", items: [
+        "Chrome / Edge: Nastavení → Systém → „Použít grafickou akceleraci, je-li k dispozici“, restart prohlížeče; stav ukáže chrome://gpu nebo edge://gpu.",
+        "Firefox: Nastavení → Obecné → Výkon → doporučená nastavení výkonu; about:config → webgl.disabled = false.",
+        "Vzdálená plocha (RDP), Citrix nebo virtuální stroj: otevřete CAD přímo na počítači s grafickou kartou.",
+        "Aktualizujte ovladač grafické karty, zkuste jiný prohlížeč v aktuální verzi nebo jiné zařízení.",
+        "**Zkopírovat diagnostiku** (na chybové obrazovce i v Nápovědě) zkopíruje verzi programu, prohlížeč, stav WebGL, stav jádra a chybové hlášení – bez jakýchkoli dat dokumentu – k poslání podpoře.",
+      ] },
     ],
   },
   {
@@ -670,6 +679,7 @@ export const CAD_FAQ: { q: string; a: string }[] = [
   { q: "Jak poptám výrobu dílu?", a: "Tlačítkem Poptat výrobu v titulní liště: připraví se STEP aktuálního dílu a e-mail s předvyplněným předmětem. Vyrábíme prototypy, náhradní díly do jednoúčelových strojů, nástroje a přípravky, typicky 1–99 ks, včetně konsignace." },
   { q: "Co dělat, když prvek zčervená s chybou?", a: "Klikněte na prvek v historii – pod ním je česká hláška, co je špatně (např. příliš velký poloměr zaoblení, otevřený profil skici, cílová plocha za rovinou skici). Upravte parametr nebo výběr; ostatní prvky se přestaví automaticky." },
   { q: "Jak pošlu díl kolegovi nebo zákazníkovi, aby se na něj jen podíval?", a: "Tlačítko Sdílet (horní lišta) → Kopírovat odkaz, nebo rovnou WhatsApp / E-mail. Příjemce odkaz otevře v prohlížeči bez instalace – vidí snímek dílu, sestavy i výkresů, může měřit, řezat a uložit si kopii. Platnost nastavíte na 1–90 dní (výchozí 10), volitelně s heslem. Dokument je uložený jen v odkazu (část za #, kterou prohlížeč neposílá na server); velké importované modely jdou do šifrovaného úložiště nebo jako příloha .mncad/STEP." },
+  { q: "Program hlásí „3D okno nelze spustit“ – co s tím?", a: "Prohlížeč neposkytl WebGL (grafickou akceleraci), kterou 3D zobrazení potřebuje. Zapněte v prohlížeči grafickou akceleraci (Chrome/Edge: Nastavení → Systém; Firefox: Výkon) a restartujte ho, nepracujte přes vzdálenou plochu či virtuální stroj, aktualizujte ovladač grafiky, případně zkuste jiný prohlížeč nebo zařízení. Zbytek programu (nabídky, soubory, 2D skica, výkresy) funguje dál; tlačítko Zkopírovat diagnostiku připraví pro podporu údaje o prostředí bez dat dokumentu." },
 ];
 
 /** Hlavní rysy pro strukturovaná data (SoftwareApplication.featureList). */

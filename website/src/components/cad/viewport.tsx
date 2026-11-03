@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -53,6 +54,8 @@ export type ViewportHandle = {
 
 type Props = {
   mesh: MeshData | null;
+  /** selhání 3D okna (WebGL nedostupné, kontext ztracen) – aplikace zobrazí chybovou obrazovku místo pádu */
+  onRenderError?: (f: RenderFailure) => void;
   /** topologické vrcholy tělesa dílu (x,y,z…) */
   vertices?: Float32Array | null;
   sketches: Extract<Feature, { type: "sketch" }>[];
@@ -180,7 +183,21 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   // ---------- inicializace ----------
   useEffect(() => {
     const el = host.current!;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    // dostupnost WebGL se ověří předem a selhání rendereru se zachytí – místo pádu aplikace chybová obrazovka
+    const probe = probeWebGL();
+    let renderer: THREE.WebGLRenderer;
+    try {
+      if (!probe.ok) throw new Error(probe.reason ?? "WebGL není dostupné");
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    } catch (e) {
+      propsRef.current.onRenderError?.({ error: e instanceof Error ? e : new Error(String(e)), probe });
+      return;
+    }
+    const onLost = (ev: Event) => {
+      ev.preventDefault();
+      propsRef.current.onRenderError?.({ error: new Error("WebGL kontext byl ztracen"), probe, lost: true });
+    };
+    renderer.domElement.addEventListener("webglcontextlost", onLost);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
@@ -701,6 +718,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
 
     return () => {
       cancelAnimationFrame(raf);
+      renderer.domElement.removeEventListener("webglcontextlost", onLost);
       ro.disconnect();
       controls.dispose();
       tc.dispose();
@@ -778,7 +796,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   }, [props.ortho]);
 
   function buildGrid(radius: number) {
-    const s = S.current!;
+    const s = S.current;
+    if (!s) return;
     const axes = s.grid.children.find((c) => c.type === "Group");
     s.grid.clear();
     if (axes) s.grid.add(axes);
@@ -800,7 +819,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const p = propsRef.current;
     const display = p.display ?? "shadedEdges";
     const base = new THREE.Color(p.bodyColor ?? "#b9c2cc");
-    const clipping = p.section ? [S.current!.clip] : [];
+    const clipping = p.section && S.current ? [S.current.clip] : [];
     const opacity = p.bodyOpacity ?? 1;
     const mk = (c: THREE.Color, isBase = false) => {
       if (display === "hiddenLine") return new THREE.MeshBasicMaterial({ color: isBase ? new THREE.Color(0xffffff) : c, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, side: THREE.DoubleSide, clippingPlanes: clipping });
