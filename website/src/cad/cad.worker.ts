@@ -168,8 +168,8 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         break;
       }
       case "drawing": {
-        // těleso se přestaví jen při změně modelu (změny voleb výkresu jsou rychlé)
-        const key = JSON.stringify(m.doc);
+        // těleso se přestaví jen při změně geometrie (razítko, název, materiál, poznámky těleso nemění – ty jsou rychlé)
+        const key = JSON.stringify({ f: m.doc.features, v: m.doc.variables, c: m.doc.configs, a: m.doc.activeConfig, b: m.doc.bodies, k: m.doc.kind, comp: m.doc.components, mates: m.doc.mates });
         if (drawCache?.key !== key) {
           const b = await shapeOfDoc(m.doc);
           if (!b) throw new Error("Model je prázdný.");

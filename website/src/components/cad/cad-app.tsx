@@ -17,7 +17,7 @@ import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
-import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, type EdgeLite, type FaceLite } from "@/cad/agent";
+import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, topAt, type EdgeLite, type FaceLite } from "@/cad/agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
@@ -26,7 +26,7 @@ import { CAD_LINKS } from "@/content/cad-links";
 import { SALES } from "@/content/site";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
-import { pickSaveTarget, writeSaved, type SavedFile } from "@/lib/save-file";
+import { pickSaveTarget, type SavedFile, setDirectDownload, writeSaved } from "@/lib/save-file";
 import { saveFile } from "@/lib/save-file";
 import { track } from "../analytics";
 import { LogoMark } from "../logo";
@@ -212,6 +212,8 @@ export function CadApp() {
       saveSettings(n);
       return n;
     });
+  // přímé stažení bez dialogu (Nastavení → Soubory) – pro automatizaci a AI agenty
+  useEffect(() => setDirectDownload(!prefs.askWhereToSave), [prefs.askWhereToSave]);
   const applySettings = (n: Settings) => {
     setPrefs(n);
     saveSettings(n);
@@ -458,11 +460,18 @@ export function CadApp() {
             changed = true;
             log.push(`✓ ${op.assembly ? "nová sestava" : "nový díl"} „${op.name}“ – nová záložka`);
             break;
-          case "meta":
+          case "meta": {
             d = { ...d, ...op.patch };
             changed = true;
-            log.push(`✓ ${Object.entries(op.patch).map(([k, v]) => `${k === "name" ? "název" : k === "material" ? "materiál" : "barva"} = ${v}`).join(", ")}`);
+            if (op.patch.materialName !== undefined) {
+              const cls = MATERIALS.find((x) => x.id === d.material) ?? MATERIALS[0];
+              log.push(`✓ materiál „${op.patch.materialName}“ = označení do razítka; hustota zůstává podle třídy „${cls.label}“ (${cls.density} g/cm³) – pro jinou hustotu zadejte: materiál ${MATERIALS.map((x) => x.id).join("|")}`);
+            } else if (op.patch.material !== undefined) {
+              const cls = MATERIALS.find((x) => x.id === op.patch.material);
+              log.push(`✓ materiál = ${cls ? `${cls.label} (${cls.density} g/cm³)` : op.patch.material}`);
+            } else log.push(`✓ ${Object.entries(op.patch).map(([k, v]) => `${k === "name" ? "název" : "barva"} = ${v}`).join(", ")}`);
             break;
+          }
           case "features":
             for (const raw of op.features) {
               const f = prepare(raw);
@@ -475,11 +484,18 @@ export function CadApp() {
             const f = prepare(op.feature);
             if (op.fillTop) {
               const r = await build();
-              if (!r.metrics) throw new Error("není těleso, na jehož horní plochu by se prvek umístil – zadejte i souřadnici z");
+              if (!r.metrics) throw new Error("není těleso, na jehož povrch by se prvek umístil – zadejte i souřadnici z");
               if (f.type === "hole") {
+                // povrch tělesa přímo v místě díry (podle sítě) – deska i vedle vyššího náboje; mimo těleso = obálka + upozornění
                 const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
-                f.position[ai] = r.metrics.bbox[1][ai];
-              } else if (f.type === "text" && f.plane.kind === "base") f.plane.offset = r.metrics.bbox[1][f.plane.name === "XY" ? 2 : f.plane.name === "XZ" ? 1 : 0];
+                const [u, v] = f.axis === "X" ? [f.position[1], f.position[2]] : f.axis === "Y" ? [f.position[0], f.position[2]] : [f.position[0], f.position[1]];
+                const h = topAt(r.mesh, f.axis, u, v);
+                if (h === null) log.push(`! řádek ${op.line}: v místě [${u}; ${v}] není povrch tělesa – díra začíná na obálce tělesa (${r.metrics.bbox[1][ai]})`);
+                f.position[ai] = h ?? r.metrics.bbox[1][ai];
+              } else if (f.type === "text" && f.plane.kind === "base") {
+                const h = f.plane.name === "XY" ? topAt(r.mesh, "Z", f.position[0], f.position[1]) : null;
+                f.plane.offset = h ?? r.metrics.bbox[1][f.plane.name === "XY" ? 2 : f.plane.name === "XZ" ? 1 : 0];
+              }
             }
             d.features.push(f);
             changed = true;
@@ -666,6 +682,22 @@ export function CadApp() {
       setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
       status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null)),
       openConsole: () => setAgentOpen(true),
+      exportFile: async (format) => {
+        const d = histRef.current.present;
+        const toB64 = (u8: Uint8Array) => {
+          let b = "";
+          for (let i = 0; i < u8.length; i += 0x8000) b += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+          return btoa(b);
+        };
+        if (format === "mncad") {
+          const u8 = new TextEncoder().encode(JSON.stringify(d, null, 1));
+          return { name: `${safeName(d.name)}.mncad`, mime: "application/json", bytes: u8.length, base64: toB64(u8) };
+        }
+        const meta = EXPORTS.find((e) => e.f === format);
+        if (!meta) throw new Error(`Neznámý formát „${format}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.`);
+        const buf = await cad.exportFile(d, format);
+        return { name: `${safeName(d.name)}.${meta.ext}`, mime: meta.mime, bytes: buf.byteLength, base64: toB64(new Uint8Array(buf)) };
+      },
     };
     return () => {
       window.removeEventListener(VAULT_EVENT, onVault);
@@ -1679,11 +1711,15 @@ export function CadApp() {
     const meta = EXPORTS.find((e) => e.f === format)!;
     try {
       // nejdřív dialog „Uložit jako“ (uživatelské gesto), pak teprve výpočet exportu
+      let bytes = 0;
       const saved = await saveFile(`${safeName(doc.name)}.${meta.ext}`, async () => {
         flash(`Připravuji ${meta.label}…`);
-        return cad.exportFile(doc, format);
+        const buf = await cad.exportFile(doc, format);
+        bytes = buf.byteLength;
+        return buf;
       }, meta.mime);
-      if (saved) flash(`Uloženo: ${saved.name}`);
+      if (saved) flash(`Export ${meta.label} hotov: ${saved.name} (${bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`})`);
+      else flash(`Export ${meta.label} zrušen.`);
       track("cad_export", { format });
     } catch (e) {
       flash((e as Error).message);
@@ -3242,6 +3278,23 @@ export function CadApp() {
                 ))}
               </select>
             </label>
+            <label className="mt-2 block">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">Označení materiálu (razítko)</span>
+              <input
+                type="text"
+                defaultValue={doc.materialName ?? ""}
+                key={`mn-${doc.materialName ?? ""}`}
+                placeholder={mat.label}
+                title="Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše"
+                onBlur={(e) => {
+                  const t = e.target.value.trim();
+                  const next = t && t !== mat.label ? t : undefined;
+                  if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+                }}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
+              />
+            </label>
             <Row k="Hmotnost" v={`${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
             <Row k="Objem" v={`${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
             <Row k="Povrch" v={`${fmtNum(m.area, 2)} mm² (${fmtNum(m.area / 100, 2)} cm²)`} />
@@ -3397,8 +3450,13 @@ export function CadApp() {
           <DrawingWorkspace
             doc={doc}
             onShare={() => setShareOpen(true)}
+            onMaterialChange={(v) => {
+              const t = v.trim();
+              const next = t && t !== mat.label ? t : undefined;
+              if ((doc.materialName ?? undefined) !== next) commit({ ...doc, materialName: next });
+            }}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
-            materialLabel={isAsm ? "dle kusovníku" : mat.label}
+            materialLabel={isAsm ? "dle kusovníku" : doc.materialName?.trim() || mat.label}
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
             drawings={doc.drawings}
             balloons={balloonItems}

@@ -210,7 +210,10 @@ export type CadDoc = {
   app: "mnastrojarna-cad";
   version: 1 | 2;
   name: string;
+  /** třída materiálu (hustota) – id z tabulky MATERIALS (ocel, nerez, hlinik…) */
   material: string;
+  /** označení materiálu do razítka (volný text, např. „ČSN 11 423“, „1.0503“, „EN AW-6082“) – nezávislé na hustotě */
+  materialName?: string;
   features: Feature[];
   /** barva tělesa (#rrggbb) */
   color?: string;

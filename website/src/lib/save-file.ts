@@ -36,8 +36,16 @@ function extOf(name: string) {
   return m ? m[0].toLowerCase() : "";
 }
 
+let direct = false;
+/** Přímé stažení pod výchozím názvem bez dotazu (Nastavení → Soubory; pro automatizaci a AI agenty). */
+export function setDirectDownload(v: boolean) {
+  direct = v;
+}
+export const isDirectDownload = () => direct;
+
 /** Otevře dialog (nebo dotaz na název) a vrátí cíl; `null` = zrušeno. */
 export async function pickSaveTarget(suggested: string, mime: string): Promise<SavedFile | null> {
+  if (direct) return { name: suggested, handle: null };
   const w = window as PickerWindow;
   const ext = extOf(suggested);
   const cleanMime = (mime.split(";")[0] || "application/octet-stream").trim();

@@ -206,6 +206,25 @@ export function Manager({
             ))}
           </select>
         </label>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">Označení materiálu (razítko)</span>
+          <input
+            type="text"
+            key={`mn-${doc.materialName ?? ""}`}
+            defaultValue={doc.materialName ?? ""}
+            placeholder={MATERIALS.find((x) => x.id === doc.material)?.label ?? "Ocel"}
+            title="Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem"
+            aria-label="Označení materiálu do razítka"
+            onBlur={(e) => {
+              const t = e.target.value.trim();
+              const cls = MATERIALS.find((x) => x.id === doc.material)?.label;
+              const next = t && t !== cls ? t : undefined;
+              if ((doc.materialName ?? undefined) !== next) onCommit({ ...doc, materialName: next });
+            }}
+            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+            className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1 text-[12.5px] outline-none focus:border-brand"
+          />
+        </label>
         {(doc.configs?.length ?? 0) > 0 && (
           <label className="block">
             <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">Aktivní stav</span>
