@@ -299,6 +299,16 @@ export interface JobEvent {
   entity?: string | null;
 }
 
+/** Kontaktní osoba z Karty zákazníka (customer_contacts) — výběr kontaktu zakázky. */
+export interface JobCustomerContact {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  position: string | null;
+  isPrimary: boolean;
+}
+
 /** Údaje zákazníka pro doklady (PDF) a detail zakázky. */
 export interface JobCustomerDetail {
   id: string;
@@ -316,6 +326,8 @@ export interface JobCustomerDetail {
   contactPerson: string | null;
   deliveryAddress: string | null;
   paymentTermsDays: number | null;
+  /** Kontaktní osoby z Karty zákazníka (hlavní první) — výběr kontaktu zakázky. */
+  contacts: JobCustomerContact[];
 }
 
 /** Kompletní karta zakázky. */
@@ -332,6 +344,11 @@ export interface JobDetail extends JobListItem {
   customerContact: string | null;
   customerContactEmail: string | null;
   customerContactPhone: string | null;
+  /**
+   * Kontaktní osoba z Karty zákazníka (orders.customer_contact_id). Je-li vybraná, jméno, e-mail
+   * a telefon výše jsou její (plní je DB); null = bez vazby (starý / AI text, nebo nic).
+   */
+  customerContactId: string | null;
   pricedBy: PersonRef | null;
   approvedBy: PersonRef | null;
   approvedAt: string | null;
@@ -446,6 +463,13 @@ export interface JobInput {
   customerContact?: string;
   customerContactEmail?: string;
   customerContactPhone?: string;
+  /**
+   * Kontaktní osoba z Karty zákazníka (jen kontakt zákazníka zakázky). Jméno, e-mail a telefon jdou
+   * s ní — úprava zakázky je samostatně nemění (mění se v Kartě zákazníka). null = žádná.
+   */
+  customerContactId?: string | null;
+  /** Nový kontakt do Karty zákazníka zakázky (stejný e-mail → použije se existující) a jeho výběr. */
+  newCustomerContact?: { name?: string; email?: string };
   inquiryDate?: string;
   orderDate?: string;
   customerRequiredDate?: string;

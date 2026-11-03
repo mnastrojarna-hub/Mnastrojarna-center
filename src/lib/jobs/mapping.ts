@@ -4,7 +4,7 @@ import type {
 } from "@/lib/supabase/database.types";
 import type {
   JobInput, JobItemInput, JobQuoteItemInput, JobQuoteInput, JobListItem, JobDetail, JobItem,
-  JobQuote, JobQuoteItem, JobFile, JobFileAnon, JobFileAnonStatus, JobEvent, JobEventType, JobFilters, JobCustomerDetail,
+  JobQuote, JobQuoteItem, JobFile, JobFileAnon, JobFileAnonStatus, JobEvent, JobEventType, JobFilters, JobCustomerDetail, JobCustomerContact,
   JobCustomerRef, PersonRef, JobSort, JobPaymentFilter,
 } from "@/lib/jobs/types";
 import { STAGE_ORDER, CLOSED_STAGES, DELIVERED_STAGES, isJobStage, stageGroup, STAGES, isDeliveredToCustomer } from "@/lib/jobs/stages";
@@ -150,6 +150,7 @@ const ID_FIELDS: [keyof JobInput, string][] = [
   ["assigneeId", "assignee_id"],
   ["pricedById", "priced_by"],
   ["supplierId", "supplier_id"],
+  ["customerContactId", "customer_contact_id"],
 ];
 
 const MONEY_FIELDS: [keyof JobInput, string][] = [
@@ -205,9 +206,46 @@ export function validateJobInput(input: JobInput): string | null {
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerContactEmail.trim())) {
     return "Neplatný e-mail kontaktní osoby.";
   }
+  if (input.newCustomerContact !== undefined) {
+    const nc = cleanNewContact(input.newCustomerContact);
+    if ("error" in nc) return nc.error;
+  }
   if (input.tags !== undefined && !Array.isArray(input.tags)) return "Štítky musí být seznam.";
   if (input.customerName !== undefined && typeof input.customerName !== "string") return "Název zákazníka musí být text.";
   return null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Jméno nového kontaktu jen z e-mailu: „pavel.novak@…" → „Pavel Novak", jinak celá adresa. */
+export function contactNameFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]+/).filter((p) => /^[\p{L}]{2,}$/u.test(p));
+  if (parts.length < 2) return email;
+  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
+}
+
+/**
+ * Nový kontakt do Karty zákazníka z výběru na zakázce: jméno a / nebo e-mail (e-mail malými písmeny).
+ * Chybí-li jméno, odvodí se z e-mailu.
+ */
+export function cleanNewContact(v: unknown): { name: string; email: string | null } | { error: string } {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return { error: "Neplatný nový kontakt." };
+  const o = v as Record<string, unknown>;
+  if ((o.name !== undefined && o.name !== null && typeof o.name !== "string") ||
+      (o.email !== undefined && o.email !== null && typeof o.email !== "string")) return { error: "Neplatný nový kontakt." };
+  const name = typeof o.name === "string" ? o.name.replace(/\s+/g, " ").trim() : "";
+  const email = typeof o.email === "string" ? o.email.trim().toLowerCase() : "";
+  if (!name && !email) return { error: "Napiš jméno nebo e-mail kontaktu." };
+  if (email && !EMAIL_RE.test(email)) return { error: "Neplatný e-mail kontaktní osoby." };
+  if (name.length > 200 || email.length > 200) return { error: "Jméno nebo e-mail kontaktu je příliš dlouhé (max. 200 znaků)." };
+  return { name: name || contactNameFromEmail(email), email: email || null };
+}
+
+/** Text z pole „Přidat kontakt …": vypadá jako e-mail → e-mail, jinak jméno. */
+export function newContactFromText(text: string): { name?: string; email?: string } {
+  const t = text.replace(/\s+/g, " ").trim();
+  return EMAIL_RE.test(t) ? { email: t } : { name: t };
 }
 
 function colOf(key: keyof JobInput): string {
@@ -545,7 +583,7 @@ export const JOB_LIST_SELECT = [
 
 export const JOB_DETAIL_SELECT = [
   "*",
-  "customer:customers!customer_id(id, name, customer_number, supplier_number_at_customer, ico, dic, street, city, zip, country, email, phone, contact_person, delivery_address, payment_terms_days, address)",
+  "customer:customers!customer_id(id, name, customer_number, supplier_number_at_customer, ico, dic, street, city, zip, country, email, phone, contact_person, delivery_address, payment_terms_days, address, contacts:customer_contacts!customer_id(id, name, position, email, phone, is_primary))",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
   `creator:profiles!created_by(${PERSON})`,
@@ -641,6 +679,16 @@ export interface CustomerEmbed {
   delivery_address?: string | null;
   payment_terms_days?: number | null;
   address?: string | null;
+  contacts?: CustomerContactEmbed[] | null;
+}
+
+export interface CustomerContactEmbed {
+  id: string;
+  name?: string | null;
+  position?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  is_primary?: boolean | null;
 }
 
 export interface JobRow {
@@ -700,6 +748,7 @@ export interface JobRow {
   customer_contact?: string | null;
   customer_contact_email?: string | null;
   customer_contact_phone?: string | null;
+  customer_contact_id?: string | null;
   approved_at?: string | null;
   confirmed_at?: string | null;
   production_started_at?: string | null;
@@ -1281,7 +1330,28 @@ export function rowToCustomerDetail(c: Embed<CustomerEmbed>): JobCustomerDetail 
     contactPerson: x.contact_person ?? null,
     deliveryAddress: x.delivery_address ?? null,
     paymentTermsDays: x.payment_terms_days ?? null,
+    contacts: rowsToCustomerContacts(x.contacts),
   };
+}
+
+/** Kontakty zákazníka pro výběr na zakázce — hlavní první, pak podle jména. */
+export function rowsToCustomerContacts(rows: CustomerContactEmbed[] | null | undefined): JobCustomerContact[] {
+  return (rows ?? [])
+    .filter((k) => k && typeof k.id === "string")
+    .map((k) => ({
+      id: k.id,
+      name: (k.name ?? "").trim() || (k.email ?? "").trim() || "—",
+      email: (k.email ?? "").trim() || null,
+      phone: (k.phone ?? "").trim() || null,
+      position: (k.position ?? "").trim() || null,
+      isPrimary: k.is_primary === true,
+    }))
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.name.localeCompare(b.name, "cs"));
+}
+
+/** Kontakt, který zakázka dostane po změně zákazníka: hlavní, jinak jediný; jinak žádný. */
+export function defaultCustomerContact<T extends { id: string; isPrimary: boolean }>(contacts: T[]): T | null {
+  return contacts.find((k) => k.isPrimary) ?? (contacts.length === 1 ? contacts[0] : null);
 }
 
 /** Marže jako podíl (0.25 = 25 %), jen s oprávněním a s oběma hodnotami. */
@@ -1318,6 +1388,7 @@ export function rowToJobDetail(
     customerContact: row.customer_contact ?? null,
     customerContactEmail: row.customer_contact_email ?? null,
     customerContactPhone: row.customer_contact_phone ?? null,
+    customerContactId: row.customer_contact_id ?? null,
     pricedBy: personRef(row.pricer),
     approvedBy: personRef(row.approver),
     approvedAt: row.approved_at ?? null,

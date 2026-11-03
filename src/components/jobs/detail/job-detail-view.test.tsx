@@ -44,13 +44,17 @@ function fixture(over: Partial<JobDetail> = {}): JobDetail {
     note: "Pozor na kalení.", tags: ["expres"], technology: "frézování", manufacturingLocation: "u dodavatele",
     specificRequirements: null, deliveryMethod: "naše doprava", supplierOrderNumber: "OBJ-2026-9", invoiceNumber: null,
     deliveryNoteNumber: null, customerContact: "Jan Dvořák", customerContactEmail: "dvorak@strojmetal.cz",
-    customerContactPhone: "+420 777 111 222", pricedBy: person("u1", "Petra Obchodní"), approvedBy: person("u0", "Admin"),
+    customerContactPhone: "+420 777 111 222", customerContactId: "k1", pricedBy: person("u1", "Petra Obchodní"), approvedBy: person("u0", "Admin"),
     approvedAt: "2026-09-05T08:00:00Z", confirmedAt: "2026-09-11T08:00:00Z", productionStartedAt: "2026-10-01T08:00:00Z",
     shippedAt: null, invoicedAt: null, emailId: null, aiConfidence: 0.91, acceptedQuoteId: "q2", margin: 0.375,
     customerDetail: {
       id: "c1", name: "StrojMetal s.r.o.", customerNumber: "Z-0042", supplierNumberAtCustomer: null, ico: "12345678",
       dic: "CZ12345678", street: "Průmyslová 1", city: "Brno", zip: "60200", country: "CZ", email: "info@strojmetal.cz",
       phone: null, contactPerson: "Jan Dvořák", deliveryAddress: null, paymentTermsDays: 30,
+      contacts: [
+        { id: "k1", name: "Jan Dvořák", email: "dvorak@strojmetal.cz", phone: "+420 777 111 222", position: "nákupčí", isPrimary: true },
+        { id: "k2", name: "Eva Malá", email: "mala@strojmetal.cz", phone: null, position: null, isPrimary: false },
+      ],
     },
     items: [{
       id: "i1", position: 0, drawingNumber: "VL-12", revision: "B", name: "Vodicí lišta", description: "kaleno 58 HRC",
@@ -192,6 +196,31 @@ describe("Karta zakázky — render", () => {
     expect(html).toContain("Přidat komentář");
   });
 
+  it("kontaktní osoba: výběr z Karty zákazníka, e-mail a telefon jen ke čtení", () => {
+    const html = render(fixture());
+    expect(html).toContain('data-testid="job-contact"');
+    expect(html).toContain("Jan Dvořák");
+    expect(html).toContain('data-field="contact-email"');
+    expect(html).toContain('data-field="contact-phone"');
+    expect(html).toContain("+420 777 111 222");
+    expect(html).toContain("Upravit v Kartě zákazníka");
+    expect(html).toContain('href="/customers/c1#kontakty"');
+    expect(html).toContain("Napsat");
+    expect(html).toContain("Zavolat");
+    // volné texty se na zakázce už nepíšou
+    expect(html).not.toContain("Doplnit e-mail");
+    expect(html).not.toContain("Doplnit telefon");
+    expect(html).not.toContain("Není v kartě zákazníka");
+  });
+
+  it("kontaktní osoba bez vazby (starý / AI text) → výzva vybrat nebo přidat", () => {
+    const html = render(fixture({ customerContactId: null, customerContact: "Petr Starý", customerContactEmail: "stary@jinde.cz", customerContactPhone: null }));
+    expect(html).toContain('data-testid="contact-legacy"');
+    expect(html).toContain("Petr Starý");
+    expect(html).toContain("Není v kartě zákazníka — vyber kontakt nebo ho přidej.");
+    expect(html).toContain("Vyber z kontaktů zákazníka");
+  });
+
   it("prázdná zakázka bez zákazníka a položek", () => {
     const html = render(fixture({
       customer: null, customerDetail: null, items: [], quotes: [], files: [], events: [], value: null, aiFilled: false,
@@ -199,6 +228,7 @@ describe("Karta zakázky — render", () => {
       supplierPromisedDate: null, maxToleratedDate: null,
     }));
     expect(html).toContain("Bez zákazníka");
+    expect(html).toContain("Nejdřív vyber zákazníka");
     expect(html).toContain("nenaceněno");
     expect(html).toContain("Zatím bez termínu");
     expect(html).not.toContain("Vyplnila AI");

@@ -1048,7 +1048,7 @@ function MailboxSwitcher({ mailboxes, mailboxId, onSwitch }: { mailboxes: Mailbo
         <option value={NO_MAILBOX}>Bez schránky</option>
       </select>
     </label>
-    <div className="-mx-1 hidden gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin sm:flex sm:flex-wrap">
+    <div className="-mx-1 hidden gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-thin sm:flex sm:flex-wrap" data-testid="mailbox-switcher">
       <button className={pill(mailboxId === null)} onClick={() => onSwitch(null)}>
         <InboxIcon className="h-3.5 w-3.5" /><span className="font-semibold">Všechny schránky</span>
       </button>
