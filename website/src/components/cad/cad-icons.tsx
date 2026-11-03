@@ -71,6 +71,7 @@ const P: Record<string, React.ReactNode> = {
   bottom: (<><rect x="5" y="5" width="14" height="14" rx="1" /><circle cx="12" cy="12" r="3" strokeDasharray="1.5 1.5" /></>),
   left: (<><path d="M17 5L7 8v8l10 3z" /></>),
   export: (<><path d="M12 15V3M7 8l5-5 5 5" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></>),
+  share: (<><circle cx="18" cy="5" r="2.6" /><circle cx="6" cy="12" r="2.6" /><circle cx="18" cy="19" r="2.6" /><path d="M8.3 13.3l7.4 4.4M15.7 6.3l-7.4 4.4" /></>),
   settings: (<><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></>),
   help: (<><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01" /></>),
   mouse: (<><rect x="6" y="3" width="12" height="18" rx="6" /><path d="M12 7v3" /></>),

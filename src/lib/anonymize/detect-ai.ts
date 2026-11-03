@@ -37,6 +37,21 @@ const en = (values: readonly string[]) => ({ type: "string", enum: [...values] }
 
 const BOX = obj({ x: int, y: int, w: int, h: int });
 
+/**
+ * Role názvu firmy / organizace na výkresu. Smaže se vše kromě naší firmy a odkazovaného výrobce
+ * nakupovaného dílu / materiálu (kusovník, normálie — technická specifikace).
+ */
+export const COMPANY_ROLES = ["owner", "customer", "designer", "other_company", "referenced_maker", "ours"] as const;
+export type CompanyRole = (typeof COMPANY_ROLES)[number];
+export const COMPANY_FORMS = ["text", "curves", "logo"] as const;
+/** Název firmy na obrázku: box v pixelech obrázku img, doslovný text, role a podoba (text / křivky / logo). */
+const COMPANY_ITEM = obj({ img: int, x: int, y: int, w: int, h: int, text: str, role: en(COMPANY_ROLES), form: en(COMPANY_FORMS) });
+export interface CompanyItem { img: number; x: number; y: number; w: number; h: number; text: string; role: CompanyRole; form: (typeof COMPANY_FORMS)[number] }
+/** Role, které se mažou. */
+export function isRemovableCompany(role: unknown): boolean {
+  return role === "owner" || role === "customer" || role === "designer" || role === "other_company";
+}
+
 export const DETECT_VECTOR_SCHEMA = obj({
   pages: arr(obj({
     index: int,
@@ -47,9 +62,13 @@ export const DETECT_VECTOR_SCHEMA = obj({
     boxes: arr(obj({ img: int, x: int, y: int, w: int, h: int, category: en(CATEGORY_ENUM), reason: en(REASONS), confidence: num })),
     keep: arr(obj({ id: str, field: en(KEEP_FIELDS) })),
     customerStandard: arr(obj({ id: str })),
+    companies: arr(COMPANY_ITEM),
   })),
   confidence: num,
 });
+
+/** Výstupní kontrola kopie: všechny názvy firem, které jsou na obrázcích VIDĚT (text, křivky, logo). */
+export const COMPANY_CHECK_SCHEMA = obj({ items: arr(COMPANY_ITEM) });
 
 export const DETECT_PHOTO_OVERVIEW_SCHEMA = obj({
   isDrawing: bool,
@@ -87,7 +106,10 @@ export interface VectorPageResult {
   boxes: { img: number; x: number; y: number; w: number; h: number; category: AnonCategory; reason: Reason; confidence: number }[];
   keep: { id: string; field: (typeof KEEP_FIELDS)[number] }[];
   customerStandard: { id: string }[];
+  /** Všechny názvy firem na stránce (i jako křivky / logo / nečitelné písmo) — chybí ve starší cache. */
+  companies?: CompanyItem[];
 }
+export interface CompanyCheckResult { items: CompanyItem[] }
 export interface VectorResult { pages: VectorPageResult[]; confidence: number }
 export interface OverviewResult {
   isDrawing: boolean;
@@ -108,7 +130,7 @@ export interface LinesResult {
 }
 export interface VerifyResult { tiles: { img: number; lines: string[]; graphics: { quad: number[]; kind: (typeof VERIFY_GRAPHIC_KINDS)[number]; description: string }[] }[] }
 
-export type AnonCall = "vector" | "overview" | "lines" | "verify";
+export type AnonCall = "vector" | "overview" | "lines" | "verify" | "company_check";
 
 /** Popis jednoho obrázku v požadavku (pro fake handler a validaci souřadnic). */
 export interface AiImageSpec {
@@ -150,8 +172,10 @@ Výkres dostane DODAVATEL (kooperant), který podle něj díl vyrobí. Z výkres
 aby nás nemohl obejít. Všechny technické údaje potřebné k výrobě MUSÍ zůstat.
 
 CO SE MAŽE (category):
-- company: název firmy vlastníka výkresu / zákazníka / projektanta v razítku, rámu, tabulce revizí a ochranné doložce;
-  i zkratky a obchodní značky (např. „STM" za STROJMETAL). V kusovníku a poznámkách NEMAŽ odkazované výrobce dílů
+- company: KAŽDÝ název firmy / organizace v razítku, rámu, tabulce revizí, ochranné doložce, logu a poznámkách o vlastnictví
+  — vlastník výkresu, zákazník, koncový zákazník / OEM, projektant, konstrukční kancelář — I KDYŽ NENÍ v seznamu termínů
+  zakázky (v razítku bývá jiná firma než zákazník zakázky); i zkratky a obchodní značky (např. „STM" za STROJMETAL),
+  i název nakreslený křivkami nebo jako logo. V kusovníku a poznámkách NEMAŽ odkazované výrobce dílů
   a materiálů (SKF 6205-2RS, Bosch Rexroth, pozink Wiegel, Misumi, Hasco, Meusburger…) — u nich reason=referenced_maker a nemaž.
 - logo: logo firmy (rastr, vektor, vodoznak) a otisk firemního razítka.
 - person: jména osob v razítku a tabulce revizí (kreslil, konstruoval, technolog, normalizoval, kontroloval, schválil)
@@ -184,7 +208,19 @@ a textLayerTrustworthy (odpovídá seznam řádků tomu, co je vidět na obrázk
 v obrázku přehledu nebo výřezu). Ze SEZNAMU ŘÁDKŮ vyber řádky k vymazání (id + přesný podřetězec, který se smaže; celý
 řádek = celý text). Pro grafiku, kterou seznam řádků neobsahuje (logo, vektorové logo z křivek, podpis, otisk razítka,
 QR/čárový kód, vodoznak), vrať boxes v pixelech konkrétního obrázku. Označ keep pole (id řádku a druh) a řádky
-s podnikovou normou zákazníka. Vrať jen to, co opravdu vede k zákazníkovi nebo projektantovi.`;
+s podnikovou normou zákazníka. Vrať jen to, co opravdu vede k zákazníkovi nebo projektantovi.
+Do companies vypiš KAŽDÝ název firmy / organizace, který je na stránce VIDĚT (razítko, rám, doložka, logo, poznámky):
+box v pixelech obrázku (img), doslovný text (u loga bez čitelného textu prázdný), role (owner = vlastník výkresu,
+customer = zákazník, designer = projektant / konstrukční kancelář, other_company = jiná firma, referenced_maker = výrobce
+nakupovaného dílu nebo materiálu v kusovníku / poznámce, ours = Mnástrojárna) a podobu (text, curves = text převedený
+na křivky / čáry bez textové vrstvy, logo). Normy (ISO, DIN, ČSN, EN) a materiály nejsou firmy.`;
+
+const COMPANY_CHECK_TASK = `ÚKOL (kontrola anonymizované kopie): Obrázky jsou z kopie výkresu, která jde dodavateli. Najdi na nich KAŽDÝ
+název firmy nebo organizace, který je pořád VIDĚT — text, text převedený na křivky, logo s názvem, vodoznak, ochranná
+doložka („© …", „majetkem …", „Property of …"), web nebo e-mail firmy. Pro každý vrať box v pixelech obrázku (img),
+doslovný text, roli a podobu (viz companies). Bílé / vyplněné (smazané) plochy ignoruj. Normy (ISO, DIN, ČSN, EN),
+materiály, rozměry a technické údaje nejsou firmy. Naše firma Mnástrojárna = role ours. Když žádný název nevidíš, vrať
+prázdný seznam items. Nic si nedomýšlej.`;
 
 const OVERVIEW_TASK = `ÚKOL (fotka/sken — přehled): Rozhodni isDrawing. Najdi list výkresu jako čtyřúhelník sheet [x1,y1,…,x4,y4]
 (rohy papíru, bez stolu a okolí), úhel natočení angleDeg (kladný = list je natočen proti směru hodinových ručiček;
@@ -243,9 +279,11 @@ function neutralFake(call: AnonCall, images: Omit<AiImageSpec, "jpeg">[], pages:
   switch (call) {
     case "vector":
       return {
-        pages: pages.map((p) => ({ index: p, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [] })),
+        pages: pages.map((p) => ({ index: p, isDrawing: true, textLayerTrustworthy: true, titleBlock: { img: 0, x: 0, y: 0, w: 0, h: 0 }, redactLines: [], boxes: [], keep: [], customerStandard: [], companies: [] })),
         confidence: 0.95,
       };
+    case "company_check":
+      return { items: [] };
     case "overview": {
       const im = images[0];
       const w = im?.outW ?? 1000, h = im?.outH ?? 700;
@@ -288,6 +326,27 @@ function fakeFromDir(call: AnonCall, sha: string, n: number): unknown | null {
   return null;
 }
 
+/**
+ * Jen testy: fixture vektorové stránky smí zadat název firmy v BODECH stránky (`pt: {x,y,w,h}`, vlevo nahoře)
+ * místo pixelů obrázku — fake ho převede na box v obrázku přehledu té stránky (E2E nezná měřítko renderu).
+ */
+function fakePtToImage(data: unknown, specs: Omit<AiImageSpec, "jpeg">[]): unknown {
+  const d = data as { pages?: { index: number; companies?: (Record<string, unknown> & { pt?: { x: number; y: number; w: number; h: number } })[] }[] } | null;
+  for (const pg of d?.pages ?? []) {
+    const ov = specs.find((s) => s.kind === "overview" && s.page === pg.index);
+    if (!ov || !Array.isArray(pg.companies)) continue;
+    pg.companies = pg.companies.map((c) => {
+      if (!c.pt) return c;
+      const { pt, ...rest } = c;
+      return {
+        img: ov.index, x: Math.max(0, Math.floor((pt.x - ov.crop.x) * ov.s)), y: Math.max(0, Math.floor((pt.y - ov.crop.y) * ov.s)),
+        w: Math.min(ov.outW, Math.ceil(pt.w * ov.s)), h: Math.min(ov.outH, Math.ceil(pt.h * ov.s)), role: "other_company", form: "text", text: "", ...rest,
+      };
+    });
+  }
+  return data;
+}
+
 async function runFake(call: AnonCall, cfg: AiCallConfig, images: AiImageSpec[], pages: number[], linesText?: string, extra?: Record<string, unknown>): Promise<{ data: unknown; meta: AiCallMeta }> {
   const n = (fakeCounter.get(call) ?? 0) + 1;
   fakeCounter.set(call, n);
@@ -307,6 +366,7 @@ async function runFake(call: AnonCall, cfg: AiCallConfig, images: AiImageSpec[],
     const { AiCallError } = await import("@/lib/ai/ai-call");
     throw new AiCallError(String((data as Record<string, unknown>).$error) as never);
   }
+  if (call === "vector") data = fakePtToImage(data, specs);
   return { data, meta: { usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, model, fallback: model !== cfg.model, fake: true } };
 }
 
@@ -385,6 +445,12 @@ export async function verifyTranscribe(cfg: AiCallConfig, input: { images: AiIma
   // bez termínů a bez otázky „je tam firma?" — nezávislý přepis
   const r = await call("verify", cfg, { images: input.images, task: VERIFY_TASK, schema: VERIFY_TRANSCRIBE_SCHEMA, effort: input.effort ?? "low", extra: input.extra });
   return { data: r.data as VerifyResult, meta: r.meta };
+}
+
+/** Kontrola anonymizované kopie: zbyl na obrázcích název firmy? (výstupní obraz, bez termínů zakázky). */
+export async function checkCompanies(cfg: AiCallConfig, input: { images: AiImageSpec[]; effort?: AiEffort; extra?: Record<string, unknown> }): Promise<{ data: CompanyCheckResult; meta: AiCallMeta }> {
+  const r = await call("company_check", cfg, { images: input.images, task: COMPANY_CHECK_TASK, schema: COMPANY_CHECK_SCHEMA, effort: input.effort ?? "low", extra: input.extra });
+  return { data: r.data as CompanyCheckResult, meta: r.meta };
 }
 
 // ── Obrana výstupu ────────────────────────────────────────────

@@ -25,7 +25,7 @@ export type RGroup = { label: string; big?: number; items: RItem[] };
 /** Pás karet (ribbon) – velká a malá tlačítka, rozbalovací nabídky, popisky skupin. */
 export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.ReactNode }) {
   return (
-    <div className="flex h-[92px] shrink-0 items-stretch overflow-x-auto border-b border-[#d5dbe2] bg-gradient-to-b from-[#fbfcfd] to-[#eef2f6] px-1 [scrollbar-width:thin]">
+    <div className="flex h-[93px] shrink-0 items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-[#d5dbe2] bg-gradient-to-b from-[#fbfcfd] to-[#eef2f6] px-1 [scrollbar-width:thin] [touch-action:pan-x]">
       {groups.map((g) => {
         const big = g.items.slice(0, g.big ?? g.items.length);
         const small = g.items.slice(g.big ?? g.items.length);

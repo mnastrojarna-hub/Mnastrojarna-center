@@ -41,6 +41,8 @@ const MAP = {
   "vysunuti.webp": "vysunuti-k-plose-pokrocile.png",
   "skica-zadani.webp": "skica-kresleni-zadani.png",
   "mobil.webp": "mobil-skica-nabidka.png",
+  "sdileni.webp": "sdileni.png",
+  "sdileni-prijemce.webp": "sdileni-prijemce.png",
 };
 const files = dirs.flatMap((d) => (existsSync(d) ? readdirSync(d).map((f) => join(d, f)) : []));
 let ok = 0;

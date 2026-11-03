@@ -16,7 +16,7 @@ import {
   jobInputToRow, validateJobInput, validateItems, jobItemToRow, quoteItemToRow, quoteInputToRow,
   computeItemTotals, diffJob, describeChanges, fieldEventMessage, stageEventMessage, aiFilledColumns,
   quoteRevisionNumber, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
-  translateDbError, type JobChange,
+  translateDbError, cleanNewContact, defaultCustomerContact, rowsToCustomerContacts, type JobChange,
 } from "@/lib/jobs/mapping";
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
 import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
@@ -86,31 +86,101 @@ async function refNames(db: JobsDb, changes: JobChange[]): Promise<Record<string
   const people = new Set<string>();
   const customers = new Set<string>();
   const suppliers = new Set<string>();
+  const contacts = new Set<string>();
   for (const c of changes) {
     const target = JOB_PERSON_COLUMNS.includes(c.field) ? people
       : c.field === "customer_id" ? customers
       : c.field === "supplier_id" ? suppliers
+      : c.field === "customer_contact_id" ? contacts
       : null;
     if (!target) continue;
     for (const v of [c.from, c.to]) if (isUuid(v)) target.add(v);
   }
   const out: Record<string, string> = {};
   try {
-    const [p, cu, su] = await Promise.all([
+    const [p, cu, su, co] = await Promise.all([
       people.size ? db.from("profiles").select("id, full_name, email").in("id", [...people]) : Promise.resolve({ data: [] }),
       customers.size ? db.from("customers").select("id, name").in("id", [...customers]) : Promise.resolve({ data: [] }),
       suppliers.size ? db.from("suppliers").select("id, name").in("id", [...suppliers]) : Promise.resolve({ data: [] }),
+      contacts.size ? db.from("customer_contacts").select("id, name").in("id", [...contacts]) : Promise.resolve({ data: [] }),
     ]);
     for (const r of (p.data ?? []) as { id: string; full_name: string | null; email: string | null }[]) {
       out[r.id] = (r.full_name ?? "").trim() || (r.email ?? "").trim() || r.id;
     }
-    for (const r of [...((cu.data ?? []) as { id: string; name: string }[]), ...((su.data ?? []) as { id: string; name: string }[])]) {
+    for (const r of [
+      ...((cu.data ?? []) as { id: string; name: string }[]),
+      ...((su.data ?? []) as { id: string; name: string }[]),
+      ...((co.data ?? []) as { id: string; name: string }[]),
+    ]) {
       out[r.id] = r.name;
     }
   } catch {
     // jména jsou jen pro čitelnost historie
   }
   return out;
+}
+
+const CONTACT_COLUMNS = ["customer_contact", "customer_contact_email", "customer_contact_phone"] as const;
+const CONTACT_SELECT = "id, customer_id, name, position, email, phone, is_primary";
+interface ContactRow { id: string; customer_id: string; name: string; position: string | null; email: string | null; phone: string | null; is_primary: boolean }
+
+/**
+ * Kontaktní osoba zakázky (majitel 3. 11.): vybírá se z Karty zákazníka, e-mail a telefon jdou s ní.
+ * Do řádku (row) doplní customer_contact_id + jméno, e-mail a telefon kontaktu (historie pak ukáže
+ * „Kontaktní osoba: A → B"; DB je vynutí i sama — trg_orders_contact_guard). Samostatná úprava
+ * jména / e-mailu / telefonu se ignoruje. Změna zákazníka bez kontaktu → hlavní (jediný) kontakt
+ * nového zákazníka, jinak nic. Vrací českou chybu nebo null.
+ */
+async function resolveJobContact(db: JobsDb, before: Row, row: Row, patch: JobInput): Promise<string | null> {
+  for (const col of CONTACT_COLUMNS) delete row[col];
+  delete row.customer_contact_id;
+
+  const beforeCustomer = (before.customer_id as string | null | undefined) ?? null;
+  const customerId = row.customer_id !== undefined ? ((row.customer_id as string | null) ?? null) : beforeCustomer;
+  const customerChanged = row.customer_id !== undefined && customerId !== beforeCustomer;
+
+  let contact: ContactRow | null = null;
+  if (patch.newCustomerContact !== undefined) {
+    if (!customerId) return "Nejdřív vyber zákazníka — kontakt se ukládá do jeho karty.";
+    const nc = cleanNewContact(patch.newCustomerContact);
+    if ("error" in nc) return nc.error;
+    const { data: existing } = await db.from("customer_contacts").select(CONTACT_SELECT).eq("customer_id", customerId);
+    const list = (existing ?? []) as ContactRow[];
+    const lc = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
+    contact = nc.email
+      ? list.find((k) => lc(k.email) === nc.email) ?? null
+      : (() => { const same = list.filter((k) => lc(k.name) === lc(nc.name)); return same.length === 1 ? same[0] : null; })();
+    if (!contact) {
+      const { data: ins, error } = await db.from("customer_contacts")
+        .insert({ customer_id: customerId, name: nc.name, email: nc.email, is_primary: list.length === 0 } as never)
+        .select(CONTACT_SELECT).single();
+      if (error || !ins) return error?.message ?? "Kontakt se nepodařilo uložit do Karty zákazníka.";
+      contact = ins as ContactRow;
+    }
+  } else if (patch.customerContactId !== undefined) {
+    const id = patch.customerContactId;
+    if (id) {
+      if (!customerId) return "Nejdřív vyber zákazníka.";
+      const { data } = await db.from("customer_contacts").select(CONTACT_SELECT).eq("id", id).maybeSingle();
+      contact = (data as ContactRow | null) ?? null;
+      if (!contact || contact.customer_id !== customerId) return "Kontakt nepatří k zákazníkovi zakázky — vyber ho z jeho karty.";
+    }
+  } else if (customerChanged) {
+    if (customerId) {
+      const { data } = await db.from("customer_contacts").select(CONTACT_SELECT).eq("customer_id", customerId);
+      const rows = (data ?? []) as ContactRow[];
+      const pick = defaultCustomerContact(rowsToCustomerContacts(rows));
+      contact = pick ? rows.find((k) => k.id === pick.id) ?? null : null;
+    }
+  } else {
+    return null;
+  }
+
+  row.customer_contact_id = contact?.id ?? null;
+  row.customer_contact = contact?.name ?? null;
+  row.customer_contact_email = contact?.email ?? null;
+  row.customer_contact_phone = contact?.phone ?? null;
+  return null;
 }
 
 /** Hodnota pro AI korekci — surová (datum RRRR-MM-DD), u id jméno. */
@@ -348,6 +418,10 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
       }
     }
 
+    // kontaktní osoba jen z Karty zákazníka — e-mail a telefon jdou s ní
+    const contactErr = await resolveJobContact(db, before, row, rest);
+    if (contactErr) return fail(contactErr);
+
     const changes = diffJob(before, row);
     if (!isAdmin && changes.some((ch) => ch.field === "owner_id")) return fail(OWNER_ADMIN_ONLY);
     const fromStage = isJobStage(before.status) ? before.status : null;
@@ -381,7 +455,9 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
       }
 
       const refs = await refNames(db, changes);
-      const views = describeChanges(changes, refs);
+      // výběr kontaktu: v historii stačí „Kontaktní osoba: A → B" (vazba sama jen když se text nezměnil)
+      const textChanged = changes.some((ch) => (CONTACT_COLUMNS as readonly string[]).includes(ch.field));
+      const views = describeChanges(textChanged ? changes.filter((ch) => ch.field !== "customer_contact_id") : changes, refs);
       await logJobEvent(db, {
         jobId: id, type: "field", message: fieldEventMessage(views),
         data: { changes: views, ...(aiCorrected.length ? { aiCorrected } : {}) },

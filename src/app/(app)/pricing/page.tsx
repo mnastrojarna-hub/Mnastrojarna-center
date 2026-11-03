@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BrainCircuit, Calculator, Inbox, SlidersHorizontal } from "lucide-react";
 import { requireFeature, getAccess } from "@/lib/auth/session";
-import { getJobsForPanels, listJobs } from "@/lib/data/jobs";
+import { getJobDrawingFiles, getJobsForPanels, listJobs } from "@/lib/data/jobs";
 import { getRecentPricingCalculations } from "@/lib/data/pricing-data";
 import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
 import { getFlowCounts } from "@/lib/data/flow-status";
@@ -58,17 +58,19 @@ export default async function PricingPage({
   // vyžádaná zakázka vždy mezi načtenými
   const ids = list.map((j) => j.id);
   const pick = [...(wanted && ids.includes(wanted) ? [wanted] : []), ...ids.filter((id) => id !== wanted)].slice(0, MAX_JOBS);
-  const [details, flows, calculations, params] = await Promise.all([
+  const [details, flows, drawings, calculations, params] = await Promise.all([
     // jedním dávkovým dotazem (dřív getJob na každou zakázku = 5–8 dotazů × 40)
     getJobsForPanels(pick),
     getFlowJobStates(pick),
+    // výkresy k položkám (náhled při nacenění; jen zakázky z `pick`, které prošly rozsahem)
+    getJobDrawingFiles(pick),
     ai ? getRecentPricingCalculations(15) : Promise.resolve([]),
     ai && settings ? getIntegrationSettingsMeta() : Promise.resolve([]),
   ]);
   const order = new Map(ids.map((id, i) => [id, i]));
   const jobs = (details as JobDetail[])
     .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
-    .map((j) => toPricingJob(j, flows[j.id] ?? null));
+    .map((j) => toPricingJob(j, flows[j.id] ?? null, drawings[j.id] ?? []));
   const chips = chipsForTab("pricing", counts);
   const pricingParams = params.filter((s) => s.category === "pricing");
   const today = todayPrague();

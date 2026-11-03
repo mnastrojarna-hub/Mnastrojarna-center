@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { loadRecent, removeRecent, type RecentDoc } from "@/cad/settings";
 import { isUnlocked, notifyVault, persistMode, unlock, VAULT_EVENT } from "@/cad/vault";
+import { CAD_LINKS } from "@/content/cad-links";
 import { cn } from "@/lib/cn";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
@@ -59,6 +60,14 @@ export function StartScreen({
         </span>
         <span className="hidden text-[12px] text-white/50 sm:inline">· parametrický 3D/2D CAD · díly · sestavy · výkresy · formy</span>
         <span className="flex-1" />
+        <a href={CAD_LINKS.docs} target="_blank" rel="noopener" title="Dokumentace a návod k obsluze (otevře se v nové záložce)" className="hidden items-center gap-1.5 rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10 sm:inline-flex">
+          <CadIcon name="info" className="h-4 w-4" />
+          Návod a dokumentace
+        </a>
+        <a href={CAD_LINKS.pdf} download title="Příručka PDF ke stažení" className="hidden items-center gap-1.5 rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10 md:inline-flex">
+          <CadIcon name="drawing" className="h-4 w-4" />
+          Příručka PDF
+        </a>
         <button type="button" onClick={onClose} className="rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10">
           Pokračovat v práci <Kbd k="Esc" />
         </button>
@@ -111,8 +120,19 @@ export function StartScreen({
             ))}
           </div>
 
-          <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Tipy</h2>
+          <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Nápověda a tipy</h2>
           <ul className="grid gap-2 text-[12.5px] text-[#3c4856] sm:grid-cols-2">
+            <li className="rounded-md border border-brand/30 bg-[#fff7f6] p-3 sm:col-span-2">
+              <strong className="text-[#1f2933]">Nevíte si rady?</strong>{" "}
+              <a href={CAD_LINKS.docs} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-2 hover:underline">
+                Dokumentace a návod k obsluze
+              </a>{" "}
+              (24 kapitol, postupy krok za krokem, FAQ) ·{" "}
+              <a href={CAD_LINKS.pdf} download className="font-medium text-brand underline-offset-2 hover:underline">
+                příručka PDF ke stažení
+              </a>{" "}
+              · v programu tlačítko <strong>Nápověda</strong> vpravo nahoře.
+            </li>
             <li className="rounded-md border border-[#e3e8ee] bg-white p-3">
               <Kbd k="Ctrl+K" /> otevře paletu příkazů – napište „díra“, „výkres“, „zaoblit“…
             </li>

@@ -3,6 +3,7 @@ import type { JobDetail, JobFile, JobListItem, JobQuote } from "@/lib/jobs/types
 import type { JobStage } from "@/lib/supabase/database.types";
 import { canIssueInvoice, quoteDisplayState, type QuoteFacts } from "@/lib/jobs/flow-status";
 import { quoteStateFromStatus } from "@/lib/data/labels";
+import { drawingsForItems, type PricingDrawingSource } from "@/lib/jobs/pricing-drawings";
 import type { FileFlowInfo, FlowJobState, FlowQuoteInfo } from "./flow-state";
 import type { FlowEmail } from "./flow-mail-list";
 import type { FlowQuote } from "./quotes-board";
@@ -145,7 +146,8 @@ export function toFlowFile(
   };
 }
 
-export function toPricingJob(j: JobDetail, flow: FlowJobState | null = null): PricingJob {
+export function toPricingJob(j: JobDetail, flow: FlowJobState | null = null, files: readonly PricingDrawingSource[] = []): PricingJob {
+  const drawings = files.length ? drawingsForItems(j.items, files) : {};
   return {
     id: j.id,
     number: j.number,
@@ -178,6 +180,7 @@ export function toPricingJob(j: JobDetail, flow: FlowJobState | null = null): Pr
         unitPrice: it.unitPrice,
         purchaseUnitPrice: it.purchaseUnitPrice,
         note: it.note,
+        drawings: drawings[it.id] ?? [],
       })),
     quotes: j.quotes.map((q) => ({
       id: q.id, number: q.number, status: q.status, revision: q.revision, archived: q.archived, total: q.total, validUntil: q.validUntil,

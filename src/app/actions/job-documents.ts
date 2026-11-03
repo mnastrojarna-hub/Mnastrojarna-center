@@ -681,13 +681,13 @@ export async function sendJobDocument(
 
     const { data: jobData, error: jobErr } = await db
       .from("orders")
-      .select("id, number, status, order_status, invoice_number, delivery_note_number, owner_id, assignee_id")
+      .select("id, number, status, order_status, invoice_number, delivery_note_number, owner_id, assignee_id, customer_id")
       .eq("id", jobId)
       .maybeSingle();
     if (jobErr) return fail(jobErr.message);
     const job = jobData as {
       id: string; number: string | null; status: string; order_status: string | null; invoice_number: string | null; delivery_note_number: string | null;
-      owner_id: string | null; assignee_id: string | null;
+      owner_id: string | null; assignee_id: string | null; customer_id?: string | null;
     } | null;
     if (!job) return fail(NOT_FOUND);
 
@@ -742,6 +742,8 @@ export async function sendJobDocument(
       from: { ownerId: user.id },
       jobId,
       senderId: user.id,
+      // Pošta → Odeslané: doklad zákazníkovi u zákazníka; nákupní doklad (nabídka dodavatele) bez vazby
+      customerId: file.issuer === "dodavatel" ? null : job.customer_id ?? null,
       // podpis je v textu z návrhu (dialog ho ukázal k úpravě) → grafický s logem místo firemní šablony;
       // bez podpisu v textu zůstane HTML výše (starý / vypnutý podpis)
       signature: { userId: user.id, mode: "inline" },

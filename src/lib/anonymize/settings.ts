@@ -7,7 +7,7 @@ import { DEFAULT_REDACT, type RedactToggles } from "./rules";
 import { sha256Hex } from "./text";
 
 /** Verze detektoru — změna = přepočet (anon_config_hash). */
-export const DETECTOR_VERSION = "anon-v1.0";
+export const DETECTOR_VERSION = "anon-v2.0";
 
 export interface AnonSettings {
   enabled: boolean;

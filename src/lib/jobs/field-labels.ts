@@ -17,6 +17,7 @@ export const JOB_FIELD_LABELS: Record<string, string> = {
   customer_contact: "Kontaktní osoba zákazníka",
   customer_contact_email: "E-mail kontaktní osoby",
   customer_contact_phone: "Telefon kontaktní osoby",
+  customer_contact_id: "Kontaktní osoba (Karta zákazníka)",
   inquiry_date: "Datum poptávky",
   order_date: "Datum objednávky",
   customer_required_date: "Požadovaný termín zákazníkem",

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDict } from "@/content";
+import { CAD_LINKS } from "@/content/cad-links";
 import { SALES, SERVICE_ORDER, SITE, YOUTUBE_CHANNEL } from "@/content/site";
 import { href, type Locale } from "@/i18n/config";
 import { Icon } from "./icons";
@@ -15,8 +16,9 @@ export function Footer({ locale }: { locale: Locale }) {
     [href(locale, "machinery"), f.links.machinery],
     [href(locale, "quality"), f.links.quality],
     [href(locale, "references"), f.links.references],
-    ["/cad", f.links.cad],
-    ["/cad/dokumentace", f.links.cadDocs],
+    [CAD_LINKS.app, f.links.cad],
+    [CAD_LINKS.docs, f.links.cadDocs],
+    [CAD_LINKS.pdf, f.links.cadPdf],
     [href(locale, "careers"), f.links.careers],
     [href(locale, "contact"), f.links.contact],
   ];
@@ -60,9 +62,15 @@ export function Footer({ locale }: { locale: Locale }) {
           <ul className="space-y-2 text-[14px]">
             {links.map(([h, l]) => (
               <li key={h}>
-                <Link className="transition hover:text-brand" href={h}>
-                  {l}
-                </Link>
+                {h.endsWith(".pdf") ? (
+                  <a className="transition hover:text-brand" href={h} download>
+                    {l}
+                  </a>
+                ) : (
+                  <Link className="transition hover:text-brand" href={h}>
+                    {l}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>

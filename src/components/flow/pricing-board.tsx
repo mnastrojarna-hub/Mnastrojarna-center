@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight, Building2, Calculator, CheckCircle2, ChevronDown, FileText, Loader2, Plus, Save, Sparkles, Trash2,
-  UserRound, AlertCircle, Flame,
+  UserRound, AlertCircle, Flame, PanelRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,12 @@ import { quoteStateFromStatus } from "@/lib/data/labels";
 import { FlowRowState } from "./flow-row-state";
 import { FlowActionBar } from "./flow-actions";
 import { RfqListLink } from "@/components/rfq/rfq-list-link";
+import { useFileViewer } from "@/components/file-viewer/file-viewer-provider";
 import { actionPalette, type FlowJobState } from "./flow-state";
+import type { PricingDrawing } from "@/lib/jobs/pricing-drawings";
+import {
+  DrawingDock, DrawingThumbButton, PinDockButton, isWideScreen, useOpenDrawingFullscreen, usePinnedDock, type DrawingTarget,
+} from "./pricing-drawing";
 
 /** Zakázka k nacenění (čistá data ze serveru). */
 export interface PricingJob {
@@ -58,6 +63,8 @@ export interface PricingJob {
     unitPrice: number | null;
     purchaseUnitPrice: number | null;
     note: string | null;
+    /** Výkresy / 3D modely položky (první = hlavní k náhledu); chybí = nenačteno. */
+    drawings?: PricingDrawing[];
   }[];
   quotes: { id: string; number: string; status: QuoteStatus; revision: number; archived: boolean; total: number | null; validUntil?: string | null }[];
   /** Podrobný stav (nacenění, poptávka, nabídka), autor a další krok — bez DB stavů null. */
@@ -80,6 +87,8 @@ interface Row {
   price: string;
   purchase: string;
   note: string | null;
+  /** Výkresy uložené položky (nové řádky žádné). */
+  drawings?: PricingDrawing[];
 }
 
 interface Result {
@@ -104,6 +113,7 @@ function toRows(job: PricingJob): Row[] {
     price: amountInput(it.unitPrice),
     purchase: amountInput(it.purchaseUnitPrice),
     note: it.note,
+    drawings: it.drawings,
   }));
 }
 
@@ -161,6 +171,48 @@ export function PricingBoard({
     initialOpenId && jobs.some((j) => j.id === initialOpenId) ? initialOpenId : (jobs[0]?.id ?? null),
   );
   const [results, setResults] = React.useState<Record<string, Result>>({});
+  // výkres vedle položek (jen počítač): panel se drží, i když se píšou ceny; nic nenaviguje
+  const [dock, setDock] = React.useState<DrawingTarget | null>(null);
+  const [pinned, setPinned] = usePinnedDock();
+  const openFullscreen = useOpenDrawingFullscreen();
+  const viewer = useFileViewer();
+
+  const showDrawing = React.useCallback(
+    (target: DrawingTarget) => {
+      if (pinned && isWideScreen()) {
+        setDock(target);
+        return;
+      }
+      const d = target.drawings[target.index];
+      if (!d) return;
+      openFullscreen(
+        d,
+        <PinDockButton
+          onPin={() => {
+            setPinned(true);
+            setDock(target);
+            viewer?.close();
+          }}
+        />,
+      );
+    },
+    [pinned, openFullscreen, setPinned, viewer],
+  );
+
+  // „Mít vedle" zapnuté → po rozbalení zakázky hned první výkres (panel nezůstane prázdný)
+  React.useEffect(() => {
+    if (!pinned || !openId || !isWideScreen()) return;
+    setDock((cur) => {
+      if (cur && cur.jobId === openId) return cur;
+      const job = jobs.find((j) => j.id === openId);
+      const i = job?.items.findIndex((it) => it.drawings?.length) ?? -1;
+      if (!job || i < 0) return cur && jobs.some((j) => j.id === cur.jobId) ? cur : null;
+      const it = job.items[i];
+      return { jobId: job.id, rowKey: it.id, label: drawingLabel(i, it.drawingNumber, it.name), drawings: it.drawings!, index: 0 };
+    });
+  }, [pinned, openId, jobs]);
+
+  const docked = pinned && dock ? dock : null;
 
   // odkaz „Nacenit" z Poptávek → dojet k rozbalené zakázce
   React.useEffect(() => {
@@ -169,7 +221,9 @@ export function PricingBoard({
   }, [initialOpenId]);
 
   return (
-    <ul className="space-y-2">
+    // vždy stejná struktura (seznam první) — zapnutí panelu nepřipojí formuláře znovu
+    <div className={cn(docked && "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,40%)] lg:items-start lg:gap-4")}>
+    <ul className="min-w-0 space-y-2">
       {jobs.map((job) => {
         const open = openId === job.id;
         const unpriced = job.items.filter((i) => i.unitPrice === null).length;
@@ -257,13 +311,48 @@ export function PricingBoard({
                 today={today}
                 result={results[job.id]}
                 onResult={(r) => setResults((all) => ({ ...all, [job.id]: { ...all[job.id], ...r } }))}
+                activeRowKey={docked?.jobId === job.id ? docked.rowKey : null}
+                onDrawing={(rowKey, label, drawings) => showDrawing({ jobId: job.id, rowKey, label, drawings, index: 0 })}
+                docked={Boolean(docked)}
+                onToggleDock={() => {
+                  if (pinned) {
+                    setPinned(false);
+                    setDock(null);
+                  } else setPinned(true);
+                }}
+                pinned={pinned}
               />
             )}
           </li>
         );
       })}
     </ul>
+    {docked && (
+      <aside
+        aria-label="Výkres vedle nacenění"
+        className="hidden overflow-hidden rounded-xl border bg-card shadow-md lg:sticky lg:top-0 lg:block lg:h-[calc(100dvh-7.5rem)]"
+      >
+        <DrawingDock
+          target={docked}
+          onClose={() => {
+            setPinned(false);
+            setDock(null);
+          }}
+          onSelect={(index) => setDock((cur) => (cur ? { ...cur, index } : cur))}
+          onFullscreen={() => {
+            const d = docked.drawings[docked.index];
+            if (d) openFullscreen(d);
+          }}
+        />
+      </aside>
+    )}
+    </div>
   );
+}
+
+/** Popisek položky pro panel výkresu („Položka 2 · H-200 · Hřídel"). */
+function drawingLabel(index: number, drawingNumber: string | null | undefined, name: string | null | undefined): string {
+  return [`Položka ${index + 1}`, (drawingNumber ?? "").trim(), (name ?? "").trim()].filter(Boolean).join(" · ");
 }
 
 function PricingPanel({
@@ -273,6 +362,11 @@ function PricingPanel({
   today,
   result,
   onResult,
+  activeRowKey = null,
+  onDrawing,
+  docked = false,
+  pinned = false,
+  onToggleDock,
 }: {
   job: PricingJob;
   me: PersonRef;
@@ -280,6 +374,14 @@ function PricingPanel({
   today: string;
   result?: Result;
   onResult: (r: Result) => void;
+  /** Řádek, jehož výkres je v panelu vedle. */
+  activeRowKey?: string | null;
+  /** Otevřít výkres položky (bez navigace — formulář zůstane, jak je). */
+  onDrawing?: (rowKey: string, label: string, drawings: PricingDrawing[]) => void;
+  /** Panel s výkresem je vedle (užší řádky). */
+  docked?: boolean;
+  pinned?: boolean;
+  onToggleDock?: () => void;
 }) {
   const router = useRouter();
   const initial = React.useMemo(() => (job.items.length ? toRows(job) : [emptyRow()]), [job]);
@@ -409,6 +511,10 @@ function PricingPanel({
     ? "md:grid-cols-[minmax(0,2.4fr)_minmax(0,1fr)_4.5rem_7.5rem_7.5rem_4.5rem_7rem_2.25rem]"
     : "md:grid-cols-[minmax(0,2.4fr)_minmax(0,1fr)_4.5rem_7.5rem_7rem_2.25rem]";
   const cur = job.currency || "CZK";
+  const hasDrawings = rows.some((r) => r.drawings?.length);
+  // panel s výkresem vedle → užší místo: řádek položky na dva řádky (popisky nad poli), jinak tabulka
+  const lbl = docked ? "block" : "md:hidden";
+  const cell = (whenDocked: string, normal: string) => (docked ? whenDocked : normal);
 
   return (
     <div className="space-y-4 border-t bg-amber-50/30 p-3 pl-4 dark:bg-amber-500/[0.03] sm:p-4 sm:pl-5">
@@ -429,8 +535,24 @@ function PricingPanel({
         </div>
       )}
 
+      {hasDrawings && onToggleDock && (
+        <div className="hidden items-center justify-end gap-2 text-xs text-muted-foreground lg:flex">
+          <span>{pinned ? "Výkres je vedle položek — klik na miniaturu ho přepne." : "Klik na miniaturu otevře výkres; rozepsané ceny zůstanou."}</span>
+          <Button
+            type="button"
+            size="sm"
+            variant={pinned ? "secondary" : "outline"}
+            onClick={onToggleDock}
+            aria-pressed={pinned}
+            data-testid="pricing-dock-toggle"
+          >
+            <PanelRight className="h-4 w-4" /> {pinned ? "Zavřít výkres vedle" : "Mít výkres vedle"}
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-2">
-        <div className={cn("hidden gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:grid", grid)}>
+        <div className={cn("hidden gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground", !docked && "md:grid", grid)}>
           <span>Výkres a název</span>
           <span>Materiál</span>
           <span className="text-right">Kusů</span>
@@ -448,14 +570,30 @@ function PricingPanel({
           const line = !qtyBad && n.price !== null && Number.isFinite(n.price) ? (n.quantity as number) * n.price : null;
           const pct = margins ? marginPercent(Number.isFinite(n.price) ? n.price : null, Number.isFinite(n.purchase) ? n.purchase : null) : null;
           return (
-            <div key={r.key} className={cn("grid grid-cols-2 items-center gap-2 rounded-lg border bg-card p-2 md:border-0 md:bg-transparent md:p-0 md:px-1", grid)}>
-              <div className="col-span-2 flex gap-1.5 md:col-span-1">
+            <div
+              key={r.key}
+              className={cn(
+                docked
+                  ? "grid grid-cols-12 items-end gap-2 rounded-lg border bg-card p-2"
+                  : cn("grid grid-cols-2 items-center gap-2 rounded-lg border bg-card p-2 md:border-0 md:bg-transparent md:p-0 md:px-1", grid),
+                docked && activeRowKey === r.key && "border-blue-400 ring-1 ring-blue-300 dark:border-blue-500/60",
+              )}
+            >
+              <div className={cell("col-span-8 flex gap-1.5", "col-span-2 flex gap-1.5 md:col-span-1")}>
+                {onDrawing && (
+                  <DrawingThumbButton
+                    drawings={r.drawings}
+                    label={`Položka ${i + 1}`}
+                    active={docked && activeRowKey === r.key}
+                    onOpen={() => r.drawings?.length && onDrawing(r.key, drawingLabel(i, r.drawingNumber, r.name), r.drawings)}
+                  />
+                )}
                 <Input
                   aria-label={`Položka ${i + 1}: číslo výkresu`}
                   value={r.drawingNumber}
                   onChange={(e) => patch(r.key, { drawingNumber: e.target.value })}
                   placeholder="Výkres"
-                  className="w-28 shrink-0 font-mono text-xs"
+                  className={cn("shrink-0 font-mono text-xs", docked ? "w-24" : "w-28")}
                 />
                 <Input
                   aria-label={`Položka ${i + 1}: název`}
@@ -465,12 +603,12 @@ function PricingPanel({
                   className="min-w-0 flex-1"
                 />
               </div>
-              <label className="col-span-2 block md:col-span-1">
-                <span className="text-[11px] text-muted-foreground md:hidden">Materiál</span>
+              <label className={cell("col-span-4 block", "col-span-2 block md:col-span-1")}>
+                <span className={cn("text-[11px] text-muted-foreground", lbl)}>Materiál</span>
                 <Input value={r.material} onChange={(e) => patch(r.key, { material: e.target.value })} placeholder="materiál" className="placeholder:italic" aria-label={`Položka ${i + 1}: materiál`} />
               </label>
-              <label className="block">
-                <span className="text-[11px] text-muted-foreground md:hidden">Kusů</span>
+              <label className={cell("col-span-2 block", "block")}>
+                <span className={cn("text-[11px] text-muted-foreground", lbl)}>Kusů</span>
                 <Input
                   inputMode="decimal"
                   value={r.quantity}
@@ -480,8 +618,8 @@ function PricingPanel({
                   className={cn("text-right tabular-nums", qtyBad && "border-red-400 focus-visible:ring-red-400")}
                 />
               </label>
-              <label className="block">
-                <span className="text-[11px] text-muted-foreground md:hidden">Prodej / ks ({cur})</span>
+              <label className={cell(margins ? "col-span-3 block" : "col-span-4 block", "block")}>
+                <span className={cn("text-[11px] text-muted-foreground", lbl)}>Prodej / ks ({cur})</span>
                 <Input
                   inputMode="decimal"
                   value={r.price}
@@ -497,8 +635,8 @@ function PricingPanel({
                 />
               </label>
               {margins && (
-                <label className="block">
-                  <span className="text-[11px] text-muted-foreground md:hidden">Nákup / ks ({cur})</span>
+                <label className={cell("col-span-3 block", "block")}>
+                  <span className={cn("text-[11px] text-muted-foreground", lbl)}>Nákup / ks ({cur})</span>
                   <Input
                     inputMode="decimal"
                     value={r.purchase}
@@ -511,16 +649,16 @@ function PricingPanel({
                 </label>
               )}
               {margins && (
-                <div className="text-right">
-                  <span className="text-[11px] text-muted-foreground md:hidden">Marže </span>
+                <div className={cell("col-span-1 pb-2 text-right", "text-right")}>
+                  <span className={cn("text-[11px] text-muted-foreground", lbl)}>Marže </span>
                   <span className={cn("text-sm font-semibold tabular-nums", marginTone(pct))}>{formatPercent(pct)}</span>
                 </div>
               )}
-              <div className="text-right">
-                <span className="text-[11px] text-muted-foreground md:hidden">Celkem </span>
+              <div className={cell(margins ? "col-span-2 pb-2 text-right" : "col-span-5 pb-2 text-right", "text-right")}>
+                <span className={cn("text-[11px] text-muted-foreground", lbl)}>Celkem </span>
                 <span className="text-sm font-semibold tabular-nums">{line === null ? "—" : money(line, cur)}</span>
               </div>
-              <div className="flex justify-end">
+              <div className={cell("col-span-1 flex justify-end pb-0.5", "flex justify-end")}>
                 <Button
                   type="button"
                   size="icon-sm"

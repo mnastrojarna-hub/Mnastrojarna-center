@@ -1,6 +1,8 @@
 import "server-only";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { addUsage } from "@/lib/ai/ai-call";
+import { checkRasterCompanies } from "./company-check";
+import { COMPANY_LEAK_WARNING } from "./decide";
 import type { AiCallConfig } from "./detect-ai";
 import { checkImageOutput, decodeImage, encodeImageOutput, heicToJpeg, imagePages, maybeGray, rasterToJpeg } from "./image";
 import { buildRasterPdf, type OutPage } from "./pdf-raster";
@@ -165,6 +167,18 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
     const final = applyManual(auto, manual);
     res.regions.push(...final);
     const out = manual.length ? await reburn(v, final, input.fill) : v.raster;
+    // výstupní kontrola obrazem: zbyl v kopii název firmy? (vypálí se a ověří znovu, jinak kopie neprošla)
+    if (input.ai) {
+      const cc = await checkRasterCompanies(out, p, input.ai, input.ctx, v.keep.map((k) => k.box), input.fill);
+      res.usage = addUsage(res.usage, cc.usage);
+      res.calls += cc.calls;
+      if (cc.fallback) res.fallback = true;
+      if (cc.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: p });
+      if (!cc.clean) {
+        res.outputProblems.push(`strana ${p}: zůstal název firmy`);
+        res.warnings.push({ code: "verify_leak", message: `${COMPANY_LEAK_WARNING} (strana ${p}).`, page: p });
+      }
+    }
 
     if (asPdf) {
       const img = maybeGray(out);

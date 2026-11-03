@@ -295,7 +295,7 @@ export function IssueOrderDialog({
             )}
 
             {(issued.hint || issued.suggestStage) && (
-              <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-950 sm:flex-row sm:items-center dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
+              <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-950 sm:flex-row sm:items-center dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100" data-testid="issue-hint">
                 <Info className="h-4 w-4 shrink-0 text-sky-600" />
                 <span className="flex-1">{issued.hint}</span>
                 {issued.suggestStage === "ve_vyrobe" ? (

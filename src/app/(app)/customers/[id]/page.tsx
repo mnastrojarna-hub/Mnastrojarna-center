@@ -268,7 +268,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </Panel>
 
           {/* Kontaktní osoby */}
-          <Panel icon={<Users />} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title={`Kontaktní osoby (${contacts.length})`}>
+          <Panel id="kontakty" icon={<Users />} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title={`Kontaktní osoby (${contacts.length})`}>
             <ContactsManager customerId={c.id} contacts={contacts} roles={book.roles} tones={book.tones} />
           </Panel>
 
@@ -314,15 +314,18 @@ function Panel({
   title,
   action,
   children,
+  id,
 }: {
   icon: React.ReactNode;
   tone: string;
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  /** Kotva (odkaz „Upravit v Kartě zákazníka" ze zakázky → #kontakty). */
+  id?: string;
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-4 shadow-sm">
+    <section id={id} className="scroll-mt-20 rounded-2xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2.5">
         <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg [&_svg]:h-4 [&_svg]:w-4", tone)}>{icon}</span>
         <h2 className="min-w-0 flex-1 truncate text-base font-semibold">{title}</h2>

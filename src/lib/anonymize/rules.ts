@@ -171,6 +171,62 @@ export function isCompanyRow(text: string): boolean {
   return OWNER_ROW_START_RE.test(t);
 }
 
+/**
+ * Je řádek buňkou řádku kusovníku? Na stejném účaří (stejná stránka a natočení) leží pozice nebo počet kusů.
+ */
+export function isTableRowCell(lines: readonly { id: string; page: number; text: string; box: Box; fontSize: number; rot: number }[], l: { id: string; page: number; box: Box; fontSize: number; rot: number }): boolean {
+  const em = Math.max(l.fontSize, l.box.h, 0.5);
+  const base = l.box.y + l.box.h;
+  const mates = lines.filter((m) => m.id !== l.id && m.page === l.page && m.rot === l.rot && m.text.trim()
+    && Math.abs((m.box.y + m.box.h) - base) < 0.45 * em);
+  return mates.some((m) => BOM_ROW_RE.test(m.text) || /^\s*\d{1,3}[.)]?\s*$/u.test(m.text));
+}
+
+/** Popisek výrobce / dodavatele nakupovaného dílu — odkazovaný výrobce (kusovník, normálie) není vlastník výkresu. */
+const MAKER_LABEL_RE = new RegExp(foldSource(String.raw`(?<![\p{L}\p{N}])(?:Výrobce|Dodavatel|Hersteller|Lieferant|Manufacturer|Supplier|Vendor|Producent|Dostawca|Gyártó|Szállító|Normalie|Normalien|Normteil|Fabrikat|Fabrikát)\.?(?![\p{L}\p{N}])`), "iu");
+/** Spojky v názvech firem („Müller & Söhne", „Smith and Partners", „van der Berg"). */
+const NAME_CONNECTORS = new Set(["&", "und", "and", "a", "de", "da", "von", "van", "der", "den", "di", "la", "le", "of", "the", "spol", "spol."]);
+
+/**
+ * Samostatný řádek s názvem firmy: „BRISK Tábor a.s.", „Robert Bosch GmbH, Stuttgart", „Firma: ACME s.r.o."
+ * — název (≤ 6 slov, slova s velkým písmenem / číslicí) + právní forma, za ní nic nebo adresa za čárkou /
+ * pomlčkou. Ne řádek kusovníku, ne popisek výrobce / dodavatele, ne věta poznámky („Povrch dle normy …").
+ */
+export function isStandaloneCompanyLine(text: string): boolean {
+  const t = String(text ?? "").trim();
+  if (!t || t.length > 100 || BOM_ROW_RE.test(t) || MAKER_LABEL_RE.test(t)) return false;
+  let start = -1, end = -1;
+  for (const m of t.matchAll(LEGAL_DOTTED_RE)) { start = m.index ?? 0; end = start + m[0].length; break; }
+  if (start < 0) {
+    for (const m of t.matchAll(LEGAL_CAPS_RE)) {
+      const before = t.slice(0, m.index ?? 0);
+      if (!/\p{Lu}[\p{L}\p{N}&.'-]+[\s,]*$/u.test(before) || /\d\s*$/u.test(before)) continue;
+      start = m.index ?? 0; end = start + m[0].length;
+      break;
+    }
+  }
+  if (start <= 0) return false;
+  const name = stripOwnerPrefix(t.slice(0, start).replace(/^\s*[\p{L} .]{2,24}:\s*/u, "")).replace(/[\s,]+$/u, "");
+  const words = name.split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 6 || !/\p{L}{2,}/u.test(name)) return false;
+  if (!words.every((w) => /^[\p{Lu}\p{N}&]/u.test(w) || NAME_CONNECTORS.has(w.toLowerCase()))) return false;
+  if (isTechnicalText(name)) return false;
+  const rest = t.slice(end).trim();
+  return !rest || (/^[,;|–—-]/u.test(rest) && rest.length <= 70);
+}
+
+/** Úvod doložky před jménem vlastníka („© ", „Property of ", „Eigentum der ", „majetkem ") — není součást jména. */
+const OWNER_PREFIX_RE = new RegExp(foldSource(String.raw`^\s*(?:©|\(c\)|copyright|property\s+of|owned\s+by|eigentum\s+(?:der|des|von)|majetkem|vlastnictv[ií]m?|w[lł]asno[sś][cć]\s+firmy)\s*[:,-]?\s*`), "iu");
+export function stripOwnerPrefix(s: string): string {
+  let v = String(s ?? "");
+  for (let i = 0; i < 3; i++) {
+    const n = v.replace(OWNER_PREFIX_RE, "");
+    if (n === v) break;
+    v = n;
+  }
+  return v.trimStart();
+}
+
 /** Obecná slova v názvech firem — samostatně nejsou termínem (normalizovaně, bez diakritiky). */
 const TERM_WORD_STOP = new Set([
   "aluminium", "aluminum", "forging", "forge", "kovarna", "kovarny", "slevarna", "slevarny", "strojirny", "strojirna", "strojirenska",
@@ -194,6 +250,47 @@ const TRAILING_LEGAL_CAPS_RE = new RegExp(String.raw`^[\s,]*(?:${LEGAL_CAPS.join
 export function trailingLegalForm(rest: string): number {
   const m = TRAILING_LEGAL_DOTTED_RE.exec(rest) ?? TRAILING_LEGAL_CAPS_RE.exec(rest);
   return m ? m[0].length : 0;
+}
+
+/**
+ * Konec jména vlastníka v doložce od `start`: slova s velkým písmenem / číslicí (ne rok), spojky a právní forma
+ * hned za nimi; končí na prvním slově s malým písmenem, pomlčce nebo roku, nejvýš 6 slov.
+ * „© Strojmetal 2024 — rozmnožování zakázáno" → „Strojmetal"; „BRISK Tabor a.s. - Vykres je…" → „BRISK Tabor a.s.".
+ */
+export function ownerNameEnd(text: string, start: number, captureEnd: number): number {
+  let i = start;
+  let end = start;
+  let words = 0;
+  while (i < text.length && words < 6) {
+    const legal = trailingLegalForm(text.slice(i));
+    if (legal && words > 0) { end = i + legal; i = end; continue; }
+    const m = /^\s*([^\s]+)/u.exec(text.slice(i));
+    if (!m) break;
+    const w = m[1].replace(/[,;:]+$/u, "");
+    const wStart = i + m[0].length - m[1].length;
+    if (/^[-–—|]+$/u.test(w) || /^(?:19|20)\d{2}$/u.test(w)) break;
+    if (!(/^[\p{Lu}\p{N}&]/u.test(w) || (words > 0 && NAME_CONNECTORS.has(w.toLowerCase())))) break;
+    if (wStart >= Math.max(captureEnd, start) && !/^[\p{Lu}]/u.test(w)) break;
+    words++;
+    end = wStart + w.length;
+    i = wStart + m[1].length;
+  }
+  // bez nalezeného názvu (jen malá písmena) → původní zachycení
+  return end > start ? end : captureEnd;
+}
+
+/** Konec první právní formy v textu (index za ní), jinak -1 — „BRISK Tábor a.s., Vožická 2068" → za „a.s.". */
+export function firstLegalFormEnd(text: string): number {
+  let best = -1;
+  for (const m of String(text ?? "").matchAll(LEGAL_DOTTED_RE)) { best = (m.index ?? 0) + m[0].length; break; }
+  for (const m of String(text ?? "").matchAll(LEGAL_CAPS_RE)) {
+    const before = text.slice(0, m.index ?? 0);
+    if (!/\p{Lu}[\p{L}\p{N}&.'-]+[\s,]*$/u.test(before) || /\d\s*$/u.test(before)) continue;
+    const e = (m.index ?? 0) + m[0].length;
+    if (best < 0 || e < best) best = e;
+    break;
+  }
+  return best;
 }
 
 /** Odstraní právní formu z názvu firmy (pro termíny z CRM). */
@@ -614,7 +711,8 @@ export function ruleLine(text: string, zone: Zone, ctx: RuleContext): LineRuleRe
   //    („STROJMETAL a.s." → celé), aby po názvu nezůstala osamělá „s.r.o."
   const norm = normalizeWithMap(text);
   for (const t of ctx.terms) {
-    for (const r of findTermRanges(text, t, norm)) hits.push({ start: r.start, end: r.end + trailingLegalForm(text.slice(r.end)), category: "custom", rule: `term_${t.source}` });
+    // jméno firmy nalezené na výkresu (source „drawing") je název firmy → kategorie company (vypínatelná jako firma)
+    for (const r of findTermRanges(text, t, norm)) hits.push({ start: r.start, end: r.end + trailingLegalForm(text.slice(r.end)), category: t.source === "drawing" ? "company" : "custom", rule: `term_${t.source}` });
   }
 
   // 4) právní forma (jen razítko / rám / revize; jinde kandidát pro AI)
@@ -728,10 +826,10 @@ export function ruleLine(text: string, zone: Zone, ctx: RuleContext): LineRuleRe
           if (!t) continue;
           const owner = text.slice(t.start, t.end);
           if (!/\p{Lu}/u.test(owner) || isTechnicalText(owner) || containsKeepTerm(owner, ctx.keepTerms)) continue;
-          // jen první 1–6 slov (název), ne celé souvětí doložky
-          const words = owner.split(/\s+/);
-          const take = words.slice(0, Math.min(words.length, 6)).join(" ");
-          if (strict) hits.push({ start: t.start, end: t.start + take.length, category: "copyright_owner", rule: "copyright_owner" });
+          // jen název (slova s velkým písmenem, spojky, právní forma — max. 6 slov), ne rok ani souvětí doložky
+          const end = ownerNameEnd(text, t.start, Math.max(t.end, t.start));
+          if (end <= t.start) continue;
+          if (strict) hits.push({ start: t.start, end, category: "copyright_owner", rule: "copyright_owner" });
           else res.candidate = true;
         }
       }
@@ -748,7 +846,9 @@ export function ruleLine(text: string, zone: Zone, ctx: RuleContext): LineRuleRe
     }
   }
 
-  res.hits = filterToggles(dedupeHits(hits), ctx.redact);
+  const kept = filterToggles(dedupeHits(hits), ctx.redact);
+  // termín firmy uvnitř smazané cesty / kontaktu (e-mail, web) smaže už ten zásah — kategorie zůstane cesta / kontakt
+  res.hits = kept.filter((h) => !(h.rule.startsWith("term_") && kept.some((o) => o !== h && (o.category === "path" || o.category === "contact") && o.start <= h.start && o.end >= h.end)));
   return res;
 }
 
@@ -774,7 +874,8 @@ export function filterToggles<T extends { category: AnonCategory; rule: string }
       case "path": return t.path;
       case "contact": return t.contact;
       case "code": return t.code;
-      case "copyright_owner": return t.copyright_owner || h.rule === "copyright_whole";
+      // jméno vlastníka v doložce JE název firmy → maže se i s volbou „jen název firmy" (majitel 2. 11.)
+      case "copyright_owner": return t.copyright_owner || t.company || h.rule === "copyright_whole";
       case "person":
         if (h.rule === "person_checked") return t.person_checked;
         if (h.rule === "person_revisions") return t.person_revisions;
@@ -1035,6 +1136,43 @@ export function rulePage(lines: readonly TextLine[], ctx: RuleContext, opts: { k
 
   // název firmy zalomený na dva řádky (buňka razítka „STROJ-" / „METAL", „Strojmetal Aluminium" / „Forging")
   for (const x of crossLineTermHits(lines, ctx.terms)) push(x.lineId, { start: x.start, end: x.end, category: "custom", rule: "term_xline" });
+
+  // samostatný řádek s názvem firmy mimo zónu razítka („BRISK Tábor a.s." v horní buňce razítka, kterou zóna
+  // z popisků nezachytila; „Robert Bosch GmbH, Stuttgart" v rámu) — NE buňka kusovníku (na stejném účaří
+  // pozice / počet kusů / další buňky tabulky: odkazovaný výrobce „SKF GmbH" zůstává)
+  if (ctx.redact.company) {
+    for (const l of lines) {
+      if (l.zone !== "body" || !isStandaloneCompanyLine(l.text) || containsKeepTerm(l.text, ctx.keepTerms)) continue;
+      if (isTableRowCell(lines, l)) continue;
+      const label = /^\s*[\p{L} .]{2,24}:\s*/u.exec(l.text);
+      const t = trimRange(l.text, { start: label ? label[0].length : 0, end: l.text.length });
+      if (t) push(l.id, { start: t.start, end: t.end, category: "company", rule: "legal_form_line" });
+    }
+  }
+
+  // osamělá právní forma jako samostatná položka hned za smazaným názvem („HYDROTEK" | „S.R.O." — písmo Type3,
+  // prostrkaný text) → smazat i ji (po názvu nesmí zůstat „s.r.o.")
+  if (ctx.redact.company) {
+    const named = new Set(out.hits.filter((h) => h.category === "custom" || h.category === "company").map((h) => h.lineId));
+    for (const l of lines) {
+      const t = l.text.trim();
+      if (!t || named.has(l.id) || trailingLegalForm(t) < t.length - 1) continue;
+      const em = Math.max(l.fontSize, l.box.h, 0.5);
+      const beside = (m: TextLine) => m.id !== l.id && m.page === l.page && m.rot === l.rot && Boolean(m.text.trim())
+        && Math.abs((m.box.y + m.box.h) - (l.box.y + l.box.h)) < 0.5 * em && l.box.x - (m.box.x + m.box.w) > -0.5 * em && l.box.x - (m.box.x + m.box.w) < 4 * em;
+      const left = lines.find((m) => named.has(m.id) && beside(m));
+      if (left) { push(l.id, { start: 0, end: l.text.length, category: "company", rule: "legal_form_tail" }); continue; }
+      // název bez známého termínu ve vlastní položce vlevo („HYDROTEK" | „S.R.O.") — spolu tvoří firmu
+      // (ne kusovník, ne popisek výrobce, ne naše firma)
+      const name = lines.find((m) => beside(m) && !named.has(m.id) && isStandaloneCompanyLine(`${m.text.trim()} ${t}`)
+        && !containsKeepTerm(m.text, ctx.keepTerms) && !isTableRowCell(lines, m));
+      if (name) {
+        const r = trimRange(name.text, { start: 0, end: name.text.length });
+        if (r) push(name.id, { start: r.start, end: r.end, category: "company", rule: "legal_form_line" });
+        push(l.id, { start: 0, end: l.text.length, category: "company", rule: "legal_form_tail" });
+      }
+    }
+  }
 
   // plot stamp složený z oddělených položek („cesta   datum   uživatel") → celý (mimo razítko a revize);
   // jen datum/čas, login a tiskárna — poznámky a technický text na stejném účaří zůstanou

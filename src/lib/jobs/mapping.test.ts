@@ -8,6 +8,7 @@ import {
   computeMargin, todayIso, matchesDeadline, fetchPaged, isGenericCaptureName, translateDbError, type JobRow,
   paymentStateOf, matchesPayment, JOB_LIST_SELECT, rowToJobItem, rowToJobQuote, paymentKeyOf, flowFactsOfRow,
   JOB_COUNT_SELECT, OVERDUE_INVOICE_SELECT, isOverdueInvoiceRow,
+  cleanNewContact, contactNameFromEmail, newContactFromText, rowsToCustomerContacts, defaultCustomerContact,
 } from "./mapping";
 import type { JobListItem } from "./types";
 import type { FlowFacts } from "./flow-status";
@@ -681,5 +682,60 @@ describe("řádky → podrobné stavy toku a autor", () => {
     expect(matchesPayment(flow, "castecne_zaplaceno", "2026-10-22")).toBe(true);
     expect(matchesPayment(flow, "nezaplaceno", "2026-10-22")).toBe(true);
     expect(matchesPayment(flow, "ceka_na_uhradu", "2026-10-22")).toBe(false);
+  });
+});
+
+describe("kontaktní osoba zakázky z Karty zákazníka (3. 11.)", () => {
+  it("customerContactId → sloupec customer_contact_id (neplatné id → null), validace", () => {
+    expect(jobInputToRow({ customerContactId: UUID })).toEqual({ customer_contact_id: UUID });
+    expect(jobInputToRow({ customerContactId: null })).toEqual({ customer_contact_id: null });
+    expect(jobInputToRow({ newCustomerContact: { name: "Pavel" } })).toEqual({});
+    expect(validateJobInput({ customerContactId: "x" })).toMatch(/Neplatný výběr/);
+    expect(validateJobInput({ customerContactId: UUID })).toBeNull();
+  });
+
+  it("nový kontakt: jméno nebo e-mail, e-mail malými, jméno z e-mailu", () => {
+    expect(cleanNewContact({ name: "  Ing.  Pavel   Novák " })).toEqual({ name: "Ing. Pavel Novák", email: null });
+    expect(cleanNewContact({ email: " Pavel.Novak@Firma.CZ " })).toEqual({ name: "Pavel Novak", email: "pavel.novak@firma.cz" });
+    expect(cleanNewContact({ email: "info@firma.cz" })).toEqual({ name: "info@firma.cz", email: "info@firma.cz" });
+    expect(cleanNewContact({ name: "Eva", email: "eva@x.cz" })).toEqual({ name: "Eva", email: "eva@x.cz" });
+    expect(cleanNewContact({})).toEqual({ error: "Napiš jméno nebo e-mail kontaktu." });
+    expect(cleanNewContact({ email: "neni-email" })).toEqual({ error: "Neplatný e-mail kontaktní osoby." });
+    expect(cleanNewContact("x")).toHaveProperty("error");
+    expect(cleanNewContact({ name: 5 })).toHaveProperty("error");
+    expect(cleanNewContact({ name: "x".repeat(201) })).toHaveProperty("error");
+    expect(validateJobInput({ newCustomerContact: { email: "spatne" } })).toBe("Neplatný e-mail kontaktní osoby.");
+    expect(validateJobInput({ newCustomerContact: { email: "ok@firma.cz" } })).toBeNull();
+  });
+
+  it("text z „Přidat kontakt …“: e-mail → e-mail, jinak jméno", () => {
+    expect(newContactFromText(" jana@firma.cz ")).toEqual({ email: "jana@firma.cz" });
+    expect(newContactFromText("Jana  Nováková")).toEqual({ name: "Jana Nováková" });
+    expect(contactNameFromEmail("jan_dvorak@x.cz")).toBe("Jan Dvorak");
+    expect(contactNameFromEmail("obchod@x.cz")).toBe("obchod@x.cz");
+  });
+
+  it("kontakty zákazníka: hlavní první, pak podle jména; výchozí = hlavní, jinak jediný", () => {
+    const list = rowsToCustomerContacts([
+      { id: "b", name: "Zdeněk", email: " z@x.cz ", phone: "", position: null, is_primary: false },
+      { id: "a", name: "Adam", email: null, phone: "+420 1", position: "technik", is_primary: false },
+      { id: "c", name: "Petr", email: "p@x.cz", phone: null, position: "nákup", is_primary: true },
+    ]);
+    expect(list.map((k) => k.id)).toEqual(["c", "a", "b"]);
+    expect(list[2]).toEqual({ id: "b", name: "Zdeněk", email: "z@x.cz", phone: null, position: null, isPrimary: false });
+    expect(defaultCustomerContact(list)?.id).toBe("c");
+    expect(defaultCustomerContact(list.filter((k) => !k.isPrimary))).toBeNull();
+    expect(defaultCustomerContact([list[1]])?.id).toBe("a");
+    expect(rowsToCustomerContacts(null)).toEqual([]);
+  });
+
+  it("detail zakázky nese vazbu i kontakty zákazníka", () => {
+    const d = rowToJobDetail({
+      id: UUID, number: "Z-1", title: "X", status: "poptavka", created_at: "2026-11-01T00:00:00Z",
+      customer_contact_id: "k1", customer_contact: "Petr", customer_contact_email: "p@x.cz", customer_contact_phone: "+420 1",
+      customer: { id: UUID2, name: "Firma", contacts: [{ id: "k1", name: "Petr", email: "p@x.cz", phone: "+420 1", position: null, is_primary: true }] },
+    } as JobRow, { quotes: [], files: [], events: [] }, { margins: true });
+    expect(d.customerContactId).toBe("k1");
+    expect(d.customerDetail?.contacts).toEqual([{ id: "k1", name: "Petr", email: "p@x.cz", phone: "+420 1", position: null, isPrimary: true }]);
   });
 });

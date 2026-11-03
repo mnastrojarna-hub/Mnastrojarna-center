@@ -51,6 +51,9 @@ export const ACCOUNTS = [
   { user: "zamek40@nastrojarstvi.test", pass: "Zamek40-Heslo-1", imap: true, pop3: true },
   // E2E 41: objednávka dodavateli — odchylky od výkresu, výkresy a modely položek v příloze e-mailu
   { user: "objednavky41@nastrojarstvi.test", pass: "Objednavky41-Heslo-1", imap: true, pop3: true },
+  // Odeslané doklady (src/lib/email/odeslana-posta.integration.test.ts): obchodník odesílatel + obchodník zakázky
+  { user: "odeslane-a@nastrojarstvi.test", pass: "OdeslaneA-Heslo-1", imap: true, pop3: true },
+  { user: "odeslane-b@nastrojarstvi.test", pass: "OdeslaneB-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {
