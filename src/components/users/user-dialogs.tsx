@@ -222,6 +222,55 @@ export function RfqToggle({
   );
 }
 
+/** Kolega do volby „Kontakt pro obchod a ceny". */
+export interface SalesContactOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Aktivní uživatelé s přístupem k cenám (obchodník, super admin, plný přístup) — kandidáti na „Kontakt pro obchod
+ * a ceny" uživatele `forId` (bez něj samého). Aktuálně nastavený kontakt zůstane v nabídce, i když už podmínky nesplňuje.
+ */
+export function salesContactOptions(users: ManagedUser[], forId: string, currentId?: string | null): SalesContactOption[] {
+  return users
+    .filter((u) => u.id !== forId && (u.id === currentId
+      || (u.active && (u.role === "obchodnik" || u.role === "super_admin" || u.fullAccess === true))))
+    .map((u) => ({ id: u.id, name: u.active ? u.fullName : `${u.fullName} (neaktivní)` }))
+    .sort((a, b) => a.name.localeCompare(b.name, "cs"));
+}
+
+/**
+ * „Kontakt pro obchod a ceny" (3. 11.): u technologa (Šponer) kolega obchodník (Volný) — e-mail k nabídce pak
+ * odkáže výrobní a technologické dotazy na odesílatele a obchod a ceny na kolegu (jméno, telefon a e-mail z profilu).
+ */
+export function SalesContactSelect({
+  id, value, onChange, options, disabled,
+}: { id: string; value: string; onChange: (v: string) => void; options: SalesContactOption[]; disabled?: boolean }) {
+  return (
+    <div className="space-y-1.5 rounded-lg border p-3" data-sales-contact={value || "none"}>
+      <label htmlFor={id} className="text-sm font-medium">Kontakt pro obchod a ceny</label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <option value="">— žádný —</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>{o.name}</option>
+        ))}
+      </select>
+      <p className="text-xs text-muted-foreground">
+        {value
+          ? "E-mail k nabídce od tohoto uživatele odkáže výrobní a technologické dotazy na něj a obchodní záležitosti a ceny na vybraného kolegu (telefon a e-mail z jeho profilu)."
+          : "E-mail k nabídce má běžný text (dotazy i obchod na odesílatele)."}
+      </p>
+    </div>
+  );
+}
+
 function DialogHeader({
   icon: Icon,
   tone,
@@ -265,6 +314,7 @@ export function EditUserDialog({
   onOpenChange,
   notify,
   onSaved,
+  salesContacts = [],
 }: {
   user: ManagedUser;
   isSelf: boolean;
@@ -272,6 +322,8 @@ export function EditUserDialog({
   onOpenChange: (o: boolean) => void;
   notify: Notify;
   onSaved: () => void;
+  /** Kandidáti na „Kontakt pro obchod a ceny" (salesContactOptions). */
+  salesContacts?: SalesContactOption[];
 }) {
   const [fullName, setFullName] = React.useState(user.fullName);
   const [phone, setPhone] = React.useState(user.phone ?? "");
@@ -282,6 +334,7 @@ export function EditUserDialog({
   const [quoteApprover, setQuoteApprover] = React.useState(user.canApproveQuotes === true);
   const [rfq, setRfq] = React.useState(user.canRfq === true);
   const [fullAccess, setFullAccess] = React.useState(user.fullAccess === true);
+  const [salesContact, setSalesContact] = React.useState(user.salesContactId ?? "");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -296,6 +349,7 @@ export function EditUserDialog({
     setQuoteApprover(user.canApproveQuotes === true);
     setRfq(user.canRfq === true);
     setFullAccess(user.fullAccess === true);
+    setSalesContact(user.salesContactId ?? "");
     setError(null);
   }, [open, user]);
 
@@ -315,6 +369,7 @@ export function EditUserDialog({
         canApproveQuotes: role === "super_admin" ? undefined : quoteApprover,
         canRfq: role === "zamestnanec" ? rfq : undefined,
         fullAccess: isSelf || role === "super_admin" ? undefined : fullAccess,
+        salesContactId: salesContact === (user.salesContactId ?? "") ? undefined : salesContact || null,
       });
       if (!res.ok) {
         setError(res.error ?? "Uložení se nepovedlo.");
@@ -378,6 +433,8 @@ export function EditUserDialog({
           />
 
           <RfqToggle id={`eu-rfq-${user.id}`} checked={rfq} onChange={setRfq} role={role} />
+
+          <SalesContactSelect id={`eu-sales-contact-${user.id}`} value={salesContact} onChange={setSalesContact} options={salesContacts} />
 
           {(role === "obchodnik" || user.commissionPercent > 0) && (
             <div className="space-y-1.5">

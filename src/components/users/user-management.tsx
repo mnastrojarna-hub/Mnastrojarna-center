@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
-  KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature, FileCheck2, ShieldCheck,
+  KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature, FileCheck2, ShieldCheck, Handshake,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { updateUser, sendUserResetCode } from "@/app/actions/users";
 import { setMailboxOwner } from "@/app/actions/mailbox-owner";
-import { EditUserDialog, SetPasswordDialog, DeleteUserDialog } from "@/components/users/user-dialogs";
+import { EditUserDialog, SetPasswordDialog, DeleteUserDialog, salesContactOptions } from "@/components/users/user-dialogs";
 import { CommissionContractDialog, contractSummary } from "@/components/users/commission-contract-dialog";
 import { UserAvatar } from "@/components/users/user-avatar";
 import { mailboxLabel } from "@/components/users/add-user-dialog";
@@ -184,6 +184,7 @@ export function UserManagement({
                 refresh={refresh}
                 openContract={contractFor === u.id}
                 onContractOpened={() => setContractFor(null)}
+                users={users}
               />
             ))}
           </ul>
@@ -224,6 +225,7 @@ function UserRow({
   refresh,
   openContract = false,
   onContractOpened,
+  users = [],
 }: {
   user: ManagedUser;
   isSelf: boolean;
@@ -235,6 +237,8 @@ function UserRow({
   /** Otevřít rovnou smlouvu a provize (odkaz ze stránky Provize). */
   openContract?: boolean;
   onContractOpened?: () => void;
+  /** Všichni uživatelé — kandidáti na „Kontakt pro obchod a ceny". */
+  users?: ManagedUser[];
 }) {
   const [busy, setBusy] = React.useState<string | null>(null);
   const [dialog, setDialog] = React.useState<null | "edit" | "password" | "delete" | "contract">(null);
@@ -447,6 +451,19 @@ function UserRow({
             <span className="truncate">schvaluje nabídky</span>
           </button>
         )}
+        {/* 3. 11.: kontakt pro obchod a ceny (e-mail k nabídce odkáže obchod a ceny na kolegu) */}
+        {user.salesContactId && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-sales-contact-chip={user.salesContactId}
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-700 transition hover:bg-violet-500/15 hover:shadow-sm dark:text-violet-300"
+            title="E-mail k nabídce odkáže obchodní záležitosti a ceny na tohoto kolegu — změnit v Upravit"
+          >
+            <Handshake className="h-3 w-3 shrink-0" />
+            <span className="truncate">obchod a ceny: {owners.get(user.salesContactId) ?? "—"}</span>
+          </button>
+        )}
         {/* 2. 11.: plný přístup (vše kromě cizí pošty a správy uživatelů) */}
         {user.role !== "super_admin" && user.fullAccess === true && (
           <button
@@ -569,6 +586,7 @@ function UserRow({
 
       <EditUserDialog
         user={user}
+        salesContacts={dialog === "edit" ? salesContactOptions(users, user.id, user.salesContactId) : undefined}
         isSelf={isSelf}
         open={dialog === "edit"}
         onOpenChange={(o) => setDialog(o ? "edit" : null)}

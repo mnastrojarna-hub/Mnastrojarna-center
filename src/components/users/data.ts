@@ -40,13 +40,18 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       }
       return res;
     };
-    const [profilesRes, mailboxesRes, rules] = await Promise.all([
+    const [profilesRes, mailboxesRes, rules, salesContacts] = await Promise.all([
       loadProfiles(),
       db
         .from("mailboxes")
         .select("id, email, display_name, owner_id, active, provider")
         .order("email", { ascending: true }),
       fetchCommissionRules(db, null, { withAuthors: true }).catch((): CommissionRuleView[] => []),
+      // „Kontakt pro obchod a ceny" zvlášť — DB bez migrace 20261103130000 → bez něj (správa uživatelů jede dál)
+      Promise.resolve(db.from("profiles").select("id, sales_contact_id"))
+        .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; sales_contact_id: string | null }[])
+          .map((r) => [r.id, r.sales_contact_id ?? null] as const)))
+        .catch(() => new Map<string, string | null>()),
     ]);
     if (profilesRes.error) return { users: [], mailboxes: [], ready: true, error: profilesRes.error.message };
 
@@ -73,6 +78,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       quoteApproverChangedAt: p.quote_approver_changed_at ?? null,
       canRfq: p.role !== "zamestnanec" || (p as Profile & { can_rfq?: boolean | null }).can_rfq === true,
       fullAccess: p.role !== "super_admin" && (p as Profile & { full_access?: boolean | null }).full_access === true,
+      salesContactId: salesContacts.get(p.id) ?? null,
     }));
 
     const mailboxes: MailboxOption[] = ((mailboxesRes.data ?? []) as Mailbox[]).map((m) => ({

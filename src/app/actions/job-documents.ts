@@ -16,7 +16,7 @@ import { cleanText, isUuid, jobFilePath, translateDbError } from "@/lib/jobs/map
 import {
   DOCUMENT_KIND_LABEL, INVOICE_NUMBER_PLACEHOLDER, INVOICE_VS_PLACEHOLDER, documentEmailHtml, draftDocumentEmail,
   fillInvoicePlaceholders, firstEmail, isDocumentEmailKind, issuedEventMessage, parseEmailList, sentEventMessage,
-  type DocumentEmailInput, type DocumentEmailKind,
+  type DocumentEmailInput, type DocumentEmailKind, type SalesContact,
 } from "@/lib/jobs/document-emails";
 import {
   buildConfirmationDoc, buildInvoiceDoc, buildQuoteDoc, confirmationNumber, dateOnly,
@@ -914,6 +914,31 @@ export async function draftQuoteEmail(
   }
 }
 
+/**
+ * „Kontakt pro obchod a ceny" uživatele (profiles.sales_contact_id → jméno, telefon a e-mail z profilu), pro text
+ * e-mailu k nabídce. Bez nastavení, sám na sebe, neaktivní kontakt nebo DB bez migrace 20261103130000 → null.
+ */
+async function salesContactOf(db: JobsDb, userId: string): Promise<SalesContact | null> {
+  try {
+    const { data: me, error } = await db.from("profiles").select("sales_contact_id").eq("id", userId).maybeSingle();
+    const contactId = error ? null : (me as { sales_contact_id?: string | null } | null)?.sales_contact_id ?? null;
+    if (!contactId || contactId === userId) return null;
+    const { data } = await db.from("profiles").select("full_name, phone, email, active").eq("id", contactId).maybeSingle();
+    const row = data as { full_name?: string | null; phone?: string | null; email?: string | null; active?: boolean | null } | null;
+    const name = (row?.full_name ?? "").trim();
+    if (!row || !name || row.active === false) return null;
+    let email = (row.email ?? "").trim() || null;
+    if (!email) {
+      // bez e-mailu v profilu → jeho schránka (Správa uživatelů → Schránka)
+      const { data: box } = await db.from("mailboxes").select("email").eq("owner_id", contactId).eq("active", true).limit(1).maybeSingle();
+      email = ((box as { email?: string | null } | null)?.email ?? "").trim() || null;
+    }
+    return { name, phone: (row.phone ?? "").trim() || null, email };
+  } catch {
+    return null;
+  }
+}
+
 async function composeDocumentEmail(
   db: JobsDb, user: CurrentUser, job: JobDetail, kind: DocumentEmailKind,
   file: { filename: string; quoteId: string | null; createdAt: string },
@@ -948,6 +973,8 @@ async function composeDocumentEmail(
     input.validUntil = dateOnly(quote?.validUntil) ?? null;
     input.leadTimeDays = quote?.leadTimeDays ?? null;
     input.jobTitle = quote?.title || job.title;
+    // „Kontakt pro obchod a ceny" toho, kdo e-mail připravuje / odesílá (Šponer → Volný)
+    input.salesContact = await salesContactOf(db, user.id);
   } else if (kind === "potvrzeni") {
     input.number = confirmationNumber(job.number);
     input.deliveryDate = dateOnly(job.dueDate ?? job.customerRequiredDate) ?? null;

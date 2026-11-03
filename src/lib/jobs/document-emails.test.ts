@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   documentEmailBody, documentEmailHtml, documentEmailSubject, draftDocumentEmail, escapeHtml, firstEmail,
   isDocumentEmailKind, issuedEventMessage, parseEmailList, sentEventMessage, type DocumentEmailInput,
-  INVOICE_NUMBER_PLACEHOLDER, INVOICE_VS_PLACEHOLDER, fillInvoicePlaceholders,
+  INVOICE_NUMBER_PLACEHOLDER, INVOICE_VS_PLACEHOLDER, fillInvoicePlaceholders, effectiveSalesContact,
 } from "./document-emails";
 
 const base: Omit<DocumentEmailInput, "kind"> = {
@@ -120,6 +120,106 @@ describe("tykání / vykání (oslovení odesílatele k adresátovi)", () => {
   });
   it("bez nastavení beze změny", () => {
     expect(documentEmailBody({ ...base, kind: "faktura" }).startsWith("Dobrý den,\n\nv příloze Vám zasíláme fakturu")).toBe(true);
+  });
+});
+
+describe("nabídka technologa s kontaktem pro obchod a ceny (3. 11.)", () => {
+  const sponer = { name: "Dominik Šponer", position: "Technolog", phone: "+420 607 688 841", email: "dominik.sponer@mnastrojarna.cz" };
+  const volny = { name: "Vít Volný", phone: "+420 734 846 246", email: "vit.volny@mnastrojarna.cz" };
+  const signatureText = [
+    "Dominik Šponer", "Technolog | Mnástrojárna s.r.o.", "", "tel.: +420 607 688 841", "e-mail: dominik.sponer@mnastrojarna.cz",
+    "web: www.mnastrojarna.cz",
+  ].join("\n");
+  const quote: DocumentEmailInput = {
+    ...base, kind: "nabidka", number: "NAB-2026-006", jobNumber: "Z-2026-057", jobTitle: "Poptávka", validUntil: "2026-12-02",
+    sender: sponer, signatureText, salesContact: volny,
+  };
+
+  it("vykání: text majitele (výroba na mě, obchod a ceny na kolegu pana Volného)", () => {
+    const body = documentEmailBody({ ...quote, salutation: "Dobrý den, pane Nováku,", address: "vy" });
+    expect(body).toBe([
+      "Dobrý den, pane Nováku,",
+      "",
+      "děkujeme za hezkou poptávku.",
+      "V příloze Vám zasíláme cenovou nabídku č. NAB-2026-006 na „Poptávka“.",
+      "",
+      "V případě jakýchkoli výrobních, technologických dotazů nebo úprav mě neváhejte kontaktovat.",
+      "",
+      "Ohledně obchodních záležitostí a cen se s Vámi rád spojí kolega pan Vít Volný.",
+      "tel. +420 734 846 246.",
+      "e-mail: vit.volny@mnastrojarna.cz",
+      "",
+      "• Platnost nabídky: do 2. 12. 2026",
+      "• Naše číslo zakázky: Z-2026-057 (prosíme, uveďte ho ve Vaší objednávce)",
+      "",
+      "Přeji krásný den.",
+      "",
+      signatureText,
+    ].join("\n"));
+  });
+
+  it("vykání bez oslovení, s číslem poptávky a dodací lhůtou", () => {
+    const body = documentEmailBody({ ...quote, customerInquiryNumber: "RFQ-77", leadTimeDays: 21 });
+    expect(body.startsWith("Dobrý den,\n\nděkujeme za hezkou poptávku č. RFQ-77.\nV příloze Vám zasíláme")).toBe(true);
+    expect(body).toContain("• Dodací lhůta: 3 týdny od potvrzení objednávky");
+  });
+
+  it("tykání: díky, ti, obrať se, kolega bez „pan“, Měj krásný den", () => {
+    const body = documentEmailBody({ ...quote, salutation: "Ahoj Pavle,", address: "ty" });
+    expect(body).toBe([
+      "Ahoj Pavle,",
+      "",
+      "díky za hezkou poptávku.",
+      "V příloze ti posíláme cenovou nabídku č. NAB-2026-006 na „Poptávka“.",
+      "",
+      "V případě jakýchkoli výrobních, technologických dotazů nebo úprav se na mě klidně obrať.",
+      "",
+      "Ohledně obchodních záležitostí a cen se s tebou rád spojí kolega Vít Volný.",
+      "tel. +420 734 846 246.",
+      "e-mail: vit.volny@mnastrojarna.cz",
+      "",
+      "• Platnost nabídky: do 2. 12. 2026",
+      "• Naše číslo zakázky: Z-2026-057 (prosím, uveď ho v objednávce)",
+      "",
+      "Měj krásný den.",
+      "",
+      signatureText,
+    ].join("\n"));
+    expect(body).not.toMatch(/\bV(ám|ámi|aši|aší|ás)\b/);
+  });
+
+  it("kolegyně: ráda … paní (odhad podle příjmení i výslovně)", () => {
+    const vy = documentEmailBody({ ...quote, salesContact: { name: "Jana Volná", phone: null, email: "jana@mnastrojarna.cz" } });
+    expect(vy).toContain("Ohledně obchodních záležitostí a cen se s Vámi ráda spojí kolegyně paní Jana Volná.\ne-mail: jana@mnastrojarna.cz\n\n");
+    expect(vy).not.toContain("tel. ");
+    const ty = documentEmailBody({ ...quote, address: "ty", salesContact: { name: "Eva Nováková" } });
+    expect(ty).toContain("Ohledně obchodních záležitostí a cen se s tebou ráda spojí kolegyně Eva Nováková.\n\n•");
+    const explicit = documentEmailBody({ ...quote, salesContact: { name: "Nikola Král", female: true } });
+    expect(explicit).toContain("ráda spojí kolegyně paní Nikola Král.");
+  });
+
+  it("bez kontaktu pro obchod = dosavadní text", () => {
+    const without = documentEmailBody({ ...quote, salesContact: null });
+    expect(without).toBe(documentEmailBody({ ...quote, salesContact: undefined }));
+    expect(without).toContain("děkujeme za Vaši poptávku. V příloze Vám zasíláme cenovou nabídku č. NAB-2026-006 na „Poptávka“.");
+    expect(without).toContain("Pokud budete mít k nabídce jakékoli dotazy nebo budete potřebovat úpravu, rádi Vám vyjdeme vstříc. Těšíme se na Vaši objednávku.");
+    expect(without).not.toContain("hezkou");
+    expect(without).not.toContain("Ohledně obchodních");
+    expect(documentEmailBody({ ...quote, salesContact: { name: "  " } })).toBe(without);
+  });
+
+  it("kontakt pro obchod = sám odesílatel (e-mail nebo jméno) → dosavadní text", () => {
+    const old = documentEmailBody({ ...quote, salesContact: null });
+    expect(documentEmailBody({ ...quote, salesContact: { name: "Dominik Šponer", email: "x@y.cz" } })).toBe(old);
+    expect(documentEmailBody({ ...quote, salesContact: { name: "D. Šponer", email: "Dominik.Sponer@mnastrojarna.cz" } })).toBe(old);
+    expect(effectiveSalesContact({ sender: sponer, salesContact: volny })).toEqual(volny);
+    expect(effectiveSalesContact({ sender: sponer, salesContact: { ...sponer } })).toBeNull();
+  });
+
+  it("jen nabídka — ostatní doklady kontakt pro obchod ignorují", () => {
+    for (const kind of ["potvrzeni", "dodaci_list", "faktura", "ostatni"] as const) {
+      expect(documentEmailBody({ ...quote, kind })).toBe(documentEmailBody({ ...quote, kind, salesContact: null }));
+    }
   });
 });
 

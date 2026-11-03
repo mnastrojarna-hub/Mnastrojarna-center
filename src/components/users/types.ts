@@ -34,6 +34,11 @@ export interface ManagedUser {
    * schránek a správy uživatelů. Výchozí ne.
    */
   fullAccess?: boolean;
+  /**
+   * 3. 11.: „Kontakt pro obchod a ceny" (profil sales_contact_id) — kolega, na kterého e-mail k nabídce odkáže
+   * obchodní záležitosti a ceny (technolog Šponer → obchodník Volný). Null = žádný (dosavadní text).
+   */
+  salesContactId?: string | null;
 }
 
 /** Schránka k přiřazení uživateli. */
