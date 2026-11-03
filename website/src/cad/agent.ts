@@ -712,6 +712,10 @@ export type MncadApi = {
   status: () => Promise<string>;
   /** otevře konzoli Textové příkazy */
   openConsole: () => void;
+  /** popisky entit v 3D okně (F1 plocha, E2 hrana, V3 vrchol): zapne/vypne a vrátí seznam se souřadnicemi na obrazovce (vůči 3D oknu) */
+  hints: (on?: boolean) => { id: string; kind: "face" | "edge" | "vertex"; index: number; x: number; y: number; title: string }[];
+  /** klikne na entitu podle popisku stejnou cestou jako myš (additive = přidat k výběru) */
+  clickHint: (id: string, additive?: boolean) => boolean;
   /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL nebo projekt .mncad – vrátí název, MIME, velikost a base64 */
   exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad") => Promise<{ name: string; mime: string; bytes: number; base64: string }>;
 };

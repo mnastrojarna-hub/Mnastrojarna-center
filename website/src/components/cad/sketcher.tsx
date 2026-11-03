@@ -115,6 +115,8 @@ type Props = {
   onFinish?: () => void;
   /** hrany modelu (dvojice bodů x,y,z ve světových souřadnicích) – pro promítnutí do roviny skici */
   modelLines?: Float32Array | null;
+  /** štítky bodů (O = počátek, P1… = konce, středy a rohy entit) – výběr a kreslení bez trefování (AI agenti, dotyk) */
+  hints?: boolean;
 };
 
 /** Druhy uchopení (OSNAP) jako v ZW3D. */
@@ -563,7 +565,7 @@ type Snap = { p: Vec2; kind: SnapKind | "free"; ref?: SketchRef; hv?: "h" | "v" 
  * Profesionální 2D skicář: uchopování (OSNAP), vazby s numerickým řešičem, řídicí kóty,
  * editační nástroje, kontextové menu. Souřadnice v mm, osa Y nahoru.
  */
-export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines }: Props) {
+export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines, hints }: Props) {
   const entities = sketch.entities;
   const constraints = useMemo(() => sketch.constraints ?? [], [sketch.constraints]);
   const dims = useMemo(() => sketch.dims ?? [], [sketch.dims]);
@@ -735,6 +737,54 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     [view, size],
   );
   const toPx = useCallback((p: Vec2): Vec2 => [size.w / 2 + (p[0] - view.cx) * view.scale, size.h / 2 - (p[1] - view.cy) * view.scale], [view, size]);
+  /** štítky bodů skici (O, P1…) – leží přesně na bodu a nepřijímají kliknutí, klik na štítek = klik na bod (uchopení) */
+  const sketchHints = useMemo(() => {
+    if (!hints) return [] as { id: string; x: number; y: number; title: string }[];
+    const pts: { p: Vec2; title: string }[] = [{ p: [0, 0], title: "počátek skici [0; 0]" }];
+    const f2 = (v: number) => (Math.round(v * 100) / 100).toString().replace(".", ",");
+    const lab = (p: Vec2, what: string) => `${what} [${f2(p[0])}; ${f2(p[1])}]`;
+    entities.forEach((e, i) => {
+      const n = i + 1;
+      if (e.type === "rect") {
+        const ca = Math.cos((e.angle * Math.PI) / 180);
+        const sa = Math.sin((e.angle * Math.PI) / 180);
+        const corner = (sx: number, sy: number): Vec2 => [e.cx + (sx * e.w) / 2 * ca - (sy * e.h) / 2 * sa, e.cy + (sx * e.w) / 2 * sa + (sy * e.h) / 2 * ca];
+        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `obdélník ${n} – střed`) });
+        for (const [sx, sy, name] of [[-1, -1, "levý dolní roh"], [1, -1, "pravý dolní roh"], [1, 1, "pravý horní roh"], [-1, 1, "levý horní roh"]] as [number, number, string][]) pts.push({ p: corner(sx, sy), title: lab(corner(sx, sy), `obdélník ${n} – ${name}`) });
+      } else if (e.type === "circle") {
+        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `kružnice ${n} Ø${f2(2 * e.r)} – střed`) });
+        for (const [dx, dy, name] of [[1, 0, "pravý kvadrant"], [-1, 0, "levý kvadrant"], [0, 1, "horní kvadrant"], [0, -1, "dolní kvadrant"]] as [number, number, string][]) pts.push({ p: [e.cx + dx * e.r, e.cy + dy * e.r], title: lab([e.cx + dx * e.r, e.cy + dy * e.r], `kružnice ${n} – ${name}`) });
+      } else if (e.type === "polygon" || e.type === "ellipse") pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `${e.type === "polygon" ? "mnohoúhelník" : "elipsa"} ${n} – střed`) });
+      else if (e.type === "slot") {
+        const ca = Math.cos((e.angle * Math.PI) / 180);
+        const sa = Math.sin((e.angle * Math.PI) / 180);
+        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `drážka ${n} – střed`) });
+        for (const sgn of [-1, 1]) { const q: Vec2 = [e.cx + (sgn * e.length) / 2 * ca, e.cy + (sgn * e.length) / 2 * sa]; pts.push({ p: q, title: lab(q, `drážka ${n} – střed oblouku`) }); }
+      } else if (e.type === "line") {
+        pts.push({ p: e.a, title: lab(e.a, `úsečka ${n} – začátek`) });
+        pts.push({ p: e.b, title: lab(e.b, `úsečka ${n} – konec`) });
+        const m: Vec2 = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
+        pts.push({ p: m, title: lab(m, `úsečka ${n} – střed`) });
+      } else if (e.type === "polyline" || e.type === "spline") e.points.forEach((q, k) => pts.push({ p: q, title: lab(q, `${e.type === "polyline" ? "čára" : "spline"} ${n} – bod ${k + 1}`) }));
+      else if (e.type === "arc") {
+        pts.push({ p: e.a, title: lab(e.a, `oblouk ${n} – začátek`) });
+        pts.push({ p: e.c, title: lab(e.c, `oblouk ${n} – konec`) });
+        pts.push({ p: e.b, title: lab(e.b, `oblouk ${n} – bod na oblouku`) });
+      } else if (e.type === "point") pts.push({ p: e.p, title: lab(e.p, `bod ${n}`) });
+    });
+    const out: { id: string; x: number; y: number; title: string }[] = [];
+    const seen = new Set<string>();
+    pts.forEach((q, i) => {
+      if (out.length >= 200) return;
+      const [x, y] = toPx(q.p);
+      if (x < 4 || y < 4 || x > size.w - 4 || y > size.h - 4) return;
+      const key = `${Math.round(x)}|${Math.round(y)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ id: i === 0 ? "O" : `P${out.length}`, x, y, title: q.title });
+    });
+    return out;
+  }, [hints, entities, toPx, size]);
   const gridStep = niceStep(24 / view.scale);
   const tol = 10 / view.scale;
 
@@ -2578,6 +2628,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
 
       {flash && <div className="pointer-events-none absolute left-1/2 top-14 -translate-x-1/2 rounded-md bg-[#1f2933] px-3 py-1.5 text-[12px] text-white shadow-lg">{flash}</div>}
 
+      {/* štítky bodů skici (pointer-events: none – klik na štítek dopadne na plátno a uchopí bod) */}
+      {hints && sketchHints.length > 0 && (
+        <div data-sketch-hints className="pointer-events-none absolute inset-0 overflow-hidden">
+          {sketchHints.map((h) => (
+            <div key={h.id} data-sketch-hint={h.id} title={h.title} className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[#2563eb]/85 px-1 font-mono text-[10px] font-semibold leading-[14px] text-white shadow" style={{ left: h.x, top: h.y }}>
+              {h.id}
+            </div>
+          ))}
+        </div>
+      )}
       {/* výzva + stav */}
       <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] text-[#26303b]">
         <span className="rounded border border-[#c9d1da] bg-white/90 px-2 py-0.5">

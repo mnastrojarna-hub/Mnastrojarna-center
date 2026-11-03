@@ -163,6 +163,8 @@ export function CadApp() {
   const [shareOpen, setShareOpen] = useState(false);
   /** konzole Textové příkazy (AI agenti, automatizace) */
   const [agentOpen, setAgentOpen] = useState(false);
+  /** popisky entit (F1 / E2 / V3 / P1) pro výběr myší bez trefování – AI agenti, automatizace, dotyk */
+  const [hintsOn, setHintsOn] = useState(false);
   /** dokument otevřený ze sdíleného odkazu (informační pruh nad pracovní plochou) */
   const [shared, setShared] = useState<{ tabId: string; from?: string; exp: number | null } | null>(null);
   /** sdílený odkaz chráněný heslem – dotaz na heslo */
@@ -682,6 +684,11 @@ export function CadApp() {
       setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
       status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null)),
       openConsole: () => setAgentOpen(true),
+      hints: (on) => {
+        if (on !== undefined) setHintsOn(on);
+        return vp.current?.hintList() ?? [];
+      },
+      clickHint: (id, additive) => vp.current?.clickHint(id, additive) ?? false,
       exportFile: async (format) => {
         const d = histRef.current.present;
         const toB64 = (u8: Uint8Array) => {
@@ -1880,6 +1887,11 @@ export function CadApp() {
         setAgentOpen(true);
         return;
       }
+      if (mod && e.shiftKey && k === "l") {
+        e.preventDefault();
+        setHintsOn((v) => !v);
+        return;
+      }
       if (mod && k === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -2489,7 +2501,7 @@ export function CadApp() {
                   ? "Klikněte na plochu, kam se má vrtat · Enter = OK"
                   : `${featureLabel(active)}: upravte parametry · Enter = OK, Esc = Storno`
           : selection.length
-            ? `Vybráno: ${selection.length}× ${KIND_LABEL[selection[0].kind].toLowerCase()} · pravé tlačítko = příkazy pro výběr · Esc zruší`
+            ? `${hintsOn ? "Popisky zapnuté (Ctrl+Shift+L) · " : ""}Vybráno: ${selection.length}× ${KIND_LABEL[selection[0].kind].toLowerCase()} · pravé tlačítko = příkazy pro výběr · Esc zruší`
             : `Filtr výběru: ${FILTER_LABEL[selFilter]} · klikněte na entitu · pravé tlačítko = nabídka`;
 
   const vpContext = (x: number, y: number, item: SelItem | null) => {
@@ -2567,6 +2579,7 @@ export function CadApp() {
       { id: "p.pdf", label: "Příručka PDF – stáhnout", group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
       { id: "p.share", label: "Sdílet odkazem (WhatsApp, e-mail, Teams…)", group: "Program", icon: "share", run: () => setShareOpen(true) },
       { id: "p.agent", label: "Textové příkazy – pro AI agenty a automatizaci", group: "Program", icon: "palette", kbd: "Ctrl+Shift+K", run: () => setAgentOpen(true) },
+      { id: "p.hints", label: `Popisky pro výběr myší (F1 / E2 / V3) – ${hintsOn ? "vypnout" : "zapnout"}`, group: "Program", icon: "filterSel", kbd: "Ctrl+Shift+L", run: () => setHintsOn((v) => !v) },
       { id: "p.rfq", label: "Poptat výrobu (STEP + e-mail)", group: "Program", icon: "export", run: toRfq },
     );
     return out;
@@ -2697,6 +2710,7 @@ export function CadApp() {
                     { id: "palette", label: "Paleta příkazů", icon: "palette", kbd: "Ctrl+K", hint: "napište název příkazu („díra“, „výkres“, „zaoblit“…)", onClick: () => setPaletteOpen(true) },
                     { id: "settings", label: "Nastavení…", icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { divider: true },
+                    { id: "hints", label: `Popisky pro výběr myší (F1 / E2 / V3) – ${hintsOn ? "vypnout" : "zapnout"}`, icon: "filterSel", kbd: "Ctrl+Shift+L", active: hintsOn, hint: "štítky na plochách, hranách a vrcholech: klik na štítek = klik na entitu; pro AI agenty, automatizaci a dotyk", onClick: () => setHintsOn((v) => !v) },
                     { id: "agent", label: "Textové příkazy – pro AI agenty i rychlé zadání", icon: "palette", kbd: "Ctrl+Shift+K", hint: "kvádr 100 60 20 · díra 8,5 skrz v 20 30 · zaoblit 2 hrany svislé · JSON dokumentu · window.mncad", onClick: () => setAgentOpen(true) },
                     { id: "diag", label: "Zkopírovat diagnostiku (bez dat dokumentu)", icon: "info", hint: "verze programu, prohlížeč, WebGL, jádro, chyba – pro e-mail podpoře", onClick: () => void copyDiagnostics() },
                     { id: "web", label: "Zpět na web mnastrojarna.cz", icon: "home", onClick: () => window.location.assign("/") },
@@ -2854,6 +2868,7 @@ export function CadApp() {
                   key={glKey}
                   ref={vp}
                   onRenderError={setGlError}
+                  hints={hintsOn}
                   mesh={result?.mesh ?? null}
                   sketches={sketchesForView}
                   datums={datums}
@@ -2901,7 +2916,7 @@ export function CadApp() {
             )}
             {sketch && (
               <>
-                <Sketcher key={sketch.id} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} modelLines={result?.mesh?.lines ?? null} />
+                <Sketcher key={sketch.id} hints={hintsOn} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} modelLines={result?.mesh?.lines ?? null} />
                 <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-[#2563eb] px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-white shadow-lg">Skica · {planeLabel(sketch.plane)}</div>
               </>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -45,7 +45,12 @@ export type AsmView = {
 /** Gizmo pro přesun/otočení (TransformControls). `matrix` = výchozí poloha úchopu (po sloupcích). */
 export type Gizmo = { id: string; matrix: number[]; mode: "translate" | "rotate"; targets: string[] } | null;
 
+/** popisek entity na obrazovce */
+export type Hint = { id: string; kind: "face" | "edge" | "vertex"; index: number; x: number; y: number; p: Vec3; title: string };
+const axisName = (n: THREE.Vector3): string => (Math.abs(n.x) > 0.95 ? (n.x > 0 ? "+X" : "-X") : Math.abs(n.y) > 0.95 ? (n.y > 0 ? "+Y" : "-Y") : Math.abs(n.z) > 0.95 ? (n.z > 0 ? "+Z" : "-Z") : "");
 export type ViewportHandle = {
+  hintList: () => Omit<Hint, "p">[];
+  clickHint: (id: string, additive?: boolean) => boolean;
   setView: (v: ViewName) => void;
   fit: () => void;
   snapshot: () => string | null;
@@ -56,6 +61,8 @@ type Props = {
   mesh: MeshData | null;
   /** selhání 3D okna (WebGL nedostupné, kontext ztracen) – aplikace zobrazí chybovou obrazovku místo pádu */
   onRenderError?: (f: RenderFailure) => void;
+  /** popisky entit (F1 plocha, E2 hrana, V3 vrchol) na viditelných místech – výběr myší bez trefování (AI agenti, automatizace) */
+  hints?: boolean;
   /** topologické vrcholy tělesa dílu (x,y,z…) */
   vertices?: Float32Array | null;
   sketches: Extract<Feature, { type: "sketch" }>[];
@@ -180,6 +187,138 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const propsRef = useRef(props);
   propsRef.current = props;
 
+  // ---------- popisky entit (F1 / E2 / V3) ----------
+  const [hintList, setHintList] = useState<Hint[]>([]);
+  const hintsRef = useRef<Hint[]>([]);
+  hintsRef.current = hintList;
+  const hintsTick = useRef<() => void>(() => undefined);
+  const computeHints = useCallback(() => {
+    const s = S.current;
+    const el = host.current;
+    const m = propsRef.current.mesh;
+    if (!s || !el || !propsRef.current.hints) {
+      setHintList((l) => (l.length ? [] : l));
+      return;
+    }
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const cam = s.camera;
+    const out: Hint[] = [];
+    const ray = new THREE.Raycaster();
+    const targets: THREE.Object3D[] = s.mesh ? [s.mesh] : [];
+    const radius = s.radius || 100;
+    const tol = Math.max(0.05, radius * 0.01);
+    const visible = (p: THREE.Vector3, t: number) => {
+      if (!targets.length) return true;
+      const ndc = p.clone().project(cam);
+      ray.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), cam);
+      const hit = ray.intersectObjects(targets, false)[0];
+      return !hit || hit.point.distanceTo(p) <= t;
+    };
+    const toScreen = (p: THREE.Vector3): [number, number, number] => {
+      const v = p.clone().project(cam);
+      return [((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h, v.z];
+    };
+    const inside = (x: number, y: number, z: number) => z <= 1 && x >= 4 && y >= 4 && x <= w - 4 && y <= h - 4;
+    const camDir = cam.getWorldDirection(new THREE.Vector3());
+    if (m) {
+      const V = m.vertices;
+      const N = m.normals;
+      const T = m.triangles;
+      for (let g = 0; g + 2 < m.faceGroups.length && out.length < 300; g += 3) {
+        const start = m.faceGroups[g];
+        const count = m.faceGroups[g + 1];
+        const fi = m.faceGroups[g + 2];
+        if (count < 3) continue;
+        let cx = 0, cy = 0, cz = 0, nx = 0, ny = 0, nz = 0, n = 0;
+        const cents: Vec3[] = [];
+        for (let i = start; i + 2 < start + count; i += 3) {
+          const a = T[i] * 3, b = T[i + 1] * 3, c = T[i + 2] * 3;
+          const tc: Vec3 = [(V[a] + V[b] + V[c]) / 3, (V[a + 1] + V[b + 1] + V[c + 1]) / 3, (V[a + 2] + V[b + 2] + V[c + 2]) / 3];
+          cents.push(tc);
+          cx += tc[0]; cy += tc[1]; cz += tc[2];
+          nx += N[a]; ny += N[a + 1]; nz += N[a + 2];
+          n++;
+        }
+        cx /= n; cy /= n; cz /= n;
+        let best = cents[0];
+        let bd = Infinity;
+        for (const c of cents) {
+          const d = (c[0] - cx) ** 2 + (c[1] - cy) ** 2 + (c[2] - cz) ** 2;
+          if (d < bd) { bd = d; best = c; }
+        }
+        const nl = Math.hypot(nx, ny, nz) || 1;
+        const nv = new THREE.Vector3(nx / nl, ny / nl, nz / nl);
+        const planar = nl / n > 0.98;
+        const p = new THREE.Vector3(best[0], best[1], best[2]);
+        const toCam = cam instanceof THREE.OrthographicCamera ? camDir.clone().negate() : cam.position.clone().sub(p).normalize();
+        if (planar && nv.dot(toCam) < 0.03) continue; // rovinná plocha odvrácená od kamery
+        if (!visible(p, tol)) continue;
+        const [x, y, z] = toScreen(p);
+        if (!inside(x, y, z)) continue;
+        const dir = axisName(nv);
+        out.push({ id: `F${fi + 1}`, kind: "face", index: fi, x, y, p: best, title: `Plocha ${fi + 1} · ${planar ? "rovinná" : "zakřivená"}${dir ? ` · normála ${dir}` : ""}` });
+      }
+      const L = m.lines;
+      let edges = 0;
+      for (let g = 0; g + 2 < m.edgeGroups.length && edges < 400; g += 3) {
+        const start = m.edgeGroups[g];
+        const count = m.edgeGroups[g + 1];
+        const ei = m.edgeGroups[g + 2];
+        const nSeg = Math.floor(count / 2);
+        if (nSeg < 1) continue;
+        // štítek uprostřed hrany: u úsečky střed mezi koncovými body (ne vrchol), u křivky prostřední bod
+        const k = start + 2 * Math.floor(nSeg / 2);
+        const p = nSeg === 1 ? new THREE.Vector3((L[start * 3] + L[(start + 1) * 3]) / 2, (L[start * 3 + 1] + L[(start + 1) * 3 + 1]) / 2, (L[start * 3 + 2] + L[(start + 1) * 3 + 2]) / 2) : new THREE.Vector3(L[k * 3], L[k * 3 + 1], L[k * 3 + 2]);
+        let len = 0;
+        for (let q = start; q + 1 < start + count; q += 2) len += Math.hypot(L[(q + 1) * 3] - L[q * 3], L[(q + 1) * 3 + 1] - L[q * 3 + 1], L[(q + 1) * 3 + 2] - L[q * 3 + 2]);
+        if (!visible(p, tol * 2)) continue;
+        const [x, y, z] = toScreen(p);
+        if (!inside(x, y, z)) continue;
+        let kind = "křivka";
+        if (nSeg === 1) {
+          const d = new THREE.Vector3(L[(start + 1) * 3] - L[start * 3], L[(start + 1) * 3 + 1] - L[start * 3 + 1], L[(start + 1) * 3 + 2] - L[start * 3 + 2]).normalize();
+          kind = Math.abs(d.z) > 0.99 ? "svislá úsečka" : Math.abs(d.z) < 0.01 ? "vodorovná úsečka" : "úsečka";
+        }
+        out.push({ id: `E${ei + 1}`, kind: "edge", index: ei, x, y, p: [p.x, p.y, p.z], title: `Hrana ${ei + 1} · ${kind} · délka ≈ ${Math.round(len * 10) / 10} mm` });
+        edges++;
+      }
+    }
+    const vs = propsRef.current.vertices;
+    if (vs) {
+      let nv = 0;
+      for (let i = 0; i + 2 < vs.length && nv < 200; i += 3) {
+        const p = new THREE.Vector3(vs[i], vs[i + 1], vs[i + 2]);
+        if (!visible(p, tol * 2)) continue;
+        const [x, y, z] = toScreen(p);
+        if (!inside(x, y, z)) continue;
+        out.push({ id: `V${i / 3 + 1}`, kind: "vertex", index: i / 3, x, y, p: [p.x, p.y, p.z], title: `Vrchol ${i / 3 + 1} · [${Math.round(p.x * 100) / 100}; ${Math.round(p.y * 100) / 100}; ${Math.round(p.z * 100) / 100}]` });
+        nv++;
+      }
+    }
+    setHintList(out);
+  }, []);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    hintsTick.current = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(computeHints, 160);
+    };
+    return () => {
+      if (t) clearTimeout(t);
+    };
+  }, [computeHints]);
+  useEffect(() => {
+    const t = setTimeout(computeHints, 120); // až po přestavbě sítě ve scéně
+    return () => clearTimeout(t);
+  }, [props.hints, props.mesh, props.vertices, computeHints]);
+  useEffect(() => {
+    if (!props.hints) return;
+    const on = () => hintsTick.current();
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, [props.hints]);
+
   // ---------- inicializace ----------
   useEffect(() => {
     const el = host.current!;
@@ -220,6 +359,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     controls.dampingFactor = 0.14;
     controls.screenSpacePanning = true;
     controls.zoomToCursor = true;
+    controls.addEventListener("change", () => hintsTick.current()); // popisky entit sledují kameru
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0xcfd6de, 0.65));
     const key = new THREE.DirectionalLight(0xffffff, 1.15);
@@ -348,7 +488,10 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       asmGeo: new Map(), grid, hoverFace: -1, hoverEdge: -1, hoverItem: null, snapCands: [], snapGroup, radius: 100, center: new THREE.Vector3(), clip, render,
     };
     resize();
-    const ro = new ResizeObserver(resize);
+    const ro = new ResizeObserver(() => {
+      resize();
+      hintsTick.current(); // štítky entit po změně velikosti 3D okna (otevření formuláře, panelů)
+    });
     ro.observe(el);
     buildGrid(100);
     applyMouse();
@@ -1333,6 +1476,19 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement.toDataURL("image/png");
     },
+    /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
+    hintList: () => hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
+    /** „klikne“ na popisek (syntetické pointer události na plátně – stejná cesta jako myš) */
+    clickHint: (id: string, additive = false) => {
+      const hh = hintsRef.current.find((x) => x.id.toUpperCase() === id.trim().toUpperCase());
+      const s = S.current;
+      if (!hh || !s) return false;
+      const r = s.renderer.domElement.getBoundingClientRect();
+      const init: PointerEventInit = { clientX: r.left + hh.x, clientY: r.top + hh.y, button: 0, buttons: 1, bubbles: true, cancelable: true, pointerType: "mouse", pointerId: 1, isPrimary: true, ctrlKey: additive };
+      s.renderer.domElement.dispatchEvent(new PointerEvent("pointerdown", init));
+      s.renderer.domElement.dispatchEvent(new PointerEvent("pointerup", { ...init, buttons: 0 }));
+      return true;
+    },
     bounds: () => {
       const s = S.current;
       return { center: s ? [s.center.x, s.center.y, s.center.z] : [0, 0, 0], radius: s?.radius ?? 100 };
@@ -1365,6 +1521,24 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
           </div>
         ))}
       </div>
+      {/* popisky entit pro výběr bez trefování (klik na střed popisku = klik na entitu; pointer-events: none) */}
+      {props.hints && hintList.length > 0 && (
+        <div data-hints className="pointer-events-none absolute inset-0 overflow-hidden">
+          {hintList.map((hh) => (
+            <div
+              key={hh.id}
+              data-hint={hh.id}
+              data-kind={hh.kind}
+              data-index={hh.index}
+              title={hh.title}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded px-1 font-mono text-[10px] font-semibold leading-[14px] text-white shadow ${hh.kind === "face" ? "bg-[#2563eb]/90" : hh.kind === "edge" ? "bg-[#059669]/90" : "bg-[#7c3aed]/90"}`}
+              style={{ left: hh.x, top: hh.y }}
+            >
+              {hh.id}
+            </div>
+          ))}
+        </div>
+      )}
       {/* ViewCube */}
       <div className="absolute right-4 top-4 z-10 select-none" style={{ perspective: 600 }}>
         <div className="relative h-[60px] w-[60px]" style={{ transformStyle: "preserve-3d" }}>
