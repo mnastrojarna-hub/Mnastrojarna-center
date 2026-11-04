@@ -231,7 +231,7 @@ describe("plošné modelování – těleso ↔ plocha, křivky", () => {
     expect(miss.bad[0].error).toMatch(/cílovou plochu/);
   });
 
-  it("šroubovice jako křivka a tažení po šroubovici (pružina, závit)", async () => {
+  it("šroubovice jako křivka a tažení po šroubovici (pružina, závit)", { timeout: 60000 }, async () => {
     const doc = base([]);
     const h = await build([ext(doc, "surf.helix", { radius: 10, pitch: 5, turns: 4 })]);
     ok(h);

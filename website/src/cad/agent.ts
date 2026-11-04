@@ -10,6 +10,7 @@
  * (výběr hran/ploch pravidlem, poloha díry „na horní ploše“), nechávají doplnění na aplikaci.
  */
 import { MATERIALS } from "@/lib/mesh-metrics";
+import { threadByName, threadLabel } from "./defaults";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec3 } from "./types";
 
 export const AGENT_API_VERSION = 1;
@@ -38,7 +39,9 @@ export type AgentOp =
   | { k: "select"; feature: Feature; rule: Rule; line: number }
   | { k: "pop"; line: number }
   | { k: "view"; view: string; line: number }
-  | { k: "status"; line: number };
+  | { k: "status"; line: number }
+  /** sestava: kontrola kolizí komponent, výsledek do protokolu */
+  | { k: "clash"; line: number };
 export type AgentError = { line: number; text: string; message: string };
 export type AgentProgram = { ops: AgentOp[]; errors: AgentError[] };
 
@@ -134,6 +137,9 @@ syn("longer", "delší", "delsi");
 syn("shorter", "kratší", "kratsi");
 syn("linear", "lineární", "linearni", "řada", "rada", "mřížka", "mrizka");
 syn("circular", "kruhové", "kruhove", "kruhový", "kruhovy", "dokola", "polar");
+syn("internal", "vnitřní", "vnitrni", "inner");
+syn("clash", "kolize", "kolizní", "kolizni", "collisions", "interference");
+syn("modeled", "modelovat", "modelovaný", "modelovany", "modeled", "modelled");
 const canon = (t: string) => SYN[fold(t)] ?? fold(t);
 
 const PLANES: Record<string, PlaneName> = { xy: "XY", xz: "XZ", yz: "YZ", "pudorys": "XY", "narys": "XZ", "bokorys": "YZ", top: "XY", front: "XZ", right: "YZ" };
@@ -143,7 +149,7 @@ const VIEWS: Record<string, string> = { iso: "iso", izo: "iso", izometrie: "iso"
 
 /** volby za příkazem: `{klíč: čísla | slova}` + příznaky */
 type Opts = { flags: Set<string>; nums: Record<string, number[]>; words: Record<string, string[]>; free: number[]; strings: string[] };
-const FLAGS = new Set(["center", "through", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular"]);
+const FLAGS = new Set(["center", "through", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular", "internal", "modeled"]);
 const NUM_OPTS = new Set(["at", "depth", "angle", "draft", "offset", "spacing", "count", "counterbore", "countersink", "height", "radius", "diameter", "sides", "rect-r", "length", "width", "longer", "shorter", "corner"]);
 const WORD_OPTS = new Set(["axis", "direction", "thread", "edges", "open", "name", "material", "color"]);
 function parseOpts(tokens: string[]): Opts {
@@ -212,6 +218,13 @@ export function parseAgentText(text: string): AgentProgram {
     if (!line || line.startsWith("#") || line.startsWith("//")) return;
     const no = idx + 1;
     try {
+      // JSON na jednom řádku (jeden prvek, pole prvků) lze míchat s textovými příkazy – např. prvek rozšíření bez textového příkazu
+      if (/^[[{]/.test(line)) {
+        const sub = parseJson(line);
+        for (const op of sub.ops) ops.push({ ...op, line: no });
+        for (const e of sub.errors) errors.push({ line: no, text: line.slice(0, 80), message: e.message });
+        return;
+      }
       // skica: `skica XY [odsazení 5]: kružnice 165; obdélník 60 40`
       const colon = line.indexOf(":");
       const headTokens = tokenize(colon >= 0 ? line.slice(0, colon) : line);
@@ -328,8 +341,11 @@ export function parseAgentText(text: string): AgentProgram {
             f.csAngle = o.nums.countersink[1] ?? 90;
           }
           if (o.words.thread?.[0]) {
+            const t = threadByName(o.words.thread[0]);
+            if (!t) throw new Error(`neznámý závit „${o.words.thread[0]}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)`);
             f.kind = "tapped";
-            f.thread = o.words.thread[0].toUpperCase();
+            f.thread = t.name;
+            f.diameter = t.tap;
           }
           ops.push({ k: "feature", feature: f, line: no, fillTop });
           return;
@@ -342,6 +358,18 @@ export function parseAgentText(text: string): AgentProgram {
           const feature: Feature = cmd === "fillet" ? { id: uid(), name: named("fillet", nm), type: "fillet", radius: v, edges: "all" } : { id: uid(), name: named("chamfer", nm), type: "chamfer", distance: v, edges: "all" };
           if (!rule.length || rule.includes("vse") || rule.includes("all")) ops.push({ k: "feature", feature, line: no });
           else ops.push({ k: "select", feature, rule, line: no });
+          return;
+        }
+        case "thread": {
+          // závit M18×1,5 délka 20 [v x y z] [osa Z] [vnitřní] [modelovat]
+          const des = (o.strings.find((w) => /^m\d/i.test(w)) ?? o.words.thread?.[0] ?? "").replace(/,/g, ".");
+          const t = threadByName(des);
+          if (!t) throw new Error(`závit potřebuje označení M2 až M48 (hrubé nebo jemné stoupání, např. M18×1,5): závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]${des ? ` – „${des}“ není metrický závit` : ""}`);
+          const L = o.nums.length?.[0] ?? o.free[0];
+          if (!(L > 0)) throw new Error("závit potřebuje délku: závit M18×1,5 délka 20");
+          const f: Feature = { id: uid(), name: named("thread", nm), type: "thread", designation: t.name, position: posOf(o) ?? [0, 0, 0], axis: axisOf(o), length: L, modeled: o.flags.has("modeled") };
+          if (o.flags.has("internal")) f.internal = true;
+          ops.push({ k: "feature", feature: f, line: no });
           return;
         }
         case "shell": {
@@ -406,6 +434,9 @@ export function parseAgentText(text: string): AgentProgram {
           return;
         case "status":
           ops.push({ k: "status", line: no });
+          return;
+        case "clash":
+          ops.push({ k: "clash", line: no });
           return;
         case "view": {
           const v = VIEWS[fold(tokens[0] ?? "iso")];
@@ -618,12 +649,14 @@ export function featureSummary(f: Feature): string {
       return `Ø${fmt(2 * f.radius)} × ${fmt(f.height)} mm, osa ${f.axis}, ${f.mode}`;
     case "sphere":
       return `Ø${fmt(2 * f.radius)} mm, ${f.mode}`;
+    case "thread":
+      return `${threadLabel(f.designation)} délka ${fmt(f.length)} mm, ${f.internal ? "vnitřní (v díře)" : "vnější (na válci)"}, ${f.modeled ? "modelované drážky" : "kosmetický (jen výkres)"}, začátek [${f.position.map((v) => fmt(v)).join("; ")}], osa ${f.axis}`;
     case "cone":
       return `Ø${fmt(2 * f.radius1)}→Ø${fmt(2 * f.radius2)} × ${fmt(f.height)} mm, ${f.mode}`;
     case "tube":
       return `Ø${fmt(f.outer)}/Ø${fmt(f.inner)} × ${fmt(f.height)} mm, ${f.mode}`;
     case "hole":
-      return `${f.kind === "tapped" && f.thread ? `${f.thread.toUpperCase()}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"} (jádro Ø${fmt(f.diameter, 2)})` : `Ø${fmt(f.diameter, 2)}${f.depth > 0 ? ` hloubka ${fmt(f.depth)}` : " skrz"}`}${f.cbDiameter > 0 ? ` zahl. Ø${fmt(f.cbDiameter)}×${fmt(f.cbDepth)}` : ""}${f.csDiameter ? ` kuž. Ø${fmt(f.csDiameter)}` : ""} v [${f.position.map((v) => fmt(v)).join("; ")}], osa ${f.axis}`;
+      return `${f.kind === "tapped" && f.thread ? `${threadLabel(f.thread)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"} (jádro Ø${fmt(f.diameter, 2)})` : `Ø${fmt(f.diameter, 2)}${f.depth > 0 ? ` hloubka ${fmt(f.depth)}` : " skrz"}`}${f.cbDiameter > 0 ? ` zahl. Ø${fmt(f.cbDiameter)}×${fmt(f.cbDepth)}` : ""}${f.csDiameter ? ` kuž. Ø${fmt(f.csDiameter)}` : ""} v [${f.position.map((v) => fmt(v)).join("; ")}], osa ${f.axis}`;
     case "fillet":
       return `R${fmt(f.radius, 2)}, hrany ${f.edges === "all" ? "vše" : f.edges.length}`;
     case "chamfer":
@@ -642,24 +675,45 @@ export function featureSummary(f: Feature): string {
       return "";
   }
 }
+/** Stav sestavy pro textový stav (počítá aplikace z načtených komponent). */
+export type AsmStatus = {
+  components: number;
+  parts: number;
+  bbox?: [Vec3, Vec3];
+  volume?: number;
+  massKg?: number;
+  /** null = kolize zatím nekontrolovány */
+  clash?: { count: number; pairs: string[]; at: string } | null;
+};
+
 /** Textový stav dokumentu – zpětná vazba pro agenta bez obrázku. */
-export function docStatusText(doc: CadDoc, res: BuildResult | null): string {
+export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus): string {
   const st = new Map((res?.status ?? []).map((s) => [s.id, s]));
   const okCount = doc.features.filter((f) => st.get(f.id)?.ok !== false).length;
+  const warnCount = doc.features.filter((f) => st.get(f.id)?.ok !== false && st.get(f.id)?.warning).length;
   const lines: string[] = [];
   const matClass = MATERIALS.find((x) => x.id === doc.material);
   const matText = doc.materialName?.trim() ? `${doc.materialName.trim()} (hustota podle: ${matClass?.label ?? doc.material})` : (matClass ? `${matClass.label} (${matClass.density} g/cm³)` : doc.material || "–");
-  lines.push(`Dokument: „${doc.name}“ · ${doc.kind === "assembly" ? "sestava" : "díl"} · materiál ${matText} · prvků ${doc.features.length} (${okCount} ✓, ${doc.features.length - okCount} ✗)${res?.bodies?.length ? ` · těles ${res.bodies.length}` : ""}`);
+  lines.push(`Dokument: „${doc.name}“ · ${doc.kind === "assembly" ? "sestava" : "díl"} · materiál ${matText} · prvků ${doc.features.length} (${okCount - warnCount} ✓${warnCount ? `, ${warnCount} ⚠` : ""}, ${doc.features.length - okCount} ✗)${res?.bodies?.length ? ` · těles ${res.bodies.length}` : ""}`);
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
     lines.push(`Rozměry: ${fmt(b[0] - a[0])} × ${fmt(b[1] - a[1])} × ${fmt(b[2] - a[2])} mm (X ${fmt(a[0])}…${fmt(b[0])}, Y ${fmt(a[1])}…${fmt(b[1])}, Z ${fmt(a[2])}…${fmt(b[2])}) · objem ${fmt(res.metrics.volume / 1000, 2)} cm³ · ploch ${res.metrics.faces} · hran ${res.metrics.edges}`);
-  } else if (res) lines.push("Rozměry: žádné těleso (jen skici / pomocná geometrie)");
-  if (doc.kind === "assembly") lines.push(`Komponenty: ${(doc.components ?? []).map((c) => c.name).join(", ") || "žádné"}`);
+    const m = res.metrics;
+    if (m.valid !== undefined || m.solids !== undefined) lines.push(`Geometrie: ${m.solids === 0 ? "ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid" : m.valid === false ? "NEPLATNÁ (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat; opravte prvek označený ⚠" : "platná"}${m.solids ? ` · ${m.solids === 1 ? "1 těleso" : `${m.solids} těles`}` : ""}`);
+  } else if (res && doc.kind !== "assembly") lines.push("Rozměry: žádné těleso (jen skici / pomocná geometrie)");
+  if (doc.kind === "assembly") {
+    lines.push(`Komponenty: ${(doc.components ?? []).map((c) => c.name).join(", ") || "žádné"}`);
+    if (asm) {
+      const [a, b] = asm.bbox ?? [null, null];
+      lines.push(`Sestava: ${asm.components} komponent (${asm.parts} dílů po rozložení podsestav)${a && b ? ` · obálka ${fmt(b[0] - a[0])} × ${fmt(b[1] - a[1])} × ${fmt(b[2] - a[2])} mm` : ""}${asm.volume != null ? ` · objem Σ ${fmt(asm.volume / 1000, 2)} cm³` : ""}${asm.massKg != null ? ` · hmotnost Σ ${fmt(asm.massKg, 3)} kg` : ""}`);
+      lines.push(asm.clash ? `Kolize: ${asm.clash.count ? `${asm.clash.count} – ${asm.clash.pairs.join("; ")}` : "žádné"} (zkontrolováno ${asm.clash.at})` : "Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava");
+    } else lines.push("Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)");
+  }
   if (doc.features.length) {
     lines.push("Prvky:");
     doc.features.forEach((f, i) => {
       const s = st.get(f.id);
-      lines.push(` ${i + 1}. ${f.name} [${f.type}, id ${f.id}] ${s?.ok === false ? "✗ " + (s.error ?? "chyba") : "✓"}${f.suppressed ? " (potlačen)" : ""} – ${featureSummary(f)}`);
+      lines.push(` ${i + 1}. ${f.name} [${f.type}, id ${f.id}] ${s?.ok === false ? "✗ " + (s.error ?? "chyba") : s?.warning ? "⚠ " + s.warning : "✓"}${f.suppressed ? " (potlačen)" : ""} – ${featureSummary(f)}`);
     });
   }
   if (res?.paramErrors?.length) lines.push(`Chyby proměnných: ${res.paramErrors.join("; ")}`);
@@ -684,7 +738,8 @@ export const AGENT_COMMANDS: { cmd: string; en: string; desc: string }[] = [
   { cmd: "úsečka x1 y1 x2 y2 · čára x1 y1 x2 y2 … [uzavřít] · bod x y · elipsa rx ry", en: "line, polyline, point, ellipse", desc: "další entity; předpona „pomocná“ = konstrukční" },
   { cmd: "vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]", en: "extrude", desc: "vysune poslední skicu" },
   { cmd: "rotovat [úhel] [osa X|Y|Z]", en: "revolve", desc: "orotuje poslední skicu (výchozí osa Y skici, 360°)" },
-  { cmd: "díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", desc: "bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů" },
+  { cmd: "díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", desc: "bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; závit i s jemným stoupáním (M18×1,5) – jádro se dopočítá" },
+  { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", desc: "závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii" },
   { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z… ] [poloměr N] [delší N]", en: "fillet", desc: "pravidla lze kombinovat (horní kruhové)" },
   { cmd: "srazit C [hrany …]", en: "chamfer", desc: "sražení hran" },
   { cmd: "skořepina T [otevřít +Z|horní|boční…]", en: "shell", desc: "vydlabání, otevřené plochy pravidlem" },
@@ -692,7 +747,8 @@ export const AGENT_COMMANDS: { cmd: string; en: string; desc: string }[] = [
   { cmd: "zrcadlit XY|XZ|YZ [odsazení N]", en: "mirror", desc: "zrcadlení tělesa" },
   { cmd: "text \"ABC\" výška H hloubka D v x y [z] [gravírovat]", en: "text", desc: "nápis vystouplý / gravírovaný" },
   { cmd: "smazat poslední · stav · zobraz iso|přední|horní…", en: "undo, status, view", desc: "správa" },
-  { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", desc: "celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků" },
+  { cmd: "kolize", en: "clash", desc: "sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)" },
+  { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", desc: "celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy" },
 ];
 
 /** JavaScript API v prohlížeči (`window.mncad`) – pro automatizaci a agenty, kteří umí spustit skript. */

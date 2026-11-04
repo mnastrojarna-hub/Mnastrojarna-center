@@ -142,6 +142,35 @@ pixely v 3D okně:
 - Ukládání a export se standardně ptají na místo a název (systémový dialog – pro agenta „blokující“). V Nastavení →
   Soubory lze zapnout **přímé stažení pod výchozím názvem**; pro skripty je nejjednodušší `window.mncad.exportFile()`.
 
+## Stav prvku: ✓ / ⚠ / ✗ – co znamená
+
+- Výsledek prvku se v protokolu vypíše **až po výpočtu** (řádek „→ … přidán“ jen potvrzuje zařazení do historie).
+- **✓** = výsledek je platné objemové těleso a operace se projevila (objem nebo topologie se změnily).
+- **⚠** = prvek se zpracoval, ale výsledek si žádá pozornost: *„Prvek těleso nezměnil“* (nástroj leží mimo těleso
+  nebo se s ním nepřekrývá – zkontrolujte polohu, poloměr, stranu) nebo *„Výsledek má neplatnou geometrii“*
+  (sebeprotínající plochy – typicky profil tečný k povrchu; export STEP pak může selhat). V historii je prvek
+  oranžový, ve stavovém řádku je čip „prvek s upozorněním“ / „neplatná geometrie“.
+- **✗** = operace selhala, těleso zůstalo jako před prvkem (např. skořepina, kterou jádro neumí, tažení bez objemu).
+- Řádek **Geometrie:** ve `stav` říká „platná · 1 těleso“, nebo „NEPLATNÁ“ / „ŽÁDNÉ objemové těleso (jen plochy)“.
+  Pokles objemu ani „1 těleso“ samy o sobě správnost nedokazují – rozhoduje tento řádek a nepřítomnost ⚠.
+
+## Závity – jak je zadat správně
+
+- Katalogový závit: `závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]` – hrubé i jemné stoupání
+  (M18×1,5, M10×1,25; jiné stoupání se dopočítá). Bez `modelovat` je kosmetický: geometrie se nemění, na výkrese
+  se kružnice válce (nebo jádra díry u `vnitřní`) kótuje označením. S `modelovat` vzniknou zjednodušené drážky.
+- Díra se závitem: `díra 5 závit M18×1,5 hloubka 20 v x y` – jádro (Ø16,5) se dopočítá z označení.
+- Skutečná šroubovice (Plochy → Tažení po šroubovici, JSON `{"type":"ext","ext":"surf.helixSweep","data":{…}}`):
+  `profile: "thread60"`, `side: "internal"` pro závit **v díře** (poloměr = poloměr díry / jádra, hloubka jde
+  do stěny) nebo `"external"` pro závit **na válci** (poloměr = poloměr válce), `pitch`, `turns`, `mode: "cut"`,
+  volitelně `leadIn` (náběh jako u závitového kalibru: hřbet prvního závitu je od začátku vybroušený až na dno drážky
+  a během N otáček se zvedá do plného profilu – drážka sama je plná od začátku).
+  Příklad matice M18×1,5 s jádrem Ø16,4: `radius: 8.2, depth: 0.8, pitch: 1.5, turns: 12, side: "internal"`.
+  JSON prvku na jednom řádku lze míchat s textovými příkazy (`trubka 42 16,4 30`, další řádek `{"type":"ext",…}`, `stav`).
+  Špička profilu nesmí být tečná k povrchu (např. radius 9 + depth 0,8 u díry Ø16,4) – takový výsledek je ⚠.
+- Na **výkrese** se modelované závity kreslí zjednodušeně (ISO 6410): hladký válec / díra s označením „M18×1,5 dl. 18“;
+  skutečná šroubovice je jen v 3D a ve STEP (přesná projekce šroubovice by trvala minuty).
+
 ## Zpětná vazba a doporučený postup pro agenta
 
 1. Otevřete https://www.mnastrojarna.cz/cad, zavřete úvodní obrazovku (Pokračovat v práci / Esc).
@@ -149,8 +178,9 @@ pixely v 3D okně:
 3. Přečtěte protokol: řádky ✗ mají důvod (např. „žádná hrana neodpovídá pravidlu“, „Hloubka díry musí být
    kladná“). Opravte a spusťte znovu jen opravené řádky – příkazy se **připojují** k dokumentu; `smazat poslední`
    vrátí poslední prvek.
-4. `stav` vrátí rozměry (X/Y/Z rozsah), objem, počet ploch a hran a seznam prvků se stavem – podle toho ověřte,
-   že model odpovídá výkresu (např. rozměr 165 × 165 × 48 mm).
+4. `stav` vrátí rozměry (X/Y/Z rozsah), objem, řádek Geometrie (platná / neplatná / bez tělesa), počet ploch a hran
+   a seznam prvků se stavem ✓ / ⚠ / ✗ – podle toho ověřte, že model odpovídá výkresu (např. 165 × 165 × 48 mm).
+   U sestavy přibude řádek Sestava (komponenty, obálka, objem, hmotnost) a Kolize (`kolize` spustí kontrolu).
 5. Výstupy: Soubor → Export 3D (STEP, STL…), Výkres → PDF/DXF/DWG, Sdílet odkazem (odkaz pro lidi), Uložit
    projekt (.mncad). Tyto akce otevírají systémový dialog uložení – to je jediné místo, kde je potřeba klik.
 
@@ -347,7 +377,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
-  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; positionRef?: Ref; dirDef?: Direction }
+  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
+  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */

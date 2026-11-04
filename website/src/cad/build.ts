@@ -3,6 +3,7 @@
  * Běží ve web workeru (prohlížeč) i v Node (testy). Předpokládá zavolané setOC().
  */
 import * as r from "replicad";
+import { checkShape, describeCheck, sameSignature, signatureOf, tryFixShape, type ShapeSignature } from "./check";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { getExt } from "./ext/index";
 import "./feat/index";
@@ -12,7 +13,7 @@ import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
 import { entityIndex, planeDefToSketchPlane, pointOf, resolveAxis, resolveDirection, resolvePlaneDef, resolveRef, V, type ResolveCtx } from "./ref-resolve";
 import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
-import { findLoops, nestLoops, shapeSegs, type Loop, type Seg } from "./sketch";
+import { findLoops, nestLoops, shapeSegs, splinePoints, type Loop, type Seg } from "./sketch";
 import type { Axis, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -186,6 +187,17 @@ export function sketchPathWire(sk: SketchF): r.Wire {
   const W = (p: Vec2): Vec3 => vec(plane.toWorldCoords(p));
   const segs: Seg[] = [];
   const closedEdges: r.Edge[] = [];
+  // Hladká křivka (spline) jako dráha = jedna B-spline hrana. Řetězec oblouků (jak se spline kreslí v profilu) má v navázání
+  // oblouků skoky křivosti, po kterých tažení vytvoří sebeprotínající plochy a booleovská operace selže.
+  const splines = sk.entities.filter((e) => e.type === "spline" && !e.construction && e.points.length >= 2);
+  const others = sk.entities.filter((e) => !e.construction && e.type !== "point" && e.type !== "spline");
+  if (splines.length === 1 && !others.length) {
+    const e = splines[0] as Extract<typeof splines[number], { type: "spline" }>;
+    const pts = splinePoints(e.points, e.closed, 8).map(W);
+    if (e.closed) pts.push(pts[0]);
+    const edge = r.makeBSplineApproximation(pts, { tolerance: 1e-3, degMin: 3, degMax: 3 });
+    return r.assembleWire([edge]);
+  }
   for (const e of sk.entities) {
     if (e.type === "line") {
       if (!e.construction) segs.push({ kind: "line", a: e.a, b: e.b });
@@ -317,7 +329,7 @@ function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { th
   let d = f.diameter;
   if (kind === "tapped") {
     const t = threadByName(f.thread);
-    if (!t) throw new Error(`Neznámý závit „${f.thread ?? ""}“ – vyberte M2 až M48.`);
+    if (!t) throw new Error(`Neznámý závit „${f.thread ?? ""}“ – ${THREAD_HINT}.`);
     d = t.tap;
   }
   if (!(d > 0)) throw new Error("Průměr díry musí být kladný.");
@@ -392,19 +404,35 @@ function holeTools(f: HoleF, ctx: Ctx): Shape {
   return tools.reduce((a, b) => a.fuse(b));
 }
 
+/**
+ * Profil (r, t) zjednodušeného modelovaného závitu: soustava V-drážek (bez stoupání – vizuálně i hmotnostně odpovídá závitu).
+ * Vnější: prstenec vně válce Ø d s drážkami dovnitř. Vnitřní (v díře Ø jádra): jádro uvnitř díry s drážkami ven (do materiálu).
+ */
+export function threadProfile(t: { d: number; pitch: number }, length: number, internal = false): [number, number][] {
+  const n = Math.max(1, Math.round(length / t.pitch));
+  const P = length / n;
+  const R = t.d / 2;
+  const rmin = R - 0.6134 * t.pitch;
+  if (internal) {
+    // nástroj od osy po zuby: valley rmin (ve vzduchu díry), špička R (v materiálu)
+    const pts: [number, number][] = [[0, 0], [0, length], [rmin, length]];
+    for (let k = n - 1; k >= 0; k--) pts.push([R, k * P + P / 2], [rmin, k * P]);
+    return pts;
+  }
+  const Rout = R + t.pitch + 1;
+  const pts: [number, number][] = [[Rout, 0], [Rout, length], [R, length]];
+  for (let k = n - 1; k >= 0; k--) pts.push([rmin, k * P + P / 2], [R, k * P]);
+  return pts;
+}
+
+export const THREAD_HINT = "zadejte M2 až M48, hrubé nebo jemné stoupání (např. M18×1,5)";
+
 /** Zjednodušený modelovaný závit: soustava V-drážek (vizuálně i hmotnostně odpovídá závitu). */
 function threadTool(f: Extract<Feature, { type: "thread" }>): Shape {
   const t = threadByName(f.designation);
-  if (!t) throw new Error(`Neznámý závit „${f.designation}“ – použijte M2 až M48.`);
+  if (!t) throw new Error(`Neznámý závit „${f.designation}“ – ${THREAD_HINT}.`);
   if (!(f.length > 0)) throw new Error("Délka závitu musí být kladná.");
-  const n = Math.max(1, Math.round(f.length / t.pitch));
-  const P = f.length / n;
-  const R = t.d / 2;
-  const rmin = R - 0.6134 * t.pitch;
-  const Rout = R + t.pitch + 1;
-  const pts: [number, number][] = [[Rout, 0], [Rout, f.length], [R, f.length]];
-  for (let k = n - 1; k >= 0; k--) pts.push([rmin, k * P + P / 2], [R, k * P]);
-  return revolved(pts, f.axis, f.position);
+  return revolved(threadProfile(t, f.length, f.internal), f.axis, f.position);
 }
 
 type ExtrudeF = Extract<Feature, { type: "extrude" }>;
@@ -653,7 +681,38 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
   const features: Feature[] = doc.features.slice(); // vyřešené skici / pomocné roviny nahrazují původní (pro odkazy)
   const resolved: Resolved = { planes: {}, datums: {} };
   let body: Shape | null = null;
+  /** podpis aktuálního tělesa (objem, plochy, hrany) – pro zjištění, že prvek těleso nezměnil */
+  let bodySig: ShapeSignature | null = null;
   const ctxOf = (): Ctx => ({ sketches, body, features });
+  /** Dokončení prvku: kontrola, že se operace projevila a že výsledek je platné objemové těleso → ✓ / ⚠ / ✗. */
+  const finish = (f: Feature, next: Shape | null): Shape | null => {
+    if (next === body || !next) {
+      status.push({ id: f.id, ok: true });
+      return next;
+    }
+    const sig = signatureOf(next);
+    let warning: string | undefined;
+    if (body && expectsChange(f) && sameSignature(bodySig, sig)) {
+      if (f.type === "shell") throw new Error("Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině.");
+      warning = "Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.";
+    }
+    // platnost výsledku: jen u prvků, které mění těleso (jinak by se kontrola opakovala zbytečně); velká tělesa se kontrolují až na konci
+    if (expectsChange(f) && sig && sig.faces <= 400) {
+      let chk = checkShape(next);
+      if (body && bodySig && !chk.solids && bodySig.faces > 0) throw new Error(`Operace nevrátila objemové těleso (${describeCheck(chk)}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).`);
+      if (!chk.valid) {
+        const fixed = tryFixShape(next);
+        if (fixed) {
+          next = fixed;
+          chk = checkShape(next);
+        }
+      }
+      if (!chk.valid) warning = `${warning ? warning + " " : ""}Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.`;
+    }
+    bodySig = sig;
+    status.push(warning ? { id: f.id, ok: true, warning } : { id: f.id, ok: true });
+    return next;
+  };
 
   for (let i = 0; i < doc.features.length && i <= untilIndex; i++) {
     const f = doc.features[i];
@@ -668,8 +727,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
       if (custom) {
         const out = await custom(f, { body, sketches, features, tools, index: i, doc });
         if (out !== null && out !== undefined) next = out;
-        body = next;
-        status.push({ id: f.id, ok: true });
+        body = finish(f, next);
         continue;
       }
       switch (f.type) {
@@ -832,13 +890,21 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           next = applyMode(body, tool, mode);
         }
       }
-      body = next;
-      status.push({ id: f.id, ok: true });
+      body = finish(f, next);
     } catch (e) {
       status.push({ id: f.id, ok: false, error: humanError(e) });
     }
   }
   return { body, status, paramErrors, resolved };
+}
+
+/** Prvky, u kterých se očekává změna tělesa (přidání / odebrání materiálu, úprava tvaru). */
+const CHANGING_TYPES = new Set<string>(["extrude", "revolve", "sweep", "loft", "box", "cylinder", "sphere", "cone", "tube", "hole", "text", "spring", "import", "fillet", "chamfer", "shell", "draft", "split", "pattern", "pushPull", "offsetFace", "deleteFace", "thicken", "rib"]);
+function expectsChange(f: Feature): boolean {
+  if (f.type === "ext") return typeof f.data?.mode === "string";
+  if (f.type === "thread") return !!f.modeled;
+  if (f.type === "mirror") return !!f.keepOriginal;
+  return CHANGING_TYPES.has(f.type);
 }
 
 function humanError(e: unknown): string {
@@ -881,6 +947,18 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
     /* otevřené těleso */
   }
   const bb = body.boundingBox.bounds as [Vec3, Vec3];
+  // platnost a počet těles – u velmi složitých tvarů (sestavy) se kontrola platnosti vynechá (drahá)
+  let valid: boolean | undefined;
+  let solids: number | undefined;
+  try {
+    const chk = body.faces.length <= 2000 ? checkShape(body) : null;
+    if (chk) {
+      valid = chk.valid;
+      solids = chk.solids;
+    }
+  } catch {
+    /* bez kontroly */
+  }
   return {
     status,
     paramErrors,
@@ -894,7 +972,7 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
       lines: new Float32Array(em.lines),
       edgeGroups,
     },
-    metrics: { volume, area, bbox: bb, faces: body.faces.length, edges: body.edges.length },
+    metrics: { volume, area, bbox: bb, faces: body.faces.length, edges: body.edges.length, valid, solids },
     vertices: safeVertices(body),
   };
 }

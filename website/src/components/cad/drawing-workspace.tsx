@@ -8,7 +8,7 @@ import { saveFile } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import { bomToCsv, defaultDrawingOptions, GDT_LABEL, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type RevisionItem, type SheetName, type ViewKey } from "@/cad/drawing";
-import { threadByName } from "@/cad/defaults";
+import { threadsOfDoc } from "@/cad/drawing-doc";
 import { dimCheck } from "@/cad/dim-check";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
@@ -100,17 +100,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     tolerance: "", // výrobní požadavky (tolerance, hrany) se nedoplňují automaticky – uvedou se jen zadané
   }));
   const [showBom, setShowBom] = useState(!!bom?.length);
-  /** závitové díry: Ø jádra → označení závitu (místo „Ø5“ se kótuje „M6 hl. 12“) */
-  const threads = useMemo(() => {
-    const out: { r: number; label: string }[] = [];
-    for (const f of doc.features) {
-      if (f.type !== "hole" || f.suppressed || f.kind !== "tapped" || !f.thread) continue;
-      const t = threadByName(f.thread);
-      if (!t) continue;
-      out.push({ r: t.tap / 2, label: `${t.name}${f.depth > 0 ? ` hl. ${String(Math.round(f.depth * 100) / 100).replace(".", ",")}` : ""}` });
-    }
-    return out;
-  }, [doc.features]);
+  /** závity: kružnice válce / jádra se kótuje označením („M6 hl. 12“, „M18×1,5 dl. 18“) – modelované šroubovice se na výkrese nekreslí (ISO 6410) */
+  const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
   const [repeatTool, setRepeatTool] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
@@ -169,8 +160,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!onDrawingsChange) return;
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = sheetDoc();
+    dirty.current = false;
     onDrawingsChange(next);
   };
+  const persistRef = useRef(persistNow);
+  persistRef.current = persistNow;
+  /** zavření výkresu: rozpracované změny (formát, razítko, kóty) se uloží hned – i když ještě běží odložené uložení nebo přepočet */
+  const close = useCallback(() => {
+    if (dirty.current) persistRef.current();
+    onClose();
+  }, [onClose]);
+  useEffect(() => () => {
+    if (dirty.current) persistRef.current();
+  }, []);
   // uložení do dokumentu (po změně kót, voleb nebo razítka)
   useEffect(() => {
     if (!dirty.current || !onDrawingsChange) return;
@@ -343,7 +345,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           setAnnPts([]);
           return;
         }
-        return onClose();
+        return close();
       }
       const k = e.key.toLowerCase();
       if (k === "f") fit();
@@ -359,7 +361,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, fit, annTool, prompt, ann.length]);
+  }, [close, fit, annTool, prompt, ann.length]);
 
   // ---------- umisťování kót a poznámek ----------
   const toSheet = (e: { clientX: number; clientY: number }): Vec2 | null => {
@@ -550,7 +552,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           </>
         )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
-        <Btn onClick={onClose} title="Zpět do 3D (Esc)">
+        <Btn onClick={close} title="Zpět do 3D (Esc)">
           Zavřít
         </Btn>
       </header>
@@ -708,7 +710,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           </Section>
           <Section title="List">
             <Row label="Formát">
-              <select className={inputCls} value={opts.sheet} onChange={(e) => set("sheet", e.target.value as DrawingOptions["sheet"])}>
+              <select className={inputCls} aria-label="Formát listu" value={opts.sheet} onChange={(e) => set("sheet", e.target.value as DrawingOptions["sheet"])}>
                 <option value="auto">Automaticky</option>
                 {(["A4", "A3", "A2", "A1", "A0"] as SheetName[]).map((s) => (
                   <option key={s} value={s}>
@@ -844,11 +846,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Row label="Opracování hran">
               <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder="např. srazit 0,5×45°" />
             </Row>
+            <Row label="Poznámka v patičce">
+              <TextInput value={meta.note ?? ""} onChange={(v) => setM({ note: v })} placeholder="např. Nekótované rozměry dle 3D modelu (STEP)" />
+            </Row>
             <p className="-mt-0.5 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">
-              Výrobní požadavky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.{" "}
-              {!meta.tolerance && !meta.edges && (
-                <button type="button" className="text-brand underline-offset-2 hover:underline" onClick={() => setM({ tolerance: "ISO 2768-mK", edges: "srazit 0,5×45°" })}>
-                  Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°)
+              Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.{" "}
+              {!meta.tolerance && !meta.edges && !meta.note && (
+                <button type="button" className="text-brand underline-offset-2 hover:underline" onClick={() => setM({ tolerance: "ISO 2768-mK", edges: "srazit 0,5×45°", note: "Nekótované rozměry dle 3D modelu (STEP)" })}>
+                  Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°, poznámka k modelu)
                 </button>
               )}
             </p>

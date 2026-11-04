@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { cad } from "@/cad/client";
-import { METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
+import { ALL_THREADS, planeLabel, threadByName } from "@/cad/defaults";
 import { AXIS_KINDS, EXTENT_KINDS, NO_EDGE, NO_FACE, NO_REF, fmtVec, isPlaceholder, type AxisDef, type Direction, type Extent, type Ref } from "@/cad/refs";
 import type { Axis, CadDoc, Feature, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -241,26 +241,32 @@ registerFeatureForm("spring", ({ f, set, b, mode }) => (
 
 registerFeatureForm("thread", ({ f, set, b }) => {
   const t = threadByName(f.designation);
+  const known = !!t && ALL_THREADS.some((x) => x.name === t.name);
   return (
     <>
-      <Field label="Závit (ISO metrický, hrubé stoupání)">
-        <select className={selectCls} value={t?.name ?? ""} onChange={(e) => set({ designation: e.target.value })}>
-          {!t && <option value="">— vyberte —</option>}
-          {METRIC_THREADS.map((x) => (
+      <Field label="Závit (ISO metrický – hrubé i jemné stoupání)">
+        <select className={selectCls} value={known ? t!.name : "custom"} onChange={(e) => e.target.value !== "custom" && set({ designation: e.target.value })}>
+          {!known && <option value="custom">{t ? `${t.name} (vlastní stoupání)` : "— vyberte nebo zadejte níže —"}</option>}
+          {ALL_THREADS.map((x) => (
             <option key={x.name} value={x.name}>
-              {x.name} × {fmtMm(x.pitch)}
+              {x.name}{x.name.includes("×") ? "" : ` × ${fmtMm(x.pitch)}`}
             </option>
           ))}
         </select>
       </Field>
+      <Field label="Označení (text)">
+        <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" aria-label="Označení závitu" value={f.designation} placeholder="např. M18×1,5" onChange={(e) => set({ designation: e.target.value })} />
+        {!t && f.designation.trim() && <span className="mt-1 block text-[11px] text-brand-600">Neznámé označení – zadejte M2 až M48, volitelně se stoupáním (M18×1,5).</span>}
+      </Field>
+      <Check label="Vnitřní závit (v díře)" value={!!f.internal} onChange={(v) => set({ internal: v })} />
       <Num label="Délka závitu" value={f.length} min={0.1} bind={b("length")} onChange={(v) => set({ length: v })} />
       <AxisDirField axis={f.axis} dirDef={f.dirDef} set={set} />
       <PositionField label="Začátek závitu (na ose)" value={f.position} refValue={f.positionRef} bind={b("position")} set={set} />
-      <Info>Tip: začátek = střed kružnice konce válce (⋯ → Střed kružnice), osa = „Podél hrany / osy válce“ s válcovou plochou.</Info>
+      <Info>Tip: začátek = střed kružnice konce válce / díry (⋯ → Střed kružnice), osa = „Podél hrany / osy válce“ s válcovou plochou.</Info>
       <Check label="Modelovat závitové drážky" value={f.modeled} onChange={(v) => set({ modeled: v })} />
       <Info>
-        {f.modeled ? "Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk." : "Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci."}
-        {t && ` Jmenovitý Ø ${fmtMm(t.d)} mm, stoupání ${fmtMm(t.pitch)} mm.`}
+        {f.modeled ? "Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dává Plochy → Tažení po šroubovici (profil Závit 60°)." : "Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci."}
+        {t && ` Jmenovitý Ø ${fmtMm(t.d)} mm, stoupání ${fmtMm(t.pitch)} mm${f.internal ? `, jádro díry Ø ${fmtMm(t.tap)} mm` : ""}.`}
       </Info>
     </>
   );

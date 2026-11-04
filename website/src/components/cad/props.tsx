@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { ALL_THREADS, FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
 import { getExt, type ExtParam } from "@/cad/ext/registry";
 import { getExtUi } from "./ext/registry";
 import { evalExpr, exprRefs, isExpression } from "@/cad/params";
@@ -97,7 +97,28 @@ export function Num({
   }
 
   const clamp = (v: number) => (min != null ? Math.max(min, v) : v);
+  // průběžné potvrzení platného čísla (po 450 ms bez psaní): hodnota se neztratí, ani když pole neopustí fokus (OK, automatizace)
+  const liveTimer = useRef<number | null>(null);
+  const latest = useRef({ value, onChange, shownExpr });
+  latest.current = { value, onChange, shownExpr };
+  const cancelLive = () => {
+    if (liveTimer.current != null) window.clearTimeout(liveTimer.current);
+    liveTimer.current = null;
+  };
+  useEffect(() => cancelLive, []);
+  const typed = (t: string) => {
+    setText(t);
+    cancelLive();
+    if (!/^\s*-?\d+(?:[.,]\d+)?\s*$/.test(t)) return;
+    liveTimer.current = window.setTimeout(() => {
+      liveTimer.current = null;
+      const v = clamp(parseFloat(t.replace(",", ".")));
+      const cur = latest.current;
+      if (Number.isFinite(v) && cur.shownExpr == null && Math.abs(v - cur.value) > 1e-12) cur.onChange(v);
+    }, 450);
+  };
   const commit = (t: string) => {
+    cancelLive();
     if (!t.trim()) {
       setText(shownExpr ?? String(round4(value)));
       return;
@@ -152,7 +173,8 @@ export function Num({
           value={text}
           inputMode={ctx ? "text" : "decimal"}
           spellCheck={false}
-          onChange={(e) => setText(e.target.value)}
+          aria-label={label}
+          onChange={(e) => typed(e.target.value)}
           onBlur={(e) => commit(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") commit((e.target as HTMLInputElement).value);
@@ -256,6 +278,9 @@ export const Info = ({ children }: { children: React.ReactNode }) => <p classNam
 
 // ---------- prvky ----------
 
+/** Změna prvku: objekt, nebo funkce nad aktuálním stavem prvku (dvě rychlé změny po sobě se nepřepíší). */
+export type FeaturePatch = Partial<Feature> | ((f: Feature) => Partial<Feature>);
+
 export function FeatureProps({
   f,
   doc,
@@ -264,10 +289,10 @@ export function FeatureProps({
 }: {
   f: Feature;
   doc: CadDoc;
-  onChange: (patch: Partial<Feature>) => void;
+  onChange: (patch: FeaturePatch) => void;
   pickHint?: string;
 }) {
-  const set = (p: Record<string, unknown>) => onChange(p as Partial<Feature>);
+  const set = (p: Record<string, unknown> | ((f: Feature) => Record<string, unknown>)) => onChange(p as FeaturePatch);
   const b = (path: string) => `${f.id}:${path}`;
   const idx = doc.features.findIndex((x) => x.id === f.id);
   const before = idx >= 0 ? doc.features.slice(0, idx) : doc.features;
@@ -445,16 +470,17 @@ export function FeatureProps({
             const t = threadByName(f.designation);
             return (
               <>
-                <Field label="Závit (ISO metrický, hrubé stoupání)">
+                <Field label="Závit (ISO metrický – hrubé i jemné stoupání)">
                   <select className={selectCls} value={t?.name ?? ""} onChange={(e) => set({ designation: e.target.value })}>
                     {!t && <option value="">— vyberte —</option>}
-                    {METRIC_THREADS.map((x) => (
+                    {ALL_THREADS.map((x) => (
                       <option key={x.name} value={x.name}>
-                        {x.name} × {fmtMm(x.pitch)}
+                        {x.name}{x.name.includes("×") ? "" : ` × ${fmtMm(x.pitch)}`}
                       </option>
                     ))}
                   </select>
                 </Field>
+                <Check label="Vnitřní závit (v díře)" value={!!f.internal} onChange={(v) => set({ internal: v })} />
                 <Num label="Délka závitu" value={f.length} min={0.1} bind={b("length")} onChange={(v) => set({ length: v })} />
                 <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
                 <Vec label="Začátek závitu (na ose)" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
@@ -756,15 +782,19 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
       <Seg label="Typ díry" value={kind} options={HOLE_KINDS} onChange={changeKind} />
       {kind === "tapped" ? (
         <>
-          <Field label="Závit">
-            <select className={selectCls} value={thread?.name ?? ""} onChange={(e) => set({ thread: e.target.value })}>
-              {!thread && <option value="">— vyberte —</option>}
-              {METRIC_THREADS.map((t) => (
+          <Field label="Závit (hrubé i jemné stoupání)">
+            <select className={selectCls} value={thread && ALL_THREADS.some((x) => x.name === thread.name) ? thread.name : "custom"} onChange={(e) => e.target.value !== "custom" && set({ thread: e.target.value, diameter: threadByName(e.target.value)?.tap ?? f.diameter })}>
+              {!(thread && ALL_THREADS.some((x) => x.name === thread.name)) && <option value="custom">{thread ? `${thread.name} (vlastní stoupání)` : "— vyberte nebo zadejte níže —"}</option>}
+              {ALL_THREADS.map((t) => (
                 <option key={t.name} value={t.name}>
-                  {t.name} × {fmtMm(t.pitch)} · vrták Ø{fmtMm(t.tap)}
+                  {t.name}{t.name.includes("×") ? "" : ` × ${fmtMm(t.pitch)}`} · vrták Ø{fmtMm(t.tap)}
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Označení závitu (text)">
+            <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" aria-label="Označení závitu díry" value={f.thread ?? ""} placeholder="např. M18×1,5" onChange={(e) => { const t = threadByName(e.target.value); set(t ? { thread: e.target.value, diameter: t.tap } : { thread: e.target.value }); }} />
+            {!thread && (f.thread ?? "").trim() && <span className="mt-1 block text-[11px] text-brand-600">Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).</span>}
           </Field>
           <Num label="Hloubka závitu" value={f.threadDepth ?? 0} min={0} hint="0 = celá" bind={b("threadDepth")} onChange={(v) => set({ threadDepth: v })} />
           {thread && <Info>Vrtá se jádrový průměr Ø{fmtMm(thread.tap)} mm, závit {thread.name} se uvede ve výkrese.</Info>}
@@ -960,11 +990,12 @@ export { FEATURE_LABEL };
 
 // ---------- prvky rozšíření: formulář z registru nebo automaticky z params ----------
 
-function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, { type: "ext" }>; doc: CadDoc; set: (p: Record<string, unknown>) => void; sketches: Feature[]; toolFeatures: Feature[] }) {
+function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, { type: "ext" }>; doc: CadDoc; set: (p: Record<string, unknown> | ((f: Feature) => Record<string, unknown>)) => void; sketches: Feature[]; toolFeatures: Feature[] }) {
   const def = getExt(f.ext);
   const ui = getExtUi(f.ext);
   const data = f.data ?? {};
-  const patch = (p: Record<string, unknown>) => set({ data: { ...data, ...p } });
+  // funkčně nad aktuálními daty prvku – změna hloubky těsně následovaná jinou změnou se nepřepíše zastaralou kopií
+  const patch = (p: Record<string, unknown>) => set((cur) => ({ data: { ...((cur as Extract<Feature, { type: "ext" }>).data ?? {}), ...p } }));
   if (!def) return <p className="text-[12px] text-brand-600">Modul prvku „{f.ext}“ není načten.</p>;
   if (ui?.Form) {
     const Form = ui.Form;

@@ -114,6 +114,8 @@ V jednom okně může být otevřeno více dílů, sestav a výkresů najednou �
 
 ### Pás karet (ribbon)
 
+Tlačítka jsou seskupená a každá skupina má pod sebou název (Skica, Tvar, Primitiva, Konstrukční prvky, Úpravy…; ve skice Uchopení, Kreslení, Úpravy, Vazby, Kóty, Nástroje). Popisek tlačítka i název skupiny jsou psané čitelným písmem; po najetí myší se zobrazí nápověda s klávesovou zkratkou.
+
 | Záložka | Obsah |
 | --- | --- |
 | Soubor | Nový díl / sestava, otevřít a importovat, uložit projekt, export 3D, výkres, rám vstřikovací formy, ukázkové díly, knihovna normálií, nastavení, klávesové zkratky, poptávka výroby. |
@@ -707,8 +709,9 @@ Nápověda → Textové příkazy, zkratka Ctrl+Shift+K, nebo paleta Ctrl+K → 
 | díra D [hloubka H\|skrz] v x y [z] [zahloubení D2 H2] [kuželové D2] [závit M8] | bez z = na horní plochu tělesa |
 | zaoblit R [hrany svislé\|horní\|kruhové\|+Z…] · srazit C [hrany …] · skořepina T [otevřít +Z] | výběr hran a ploch pravidlem – bez klikání do 3D |
 | pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N · zrcadlit YZ · text "ABC" výška 8 hloubka 1 v x y | pole, zrcadlení, nápis |
-| stav · smazat poslední · zobraz iso | zpětná vazba a správa |
-| { … } / [ … ] | JSON: celý dokument .mncad, pole prvků nebo jeden prvek – všech 36 typů prvků včetně ploch, plechu, sestav |
+| závit M18×1,5 délka 20 v x y z [vnitřní] [modelovat] · kolize | katalogový závit (hrubé i jemné stoupání, vnější / v díře) · kontrola kolizí sestavy do protokolu |
+| stav · smazat poslední · zobraz iso | zpětná vazba a správa; stav prvku ✓ / ⚠ / ✗ se vypíše až po výpočtu, řádek Geometrie říká, zda je výsledek platné těleso |
+| { … } / [ … ] | JSON: celý dokument .mncad, pole prvků nebo jeden prvek – všech 36 typů prvků včetně ploch, plechu, sestav; jeden prvek na jednom řádku lze míchat s textovými příkazy (např. tažení po šroubovici) |
 
 ### Příklad: příruba DN50 sedmi řádky
 
@@ -778,6 +781,8 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 | 3. | plochy (19), plech (12), svařence (10), pokročilé modelování, knihovna 103 rodin, výkresy s anotacemi a DWG, vazby sestav, formařské analýzy, nastavení a zkratky |
 | 4. | výběr entit a inspektor, měření mezi entitami, kontextové nabídky, gizmo, barvy ploch, podsestavy, SEO a výkon webu |
 | 5. (listopad 2026) | referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace |
+| 5. – zpětná vazba z testu 3. 11. 2026 (III) | náběh závitu jako u závitového kalibru (vybroušený hřbet prvního závitu, plynule do plného profilu); pás karet: větší písmo tlačítek a výrazné názvy skupin (Skica, Tvar, Primitiva, Kreslení, Vazby, Kóty…) |
+| 5. – zpětná vazba z testu 3. 11. 2026 (II) | poctivý stav prvku: po každém prvku kontrola objemu/topologie a platnosti geometrie (⚠ „prvek těleso nezměnil“, „neplatná geometrie“, ✗ skořepina beze změny), řádek Geometrie ve stavu, protokol agenta s výsledkem až po výpočtu; závity s jemným stoupáním (M18×1,5), vnitřní závit v díře (prvek Závit i tažení po šroubovici se stranou a náběhem); tažení po spline jako hladká B-spline (forma zůstane solidem); kusovník s označením materiálu a číslem dílu, balónky uvnitř rámu, stav sestavy a kolize v textovém stavu; žádná ztráta rychlých změn ve formuláři ani formátu výkresu; kontrola kót pro rotační díly; poznámka v patičce jen na vyžádání |
 | 5. – dodatky (listopad 2026) | sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu |
 
 ## Časté otázky
@@ -858,6 +863,14 @@ Výrobní požadavky jsou konkrétní technické údaje, které by na výkres ne
 
 Nabídka Materiál určuje třídu (hustotu) pro hmotnost. Pod ní je pole „Označení materiálu (razítko)“ – volný text, který se uloží do dokumentu, přenese sdíleným odkazem i souborem .mncad a zobrazí v razítku výkresu. Stejné pole je přímo v razítku výkresu. Textový příkaz „materiál ČSN 11 423“ dělá totéž a protokol napíše, podle které třídy se počítá hustota.
 
+**Prvek je zelený, ale model se nezměnil / STEP se nedá uložit. Proč?**
+
+To už nenastává: po každém prvku program porovná objem a topologii tělesa a zkontroluje platnost geometrie (BRepCheck). Prvek, který těleso nezměnil (nástroj mimo těleso), nebo jehož výsledek má sebeprotínající plochy, dostane oranžové ⚠ s vysvětlením v historii, ve formuláři i ve stavovém řádku; operace, kterou jádro neprovede (např. skořepina přes zaoblené plochy), skončí červeně a těleso zůstane. Stav dokumentu (konzole „stav“) má řádek Geometrie: platná / neplatná / bez objemového tělesa.
+
+**Jak udělám jemný závit M18×1,5 nebo závit v díře?**
+
+Prvek Závit přijímá hrubé i jemné stoupání (nabídka nebo text „M18×1,5“); zaškrtnutí Vnitřní závit (v díře) ho umístí do díry (kružnice jádra se pak kótuje M18×1,5). Díra se závitem má stejnou nabídku a jádro dopočítá. Skutečnou šroubovici dá Plochy → Tažení po šroubovici: profil Závit 60°, volba Vnější (na válci) / Vnitřní (v díře), poloměr = povrch, kde závit začíná, hloubka jde do materiálu; Náběh (otáček) vybrousí hřbet prvního závitu jako u závitového kalibru – od začátku až na dno drážky, během zadaných otáček se zvedá do plného profilu. Na výkrese se modelované závity kreslí zjednodušeně podle ISO 6410 – hladký válec / díra s označením M18×1,5 (přesná projekce šroubovice by trvala minuty); ve STEP je skutečná šroubovice.
+
 **Stačí automatické kótování pro výrobní výkres?**
 
-Ne – „Auto + Ø“ je pomocný základ (celkové rozměry, průměry děr, závity). Funkční kóty, tolerance (H8, ±0,1) a drsnosti doplní konstruktér. Tlačítko „Kontrola kót“ ve výkresu porovná kóty na listu s historií prvků a vypíše, co chybí; toleranci zapíšete u kóty do pole „přípona“.
+Ne – „Auto + Ø“ je pomocný základ (celkové rozměry, průměry děr, závity). Funkční kóty, tolerance (H8, g6, ±0,1) a drsnosti doplní konstruktér – tolerance z geometrie odvodit nelze. Tlačítko „Kontrola kót“ ve výkresu porovná kóty na listu s historií prvků (u rotačních dílů průměry a délky osazení, závity, drážky, zaoblení; délka průchozího řezu se nenabízí) a vypíše, co chybí; toleranci zapíšete u kóty do pole „přípona“. Poznámka „Nekótované rozměry dle 3D modelu“ se na výkres nedoplňuje sama – zapnete ji v razítku (Poznámka v patičce).

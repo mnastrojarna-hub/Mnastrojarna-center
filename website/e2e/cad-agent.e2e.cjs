@@ -69,15 +69,15 @@ díra 8,5 skrz v 20 30 zahloubení 15 5
 srazit 1 hrany horní kruhové
 blabla 5
 stav`);
-  ok(/✓ Zaoblení 1 \(fillet\) – 4 hran podle pravidla „svisle“/.test(log), 'zaoblit hrany svislé → 4 svislé hrany kvádru' + (/4 hran podle pravidla „svisle“/.test(log) ? '' : '\n' + bad(log).join('\n') + '\n' + (log.match(/Zaoblení 1[^\n]*/) || [''])[0]));
-  ok(/✓ Sražení 1 \(chamfer\) – \d+ hran podle pravidla „horni kruhove“/.test(log), 'srazit hrany horní kruhové → kruhové hrany zahloubení nahoře');
+  ok(/→ Zaoblení 1 \(fillet\) – 4 hran podle pravidla „svisle“/.test(log) && /✓ Zaoblení 1 \(fillet\)/.test(log), 'zaoblit hrany svislé → 4 svislé hrany kvádru' + (/4 hran podle pravidla „svisle“/.test(log) ? '' : '\n' + bad(log).join('\n') + '\n' + (log.match(/Zaoblení 1[^\n]*/) || [''])[0]));
+  ok(/→ Sražení 1 \(chamfer\) – \d+ hran podle pravidla „horni kruhove“/.test(log) && /✓ Sražení 1 \(chamfer\)/.test(log), 'srazit hrany horní kruhové → kruhové hrany zahloubení nahoře');
   ok(/✗ řádek 6: neznámý příkaz „blabla“/.test(log), 'neznámý příkaz: chyba s číslem řádku a nápovědou');
   ok(/Rozměry: 100 × 60 × 20 mm/.test(log) && bad(log).length === 1, 'deska 100 × 60 × 20 postavena, jediná chyba je neznámý příkaz');
   log = await run(`nový díl Krabička
 kvádr 60 40 30
 skořepina 2 otevřít +Z
 stav`);
-  ok(/✓ Skořepina 1 \(shell\) – otevřeno ploch: 1/.test(log) && /\(2 ✓, 0 ✗\)/.test(log), 'skořepina otevřít +Z → 1 plocha, stavba v pořádku' + (bad(log).length ? '\n' + bad(log).join('\n') : ''));
+  ok(/→ Skořepina 1 \(shell\) – otevřeno ploch: 1/.test(log) && /✓ Skořepina 1 \(shell\)/.test(log) && /\(2 ✓, 0 ✗\)/.test(log), 'skořepina otevřít +Z → 1 plocha, stavba v pořádku' + (bad(log).length ? '\n' + bad(log).join('\n') : ''));
   log = await run(`smazat poslední
 stav`);
   ok(/✓ odstraněn prvek „Skořepina 1“/.test(log) && !/Skořepina 1 \[shell/.test(log), 'smazat poslední odebere skořepinu');
@@ -106,14 +106,14 @@ status`);
   const api = await p.evaluate(async () => {
     const m = window.mncad;
     if (!m) return { ok: false };
-    const log = await m.run('box 30 30 30 name Kostka\nfillet 5');
+    const log = await m.run('new part API test\nbox 30 30 30 name Kostka\nfillet 5'); // čistý díl: zaoblení R5 na krychli je ověřitelně ✓ (dřív test „prošel“ jen díky ✓ před výpočtem)
     const doc = m.getDocument();
     const st = await m.status();
     return { ok: true, version: m.version, cmds: m.commands().length, guide: m.guide().length, log, docName: doc.name, n: doc.features.length, st };
   });
   ok(api.ok && api.version === 1 && api.cmds > 15 && api.guide > 1000, 'window.mncad: version, commands, guide');
   ok(/✓ Kostka \(box\)/.test(api.log) && /✓ Zaoblení \d+ \(fillet\)/.test(api.log), 'window.mncad.run provede příkazy a vrátí protokol');
-  ok(api.n >= 5 && /Prvky:/.test(api.st), 'window.mncad.getDocument / status');
+  ok(api.n >= 2 && /Prvky:/.test(api.st) && /Geometrie: platná/.test(api.st), 'window.mncad.getDocument / status (včetně řádku Geometrie)');
   const setLog = await p.evaluate(() => window.mncad.setDocument({ app: 'mnastrojarna-cad', version: 2, name: 'API díl', material: 'ocel', features: [{ type: 'sphere', radius: 10 }] }));
   ok(/✓ dokument „API díl“/.test(setLog) && /Rozměry: 20 × 20 × 20 mm/.test(setLog), 'window.mncad.setDocument otevře dokument z objektu');
 

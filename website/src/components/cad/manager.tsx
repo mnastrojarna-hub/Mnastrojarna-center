@@ -172,6 +172,11 @@ export function Manager({
                         !
                       </span>
                     )}
+                    {st && st.ok && st.warning && (
+                      <span data-feature-warning className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-amber-500 text-[10px] font-bold text-white" title={st.warning}>
+                        ⚠
+                      </span>
+                    )}
                     <button
                       type="button"
                       title="Nabídka"
@@ -185,6 +190,7 @@ export function Manager({
                     </button>
                   </div>
                   {st && !st.ok && isActive && <p className="mx-2 mb-1 rounded bg-brand/10 px-2 py-1 text-[11px] text-brand-600">{st.error}</p>}
+                  {st && st.ok && st.warning && isActive && <p className="mx-2 mb-1 rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-800">{st.warning}</p>}
                 </div>
               );
             })}

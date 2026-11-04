@@ -25,14 +25,14 @@ export type RGroup = { label: string; big?: number; items: RItem[] };
 /** Pás karet (ribbon) – velká a malá tlačítka, rozbalovací nabídky, popisky skupin. */
 export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.ReactNode }) {
   return (
-    <div className="flex h-[93px] shrink-0 items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-[#d5dbe2] bg-gradient-to-b from-[#fbfcfd] to-[#eef2f6] px-1 [scrollbar-width:thin] [touch-action:pan-x]">
+    <div className="flex h-[108px] shrink-0 items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-[#d5dbe2] bg-gradient-to-b from-[#fbfcfd] to-[#eef2f6] px-1 [scrollbar-width:thin] [touch-action:pan-x]">
       {groups.map((g) => {
         const big = g.items.slice(0, g.big ?? g.items.length);
         const small = g.items.slice(g.big ?? g.items.length);
         const cols: RItem[][] = [];
         for (let i = 0; i < small.length; i += 3) cols.push(small.slice(i, i + 3));
         return (
-          <div key={g.label} className="flex shrink-0 flex-col border-r border-[#d5dbe2] px-1.5 pt-1.5 last:border-r-0">
+          <div key={g.label} data-ribbon-group={g.label} className="flex shrink-0 flex-col border-r border-[#d5dbe2] px-1.5 pt-1.5 last:border-r-0">
             <div className="flex flex-1 items-start gap-0.5">
               {big.map((it) => (
                 <BigBtn key={it.id} it={it} />
@@ -45,7 +45,8 @@ export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.Reac
                 </div>
               ))}
             </div>
-            <p className="pb-1 pt-0.5 text-center text-[10px] text-[#6b7785]">{g.label}</p>
+            {/* název skupiny (Skica, Tvar, Vazby, Kóty…) – čitelný, ne jen šedá drobná poznámka */}
+            <p className="mt-0.5 border-t border-[#d5dbe2]/80 pb-1 pt-1 text-center text-[12px] font-semibold tracking-wide text-[#3f4a57]">{g.label}</p>
           </div>
         );
       })}
@@ -86,7 +87,7 @@ function BigBtn({ it }: { it: RItem }) {
         title={tip(it)}
         onClick={() => (it.menu ? m.setOpen(!m.open) : it.onClick?.())}
         className={cn(
-          "flex h-[64px] w-[62px] flex-col items-center justify-start gap-1 rounded-md px-1 pt-1.5 text-[11px] leading-[1.1] text-[#26303b] transition disabled:opacity-35",
+          "flex h-[70px] w-[72px] flex-col items-center justify-start gap-1 rounded-md px-1 pt-1.5 text-[12.5px] font-medium leading-[1.15] text-[#26303b] transition disabled:opacity-35",
           it.active ? "bg-[#fde3e1] ring-1 ring-brand/40" : "hover:bg-[#e3e9f0]",
         )}
       >
@@ -111,7 +112,7 @@ function SmallBtn({ it }: { it: RItem }) {
         title={tip(it)}
         onClick={() => (it.menu ? m.setOpen(!m.open) : it.onClick?.())}
         className={cn(
-          "flex h-[21px] w-full min-w-[96px] items-center gap-1.5 whitespace-nowrap rounded px-1.5 text-left text-[11.5px] text-[#26303b] transition disabled:opacity-35",
+          "flex h-[23px] w-full min-w-[110px] items-center gap-1.5 whitespace-nowrap rounded px-1.5 text-left text-[12.5px] text-[#26303b] transition disabled:opacity-35",
           it.active ? "bg-[#fde3e1] ring-1 ring-brand/40" : "hover:bg-[#e3e9f0]",
         )}
       >
@@ -128,7 +129,7 @@ export function Dropdown({ entries, close, className, anchor }: { entries: RMenu
   const list = entries.map((e, i) =>
     "divider" in e ? (
       <div key={i} className="my-1 border-t border-[#e6eaef]">
-        {e.label && <p className="px-3 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{e.label}</p>}
+        {e.label && <p className="px-3 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6b7785]">{e.label}</p>}
       </div>
     ) : (
       <button
@@ -299,7 +300,7 @@ export function HudBar({ x, y, entries, onMore, onClose, max = 4 }: { x: number;
             onClose();
             it.onClick?.();
           }}
-          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[11.5px] text-[#26303b] hover:bg-[#e3e9f0]"
+          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-[#26303b] hover:bg-[#e3e9f0]"
         >
           <CadIcon name={it.icon} tone={it.tone} className="h-5 w-5" />
           <span className="hidden sm:inline">{it.label}</span>
