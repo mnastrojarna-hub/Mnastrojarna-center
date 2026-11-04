@@ -11,6 +11,7 @@ import { FileViewerProvider } from "@/components/file-viewer/file-viewer-provide
 import { TabChunkPreload } from "@/components/jobs/detail/tab-chunk-preload";
 import { UiPrefsProvider } from "@/components/ui-prefs/use-ui-prefs";
 import { getUiPrefs } from "@/lib/data/ui-prefs";
+import { ScrollMemory } from "@/components/nav/scroll-memory";
 
 // Každý požadavek ověřuje přihlášení a oprávnění — nikdy statické předrenderování
 // (bez env při buildu by se jinak stránky aplikace „zapekly" jako statické).
@@ -35,11 +36,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <FileViewerProvider>
           <div className="flex h-screen overflow-hidden">
             <TabChunkPreload />
+            {/* paměť posunu: Zpět / Vpřed a obnovení vrátí <main> i vnitřní panely tam, kde uživatel skončil */}
+            <ScrollMemory />
             <Sidebar counts={counts} features={features} userName={user.fullName} roleLabel={user.roleLabel} />
             <div className="flex flex-1 flex-col overflow-hidden">
               <Topbar user={user} features={features} />
               <PasswordChangeGate required={user.mustChangePassword} />
-              <main className="flex-1 overflow-y-auto scrollbar-thin px-4 pb-28 pt-5 sm:px-6 md:pb-14">
+              <main data-scroll-key="main" className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-4 pb-28 pt-5 sm:px-6 md:pb-14">
                 <div className="mx-auto w-full max-w-7xl animate-fade-in">{children}</div>
               </main>
               <MobileNav features={features} counts={counts} user={{ fullName: user.fullName, roleLabel: user.roleLabel }} />

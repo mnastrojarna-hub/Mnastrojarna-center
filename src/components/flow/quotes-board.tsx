@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Archive, ArchiveRestore, ArrowRight, Eye, FileText, Search, Undo2, X } from "lucide-react";
@@ -94,7 +95,10 @@ function Board({
   approver?: boolean;
 }) {
   const [states, setStates] = React.useState<string[]>(() => parseStateParam(initialStates, QUOTE_ORDER, OPEN_QUOTE));
-  const [q, setQ] = React.useState("");
+  // hledání v adrese (stavy ?stav= drží change() níž) — Zpět vrátí stejný seznam, menu si ho pamatuje
+  const url = useUrlState({ q: "" });
+  const q = url.values.q;
+  const setQ = (v: string) => url.set({ q: v }, { delay: 300 });
   const chips = React.useMemo(() => chipsOf(quotes, counts), [quotes, counts]);
   const shown = React.useMemo(() => filterQuotes(quotes, { states, q }), [quotes, states, q]);
   // vykreslit po dávkách (stovky řádků = pomalé první zobrazení hlavně na mobilu); nový filtr = od začátku

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +32,10 @@ import { cn, relativeTime } from "@/lib/utils";
 
 type Notify = (tone: "success" | "error", text: string) => void;
 type Filter = "all" | UserRole | "inactive" | "ai";
+const USER_FILTERS: Filter[] = ["all", "super_admin", "obchodnik", "zamestnanec", "inactive", "ai"];
+function isUserFilter(v: string): v is Filter {
+  return (USER_FILTERS as string[]).includes(v);
+}
 
 const ROLE_ICONS: Record<UserRole, React.ComponentType<{ className?: string }>> = {
   super_admin: Crown,
@@ -51,8 +56,12 @@ export function UserManagement({
   aiForAll: boolean;
 }) {
   const router = useRouter();
-  const [query, setQuery] = React.useState("");
-  const [filter, setFilter] = React.useState<Filter>("all");
+  // hledání a filtr v adrese (Zpět vrátí stejný seznam)
+  const url = useUrlState({ q: "", filtr: "all" });
+  const query = url.values.q;
+  const setQuery = (v: string) => url.set({ q: v }, { delay: 300 });
+  const filter: Filter = isUserFilter(url.values.filtr) ? url.values.filtr : "all";
+  const setFilter = (f: Filter) => url.set({ filtr: f });
   const [toast, setToast] = React.useState<{ tone: "success" | "error"; text: string; id: number } | null>(null);
 
   const notify = React.useCallback<Notify>((tone, text) => setToast({ tone, text, id: Date.now() }), []);

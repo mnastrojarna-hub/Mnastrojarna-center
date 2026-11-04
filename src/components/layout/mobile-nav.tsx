@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, Inbox, MessageSquareQuote, Camera, Menu, Moon, Sun, LogOut, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -68,7 +69,7 @@ export function MobileNav({ features, counts, user }: {
         {items.map((item) => {
           const active = matchesNavPath(pathname, item.href);
           return (
-            <Link
+            <RememberedLink
               key={item.href}
               href={item.href}
               className={cn(
@@ -78,7 +79,7 @@ export function MobileNav({ features, counts, user }: {
             >
               <item.icon className="h-5 w-5" />
               {item.title}
-            </Link>
+            </RememberedLink>
           );
         })}
 
@@ -134,7 +135,7 @@ export function MobileNav({ features, counts, user }: {
                   {section.items.map((item) => {
                     const n = item.badgeKey ? badgeCounts[item.badgeKey] ?? 0 : 0;
                     return (
-                      <Link
+                      <RememberedLink
                         key={item.href}
                         href={item.href}
                         className={cn(
@@ -145,7 +146,7 @@ export function MobileNav({ features, counts, user }: {
                         <item.icon className={cn("h-4 w-4 shrink-0", item.color)} />
                         <span className="min-w-0 flex-1 truncate">{item.title}</span>
                         <CountBadge n={n} className="shrink-0" />
-                      </Link>
+                      </RememberedLink>
                     );
                   })}
                 </div>

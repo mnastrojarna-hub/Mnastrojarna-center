@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -103,7 +104,7 @@ export function Sidebar({
               return (
                 <React.Fragment key={item.href}>
                   {tip(
-                    <Link
+                    <RememberedLink
                       href={item.href}
                       title={collapsed ? undefined : item.description}
                       aria-label={collapsed ? (count ? `${item.title} (${count})` : item.title) : undefined}
@@ -134,7 +135,7 @@ export function Sidebar({
                           {count}
                         </span>
                       ) : null}
-                    </Link>,
+                    </RememberedLink>,
                     count ? `${item.title} · ${count}` : item.title,
                   )}
                 </React.Fragment>

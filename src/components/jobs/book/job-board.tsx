@@ -95,7 +95,7 @@ export function JobBoard({
 
   return (
     <div className="relative">
-      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-thin md:snap-none">
+      <div data-scroll-key="board" className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-thin md:snap-none">
         {columns.map((col) => {
           const m = stageMeta(col.stage);
           const Icon = m.icon;

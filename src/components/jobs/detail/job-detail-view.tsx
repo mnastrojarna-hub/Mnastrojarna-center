@@ -25,6 +25,7 @@ import type { JobPayment, OrderRevision } from "@/lib/data/flow-status";
 import type { JobRfqData } from "@/lib/rfq/store";
 import { RfqProvider } from "@/components/rfq/rfq-context";
 import { RfqSection } from "@/components/rfq/rfq-panel";
+import { isTraversalNavigation } from "@/components/nav/scroll-memory";
 
 /** Podrobné stavy a „kdo · kdy" karty (načítá stránka; bez nich karta funguje se sloupci zakázky). */
 export interface JobFlowData {
@@ -87,6 +88,8 @@ export function JobDetailView({
   React.useEffect(() => {
     if (scrolledToTab.current || !fromUrl || fromUrl === "prehled") return;
     scrolledToTab.current = true;
+    // Zpět / Vpřed: paměť posunu vrací místo, kde uživatel skončil — k záložkám neskákat
+    if (isTraversalNavigation()) return;
     const t = window.setTimeout(() => document.getElementById(DETAIL_TABS_ID)?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
     return () => window.clearTimeout(t);
   }, [fromUrl]);

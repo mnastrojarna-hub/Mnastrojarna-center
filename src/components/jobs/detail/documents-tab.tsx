@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import {
   ExternalLink, Download, MoreHorizontal, Upload, Pencil, Archive, ArchiveRestore, Trash2, Sparkles, FileText,
   ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send, Lock,
@@ -415,7 +416,10 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
   // oprávnění dorazí na klient po načtení layoutu; server akce je hlídá znovu
   const canSend = features.length === 0 || can("documents");
   const [sending, setSending] = React.useState<JobFile | null>(null);
-  const [showArchive, setShowArchive] = React.useState(false);
+  // rozbalený archiv starších verzí v adrese karty (Zpět / obnovení ho zachová)
+  const url = useUrlState({ archiv: "" }, { remember: false });
+  const showArchive = url.values.archiv === "1";
+  const setShowArchive = (v: boolean) => url.set({ archiv: v ? "1" : "" });
   const [editing, setEditing] = React.useState<JobFile | null>(null);
   const [deleting, setDeleting] = React.useState<JobFile | null>(null);
   const [preview, setPreview] = React.useState<number | null>(null);
@@ -529,7 +533,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
       {archivedCount > 0 && (
         <button
           type="button"
-          onClick={() => setShowArchive((s) => !s)}
+          onClick={() => setShowArchive(!showArchive)}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           {showArchive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

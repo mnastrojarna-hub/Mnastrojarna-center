@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import {
   Sparkles, PlusCircle, PencilLine, Paperclip, FileText, MessageCircle, Mail, Send, Loader2, ArrowRight, History,
   ListChecks, UserRound, StickyNote, ShieldCheck, type LucideIcon,
@@ -205,8 +206,12 @@ export function HistoryTab({ events: raw }: { events: JobEvent[] }) {
   const { jobId, notify, refresh } = useJobDetail();
   const [text, setText] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const [filter, setFilter] = React.useState<Filter>("vse");
-  const [person, setPerson] = React.useState("");
+  // filtr fáze a osoby v adrese karty (Zpět / obnovení je zachová)
+  const url = useUrlState({ historie: "vse", kdo: "" }, { remember: false });
+  const filter: Filter = url.values.historie === "vse" || HISTORY_PHASES.some((p) => p.key === url.values.historie) ? (url.values.historie as Filter) : "vse";
+  const setFilter = (f: Filter) => url.set({ historie: f });
+  const person = url.values.kdo;
+  const setPerson = (v: string) => url.set({ kdo: v });
   const personId = React.useId();
 
   const events = React.useMemo(() => dedupeEvents(raw), [raw]);

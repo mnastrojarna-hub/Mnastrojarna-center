@@ -99,6 +99,16 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  /*
+   * Okno aplikace samo neroluje (roluje <main> a vnitřní panely). Bez této pojistky prohlížeč bere posun,
+   * který roluvaný prvek nespotřebuje (vodorovná složka gesta na touchpadu / Magic Mouse, tažení dolů na
+   * telefonu), jako gesto historie „zpět" nebo „obnovit stránku" — a to zavíralo otevřený prohlížeč dokumentu
+   * (majitel 4. 11.: „otevřu PDF, točím kolečkem a PDF se zavře"). Vlastní Zpět / Esc / ✕ fungují dál.
+   */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
 }
 
 @layer utilities {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft, Banknote, BookOpen, Building2, CalendarClock, ClipboardList, ExternalLink, FileBox, FileText, Globe, Hash,
@@ -60,7 +61,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   return (
     <div className="space-y-5">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link href="/customers"><ArrowLeft /> Všichni zákazníci</Link>
+        <RememberedLink href="/customers"><ArrowLeft /> Všichni zákazníci</RememberedLink>
       </Button>
 
       {/* Hlavička */}

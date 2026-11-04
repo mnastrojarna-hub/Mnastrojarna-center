@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -70,7 +71,10 @@ function Board({
   const notify = useNotify();
   const [refreshing, startRefresh] = React.useTransition();
   const [filter, setFilter] = React.useState<PurchaseFilter>(isFilter(initialFilter) ? initialFilter : "vse");
-  const [query, setQuery] = React.useState(initialQuery ?? "");
+  // hledání v adrese (?q= čte i server) — Zpět z karty zakázky vrátí stejný seznam, menu si ho pamatuje
+  const url = useUrlState({ q: initialQuery ?? "" });
+  const query = url.values.q;
+  const setQuery = (v: string) => url.set({ q: v }, { delay: 300 });
   const refresh = React.useCallback(() => startRefresh(() => router.refresh()), [router]);
 
   const stats = React.useMemo(() => FILTERS.map((f) => {

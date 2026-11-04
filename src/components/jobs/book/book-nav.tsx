@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { applyBookPatch, bookHref, canonicalBookHref, type BookParams, type BookPatch } from "@/components/jobs/book/book-params";
+import { applyBookPatch, bookHref, bookQuery, canonicalBookHref, type BookParams, type BookPatch } from "@/components/jobs/book/book-params";
+import { rememberPageSearch } from "@/lib/nav/url-state";
 
 /**
  * Navigace knihy přes URL: filtry, záložky i řazení mění parametry adresy
@@ -11,6 +12,10 @@ import { applyBookPatch, bookHref, canonicalBookHref, type BookParams, type Book
  * nová, takže nic neposkakuje. Výběr se ukáže hned (optimisticky).
  * Pojistka: když přechod routeru uvízne (nová stránka nedorazí do NAV_GUARD_MS),
  * adresa se načte klasicky — filtr tak vždy zabere.
+ *
+ * Paměť (majitel 4. 11.): každá změna filtru / záložky / řazení přepisuje stejnou položku historie
+ * (replace) — odkaz na kartu zakázky je běžný push, takže Zpět vrátí knihu přesně s těmi filtry a další Zpět
+ * teprve knihu opustí (filtry „nemizí po jednom"). Poslední stav se pamatuje i pro položku menu (sessionStorage).
  */
 
 /** Do kdy musí dorazit nová stránka knihy, jinak klasické načtení adresy. */
@@ -36,6 +41,8 @@ export function BookNavProvider({ params, children }: { params: BookParams; chil
 
   React.useEffect(() => {
     paramsRef.current = params;
+    // poslední stav knihy pro „Kniha zakázek" v menu (bez jednorázových parametrů)
+    rememberPageSearch("/orders", bookQuery(params));
     // stránka s požadovanými parametry dorazila → pojistka není potřeba
     if (guard.current && bookHref(params) === guard.current.href) {
       window.clearTimeout(guard.current.timer);
@@ -69,12 +76,13 @@ export function BookNavProvider({ params, children }: { params: BookParams; chil
         timer: window.setTimeout(() => {
           if (guard.current?.href !== target) return;
           guard.current = null;
-          if (opts?.replace) window.location.replace(href);
+          if (opts?.replace !== false) window.location.replace(href);
           else window.location.assign(href);
         }, NAV_GUARD_MS),
       };
       startTransition(() => {
-        if (opts?.replace) router.replace(href, { scroll: false });
+        // výchozí replace: filtry nezaplňují historii (push jen na výslovné přání)
+        if (opts?.replace !== false) router.replace(href, { scroll: false });
         else router.push(href, { scroll: false });
       });
     },

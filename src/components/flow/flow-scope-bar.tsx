@@ -68,7 +68,7 @@ function ScopeToggle({ who, className }: { who: FlowWho; className?: string }) {
     if (next === "moje") sp.set(FLOW_WHO_PARAM, "moje");
     else sp.delete(FLOW_WHO_PARAM);
     const q = sp.toString();
-    start(() => router.push(q ? `${pathname}?${q}` : pathname));
+    start(() => router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false }));
   }
 
   const options: { key: FlowWho; label: string; icon: typeof Users }[] = [
