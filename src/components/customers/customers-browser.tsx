@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import {
   Building2, ChevronRight, ClipboardList, Hash, Mail, MapPin, Phone, Search, SearchX, Sparkles, UserRound, Users, X,
@@ -54,8 +55,12 @@ export function CustomersBrowser({
   owners: OwnerOption[];
   userId: string;
 }) {
-  const [q, setQ] = React.useState("");
-  const [filter, setFilter] = React.useState<CustomerFilter>("vse");
+  // hledání a filtr v adrese (Zpět z karty zákazníka vrátí stejný seznam; položka menu si ho pamatuje)
+  const url = useUrlState({ q: "", filtr: "vse" });
+  const q = url.values.q;
+  const setQ = (v: string) => url.set({ q: v }, { delay: 300 });
+  const filter: CustomerFilter = CUSTOMER_FILTERS.some((f) => f.key === url.values.filtr) ? (url.values.filtr as CustomerFilter) : "vse";
+  const setFilter = (f: CustomerFilter) => url.set({ filtr: f });
   const counts = React.useMemo(() => customerFilterCounts(customers, userId), [customers, userId]);
   const shown = React.useMemo(() => filterCustomers(customers, { q, filter, userId }), [customers, q, filter, userId]);
 

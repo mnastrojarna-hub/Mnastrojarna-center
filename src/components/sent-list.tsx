@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Send, UserCheck, ChevronDown, Wand2, Search, FolderOpen, Mail, Inbox as InboxIcon, Upload } from "lucide-react";
@@ -42,16 +43,21 @@ export function SentList({
   const pathname = usePathname();
   const { can } = useAccess();
   const canAi = can("dashboard");
-  const [filter, setFilter] = React.useState<SentFilter>("all");
-  const [query, setQuery] = React.useState("");
-  const [openId, setOpenId] = React.useState<string | null>(null);
+  // druh, hledání a rozbalená zpráva v adrese (Zpět vrátí stejný seznam)
+  const url = useUrlState({ druh: "all", q: "", otevreno: "" }, { transient: ["otevreno"] });
+  const filter: SentFilter = url.values.druh === "all" || (SENT_KINDS as string[]).includes(url.values.druh) ? (url.values.druh as SentFilter) : "all";
+  const setFilter = (f: SentFilter) => url.set({ druh: f });
+  const query = url.values.q;
+  const setQuery = (v: string) => url.set({ q: v }, { delay: 300 });
+  const openId: string | null = url.values.otevreno || null;
+  const setOpenId = (id: string | null) => url.set({ otevreno: id ?? "" });
 
   const counts = React.useMemo(() => countSentKinds(items), [items]);
   const filtered = React.useMemo(() => filterSent(items, { kind: filter, query }), [items, filter, query]);
 
   const switchMailbox = (id: string | null) => {
     setOpenId(null);
-    router.push(id ? `${pathname}?schranka=${encodeURIComponent(id)}` : pathname);
+    router.replace(id ? `${pathname}?schranka=${encodeURIComponent(id)}` : pathname);
   };
 
   const chips: { key: SentFilter; label: string; icon?: React.ComponentType<{ className?: string }>; active: string; idle: string }[] = [

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, Sparkles, Camera, Mail, Trash2, MoreHorizontal, Banknote, Package, FileText, Paperclip,
@@ -55,9 +56,10 @@ export function JobToolbar({ job }: { job: JobDetail }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
           <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
-            <Link href="/orders" aria-label="Zpět do Knihy zakázek" title="Kniha zakázek">
+            {/* zpět do knihy s posledními filtry (paměť stránky) */}
+            <RememberedLink href="/orders" aria-label="Zpět do Knihy zakázek" title="Kniha zakázek">
               <ArrowLeft className="h-4 w-4" />
-            </Link>
+            </RememberedLink>
           </Button>
           {/* číslo se raději zkrátí (celé v title), štítek schválení zůstane vždy vidět */}
           <span className="min-w-0 truncate font-mono text-sm font-bold tracking-tight" title={job.number}>{job.number}</span>

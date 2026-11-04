@@ -36,11 +36,13 @@ import { sendReceiveText } from "@/lib/email/send-receive";
 import { backfillMailJobsAction, confirmJobSuggestionAction, rejectJobSuggestionAction } from "@/app/actions/mail-jobs";
 import { CATEGORY_STYLE, INBOX_CATEGORIES, NO_MAILBOX, categoryCodeFromLabel, type MailboxOption } from "@/lib/email/visibility";
 import {
-  EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, progressText, threadCountLabel, type FolderCounts, type MailFolder, type MailSort, type ThreadPage,
-  type ThreadSummary,
+  EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, isMailFolder, isMailSort, progressText, threadCountLabel, type FolderCounts, type MailFolder,
+  type MailSort, type ThreadPage, type ThreadSummary,
 } from "@/lib/email/mail-types";
 import type { EmailCategory } from "@/lib/data/types";
 import { debug } from "@/lib/debug/logger";
+import { emailCategoryLabel } from "@/lib/data/labels";
+import { useUrlState } from "@/components/nav/use-url-state";
 import { cn, relativeTime } from "@/lib/utils";
 
 interface InboxViewProps {
@@ -90,6 +92,13 @@ const FOLDERS: { id: MailFolder; icon: React.ComponentType<{ className?: string 
   { id: "spam", icon: Ban },
 ];
 
+/** ?kategorie=poptavka → „Poptávka" (neznámý kód = bez filtru). */
+function categoryFromCode(code: string): EmailCategory | null {
+  if (!code) return null;
+  const label = (emailCategoryLabel as Record<string, string>)[code];
+  return label && (INBOX_CATEGORIES as string[]).includes(label) ? (label as EmailCategory) : null;
+}
+
 function folderCount(f: MailFolder, c: FolderCounts): number {
   return f === "inbox" ? c.inboxUnread : f === "jobs" ? (c.jobsUnread ?? 0) + (c.jobSuggestions ?? 0) : f === "flagged" ? c.flagged : f === "shared" ? c.sharedUnread : f === "spam" ? c.spam : 0;
 }
@@ -112,21 +121,34 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   useMailLiveFast();
   const router = useRouter();
 
-  const [folder, setFolder] = React.useState<MailFolder>(initialFolder);
-  const [mailboxId, setMailboxId] = React.useState<string | null>(initialMailbox);
-  const [query, setQuery] = React.useState("");
-  const [debounced, setDebounced] = React.useState("");
-  const [priorityMax, setPriorityMax] = React.useState<number | null>(null);
-  const [category, setCategory] = React.useState<EmailCategory | null>(null);
-  const [unreadOnly, setUnreadOnly] = React.useState(false);
-  const [sort, setSort] = React.useState<MailSort>("date");
+  // Stav Pošty žije v adrese (majitel 4. 11.: „vyhledám, potvrdím, dám Zpět a hledání je pryč"): složka,
+  // schránka, hledání, priorita, kategorie, řazení, vybrané vlákno. Odkaz ze zprávy (zakázka…) je běžná navigace,
+  // Zpět vrátí Poštu přesně tak, jak byla; obnovení stránky také. Položka menu si pamatuje poslední stav.
+  const url = useUrlState(
+    { slozka: "inbox", schranka: "", q: "", priorita: "", kategorie: "", neprectene: "", razeni: "date", vlakno: "", detail: "" },
+    { transient: ["vlakno", "detail"] }, // menu „Pošta" otevře složku a filtry, ne znovu vlákno
+  );
+  const folder: MailFolder = isMailFolder(url.values.slozka) ? url.values.slozka : initialFolder;
+  const mailboxId: string | null = url.values.schranka || null;
+  const [query, setQuery] = React.useState(url.values.q);
+  const debounced = url.values.q.trim();
+  const priorityMax: number | null = /^[123]$/.test(url.values.priorita) ? Number(url.values.priorita) : null;
+  const category: EmailCategory | null = categoryFromCode(url.values.kategorie);
+  const unreadOnly = url.values.neprectene === "1";
+  const sort: MailSort = isMailSort(url.values.razeni) ? url.values.razeni : "date";
+  const setPriorityMax = (p: number | null) => url.set({ priorita: p ? String(p) : "" });
+  const setCategory = (c: EmailCategory | null) => url.set({ kategorie: c ? categoryCodeFromLabel(c) ?? "" : "" });
+  const setUnreadOnly = (v: boolean) => url.set({ neprectene: v ? "1" : "" });
+  const setSort = (v: MailSort) => url.set({ razeni: v });
   const [showFilters, setShowFilters] = React.useState(false);
   const [page, setPage] = React.useState<ThreadPage>(initial);
   const [counts, setCounts] = React.useState<FolderCounts>(initialCounts ?? EMPTY_COUNTS);
   const [loading, setLoading] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState<string>("");
-  const [mobileDetail, setMobileDetail] = React.useState(false);
+  const selectedId = url.values.vlakno;
+  const mobileDetail = url.values.detail === "1";
+  // vlákno na telefonu = položka historie (Zpět ho zavře a vrátí seznam na stejné místo)
+  const pushedDetail = React.useRef(false);
   const [threadVersion, setThreadVersion] = React.useState(0);
   const [compose, setCompose] = React.useState<ComposeRequest | null>(null);
   const [syncMsg, setSyncMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
@@ -201,10 +223,19 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   const ownMailboxes = scope === "own" ? mailboxes : [];
   const noMailbox = scope === "own" && mailboxes.length === 0;
 
+  // hledání: do adresy s prodlevou 300 ms (replace — psaní nezaplní historii)
+  const urlSet = url.set;
   React.useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 300);
+    if (query.trim() === debounced) return;
+    const t = setTimeout(() => urlSet({ q: query.trim() }), 300);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, debounced, urlSet]);
+  // změna zvenku (Zpět / Vpřed) → do pole
+  const [lastUrlQ, setLastUrlQ] = React.useState(url.values.q);
+  if (url.values.q !== lastUrlQ) {
+    setLastUrlQ(url.values.q);
+    setQuery(url.values.q);
+  }
 
   const params = React.useMemo(
     () => ({ folder, mailboxId, query: debounced, priorityMax, unreadOnly, sort, category }),
@@ -227,20 +258,18 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     }
   }, [params]);
 
-  // změna složky / filtru → první stránka znovu (počáteční data přišla ze serveru)
+  // změna složky / filtru → první stránka znovu (počáteční data přišla ze serveru jen podle složky a schránky;
+  // s hledáním / filtrem v adrese — Zpět, obnovení — se načte hned)
   const firstRun = React.useRef(true);
   React.useEffect(() => {
-    if (firstRun.current) { firstRun.current = false; return; }
+    if (firstRun.current) {
+      firstRun.current = false;
+      const clientFiltered = debounced !== "" || priorityMax !== null || category !== null || unreadOnly || sort !== "date"
+        || folder !== initialFolder || (mailboxId ?? null) !== (initialMailbox ?? null);
+      if (!clientFiltered) return;
+    }
     void reload();
-  }, [reload]);
-
-  // URL drží složku a schránku (odkaz / obnovení stránky) — bez navigace
-  React.useEffect(() => {
-    const u = new URL(window.location.href);
-    if (folder === "inbox") u.searchParams.delete("slozka"); else u.searchParams.set("slozka", folder);
-    if (mailboxId) u.searchParams.set("schranka", mailboxId); else u.searchParams.delete("schranka");
-    window.history.replaceState(window.history.state, "", u.toString());
-  }, [folder, mailboxId]);
+  }, [reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // živá pošta: přišlo něco nového → obnovit seznam (zachovat načtený počet) a otevřené vlákno
   const lastLive = React.useRef(live.version);
@@ -434,8 +463,10 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   }, [selectedId]);
   const open = (t: ThreadSummary) => {
     setOpenedSummary(t);
-    setSelectedId(t.threadId);
-    setMobileDetail(true);
+    // telefon: nová položka historie (Zpět = zavřít vlákno); počítač: jen přepis adresy
+    const push = !isDesktop && !mobileDetail;
+    if (push) pushedDetail.current = true;
+    url.set({ vlakno: t.threadId, detail: "1" }, { push });
   };
   // Pošta E: hlavní akce zprávy přímo z řádku (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu …)
   const rowActions = useMailActionRunner({
@@ -448,19 +479,23 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     },
   });
   const closeDetail = () => {
-    setMobileDetail(false);
+    if (pushedDetail.current && !isDesktop) {
+      // vlákno otevřené jako položka historie → zavřít = Zpět (adresa i seznam se vrátí samy)
+      pushedDetail.current = false;
+      window.history.back();
+      return;
+    }
     // mobil: zavřený detail se nenechává skrytě otevřený (živá pošta by ho jinak „četla")
-    if (!isDesktop) setSelectedId("");
+    url.set(isDesktop ? { detail: "" } : { detail: "", vlakno: "" });
   };
+  React.useEffect(() => {
+    if (!mobileDetail) pushedDetail.current = false;
+  }, [mobileDetail]);
   const changeFolder = (f: MailFolder) => {
-    setFolder(f);
-    setSelectedId("");
-    setMobileDetail(false);
+    url.set({ slozka: f, vlakno: "", detail: "" });
   };
   const switchMailbox = (id: string | null) => {
-    setMailboxId(id);
-    setSelectedId("");
-    setMobileDetail(false);
+    url.set({ schranka: id ?? "", vlakno: "", detail: "" });
   };
 
   const description = scope === "all"
@@ -808,7 +843,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                   <select value={sort} onChange={(e) => setSort(e.target.value as MailSort)} className="h-8 rounded-md border bg-background px-2 text-xs" aria-label="Řazení" data-testid="mail-sort">
                     {(Object.keys(SORT_LABEL) as MailSort[]).map((s) => <option key={s} value={s}>{SORT_LABEL[s]}</option>)}
                   </select>
-                  <button type="button" onClick={() => setUnreadOnly((v) => !v)} aria-pressed={unreadOnly} className={cn("inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", unreadOnly ? "border-blue-500 bg-blue-500 text-white" : "hover:bg-accent")}>
+                  <button type="button" onClick={() => setUnreadOnly(!unreadOnly)} aria-pressed={unreadOnly} className={cn("inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium", unreadOnly ? "border-blue-500 bg-blue-500 text-white" : "hover:bg-accent")}>
                     <MailOpen className="h-3.5 w-3.5" /> Jen nepřečtené
                   </button>
                 </div>
@@ -864,7 +899,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
               </div>
             )}
             </div>
-            <div ref={listScroll} className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 scrollbar-thin" data-testid="thread-list-scroll">
+            <div ref={listScroll} data-scroll-key="mail-list" className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 scrollbar-thin" data-testid="thread-list-scroll">
               {items.length === 0 ? (
                 <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} onConnect={() => openSettings("schranka")} />
               ) : (
@@ -931,6 +966,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           {/* Vlákno */}
           <div
             ref={detailScroll}
+            data-scroll-key="mail-thread"
             className={cn(
               "min-w-0",
               // mobil / tablet: detail vlákna přes celou obrazovku (nad hlavičkou, nad spodní lištou zůstává navigace)

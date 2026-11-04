@@ -69,7 +69,8 @@ export function InvoiceList({ items, totals, suppliers, perms, filter, visibilit
     }
     if (next.q) sp.set("q", next.q);
     const qs = sp.toString();
-    start(() => router.push(qs ? `${pathname}?${qs}` : pathname));
+    // filtr přepisuje položku historie (Zpět z faktury vrátí seznam s filtry, další Zpět seznam opustí)
+    start(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
   }, [filter, pathname, router]);
 
   React.useEffect(() => {

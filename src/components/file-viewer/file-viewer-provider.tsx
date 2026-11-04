@@ -58,10 +58,14 @@ export function FileViewerProvider({ children }: { children: React.ReactNode }) 
     setReq(null);
   }, []);
 
-  // systémové / prohlížečové zpět zavře prohlížeč
+  // systémové / prohlížečové zpět zavře prohlížeč — jen když historie opravdu opustila jeho položku
+  // (vpřed zpátky na ni ho nechá otevřený). Gesta prohlížeče „zpět" z přetažení obsahu (touchpad, Magic Mouse,
+  // tažení na telefonu) jsou vypnutá v globals.css (overscroll-behavior: none na html/body).
   React.useEffect(() => {
-    const onPop = () => {
+    const onPop = (e: PopStateEvent) => {
       if (!reqRef.current) return;
+      const state = e.state as Record<string, unknown> | null;
+      if (state && state[STATE_KEY]) return;
       pushed.current = false;
       setReq(null);
     };
@@ -115,7 +119,7 @@ export function FileViewerProvider({ children }: { children: React.ReactNode }) 
         <DialogPrimitive.Portal>
           <DialogPrimitive.Content
             aria-describedby={undefined}
-            className="fixed inset-0 z-[60] flex flex-col bg-background outline-none"
+            className="fixed inset-0 z-[60] flex flex-col overscroll-contain bg-background outline-none"
             onOpenAutoFocus={(e) => e.preventDefault()}
             data-testid="file-viewer-layer"
           >

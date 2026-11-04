@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -167,9 +168,15 @@ export function PricingBoard({
   /** Rozbalit tuto zakázku (odkaz „Nacenit" z Poptávek), jinak první. */
   initialOpenId?: string | null;
 }) {
-  const [openId, setOpenId] = React.useState<string | null>(
+  const [openId, setOpenIdState] = React.useState<string | null>(
     initialOpenId && jobs.some((j) => j.id === initialOpenId) ? initialOpenId : (jobs[0]?.id ?? null),
   );
+  // rozbalená zakázka v adrese (?job=, čte ji i server) — Zpět z karty zakázky vrátí stejný stav
+  const url = useUrlState({ job: "" });
+  const setOpenId = React.useCallback((id: string | null) => {
+    setOpenIdState(id);
+    url.set({ job: id ?? "" });
+  }, [url.set]); // eslint-disable-line react-hooks/exhaustive-deps
   const [results, setResults] = React.useState<Record<string, Result>>({});
   // výkres vedle položek (jen počítač): panel se drží, i když se píšou ceny; nic nenaviguje
   const [dock, setDock] = React.useState<DrawingTarget | null>(null);
