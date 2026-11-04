@@ -303,14 +303,17 @@ export async function createJobFromEmail(
     const hints = itemHintsFromMail(email.body_text, names);
     if (hints.length) {
       const { error: itemErr } = await a.db.from("order_items").insert(hints.map((h, i) => ({
+        // poznámka položky je pro zákazníka (tiskne se na nabídku, DL i fakturu) — interní připomínka
+        // „počet nezjištěn" patří jen do historie zakázky, ne do dokladu (majitel 4. 11.)
         order_id: job.id, position: i, drawing_number: h.drawingNumber.slice(0, 120), name: h.name, quantity: h.quantity ?? 1, unit: "ks",
-        note: h.quantity ? null : "Počet doplň — v e-mailu není",
       })));
       if (itemErr) console.error(`[mail] Položky z e-mailu se nepodařilo uložit: ${itemErr.message}`);
       else {
+        const missing = hints.filter((h) => !h.quantity).length;
         await logJobEvent(db, {
-          jobId: job.id, type: "field", message: `Položky z e-mailu: ${hints.map((h) => `${h.drawingNumber}${h.quantity ? ` · ${h.quantity} ks` : ""}`).join(", ").slice(0, 300)}`,
-          data: { items: hints.length, emailId }, actorId: user.id,
+          jobId: job.id, type: "field",
+          message: `Položky z e-mailu: ${hints.map((h) => `${h.drawingNumber}${h.quantity ? ` · ${h.quantity} ks` : " · počet nezjištěn (1 ks)"}`).join(", ").slice(0, 300)}${missing ? ` — u ${missing} ${missing === 1 ? "položky" : "položek"} zkontroluj počet kusů` : ""}`,
+          data: { items: hints.length, missingQuantity: missing, emailId }, actorId: user.id,
         });
       }
     }
