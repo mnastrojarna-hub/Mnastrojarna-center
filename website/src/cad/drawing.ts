@@ -35,6 +35,8 @@ export type DrawingMeta = {
   revision?: string;
   /** nepředepsané tolerance (např. „ISO 2768-mK“); prázdné = na výkrese se neuvádí – výrobní požadavek musí zadat uživatel */
   tolerance?: string;
+  /** poznámka v patičce (např. „Nekótované rozměry dle 3D modelu (STEP)“); prázdné = nic – nedoplňuje se automaticky */
+  note?: string;
   /** opracování hran (např. „srazit 0,5×45°“); prázdné = neuvádí se */
   edges?: string;
   /** závitové díry: poloměr jádrového vrtání → popis (např. „M6 hl. 12“) – místo Ø jádra se kótuje označení závitu */
@@ -764,7 +766,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   const balloons: NonNullable<DrawingResult["balloons"]> = [];
   if (opts.balloons && meta.components?.length) {
     const mainView = centerView ? placed.get(centerView.key) : [...placed.values()][0];
-    if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons);
+    if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons, { top: M + 3, bottom: SH - M - TBH - 3, left: M_LEFT + 3, right: SW - M - 3 });
   }
 
   // rám, centrovací značky, razítko
@@ -1183,7 +1185,8 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
   const ny = y - bomHeight(meta.bom) - extraAbove;
   // výrobní požadavky (tolerance, hrany) jen když je uživatel zadal – nic se nedoplňuje automaticky
   T(x, ny - 5.5, ["Rozměry v mm", meta.tolerance?.trim() ? `Nepředepsané tolerance ${meta.tolerance.trim()}` : "", meta.edges?.trim() ? `Hrany: ${meta.edges.trim()}` : ""].filter(Boolean).join(" · "), 2.5);
-  T(x, ny - 1.8, `Nekótované rozměry dle 3D modelu (STEP) · List ${meta.sheetIndex ?? 1}/${meta.sheetCount ?? 1}`, 2.5);
+  // poznámka k modelu jen na vyžádání (razítko → „Poznámka v patičce“) – nic nenaznačuje úplnost dokumentace automaticky
+  T(x, ny - 1.8, [meta.note?.trim() ?? "", `List ${meta.sheetIndex ?? 1}/${meta.sheetCount ?? 1}`].filter(Boolean).join(" · "), 2.5);
 }
 
 // ---------------------------------------------------------------- kusovník (ISO 7573)
@@ -1415,8 +1418,11 @@ function detailView(d: DetailView, p: Placed, SW: number, SH: number, TBH: numbe
 
 // ---------------------------------------------------------------- pozice (balónky)
 
-/** Balónky s čísly pozic nad hlavním pohledem s odkazy na průmět středu komponenty. */
-function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>) {
+/**
+ * Balónky s čísly pozic u hlavního pohledu s odkazy na průmět středu komponenty.
+ * Řady nad a pod pohledem se použijí jen tam, kde se vejdou do rámu (a mimo razítko); jinak sloupec vlevo od pohledu.
+ */
+function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>, bounds: { top: number; bottom: number; left: number; right: number }) {
   const R = 4;
   const pts = items
     .map((it) => {
@@ -1427,12 +1433,12 @@ function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DTex
   const n = pts.length;
   const left = v.px;
   const width = v.w * v.s;
-  const spacing = Math.max(2 * R + 3, Math.min(14, width / Math.max(1, Math.ceil(n / 2))));
-  pts.forEach((b, i) => {
-    const above = i % 2 === 0;
-    const col = Math.floor(i / 2);
-    const bx = left + col * spacing + R;
-    const by = above ? v.py - 12 - R : v.py + v.h * v.s + 12 + R;
+  const clampX = (x: number) => Math.max(bounds.left + R, Math.min(bounds.right - R, x));
+  const clampY = (y: number) => Math.max(bounds.top + R, Math.min(bounds.bottom - R, y));
+  const aboveY = v.py - 12 - R;
+  const belowY = v.py + v.h * v.s + 12 + R;
+  const rows = [aboveY, belowY].filter((y) => y - R >= bounds.top && y + R <= bounds.bottom);
+  const place = (b: { pos: number; q: Vec2 }, bx: number, by: number) => {
     polys.push({ layer: "dim", pts: circlePts([bx, by], R, 32) });
     texts.push({ x: bx, y: by + 1.3, s: String(b.pos), size: 3.5, anchor: "middle", bold: true, layer: "dim" });
     // odkazová čára od okraje kroužku k bodu komponenty, zakončená tečkou
@@ -1442,7 +1448,16 @@ function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DTex
     polys.push({ layer: "dim", pts: [[bx + (dx / l) * R, by + (dy / l) * R], b.q] });
     polys.push({ layer: "dim", fill: true, pts: circlePts(b.q, 0.7, 10) });
     out.push({ pos: b.pos, x: bx, y: by });
-  });
+  };
+  if (rows.length) {
+    const perRow = Math.ceil(n / rows.length);
+    const spacing = Math.max(2 * R + 3, Math.min(14, width / Math.max(1, perRow)));
+    pts.forEach((b, i) => place(b, clampX(left + Math.floor(i / rows.length) * spacing + R), rows[i % rows.length]));
+    return;
+  }
+  // pohled sahá až k rámu nahoře i dole → sloupec vlevo od pohledu
+  const bx = clampX(v.px - 12 - R);
+  pts.forEach((b, i) => place(b, bx, clampY(v.py + i * (2 * R + 3) + R)));
 }
 
 /** Kusovník jako CSV pro Excel (středníky, UTF-8 s BOM, CRLF). */

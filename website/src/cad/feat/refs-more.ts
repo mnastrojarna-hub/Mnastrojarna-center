@@ -8,7 +8,7 @@
  * Vše přes `registerFeatureBuilder`; stavitel nástrojového prvku uloží nástroj do `ctx.tools` (pro pole / zrcadlení).
  */
 import * as r from "replicad";
-import { applyMode, planeOf } from "../build";
+import { applyMode, planeOf, threadProfile, THREAD_HINT } from "../build";
 import { planeBasis, threadByName } from "../defaults";
 import { pushPull, springSolid } from "../direct";
 import { axisVec, csysBasis, entityIndex, planeDefToSketchPlane, planeOfRef, pointOf, resolveAxis, resolveDirection, sigOf, V, type ResolveCtx } from "../ref-resolve";
@@ -127,19 +127,12 @@ toolBuilder("spring", (f, ctx) => {
 });
 
 toolBuilder("thread", (f, ctx) => {
-  if (!ctx.body) throw new Error("Závit potřebuje těleso (válcovou plochu).");
+  if (!ctx.body) throw new Error("Závit potřebuje těleso (válcovou plochu nebo díru).");
   if (!f.modeled) return null; // kosmetický závit – jen ve výkrese
   const t = threadByName(f.designation);
-  if (!t) throw new Error(`Neznámý závit „${f.designation}“ – použijte M2 až M48.`);
+  if (!t) throw new Error(`Neznámý závit „${f.designation}“ – ${THREAD_HINT}.`);
   if (!(f.length > 0)) throw new Error("Délka závitu musí být kladná.");
-  const n = Math.max(1, Math.round(f.length / t.pitch));
-  const P = f.length / n;
-  const R = t.d / 2;
-  const rmin = R - 0.6134 * t.pitch;
-  const Rout = R + t.pitch + 1;
-  const pts: [number, number][] = [[Rout, 0], [Rout, f.length], [R, f.length]];
-  for (let k = n - 1; k >= 0; k--) pts.push([rmin, k * P + P / 2], [R, k * P]);
-  return alignZ(revolvedZ(pts), dirDefOf(f, ctx)).translate(placeOf(f, ctx, "začátek závitu"));
+  return alignZ(revolvedZ(threadProfile(t, f.length, f.internal)), dirDefOf(f, ctx)).translate(placeOf(f, ctx, "začátek závitu"));
 });
 
 const FONT_FAMILY = "MnRoboto";

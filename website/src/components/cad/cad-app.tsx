@@ -17,7 +17,7 @@ import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
-import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, topAt, type EdgeLite, type FaceLite } from "@/cad/agent";
+import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, topAt, type AsmStatus, type EdgeLite, type FaceLite } from "@/cad/agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
@@ -46,7 +46,7 @@ import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSuba
 import { AsmProps, AsmTree, BomTable, MoldWizard, type MateMode } from "./asm-panel";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { FEATURE_TONE, Manager } from "./manager";
-import { EntityProps, FeatureProps, ParamContext } from "./props";
+import { EntityProps, FeatureProps, ParamContext, type FeaturePatch } from "./props";
 import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Want } from "./ref-field";
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
@@ -178,6 +178,8 @@ export function CadApp() {
   const [asmLoading, setAsmLoading] = useState(0);
   const [explode, setExplode] = useState(0);
   const [clashes, setClashes] = useState<Interference[] | null>(null);
+  /** kdy a nad kolika komponentami proběhla poslední kontrola kolizí (výsledek zůstane v panelu i ve stavu) */
+  const [clashInfo, setClashInfo] = useState<{ at: string; comps: number } | null>(null);
   const [mate, setMate] = useState<{ mode: MateMode; compId: string; a?: MateRef; value?: number } | null>(null);
   const [mateStatus, setMateStatus] = useState<Record<string, MateStatus>>({});
   const [boltPick, setBoltPick] = useState<{ washer: boolean; nut: boolean } | null>(null);
@@ -242,12 +244,21 @@ export function CadApp() {
     return () => window.removeEventListener("beforeunload", h);
   }, []);
   const live = useCallback((next: CadDoc) => setHist((h) => ({ ...h, present: next })), []);
+  /** změna nad aktuálním stavem (funkčně) – bezpečné i pro dvě změny v jednom tiku (formulář: hloubka, hned nato název) */
+  const commitWith = useCallback((fn: (d: CadDoc) => CadDoc) => {
+    dirty.current = true;
+    setHist((h) => {
+      const next = fn(h.present);
+      return next === h.present ? h : { past: [...h.past.slice(-80), h.present], present: next, future: [] };
+    });
+  }, []);
+  const liveWith = useCallback((fn: (d: CadDoc) => CadDoc) => setHist((h) => ({ ...h, present: fn(h.present) })), []);
   const undo = () => setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
   const redo = () => setHist((h) => (h.future.length ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) } : h));
 
-  const updateFeature = (id: string, patch: Partial<Feature>, record = true) => {
-    const next = { ...doc, features: doc.features.map((f) => (f.id === id ? ({ ...f, ...patch } as Feature) : f)) };
-    (record ? commit : live)(next);
+  const updateFeature = (id: string, patch: FeaturePatch, record = true) => {
+    // funkčně nad aktuálním dokumentem: změna hloubky těsně následovaná změnou názvu se nepřepíše zastaralou kopií dokumentu
+    (record ? commitWith : liveWith)((d) => ({ ...d, features: d.features.map((f) => (f.id === id ? ({ ...f, ...(typeof patch === "function" ? patch(f) : patch) } as Feature) : f)) }));
   };
 
   // ---------- záložky dokumentů ----------
@@ -399,6 +410,8 @@ export function CadApp() {
     let d: CadDoc = JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc;
     let openNew = false;
     let changed = false;
+    /** prvky přidané tímto během – jejich výsledek (✓ / ⚠ / ✗) se vypíše až po stavbě, ne při přidání */
+    const added: Feature[] = [];
     const SOLID = new Set(["extrude", "revolve", "box", "cylinder", "sphere", "cone", "tube", "import", "sweep", "loft", "spring", "thicken", "text", "ext"]);
     const hasSolid = () => d.features.some((f) => SOLID.has(f.type) && !f.suppressed);
     const lastSketch = () => [...d.features].reverse().find((f) => f.type === "sketch");
@@ -478,7 +491,8 @@ export function CadApp() {
             for (const raw of op.features) {
               const f = prepare(raw);
               d.features.push(f);
-              log.push(`✓ ${f.name} (${f.type})`);
+              added.push(f);
+              log.push(`→ ${f.name} (${f.type}) přidán – výsledek po výpočtu níže`);
             }
             changed = true;
             break;
@@ -500,8 +514,9 @@ export function CadApp() {
               }
             }
             d.features.push(f);
+            added.push(f);
             changed = true;
-            log.push(`✓ ${f.name} (${f.type})`);
+            log.push(`→ ${f.name} (${f.type}) přidán – výsledek po výpočtu níže`);
             break;
           }
           case "entities": {
@@ -519,15 +534,26 @@ export function CadApp() {
               const idx = selectEdges(op.rule, t.edges, t.bbox);
               if (!idx.length) throw new Error(`žádná hrana neodpovídá pravidlu „${op.rule.join(" ")}“ (hran celkem ${t.edges.length})`);
               f.edges = idx;
-              log.push(`✓ ${f.name} (${f.type}) – ${idx.length} hran podle pravidla „${op.rule.join(" ")}“`);
+              log.push(`→ ${f.name} (${f.type}) – ${idx.length} hran podle pravidla „${op.rule.join(" ")}“ – výsledek po výpočtu níže`);
             } else if (f.type === "shell") {
               const idx = selectFaces(op.rule, t.faces, t.bbox);
               if (!idx.length) throw new Error(`žádná plocha neodpovídá pravidlu „${op.rule.join(" ")}“ (ploch celkem ${t.faces.length})`);
               f.faces = idx;
-              log.push(`✓ ${f.name} (shell) – otevřeno ploch: ${idx.length}`);
+              log.push(`→ ${f.name} (shell) – otevřeno ploch: ${idx.length} – výsledek po výpočtu níže`);
             } else throw new Error("pravidlo výběru podporují zaoblení, sražení a skořepina");
             d.features.push(f);
+            added.push(f);
             changed = true;
+            break;
+          }
+          case "clash": {
+            if (d.kind !== "assembly") throw new Error("kolize: otevřený dokument není sestava");
+            const res = await cad.interference(d);
+            const comps = (d.components ?? []).length;
+            setClashes(res);
+            setClashInfo({ at: new Date().toLocaleTimeString("cs-CZ"), comps });
+            const name = (cid: string) => d.components?.find((c) => c.id === cid)?.name ?? cid;
+            log.push(res.length ? `⚠ kolize: ${res.length} – ${res.map((x) => `${name(x.a)} × ${name(x.b)} (${fmtNum(x.volume, 1)} mm³)`).join("; ")}` : `✓ kolize: žádné (${comps} komponent)`);
             break;
           }
           case "pop": {
@@ -542,7 +568,7 @@ export function CadApp() {
             break;
           case "status": {
             const r = await build();
-            log.push(docStatusText(d, r));
+            log.push(docStatusText(d, r, openNew ? undefined : asmStatusRef.current()));
             break;
           }
         }
@@ -558,15 +584,22 @@ export function CadApp() {
     }
     const res = await build().catch(() => null);
     if (res) {
-      const bad = d.features.filter((f) => res.status.find((s) => s.id === f.id)?.ok === false);
-      for (const f of bad) log.push(`✗ ${f.name}: ${res.status.find((s) => s.id === f.id)?.error ?? "chyba stavby"}`);
-    }
-    log.push("", docStatusText(d, res));
+      // výsledek až po výpočtu: ✓ = platné těleso a operace se projevila, ⚠ = zpracováno s výhradou, ✗ = selhalo
+      const st = new Map(res.status.map((s) => [s.id, s]));
+      const addedIds = new Set(added.map((f) => f.id));
+      for (const f of added) {
+        const s = st.get(f.id);
+        log.push(s?.ok === false ? `✗ ${f.name} (${f.type}): ${s.error ?? "chyba stavby"}` : s?.warning ? `⚠ ${f.name} (${f.type}): ${s.warning}` : `✓ ${f.name} (${f.type})`);
+      }
+      const bad = d.features.filter((f) => !addedIds.has(f.id) && st.get(f.id)?.ok === false);
+      for (const f of bad) log.push(`✗ ${f.name}: ${st.get(f.id)?.error ?? "chyba stavby"}`);
+    } else if (added.length) log.push(`✗ stavba selhala – prvky ${added.map((f) => f.name).join(", ")} nebyly ověřeny`);
+    log.push("", docStatusText(d, res, openNew ? undefined : asmStatusRef.current()));
     return log.join("\n");
   };
   const runAgentRef = useRef(runAgentText);
   runAgentRef.current = runAgentText;
-  const agentStatus = async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null));
+  const agentStatus = async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current());
   /** diagnostika prostředí pro podporu (bez dat dokumentu) do schránky */
   const copyDiagnostics = async () => {
     const ok = await copyText(collectDiagnostics({ error: glError?.error ?? null, probe: glError?.probe ?? probeWebGL(), core, lost: glError?.lost }));
@@ -682,7 +715,7 @@ export function CadApp() {
       run: (text) => runAgentRef.current(text),
       getDocument: () => JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc,
       setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
-      status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null)),
+      status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current()),
       openConsole: () => setAgentOpen(true),
       hints: (on) => {
         if (on !== undefined) setHintsOn(on);
@@ -885,7 +918,9 @@ export function CadApp() {
       const r = asmCache.current.get(sourceKey(c.source));
       const matId = c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel");
       const mt = MATERIALS.find((x) => x.id === matId);
-      return { material: (mt?.label ?? matId).split(" – ")[0], massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
+      // do kusovníku jde označení materiálu dílu (razítko, např. „TEST – 1.2311“), třída (Ocel) jen když označení chybí
+      const label = c.source.kind === "part" && c.source.doc.materialName?.trim() ? c.source.doc.materialName.trim() : (mt?.label ?? matId).split(" – ")[0];
+      return { material: label, massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [asmVer],
@@ -1475,10 +1510,46 @@ export function CadApp() {
     try {
       const res = await cad.interference(doc);
       setClashes(res);
-      if (!res.length) flash("Bez kolizí ✓");
+      setClashInfo({ at: new Date().toLocaleTimeString("cs-CZ"), comps: leaves.filter((l) => !l.hidden).length });
+      flash(res.length ? `Kolize: ${res.length}` : "Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu");
     } catch (e) {
       flash((e as Error).message);
     }
+  };
+  const compName = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  /** stav sestavy pro textový stav (agenti): počty, obálka, objem, hmotnost, poslední kontrola kolizí */
+  const asmStatusRef = useRef<() => AsmStatus | undefined>(() => undefined);
+  asmStatusRef.current = () => {
+    if (!isAsm) return undefined;
+    const vis = leaves.filter((l) => !l.hidden);
+    let volume = 0;
+    let mass = 0;
+    let known = vis.length > 0;
+    for (const l of vis) {
+      const v = asmCache.current.get(l.key)?.metrics?.volume;
+      if (v == null) {
+        known = false;
+        continue;
+      }
+      volume += v;
+      mass += asmPartInfo(l.comp).massKg ?? 0;
+    }
+    let bbox: [Vec3, Vec3] | undefined;
+    for (const it of balloonItems ?? []) {
+      if (!bbox) bbox = [[...it.bbox[0]] as Vec3, [...it.bbox[1]] as Vec3];
+      else for (let k = 0; k < 3; k++) {
+        bbox[0][k] = Math.min(bbox[0][k], it.bbox[0][k]);
+        bbox[1][k] = Math.max(bbox[1][k], it.bbox[1][k]);
+      }
+    }
+    return {
+      components: (doc.components ?? []).length,
+      parts: vis.length,
+      bbox,
+      volume: known ? volume : undefined,
+      massKg: known ? mass : undefined,
+      clash: clashes ? { count: clashes.length, pairs: clashes.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clashInfo?.at ?? "" } : null,
+    };
   };
 
   // ---------- prvky ----------
@@ -1721,9 +1792,16 @@ export function CadApp() {
       let bytes = 0;
       const saved = await saveFile(`${safeName(doc.name)}.${meta.ext}`, async () => {
         flash(`Připravuji ${meta.label}…`);
-        const buf = await cad.exportFile(doc, format);
-        bytes = buf.byteLength;
-        return buf;
+        const t0 = Date.now();
+        // dlouhý export (složitá / neplatná geometrie): průběžná zpráva s časem místo ticha
+        const tick = window.setInterval(() => flash(`Připravuji ${meta.label}… ${Math.round((Date.now() - t0) / 1000)} s – složitá geometrie; prvky s ⚠ (neplatná geometrie) export výrazně zpomalují`), 4000);
+        try {
+          const buf = await cad.exportFile(doc, format);
+          bytes = buf.byteLength;
+          return buf;
+        } finally {
+          window.clearInterval(tick);
+        }
       }, meta.mime);
       if (saved) flash(`Export ${meta.label} hotov: ${saved.name} (${bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`})`);
       else flash(`Export ${meta.label} zrušen.`);
@@ -2024,6 +2102,8 @@ export function CadApp() {
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];
   const m = result?.metrics;
   const errors = result?.status.filter((s) => !s.ok) ?? [];
+  const warnings = result?.status.filter((s) => s.ok && s.warning) ?? [];
+  const geomBad = !isAsm && result?.metrics && (result.metrics.valid === false || result.metrics.solids === 0);
   const bg = BACKGROUNDS[prefs.bg] ?? BACKGROUNDS.blue;
   const hasBody = isAsm ? asmViews.length > 0 : !!result?.mesh;
 
@@ -3077,8 +3157,13 @@ export function CadApp() {
                 <Row k="Rozložení" v={`${Math.round(explode * 100)} %`} />
               </FloatPanel>
             )}
-            {isAsm && clashes && clashes.length > 0 && (
-              <FloatPanel title={`Kolize (${clashes.length})`} icon="section" onClose={() => setClashes(null)} pos={explode > 0 ? "left-3 top-[150px]" : "left-3 top-3"}>
+            {isAsm && clashes && (
+              <FloatPanel title={clashes.length ? `Kolize (${clashes.length})` : "Bez kolizí ✓"} icon="section" onClose={() => setClashes(null)} pos={explode > 0 ? "left-3 top-[150px]" : "left-3 top-3"}>
+                {clashInfo && (
+                  <p data-clash-result className="mb-1 text-[11px] text-[#5b6776]">
+                    {clashes.length ? `${clashes.length} ${clashes.length === 1 ? "průnik" : clashes.length < 5 ? "průniky" : "průniků"}` : "Žádný průnik komponent"} · zkontrolováno {clashInfo.comps} komponent · {clashInfo.at}
+                  </p>
+                )}
                 <div className="max-h-56 space-y-1 overflow-y-auto">
                   {clashes.map((x, i) => {
                     const a = doc.components?.find((c) => c.id === x.a);
@@ -3132,6 +3217,18 @@ export function CadApp() {
                   <Chip dark={bg.dark}>Prázdný model</Chip>
                 )}
                 {errors.length > 0 && <Chip warn>{errors.length} prvek s chybou</Chip>}
+                {warnings.length > 0 && (
+                  <Chip warn>
+                    <span data-warn-chip title={warnings.map((w) => w.warning).join("\n")}>
+                      {warnings.length} {warnings.length === 1 ? "prvek s upozorněním" : "prvky s upozorněním"}
+                    </span>
+                  </Chip>
+                )}
+                {geomBad && (
+                  <Chip warn>
+                    <span data-geom-chip title="Výsledné těleso není platné (sebeprotínající plochy) nebo nemá žádný solid – export STEP může selhat. Opravte prvek označený ⚠ v historii.">{result!.metrics!.solids === 0 ? "bez objemového tělesa" : "neplatná geometrie"}</span>
+                  </Chip>
+                )}
               </div>
             )}
           </main>
@@ -3200,6 +3297,9 @@ export function CadApp() {
               </div>
               {active && statusOf(result, active.id) && !statusOf(result, active.id)!.ok && (
                 <p className="mx-3 mt-3 rounded border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-[12px] text-brand-600">{statusOf(result, active.id)!.error}</p>
+              )}
+              {active && statusOf(result, active.id)?.ok && statusOf(result, active.id)?.warning && (
+                <p data-form-warning className="mx-3 mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[12px] text-amber-800">⚠ {statusOf(result, active.id)!.warning}</p>
               )}
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 {active && <FeatureProps f={active} doc={doc} onChange={(p) => updateFeature(active.id, p)} />}
@@ -3475,7 +3575,7 @@ export function CadApp() {
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
             drawings={doc.drawings}
             balloons={balloonItems}
-            onDrawingsChange={(d) => live({ ...doc, drawings: d })}
+            onDrawingsChange={(d) => liveWith((cur) => ({ ...cur, drawings: d }))}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onClose={() => {
               const t = docTabs.find((x) => x.id === tabId);

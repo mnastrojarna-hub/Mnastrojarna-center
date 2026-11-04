@@ -837,13 +837,15 @@ registerExt({
   group: "Křivky",
   order: 33,
   hint: "profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka",
-  make: (doc) => ({ profile: "circle", wire: 2, depth: 1.2, sketchId: lastSketch(doc), radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: "Z", lefthand: false, mode: "add" }),
+  make: (doc) => ({ profile: "circle", wire: 2, depth: 1.2, side: "external", leadIn: 0, sketchId: lastSketch(doc), radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: "Z", lefthand: false, mode: "add" }),
   params: [
     { key: "profile", label: "Profil", kind: "enum", options: [{ v: "circle", l: "Kruh (drát)" }, { v: "thread60", l: "Závit 60°" }, { v: "sketch", l: "Skica" }] },
     { key: "wire", label: "Průměr drátu", kind: "number", min: 0.01, hint: "pro profil Kruh" },
     { key: "depth", label: "Hloubka závitu", kind: "number", min: 0.01, hint: "pro profil Závit 60°" },
+    { key: "side", label: "Závit", kind: "enum", options: [{ v: "external", l: "Vnější (na válci)" }, { v: "internal", l: "Vnitřní (v díře)" }], hint: "poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu" },
+    { key: "leadIn", label: "Náběh (otáček)", kind: "number", min: 0, step: 0.25, unit: "", hint: "jen Závit 60°: hloubka profilu roste od 0 po plnou během prvních otáček od začátku (0 = bez náběhu)" },
     { key: "sketchId", label: "Skica profilu", kind: "sketch", hint: "uzavřený profil v rovině XZ u začátku šroubovice" },
-    { key: "radius", label: "Poloměr šroubovice", kind: "number", min: 0.01 },
+    { key: "radius", label: "Poloměr šroubovice", kind: "number", min: 0.01, hint: "poloměr válce / díry" },
     { key: "pitch", label: "Stoupání", kind: "number", min: 0.01 },
     { key: "turns", label: "Počet závitů", kind: "number", min: 0.05, step: 0.5, unit: "" },
     { key: "position", label: "Střed začátku", kind: "vec3" },
@@ -859,39 +861,80 @@ registerExt({
     if (t > 200) throw new Error("Nejvýš 200 závitů.");
     const center = vec3(d.position);
     const dir = axisDir(str(d.axis, "Z"));
-    const helix = r.makeHelix(p, p * t, R, center, dir, !!d.lefthand);
-    const start = vec(helix.startPoint);
-    const tangent = norm(vec(helix.tangentAt(0)));
-    const radial = norm([start[0] - center[0], start[1] - center[1], start[2] - center[2]].map((v, i) => v - dir[i] * (dir[0] * (start[0] - center[0]) + dir[1] * (start[1] - center[1]) + dir[2] * (start[2] - center[2]))) as Vec3);
+    const lefthand = !!d.lefthand;
     const profile = str(d.profile, "circle");
     const mode = str(d.mode, "add") as BoolMode;
-    let wire: r.Wire;
-    if (profile === "circle") {
-      const w = num(d.wire);
-      if (!(w > 0) || w >= p) throw new Error("Průměr drátu musí být kladný a menší než stoupání.");
-      wire = r.assembleWire([r.makeCircle(w / 2, start, tangent)]);
-    } else if (profile === "thread60") {
-      const h = num(d.depth);
-      if (!(h > 0)) throw new Error("Hloubka závitu musí být kladná.");
-      const half = Math.min(p * 0.45, h * Math.tan(30 * DEG) + 0.05 * p);
-      const inward = mode === "cut" || mode === "intersect" ? -1 : 1;
-      const P = (rad: number, ax: number): Vec3 => addV(addV(start, scaleV(radial, rad)), scaleV(dir, ax));
-      const a = P(-0.15 * inward, -half);
-      const b = P(-0.15 * inward, half);
-      const c = P(h * inward, 0);
-      wire = r.assembleWire([r.makeLine(a, b), r.makeLine(b, c), r.makeLine(c, a)]);
-    } else {
+    const removing = mode === "cut" || mode === "intersect";
+    const internal = str(d.side, "external") === "internal";
+    const leadIn = profile === "thread60" ? Math.max(0, Math.min(num(d.leadIn), t)) : 0;
+    const full = r.makeHelix(p, p * t, R, center, dir, lefthand);
+    /** úsek šroubovice od otáčky `from` do `to` – navazuje na celou šroubovici (pootočený a posunutý začátek) */
+    const segment = (from: number, to: number) => {
+      const h = r.makeHelix(p, p * (to - from), R, center, dir, lefthand);
+      if (from <= 0) return h;
+      const target = vec(full.pointAt(from / t));
+      const moved = h.translate(scaleV(dir, p * from));
+      const dist = (w: r.Wire, deg: number) => {
+        const q = vec(w.clone().rotate(deg, center, dir).startPoint);
+        return Math.hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]);
+      };
+      const deg = 360 * from;
+      return (dist(moved, deg) <= dist(moved, -deg) ? moved.rotate(deg, center, dir) : moved.rotate(-deg, center, dir)) as r.Wire;
+    };
+    /** profil u začátku daného úseku; `scale` zmenšuje hloubku závitu (náběh) */
+    const wireFor = (helix: r.Wire, scale = 1): r.Wire => {
+      const start = vec(helix.startPoint);
+      const tangent = norm(vec(helix.tangentAt(0)));
+      const radial = norm([start[0] - center[0], start[1] - center[1], start[2] - center[2]].map((v, i) => v - dir[i] * (dir[0] * (start[0] - center[0]) + dir[1] * (start[1] - center[1]) + dir[2] * (start[2] - center[2]))) as Vec3);
+      if (profile === "circle") {
+        const w = num(d.wire);
+        if (!(w > 0) || w >= p) throw new Error("Průměr drátu musí být kladný a menší než stoupání.");
+        return r.assembleWire([r.makeCircle(w / 2, start, tangent)]);
+      }
+      if (profile === "thread60") {
+        const h = num(d.depth) * scale;
+        if (!(h > 0)) throw new Error("Hloubka závitu musí být kladná.");
+        const half = Math.min(p * 0.45, h * Math.tan(30 * DEG) + 0.05 * p);
+        // Trojúhelník profilu: základna 0,15 mm „za“ povrchem (ve vzduchu u odebrání, v materiálu u přidání), špička v hloubce h.
+        // Vnější závit: materiál uvnitř poloměru R (válec) → odebrání směřuje dovnitř, přidání ven.
+        // Vnitřní závit: materiál vně poloměru R (díra) → odebrání směřuje ven (do stěny díry), přidání dovnitř.
+        // Dřívější chování (bez `side`) odpovídá vnějšímu závitu. Špička nesmí být tečná k povrchu – proto základna 0,15 mimo povrch.
+        const inward = (removing ? -1 : 1) * (internal ? -1 : 1);
+        const P = (rad: number, ax: number): Vec3 => addV(addV(start, scaleV(radial, rad)), scaleV(dir, ax));
+        const a = P(-0.15 * inward, -half);
+        const b = P(-0.15 * inward, half);
+        const c = P(h * inward, 0);
+        return r.assembleWire([r.makeLine(a, b), r.makeLine(b, c), r.makeLine(c, a)]);
+      }
       const sk = needSketch(ctx, d.sketchId, "skicu profilu");
-      wire = sketchWires(sk)[0];
+      return sketchWires(sk)[0];
+    };
+    const sweep = (helix: r.Wire, wire: r.Wire): Shape => {
+      let solid: Shape;
+      try {
+        solid = r.genericSweep(wire, helix, { frenet: true }, false);
+      } catch {
+        throw new Error("Tažení po šroubovici se nepodařilo – profil se nesmí protínat sám se sebou (zmenšete profil nebo zvětšete stoupání).");
+      }
+      if (!(Math.abs(r.measureVolume(solid)) > 1e-6)) throw new Error("Tažení po šroubovici nevytvořilo objem – profil musí být uzavřený.");
+      return solid;
+    };
+    if (leadIn <= 0) return applySolid(ctx, sweep(full, wireFor(full)), mode);
+    // Náběh: během prvních `leadIn` otáček roste hloubka profilu od 0 po plnou (po krocích) – odstraní ostrý neúplný začátek závitu.
+    const N = Math.max(4, Math.ceil(leadIn * 8));
+    const parts: Shape[] = [];
+    for (let k = 0; k < N; k++) {
+      const seg = segment((k * leadIn) / N, ((k + 1) * leadIn) / N);
+      parts.push(sweep(seg, wireFor(seg, (k + 0.5) / N)));
     }
-    let solid: Shape;
-    try {
-      solid = r.genericSweep(wire, helix, { frenet: true }, false);
-    } catch {
-      throw new Error("Tažení po šroubovici se nepodařilo – profil se nesmí protínat sám se sebou (zmenšete profil nebo zvětšete stoupání).");
+    if (t - leadIn > 1e-6) {
+      const seg = segment(leadIn, t);
+      parts.push(sweep(seg, wireFor(seg, 1)));
     }
-    if (!(Math.abs(r.measureVolume(solid)) > 1e-6)) throw new Error("Tažení po šroubovici nevytvořilo objem – profil musí být uzavřený.");
-    return applySolid(ctx, solid, mode);
+    if (!removing) return applySolid(ctx, fuseAll(parts), mode);
+    let cur: ExtBuildCtx = ctx;
+    for (const part of parts) cur = { ...cur, body: applySolid(cur, part, mode) };
+    return cur.body;
   },
 });
 

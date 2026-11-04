@@ -73,7 +73,44 @@ export const METRIC_THREADS: { name: string; d: number; pitch: number; tap: numb
   { name: "M48", d: 48, pitch: 5, tap: 43, clear: 52 },
 ];
 
-export const threadByName = (name?: string) => METRIC_THREADS.find((t) => t.name.toLowerCase() === (name ?? "").trim().toLowerCase().replace(",", "."));
+export type MetricThread = (typeof METRIC_THREADS)[number];
+
+/** ISO metrické závity s jemným stoupáním (ISO 261) – označení „M18×1,5“. tap = d − P. */
+export const FINE_THREADS: MetricThread[] = [
+  ["M8", 1], ["M10", 1.25], ["M10", 1], ["M12", 1.5], ["M12", 1.25], ["M14", 1.5], ["M16", 1.5], ["M18", 2], ["M18", 1.5], ["M20", 2], ["M20", 1.5],
+  ["M22", 2], ["M22", 1.5], ["M24", 2], ["M24", 1.5], ["M27", 2], ["M30", 2], ["M30", 1.5], ["M33", 2], ["M36", 3], ["M36", 2], ["M39", 3], ["M42", 3], ["M42", 2], ["M45", 3], ["M48", 3], ["M48", 2],
+].map(([n, p]) => fineThread(METRIC_THREADS.find((t) => t.name === n)!, p as number));
+
+function fineThread(base: MetricThread, pitch: number): MetricThread {
+  return { ...base, name: `${base.name}×${String(pitch).replace(".", ",")}`, pitch, tap: Math.round((base.d - pitch) * 10) / 10 };
+}
+
+/** Všechny katalogové závity (hrubé i jemné) – pro nabídky ve formulářích. */
+export const ALL_THREADS: MetricThread[] = [...METRIC_THREADS, ...FINE_THREADS].sort((a, b) => a.d - b.d || b.pitch - a.pitch);
+
+const normThread = (name: string) => name.trim().toLowerCase().replace(/\s+/g, "").replace(/,/g, ".").replace(/×|x/g, "x");
+
+/**
+ * Závit podle označení: „M6“, „M18×1,5“, „M18x1.5“, „m18 x 1,5“. Hrubé stoupání z tabulky; jemné z tabulky ISO 261,
+ * jiné stoupání (např. M18×1) se dopočítá (jádro = d − P). Neznámý průměr → undefined.
+ */
+export const threadByName = (name?: string): MetricThread | undefined => {
+  const key = normThread(name ?? "");
+  if (!key) return undefined;
+  const hit = ALL_THREADS.find((t) => normThread(t.name) === key);
+  if (hit) return hit;
+  const m = /^m(\d+(?:\.\d+)?)(?:x(\d+(?:\.\d+)?))?$/.exec(key);
+  if (!m) return undefined;
+  const d = parseFloat(m[1]);
+  const base = METRIC_THREADS.find((t) => Math.abs(t.d - d) < 1e-9);
+  if (!base) return undefined;
+  const pitch = m[2] ? parseFloat(m[2]) : base.pitch;
+  if (!(pitch > 0 && pitch < d / 2)) return undefined;
+  return Math.abs(pitch - base.pitch) < 1e-9 ? base : fineThread(base, pitch);
+};
+
+/** Označení závitu pro výkres / stav: „M6“, „M18×1,5“. */
+export const threadLabel = (name?: string) => threadByName(name)?.name ?? (name ?? "").trim().toUpperCase();
 
 /** Popisek prvku (včetně prvků rozšíření). */
 export function featureLabel(f: Pick<Feature, "type"> & { ext?: string }): string {

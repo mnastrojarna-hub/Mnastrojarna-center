@@ -4,8 +4,10 @@
  * (automatické i uživatelské). Automatické kótování je jen pomocný základ – tato kontrola ukáže, co chybí.
  * Čisté funkce (testovatelné v Node).
  */
-import { threadByName } from "./defaults";
+import { threadByName, threadLabel } from "./defaults";
 import type { CadDoc, Feature, Vec3 } from "./types";
+
+type Vec2Like = readonly [number, number];
 
 export type DimKind = "lin" | "dia" | "rad" | "thread";
 export type DimExpect = { kind: DimKind; value: number; label: string; source: string };
@@ -51,7 +53,7 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
         const cnt = n > 1 ? `${n}× ` : "";
         if (f.kind === "tapped" && f.thread) {
           const t = threadByName(f.thread);
-          push(out, "thread", t?.d ?? parseFloat(f.thread.replace(/^m/i, "")), `${cnt}${f.thread.toUpperCase()}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}`, src);
+          push(out, "thread", t?.d ?? parseFloat(f.thread.replace(/^m/i, "")), `${cnt}${threadLabel(f.thread)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}`, src);
         } else push(out, "dia", f.diameter, `${cnt}Ø${fmt(f.diameter)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"}`, src);
         if (f.depth > 0) push(out, "lin", f.depth, `${fmt(f.depth)} (hloubka díry)`, src);
         if (f.cbDiameter > 0) {
@@ -81,9 +83,58 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
       case "box":
         for (const v of f.size) push(out, "lin", v, `${fmt(v)}`, src);
         break;
-      case "extrude":
-        if (!f.extent || f.extent.kind === "blind") push(out, "lin", f.extent?.kind === "blind" ? f.extent.d : f.distance, `${fmt(f.extent?.kind === "blind" ? f.extent.d : f.distance)} (výška vysunutí)`, src);
+      case "extrude": {
+        if (f.extent && f.extent.kind !== "blind") break;
+        const d = f.extent?.kind === "blind" ? f.extent.d : f.distance;
+        // průchozí odebrání (řez skrz celý díl): délka nástroje není rozměr součásti
+        if (f.mode === "cut" && bbox && d >= Math.max(bbox[1][0] - bbox[0][0], bbox[1][1] - bbox[0][1], bbox[1][2] - bbox[0][2]) - 1e-6) break;
+        push(out, "lin", d, `${fmt(d)} (${f.mode === "cut" ? "hloubka odebrání" : "výška vysunutí"})`, src);
         break;
+      }
+      case "revolve": {
+        // rotační díl: průměry z radiálních souřadnic profilu a délky úseků rovnoběžných s osou
+        const sk = doc.features.find((x): x is Extract<Feature, { type: "sketch" }> => x.type === "sketch" && x.id === f.sketchId);
+        if (!sk) break;
+        const ax = f.axis === "x" ? 0 : 1; // osa skici; radiální souřadnice je ta druhá
+        const rad = 1 - ax;
+        for (const e of sk.entities) {
+          if (e.construction) continue;
+          const pts: Vec2Like[] = e.type === "polyline" ? e.points : e.type === "line" ? [e.a, e.b] : e.type === "rect" ? [[e.cx - e.w / 2, e.cy - e.h / 2], [e.cx + e.w / 2, e.cy + e.h / 2]] : [];
+          for (const p of pts) if (Math.abs(p[rad]) > 1e-6) push(out, "dia", 2 * Math.abs(p[rad]), `Ø${fmt(2 * Math.abs(p[rad]))}`, src);
+          if (e.type === "rect") {
+            push(out, "lin", e.type === "rect" ? (ax === 0 ? e.w : e.h) : 0, `${fmt(ax === 0 ? e.w : e.h)} (délka)`, src);
+            continue;
+          }
+          for (let i = 1; i < pts.length; i++) {
+            const a = pts[i - 1];
+            const b = pts[i];
+            if (Math.abs(a[rad] - b[rad]) < 1e-6 && Math.abs(a[ax] - b[ax]) > 1e-6) push(out, "lin", Math.abs(a[ax] - b[ax]), `${fmt(Math.abs(a[ax] - b[ax]))} (délka Ø${fmt(2 * Math.abs(a[rad]))})`, src);
+          }
+          if (e.type === "polyline" && e.closed && pts.length > 2) {
+            const a = pts[pts.length - 1];
+            const b = pts[0];
+            if (Math.abs(a[rad] - b[rad]) < 1e-6 && Math.abs(a[ax] - b[ax]) > 1e-6) push(out, "lin", Math.abs(a[ax] - b[ax]), `${fmt(Math.abs(a[ax] - b[ax]))} (délka Ø${fmt(2 * Math.abs(a[rad]))})`, src);
+          }
+        }
+        break;
+      }
+      case "thread": {
+        const t = threadByName(f.designation);
+        push(out, "thread", t?.d ?? 0, `${threadLabel(f.designation)}${f.length > 0 ? ` délka ${fmt(f.length)}` : ""}`, src);
+        break;
+      }
+      case "ext": {
+        // tažení po šroubovici s profilem závitu: závit M(velký Ø)×stoupání
+        const d = f.data ?? {};
+        if (f.ext === "surf.helixSweep" && d.profile === "thread60" && typeof d.radius === "number" && typeof d.pitch === "number") {
+          const h = typeof d.depth === "number" ? d.depth : 0;
+          const internal = d.side === "internal";
+          const removing = d.mode === "cut" || d.mode === "intersect";
+          const major = 2 * ((internal ? removing : !removing) ? d.radius + h : d.radius);
+          push(out, "thread", major, `M${fmt(major)}×${fmt(d.pitch)}${typeof d.turns === "number" ? ` (${fmt(d.turns * d.pitch)} dl.)` : ""}`, src);
+        }
+        break;
+      }
       case "sketch":
         if (!sketchUsed.has(f.id)) break;
         for (const e of f.entities) {

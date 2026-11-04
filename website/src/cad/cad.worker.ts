@@ -3,6 +3,7 @@
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { buildDoc, faceInfo } from "./build";
+import { drawingDoc } from "./drawing-doc";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { exportShape } from "./formats/export";
@@ -169,9 +170,11 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       }
       case "drawing": {
         // těleso se přestaví jen při změně geometrie (razítko, název, materiál, poznámky těleso nemění – ty jsou rychlé)
-        const key = JSON.stringify({ f: m.doc.features, v: m.doc.variables, c: m.doc.configs, a: m.doc.activeConfig, b: m.doc.bodies, k: m.doc.kind, comp: m.doc.components, mates: m.doc.mates });
+        // závity se kreslí zjednodušeně (kružnice + označení) – modelované šroubovice se pro výkres potlačí (jejich přesná projekce trvá minuty)
+        const dd = drawingDoc(m.doc);
+        const key = JSON.stringify({ f: dd.features, v: dd.variables, c: dd.configs, a: dd.activeConfig, b: dd.bodies, k: dd.kind, comp: dd.components, mates: dd.mates });
         if (drawCache?.key !== key) {
-          const b = await shapeOfDoc(m.doc);
+          const b = await shapeOfDoc(dd);
           if (!b) throw new Error("Model je prázdný.");
           drawCache?.body.delete?.();
           drawCache = { key, body: b };

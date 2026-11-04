@@ -181,7 +181,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
-  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; positionRef?: Ref; dirDef?: Direction }
+  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
+  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */
@@ -271,7 +272,11 @@ export type AsmComponent = {
   group?: string;
 };
 
-export type FeatureStatus = { id: string; ok: boolean; error?: string };
+/**
+ * Stav prvku po stavbě: `ok` = prvek se zpracoval; `warning` = zpracoval se, ale výsledek si zaslouží pozornost
+ * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
+ */
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string };
 
 export type MeshData = {
   vertices: Float32Array;
@@ -289,7 +294,17 @@ export type BuildResult = {
   /** chyby proměnných / vazeb parametrů (z resolveDoc) */
   paramErrors?: string[];
   mesh: MeshData | null;
-  metrics: { volume: number; area: number; bbox: [Vec3, Vec3]; faces: number; edges: number } | null;
+  metrics: {
+    volume: number;
+    area: number;
+    bbox: [Vec3, Vec3];
+    faces: number;
+    edges: number;
+    /** platnost výsledného tělesa (BRepCheck) – neplatné těleso může selhat při exportu STEP */
+    valid?: boolean;
+    /** počet objemových těles (0 = jen pláště / plochy) */
+    solids?: number;
+  } | null;
   /** polohy topologických vrcholů tělesa (x,y,z po trojicích) – pro výběr bodů */
   vertices?: Float32Array;
   /** tělesa dílu (více těles) s globálními indexy ploch a hran */

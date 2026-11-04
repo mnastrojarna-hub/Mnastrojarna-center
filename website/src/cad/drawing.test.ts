@@ -174,6 +174,16 @@ describe("tabulka děr, pozice, detail, revize, listy", () => {
     expect(d.balloons!.map((b) => b.pos).sort()).toEqual([1, 2, 3]);
     const off = makeDrawing(plate(), { ...meta, components: comps }, { balloons: false });
     expect(off.balloons).toBeUndefined();
+    // balónky zůstávají uvnitř rámu listu (okraj 10 mm nahoře, razítko dole) – i na malém formátu s velkým měřítkem
+    for (const sheet of ["A4", "A3", "A2"] as const) {
+      const big = makeDrawing(plate(), { ...meta, components: comps }, { balloons: true, sheet, scale: sheet === "A4" ? 2 : 1 });
+      for (const b of big.balloons ?? []) {
+        expect(b.y - 4, `${sheet} balónek ${b.pos} nad rámem`).toBeGreaterThanOrEqual(10);
+        expect(b.y + 4, `${sheet} balónek ${b.pos} pod rámem`).toBeLessThanOrEqual(big.sheet.h - 10 - 38);
+        expect(b.x - 4).toBeGreaterThanOrEqual(20);
+        expect(b.x + 4).toBeLessThanOrEqual(big.sheet.w - 10);
+      }
+    }
   });
   it("detailní pohled: oříznutá kopie v měřítku 2:1 s popiskem", () => {
     const d = makeDrawing(plate(), meta, { details: [{ id: "d1", label: "A", view: "front", cx: 0, cy: 0, r: 15, scale: 2 }] });

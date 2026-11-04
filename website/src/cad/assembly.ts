@@ -160,14 +160,16 @@ function compInfo(c: AsmComponent, info: (c: AsmComponent) => { material?: strin
 function aggregate(comps: { c: AsmComponent; n: number }[], info: (c: AsmComponent) => { material?: string; massKg?: number }, level: number): BomRow[] {
   const rows = new Map<string, BomRow>();
   for (const { c, n } of comps) {
-    const key = `${sourceKey(c.source)}|${c.name}|${c.number ?? ""}`;
+    // číslo výkresu: z komponenty, jinak z vlastností vloženého dílu (props.number) – ať se do kusovníku dostane
+    const number = c.number?.trim() || (c.source.kind === "part" ? c.source.doc.props?.number?.trim() : undefined) || undefined;
+    const key = `${sourceKey(c.source)}|${c.name}|${number ?? ""}`;
     const r = rows.get(key);
     if (r) {
       r.qty += n;
       r.ids.push(c.id);
     } else {
       const i = compInfo(c, info);
-      rows.set(key, { pos: 0, name: c.name, number: c.number, qty: n, material: i.material, massKg: i.massKg, group: c.source.kind === "asm" ? (c.group ?? "Podsestavy") : c.group, ids: [c.id], level, assembly: c.source.kind === "asm" || undefined });
+      rows.set(key, { pos: 0, name: c.name, number, qty: n, material: i.material, massKg: i.massKg, group: c.source.kind === "asm" ? (c.group ?? "Podsestavy") : c.group, ids: [c.id], level, assembly: c.source.kind === "asm" || undefined });
     }
   }
   return [...rows.values()].sort(byGroup);
