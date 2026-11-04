@@ -843,7 +843,7 @@ registerExt({
     { key: "wire", label: "Průměr drátu", kind: "number", min: 0.01, hint: "pro profil Kruh" },
     { key: "depth", label: "Hloubka závitu", kind: "number", min: 0.01, hint: "pro profil Závit 60°" },
     { key: "side", label: "Závit", kind: "enum", options: [{ v: "external", l: "Vnější (na válci)" }, { v: "internal", l: "Vnitřní (v díře)" }], hint: "poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu" },
-    { key: "leadIn", label: "Náběh (otáček)", kind: "number", min: 0, step: 0.25, unit: "", hint: "jen Závit 60°: hloubka profilu roste od 0 po plnou během prvních otáček od začátku (0 = bez náběhu)" },
+    { key: "leadIn", label: "Náběh (otáček)", kind: "number", min: 0, step: 0.25, unit: "", hint: "jen Závit 60°: jako u závitového kalibru – hřbet prvního závitu je od začátku vybroušený a během zadaných otáček se zvedá do plného profilu (0 = bez náběhu)" },
     { key: "sketchId", label: "Skica profilu", kind: "sketch", hint: "uzavřený profil v rovině XZ u začátku šroubovice" },
     { key: "radius", label: "Poloměr šroubovice", kind: "number", min: 0.01, hint: "poloměr válce / díry" },
     { key: "pitch", label: "Stoupání", kind: "number", min: 0.01 },
@@ -868,21 +868,15 @@ registerExt({
     const internal = str(d.side, "external") === "internal";
     const leadIn = profile === "thread60" ? Math.max(0, Math.min(num(d.leadIn), t)) : 0;
     const full = r.makeHelix(p, p * t, R, center, dir, lefthand);
-    /** úsek šroubovice od otáčky `from` do `to` – navazuje na celou šroubovici (pootočený a posunutý začátek) */
-    const segment = (from: number, to: number) => {
-      const h = r.makeHelix(p, p * (to - from), R, center, dir, lefthand);
-      if (from <= 0) return h;
-      const target = vec(full.pointAt(from / t));
-      const moved = h.translate(scaleV(dir, p * from));
-      const dist = (w: r.Wire, deg: number) => {
-        const q = vec(w.clone().rotate(deg, center, dir).startPoint);
-        return Math.hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]);
-      };
-      const deg = 360 * from;
-      return (dist(moved, deg) <= dist(moved, -deg) ? moved.rotate(deg, center, dir) : moved.rotate(-deg, center, dir)) as r.Wire;
+    /** bod šroubovice v otáčce `u` (0…t): osová souřadnice a jednotkový radiální směr */
+    const helixAt = (u: number) => {
+      const P = vec(full.pointAt(Math.max(0, Math.min(1, u / t))));
+      const rel: Vec3 = [P[0] - center[0], P[1] - center[1], P[2] - center[2]];
+      const z = rel[0] * dir[0] + rel[1] * dir[1] + rel[2] * dir[2];
+      return { z, rad: norm([rel[0] - dir[0] * z, rel[1] - dir[1] * z, rel[2] - dir[2] * z]) };
     };
-    /** profil u začátku daného úseku; `scale` zmenšuje hloubku závitu (náběh) */
-    const wireFor = (helix: r.Wire, scale = 1): r.Wire => {
+    /** profil u začátku šroubovice */
+    const wireFor = (helix: r.Wire): r.Wire => {
       const start = vec(helix.startPoint);
       const tangent = norm(vec(helix.tangentAt(0)));
       const radial = norm([start[0] - center[0], start[1] - center[1], start[2] - center[2]].map((v, i) => v - dir[i] * (dir[0] * (start[0] - center[0]) + dir[1] * (start[1] - center[1]) + dir[2] * (start[2] - center[2]))) as Vec3);
@@ -892,7 +886,7 @@ registerExt({
         return r.assembleWire([r.makeCircle(w / 2, start, tangent)]);
       }
       if (profile === "thread60") {
-        const h = num(d.depth) * scale;
+        const h = num(d.depth);
         if (!(h > 0)) throw new Error("Hloubka závitu musí být kladná.");
         const half = Math.min(p * 0.45, h * Math.tan(30 * DEG) + 0.05 * p);
         // Trojúhelník profilu: základna 0,15 mm „za“ povrchem (ve vzduchu u odebrání, v materiálu u přidání), špička v hloubce h.
@@ -919,22 +913,39 @@ registerExt({
       if (!(Math.abs(r.measureVolume(solid)) > 1e-6)) throw new Error("Tažení po šroubovici nevytvořilo objem – profil musí být uzavřený.");
       return solid;
     };
-    if (leadIn <= 0) return applySolid(ctx, sweep(full, wireFor(full)), mode);
-    // Náběh: během prvních `leadIn` otáček roste hloubka profilu od 0 po plnou (po krocích) – odstraní ostrý neúplný začátek závitu.
-    const N = Math.max(4, Math.ceil(leadIn * 8));
-    const parts: Shape[] = [];
-    for (let k = 0; k < N; k++) {
-      const seg = segment((k * leadIn) / N, ((k + 1) * leadIn) / N);
-      parts.push(sweep(seg, wireFor(seg, (k + 0.5) / N)));
+    const groove = sweep(full, wireFor(full));
+    if (leadIn <= 0) return applySolid(ctx, groove, mode);
+    // Náběh jako u závitového kalibru: drážka je od začátku plná, ale HŘBET prvního závitu je vybroušený – od začátku
+    // šroubovice (hřbet odstraněn až na dno drážky) se během `leadIn` otáček plynule zvedá do plného profilu.
+    // Výbrus = šablonování obdélníkových řezů podél šroubovice (šířka = stoupání, radiální hloubka klesá k nule), odebráno z tělesa.
+    const h = num(d.depth);
+    const inwardSign = (removing ? -1 : 1) * (internal ? -1 : 1); // směr od povrchu R do materiálu (jako u profilu)
+    const crestR = removing ? R : R + h * inwardSign; // poloměr hřbetu (povrch, který zůstal mezi drážkami)
+    const outward = removing ? inwardSign : -inwardSign; // směr od hřbetu ke dnu drážky
+    const M = Math.max(12, Math.ceil(leadIn * 48));
+    const sections: r.Wire[] = [];
+    for (let k = 0; k <= M; k++) {
+      const u = (leadIn * k) / M;
+      const { z, rad } = helixAt(u);
+      const depth = h * (1 - k / M); // od plného výbrusu po nulu
+      const r1 = crestR - outward * 0.2; // 0,2 mm ve vzduchu za hřbetem
+      const r2 = crestR + outward * depth;
+      const P = (rr: number, ax: number): Vec3 => addV(addV(center, scaleV(rad, rr)), scaleV(dir, ax));
+      const a = P(r1, z - p / 2);
+      const b = P(r2, z - p / 2);
+      const c = P(r2, z + p / 2);
+      const e = P(r1, z + p / 2);
+      sections.push(r.assembleWire([r.makeLine(a, b), r.makeLine(b, c), r.makeLine(c, e), r.makeLine(e, a)]));
     }
-    if (t - leadIn > 1e-6) {
-      const seg = segment(leadIn, t);
-      parts.push(sweep(seg, wireFor(seg, 1)));
+    let relief: Shape;
+    try {
+      relief = r.loft(sections, { ruled: false }); // hladká plocha výbrusu (bez facet mezi řezy)
+    } catch {
+      throw new Error("Náběh závitu se nepodařilo vytvořit – zmenšete počet otáček náběhu nebo hloubku závitu.");
     }
-    if (!removing) return applySolid(ctx, fuseAll(parts), mode);
-    let cur: ExtBuildCtx = ctx;
-    for (const part of parts) cur = { ...cur, body: applySolid(cur, part, mode) };
-    return cur.body;
+    const body = applySolid(ctx, groove, mode);
+    // výbrus hřbetu se vždy odebírá (i u přidaného závitu odebírá z hřbetu nově přidaného materiálu)
+    return applySolid({ ...ctx, body }, relief, "cut");
   },
 });
 

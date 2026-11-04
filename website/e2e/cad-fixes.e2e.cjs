@@ -103,6 +103,15 @@ const part = (name, number, materialName, size) => ({ app: 'mnastrojarna-cad', v
   // ── 5. závit M18×1,5 v díře: šroubovice i katalogový závit; výkres kótuje M18×1,5 ──
   log = await run(p, 'nový díl Matice\ntrubka 42 16.5 30\n' + JSON.stringify({ type: 'ext', ext: 'surf.helixSweep', data: { profile: 'thread60', side: 'internal', depth: 0.75, radius: 8.25, pitch: 1.5, turns: 12, position: [0, 0, 5], axis: 'Z', mode: 'cut' } }) + '\nstav');
   ok(/✓ Prvek \d+ \(ext\)|✓ [^\n]*\(ext\)/.test(log) && /Geometrie: platná/.test(log), 'vnitřní závit tažením po šroubovici: ✓ a platná geometrie\n' + (log.match(/Geometrie[^\n]*/) || [''])[0]);
+  // náběh jako u kalibru: snímek pohledu do díry (vybroušený hřbet prvního závitu)
+  const lead = await run(p, 'nový díl Kalibr\ntrubka 42 16.5 12\n' + JSON.stringify({ type: 'ext', ext: 'surf.helixSweep', data: { profile: 'thread60', side: 'internal', depth: 0.75, radius: 8.25, pitch: 1.5, turns: 9, leadIn: 1, position: [0, 0, -1], axis: 'Z', mode: 'cut' } }) + '\nzobraz horní\nstav');
+  ok(/✓ [^\n]*\(ext\)/.test(lead) && /Geometrie: platná/.test(lead), 'náběh (výbrus hřbetu prvního závitu): ✓ a platná geometrie\n' + (lead.match(/⚠[^\n]*|✗[^\n]*/) || [''])[0]);
+  await p.waitForTimeout(1500);
+  await p.screenshot({ path: S + 'fixes-lead-in-top.png' });
+  await p.evaluate(() => window.mncad.run('zobraz iso'));
+  await p.waitForTimeout(800);
+  await p.screenshot({ path: S + 'fixes-lead-in-iso.png' });
+  log = await run(p, 'nový díl Matice\ntrubka 42 16.5 30\n' + JSON.stringify({ type: 'ext', ext: 'surf.helixSweep', data: { profile: 'thread60', side: 'internal', depth: 0.75, radius: 8.25, pitch: 1.5, turns: 12, position: [0, 0, 5], axis: 'Z', mode: 'cut' } }) + '\nstav');
   log = await run(p, 'závit M18×1,5 délka 30 v 0 0 0 vnitřní');
   ok(/✓ Závit 1 \(thread\)/.test(log) && /M18×1,5 délka 30 mm, vnitřní/.test(log), 'katalogový závit M18×1,5 vnitřní (kosmetický)');
   await p.getByRole('button', { name: 'Soubor', exact: true }).click();

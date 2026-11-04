@@ -866,7 +866,7 @@ To už nenastává: po každém prvku program porovná objem a topologii tělesa
 
 **Jak udělám jemný závit M18×1,5 nebo závit v díře?**
 
-Prvek Závit přijímá hrubé i jemné stoupání (nabídka nebo text „M18×1,5“); zaškrtnutí Vnitřní závit (v díře) ho umístí do díry (kružnice jádra se pak kótuje M18×1,5). Díra se závitem má stejnou nabídku a jádro dopočítá. Skutečnou šroubovici dá Plochy → Tažení po šroubovici: profil Závit 60°, volba Vnější (na válci) / Vnitřní (v díře), poloměr = povrch, kde závit začíná, hloubka jde do materiálu; Náběh (otáček) odstraní ostrý neúplný začátek závitu. Na výkrese se modelované závity kreslí zjednodušeně podle ISO 6410 – hladký válec / díra s označením M18×1,5 (přesná projekce šroubovice by trvala minuty); ve STEP je skutečná šroubovice.
+Prvek Závit přijímá hrubé i jemné stoupání (nabídka nebo text „M18×1,5“); zaškrtnutí Vnitřní závit (v díře) ho umístí do díry (kružnice jádra se pak kótuje M18×1,5). Díra se závitem má stejnou nabídku a jádro dopočítá. Skutečnou šroubovici dá Plochy → Tažení po šroubovici: profil Závit 60°, volba Vnější (na válci) / Vnitřní (v díře), poloměr = povrch, kde závit začíná, hloubka jde do materiálu; Náběh (otáček) vybrousí hřbet prvního závitu jako u závitového kalibru – od začátku až na dno drážky, během zadaných otáček se zvedá do plného profilu. Na výkrese se modelované závity kreslí zjednodušeně podle ISO 6410 – hladký válec / díra s označením M18×1,5 (přesná projekce šroubovice by trvala minuty); ve STEP je skutečná šroubovice.
 
 **Stačí automatické kótování pro výrobní výkres?**
 

@@ -168,7 +168,8 @@ pixely v 3D okně:
 - Skutečná šroubovice (Plochy → Tažení po šroubovici, JSON \`{"type":"ext","ext":"surf.helixSweep","data":{…}}\`):
   \`profile: "thread60"\`, \`side: "internal"\` pro závit **v díře** (poloměr = poloměr díry / jádra, hloubka jde
   do stěny) nebo \`"external"\` pro závit **na válci** (poloměr = poloměr válce), \`pitch\`, \`turns\`, \`mode: "cut"\`,
-  volitelně \`leadIn\` (náběh: během prvních N otáček hloubka roste od nuly – odstraní ostrý neúplný začátek).
+  volitelně \`leadIn\` (náběh jako u závitového kalibru: hřbet prvního závitu je od začátku vybroušený až na dno drážky
+  a během N otáček se zvedá do plného profilu – drážka sama je plná od začátku).
   Příklad matice M18×1,5 s jádrem Ø16,4: \`radius: 8.2, depth: 0.8, pitch: 1.5, turns: 12, side: "internal"\`.
   JSON prvku na jednom řádku lze míchat s textovými příkazy (\`trubka 42 16,4 30\`, další řádek \`{"type":"ext",…}\`, \`stav\`).
   Špička profilu nesmí být tečná k povrchu (např. radius 9 + depth 0,8 u díry Ø16,4) – takový výsledek je ⚠.

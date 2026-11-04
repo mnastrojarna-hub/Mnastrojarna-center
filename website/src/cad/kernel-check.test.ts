@@ -108,7 +108,7 @@ describe("závit v díře tažením po šroubovici", () => {
     if (st.ok && !st.warning) expect(checkShape(res.body!).valid).toBe(true);
     else expect((st.error ?? st.warning) ?? "").toMatch(/geometri|nezměnil|objemové/);
   });
-  it("náběh: hloubka roste od nuly během první otáčky", { timeout: 180000 }, async () => {
+  it("náběh jako u kalibru: drážka plná od začátku, hřbet prvního závitu vybroušený a zvedá se do plného profilu", { timeout: 180000 }, async () => {
     const t = tube();
     const doc = base([t]);
     const plain = ext(doc, "surf.helixSweep", { profile: "thread60", side: "internal", depth: 0.8, radius: 8.2, pitch: 1.5, turns: 6, position: [0, 0, 5], axis: "Z", mode: "cut" });
@@ -117,11 +117,34 @@ describe("závit v díře tažením po šroubovici", () => {
     const a = await buildDoc(base([t, plain]));
     const b = await buildDoc(base([t, lead]));
     expect(statusOf(b, lead).ok).toBe(true);
+    expect(statusOf(b, lead).warning).toBeUndefined();
     const removedPlain = r0.metrics!.volume - a.metrics!.volume;
     const removedLead = r0.metrics!.volume - b.metrics!.volume;
-    expect(removedLead).toBeGreaterThan(removedPlain * 0.7);
-    expect(removedLead).toBeLessThan(removedPlain * 0.98);
+    // výbrus hřbetu odebírá navíc (ne méně): pás šířky p, hloubka od h k 0 během jedné otáčky ≈ p·h/2·2πr ≈ 32 mm³ (část už odebrala drážka)
+    expect(removedLead - removedPlain).toBeGreaterThan(5);
+    expect(removedLead - removedPlain).toBeLessThan(60);
     expect(checkShape(b.body!).valid).toBe(true);
+    // v místě začátku je hřbet odstraněn až na dno drážky: bod na poloměru 8,2 + 0,6 těsně nad začátkem je ve vzduchu,
+    // o otáčku dál (plný profil) je tam materiál hřbetu
+    // materiál v bodě: průnik tělesa s kuličkou Ø0,2 má objem
+    const inside = (p: [number, number, number]) => {
+      try {
+        return r.measureVolume(b.body!.intersect(r.makeSphere(0.05).translate(p))) > 1e-7;
+      } catch {
+        return false;
+      }
+    };
+    // bod na hřbetu: od bodu šroubovice (střed drážky) 0,5 mm podél osy (mimo V-drážku v hloubce 0,5, uvnitř pásu výbrusu ±0,75) a 0,5 mm do materiálu
+    const helix = r.makeHelix(1.5, 9, 8.2, [0, 0, 5], [0, 0, 1], false);
+    const pt = (turn: number): [number, number, number] => {
+      const q = helix.pointAt(turn / 6);
+      const rr = Math.hypot(q.x, q.y);
+      return [(q.x / rr) * 8.7, (q.y / rr) * 8.7, q.z + 0.5];
+    };
+    expect(inside(pt(0.1))).toBe(false); // začátek: hřbet vybroušen
+    expect(inside(pt(2.1))).toBe(true); // plný profil: hřbet je materiál
+    expect(inside([15, 0, 15])).toBe(true); // kontrola pomocné funkce: bod hluboko v materiálu stěny
+    expect(inside([0, 0, 15])).toBe(false); // osa díry = vzduch
   });
   it("vnější závit odebráním na válci funguje jako dřív", { timeout: 60000 }, async () => {
     const cyl: Feature = { id: id(), name: "Válec", type: "cylinder", radius: 10, height: 30, position: [0, 0, -5], axis: "Z", mode: "new" };
