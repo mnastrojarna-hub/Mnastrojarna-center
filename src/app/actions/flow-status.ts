@@ -6,6 +6,7 @@ import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
+import { applyQuotePricesToItems } from "@/lib/jobs/consistency-store";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { isJobStage } from "@/lib/jobs/stages";
 import { cleanDate, cleanText, isUuid, todayIso, translateDbError } from "@/lib/jobs/mapping";
@@ -424,8 +425,11 @@ async function applyQuote(
     const err = await update({ status: "prijato" });
     if (err) return err;
     if (jobId) {
+      // křížová konzistence (4. 11.): ceny přijaté nabídky → položky zakázky; hodnota = Σ položek (DB)
+      const { data: qItems } = await c.db.from("quote_items").select("position, drawing_number, name, unit_price").eq("quote_id", quoteId);
+      const priced = await applyQuotePricesToItems(c.db, jobId, (qItems ?? []) as Row[]);
       const jobPatch: Row = { quote_id: quoteId };
-      if (quote.total !== null && quote.total !== undefined) jobPatch.value = quote.total;
+      if (quote.total !== null && quote.total !== undefined && !priced.invoiced) jobPatch.value = quote.total;
       await c.db.from("orders").update(jobPatch as never).eq("id", jobId);
     }
     await log(`${evLabel} přijata zákazníkem`, "accepted");

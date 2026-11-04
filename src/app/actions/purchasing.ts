@@ -314,7 +314,9 @@ export async function updateSupplierQuote(id: string, input: Partial<SupplierQuo
     }
 
     // vítězná nabídka → plánovaný nákup zakázky drží krok
-    if (quote.selected && "total" in row && row.total !== null && row.total !== quote.total) {
+    // (s objednávkami dodavatelům je nákup = Σ objednávek — DB, migrace 20261104120000)
+    const { data: activePo } = await db.from("purchase_orders").select("id").eq("job_id", quote.jobId).neq("status", "zrusena").limit(1);
+    if (quote.selected && "total" in row && row.total !== null && row.total !== quote.total && !((activePo ?? []) as unknown[]).length) {
       const job = await loadJob(db, quote.jobId, "id, purchase_cost");
       if (job) {
         const err = await patchJob(c, quote.jobId, job, { purchase_cost: row.total }, {}, { supplierQuoteId: id });
@@ -710,6 +712,12 @@ export async function updatePurchaseOrder(
     const required = "required_date" in row ? (row.required_date as string | null) : po.requiredDate;
     const orderDate = "order_date" in row ? (row.order_date as string) : po.orderDate;
     if (required && required < orderDate) return fail("Požadovaný termín dodání je před datem objednávky.");
+    // odeslaná objednávka: dodavatel zná termín a datum — změna jen jako „změna objednávky" (termín kroku výroby)
+    const requiredChanged = "required_date" in row && (row.required_date ?? null) !== (po.requiredDate ?? null);
+    const orderDateChanged = "order_date" in row && row.order_date !== po.orderDate;
+    if ((requiredChanged || orderDateChanged) && !isPurchaseOrderEditable(po.status)) {
+      return fail(PO_SENT_DATE_LOCKED);
+    }
 
     let newRows: PurchaseItemRowInput[] | null = null;
     let prices: { itemId: string; unitPrice: unknown }[] | null = null;
@@ -814,6 +822,11 @@ export async function updatePurchaseOrder(
     // dopady do zakázky
     let hint: string | undefined;
     let stage: JobStage | undefined;
+    // požadovaný termín neodeslané objednávky → termín navázaného (posledního otevřeného) kroku výroby
+    if (requiredChanged && required) {
+      const synced = await syncStepEndFromPurchaseOrder(c, po.jobId, id, po.number, required);
+      if (synced) hint = [hint, synced].filter(Boolean).join(" ");
+    }
     const job = await loadJob(db, po.jobId, "id, status, supplier_promised_date");
     if (job) {
       // slíbený termín dodavatele = termín zakázky jen od objednávky posledního otevřeného kroku výroby
@@ -866,6 +879,34 @@ export async function updatePurchaseOrder(
   } catch (err) {
     return fail(err);
   }
+}
+
+const PO_SENT_DATE_LOCKED = "Objednávka už odešla dodavateli — termín ani datum objednávky tady změnit nejde. Změň termín kroku výroby (Technologie / Výroba) — vznikne změna objednávky, kterou dodavateli pošleš.";
+
+/** Termín kroku výroby podle požadovaného termínu objednávky (jen krok navázaný na objednávku, ne konečný termín zákazníka). */
+async function syncStepEndFromPurchaseOrder(c: Ctx, jobId: string, poId: string, poNumber: string | null, required: string): Promise<string | null> {
+  const { data } = await c.db.from("job_operations")
+    .select("id, title, kind, planned_end, ends_at_customer_date, status, position")
+    .eq("purchase_order_id", poId).in("status", ["ceka", "probiha", "problem"])
+    .order("position", { ascending: false }).limit(1);
+  const op = ((data ?? []) as { id: string; title: string | null; kind: string; planned_end: string | null; ends_at_customer_date: boolean | null }[])[0];
+  if (!op || op.planned_end === required) return null;
+  const name = op.title?.trim() || (isOperationKind(op.kind) ? OPERATION_KINDS[op.kind].label : "výroby");
+  if (op.ends_at_customer_date) {
+    return `Krok ${name} končí termínem zákazníka (${czDate(op.planned_end ?? "")}) — jeho termín se podle objednávky nemění.`;
+  }
+  const { error } = await c.db.from("job_operations").update({ planned_end: required, deadline_source: "rucne" } as never).eq("id", op.id);
+  if (error) {
+    console.error(`[purchasing] Termín kroku podle objednávky ${poNumber ?? poId}: ${error.message}`);
+    return null;
+  }
+  await logJobEvent(c.db, {
+    jobId, type: "field",
+    message: `Výroba: ${name} — termín ${op.planned_end ? czDate(op.planned_end) : "—"} → ${czDate(required)} (podle požadovaného termínu objednávky ${poNumber ?? ""})`.replace(/ \)/, ")"),
+    data: { production: "updated", operationId: op.id, purchaseOrderId: poId, fields: ["planned_end"] },
+    actorId: c.user.id, entity: "operation", entityId: op.id,
+  });
+  return null;
 }
 
 /**

@@ -19,6 +19,7 @@ import { ownerAssignedStamp } from "./purchasing-model";
 import { JobSupplierInvoices } from "@/components/supplier-invoices/job-supplier-invoices";
 import { useRfq } from "@/components/rfq/rfq-context";
 import { RfqSection } from "@/components/rfq/rfq-panel";
+import { ConsistencyBadges, useJobConsistency } from "@/components/jobs/detail/consistency-ui";
 
 type SendTarget = { id: string; number: string; supplierName: string | null; fileId: string | null };
 
@@ -49,6 +50,8 @@ export function PurchasingTab({ job, data, stepOf }: {
     () => [...data.purchaseOrders].sort((a, b) => Number(a.status === "zrusena") - Number(b.status === "zrusena") || b.createdAt.localeCompare(a.createdAt)),
     [data.purchaseOrders],
   );
+  // nákup × objednávky, kusy objednávek × zakázky, termíny objednávek × termín zákazníka (4. 11.)
+  const issues = useJobConsistency(job, data).filter((i) => i.field === "purchaseCost" || i.field === "purchaseOrders" || i.key.startsWith("po_date_"));
   const otherCost = (exclude?: string) =>
     active.filter((p) => p.id !== exclude).reduce((s, p) => s + (Number.isFinite(p.total) ? p.total : 0), 0);
 
@@ -135,6 +138,7 @@ export function PurchasingTab({ job, data, stepOf }: {
             </Button>
           }
         />
+        <ConsistencyBadges issues={issues} />
         {orders.length === 0 ? (
           <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
             Zatím žádná objednávka dodavateli — vystav ji tlačítkem výše, vyplní se sama.

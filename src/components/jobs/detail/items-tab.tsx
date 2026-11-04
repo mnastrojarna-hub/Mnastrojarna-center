@@ -147,7 +147,8 @@ export function ItemsTab({ items, currency, value, onDirtyChange }: { items: Job
         setError(res.error ?? "Položky se nepodařilo uložit.");
         return;
       }
-      notify("success", `Položky uloženy (${input.length}).`);
+      notify("success", `Položky uloženy (${input.length})${res.value !== undefined && res.value !== null && res.value !== (value ?? null) ? " — hodnota zakázky přepočtena ze součtu" : ""}.`);
+      if (res.warning) notify("info", res.warning);
       // po uložení převzít stav ze serveru (nová id položek)
       const kept = drafts.filter((d) => !isBlankDraft(d));
       setDrafts(kept);
@@ -190,6 +191,7 @@ export function ItemsTab({ items, currency, value, onDirtyChange }: { items: Job
         }}
         columns={{ revision: true, purchase: perms.margins, currency }}
         specs={specs}
+        jobValue={value ?? null}
       />
 
       {error && (

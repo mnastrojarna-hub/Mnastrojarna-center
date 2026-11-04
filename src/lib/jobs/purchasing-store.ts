@@ -216,7 +216,9 @@ export async function selectWinningQuoteCore(db: JobsDb, userId: string, quoteId
 
   const patch: Row = {};
   if (!job.supplier_id && quote.supplier) patch.supplier_id = quote.supplier.id;
-  if (quote.total !== null) patch.purchase_cost = quote.total;
+  // s objednávkami dodavatelům je nákup = Σ objednávek (DB) — vítězná nabídka ho už nepřepíše
+  const { data: posData } = await db.from("purchase_orders").select("id").eq("job_id", quote.jobId).neq("status", "zrusena").limit(1);
+  if (quote.total !== null && !((posData ?? []) as unknown[]).length) patch.purchase_cost = quote.total;
   if (!job.supplier_promised_date && quote.deliveryDate) patch.supplier_promised_date = quote.deliveryDate;
   const changes = diffJob(job, patch);
   if (changes.length) {
