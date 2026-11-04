@@ -5,20 +5,27 @@ import {
   moveJobStage, todayInPrague, dateFromIso, shortDate, initials, avatarTone, AVATAR_TONES, countLabel,
   normalizeStages, segmentOfStage, defaultStageFor, firstParam, sumValue, DEFAULT_PARAMS, RESET_FILTERS,
   KPI_PATCHES, ORDER_STAGES, INQUIRY_STAGES, BOOK_SEGMENTS, PAYMENT_FILTERS, isProductionStepKey, canonicalBookHref, type BookParams,
-  DONE_STAGES, ORDER_FILTER_KEYS, deliveryFiltersFor, segmentQueryStages, segmentStageCounts,
+  DONE_STAGES, ARCHIVE_STAGES, ORDER_FILTER_KEYS, deliveryFiltersFor, segmentQueryStages, segmentStageCounts, bookValue, VALUE_TILE,
+  DEFAULT_SORT, BOOK_SORTS,
 } from "./book-params";
-import { PRE_DELIVERY_STAGES, STAGE_ORDER, isDeliveredToCustomer, isRunningOrder } from "@/lib/jobs/stages";
+import { DELIVERED_STAGES, PRE_DELIVERY_STAGES, STAGE_ORDER, isArchivedJob, isDeliveredToCustomer, isPaidJob, isRunningOrder } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
 
 const UUID = "3f2b8c1e-1d2a-4c3b-9a8e-7f6d5c4b3a21";
 
 describe("parseBookParams", () => {
-  it("výchozí = Objednávky, řádky, nejnovější", () => {
+  it("výchozí = Objednávky, řádky, naposledy změněné", () => {
     expect(parseBookParams({})).toEqual(DEFAULT_PARAMS);
     expect(DEFAULT_PARAMS.segment).toBe("objednavky");
     expect(DEFAULT_PARAMS.view).toBe("radky");
-    expect(DEFAULT_PARAMS.sort).toBe("created");
+    expect(DEFAULT_SORT).toBe("updated");
+    expect(DEFAULT_PARAMS.sort).toBe("updated");
     expect(DEFAULT_PARAMS.dir).toBe("desc");
+    expect(BOOK_SORTS[0]).toMatchObject({ key: "updated", label: "Naposledy změněné" });
+    // výchozí řazení se do adresy nepíše; „Nejnovější" (created) ano
+    expect(bookQuery({ ...DEFAULT_PARAMS, sort: "updated", dir: "desc" })).toBe("");
+    expect(bookQuery({ ...DEFAULT_PARAMS, sort: "created" })).toBe("sort=created");
+    expect(parseBookParams({ sort: "created" }).sort).toBe("created");
   });
 
   it("čte všechny parametry a ignoruje neplatné", () => {
@@ -42,7 +49,7 @@ describe("parseBookParams", () => {
   it("neznámý segment / řazení / termín → výchozí", () => {
     const p = parseBookParams({ segment: "hack", sort: "drop table", deadline: "zitra", dir: "sideways" });
     expect(p.segment).toBe("objednavky");
-    expect(p.sort).toBe("created");
+    expect(p.sort).toBe("updated");
     expect(p.deadline).toBeNull();
     expect(p.dir).toBe("desc");
   });
@@ -64,7 +71,7 @@ describe("bookQuery / bookHref", () => {
   });
 
   it("vynechává výchozí hodnoty a nikdy nepřenáší capture / pristup", () => {
-    const p = parseBookParams({ segment: "objednavky", sort: "created", dir: "desc", capture: "1", pristup: "knowledge" });
+    const p = parseBookParams({ segment: "objednavky", sort: "updated", dir: "desc", capture: "1", pristup: "knowledge" });
     expect(bookQuery(p)).toBe("");
     const q = bookQuery({ ...DEFAULT_PARAMS, sort: "deadline", dir: "asc", view: "tabule", q: "PO-45" });
     expect(q).toBe("q=PO-45&sort=deadline&view=tabule");
@@ -135,8 +142,9 @@ describe("bookParamsToFilters", () => {
   it("segment bez výběru = stavy segmentu", () => {
     const f = bookParamsToFilters(DEFAULT_PARAMS);
     expect(f.stages).toEqual(ORDER_STAGES);
-    expect(f.sort).toBe("created");
+    expect(f.sort).toBe("updated");
     expect(f.q).toBeUndefined();
+    expect(f.paid).toBeUndefined();
   });
 
   it("31. 10.: Objednávky = od objednávky do DL (bez Dodáno/Vyfakturováno), jen bez DL na vše", () => {
@@ -150,21 +158,51 @@ describe("bookParamsToFilters", () => {
     expect([picked.stages, picked.deliveredToCustomer]).toEqual([["montaz"], false]);
   });
 
-  it("31. 10.: Dokončené = Dodáno zákazníkovi, Vyfakturováno, Dokončeno + stavy před dodáním s dodaným vším", () => {
+  it("31. 10.: Dokončené = Dodáno zákazníkovi, Vyfakturováno (nezaplacené) + stavy před dodáním s dodaným vším", () => {
     const seg = BOOK_SEGMENTS.find((s) => s.key === "dokoncene")!;
     expect(seg.stages).toEqual(DONE_STAGES);
-    expect(DONE_STAGES).toEqual(["dodano_zakaznikovi", "fakturovano", "dokonceno"]);
-    expect(seg.hint).toBe("Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené.");
+    expect(DONE_STAGES).toEqual(["dodano_zakaznikovi", "fakturovano"]);
+    expect(seg.hint).toBe("Dodané zákazníkovi (vystavený DL) a vyfakturované — čekají na zaplacení.");
     expect(BOOK_SEGMENTS.find((s) => s.key === "objednavky")!.hint).toBe("Objednané zakázky bez dodacího listu — v běhu.");
     const f = bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "dokoncene" });
     expect(f.deliveredToCustomer).toBe(true);
+    expect(f.paid).toBe(false);
     expect(f.stages).toEqual(STAGE_ORDER.filter((s) => DONE_STAGES.includes(s) || PRE_DELIVERY_STAGES.includes(s)));
+    expect(f.stages).not.toContain("dokonceno");
     expect(segmentQueryStages(seg)).toEqual(f.stages);
-    // vybraný stav = jen ten stav
-    expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "dokoncene", stages: ["fakturovano"] }).stages).toEqual(["fakturovano"]);
-    // ostatní záložky dodání neřeší
+    // vybraný stav = jen ten stav (stále jen nezaplacené)
+    const picked = bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "dokoncene", stages: ["fakturovano"] });
+    expect([picked.stages, picked.deliveredToCustomer, picked.paid]).toEqual([["fakturovano"], true, false]);
+    // ostatní záložky dodání ani úhradu neřeší
     expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "vse" }).deliveredToCustomer).toBeUndefined();
     expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "poptavky" }).deliveredToCustomer).toBeUndefined();
+    expect(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "vse" }).paid).toBeUndefined();
+  });
+
+  it("Archiv = dodáno a zaplaceno: stav Dokončeno + dodané s datem úhrady v jiném stavu", () => {
+    const seg = BOOK_SEGMENTS.find((s) => s.key === "archiv")!;
+    expect(BOOK_SEGMENTS.map((s) => s.key)).toEqual(["objednavky", "poptavky", "dokoncene", "archiv", "nerealizovane", "vse"]);
+    expect(seg.stages).toEqual(ARCHIVE_STAGES);
+    expect(ARCHIVE_STAGES).toEqual(["dokonceno"]);
+    expect(seg.hint).toBe("Dodané a zaplacené zakázky — hotovo, uloženo v archivu.");
+    const f = bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "archiv" });
+    expect([f.deliveredToCustomer, f.paid]).toEqual([true, true]);
+    // dotaz: Dokončeno + všechny stavy po dodání i před dodáním (zaplacená, stav se neposunul)
+    expect(f.stages).toEqual(STAGE_ORDER.filter((s) => DELIVERED_STAGES.includes(s) || PRE_DELIVERY_STAGES.includes(s)));
+    expect(segmentQueryStages(seg)).toEqual(f.stages);
+    expect(deliveryFiltersFor("archiv")).toEqual(["dodano", "dl_potvrzen"]);
+    expect(segmentOfStage("dokonceno")).toBe("archiv");
+    expect(segmentOfStage("fakturovano")).toBe("dokoncene");
+    // pravidlo zaplaceno / archiv (stages.ts)
+    expect(isPaidJob({ stage: "dokonceno" })).toBe(true);
+    expect(isPaidJob({ stage: "fakturovano", paidAt: "2026-10-01" })).toBe(true);
+    expect(isPaidJob({ stage: "fakturovano", paidAt: null })).toBe(false);
+    expect(isArchivedJob({ stage: "dokonceno" })).toBe(true);
+    expect(isArchivedJob({ stage: "fakturovano", paidAt: "2026-10-01" })).toBe(true);
+    expect(isArchivedJob({ stage: "fakturovano" })).toBe(false);
+    expect(isArchivedJob({ stage: "montaz", paidAt: "2026-10-01", flow: { itemsCount: 2, itemsDelivered: 2 } })).toBe(true);
+    expect(isArchivedJob({ stage: "montaz", paidAt: "2026-10-01", flow: { itemsCount: 2, itemsDelivered: 1 } })).toBe(false);
+    expect(isArchivedJob({ stage: "reklamace", paidAt: "2026-10-01", flow: { itemsCount: 1, itemsDelivered: 1 } })).toBe(false);
   });
 
   it("31. 10.: filtr Dodání podle záložky (Dodáno jen v Dokončených), chip „Vše dodáno“ v Objednávkách není", () => {
@@ -249,10 +287,21 @@ describe("výroba a platba", () => {
 
   it("ostatní dlaždice jsou celý pohled — zbylý filtr platby zruší", () => {
     const overdueInv = applyBookPatch(DEFAULT_PARAMS, KPI_PATCHES.overdueInvoices);
-    const value = applyBookPatch(overdueInv, KPI_PATCHES.value);
-    expect([value.segment, value.sort, value.dir, value.payment]).toEqual(["objednavky", "value", "desc", null]);
     expect(isPatchActive(overdueInv, KPI_PATCHES.ordersRunning)).toBe(false);
     expect(applyBookPatch(overdueInv, KPI_PATCHES.overdue).payment).toBeNull();
+  });
+
+  it("dlaždice hodnoty = aktuální pohled: kliknutí jen seřadí podle hodnoty, záložka a filtry zůstávají", () => {
+    const view = applyBookPatch(DEFAULT_PARAMS, { segment: "poptavky", customer: UUID, payment: "nezaplaceno" });
+    const value = applyBookPatch(view, KPI_PATCHES.value);
+    expect([value.segment, value.customer, value.payment, value.sort, value.dir]).toEqual(["poptavky", UUID, "nezaplaceno", "value", "desc"]);
+    expect(isPatchActive(value, KPI_PATCHES.value)).toBe(true);
+    expect(isPatchActive(view, KPI_PATCHES.value)).toBe(false);
+    expect(bookValue([{ value: 100 }, { value: null }, { value: 50.5 }])).toEqual({ sum: 150.5, count: 3 });
+    expect(bookValue([])).toEqual({ sum: 0, count: 0 });
+    expect(Object.keys(VALUE_TILE).sort()).toEqual(BOOK_SEGMENTS.map((s) => s.key).sort());
+    expect(VALUE_TILE.objednavky.label).toBe("Hodnota objednávek v běhu");
+    expect(VALUE_TILE.archiv.label).toBe("Hodnota v archivu");
   });
 });
 
@@ -262,10 +311,29 @@ describe("počty", () => {
   it("segmenty sečtou své stavy", () => {
     const c = segmentCounts(byStage);
     expect(c.poptavky).toBe(1 + 2 + 3);
-    expect(c.dokoncene).toBe(byStage.dodano_zakaznikovi + byStage.fakturovano + byStage.dokonceno);
+    // bez archived se Dokončeno nikam nepočítá (Archiv počítá jen z archived — Dokončeno je vždy zaplacené)
+    expect(c.dokoncene).toBe(byStage.dodano_zakaznikovi + byStage.fakturovano);
+    expect(c.archiv).toBe(0);
     expect(c.nerealizovane).toBe(byStage.nerealizovano + byStage.zruseno);
     expect(c.vse).toBe(STAGE_ORDER.reduce((n, _s, i) => n + i + 1, 0));
     expect(c.objednavky).toBe(ORDER_STAGES.reduce((n, s) => n + byStage[s], 0));
+  });
+
+  it("Archiv: dodané a zaplacené se počítají do Archivu, ne do Dokončených (záložky, chipy)", () => {
+    const delivered = { montaz: 2, objednavka: 1 };
+    // Dokončeno vždy; 2 vyfakturované zaplacené (stav se neposunul), 1 dodaná v Montáži zaplacená
+    const archived = { dokonceno: byStage.dokonceno, fakturovano: 2, montaz: 1 };
+    const c = segmentCounts(byStage, delivered, archived);
+    expect(c.archiv).toBe(byStage.dokonceno + 3);
+    expect(c.dokoncene).toBe(byStage.dodano_zakaznikovi + byStage.fakturovano + 3 - 3);
+    expect(c.objednavky).toBe(segmentCounts(byStage, delivered).objednavky);
+    // součet záložek (bez Vše) = celá kniha
+    expect(c.objednavky + c.poptavky + c.dokoncene + c.archiv + c.nerealizovane).toBe(c.vse);
+    // chipy: Dokončené bez zaplacených, Archiv jen zaplacené
+    const done = segmentStageCounts(byStage, delivered, "dokoncene", archived);
+    expect([done.fakturovano, done.dodano_zakaznikovi]).toEqual([byStage.fakturovano - 2, byStage.dodano_zakaznikovi]);
+    expect(segmentStageCounts(byStage, delivered, "archiv", archived)).toEqual(archived);
+    expect(segmentStageCounts(byStage, delivered, "vse", archived)).toBe(byStage);
   });
 
   it("31. 10.: zakázka s dodaným vším ve stavu před dodáním → počet Dokončené, ne Objednávky (záložky, chipy, KPI)", () => {
@@ -275,13 +343,15 @@ describe("počty", () => {
     expect(c.objednavky).toBe(plain.objednavky - 3);
     expect(c.dokoncene).toBe(plain.dokoncene + 3);
     expect([c.poptavky, c.nerealizovane, c.vse]).toEqual([plain.poptavky, plain.nerealizovane, plain.vse]);
-    // součet záložek (bez Vše) = celá kniha
-    expect(c.objednavky + c.poptavky + c.dokoncene + c.nerealizovane).toBe(c.vse);
+    // součet záložek (bez Vše) = celá kniha (Dokončeno = vždy zaplacené → Archiv)
+    const archived = { dokonceno: byStage.dokonceno };
+    const all = segmentCounts(byStage, delivered, archived);
+    expect(all.objednavky + all.poptavky + all.dokoncene + all.archiv + all.nerealizovane).toBe(all.vse);
     // chipy: v Objednávkách bez dodaných, jinde podle stavu
     const chips = segmentStageCounts(byStage, delivered, "objednavky");
     expect([chips.montaz, chips.objednavka, chips.ve_vyrobe]).toEqual([byStage.montaz - 2, byStage.objednavka - 1, byStage.ve_vyrobe]);
     expect(segmentStageCounts(byStage, delivered, "vse")).toBe(byStage);
-    expect(segmentStageCounts(byStage, delivered, "dokoncene")).toBe(byStage);
+    expect(segmentStageCounts(byStage, delivered, "dokoncene")).toEqual(byStage);
     // KPI Objednávky v běhu = záložka Objednávky (i na přehledu)
     expect(bookKpis({ byStage, deliveredByStage: delivered, overdue: 0, dueThisWeek: 0 }).ordersRunning).toBe(c.objednavky);
   });
@@ -289,7 +359,7 @@ describe("počty", () => {
   it("31. 10.: vystavený DL na vše = Dokončené; částečná dodávka zůstává v běhu", () => {
     const job = (stage: JobStage, itemsCount: number, itemsDelivered: number) => ({ stage, flow: { itemsCount, itemsDelivered } });
     // stav Dodáno zákazníkovi a dál = vždy dodáno
-    for (const s of DONE_STAGES) expect(isDeliveredToCustomer(job(s, 0, 0))).toBe(true);
+    for (const s of DELIVERED_STAGES) expect(isDeliveredToCustomer(job(s, 0, 0))).toBe(true);
     // stav před dodáním: rozhodují položky
     expect(isDeliveredToCustomer(job("montaz", 2, 2))).toBe(true);
     expect(isRunningOrder(job("montaz", 2, 2))).toBe(false);
@@ -349,6 +419,10 @@ describe("tabule", () => {
     expect(boardStages(p)).toEqual(DONE_STAGES);
     expect(boardStages(p, [{ stage: "fakturovano" }, { stage: "montaz" }])).toEqual(["montaz", ...DONE_STAGES]);
     expect(boardStages({ ...p, stages: ["fakturovano"] }, [{ stage: "montaz" }])).toEqual(["fakturovano"]);
+    // Archiv: sloupec Dokončeno + zaplacené v jiném stavu podle řádků
+    const a = { ...DEFAULT_PARAMS, segment: "archiv" as const };
+    expect(boardStages(a)).toEqual(["dokonceno"]);
+    expect(boardStages(a, [{ stage: "dokonceno" }, { stage: "fakturovano" }])).toEqual(["fakturovano", "dokonceno"]);
   });
 
   it("seskupí zakázky a sečte hodnoty", () => {

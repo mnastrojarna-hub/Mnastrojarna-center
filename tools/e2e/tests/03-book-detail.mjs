@@ -8,7 +8,7 @@
 import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary } from "../lib.mjs";
 import {
   PREFIX, TAG, STAGE_LABELS, LABEL_TO_STAGE, SEGMENTS, SEGMENT_ROWS, STAGE_SOLID, STAGE_DOT, lit, userIds, eventually, bookIdle,
-  readRows, rowStages, shownCount, dbCount, dbSegmentCount, dbRunningValue, segmentWhere, expectNoOverflow, expectInViewport,
+  readRows, rowStages, shownCount, dbCount, dbSegmentCount, dbSegmentValue, segmentWhere, expectNoOverflow, expectInViewport,
   createCustomer, createJob, cleanupOwnData, waitHydrated,
 } from "../lib-book-detail.mjs";
 
@@ -55,6 +55,10 @@ const L2 = createJob({
   title: `${PREFIX}L2 dílčí dodávka ${TAG}`, status: "ve_vyrobe", customerId: CUST.id, ownerId: ID.obchod, value: 6000,
   items: [{ ...item("L2A"), delivered: 2 }, item("L2B")],
 });
+// 4. 11.: Archiv = dodáno a zaplaceno: A1 Dokončeno (trigger doplní paid_at), A2 vyfakturovaná s datem úhrady
+// (stav se neposunul). Vyfakturovaná nezaplacená F2 a dodaná L1 zůstávají v Dokončených.
+const A1 = createJob({ title: `${PREFIX}A1 archiv dokončeno ${TAG}`, status: "dokonceno", customerId: CUST.id, ownerId: ID.obchod, value: 5000, invoiceNumber: `E2EB-FA1-${TAG}`, invoiceDays: -40, invoiceDueDays: -26 });
+const A2 = createJob({ title: `${PREFIX}A2 archiv zaplaceno ${TAG}`, status: "fakturovano", customerId: CUST.id, ownerId: ID.obchod, value: 7000, invoiceNumber: `E2EB-FA2-${TAG}`, invoiceDays: -30, invoiceDueDays: -16, paidDays: -3 });
 
 /** Zachycená server akce deleteJob (super admin) — pro pokus zaměstnance. */
 let deleteAction = null;
@@ -120,15 +124,19 @@ await T("kniha: výchozí segment Objednávky — jen objednávkové stavy, poč
   await shot(page, S("01-orders-default"));
 });
 
-await T("kniha: segmenty Poptávky & nabídky, Dokončené, Nerealizované, Vše (URL, stavy, počty)", async (context) => {
+await T("kniha: segmenty Poptávky & nabídky, Dokončené, Archiv, Nerealizované, Vše (URL, stavy, počty)", async (context) => {
   const page = await context.newPage();
   await openBook(page, USERS.admin);
   const segs = [
     ["poptavky", "Poptávky"],
     ["dokoncene", "Dokončené"],
+    ["archiv", "Archiv"],
     ["nerealizovane", "Nerealizované"],
     ["vse", "Vše"],
   ];
+  // pořadí záložek: Objednávky · Poptávky & nabídky · Dokončené · Archiv · Nerealizované & zrušené · Vše
+  const tabs = (await page.locator('main nav[aria-label="Části knihy"] a').allInnerTexts()).map((t) => t.replace(/\s*\d+\s*$/, "").trim());
+  expect(JSON.stringify(tabs) === JSON.stringify(["Objednávky", "Poptávky & nabídky", "Dokončené", "Archiv", "Nerealizované & zrušené", "Vše"]), `pořadí záložek (${tabs.join(" · ")})`);
   for (const [key, label] of segs) {
     await segLink(page, label).click();
     await waitParams(page, (sp) => sp.get("segment") === key, `záložka ${label}`);
@@ -150,12 +158,22 @@ await T("kniha: segmenty Poptávky & nabídky, Dokončené, Nerealizované, Vše
       // 31. 10.: vystavený DL na vše = Dokončené (i vyfakturovaná nezaplacená, i stav, který se neposunul)
       expect(nums.includes(F2.number) && nums.includes(L1.number), `Dokončené: F2 (vyfakturováno) a L1 (dodáno vše) ano (${nums.join(",")})`);
       expect(!nums.includes(F1.number) && !nums.includes(L2.number), "Dokončené: F1 (ve výrobě) a L2 (dílčí dodávka) ne");
-      expect((await main(page)).includes("Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené."), "popisek záložky Dokončené");
-      // chipy stavů Dokončených
+      // 4. 11.: zaplacené jsou v Archivu
+      expect(!nums.includes(A1.number) && !nums.includes(A2.number), "Dokončené: A1 (dokončeno) a A2 (zaplaceno) ne — jsou v Archivu");
+      expect((await main(page)).includes("Dodané zákazníkovi (vystavený DL) a vyfakturované — čekají na zaplacení."), "popisek záložky Dokončené");
+      // chipy stavů Dokončených (bez Dokončeno — to je Archiv)
       for (const st of SEGMENTS.dokoncene) {
         expect(trailingNumber(await chip(page, STAGE_LABELS[st]).innerText()) === dbSegmentCount("dokoncene", st), `Dokončené: chip ${STAGE_LABELS[st]} = DB`);
       }
+      expect((await chip(page, "Dokončeno").count()) === 0, "Dokončené: bez chipu Dokončeno");
       await shot(page, S("02-segment-dokoncene"));
+    }
+    if (key === "archiv") {
+      expect(nums.includes(A1.number) && nums.includes(A2.number), `Archiv: A1 (dokončeno) a A2 (vyfakturováno + zaplaceno) ano (${nums.join(",")})`);
+      expect(!nums.includes(F2.number) && !nums.includes(L1.number) && !nums.includes(F1.number), "Archiv: F2 (nezaplaceno), L1 (dodáno, nezaplaceno) a F1 ne");
+      expect((await main(page)).includes("Dodané a zaplacené zakázky — hotovo, uloženo v archivu."), "popisek záložky Archiv");
+      expect((await page.locator('main [role=group][aria-label="Filtr podle stavu"]').count()) === 0, "Archiv: jediný stav → bez chipů");
+      await shot(page, S("02-segment-archiv"));
     }
     if (key === "vse") expect([F1, F2, F3].every((f) => nums.includes(f.number)), "Vše: F1, F2, F3");
   }
@@ -380,6 +398,9 @@ await T("kniha: řazení — číslo, zákazník, hodnota, směr šipkou", async
   await shot(page, S("06-sort-value"));
 });
 
+/** Dlaždice hodnoty (jakékoli záložky). */
+const VALUE_TILE_RE = /Hodnota (objednávek v běhu|poptávek|dokončených|v archivu|nerealizovaných|— vše)/;
+
 await T("kniha: KPI dlaždice — počty a proklik = filtr", async (context) => {
   const page = await context.newPage();
   await openBook(page, USERS.admin);
@@ -391,12 +412,14 @@ await T("kniha: KPI dlaždice — počty a proklik = filtr", async (context) => 
     expect(inq === dbCount(SEGMENTS.poptavky), `Poptávky & nabídky ${inq} = DB`);
     const prob = trailingNumber((await tile("Reklamace & pauza").innerText()).split("\n")[0]);
     expect(prob === dbCount(["pozastaveno", "reklamace"]), `Reklamace & pauza ${prob} = DB`);
-    // 31. 10.: Hodnota v běhu = součet VŠECH objednávek bez DL na vše (ne jen zobrazených řádků); L1 (dodáno vše) a F2 ne, L2 (dílčí) ano
-    const shown = Number((await tile("Hodnota v běhu").locator(".text-xl").innerText()).replace(/[^\d]/g, ""));
-    const db = Math.round(dbRunningValue());
-    expect(shown === db, `Hodnota v běhu ${shown} = DB ${db}`);
+    // 31. 10.: Hodnota objednávek v běhu = součet VŠECH objednávek bez DL na vše (ne jen zobrazených řádků); L1 (dodáno vše) a F2 ne, L2 (dílčí) ano
+    const shown = Number((await tile("Hodnota objednávek v běhu").locator(".text-xl").innerText()).replace(/[^\d]/g, ""));
+    const db = Math.round(dbSegmentValue("objednavky"));
+    expect(shown === db, `Hodnota objednávek v běhu ${shown} = DB ${db}`);
+    const tileText = await tile("Hodnota objednávek v běhu").innerText();
+    expect(tileText.includes(`${dbSegmentCount("objednavky")} zakáz`) && !tileText.includes("podle filtru"), `dlaždice hodnoty nese počet zakázek, bez filtru (${tileText.replace(/\n/g, " | ")})`);
     const inRunning = sql(`select coalesce(string_agg(number, ','), '') from orders where id in (${[L1.id, L2.id, F2.id].map(lit).join(",")}) and ${segmentWhere("objednavky")}`);
-    expect(inRunning === L2.number, `do Hodnoty v běhu se počítá L2, ne L1 ani F2 (${inRunning})`);
+    expect(inRunning === L2.number, `do Hodnoty objednávek v běhu se počítá L2, ne L1 ani F2 (${inRunning})`);
     // Po splatnosti = všechny nezaplacené faktury po splatnosti (F2 je v Dokončených, počítá se i tak)
     const overdueInv = trailingNumber((await tile("Po splatnosti").innerText()).split("\n")[0]);
     await page.goto(`${BASE}/orders?segment=vse&payment=po_splatnosti`);
@@ -406,7 +429,7 @@ await T("kniha: KPI dlaždice — počty a proklik = filtr", async (context) => 
     await page.goto(`${BASE}/orders`);
     await bookIdle(page);
   });
-  expect(await tile("Hodnota v běhu").isVisible(), "super admin vidí Hodnota v běhu");
+  expect(await tile("Hodnota objednávek v běhu").isVisible(), "super admin vidí Hodnota objednávek v běhu");
 
   await tile("Po termínu").click();
   await waitParams(page, (sp) => sp.get("segment") === "vse" && sp.get("deadline") === "overdue", "dlaždice Po termínu");
@@ -427,8 +450,100 @@ await T("kniha: KPI dlaždice — počty a proklik = filtr", async (context) => 
   await waitParams(page, (sp) => sp.get("payment") === "po_splatnosti", "dlaždice Po splatnosti");
   expect(numbersOf(await readRows(page)).includes(F2.number), "F2 po splatnosti");
 
-  await tile("Hodnota v běhu").click();
-  await waitParams(page, (sp) => sp.get("sort") === "value" && !sp.has("payment"), "dlaždice Hodnota v běhu");
+  // 4. 11.: dlaždice hodnoty = aktuální pohled (Vše + filtr platby → „podle filtru"); klik ji jen seřadí podle hodnoty
+  const overdueText = await tile("Hodnota — vše").innerText();
+  expect(overdueText.includes("podle filtru"), `Hodnota — vše s filtrem platby: „podle filtru" (${overdueText.replace(/\n/g, " | ")})`);
+  const overdueShown = Number((await tile("Hodnota — vše").locator(".text-xl").innerText()).replace(/[^\d]/g, ""));
+  const overdueRowsNow = await readRows(page);
+  const overdueDb = Math.round(Number(sql(`select coalesce(round(sum(value), 2), 0) from orders where number in (${numbersOf(overdueRowsNow).map(lit).join(",")})`)));
+  expect(overdueShown === overdueDb, `Hodnota — vše podle filtru ${overdueShown} = součet zobrazených řádků ${overdueDb}`);
+  await tile("Hodnota — vše").click();
+  await waitParams(page, (sp) => sp.get("sort") === "value" && sp.get("payment") === "po_splatnosti" && sp.get("segment") === "vse", "dlaždice Hodnota — vše (řazení, filtr zůstává)");
+  expect((await tile("Hodnota — vše").getAttribute("aria-current")) === "true", "dlaždice hodnoty zvýrazněná při řazení podle hodnoty");
+});
+
+await T("kniha: dlaždice hodnoty sleduje záložku (Objednávky, Poptávky, Dokončené, Archiv) i filtr zákazníka", async (context) => {
+  const page = await context.newPage();
+  await openBook(page, USERS.admin);
+  const tile = (label) => page.locator("main a").filter({ hasText: label }).filter({ has: page.locator(".text-xl") });
+  const shownValue = async (label) => Number((await tile(label).locator(".text-xl").innerText()).replace(/[^\d]/g, ""));
+  const cases = [
+    ["poptavky", "Hodnota poptávek", "poptávky a nabídky"],
+    ["dokoncene", "Hodnota dokončených", "dodané, nezaplacené"],
+    ["archiv", "Hodnota v archivu", "dodané a zaplacené"],
+    ["nerealizovane", "Hodnota nerealizovaných", "prohrané a zrušené"],
+    ["vse", "Hodnota — vše", "celá kniha"],
+  ];
+  for (const [key, label, hint] of cases) {
+    await page.goto(`${BASE}/orders?segment=${key}`);
+    await bookIdle(page);
+    await expectCountsMatchDb(page, async () => {
+      expect((await tile(label).count()) === 1, `${key}: dlaždice „${label}"`);
+      expect((await page.locator("main a").filter({ hasText: VALUE_TILE_RE }).filter({ has: page.locator(".text-xl") }).count()) === 1, `${key}: jediná dlaždice hodnoty`);
+      const shown = await shownValue(label);
+      const db = Math.round(dbSegmentValue(key));
+      expect(shown === db, `${key}: ${label} ${shown} = DB ${db}`);
+      const text = await tile(label).innerText();
+      expect(text.includes(hint) && text.includes(`${dbSegmentCount(key)} zakáz`) && !text.includes("podle filtru"), `${key}: popisek „${hint}" + počet, bez „podle filtru" (${text.replace(/\n/g, " | ")})`);
+    });
+    if (key === "archiv") {
+      const archived = Math.round(dbSegmentValue("archiv"));
+      expect(archived >= 12000, `Archiv: hodnota ${archived} zahrnuje A1 (5 000) + A2 (7 000)`);
+      await shot(page, S("07b-value-archiv"));
+    }
+    if (key === "dokoncene") await shot(page, S("07b-value-dokoncene"));
+    if (key === "poptavky") await shot(page, S("07b-value-poptavky"));
+  }
+  // filtr zákazníka: hodnota = jen jeho objednávky v běhu, popisek „podle filtru"
+  await page.goto(`${BASE}/orders?customer=${CUST.id}`);
+  await bookIdle(page);
+  await expectCountsMatchDb(page, async () => {
+    const shown = await shownValue("Hodnota objednávek v běhu");
+    const db = Math.round(dbSegmentValue("objednavky", `customer_id = ${lit(CUST.id)}`));
+    const all = Math.round(dbSegmentValue("objednavky"));
+    expect(shown === db, `zákazník: Hodnota objednávek v běhu ${shown} = DB ${db}`);
+    expect(db < all, `hodnota podle zákazníka (${db}) je menší než celé Objednávky (${all})`);
+    const text = await tile("Hodnota objednávek v běhu").innerText();
+    expect(text.includes("podle filtru") && text.includes(`${dbSegmentCount("objednavky")} zakáz`) === false, `zákazník: „podle filtru" a počet jen jeho zakázek (${text.replace(/\n/g, " | ")})`);
+    expect(text.includes(`${custOrderNumbers().length} zakáz`), `zákazník: počet ${custOrderNumbers().length} zakázek v dlaždici`);
+    // počítadla (Objednávky v běhu, Poptávky…) zůstávají přes celou knihu
+    const running = trailingNumber((await tile("Objednávky v běhu").innerText()).split("\n")[0]);
+    expect(running === dbSegmentCount("objednavky"), `zákazník: Objednávky v běhu ${running} = celá kniha`);
+  });
+  await shot(page, S("07b-value-customer"));
+  // hledání v Archivu: hodnota jen nalezených
+  await page.goto(`${BASE}/orders?segment=archiv&q=${encodeURIComponent(A2.number)}`);
+  await bookIdle(page);
+  expect((await shownValue("Hodnota v archivu")) === 7000, "Archiv + hledání A2: hodnota 7 000");
+  expect((await tile("Hodnota v archivu").innerText()).includes("1 zakázka"), "Archiv + hledání A2: 1 zakázka");
+});
+
+await T("kniha: výchozí řazení = Naposledy změněné (bez parametru v URL), změna zakázky ji posune nahoru", async (context) => {
+  const page = await context.newPage();
+  await openBook(page, USERS.admin);
+  expect(!new URL(page.url()).searchParams.has("sort"), "výchozí řazení se do URL nepíše");
+  expect((await page.getByLabel("Řazení", { exact: true }).inputValue()) === "updated", "select Řazení = Naposledy změněné");
+  const sortLabel = await page.getByLabel("Řazení", { exact: true }).locator("option:checked").innerText();
+  expect(sortLabel.trim().endsWith("Naposledy změněné"), `popisek řazení (${sortLabel})`);
+  // zobrazené řádky jdou podle updated_at sestupně
+  const nums = numbersOf(await readRows(page));
+  const upd = Object.fromEntries(sql(`select number || '|' || updated_at from orders where number in (${nums.map(lit).join(",")})`).split("\n").map((l) => l.split("|")));
+  const seq = nums.map((n) => upd[n] ?? "");
+  expect(seq.every((v, i) => i === 0 || seq[i - 1] >= v), `updated_at sestupně: ${seq.slice(0, 4).join(" ≥ ")}…`);
+  // úprava zakázky (trigger set_updated_at) → první v knize
+  sql(`update orders set note = 'E2E: dotek ${TAG}' where id = ${lit(D4.id)}`);
+  await page.reload();
+  await bookIdle(page);
+  await eventually(async () => {
+    const first = numbersOf(await readRows(page))[0];
+    expect(first === D4.number, `naposledy změněná D4 je první (${first})`);
+  });
+  // „Nejnovější" (created) už není výchozí → do URL se píše
+  await page.getByLabel("Řazení", { exact: true }).selectOption("created");
+  await waitParams(page, (sp) => sp.get("sort") === "created" && !sp.has("dir"), "řazení Nejnovější");
+  await page.getByLabel("Řazení", { exact: true }).selectOption("updated");
+  await waitParams(page, (sp) => !sp.has("sort") && !sp.has("dir"), "zpět na výchozí řazení = čistá adresa");
+  await shot(page, S("06b-sort-updated"));
 });
 
 await T("kniha: Tabule — sloupce podle stavů segmentu, karty ve správném sloupci", async (context) => {
@@ -449,18 +564,28 @@ await T("kniha: Tabule — sloupce podle stavů segmentu, karty ve správném sl
   expect((await col.getByRole("link", { name: `Otevřít zakázku ${L2.number}` }).count()) === 1, "L2 (dílčí dodávka) je ve sloupci Ve výrobě");
   expect((await page.locator("main").getByRole("link", { name: `Otevřít zakázku ${L1.number}` }).count()) === 0, "L1 (dodáno vše) na tabuli Objednávek není");
   await shot(page, S("08-board-objednavky"));
-  // 31. 10.: Dokončené — sloupce Dodáno zákazníkovi / Vyfakturováno / Dokončeno + Montáž pro L1 (stav se neposunul)
+  // 31. 10.: Dokončené — sloupce Dodáno zákazníkovi / Vyfakturováno + Montáž pro L1 (stav se neposunul); 4. 11.: bez Dokončeno (Archiv)
+  const segColumns = async (key) => {
+    const cols = await columns();
+    const lag = sql(`select coalesce(string_agg(distinct status::text, ','), '') from orders where ${segmentWhere(key)} and status::text not in (${SEGMENTS[key].map(lit).join(",")})`).split(",").filter(Boolean);
+    const stages = Object.keys(STAGE_LABELS).filter((s) => SEGMENTS[key].includes(s) || lag.includes(s));
+    const expected = stages.map((s) => `${STAGE_LABELS[s]} (${dbSegmentCount(key, s)})`);
+    expect(JSON.stringify(cols) === JSON.stringify(expected), `${key}: sloupce ${cols.join(" | ")} ≠ ${expected.join(" | ")}`);
+  };
   await page.goto(`${BASE}/orders?segment=dokoncene&view=tabule`);
   await bookIdle(page);
-  await expectCountsMatchDb(page, async () => {
-    const done = await columns();
-    const lag = sql(`select coalesce(string_agg(distinct status::text, ','), '') from orders where ${segmentWhere("dokoncene")} and status::text not in ('dodano_zakaznikovi','fakturovano','dokonceno')`).split(",").filter(Boolean);
-    const stages = Object.keys(STAGE_LABELS).filter((s) => SEGMENTS.dokoncene.includes(s) || lag.includes(s));
-    const expected = stages.map((s) => `${STAGE_LABELS[s]} (${dbSegmentCount("dokoncene", s)})`);
-    expect(JSON.stringify(done) === JSON.stringify(expected), `Dokončené: sloupce ${done.join(" | ")} ≠ ${expected.join(" | ")}`);
-  });
+  await expectCountsMatchDb(page, () => segColumns("dokoncene"));
   expect((await page.locator(`main section[aria-label^="Montáž ("]`).getByRole("link", { name: `Otevřít zakázku ${L1.number}` }).count()) === 1, "Dokončené: L1 ve sloupci Montáž");
   expect((await page.locator(`main section[aria-label^="Vyfakturováno ("]`).getByRole("link", { name: `Otevřít zakázku ${F2.number}` }).count()) === 1, "Dokončené: F2 ve sloupci Vyfakturováno");
+  expect((await page.locator("main").getByRole("link", { name: `Otevřít zakázku ${A2.number}` }).count()) === 0, "Dokončené: zaplacená A2 na tabuli není");
+  // 4. 11.: Archiv — sloupec Dokončeno + Vyfakturováno pro A2 (zaplaceno, stav se neposunul)
+  await page.goto(`${BASE}/orders?segment=archiv&view=tabule`);
+  await bookIdle(page);
+  await expectCountsMatchDb(page, () => segColumns("archiv"));
+  expect((await page.locator(`main section[aria-label^="Dokončeno ("]`).getByRole("link", { name: `Otevřít zakázku ${A1.number}` }).count()) === 1, "Archiv: A1 ve sloupci Dokončeno");
+  expect((await page.locator(`main section[aria-label^="Vyfakturováno ("]`).getByRole("link", { name: `Otevřít zakázku ${A2.number}` }).count()) === 1, "Archiv: A2 ve sloupci Vyfakturováno");
+  expect((await page.locator("main").getByRole("link", { name: `Otevřít zakázku ${F2.number}` }).count()) === 0, "Archiv: nezaplacená F2 na tabuli není");
+  await shot(page, S("08-board-archiv"));
   // jiný segment / vybraný stav
   await page.goto(`${BASE}/orders?segment=poptavky&view=tabule`);
   await bookIdle(page);
@@ -486,7 +611,7 @@ await T("kniha: URL parametry (segment, stages, q, sort, dir, deadline, view) a 
   await page.goto(`${BASE}/orders?segment=nesmysl&stages=poptavka,xyz&sort=foo&dir=bar&deadline=zitra&view=mapa&owner=neni-uuid`);
   await bookIdle(page);
   expect((await segLink(page, "Objednávky").getAttribute("aria-current")) === "page", "neplatný segment → Objednávky");
-  expect((await page.getByLabel("Řazení", { exact: true }).inputValue()) === "created", "neplatné řazení → Nejnovější");
+  expect((await page.getByLabel("Řazení", { exact: true }).inputValue()) === "updated", "neplatné řazení → Naposledy změněné (výchozí)");
   expect((await page.getByLabel("Termín", { exact: true }).inputValue()) === "", "neplatný termín → vše");
   expect((await page.getByRole("button", { name: "Řádky" }).getAttribute("aria-pressed")) === "true", "neplatný pohled → Řádky");
   await expectCountsMatchDb(page, async () => {
@@ -1118,7 +1243,7 @@ await T("role: obchodník vidí nákupní ceny a marži; zaměstnanec ne — ani
   expect(!book.includes("4321.09") && !book.includes("1555.54"), "HTML knihy pro zaměstnance bez nákupních nákladů");
   await p2.goto(`${BASE}/orders`);
   await bookIdle(p2);
-  expect((await p2.locator("main a").filter({ hasText: "Hodnota v běhu" }).count()) === 0, "zaměstnanec: bez dlaždice Hodnota v běhu");
+  expect((await p2.locator("main a").filter({ hasText: VALUE_TILE_RE }).count()) === 0, "zaměstnanec: bez dlaždice hodnoty");
 });
 
 // ═════════════════════════ MOBIL 390 px ═════════════════════════
@@ -1147,10 +1272,14 @@ await T("mobil 390 px: kniha (karty), Vyfotit doklad + Nová zakázka viditelné
   await bookIdle(page);
   await expectNoOverflow(page, "/orders?view=tabule mobil");
   await shot(page, S("30-mobile-board"));
-  for (const seg of ["poptavky", "vse"]) {
+  for (const seg of ["poptavky", "archiv", "vse"]) {
     await page.goto(`${BASE}/orders?segment=${seg}`);
     await bookIdle(page);
     await expectNoOverflow(page, `/orders?segment=${seg} mobil`);
+    if (seg === "archiv") {
+      await expectInViewport(page, segLink(page, "Archiv"), "záložka Archiv (mobil)");
+      await shot(page, S("30-mobile-archiv"));
+    }
   }
 }, { mobile: true });
 

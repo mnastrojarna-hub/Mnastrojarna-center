@@ -623,11 +623,11 @@ await T("filtry a počty: chipy /inquiries, /quotes, /confirmations a Knihy = fl
   await page.goto(`${BASE}/orders?segment=poptavky`);
   await waitHydrated(page, 'main [role=group][aria-label="Stav poptávky"] button');
   expect(await chipCount(page, "Stav poptávky", "Přijatá") === flowCount("inquiry", "prijata"), "Kniha Poptávky: Přijatá = flow_counts");
-  // filtr „Změnil" v Knize (Dokončené): J posunul Petr
-  await page.goto(`${BASE}/orders?segment=dokoncene&zmenil=${ID.obchod}&q=${encodeURIComponent(J.number)}`);
+  // filtr „Změnil" v Knize (Archiv — J je dokončená a zaplacená): J posunul Petr
+  await page.goto(`${BASE}/orders?segment=archiv&zmenil=${ID.obchod}&q=${encodeURIComponent(J.number)}`);
   const li = page.locator("main ul[role=list] > li").filter({ has: page.locator(`a[href="/orders/${J.id}"]`) });
   await li.waitFor({ timeout: 15_000 });
-  await page.goto(`${BASE}/orders?segment=dokoncene&zmenil=${ID.dilna}&q=${encodeURIComponent(J.number)}`);
+  await page.goto(`${BASE}/orders?segment=archiv&zmenil=${ID.dilna}&q=${encodeURIComponent(J.number)}`);
   await page.waitForLoadState("networkidle");
   await page.locator('main [aria-busy="false"]').first().waitFor({ timeout: 15_000 }).catch(() => {});
   expect(await page.locator(`main a[href="/orders/${J.id}"]`).count() === 0, "filtr Změnil = Jana: zakázka J není (posouval ji Petr)");

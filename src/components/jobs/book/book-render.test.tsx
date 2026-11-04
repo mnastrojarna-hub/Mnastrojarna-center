@@ -112,7 +112,7 @@ describe("Kniha zakázek — vykreslení", () => {
     const counts = { byStage, overdue: 2, dueThisWeek: 1, active: 13, total: 16 };
     const html = render(
       <>
-        <KpiStrip kpis={bookKpis(counts)} runningValue={524100} />
+        <KpiStrip kpis={bookKpis(counts)} value={{ sum: 524100, count: 7 }} />
         <SegmentTabs counts={segmentCounts(byStage)} />
         <StageChips byStage={byStage} />
         <BookToolbar options={OPTIONS} />
@@ -123,6 +123,10 @@ describe("Kniha zakázek — vykreslení", () => {
     expect(html).toContain("Objednávky v běhu");
     expect(html).toContain("Po termínu");
     expect(html).toMatch(/524\s100\sKč/);
+    // dlaždice hodnoty = aktuální pohled: záložka Objednávky, vybraný stav = filtr → „podle filtru" + počet
+    expect(html).toContain("Hodnota objednávek v běhu");
+    expect(html).toContain("podle filtru · 7 zakázek");
+    expect(html).toContain("Archiv");
     expect(html).toContain("Poptávky &amp; nabídky");
     expect(html).toContain("Ve výrobě");
     expect(html).toContain("stages=ve_vyrobe"); // odkazy nesou aktuální výběr
@@ -136,7 +140,7 @@ describe("Kniha zakázek — vykreslení", () => {
     const seg = segmentCounts(byStage, delivered);
     const html = render(
       <>
-        <KpiStrip kpis={bookKpis(counts)} runningValue={1000} />
+        <KpiStrip kpis={bookKpis(counts)} value={{ sum: 1000, count: 1 }} />
         <SegmentTabs counts={seg} />
         <StageChips byStage={segmentStageCounts(byStage, delivered, "objednavky")} />
         <FlowFilterChips counts={{ "order.dorucena": 3, "fulfilment.dokoncena": 9 }} />
@@ -144,9 +148,10 @@ describe("Kniha zakázek — vykreslení", () => {
       </>,
     );
     expect(html).toContain("objednávka → dodací list");
-    expect(html).toContain("objednávky bez DL, bez DPH");
+    expect(html).toContain("objednávky bez DL · 1 zakázka");
     expect(html).toContain("Objednané zakázky bez dodacího listu — v běhu.");
-    expect(html).toContain("Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené.");
+    expect(html).toContain("Dodané zákazníkovi (vystavený DL) a vyfakturované — čekají na zaplacení.");
+    expect(html).toContain("Dodané a zaplacené zakázky — hotovo, uloženo v archivu.");
     // v Objednávkách nejsou chipy Dodáno zákazníkovi / Vyfakturováno ani „Vše dodáno"
     expect(html).not.toContain("stages=dodano_zakaznikovi");
     expect(html).not.toContain("stages=fakturovano");
@@ -164,10 +169,26 @@ describe("Kniha zakázek — vykreslení", () => {
     );
     expect(done).toContain("stages=dodano_zakaznikovi");
     expect(done).toContain("stages=fakturovano");
+    // Dokončeno (zaplaceno) je v Archivu, ne v Dokončených
+    expect(done).not.toContain("stages=dokonceno");
     expect(done).toContain('value="dl_potvrzen"');
     expect(done).not.toContain('value="k_expedici"');
     const empty = render(<BookEmpty segment="dokoncene" filtered={false} options={OPTIONS} defaultStage="objednavka" userId="u1" />);
     expect(empty).toContain("vystavíš dodací list na celou dodávku");
+    // Archiv: dlaždice hodnoty podle záložky, bez filtru = popis záložky; jediný stav = bez chipů
+    const archive = render(
+      <>
+        <KpiStrip kpis={bookKpis(counts)} value={{ sum: 250000, count: 12 }} />
+        <StageChips byStage={segmentStageCounts(byStage, delivered, "archiv", { dokonceno: 12 })} />
+      </>,
+      { ...DEFAULT_PARAMS, segment: "archiv" },
+    );
+    expect(archive).toContain("Hodnota v archivu");
+    expect(archive).toContain("dodané a zaplacené · 12 zakázek");
+    expect(archive).not.toContain("podle filtru");
+    expect(archive).not.toContain("stages=dokonceno");
+    const archiveEmpty = render(<BookEmpty segment="archiv" filtered={false} options={OPTIONS} defaultStage="objednavka" userId="u1" />);
+    expect(archiveEmpty).toContain("Archiv je zatím prázdný");
   });
 
   it("výroba, platba a domluvy v řádku i na kartě tabule", () => {
@@ -209,7 +230,7 @@ describe("Kniha zakázek — vykreslení", () => {
     };
     const html = render(
       <>
-        <KpiStrip kpis={bookKpis(counts)} runningValue={null} overdueInvoices={2} />
+        <KpiStrip kpis={bookKpis(counts)} value={null} overdueInvoices={2} />
         <BookToolbar options={OPTIONS} production={production} />
       </>,
       { ...DEFAULT_PARAMS, step: "tepelne_zpracovani", payment: "po_splatnosti" },

@@ -237,6 +237,23 @@ export function isRunningOrder(j: Parameters<typeof isDeliveredToCustomer>[0]): 
   return RUNNING_ORDER_STAGES.includes(j.stage) && !isDeliveredToCustomer(j);
 }
 
+/**
+ * Zaplaceno = datum úhrady (orders.paid_at), nebo stav Dokončeno. DB drží obojí pohromadě: Dokončeno bez data
+ * úhrady si ho doplní, úhrada vyfakturované zakázky ji posune na Dokončeno (orders_stage_change) — stejně jako
+ * paymentKey „zaplaceno" v toku.
+ */
+export function isPaidJob(j: { stage: JobStage; paidAt?: string | null }): boolean {
+  return j.stage === "dokonceno" || Boolean(j.paidAt);
+}
+
+/**
+ * Archiv Knihy: zboží je u zákazníka (DL na vše — isDeliveredToCustomer) a zaplaceno (isPaidJob). Dodané,
+ * ale nezaplacené zakázky zůstávají v Dokončených (čekají na peníze).
+ */
+export function isArchivedJob(j: Parameters<typeof isDeliveredToCustomer>[0] & { paidAt?: string | null }): boolean {
+  return isDeliveredToCustomer(j) && isPaidJob(j);
+}
+
 export function isJobStage(value: unknown): value is JobStage {
   return typeof value === "string" && value in STAGES;
 }

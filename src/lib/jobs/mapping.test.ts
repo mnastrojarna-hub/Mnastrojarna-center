@@ -416,6 +416,35 @@ describe("filtry a řazení", () => {
     ], today);
     expect(counts.byStage.montaz).toBe(2);
     expect(counts.deliveredByStage).toEqual({ montaz: 1, ve_vyrobe: 1 });
+    expect(counts.archivedByStage).toEqual({});
+  });
+
+  it("Archiv: countJobStages — dodáno a zaplaceno (Dokončeno vždy, jinak podle paid_at)", () => {
+    expect(JOB_COUNT_SELECT).toContain("paid_at");
+    const counts = countJobStages([
+      { status: "dokonceno", items_count: 1, items_delivered: 1 },
+      { status: "dokonceno", items_count: 0, items_delivered: 0, paid_at: null },
+      { status: "fakturovano", paid_at: "2026-10-01" },
+      { status: "fakturovano", paid_at: null },
+      { status: "dodano_zakaznikovi", paid_at: "2026-10-02" },
+      { status: "montaz", items_count: 2, items_delivered: 2, paid_at: "2026-10-03" },
+      { status: "montaz", items_count: 2, items_delivered: 1, paid_at: "2026-10-03" },
+      { status: "reklamace", items_count: 1, items_delivered: 1, paid_at: "2026-10-03" },
+    ], today);
+    expect(counts.archivedByStage).toEqual({ dokonceno: 2, fakturovano: 1, dodano_zakaznikovi: 1, montaz: 1 });
+    expect(counts.deliveredByStage).toEqual({ montaz: 1 });
+  });
+
+  it("Archiv: filterJobs — paid (Dokončené = nezaplacené ↔ Archiv = zaplacené)", () => {
+    const all = [
+      listItem({ id: "done", stage: "dokonceno" }),
+      listItem({ id: "paidInv", stage: "fakturovano", paidAt: "2026-10-01" }),
+      listItem({ id: "openInv", stage: "fakturovano", paidAt: null }),
+      listItem({ id: "deliv", stage: "dodano_zakaznikovi" }),
+    ];
+    expect(filterJobs(all, { paid: true }, today).map((j) => j.id)).toEqual(["done", "paidInv"]);
+    expect(filterJobs(all, { paid: false }, today).map((j) => j.id)).toEqual(["openInv", "deliv"]);
+    expect(filterJobs(all, {}, today)).toHaveLength(4);
   });
 
   it("31. 10.: filterJobs — deliveredToCustomer (Objednávky v běhu ↔ Dokončené)", () => {

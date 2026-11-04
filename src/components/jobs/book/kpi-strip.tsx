@@ -4,13 +4,16 @@ import {
   AlarmClock, AlertTriangle, Banknote, CalendarClock, MessageSquareQuote, ReceiptText, ShoppingCart, type LucideIcon,
 } from "lucide-react";
 import { BookLink, useBookNav } from "@/components/jobs/book/book-nav";
-import { KPI_PATCHES, isPatchActive, type BookKpis, type BookPatch } from "@/components/jobs/book/book-params";
+import {
+  KPI_PATCHES, VALUE_TILE, countLabel, isFiltered, isPatchActive, type BookKpis, type BookPatch, type BookValue,
+} from "@/components/jobs/book/book-params";
 import { cn, formatCZK } from "@/lib/utils";
 
 /**
- * Barevné dlaždice nad knihou — kliknutí rovnou nastaví filtr.
- * Hodnota objednávek v běhu jen pro role s právem na marže; faktury po
- * splatnosti, když je stránka spočítá.
+ * Barevné dlaždice nad knihou — kliknutí rovnou nastaví filtr. Počty jsou přes celou knihu (nezávisle na
+ * záložce a filtrech). Dlaždice hodnoty sleduje aktuální pohled: záložku („Hodnota objednávek v běhu",
+ * „Hodnota poptávek", „Hodnota v archivu"…) i zapnuté filtry (zákazník, obchodník, hledání…) — jen pro role
+ * s právem na marže; faktury po splatnosti, když je stránka spočítá.
  */
 
 interface Tile {
@@ -57,14 +60,16 @@ const TONES = {
 } as const;
 
 export function KpiStrip({
-  kpis, runningValue, overdueInvoices = null,
+  kpis, value, overdueInvoices = null,
 }: {
   kpis: BookKpis;
-  runningValue: number | null;
+  /** Hodnota aktuálního pohledu (součet + počet zakázek; null = bez práva na marže, nezobrazovat). */
+  value: BookValue | null;
   /** Počet nezaplacených faktur po splatnosti (null = nezobrazovat). */
   overdueInvoices?: number | null;
 }) {
   const { params } = useBookNav();
+  const filtered = isFiltered(params);
 
   const tiles: Tile[] = [
     {
@@ -100,10 +105,14 @@ export function KpiStrip({
       icon: ReceiptText, patch: KPI_PATCHES.overdueInvoices, tone: overdueInvoices ? TONES.red : TONES.calm,
     });
   }
-  if (runningValue !== null) {
+  if (value !== null) {
+    const meta = VALUE_TILE[params.segment];
+    const n = countLabel(value.count, "zakázka", "zakázky", "zakázek");
+    // bez DPH; popisek krátký, ať se na dlaždici vejde celý („podle filtru · 9 zakázek")
     tiles.push({
-      key: "value", label: "Hodnota v běhu", value: formatCZK(runningValue),
-      hint: "objednávky bez DL, bez DPH", icon: Banknote, patch: KPI_PATCHES.value, tone: TONES.emerald,
+      key: "value", label: meta.label, value: formatCZK(value.sum),
+      hint: filtered ? `podle filtru · ${n}` : `${meta.hint} · ${n}`,
+      icon: Banknote, patch: KPI_PATCHES.value, tone: TONES.emerald,
     });
   }
 
