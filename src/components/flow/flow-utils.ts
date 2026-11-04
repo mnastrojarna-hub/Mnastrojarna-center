@@ -28,7 +28,7 @@ export function visibleFlowSteps(canPrice: boolean): FlowStep[] {
 }
 
 /** Odkaz do Knihy zakázek s předvybranou záložkou a stavy. */
-export function bookHref(segment: "objednavky" | "poptavky" | "dokoncene" | "nerealizovane" | "vse", stages: JobStage[] = []): string {
+export function bookHref(segment: "objednavky" | "poptavky" | "dokoncene" | "archiv" | "nerealizovane" | "vse", stages: JobStage[] = []): string {
   const sp = new URLSearchParams();
   sp.set("segment", segment);
   if (stages.length) sp.set("stages", stages.join(","));

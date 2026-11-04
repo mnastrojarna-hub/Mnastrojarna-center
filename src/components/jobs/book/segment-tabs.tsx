@@ -1,6 +1,7 @@
 "use client";
 
-import { Ban, CircleCheckBig, LayoutList, MessageSquareQuote, ShoppingCart, type LucideIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Archive, Ban, CircleCheckBig, LayoutList, MessageSquareQuote, ShoppingCart, type LucideIcon } from "lucide-react";
 import { BookLink, useBookNav } from "@/components/jobs/book/book-nav";
 import {
   BOOK_SEGMENTS, bookSegment, toggleStagePatch, type BookSegmentKey,
@@ -14,15 +15,27 @@ import { cn } from "@/lib/utils";
 const SEGMENT_STYLE: Record<BookSegmentKey, { icon: LucideIcon; active: string; iconCls: string }> = {
   objednavky: { icon: ShoppingCart, active: "bg-orange-500 text-white shadow-sm shadow-orange-500/30", iconCls: "text-orange-500" },
   poptavky: { icon: MessageSquareQuote, active: "bg-sky-500 text-white shadow-sm shadow-sky-500/30", iconCls: "text-sky-500" },
-  dokoncene: { icon: CircleCheckBig, active: "bg-slate-600 text-white shadow-sm", iconCls: "text-slate-500" },
+  dokoncene: { icon: CircleCheckBig, active: "bg-emerald-600 text-white shadow-sm shadow-emerald-500/30", iconCls: "text-emerald-600" },
+  archiv: { icon: Archive, active: "bg-slate-600 text-white shadow-sm", iconCls: "text-slate-500" },
   nerealizovane: { icon: Ban, active: "bg-stone-500 text-white shadow-sm", iconCls: "text-stone-500" },
   vse: { icon: LayoutList, active: "bg-foreground text-background shadow-sm", iconCls: "text-muted-foreground" },
 };
 
 export function SegmentTabs({ counts }: { counts: Record<BookSegmentKey, number> }) {
   const { params } = useBookNav();
+  const navRef = useRef<HTMLElement>(null);
+  // mobil: záložky se posouvají vodorovně — aktivní (např. Archiv vpravo) ať je vidět; jen vodorovně, stránka neskáče
+  useEffect(() => {
+    const nav = navRef.current;
+    const el = nav?.querySelector<HTMLElement>('a[aria-current="page"]');
+    if (!nav || !el) return;
+    const left = el.offsetLeft;
+    const right = left + el.offsetWidth;
+    if (right > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = right - nav.clientWidth + 8;
+    else if (left < nav.scrollLeft) nav.scrollLeft = Math.max(0, left - 8);
+  }, [params.segment]);
   return (
-    <nav aria-label="Části knihy" className="-mx-1 overflow-x-auto px-1 scrollbar-thin">
+    <nav ref={navRef} aria-label="Části knihy" className="-mx-1 overflow-x-auto px-1 scrollbar-thin">
       <ul className="flex w-max min-w-full gap-1 rounded-xl bg-muted/70 p-1">
         {BOOK_SEGMENTS.map((s) => {
           const st = SEGMENT_STYLE[s.key];

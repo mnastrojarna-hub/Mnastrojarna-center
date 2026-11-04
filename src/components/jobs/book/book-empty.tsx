@@ -1,4 +1,4 @@
-import { Ban, CircleCheckBig, LayoutList, MessageSquareQuote, SearchX, ShoppingCart, Camera, PenLine, type LucideIcon } from "lucide-react";
+import { Archive, Ban, CircleCheckBig, LayoutList, MessageSquareQuote, SearchX, ShoppingCart, Camera, PenLine, type LucideIcon } from "lucide-react";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { NewJobDialog } from "@/components/jobs/new-job-dialog";
 import { ResetFiltersButton } from "@/components/jobs/book/book-reset";
@@ -23,9 +23,15 @@ const EMPTY: Record<BookSegmentKey, { icon: LucideIcon; tone: string; title: str
     actions: true,
   },
   dokoncene: {
-    icon: CircleCheckBig, tone: "bg-slate-200 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300",
+    icon: CircleCheckBig, tone: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
     title: "Zatím nic dokončeného",
-    text: "Zakázka se sem přesune, jakmile vystavíš dodací list na celou dodávku (Dodáno zákazníkovi), a zůstane tu i po faktuře a zaplacení.",
+    text: "Zakázka se sem přesune, jakmile vystavíš dodací list na celou dodávku (Dodáno zákazníkovi), a zůstane tu přes fakturu až do zaplacení — pak jde do Archivu.",
+    actions: false,
+  },
+  archiv: {
+    icon: Archive, tone: "bg-slate-200 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300",
+    title: "Archiv je zatím prázdný",
+    text: "Sem se zakázka uloží, jakmile je dodaná a zaplacená (Dokončeno). Dodané a dosud nezaplacené najdeš v Dokončených.",
     actions: false,
   },
   nerealizovane: {

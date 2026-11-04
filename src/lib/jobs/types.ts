@@ -439,6 +439,11 @@ export interface JobFilters {
    * false = jen bez DL na vše (Kniha → Objednávky v běhu). Bez hodnoty = bez ohledu na dodání.
    */
   deliveredToCustomer?: boolean;
+  /**
+   * Zaplaceno (isPaidJob: datum úhrady nebo stav Dokončeno): true = jen zaplacené (Kniha → Archiv),
+   * false = jen nezaplacené (Kniha → Dokončené). Bez hodnoty = bez ohledu na úhradu.
+   */
+  paid?: boolean;
   /** Kdo naposledy změnil hlavní stav nebo dílčí stav (uuid). */
   changedBy?: string;
   /** Výjimka v toku (bez_po, reklamace, pozastaveno, vykres, opraveno). */

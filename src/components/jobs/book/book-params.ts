@@ -17,7 +17,7 @@ import type { LostReason } from "@/lib/supabase/database.types";
  */
 
 // ── Segmenty (záložky knihy) ────────────────────────────────
-export type BookSegmentKey = "objednavky" | "poptavky" | "dokoncene" | "nerealizovane" | "vse";
+export type BookSegmentKey = "objednavky" | "poptavky" | "dokoncene" | "archiv" | "nerealizovane" | "vse";
 export type BookView = "radky" | "tabule";
 export type SortDir = "asc" | "desc";
 
@@ -35,6 +35,11 @@ export interface BookSegment {
    * true = navíc i zakázky ve stavu před dodáním s dodaným vším (Dokončené). Bez hodnoty = jen podle stavu.
    */
   delivered?: boolean;
+  /**
+   * Zaplaceno (isPaidJob: datum úhrady nebo stav Dokončeno): true = jen zaplacené (Archiv), false = jen
+   * nezaplacené (Dokončené — dodané, čekají na peníze). Bez hodnoty = bez ohledu na úhradu.
+   */
+  paid?: boolean;
 }
 
 /**
@@ -42,8 +47,13 @@ export interface BookSegment {
  * a reklamací). Jakmile je vystavený DL na vše (Dodáno zákazníkovi a dál), zakázka je v Dokončených.
  */
 export const ORDER_STAGES: JobStage[] = RUNNING_ORDER_STAGES;
-/** Dokončené: dodáno zákazníkovi (vystavený DL), vyfakturováno, dokončeno (zaplaceno). */
-export const DONE_STAGES: JobStage[] = DELIVERED_STAGES;
+/** Dokončené: dodáno zákazníkovi (vystavený DL) a vyfakturováno — dokud není zaplaceno (pak Archiv). */
+export const DONE_STAGES: JobStage[] = ["dodano_zakaznikovi", "fakturovano"];
+/**
+ * Archiv: dodáno a zaplaceno. Stavem Dokončeno (vždy zaplaceno); navíc dodané zakázky v jiném stavu s datem
+ * úhrady (isArchivedJob) — ty se do záložky dofiltrují, chipy a sloupce tabule dostanou podle zobrazených řádků.
+ */
+export const ARCHIVE_STAGES: JobStage[] = ["dokonceno"];
 /** Předobjednávková fáze. */
 export const INQUIRY_STAGES: JobStage[] = ["poptavka", "naceneni", "nabidka"];
 export const PROBLEM_STAGES: JobStage[] = ["reklamace", "pozastaveno"];
@@ -51,7 +61,8 @@ export const PROBLEM_STAGES: JobStage[] = ["reklamace", "pozastaveno"];
 export const BOOK_SEGMENTS: BookSegment[] = [
   { key: "objednavky", label: "Objednávky", short: "Objednávky", hint: "Objednané zakázky bez dodacího listu — v běhu.", stages: ORDER_STAGES, delivered: false },
   { key: "poptavky", label: "Poptávky & nabídky", short: "Poptávky", hint: "Poptávky, nacenění a odeslané nabídky — před objednávkou.", stages: INQUIRY_STAGES },
-  { key: "dokoncene", label: "Dokončené", short: "Hotové", hint: "Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené.", stages: DONE_STAGES, delivered: true },
+  { key: "dokoncene", label: "Dokončené", short: "Hotové", hint: "Dodané zákazníkovi (vystavený DL) a vyfakturované — čekají na zaplacení.", stages: DONE_STAGES, delivered: true, paid: false },
+  { key: "archiv", label: "Archiv", short: "Archiv", hint: "Dodané a zaplacené zakázky — hotovo, uloženo v archivu.", stages: ARCHIVE_STAGES, delivered: true, paid: true },
   { key: "nerealizovane", label: "Nerealizované & zrušené", short: "Nerealiz.", hint: "Prohrané nabídky a zrušené zakázky.", stages: ["nerealizovano", "zruseno"] },
   { key: "vse", label: "Vše", short: "Vše", hint: "Celá kniha zakázek.", stages: STAGE_ORDER },
 ];
@@ -66,9 +77,13 @@ export function bookSegment(key: BookSegmentKey): BookSegment {
   return BOOK_SEGMENTS.find((s) => s.key === key) ?? BOOK_SEGMENTS[0];
 }
 
-/** Stavy pro dotaz do DB: Dokončené navíc stavy před dodáním (dodáno vše, stav se neposunul — dofiltruje se). */
+/**
+ * Stavy pro dotaz do DB: záložky „dodáno" (Dokončené, Archiv) navíc stavy před dodáním (dodáno vše, stav se
+ * neposunul — dofiltruje se); Archiv navíc všechny stavy po dodání (zaplacená, stav se neposunul na Dokončeno).
+ */
 export function segmentQueryStages(seg: BookSegment): JobStage[] {
-  return seg.delivered === true ? STAGE_ORDER.filter((s) => seg.stages.includes(s) || PRE_DELIVERY_STAGES.includes(s)) : seg.stages;
+  if (seg.delivered !== true) return seg.stages;
+  return STAGE_ORDER.filter((s) => seg.stages.includes(s) || PRE_DELIVERY_STAGES.includes(s) || (seg.paid === true && DELIVERED_STAGES.includes(s)));
 }
 
 /** Do které záložky stav patří (pro „Vše" se nehledá). */
@@ -89,16 +104,17 @@ export interface BookSortOption {
 }
 
 export const BOOK_SORTS: BookSortOption[] = [
+  { key: "updated", label: "Naposledy změněné", defaultDir: "desc" },
   { key: "created", label: "Nejnovější", defaultDir: "desc" },
   { key: "deadline", label: "Termín", defaultDir: "asc" },
   { key: "number", label: "Číslo", defaultDir: "desc" },
   { key: "customer", label: "Zákazník", defaultDir: "asc" },
   { key: "value", label: "Hodnota", defaultDir: "desc" },
   { key: "stage", label: "Stav", defaultDir: "asc" },
-  { key: "updated", label: "Naposledy změněné", defaultDir: "desc" },
 ];
 
-export const DEFAULT_SORT: JobSort = "created";
+/** Výchozí řazení knihy = naposledy změněné (orders.updated_at — každá změna řádku zakázky, i automatická). */
+export const DEFAULT_SORT: JobSort = "updated";
 
 export function defaultDirFor(sort: JobSort): SortDir {
   return BOOK_SORTS.find((s) => s.key === sort)?.defaultDir ?? "desc";
@@ -131,7 +147,7 @@ export function deliveryLabel(k: DeliveryState): string {
  */
 export function deliveryFiltersFor(segment: BookSegmentKey): DeliveryState[] {
   if (segment === "objednavky") return ["k_expedici", "castecne"];
-  if (segment === "dokoncene") return ["dodano", "dl_potvrzen"];
+  if (segment === "dokoncene" || segment === "archiv") return ["dodano", "dl_potvrzen"];
   return DELIVERY_FILTERS;
 }
 /**
@@ -399,8 +415,10 @@ export function bookParamsToFilters(p: BookParams): JobFilters {
   const filters: JobFilters = { sort: p.sort, dir: p.dir };
   if (stages.length) filters.stages = stages;
   else filters.group = "vse";
-  // Objednávky = jen bez DL na vše; Dokončené = i zakázky s dodaným vším ve stavu před dodáním
+  // Objednávky = jen bez DL na vše; Dokončené / Archiv = i zakázky s dodaným vším ve stavu před dodáním
   if (typeof seg.delivered === "boolean") filters.deliveredToCustomer = seg.delivered;
+  // Dokončené = nezaplacené, Archiv = zaplacené
+  if (typeof seg.paid === "boolean") filters.paid = seg.paid;
   if (p.q.trim()) filters.q = p.q.trim();
   if (p.owner) filters.ownerId = p.owner;
   if (p.assignee) filters.assigneeId = p.assignee;
@@ -426,24 +444,43 @@ export function sumStages(byStage: Partial<Record<JobStage, number>>, stages: re
 /** Zakázky ve stavu před dodáním s dodaným vším, po stavech (JobStageCounts.deliveredByStage). */
 export type DeliveredByStage = Partial<Record<JobStage, number>>;
 
+/** Zakázky v Archivu (dodáno a zaplaceno) po stavech (JobStageCounts.archivedByStage). */
+export type ArchivedByStage = Partial<Record<JobStage, number>>;
+
 /**
  * Počty záložek: podle stavů, ale zakázka s dodaným vším ve stavu před dodáním (stav se neposunul)
  * se počítá do Dokončených, ne do Objednávek v běhu — stejně jako seznam (bookParamsToFilters).
+ * Dodané a zaplacené (archived) patří do Archivu, ne do Dokončených. Součet záložek (bez Vše) = celá kniha.
  */
-export function segmentCounts(byStage: Partial<Record<JobStage, number>>, delivered: DeliveredByStage = {}): Record<BookSegmentKey, number> {
+export function segmentCounts(
+  byStage: Partial<Record<JobStage, number>>, delivered: DeliveredByStage = {}, archived: ArchivedByStage = {},
+): Record<BookSegmentKey, number> {
   return Object.fromEntries(BOOK_SEGMENTS.map((s) => {
     let n = sumStages(byStage, s.stages);
     if (s.delivered === false) n -= sumStages(delivered, s.stages.filter((st) => PRE_DELIVERY_STAGES.includes(st)));
     if (s.delivered === true) n += sumStages(delivered, PRE_DELIVERY_STAGES.filter((st) => !s.stages.includes(st)));
+    // Dokončené bez zaplacených; Archiv = všechny dodané a zaplacené (v jakémkoli stavu)
+    if (s.paid === false) n -= sumStages(archived, STAGE_ORDER.filter((st) => s.stages.includes(st) || PRE_DELIVERY_STAGES.includes(st)));
+    if (s.paid === true) n = sumStages(archived, STAGE_ORDER);
     return [s.key, Math.max(0, n)];
   })) as Record<BookSegmentKey, number>;
 }
 
-/** Počty chipů stavů v záložce (Objednávky: bez zakázek s dodaným vším — ty jsou v Dokončených). */
+/**
+ * Počty chipů stavů v záložce: Objednávky bez zakázek s dodaným vším (ty jsou v Dokončených), Dokončené bez
+ * zaplacených (ty jsou v Archivu), Archiv jen zaplacené; jinde podle stavu.
+ */
 export function segmentStageCounts(
-  byStage: Partial<Record<JobStage, number>>, delivered: DeliveredByStage, segment: BookSegmentKey,
+  byStage: Partial<Record<JobStage, number>>, delivered: DeliveredByStage, segment: BookSegmentKey, archived: ArchivedByStage = {},
 ): Partial<Record<JobStage, number>> {
-  if (bookSegment(segment).delivered !== false) return byStage;
+  const seg = bookSegment(segment);
+  if (seg.paid === true) return { ...archived };
+  if (seg.paid === false) {
+    const out: Partial<Record<JobStage, number>> = { ...byStage };
+    for (const st of seg.stages) out[st] = Math.max(0, (byStage[st] ?? 0) - (archived[st] ?? 0));
+    return out;
+  }
+  if (seg.delivered !== false) return byStage;
   const out: Partial<Record<JobStage, number>> = { ...byStage };
   for (const st of PRE_DELIVERY_STAGES) out[st] = Math.max(0, (byStage[st] ?? 0) - (delivered[st] ?? 0));
   return out;
@@ -458,7 +495,8 @@ export interface BookKpis {
 }
 
 export function bookKpis(counts: {
-  byStage: Partial<Record<JobStage, number>>; deliveredByStage?: DeliveredByStage; overdue: number; dueThisWeek: number;
+  byStage: Partial<Record<JobStage, number>>; deliveredByStage?: DeliveredByStage; archivedByStage?: ArchivedByStage;
+  overdue: number; dueThisWeek: number;
 }): BookKpis {
   return {
     // = záložka Objednávky (bez DL na vše)
@@ -478,7 +516,8 @@ export const KPI_PATCHES = {
   dueSoon: { segment: "vse", stages: [], deadline: "week", payment: null },
   inquiries: { segment: "poptavky", stages: [], deadline: null, payment: null },
   problems: { segment: "objednavky", stages: [...PROBLEM_STAGES], deadline: null, payment: null },
-  value: { segment: "objednavky", stages: [], deadline: null, payment: null, sort: "value", dir: "desc" },
+  /** Dlaždice hodnoty = aktuální pohled (záložka + filtry): kliknutí ho jen seřadí podle hodnoty. */
+  value: { sort: "value", dir: "desc" },
   /** Faktury po splatnosti — přes celou knihu. */
   overdueInvoices: { segment: "vse", stages: [], deadline: null, payment: "po_splatnosti" },
 } satisfies Record<keyof BookKpis | "value" | "overdueInvoices", BookPatch>;
@@ -487,6 +526,26 @@ export const KPI_PATCHES = {
 export function sumValue(jobs: readonly Pick<JobListItem, "value">[]): number {
   return Math.round(jobs.reduce((n, j) => n + (j.value ?? 0), 0) * 100) / 100;
 }
+
+/** Dlaždice hodnoty: součet hodnot a počet zakázek aktuálního pohledu (celý seznam, ne jen zobrazená stránka). */
+export interface BookValue {
+  sum: number;
+  count: number;
+}
+
+export function bookValue(jobs: readonly Pick<JobListItem, "value">[]): BookValue {
+  return { sum: sumValue(jobs), count: jobs.length };
+}
+
+/** Popisek dlaždice hodnoty podle záložky („Hodnota objednávek v běhu", „Hodnota poptávek", …). */
+export const VALUE_TILE: Record<BookSegmentKey, { label: string; hint: string }> = {
+  objednavky: { label: "Hodnota objednávek v běhu", hint: "objednávky bez DL" },
+  poptavky: { label: "Hodnota poptávek", hint: "poptávky a nabídky" },
+  dokoncene: { label: "Hodnota dokončených", hint: "dodané, nezaplacené" },
+  archiv: { label: "Hodnota v archivu", hint: "dodané a zaplacené" },
+  nerealizovane: { label: "Hodnota nerealizovaných", hint: "prohrané a zrušené" },
+  vse: { label: "Hodnota — vše", hint: "celá kniha" },
+};
 
 // ── Tabule (kanban) ─────────────────────────────────────────
 /**

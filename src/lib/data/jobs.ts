@@ -191,8 +191,8 @@ function lightEligible(filters: JobFilters, narrowed: FlowScope | null): boolean
     && !(filters.q ?? "").trim() && !(filters.step ?? "").trim() && !(filters.location ?? "").trim() && !filters.payment
     && !(filters.inquiry ?? []).length && !(filters.order ?? []).length && !(filters.delivery ?? []).length
     && !filters.exception && !filters.lostReason
-    // dodáno zákazníkovi potřebuje items_count / items_delivered (lehké řádky je nemají)
-    && typeof filters.deliveredToCustomer !== "boolean"
+    // dodáno zákazníkovi potřebuje items_count / items_delivered, zaplaceno paid_at (lehké řádky je nemají)
+    && typeof filters.deliveredToCustomer !== "boolean" && typeof filters.paid !== "boolean"
     && filters.deadline !== "krok";
 }
 
@@ -232,7 +232,7 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
     const filtered = filterJobs(items, {
       q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
       inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery, deliveredToCustomer: filters.deliveredToCustomer,
-      exception: filters.exception, lostReason: filters.lostReason,
+      paid: filters.paid, exception: filters.exception, lostReason: filters.lostReason,
     });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
