@@ -85,6 +85,8 @@ describe.skipIf(!ENABLED)("nákup zakázky ↔ lokální Supabase (provize v DB)
     if (poIds.length) await db.from("purchase_orders").delete().in("id", poIds);
     if (quoteIds.length) await db.from("supplier_quotes").delete().in("id", quoteIds);
     if (ownerId) await db.from("orders").update({ owner_id: ownerId }).eq("id", JOB);
+    // nákup zakázky (s objednávkami = Σ objednávek, po smazání podle položek) zpět na odhad ze seedu
+    if (Number.isFinite(plannedCost)) await db.from("orders").update({ purchase_cost: plannedCost }).eq("id", JOB);
   });
 
   it("výchozí stav: provize z odhadu nákupu", async () => {
@@ -217,11 +219,26 @@ describe.skipIf(!ENABLED)("nákup zakázky ↔ lokální Supabase (provize v DB)
     expect((await commission()).owner_id).toBe(ownerId);
   });
 
-  it("smazání objednávek vrátí provizi na odhad nákupu", async () => {
+  it("nákupní náklady zakázky = Σ objednávek (křížová konzistence)", async () => {
+    const { data } = await db.from("orders").select("purchase_cost").eq("id", JOB).single();
+    expect(Number((data as { purchase_cost: string }).purchase_cost)).toBe(7_500);
+    // ruční zápis jiné částky DB srovná zpět na objednávky
+    await db.from("orders").update({ purchase_cost: 1 }).eq("id", JOB);
+    const { data: again } = await db.from("orders").select("purchase_cost").eq("id", JOB).single();
+    expect(Number((again as { purchase_cost: string }).purchase_cost)).toBe(7_500);
+  });
+
+  it("smazání objednávek vrátí provizi na odhad nákupu (nákupní ceny položek)", async () => {
     await db.from("purchase_orders").delete().in("id", poIds);
     poIds.length = 0;
+    // bez objednávek: nákup podle nákupních cen položek, jinak vítězné nabídky (migrace 20261104120000)
+    const { data: items } = await db.from("order_items").select("quantity, purchase_unit_price").eq("order_id", JOB);
+    const priced = ((items ?? []) as { quantity: string; purchase_unit_price: string | null }[]).filter((i) => i.purchase_unit_price !== null);
+    const expected = priced.length
+      ? Math.round(priced.reduce((s, i) => s + Number(i.quantity) * Number(i.purchase_unit_price), 0) * 100) / 100
+      : plannedCost;
     const c = await commission();
-    expect(Number(c.cost)).toBe(plannedCost);
-    expect(Number(c.commission)).toBeCloseTo((value - plannedCost) * ownerRate, 2);
+    expect(Number(c.cost)).toBe(expected);
+    expect(Number(c.commission)).toBeCloseTo((value - expected) * ownerRate, 2);
   });
 });

@@ -390,6 +390,7 @@ function PricingPanel({
   const [validity, setValidity] = React.useState("30");
   const [busy, setBusy] = React.useState<null | "save" | "quote">(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
   // uložený stav — po uložení se posune (položky si drží id, editor se znovu nepřipojí)
   const [baseline, setBaseline] = React.useState(() => signature(initial));
   const dirty = signature(rows) !== baseline || !job.items.length;
@@ -439,6 +440,8 @@ function PricingPanel({
   async function persist(items: JobItemInput[]): Promise<string | null> {
     const saved = await saveJobItems(job.id, items);
     if (!saved.ok) return saved.error ?? "Nacenění se nepodařilo uložit.";
+    // cena už neodpovídá odeslané / přijaté nabídce → upozornit (uložení proběhlo)
+    setNotice(saved.warning || null);
     const up = await updateJob(job.id, { pricedById: me.id, ...(job.stage === "poptavka" ? { stage: "naceneni" as const } : {}) });
     if (!up.ok) return up.error ?? "Ceny jsou uložené, ale nepodařilo se zapsat, kdo nacenil.";
     return null;
@@ -706,9 +709,22 @@ function PricingPanel({
           {summary.unpriced > 0 && (
             <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">bez ceny: {summary.unpriced}</span>
           )}
+          {/* hodnota zakázky = součet položek (křížová konzistence 4. 11.) — uloží se se stejným číslem */}
+          {summary.unpriced < nums.length && (
+            <span className="text-xs text-muted-foreground" data-testid="pricing-job-value">
+              {job.value !== null && Math.abs(job.value - summary.sale) < 0.005
+                ? "= hodnota zakázky"
+                : `hodnota zakázky ${money(job.value, cur)} → po uložení ${money(summary.sale, cur)}`}
+            </span>
+          )}
         </div>
       </div>
 
+      {notice && (
+        <p role="status" className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100" data-testid="pricing-notice">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {notice}
+        </p>
+      )}
       {error && (
         <p role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}

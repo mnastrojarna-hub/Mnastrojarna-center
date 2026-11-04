@@ -185,7 +185,8 @@ describe.skipIf(!LOCAL_ENABLED)("sloučení zakázek ↔ lokální Supabase", ()
       customer_required_date: "2026-12-04", due_date: "2026-12-11", inquiry_date: "2026-10-01", note: "Termín z nabídky 6 týdnů.",
       customer_contact: "Ing. Novák", quote_id: f.quoteId, merged_into_id: null, items_count: 2,
     });
-    expect(Number(t.value)).toBe(48_000);                            // vyhrává cíl (objednávka)
+    // křížová konzistence (4. 11.): hodnota = Σ položek po sloučení (40 ks × 1 200 z nabídky + víko 50 × 300)
+    expect(Number(t.value)).toBe(63_000);
     expect(t.updated_by).toBe(sales);
     const { data: q } = await svc.from("quotes").select("job_id, status, state, accepted_by, updated_by").eq("id", f.quoteId).single();
     expect(q).toMatchObject({ job_id: f.order.id, status: "prijato", state: "prijata", accepted_by: sales, updated_by: sales });
@@ -226,10 +227,10 @@ describe.skipIf(!LOCAL_ENABLED)("sloučení zakázek ↔ lokální Supabase", ()
     expect((sev ?? []).some((e) => (e.message as string).startsWith(`Sloučeno do zakázky ${f.order.number} (Petr Obchodník)`))).toBe(true);
     expect((sev ?? []).some((e) => e.type === "stage" && /Zrušeno/.test(e.message as string) && /sloučeno do zakázky/.test(e.message as string))).toBe(true);
 
-    // provize: cíl přepočtený (hodnota objednávky), zdroj žádnou nemá
+    // provize: cíl přepočtený (hodnota = Σ položek), zdroj žádnou nemá
     const { data: ce } = await svc.from("commission_entries").select("order_id, revenue, status").in("order_id", [f.order.id, f.quoteJob.id]);
     expect((ce ?? []).map((x) => x.order_id)).toEqual([f.order.id]);
-    expect(Number(ce?.[0].revenue)).toBe(48_000);
+    expect(Number(ce?.[0].revenue)).toBe(63_000);
 
     // audit
     const { data: audit } = await svc.from("audit_log").select("action, actor_id").eq("entity_id", f.order.id).eq("action", "job_merged");
@@ -253,7 +254,8 @@ describe.skipIf(!LOCAL_ENABLED)("sloučení zakázek ↔ lokální Supabase", ()
     // náhled: částky česky, název zakázky mezi hodnotami (vyhrává cíl)
     const pv = await previewJobMergeCore(as(admin), f.quoteJob.id, f.order.id);
     const pf = pv.ok ? Object.fromEntries(pv.preview.fields.map((x) => [x.field, x])) : {};
-    expect(pf.value?.result).toMatch(/^48\s000 Kč$/);
+    // hodnota nabídkové zakázky = Σ jejích naceněných položek (50 × 1 200 + 50 × 300) — cíl si ji drží
+    expect(pf.value?.result).toMatch(/^75\s000 Kč$/);
     expect(pf.title).toMatchObject({ rule: "keep", source: "F00N603W84 — objednávka", result: "F00N603W84 — nabídka" });
     expect(pv.ok && pv.preview.conflicts.some((c) => c.code === "STAGE_ADVANCE")).toBe(true);
     const res = await mergeJobsCore(as(admin), { targetId: f.quoteJob.id, sourceId: f.order.id, token: randomUUID() });
@@ -268,6 +270,8 @@ describe.skipIf(!LOCAL_ENABLED)("sloučení zakázek ↔ lokální Supabase", ()
     const { data: items } = await svc.from("order_items").select("drawing_number, quantity, unit_price").eq("order_id", f.quoteJob.id).order("position");
     expect(Number(items?.[0].quantity)).toBe(40);
     expect(Number(items?.[0].unit_price)).toBe(1200);
+    // po sloučení hodnota = Σ položek (počty z objednávky): 40 × 1 200 + 50 × 300
+    expect(Number(t.value)).toBe(63_000);
     const { data: ce } = await svc.from("commission_entries").select("order_id").in("order_id", [f.order.id, f.quoteJob.id]);
     expect((ce ?? []).map((x) => x.order_id)).toEqual([f.quoteJob.id]);
   }, 60_000);

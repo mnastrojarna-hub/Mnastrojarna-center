@@ -19,6 +19,7 @@ vi.mock("@/app/actions/job-files", () => ({
 vi.mock("@/app/actions/job-documents", () => ({
   generateJobDocument: vi.fn(), sendJobDocument: vi.fn(), draftJobDocumentEmail: vi.fn(),
 }));
+vi.mock("@/app/actions/job-consistency", () => ({ setJobValue: vi.fn(), alignJobConsistency: vi.fn() }));
 vi.mock("@/lib/jobs/upload-client", () => ({ uploadJobFiles: vi.fn(), uploadJobFile: vi.fn() }));
 vi.mock("@/components/jobs/capture/capture-button", () => ({
   CaptureButton: ({ label }: { label?: string }) => <button type="button">{label ?? "Vyfotit doklad"}</button>,
@@ -137,6 +138,23 @@ describe("Karta zakázky — render", () => {
     expect(html).toContain("37,5 %");
     expect(html).toContain("expres");
     expect(html).toContain("Další akce"); // menu se smazáním
+  });
+
+  it("křížová konzistence: hodnota = součet položek, nesoulad s opravou jedním klikem (4. 11.)", () => {
+    // vše sedí → hodnota odvozená z položek, žádný odznak
+    const ok = render(fixture());
+    expect(ok).toContain("= součet položek (1 s cenou)");
+    expect(ok).not.toContain('data-testid="consistency-badges"');
+    // případ majitele: součet položek ≠ hodnota, přijatá nabídka jinak → odznaky; oprava jen u položek
+    const bad = render(fixture({ value: 50_000 }));
+    expect(bad).toContain('data-issue="value_items"');
+    expect(bad).toMatch(/Součet položek 48\s000\sKč neodpovídá hodnotě zakázky 50\s000\sKč/);
+    expect(bad).toContain("Srovnat podle položek");
+    expect(bad).toContain('data-issue="value_quote"');
+    // vyfakturovaná → hodnota zamčená, bez opravy
+    const inv = render(fixture({ value: 50_000, invoiceNumber: "FV-2026-0001" }));
+    expect(inv).toContain("Vyfakturováno — hodnota je uzamčená.");
+    expect(inv).not.toContain("Srovnat podle položek");
   });
 
   it("zaměstnanec bez marží a bez mazání", () => {

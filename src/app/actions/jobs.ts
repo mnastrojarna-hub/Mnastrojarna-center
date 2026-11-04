@@ -26,6 +26,10 @@ import {
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
 import { supersedeEditedMailChanges } from "@/lib/email/job-link-store";
+import {
+  invoicedValueBlock, itemsSaleValue, purchaseCostEditBlock, quotePriceWarning, activePurchaseOrders,
+} from "@/lib/jobs/consistency";
+import { applyJobValueToItems, applyQuotePricesToItems, loadJobMoneyContext, type JobMoneyContext } from "@/lib/jobs/consistency-store";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -380,7 +384,7 @@ export async function createJob(
   }
 }
 
-export async function updateJob(id: string, patch: JobInput): Promise<ActionResult> {
+export async function updateJob(id: string, patch: JobInput): Promise<ActionResult<{ warning: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(NOT_FOUND);
@@ -422,12 +426,40 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     const contactErr = await resolveJobContact(db, before, row, rest);
     if (contactErr) return fail(contactErr);
 
-    const changes = diffJob(before, row);
+    let changes = diffJob(before, row);
     if (!isAdmin && changes.some((ch) => ch.field === "owner_id")) return fail(OWNER_ADMIN_ONLY);
     const fromStage = isJobStage(before.status) ? before.status : null;
     const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
     if (stageTo && reasonRequired("job", stageTo)) return fail(CLOSE_NEEDS_REASON);
-    if (!changes.length && !stageTo) return { ok: true };
+
+    // křížová konzistence (4. 11.): hodnota s naceněnými položkami se rozpočítá na položky,
+    // vyfakturovaná zakázka se nepřeceňuje, nákup s objednávkami dodavatelům se mění v objednávce
+    let warning = "";
+    let valueTarget: number | null = null;
+    let money: JobMoneyContext | null = null;
+    if (changes.some((ch) => ch.field === "value" || ch.field === "purchase_cost")) {
+      money = await loadJobMoneyContext(db, id, { margins });
+      if (money) {
+        const cur = money.snapshot.currency || "CZK";
+        if (changes.some((ch) => ch.field === "value")) {
+          const block = invoicedValueBlock(money.snapshot);
+          if (block) return fail(block);
+          const next = cleanNumber(row.value);
+          if (itemsSaleValue(money.snapshot.items) !== null) {
+            if (next === null) return fail("Hodnotu zakázky nejde smazat, dokud mají položky ceny — smaž ceny v Položkách.");
+            valueTarget = next;
+            changes = changes.filter((ch) => ch.field !== "value");
+          } else {
+            warning = quotePriceWarning(money.snapshot.quotes ?? [], next, cur) ?? "";
+          }
+        }
+        if (changes.some((ch) => ch.field === "purchase_cost")) {
+          const block = purchaseCostEditBlock(money.snapshot.purchaseOrders ?? [], cleanNumber(row.purchase_cost), cur);
+          if (block) return fail(block);
+        }
+      }
+    }
+    if (!changes.length && !stageTo && valueTarget === null) return { ok: true };
 
     if (changes.length) {
       const update: Row = {};
@@ -481,13 +513,19 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
       }
     }
 
+    if (valueTarget !== null && money) {
+      const applied = await applyJobValueToItems(db, money, valueTarget);
+      if (!applied.ok) return fail(applied.error);
+      if (applied.warning) warning = applied.warning;
+    }
+
     if (stageTo) {
       const err = await applyStage(db, id, fromStage, stageTo, user.id);
       if (err) return fail(err);
     }
 
     revalidateJob(id);
-    return { ok: true };
+    return { ok: true, ...(warning ? { warning } : {}) };
   } catch (err) {
     return fail(err);
   }
@@ -553,7 +591,7 @@ export async function deleteJob(id: string): Promise<ActionResult> {
 }
 
 // ── Položky a komentáře ─────────────────────────────────────
-export async function saveJobItems(jobId: string, items: JobItemInput[]): Promise<ActionResult> {
+export async function saveJobItems(jobId: string, items: JobItemInput[]): Promise<ActionResult<{ warning: string; value: number | null }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
@@ -562,15 +600,15 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
 
   try {
     const { db, user, margins } = c;
-    const job = await loadJob(db, jobId, "id, value");
+    const job = await loadJob(db, jobId, "id, value, currency, invoice_number, invoiced_at");
     if (!job) return fail(NOT_FOUND);
 
     const { data: oldData, error: oldErr } = await db
       .from("order_items")
-      .select("id, drawing_id, purchase_unit_price, note, drawing_number, name")
+      .select("id, drawing_id, purchase_unit_price, note, drawing_number, name, quantity, unit_price")
       .eq("order_id", jobId);
     if (oldErr) return fail(oldErr.message);
-    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null; note: string | null; drawing_number: string | null; name: string | null }[]).map((r) => [r.id, r]));
+    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null; note: string | null; drawing_number: string | null; name: string | null; quantity: number | string | null; unit_price: number | string | null }[]).map((r) => [r.id, r]));
 
     const rows = items.map((it, i): Row => {
       const r = jobItemToRow(it, i);
@@ -580,6 +618,15 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       if (prev?.drawing_id) r.drawing_id = prev.drawing_id;
       return { ...r, order_id: jobId };
     });
+
+    // vyfakturovaná zakázka: prodejní ceny a počty (i přidání / odebrání položky) už ne — jen dobropisem
+    const invoiceBlock = invoicedValueBlock({ invoiceNumber: job.invoice_number as string | null, invoicedAt: job.invoiced_at as string | null });
+    if (invoiceBlock) {
+      const priceKey = (q: unknown, p: unknown) => `${cleanNumber(q) ?? 0}|${cleanNumber(p) ?? ""}`;
+      const oldSig = [...old.values()].map((r) => `${r.id}:${priceKey(r.quantity, r.unit_price)}`).sort().join(",");
+      const newSig = items.map((it, i) => `${it.id && old.has(it.id) ? it.id : `new${i}`}:${priceKey(rows[i].quantity, rows[i].unit_price)}`).sort().join(",");
+      if (oldSig !== newSig) return fail(invoiceBlock);
+    }
 
     // upsert podle id: existující se upraví (dodávky a uzavření položek zůstanou), nové se vloží,
     // odebrané smažou. Vložení ani smazání stav zakázky neposouvá.
@@ -622,12 +669,22 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       unitPrice: r.unit_price as number | null,
       purchaseUnitPrice: r.purchase_unit_price as number | null,
     })));
+    // hodnota zakázky = Σ položek přepočte DB (trigger, se záznamem do historie); nákup podle nákupních
+    // cen položek jen bez objednávek dodavatelům (s nimi je nákup = Σ objednávek)
     const update: Row = {};
-    if (rows.some((r) => r.unit_price !== null)) update.value = totals.value;
-    if (margins && rows.some((r) => r.purchase_unit_price !== null)) update.purchase_cost = totals.purchaseCost;
+    if (rows.some((r) => r.unit_price !== null) && !invoiceBlock) update.value = totals.value;
+    let warning = "";
+    if (margins && rows.some((r) => r.purchase_unit_price !== null)) {
+      const { data: posData } = await db.from("purchase_orders").select("status").eq("job_id", jobId);
+      if (!activePurchaseOrders((posData ?? []) as { status: string }[]).length) update.purchase_cost = totals.purchaseCost;
+    }
     if (Object.keys(update).length) {
       const { error: upErr } = await db.from("orders").update(update as never).eq("id", jobId);
       if (upErr) return fail(upErr.message);
+    }
+    if (update.value !== undefined && cleanNumber(job.value) !== cleanNumber(update.value)) {
+      const ctx = await loadJobMoneyContext(db, jobId, { margins: false });
+      warning = (ctx && quotePriceWarning(ctx.snapshot.quotes ?? [], cleanNumber(update.value), String(job.currency || "CZK"))) || "";
     }
 
     // poznámky položek (nové / změněné) jako změny v historii — s textem, ne jen „Položky upraveny"
@@ -646,7 +703,7 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       actorId: user.id,
     });
     revalidateJob(jobId);
-    return { ok: true };
+    return { ok: true, value: cleanNumber(update.value ?? job.value), ...(warning ? { warning } : {}) };
   } catch (err) {
     return fail(err);
   }
@@ -1004,15 +1061,23 @@ export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
     if (error) return fail(error.message);
 
     const total = cleanNumber(quote.total);
+    // křížová konzistence (4. 11.): ceny přijaté nabídky → prodejní ceny položek zakázky (spárované podle
+    // výkresu / názvu / pozice); hodnota zakázky = Σ položek (DB). Bez položek s cenou = cena nabídky.
+    const priced = await applyQuotePricesToItems(db, quote.job_id, quote.items ?? []);
     const jobUpdate: Row = { quote_id: quoteId };
-    if (total !== null) jobUpdate.value = total;
+    if (total !== null && !priced.invoiced) jobUpdate.value = total;
     const { error: jobErr } = await db.from("orders").update(jobUpdate as never).eq("id", quote.job_id);
     if (jobErr) return fail(jobErr.message);
 
-    const valueText = total !== null ? ` — hodnota zakázky ${formatFieldValue("value", total)}` : "";
+    // skutečná hodnota po přijetí (= Σ položek, když mají ceny) — může se lišit, když nešlo spárovat vše
+    const after = await loadJob(db, quote.job_id, "value");
+    const valueNow = cleanNumber(after?.value);
+    const valueText = valueNow !== null ? ` — hodnota zakázky ${formatFieldValue("value", valueNow)}` : "";
+    const differs = total !== null && valueNow !== null && Math.abs(total - valueNow) >= 0.005;
     await logJobEvent(db, {
-      jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} přijata zákazníkem${valueText}`,
-      data: { quoteId, number: quote.number, action: "accepted", total, previousValue: cleanNumber(job.value) },
+      jobId: quote.job_id, type: "quote",
+      message: `${quoteLabel(quote)} přijata zákazníkem${valueText}${priced.changed ? ` (ceny ${priced.changed} ${priced.changed === 1 ? "položky" : "položek"} podle nabídky)` : ""}${differs ? ` — pozor: nabídka je na ${formatFieldValue("value", total)}, položky zakázky se liší` : ""}`,
+      data: { quoteId, number: quote.number, action: "accepted", total, value: valueNow, previousValue: cleanNumber(job.value), itemsPriced: priced.changed },
       actorId: user.id,
     });
 
