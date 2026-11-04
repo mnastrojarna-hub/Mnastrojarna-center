@@ -73,6 +73,10 @@ function install(): void {
   });
 }
 
+function pathOf(href: string): string {
+  return href.split(/[?#]/)[0];
+}
+
 function currentHref(): string {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
@@ -87,6 +91,7 @@ function sync(): void {
   const want = intended;
   intended = null;
   if (want.pop !== popstateSerial) return; // mezitím Zpět / Vpřed
+  if (pathOf(want.href) !== window.location.pathname) return; // mezitím odchod na jinou stránku
   try {
     // Next mohl adresu vrátit na svou starou (po dokončení akce) → nejdřív zpět na zamýšlenou
     if (currentHref() !== want.href) window.history.replaceState(stateForOwnWrite(window.history.state), "", want.href);
@@ -110,7 +115,13 @@ export function writeUrlSafely(href: string, opts: { push?: boolean } = {}): voi
   intended = { href, pop: popstateSerial };
   if (syncTimer !== null) window.clearTimeout(syncTimer);
   syncTimer = window.setTimeout(sync, SYNC_DELAY_MS);
+  // adresa se změnila bez Next (useSearchParams se dozví až při synchronizaci) → kdo sleduje adresu
+  // (ScrollMemory: nová adresa přebírá aktuální posun), ať se dozví hned
+  window.dispatchEvent(new Event(URL_WRITE_EVENT));
 }
+
+/** Událost na window po vlastním zápisu adresy (writeUrlSafely). */
+export const URL_WRITE_EVENT = "mn:urlwrite";
 
 /** Jen pro testy / diagnostiku. */
 export function _serverActionActivity(): { inflight: number; lastActionEnd: number } {

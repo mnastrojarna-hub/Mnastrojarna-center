@@ -6,6 +6,7 @@ import {
   RESTORE_WINDOW_MS, SCROLL_STORE_KEY, canApply, isApplied, parseScrollStore, restoresOnLoad, scrollEntry, scrollKey, withScrollPos,
   type ScrollEntry, type ScrollStore,
 } from "@/lib/nav/scroll-memory";
+import { URL_WRITE_EVENT } from "@/lib/nav/safe-history";
 
 /**
  * Paměť posunu pro celou aplikaci (majitel 4. 11.: „Zpět mě vrátí vždy nahoru"). Okno neroluje — roluje
@@ -202,7 +203,7 @@ export function ScrollMemory() {
   }, [getStore, restore]);
 
   // změna adresy: po Zpět / Vpřed obnovit; jinak (odkaz, filtr) si nová adresa převezme aktuální pozice
-  React.useEffect(() => {
+  const onUrlChanged = React.useCallback(() => {
     if (!booted.current) return;
     const href = window.location.href;
     if (href === lastHref.current) return;
@@ -218,7 +219,14 @@ export function ScrollMemory() {
     stopRestore();
     const snap = snapshot();
     for (const [elKey, pos] of Object.entries(snap)) save(key, elKey, pos.t, pos.l);
-  }, [url, getStore, restore, save, stopRestore]);
+  }, [getStore, restore, save, stopRestore]);
+  React.useEffect(() => { onUrlChanged(); }, [url, onUrlChanged]);
+  // vlastní zápis adresy (useUrlState → writeUrlSafely) se do useSearchParams dostane až při synchronizaci
+  // s Next — pozice převzít hned (než uživatel odejde odkazem pryč)
+  React.useEffect(() => {
+    window.addEventListener(URL_WRITE_EVENT, onUrlChanged);
+    return () => window.removeEventListener(URL_WRITE_EVENT, onUrlChanged);
+  }, [onUrlChanged]);
 
   return null;
 }
