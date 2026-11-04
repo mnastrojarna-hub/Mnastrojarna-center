@@ -155,6 +155,9 @@ export function ScrollMemory() {
       const r = restoring.current;
       // během obnovy neukládat (ořezané hodnoty by přepsaly cíl) — kromě prvků, které už stojí
       if (r && r.key === currentKey() && !r.done.has(elKey)) return;
+      // po Zpět / Vpřed, než obnova začne (Next ještě nesynchronizoval adresu): seznam se znovu vykreslí
+      // a posun se ořízne na 0 — ten by přepsal uloženou pozici (telefon: 2305 → 0)
+      if (pendingTraversal.current && Date.now() < traversalUntil) return;
       save(currentKey(), elKey, (el as HTMLElement).scrollTop, (el as HTMLElement).scrollLeft);
     };
     // vlastní posun uživatele ukončí obnovu (nikdy nebojovat s člověkem)

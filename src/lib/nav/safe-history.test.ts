@@ -6,6 +6,7 @@ describe("bezpečný zápis adresy (fronta akcí Next)", () => {
     expect(hasServerActionHeader(new Headers({ "Next-Action": "abc" }))).toBe(true);
     expect(hasServerActionHeader({ "next-action": "abc" })).toBe(true);
     expect(hasServerActionHeader([["Next-Action", "abc"]])).toBe(true);
+    expect(hasServerActionHeader({ RSC: "1" })).toBe(true); // navigace / obnovení routeru
     expect(hasServerActionHeader({ accept: "text/x-component" })).toBe(false);
     expect(hasServerActionHeader(undefined)).toBe(false);
   });
