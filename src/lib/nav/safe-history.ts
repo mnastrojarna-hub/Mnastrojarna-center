@@ -28,8 +28,11 @@ let inflight = 0;
 let lastActionEnd = -Infinity;
 let popstateSerial = 0;
 let syncTimer: number | null = null;
-/** Poslední zamýšlená adresa (cesta + dotaz + hash) a číslo popstate v okamžiku zápisu. */
-let intended: { href: string; pop: number } | null = null;
+/**
+ * Poslední zamýšlená adresa (cesta + dotaz + hash), adresa PŘED zápisem (tu zná Next jako canonicalUrl —
+ * na ni by adresu vrátil po dokončení akce) a číslo popstate v okamžiku zápisu.
+ */
+let intended: { href: string; before: string; pop: number } | null = null;
 
 type AnyHeaders = Headers | Record<string, string> | [string, string][] | undefined | null;
 
@@ -73,10 +76,6 @@ function install(): void {
   });
 }
 
-function pathOf(href: string): string {
-  return href.split(/[?#]/)[0];
-}
-
 function currentHref(): string {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
@@ -91,10 +90,14 @@ function sync(): void {
   const want = intended;
   intended = null;
   if (want.pop !== popstateSerial) return; // mezitím Zpět / Vpřed
-  if (pathOf(want.href) !== window.location.pathname) return; // mezitím odchod na jinou stránku
+  const now = currentHref();
+  if (now !== want.href) {
+    // Next vrátil adresu na tu před zápisem (po dokončení akce přepisuje adresu na svou canonicalUrl) →
+    // zpět na zamýšlenou; jakákoli jiná adresa = mezitím navigoval někdo jiný (odkaz, router.replace) → nic
+    if (now !== want.before) return;
+    window.history.replaceState(stateForOwnWrite(window.history.state), "", want.href);
+  }
   try {
-    // Next mohl adresu vrátit na svou starou (po dokončení akce) → nejdřív zpět na zamýšlenou
-    if (currentHref() !== want.href) window.history.replaceState(stateForOwnWrite(window.history.state), "", want.href);
     // prázdný stav = Next adresu převezme (RESTORE) — teď bez běžící akce, kterou by zahodil
     window.history.replaceState({}, "", want.href);
   } catch {
@@ -110,9 +113,11 @@ export function writeUrlSafely(href: string, opts: { push?: boolean } = {}): voi
   if (typeof window === "undefined") return;
   install();
   const state = stateForOwnWrite(window.history.state);
+  // adresa, kterou Next zná (před naším zápisem) — pokud už probíhá synchronizace, platí její „před"
+  const before = intended?.before ?? currentHref();
   if (opts.push) window.history.pushState(state, "", href);
   else window.history.replaceState(state, "", href);
-  intended = { href, pop: popstateSerial };
+  intended = { href, before, pop: popstateSerial };
   if (syncTimer !== null) window.clearTimeout(syncTimer);
   syncTimer = window.setTimeout(sync, SYNC_DELAY_MS);
   // adresa se změnila bez Next (useSearchParams se dozví až při synchronizaci) → kdo sleduje adresu
