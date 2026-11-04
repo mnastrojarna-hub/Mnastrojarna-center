@@ -907,7 +907,7 @@ await T("detail: položky — přidat, upravit, přesunout, smazat, součty, ulo
   expect((await page.getByRole("tab", { name: /^Položky/ }).locator('[title="Neuložené změny"]').count()) === 1, "záložka ukazuje neuložené změny");
   await shot(page, S("24-detail-items-dirty"));
   await page.getByRole("button", { name: "Uložit položky" }).click();
-  await page.getByText("Položky uloženy (2).").waitFor({ timeout: 10_000 });
+  await page.getByText(/Položky uloženy \(2\)/).waitFor({ timeout: 10_000 }); // + „— hodnota zakázky přepočtena ze součtu" (křížová konzistence)
   await eventually(async () => {
     const items = sql(`select position || ':' || coalesce(drawing_number,'') || ':' || quantity::float || ':' || coalesce(unit_price::float::text,'') || ':' || coalesce(purchase_unit_price::float::text,'') from order_items where order_id = ${lit(D3.id)} order by position`).split("\n");
     expect(items.length === 2 && items[0] === `0:E2EB-IT2-${TAG}:3:100:60` && items[1] === `1:E2EB-D3-DWG-${TAG}:2:1500:777.77`, `DB položky: ${items.join(" ; ")}`);
@@ -919,7 +919,7 @@ await T("detail: položky — přidat, upravit, přesunout, smazat, součty, ulo
   await cell(1, "Množství").fill("4");
   await rowsLoc.nth(0).getByRole("button", { name: "Odebrat položku" }).click();
   await page.getByRole("button", { name: "Uložit položky" }).click();
-  await page.getByText("Položky uloženy (1).").waitFor({ timeout: 10_000 });
+  await page.getByText(/Položky uloženy \(1\)/).waitFor({ timeout: 10_000 }); // + „— hodnota zakázky přepočtena ze součtu" (křížová konzistence)
   await eventually(async () => {
     const items = sql(`select drawing_number || ':' || quantity::float from order_items where order_id = ${lit(D3.id)}`);
     expect(items === `E2EB-D3-DWG-${TAG}:4`, `DB: 1 položka × 4 (${items})`);
