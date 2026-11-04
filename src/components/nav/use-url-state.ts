@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as nav from "next/navigation";
 import { isDefaultValues, readUrlValues, rememberPageSearch, writeUrlValues, type UrlValues } from "@/lib/nav/url-state";
+import { writeUrlSafely } from "@/lib/nav/safe-history";
 
 /**
  * Stav stránky v adrese (filtry, hledání, řazení, záložka, vybrané vlákno…) — majitel 4. 11.: „systém si
@@ -12,7 +13,11 @@ import { isDefaultValues, readUrlValues, rememberPageSearch, writeUrlValues, typ
  *   historie (replaceState → psaní nezaplní historii), takže odkaz na detail je běžný push a Zpět vrátí
  *   seznam i s filtry; obnovení stránky je zachová také.
  * - `push: true` přidá položku historie (otevření vlákna na telefonu: Zpět ho zavře a vrátí seznam).
- * - Zpět / Vpřed uvnitř stránky (Next synchronizuje useSearchParams) stav převezme.
+ * - Zpět / Vpřed uvnitř stránky (popstate) a navigace Next na tutéž stránku s jinými parametry (odkaz z menu,
+ *   router.replace jiné komponenty) stav převezmou; vlastní zápisy a dodatečné synchronizace Next se ignorují.
+ * - Zápis jde přes writeUrlSafely (lib/nav/safe-history): bez zásahu do fronty akcí Next — prostý
+ *   `replaceState({}, …)` Next bere jako obnovení z historie a zahodí právě běžící serverovou akci
+ *   (vlákno v Poště zůstalo na „Načítám…"); Next se sesynchronizuje až v klidu.
  * - `remember`: poslední stav se uloží do sessionStorage pod cestou stránky — položka menu bez parametrů ho
  *   otevře znovu (viz rememberedHref), viditelně, s tlačítkem Zrušit filtry.
  *
@@ -63,17 +68,35 @@ export function useUrlState<K extends string>(defaults: UrlValues<K>, options: U
   valuesRef.current = values;
   const timer = React.useRef<number | null>(null);
 
-  // adresa se změnila zvenku (Zpět / Vpřed) → převzít; zastaralé synchronizace (po vlastním zápisu) ignorovat
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const live = window.location.search.replace(/^\?/, "");
-    if (normalize(live) !== normalize(search)) return;
-    const next = readUrlValues(search, defaultsRef.current);
+  /** Dotaz, který jsme naposledy zapsali / převzali — synchronizace Next na něj se nepovažuje za změnu zvenku. */
+  const expectedSearch = React.useRef(normalize(search));
+
+  const adopt = React.useCallback((rawSearch: string) => {
+    const next = readUrlValues(rawSearch, defaultsRef.current);
+    expectedSearch.current = normalize(rawSearch);
     if (!sameValues(valuesRef.current, next)) {
       valuesRef.current = next;
       setValues(next);
     }
-  }, [search]);
+  }, []);
+
+  // Zpět / Vpřed → převzít stav z adresy (Next si svůj strom obnoví sám)
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPop = () => adopt(window.location.search);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [adopt]);
+
+  // Next navigoval na tutéž stránku s jinými parametry (odkaz z menu, router.replace jiné komponenty) → převzít;
+  // vlastní zápis a dodatečná synchronizace Next (stejný dotaz) nebo zastaralý stav (adresa už jiná) se ignorují
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const live = normalize(window.location.search);
+    const got = normalize(search);
+    if (got === expectedSearch.current || got !== live) return;
+    adopt(search);
+  }, [search, adopt]);
 
   // první vykreslení s parametry v adrese (odkaz, obnovení) → paměť stránky odpovídá adrese
   React.useEffect(() => {
@@ -87,9 +110,8 @@ export function useUrlState<K extends string>(defaults: UrlValues<K>, options: U
     try {
       const qs = writeUrlValues(window.location.search, defaultsRef.current, next);
       const url = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
-      // prázdný stav → Next si doplní svůj (a zároveň synchronizuje useSearchParams / usePathname)
-      if (push) window.history.pushState({}, "", url);
-      else window.history.replaceState({}, "", url);
+      expectedSearch.current = normalize(qs);
+      writeUrlSafely(url, { push });
       if (remember) rememberPageSearch(window.location.pathname, qs, undefined, transient.current);
     } catch {
       // adresa je jen pohodlí — filtr funguje dál
