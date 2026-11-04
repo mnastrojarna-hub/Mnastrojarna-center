@@ -114,6 +114,8 @@ V jednom okně může být otevřeno více dílů, sestav a výkresů najednou �
 
 ### Pás karet (ribbon)
 
+Tlačítka jsou seskupená a každá skupina má pod sebou název (Skica, Tvar, Primitiva, Konstrukční prvky, Úpravy…; ve skice Uchopení, Kreslení, Úpravy, Vazby, Kóty, Nástroje). Popisek tlačítka i název skupiny jsou psané čitelným písmem; po najetí myší se zobrazí nápověda s klávesovou zkratkou.
+
 | Záložka | Obsah |
 | --- | --- |
 | Soubor | Nový díl / sestava, otevřít a importovat, uložit projekt, export 3D, výkres, rám vstřikovací formy, ukázkové díly, knihovna normálií, nastavení, klávesové zkratky, poptávka výroby. |
@@ -779,6 +781,7 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 | 3. | plochy (19), plech (12), svařence (10), pokročilé modelování, knihovna 103 rodin, výkresy s anotacemi a DWG, vazby sestav, formařské analýzy, nastavení a zkratky |
 | 4. | výběr entit a inspektor, měření mezi entitami, kontextové nabídky, gizmo, barvy ploch, podsestavy, SEO a výkon webu |
 | 5. (listopad 2026) | referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace |
+| 5. – zpětná vazba z testu 3. 11. 2026 (III) | náběh závitu jako u závitového kalibru (vybroušený hřbet prvního závitu, plynule do plného profilu); pás karet: větší písmo tlačítek a výrazné názvy skupin (Skica, Tvar, Primitiva, Kreslení, Vazby, Kóty…) |
 | 5. – zpětná vazba z testu 3. 11. 2026 (II) | poctivý stav prvku: po každém prvku kontrola objemu/topologie a platnosti geometrie (⚠ „prvek těleso nezměnil“, „neplatná geometrie“, ✗ skořepina beze změny), řádek Geometrie ve stavu, protokol agenta s výsledkem až po výpočtu; závity s jemným stoupáním (M18×1,5), vnitřní závit v díře (prvek Závit i tažení po šroubovici se stranou a náběhem); tažení po spline jako hladká B-spline (forma zůstane solidem); kusovník s označením materiálu a číslem dílu, balónky uvnitř rámu, stav sestavy a kolize v textovém stavu; žádná ztráta rychlých změn ve formuláři ani formátu výkresu; kontrola kót pro rotační díly; poznámka v patičce jen na vyžádání |
 | 5. – dodatky (listopad 2026) | sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu |
 

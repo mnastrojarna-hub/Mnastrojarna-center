@@ -263,8 +263,7 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
           },
         ]
       : [];
-  return [
-    ...snapGroup,
+  const groups: RGroup[] = [
     {
       label: "Kreslení",
       big: 5,
@@ -329,6 +328,9 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
       ],
     },
   ];
+  // pořadí jako v desktopových CADech: kreslení → vazby a kóty → úpravy → nástroje; uchopení (přepínače) až na konci
+  const by = (l: string) => groups.find((g) => g.label === l)!;
+  return [by("Kreslení"), by("Vazby"), by("Kóty"), by("Úpravy"), by("Nástroje"), ...snapGroup];
 }
 
 // ======================= geometrie pomocí =======================
