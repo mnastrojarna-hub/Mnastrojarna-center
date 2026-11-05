@@ -316,8 +316,10 @@ export async function createJob(
     const totals = computeItemTotals(items.map((it) => ({
       quantity: it.quantity, unitPrice: it.unitPrice, purchaseUnitPrice: margins ? it.purchaseUnitPrice : null,
     })));
-    if (input.value === undefined && totals.value !== null) row.value = totals.value;
-    if (margins && input.purchaseCost === undefined && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
+    // křížová konzistence (4. 11.): s nacenenými položkami je hodnota zakázky jejich součet (částka z hlavičky
+    // dokladu / formuláře ji nepřebije — DB by ji stejně srovnala); bez cen zůstane zadaná ručně
+    if (totals.value !== null) row.value = totals.value;
+    if (margins && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
 
     if (!row.title) {
       row.title = cleanText(items[0]?.name, 300) ?? cleanText(items[0]?.drawingNumber, 300) ?? "Nová zakázka";

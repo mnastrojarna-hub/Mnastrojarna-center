@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Factory, Hash, CalendarDays, Clock, Truck, Wallet, StickyNote, CalendarCheck, FilePlus2, Pencil } from "lucide-react";
+import { Loader2, Factory, Hash, CalendarDays, Clock, Truck, Wallet, StickyNote, CalendarCheck, FilePlus2, Pencil, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { OPERATION_KINDS, OPERATION_KIND_ORDER } from "@/lib/jobs/operations";
 import { cn } from "@/lib/utils";
 import { FULLSCREEN_DIALOG, Field } from "./ui-bits";
 import {
-  draftsFromJobItems, purchaseDraftsTotal, supplierQuoteFormFrom, supplierQuoteFormNew, supplierQuoteFormToInput,
+  draftsFromJobItems, purchaseDraftsTotal, supplierQuoteFormFrom, supplierQuoteFormNew, supplierQuoteFormToInput, supplierQuoteTotalMismatch,
   validateSupplierQuoteForm, type SupplierQuoteFormState,
 } from "./purchasing-model";
 
@@ -60,6 +60,7 @@ export function SupplierQuoteDialog({
   const supplierOptions = React.useMemo(() => options.suppliers.map((s) => ({ value: s.id, label: s.name })), [options.suppliers]);
   const sum = purchaseDraftsTotal(form.items);
   const explicitTotal = parseDecimal(form.total);
+  const mismatch = supplierQuoteTotalMismatch(form);
   const lead = parseDecimal(form.leadTimeDays);
   const autoDelivery = !form.deliveryDate && lead !== null && lead > 0 ? addDaysIso(form.quoteDate || isoToday(), Math.round(lead)) : null;
   const editing = Boolean(quote);
@@ -148,6 +149,22 @@ export function SupplierQuoteDialog({
               <Input inputMode="decimal" value={form.total} onChange={(e) => set("total", e.target.value)} placeholder={sum.priced ? formatMoney(sum.total) : "celková cena"} className="text-right tabular-nums" />
             </Field>
           </div>
+          {mismatch && (
+            // zadaná celková cena ≠ součet položek (křížová konzistence 4. 11.) — jedním klikem = součet
+            <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center" data-testid="supplier-quote-total-mismatch">
+              <span className="flex min-w-0 flex-1 items-start gap-1.5">
+                <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span>
+                  Zadaná cena <strong className="tabular-nums">{formatMoney(mismatch.explicit, job.currency)}</strong> neodpovídá součtu položek{" "}
+                  <strong className="tabular-nums">{formatMoney(mismatch.sum, job.currency)}</strong> ({mismatch.diff > 0 ? "+" : "−"}{formatMoney(Math.abs(mismatch.diff), job.currency)}).
+                  Uloží se zadaná cena — do nákupu zakázky jde celková cena nabídky.
+                </span>
+              </span>
+              <Button type="button" size="sm" variant="outline" className="h-8 shrink-0 bg-background/70 text-xs" onClick={() => set("total", "")} data-testid="supplier-quote-use-sum">
+                Použít součet položek
+              </Button>
+            </div>
+          )}
 
           {/* na co je nabídka (druhy kroků) — předání do výroby porovná nabídky ke stejnému kroku */}
           <div className="space-y-1.5" data-testid="quote-kinds">

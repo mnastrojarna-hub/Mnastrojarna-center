@@ -6,8 +6,9 @@ import { emptyParty, normalizeExtracted } from "./extracted-normalize";
 import {
   CAPTURE_CHIPS, buildExistingTarget, buildNewTarget, canAutoApply, captureEventMessage, capturePagePath,
   captureSessionPath, changeChip, chipByKey, chipFor, defaultCustomerChoice, documentNumberFor, hiddenFieldCount,
-  initialReviewState, isAiValue, isCapturePagePath, isFieldLocked, resultHeadline, reviewChanges, reviewItemsToInputs,
-  reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState, switchTarget, visibleFieldGroups,
+  initialReviewState, isAiValue, isCapturePagePath, isFieldLocked, linkedTotal, linkedTotalKey, linkedTotalMismatch, resultHeadline,
+  reviewChanges, reviewItemsToInputs, reviewItemsTotals, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
+  switchTarget, syncLinkedTotals, visibleFieldGroups,
   type ReviewModel, type ReviewState, type ReviewTarget, type TargetJob,
 } from "./capture-review";
 import objednavkaFixture from "./__fixtures__/capture/objednavka-strojmetal.json";
@@ -390,5 +391,87 @@ describe("kontrola odeslaného formuláře", () => {
   it("nová zakázka nemůže mít „neměnit stav\"", () => {
     const r = sanitizeReviewState({ ...base(), stage: "keep" });
     expect(r.ok && r.state.stage).toBe("objednavka");
+  });
+});
+
+// ── Hodnota zakázky = součet položek (majitel 5. 11.: „vyplním ceny položek a hodnota se nedoplní") ──
+describe("hodnota zakázky = součet položek ve formuláři focení", () => {
+  const newT = buildNewTarget({ plan: planNewJob(PO), margins: true, docKind: PO.docKind, issuer: PO.issuer });
+  const base = initialReviewState({
+    docKind: PO.docKind, issuer: PO.issuer, target: newT, customerMatch: null, supplierMatch: null,
+    docCustomer: PO.customer, docSupplier: PO.supplier,
+  });
+  const sp = (s: string | null) => (s ?? "").replace(/[\u00a0\u202f]/g, " ");
+
+  it("součty řádků: jen nacenené, prázdné řádky a nesmysly se nepočítají", () => {
+    const t = reviewItemsTotals(base.items, true);
+    expect(t).toEqual({ value: 107_000, purchase: null, unpriced: 0, count: 2 });
+    const items = [
+      { ...base.items[0], unitPrice: "1 000,50" },
+      { ...base.items[1], unitPrice: "" },
+      { ...base.items[1], key: "x", drawingNumber: "", name: "", description: "" }, // prázdný řádek
+      { ...base.items[1], key: "y", drawingNumber: "Z-1", unitPrice: "abc", purchaseUnitPrice: "10" },
+    ];
+    expect(reviewItemsTotals(items, true)).toEqual({ value: 50_025, purchase: 500, unpriced: 2, count: 3 });
+    expect(reviewItemsTotals(items, false).purchase).toBeNull();
+  });
+
+  it("zákaznický doklad odvozuje hodnotu, dodavatelský nákup (jen s právem na marže)", () => {
+    expect(linkedTotalKey(base, true)).toBe("value");
+    expect(linkedTotalKey({ docKind: "potvrzeni", issuer: "dodavatel" }, true)).toBe("purchaseCost");
+    expect(linkedTotalKey({ docKind: "potvrzeni", issuer: "dodavatel" }, false)).toBeNull();
+    expect(linkedTotalKey({ docKind: "objednavka", issuer: "my" }, true)).toBe("purchaseCost");
+    // vložený formulář dávky: položky jsou vždy zákaznické
+    expect(linkedTotalKey({ docKind: "potvrzeni", issuer: "dodavatel" }, true, { supplierSide: false })).toBe("value");
+    expect(linkedTotal(base, true)).toEqual({ key: "value", sum: 107_000, priced: 2, unpriced: 0 });
+    expect(linkedTotal({ ...base, items: base.items.map((i) => ({ ...i, unitPrice: "" })) }, true)).toBeNull();
+    const dl = { docKind: "potvrzeni" as const, issuer: "dodavatel" as const, items: [{ ...base.items[0], purchaseUnitPrice: "700" }] };
+    expect(linkedTotal(dl, true)).toEqual({ key: "purchaseCost", sum: 35_000, priced: 1, unpriced: 0 });
+  });
+
+  it("změna ceny položky → hodnota ve formuláři následuje; zamčená hodnota existující zakázky se nemění", () => {
+    const edited: ReviewState = { ...base, items: base.items.map((i, n) => (n === 0 ? { ...i, unitPrice: "1000" } : i)) };
+    expect(edited.fields.value).toBe("107000"); // z hlavičky dokladu — zastaralé
+    const synced = syncLinkedTotals(edited, newT, true);
+    expect(synced.fields.value).toBe("98000");
+    expect(synced).not.toBe(edited);
+    // beze změny vrací tentýž objekt (žádné zbytečné překreslení)
+    expect(syncLinkedTotals(synced, newT, true)).toBe(synced);
+    // ručně napsaná hodnota prohraje se součtem položek
+    expect(syncLinkedTotals({ ...edited, fields: { ...edited.fields, value: "123" } }, newT, true).fields.value).toBe("98000");
+    // bez cen zůstane ruční hodnota
+    const unpriced = { ...edited, items: edited.items.map((i) => ({ ...i, unitPrice: "" })), fields: { ...edited.fields, value: "5000" } };
+    expect(syncLinkedTotals(unpriced, newT, true).fields.value).toBe("5000");
+    // existující zakázka s hodnotou: pole je zamčené — srovná ji server ze všech položek
+    const locked: ReviewTarget = { ...newT, mode: "existing", existing: { value: "50000" } };
+    expect(syncLinkedTotals(edited, locked, true).fields.value).toBe("107000");
+  });
+
+  it("k uložení jde součet položek, ne částka z hlavičky dokladu ani ručně zadaná", () => {
+    const edited: ReviewState = { ...base, items: base.items.map((i, n) => (n === 0 ? { ...i, unitPrice: "1000" } : i)), fields: { ...base.fields, value: "999" } };
+    expect(reviewToJobInput(edited, newT, true).value).toBe(98_000);
+    // jen pole (bez položek) = jako dřív
+    expect(reviewToJobInput({ fields: edited.fields }, newT, true).value).toBe(999);
+    // položky bez cen → ruční hodnota zůstává
+    const manual = { ...edited, items: edited.items.map((i) => ({ ...i, unitPrice: "" })) };
+    expect(reviewToJobInput(manual, newT, true).value).toBe(999);
+    // dodavatelský doklad: nákupní náklady = Σ nákupních cen (jen s marží)
+    const sup: ReviewState = {
+      ...base, chip: "potvrzeni_dodavatel", docKind: "potvrzeni", issuer: "dodavatel",
+      fields: { purchaseCost: "1" }, items: base.items.map((i) => ({ ...i, purchaseUnitPrice: "500" })),
+    };
+    expect(reviewToJobInput(sup, newT, true).purchaseCost).toBe(50_000);
+    expect(reviewToJobInput(sup, newT, false).purchaseCost).toBeUndefined();
+  });
+
+  it("nesoulad hlavičky dokladu a položek: oranžová hláška, jinak nic", () => {
+    expect(linkedTotalMismatch("107000", 107_000, "value")).toBeNull();
+    expect(linkedTotalMismatch("", 98_000, "value")).toBeNull();
+    expect(linkedTotalMismatch(undefined, 98_000, "value")).toBeNull();
+    const t = sp(linkedTotalMismatch("107 000", 98_000, "value"));
+    expect(t).toContain("Na dokladu je 107 000 Kč");
+    expect(t).toContain("položky dávají 98 000 Kč");
+    expect(t).toContain("Uloží se součet položek");
+    expect(sp(linkedTotalMismatch("1000", 980.5, "purchaseCost", "EUR", "typed"))).toMatch(/^Zadáno 1 000 € — položky dávají 980,50 €.*nákupní náklady/);
   });
 });

@@ -32,6 +32,8 @@ import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { docNumbersEqual } from "@/lib/jobs/matching";
 import { findPurchaseOrderByNumber } from "@/lib/jobs/purchasing-store";
 import { resolveMergeTarget } from "@/lib/jobs/job-merge-store";
+import { syncJobMoneyFromItems } from "@/lib/jobs/consistency-store";
+import { formatKc } from "@/lib/jobs/consistency";
 import {
   autoCaptureCtx, captureHandoffActor, captureProductionHandoff, captureStageGuard, checkPhotoOrderMismatch, confirmOrderByPhoto, markQuoteSentByPhoto, photoOrderRevision,
   proposeFromCapture, receiveSupplierDlByPhoto, recordPhotoDelivery, registerPhotoOrderRevision,
@@ -59,7 +61,7 @@ import {
   captureSessionPath, captureSortPath, chipByKey, chipFor, defaultCustomerChoice, defaultSupplierChoice, documentNumberFor,
   initialReviewState, isAiReadableMime, isAiValue, isBatchUploadable, isCaptureDocKind, isCaptureHiresPath, isCapturePagePath, isCaptureSortPath,
   isFieldLocked,
-  openPairQuestions, reviewChanges, reviewItemsToInputs, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
+  linkedTotal, linkedTotalMismatch, openPairQuestions, reviewChanges, reviewItemsToInputs, reviewMergePatches, reviewToFinalDoc, reviewToJobInput, sanitizeReviewState,
   sniffDocumentMime, updateToMerge,
   type AnalyzeCaptureResponse, type CaptureFileRef, type CapturePreview, type CaptureUploadPrep, type PartyMatchView, type ReviewFieldKey,
   type ReviewModel, type ReviewState, type ReviewTarget,
@@ -835,13 +837,20 @@ export async function applyBusinessDoc(
     target = newTarget(session, margins);
   }
 
-  // údaje formuláře
+  // údaje formuláře (hodnota zakázky / nákup = součet nacenených položek — křížová konzistence 4. 11.)
   const input = reviewToJobInput(state, target, margins);
   const invalid = validateJobInput(input);
   if (invalid) return failResult(invalid, aiUsed);
   const items = reviewItemsToInputs(state.items, margins);
   const badItems = validateItems(items);
   if (badItems) return failResult(badItems, aiUsed);
+  const linked = linkedTotal(state, margins);
+  if (linked && !isFieldLocked(target, linked.key)) {
+    // celková částka z hlavičky dokladu (návrh AI) nesedí na položky → řekne se to, platí položky
+    const currency = (state.fields.currency || target.existing.currency || "CZK").toUpperCase();
+    const mismatch = linkedTotalMismatch(target.proposed[linked.key], linked.sum, linked.key, currency, "doc");
+    if (mismatch) warnings.push(mismatch);
+  }
   if (target.mode === "new" && !input.title && state.customer.mode === "none" && !items.length) {
     return failResult("Doplň aspoň název zakázky, zákazníka nebo položku.", aiUsed);
   }
@@ -1088,14 +1097,11 @@ export async function applyBusinessDoc(
       if (error) warnings.push(`Položku se nepodařilo doplnit: ${message(error.message)}`);
       else itemsMerged++;
     }
-    // objednávka změnila počet / cenu spárovaných položek → hodnota zakázky = součet položek (jako ruční úprava)
-    if (overridden) {
-      const { data: all } = await db.from("order_items").select("quantity, unit_price").eq("order_id", jobId);
-      const rows = (all ?? []) as { quantity: number | string | null; unit_price: number | string | null }[];
-      if (rows.length && rows.every((r) => Number(r.unit_price) > 0)) {
-        const value = Math.round(rows.reduce((s, r) => s + (Number(r.quantity) || 0) * Number(r.unit_price), 0) * 100) / 100;
-        await db.from("orders").update({ value } as never).eq("id", jobId);
-      }
+    // položky přibyly / změnily cenu či počet → hodnota zakázky = součet všech položek s cenou (nákup = nákupní
+    // ceny položek, dokud nejsou objednávky dodavatelům) — stejně jako DB trigger, ale výslovně (4. 11.)
+    if (itemsAdded || itemsMerged || overridden) {
+      const synced = await syncJobMoneyFromItems(db, jobId, { margins });
+      if (synced.changed.includes("value")) flowNotes.push(`Hodnota zakázky přepočtena ze součtu položek: ${formatKc(synced.value, String(row.currency || "CZK"))}`);
     }
 
     // náš dodací list → dodané množství po položkách (DB při 100 % posune na „Dodáno zákazníkovi")
