@@ -27,10 +27,13 @@ export function JobAnonBadge({ badge, className }: { badge: JobBadgeInput | null
 }
 
 export function FileAnonBadge({
-  status, reviewed, reason, total, backfill, stalled, className,
-}: { status: AnonUiStatus | null | undefined; reviewed?: boolean; reason?: string | null; total?: number | null; backfill?: boolean; stalled?: boolean; className?: string }) {
+  status, reviewed, reason, total, backfill, stalled, lockUntil, attempts, className,
+}: {
+  status: AnonUiStatus | null | undefined; reviewed?: boolean; reason?: string | null; total?: number | null; backfill?: boolean; stalled?: boolean;
+  lockUntil?: string | null; attempts?: number | null; className?: string;
+}) {
   if (!status) return null;
-  const l = fileAnonLabel({ status, reviewed, reason, total, backfill, stalled });
+  const l = fileAnonLabel({ status, reviewed, reason, total, backfill, stalled, lockUntil, attempts });
   const busy = l.tone === "busy";
   return (
     <span

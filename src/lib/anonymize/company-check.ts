@@ -32,8 +32,20 @@ export interface CompanyCheckInput {
   fill: readonly number[];
   /** Smazat i logo bez čitelného názvu (volba „logo"). */
   logo: boolean;
-  /** Kola kontroly (kontrola → vypálení nálezů → kontrola); výchozí 2. */
+  /** Kola kontroly (kontrola → vypálení nálezů → kontrola); výchozí podle zbývajícího času (2–3). */
   rounds?: number;
+}
+
+/** Třetí kolo kontroly (další levné volání) jen když do termínu zbývá aspoň tolik. */
+export const THIRD_ROUND_MIN_LEFT_MS = 90_000;
+
+/**
+ * Počet kol kontroly podle času: majitel 5. 11. („někdy to musí dělat na třikrát") — dřív dvě kola: nález
+ * ve druhém kole (druhý výskyt názvu, který AI v prvním kole nevypsala) = kopie neprošla a celý běh se
+ * opakoval. Třetí kolo je jedno levné volání navíc a většinu takových případů dořeší hned.
+ */
+export function checkRounds(deadline: number, now = Date.now()): number {
+  return deadline - now >= THIRD_ROUND_MIN_LEFT_MS ? 3 : 2;
 }
 
 export interface CompanyCheckOutcome {
@@ -43,6 +55,12 @@ export interface CompanyCheckOutcome {
   healed: Box[];
   /** Počet nálezů v poslední kontrole. */
   leaks: number;
+  /**
+   * Čitelné názvy firem, které kontrola ve výstupu viděla (přepis AI; i ty, které se podařilo vypálit).
+   * Volající je přidá k termínům — další stránky / další pokus je pak najdou pravidly v textové vrstvě
+   * (všechny výskyty), ne jen jako box z obrazu.
+   */
+  names: string[];
   usage: AiUsage | null;
   calls: number;
   fallback: boolean;
@@ -99,8 +117,8 @@ function clamp(b: Box, W: number, H: number): Box | null {
 }
 
 export async function checkAndHealCompanies(input: CompanyCheckInput): Promise<CompanyCheckOutcome> {
-  const out: CompanyCheckOutcome = { clean: false, healed: [], leaks: 0, usage: null, calls: 0, fallback: false };
-  const rounds = Math.max(1, input.rounds ?? 2);
+  const out: CompanyCheckOutcome = { clean: false, healed: [], leaks: 0, names: [], usage: null, calls: 0, fallback: false };
+  const rounds = Math.max(1, input.rounds ?? checkRounds(input.ai.deadline));
   for (let round = 0; round < rounds; round++) {
     const specs = await imagesFor(input.raster, input.focus, input.page);
     const r = await checkCompanies(input.ai, { images: specs, extra: { round, page: input.page, width: input.raster.width, height: input.raster.height } });
@@ -111,6 +129,8 @@ export async function checkAndHealCompanies(input: CompanyCheckInput): Promise<C
     let unhealable = 0;
     for (const it of asArray<CompanyItem>(r.data?.items)) {
       if (!isCompanyLeak(it, input.keepTerms, input.logo, input.terms ?? [])) continue;
+      const txt = String(it.text ?? "").replace(/[\r\n]+/g, " ").trim();
+      if (/\p{L}{2,}/u.test(txt) && !isTechnicalText(txt) && !out.names.includes(txt)) out.names.push(txt.slice(0, 120));
       const spec = specs.find((s) => s.index === it.img);
       // únik bez použitelných souřadnic nejde opravit → kopie neprošla (nikdy „asi v pořádku")
       if (!spec || !boxInsideSent(spec, it.x, it.y, it.w, it.h)) { unhealable++; continue; }

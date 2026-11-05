@@ -77,7 +77,7 @@ export default async function InquiriesPage({
   const reviewRows: AnonReviewRowView[] = anonReview.map((r) => ({
     id: r.id, jobId: r.jobId, jobNumber: r.jobNumber, jobTitle: r.jobTitle, filename: r.filename, anonFilename: r.anonFilename,
     status: r.status as AnonUiStatus, reason: r.reason, counts: (r.summary?.counts ?? {}) as Record<string, number>, at: r.at,
-    total: typeof r.summary?.total === "number" ? r.summary.total : null, crop: r.crop, page: r.page,
+    total: typeof r.summary?.total === "number" ? r.summary.total : null, crop: r.crop, page: r.page, debug: r.debug,
   }));
   // „Anonymizace se nepovedla" (technická chyba po automatických pokusech): s položkami nahoře, jen
   // čekající → dole. „Ke kontrole" už nevzniká (plná automatika, majitel 31. 10.).

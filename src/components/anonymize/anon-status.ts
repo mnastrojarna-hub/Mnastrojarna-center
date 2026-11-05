@@ -3,7 +3,7 @@
  * „Ven" jde jen to, co je hotové (plná automatika, bez kontroly člověkem); stav u souboru i zakázky.
  */
 
-import { userFacingFailure } from "@/lib/anonymize/failure-text";
+import { FAST_ATTEMPTS, userFacingFailure } from "@/lib/anonymize/failure-text";
 
 export type AnonUiStatus = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped" | "uploading";
 
@@ -78,6 +78,25 @@ export function displayReason(status: string | null | undefined, reason: string 
   return status === "failed" ? userFacingFailure(reason) : reason;
 }
 
+/**
+ * Odložený automatický pokus (pending se zámkem v budoucnu, ne denní limit): za kolik minut pokračuje
+ * (null = žádný odklad). Majitel 5. 11.: odklad se musí ukázat jako „pokračuje", ne jako selhání.
+ */
+export function retryInMs(status: string | null | undefined, lockUntil: string | null | undefined, now = Date.now()): number | null {
+  if (status !== "pending" || !lockUntil) return null;
+  const t = Date.parse(lockUntil);
+  if (!Number.isFinite(t) || t <= now) return null;
+  return t - now;
+}
+
+/** „za chvíli" / „za 3 min" / „za 2 h". */
+export function inWords(ms: number): string {
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return "za chvíli";
+  if (min < 90) return `za ${min} min`;
+  return `za ${Math.round(min / 60)} h`;
+}
+
 /** Stav jednoho souboru → štítek. total = počet smazaných oblastí (když je znám). */
 export function fileAnonLabel(a: {
   status: AnonUiStatus; reviewed?: boolean; reason?: string | null; total?: number | null;
@@ -85,17 +104,30 @@ export function fileAnonLabel(a: {
   backfill?: boolean;
   /** Čeká déle než obvykle (UI přestalo čekat) — místo spinneru „Zkusit znovu". */
   stalled?: boolean;
+  /** Zámek běhu / odložený pokus (anon_lock_until). */
+  lockUntil?: string | null;
+  /** Počet pokusů (anon_attempts). */
+  attempts?: number | null;
+  /** Jen testy: „teď". */
+  now?: number;
 }): { label: string; tone: AnonTone; hint: string } {
   switch (a.status) {
     case "uploading":
       return { label: "Nahrávám…", tone: "busy", hint: "Soubor se nahrává." };
     case "pending":
-    case "processing":
+    case "processing": {
       if (isBudgetWait(a.status, a.reason)) return { label: "Čeká (denní limit)", tone: "muted", hint: a.reason ?? "" };
       if (a.backfill && a.status === "pending") return { label: "Starší výkres", tone: "muted", hint: "Výkres z doby před anonymizací — spusť „Anonymizovat“ v menu, nebo hromadně v Nastavení." };
+      // odložený automatický pokus (zámek v budoucnu): systém pokračuje sám — žádné „selhalo, klikni znovu"
+      const wait = retryInMs(a.status, a.lockUntil, a.now);
+      if (wait !== null) return { label: `Pokračuje ${inWords(wait)}…`, tone: "busy", hint: `${displayReason("failed", a.reason) ?? "Předchozí pokus se nepovedl."} Další pokus proběhne sám ${inWords(wait)}.` };
       if (a.stalled) return { label: "Čeká déle než obvykle", tone: "warn", hint: "Anonymizace se nerozběhla — zkus to znovu." };
-      if (a.status === "pending" && a.reason) return { label: "Zkouší se znovu…", tone: "busy", hint: displayReason("failed", a.reason) ?? "Předchozí pokus selhal — zkouší se znovu." };
+      // pokus n (claim): „Zkouší se znovu (2/3)…" u opakování v témže běhu i po přechodné chybě
+      const n = typeof a.attempts === "number" && a.attempts > 1 ? ` (${Math.min(a.attempts, FAST_ATTEMPTS)}/${FAST_ATTEMPTS})` : "";
+      if (a.status === "pending" && a.reason) return { label: `Zkouší se znovu${n}…`, tone: "busy", hint: displayReason("failed", a.reason) ?? "Předchozí pokus selhal — zkouší se znovu." };
+      if (a.status === "processing" && n) return { label: `Zkouší se znovu${n}…`, tone: "busy", hint: `${displayReason("failed", a.reason) ?? "Předchozí pokus se nepovedl"} — právě běží další pokus.` };
       return { label: "Anonymizuje se…", tone: "busy", hint: "Maže se název firmy zákazníka — za chvíli bude hotovo." };
+    }
     // „Ke kontrole" už nevzniká (plná automatika, majitel 31. 10.) — starší řádek = hotovo
     case "review":
     case "done":

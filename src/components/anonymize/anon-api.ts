@@ -1,5 +1,7 @@
 "use client";
 
+import type { AnonDebugEntry } from "@/lib/anonymize/types";
+
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -62,6 +64,9 @@ export interface AnonStateDto {
   keep?: (AnonBoxDto & { field: string })[];
   /** Razítko stránky (jen PDF s lines=1). */
   titleBlock?: AnonBoxDto | null;
+  /** Diagnostika pokusů (jen super admin). */
+  debug?: AnonDebugEntry[];
+  attempts?: number | null;
 }
 
 export interface AdhocItemDto {

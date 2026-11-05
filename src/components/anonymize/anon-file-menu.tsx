@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { anonApi, downloadUrl, previewUrl, type AnonTableParam, type SendQueueDto } from "./anon-api";
 import { PrintButton } from "@/components/print/print-button";
 import { FileAnonBadge } from "./anon-badge";
-import { describeCounts, displayReason, isBudgetWait, NOTHING_REMOVED, sendQueueText, sendQueueWhat, type AnonUiStatus } from "./anon-status";
+import { describeCounts, displayReason, inWords, isBudgetWait, NOTHING_REMOVED, retryInMs, sendQueueText, sendQueueWhat, type AnonUiStatus } from "./anon-status";
 
 /**
  * Anonymizace v Dokumentech zakázky (spec §6.2): položky menu dokumentu, viditelná akce „Pro dodavatele",
@@ -48,7 +48,7 @@ function relevant(f: JobFile): boolean {
 export function AnonFileBadge({ file, stalled }: { file: JobFile; stalled?: boolean }) {
   const a = anonOf(file);
   if (!a.status || !relevant(file)) return null;
-  return <FileAnonBadge status={a.status} reviewed={a.reviewed} reason={a.reason} total={a.total} backfill={Boolean(file.anon?.backfill)} stalled={stalled} />;
+  return <FileAnonBadge status={a.status} reviewed={a.reviewed} reason={a.reason} total={a.total} backfill={Boolean(file.anon?.backfill)} stalled={stalled} lockUntil={file.anon?.lockUntil ?? null} attempts={file.anon?.attempts ?? null} />;
 }
 
 /** Výkres čeká / běží na serveru (ne starý výkres z backfillu — ten se sám nespouští). */
@@ -360,6 +360,9 @@ export function AnonSummaryLine({ file, onRetry, stalled }: { file: JobFile; onR
     return <p className={cn("mt-0.5 text-[11px]", a.status === "failed" ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>{reason}{retry}</p>;
   }
   if (a.status === "pending" && isBudgetWait(a.status, a.reason)) return <p className="mt-0.5 text-[11px] text-muted-foreground">{a.reason}</p>;
+  // odložený automatický pokus: důvod + kdy pokračuje (systém to udělá sám, nic se neklikat)
+  const wait = retryInMs(a.status, a.lockUntil);
+  if (wait !== null) return <p className="mt-0.5 text-[11px] text-muted-foreground" data-testid="anon-retry-later">{displayReason("failed", a.reason) ?? "Předchozí pokus se nepovedl."} Pokračuje sám {inWords(wait)}.</p>;
   if (a.status !== "done" && a.status !== "review") return null;
   const c = describeCounts(a.counts);
   return (

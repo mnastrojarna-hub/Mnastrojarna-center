@@ -436,26 +436,39 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
   const [reviewDl, setReviewDl] = React.useState<JobFile | null>(null);
 
   // výkresy v anonymizaci → šťouchnout do fronty (zpracuje route na serveru, bez plánovače) a obnovovat,
-  // dokud nedoběhnou. Když se 5 min nic nezmění, přestat čekat a ukázat „Zkusit znovu" (žádný nekonečný spinner).
-  const anonKey = files.filter(anonInFlight).map((f) => `${f.id}:${f.anon?.status}`).join(",");
+  // dokud nedoběhnou. Klíč = vše, co se při postupu mění (stav, pokus, zámek, důvod) — každý postup vynuluje
+  // čekání. Majitel 5. 11.: odložený pokus (zámek v budoucnu — přetížená AI, 5/15/45 min) a převzetí
+  // přerušeného běhu (zámek 6 min) musí spustit otevřená stránka SAMA, hned po uplynutí zámku; „Zkusit znovu"
+  // se ukáže až když se 5 min (resp. 2 min po zámku) nic neděje — žádný nekonečný spinner, ale ani planý
+  // „selhalo" uprostřed práce systému.
+  const anonInFlightFiles = files.filter(anonInFlight);
+  const anonKey = anonInFlightFiles.map((f) => `${f.id}:${f.anon?.status}:${f.anon?.attempts ?? ""}:${f.anon?.lockUntil ?? ""}:${f.anon?.reason ?? ""}`).join(",");
+  const anonMaxLock = Math.max(0, ...anonInFlightFiles.map((f) => Date.parse(f.anon?.lockUntil ?? "") || 0));
   const [anonStalled, setAnonStalled] = React.useState(false);
   React.useEffect(() => {
     setAnonStalled(false);
     if (!anonKey) return;
+    const started = Date.now();
+    const stallAt = Math.max(started + 5 * 60_000, anonMaxLock + 2 * 60_000);
     void nudgeAnonymize({ jobId });
     let n = 0;
-    const t = window.setInterval(() => {
+    let nudgedSinceDue = true;
+    let t = 0;
+    const tick = () => {
       n += 1;
-      if (n > 50) {
-        window.clearInterval(t);
-        setAnonStalled(true);
-        return;
-      }
-      if (n % 3 === 0) void nudgeAnonymize({ jobId });
+      const now = Date.now();
+      if (now > stallAt) { setAnonStalled(true); return; }
+      const lockLeft = anonMaxLock - now;
+      const due = lockLeft <= 0; // bez zámku / po zámku: soubor je k zpracování → šťouchat
+      if (due && (!nudgedSinceDue || n % 3 === 0)) { nudgedSinceDue = true; void nudgeAnonymize({ jobId }); }
+      if (!due) nudgedSinceDue = false;
       refresh();
-    }, 6000);
-    return () => window.clearInterval(t);
-  }, [anonKey, jobId, refresh]);
+      // odložený pokus daleko v budoucnu: obnovovat zvolna, těsně před uplynutím zámku zase hustě
+      t = window.setTimeout(tick, lockLeft > 60_000 ? 30_000 : 6_000);
+    };
+    t = window.setTimeout(tick, 6_000);
+    return () => window.clearTimeout(t);
+  }, [anonKey, anonMaxLock, jobId, refresh]);
 
   async function anonAction(f: JobFile, action: "enqueue" | "approve" | "skip") {
     if (action === "enqueue") {

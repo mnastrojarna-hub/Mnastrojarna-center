@@ -136,7 +136,7 @@ export type AnonWarningCode =
   | "verify_new_graphic" | "no_title_block" | "dxf_graphics" | "dxf_layer_term" | "step_suspicious" | "residue"
   | "text_layer_untrusted" | "ai_failed" | "budget" | "too_large" | "approval_mode" | "low_confidence"
   | "scan_page" | "excluded_pages" | "mixed_content" | "ai_removed_text" | "truncated" | "no_terms" | "cut_uncertain" | "hidden_text" | "plot_stamp"
-  | "nothing_found";
+  | "nothing_found" | "terms_learned";
 
 export interface AnonWarning {
   code: AnonWarningCode;
@@ -203,4 +203,37 @@ export interface AnonUsage {
   cacheWrite: number;
   usd: number;
   calls: number;
+}
+
+/** Kolik posledních pokusů se drží v anon_debug (diagnostika, jen super admin). */
+export const ANON_DEBUG_KEEP = 12;
+
+/**
+ * Technický záznam jednoho pokusu anonymizace (sloupec anon_debug; UI ho ukáže jen super adminovi).
+ * Majitel 5. 11. („často ještě selže anonymizace výkresu") — aby šlo selhání v produkci vysvětlit z DB:
+ * fáze, čas, surová chyba, číslo pokusu a běh.
+ */
+export interface AnonDebugEntry {
+  at: string;
+  /** Id běhu fronty (runner) — pokusy jednoho běhu jdou dohledat; null = ruční uložení editoru. */
+  run: string | null;
+  attempt: number;
+  /** Fáze, ve které pokus skončil (download, terms, twin, budget, pipeline, upload, finish). */
+  stage: string;
+  ms: number;
+  status: string;
+  /** Důvod pro uživatele (anon_reason). */
+  reason?: string;
+  /** Surová chyba (třída + zpráva, ≤ 300 znaků) — jen diagnostika. */
+  error?: string;
+  /** Druh chyby (classifyFailure). */
+  kind?: string;
+  calls?: number;
+  usd?: number;
+  /** Navazování po dávkách: další strana. */
+  next?: number | null;
+  /** Odklad dalšího automatického pokusu (ms). */
+  delayMs?: number;
+  /** Hned znovu v témže běhu. */
+  retryNow?: boolean;
 }

@@ -1,3 +1,5 @@
+import type { AiFailure } from "@/lib/jobs/capture-batch-types";
+
 /**
  * Technická chyba běhu anonymizace → česká hláška pro uživatele + jestli má smysl to zkusit znovu
  * (čistá funkce — server i klient). Surová (anglická) zpráva patří jen do logu serveru — nikdy do
@@ -27,7 +29,10 @@ export const LEGACY_PDF_FAILURE_TEXT = "PDF je poškozené nebo zaheslované —
 /** Dřívější obecná hláška technické chyby (také se vrací do fronty). */
 export const LEGACY_TECH_FAILURE_TEXT = "Anonymizace se nepovedla (technická chyba) — zkus Anonymizovat znovu.";
 
-export type FailureKind = "password" | "corrupt" | "storage" | "ai_busy" | "timeout" | "internal" | "core";
+/** Přetížená AI (429 / 529) — opakuje se samo. */
+export const AI_BUSY_TEXT = "AI je teď přetížená — zkusí se znovu automaticky za chvíli.";
+
+export type FailureKind = "password" | "corrupt" | "storage" | "ai_busy" | "timeout" | "internal" | "core" | "ai_final";
 
 export interface FailureInfo {
   kind: FailureKind;
@@ -50,7 +55,9 @@ export function classifyFailure(message: string): FailureInfo {
   if (/stáhnout|úložiště|Uložení|Object not found|Storage(Unknown|Api)?Error|Bucket not found/i.test(m)) {
     return { kind: "storage", text: "Soubor se nepodařilo načíst z úložiště nebo uložit výsledek — zkusí se znovu automaticky.", transient: true };
   }
-  if (/\b429\b|\b529\b|overloaded|rate.?limit/i.test(m)) return { kind: "ai_busy", text: "AI je teď přetížená — zkusí se znovu automaticky za chvíli.", transient: true };
+  if (/\b429\b|\b529\b|overloaded|rate.?limit|AI je (teď|právě) přetížená/i.test(m)) return { kind: "ai_busy", text: AI_BUSY_TEXT, transient: true };
+  // česká hláška volání AI (AiCallError: nestihla / nečitelná odpověď) — přechodné, ne „vada souboru"
+  if (/AI nestihla|AI vrátila nečitelnou odpověď|AI odpověď byla useknutá/i.test(m)) return { kind: "timeout", text: "Zpracování se přerušilo (vypršel čas nebo výpadek spojení) — zkusí se znovu automaticky.", transient: true };
   if (/timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|EPIPE|fetch failed|socket hang up|network|trvalo příliš dlouho|aborted|\b50[234]\b/i.test(m)) {
     return { kind: "timeout", text: "Zpracování se přerušilo (vypršel čas nebo výpadek spojení) — zkusí se znovu automaticky.", transient: true };
   }
@@ -66,6 +73,34 @@ export function classifyFailure(message: string): FailureInfo {
 
 export function userFacingFailure(message: string): string {
   return classifyFailure(message).text;
+}
+
+/**
+ * Typované selhání volání AI (AiCallError.failure) → plán. Majitel 5. 11.: „často ještě selže anonymizace
+ * výkresu, někdy to musí dělat na třikrát" — přetížená AI, vypršení času nebo nečitelná odpověď je přechodná
+ * chyba (běh se zopakuje sám, hned v témže běhu), jen odmítnutý klíč / limit útraty / odmítnutí dokumentu
+ * je konečné (opakování nepomůže).
+ */
+export function classifyAiFailure(failure: AiFailure, message?: string): FailureInfo {
+  switch (failure) {
+    case "rate_limit":
+    case "overloaded":
+      return { kind: "ai_busy", text: AI_BUSY_TEXT, transient: true };
+    case "timeout":
+      return { kind: "timeout", text: "AI nestihla výkres zpracovat včas — zkusí se znovu automaticky.", transient: true };
+    case "max_tokens":
+    case "other":
+      return { kind: "internal", text: INTERNAL_RETRY_TEXT, transient: true };
+    case "auth":
+    case "spend_limit":
+      return { kind: "ai_final", text: "AI požadavek odmítla (klíč nebo limit útraty) — zkontroluj Nastavení → Integrace a klikni Anonymizovat znovu.", transient: false };
+    case "refusal":
+    case "invalid_request":
+    default: {
+      const m = (message ?? "").trim();
+      return { kind: "ai_final", text: `${m ? m.replace(/\s*—\s*(vyplň|zkus).*$/i, "") : "AI výkres odmítla zpracovat"} — klikni Anonymizovat znovu.`, transient: false };
+    }
+  }
 }
 
 /** Pokusy hned za sebou (claim zvedá anon_attempts). */

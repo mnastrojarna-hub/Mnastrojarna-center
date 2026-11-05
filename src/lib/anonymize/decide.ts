@@ -5,6 +5,7 @@
  * unsupported (formát nejde), failed (technická chyba po opakováních). Stav `review` už nevzniká.
  */
 
+import { FAST_ATTEMPTS } from "./failure-text";
 import type { AnonMethod, AnonPagesAcc, AnonStatus, AnonUsage, AnonWarning } from "./types";
 
 export interface DecideInput {
@@ -54,12 +55,15 @@ export const COMPANY_LEAK_TEXT = "V anonymizované kopii zůstal název firmy �
 export const COMPANY_LEAK_RETRY_TEXT = "V anonymizované kopii zůstal název firmy — kopie se nepoužije, zkusí se znovu automaticky.";
 
 /**
- * Zůstal v kopii název firmy a má smysl jeden automatický pokus znovu? Jen s AI (nová detekce a kontrola
- * obrazem — pravidla bez AI by dopadla stejně), ne po ručním uložení editoru a jen při prvním pokusu
- * (claim zvyšuje anon_attempts; druhý únik = selhalo s důvodem).
+ * Zůstal v kopii název firmy a má smysl automatický pokus znovu? Jen s AI (nová detekce a kontrola
+ * obrazem — pravidla bez AI by dopadla stejně), ne po ručním uložení editoru a jen v rámci rychlých pokusů
+ * (claim zvyšuje anon_attempts; FAST_ATTEMPTS = 3 pokusy hned za sebou v témže běhu, třetí únik = selhalo
+ * s důvodem). Majitel 5. 11.: „někdy to musí dělat na třikrát" — opakování po úniku dřív skončilo po dvou
+ * pokusech hláškou „Klikni Anonymizovat znovu" a třetí pokus dělal majitel ručně; teď ho udělá systém sám
+ * (jména nalezená kontrolou kopie se navíc přenášejí do dalšího pokusu jako termíny, viz service.ts).
  */
 export function companyLeakRetry(i: { status: AnonStatus; reason: string | null; aiUsed: boolean; manualSave: boolean; attempts: number | null | undefined }): boolean {
-  return i.status === "failed" && i.reason === COMPANY_LEAK_TEXT && i.aiUsed && !i.manualSave && (i.attempts ?? 1) < 2;
+  return i.status === "failed" && i.reason === COMPANY_LEAK_TEXT && i.aiUsed && !i.manualSave && (i.attempts ?? 1) < FAST_ATTEMPTS;
 }
 
 export const DONE_MIN_CONFIDENCE = 0.85;
@@ -75,7 +79,7 @@ export const NOTE_CODES = new Set<AnonWarning["code"]>([
   "no_ai", "model_fallback", "coords_out_of_image", "low_resolution", "no_master", "low_px_per_mm", "customer_standard",
   "term_in_keep", "area_cap", "keep_overlap", "verify_leak", "verify_keep_missing", "verify_new_graphic", "no_title_block",
   "dxf_graphics", "dxf_layer_term", "step_suspicious", "residue", "ai_failed", "approval_mode", "low_confidence",
-  "text_layer_untrusted", "ai_removed_text", "truncated", "no_terms", "cut_uncertain", "hidden_text", "plot_stamp", "nothing_found",
+  "text_layer_untrusted", "ai_removed_text", "truncated", "no_terms", "cut_uncertain", "hidden_text", "plot_stamp", "nothing_found", "terms_learned",
 ]);
 
 /** Fakta jedné dávky stránek PDF (pdf-pipeline → service). */

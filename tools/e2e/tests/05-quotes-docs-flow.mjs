@@ -379,7 +379,9 @@ await T("detail Nabídky: nová verze (R2) → stará archivována, „Starší 
   st.r2 = { id: n[7], number: r2 };
   expect(sql(`select count(*) from quote_items where quote_id = ${lit(st.r2.id)}`) === "2", "položky zkopírované do nové verze");
   const ev = sql(`select message from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
-  expect(ev === `Nová verze nabídky ${r2} (verze 2) — ${st.q1.number} archivována — čeká na schválení`, `historie: ${ev}`);
+  // 5. 11.: nová verze bere položky z aktuální zakázky → v historii „podle aktuálních položek zakázky" (zakázka bez položek bez dovětku)
+  expect(ev === `Nová verze nabídky ${r2} (verze 2) podle aktuálních položek zakázky — ${st.q1.number} archivována — čeká na schválení`
+    || ev === `Nová verze nabídky ${r2} (verze 2) — ${st.q1.number} archivována — čeká na schválení`, `historie: ${ev}`);
   expect(/Nabídky\s*1/.test(await page.getByRole("tab", { name: /^Nabídky/ }).innerText()), "záložka Nabídky počítá jen aktuální (1)");
   await shot(page, S("07-quote-revision"));
 });

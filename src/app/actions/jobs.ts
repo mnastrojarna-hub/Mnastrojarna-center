@@ -15,7 +15,7 @@ import { JOB_PERSON_COLUMNS, formatFieldValue } from "@/lib/jobs/field-labels";
 import {
   jobInputToRow, validateJobInput, validateItems, jobItemToRow, quoteItemToRow, quoteInputToRow,
   computeItemTotals, diffJob, describeChanges, fieldEventMessage, stageEventMessage, aiFilledColumns,
-  quoteRevisionNumber, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
+  quoteRevisionNumber, quoteItemsFromJobItems, quoteRevisionValidUntil, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
   translateDbError, cleanNewContact, defaultCustomerContact, rowsToCustomerContacts, type JobChange,
 } from "@/lib/jobs/mapping";
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
@@ -1130,16 +1130,34 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {
-    const { db, user } = c;
+    const { db, user, margins } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
+
+    // majitel 5. 11.: nový doklad = aktuální data zakázky. Položky, počty a ceny nové verze jdou z AKTUÁLNÍCH
+    // položek zakázky (po změně ceny / počtu „nabídka nesedí" → nová verze to má správně, ne opsané ze staré);
+    // kde zakázka cenu nemá, zůstane z předchozí verze. Platnost se počítá znovu ode dneška. Bez položek
+    // zakázky se opíše předchozí verze.
+    const prevItems = (quote.items ?? []) as Row[];
+    let jobItems: Row[] = [];
+    if (quote.job_id) {
+      const { data: ji } = await db.from("order_items")
+        .select("position, drawing_id, drawing_number, name, description, material, quantity, unit, unit_price, purchase_unit_price, note")
+        .eq("order_id", quote.job_id).order("position");
+      jobItems = (ji ?? []) as Row[];
+    }
+    const fromJob = jobItems.length > 0;
+    const itemRows: Row[] = fromJob
+      ? quoteItemsFromJobItems(jobItems, prevItems, { margins })
+      : prevItems.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "id" && k !== "quote_id")));
+    const totals = computeItemTotals(itemRows.map((r) => ({ quantity: Number(r.quantity), unitPrice: cleanNumber(r.unit_price), purchaseUnitPrice: cleanNumber(r.purchase_unit_price) })));
 
     let rev = (quote.job_id ? await maxRevision(db, quote.job_id) : (quote.revision ?? 1)) + 1;
     const copy = {
       title: quote.title ?? null,
       currency: quote.currency ?? "CZK",
-      total: quote.total ?? null,
-      valid_until: quote.valid_until ?? null,
+      total: fromJob ? totals.value : quote.total ?? null,
+      valid_until: quoteRevisionValidUntil({ validUntil: (quote.valid_until as string | null) ?? null, createdAt: (quote.created_at as string | null) ?? null }),
       lead_time_days: quote.lead_time_days ?? null,
       delivery_terms: quote.delivery_terms ?? null,
       payment_terms: quote.payment_terms ?? null,
@@ -1174,10 +1192,7 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
     if (!createdId) return fail("Nepodařilo se vytvořit novou verzi nabídky.");
     const finalRev = rev;
 
-    const items = (quote.items ?? []).map((r) => ({
-      ...Object.fromEntries(Object.entries(r).filter(([k]) => k !== "id" && k !== "quote_id")),
-      quote_id: createdId,
-    }));
+    const items = itemRows.map((r) => ({ ...r, quote_id: createdId }));
     if (items.length) {
       const { error: itemErr } = await db.from("quote_items").insert(items as never);
       if (itemErr) {
@@ -1192,8 +1207,8 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
     if (quote.job_id) {
       await logJobEvent(db, {
         jobId: quote.job_id, type: "quote",
-        message: `Nová verze nabídky ${number} (verze ${finalRev}) — ${quote.number ?? "původní"} archivována${needsApproval ? PENDING_SUFFIX : ""}`,
-        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision", ...(needsApproval ? { needsApproval: true } : {}) },
+        message: `Nová verze nabídky ${number} (verze ${finalRev})${fromJob ? " podle aktuálních položek zakázky" : ""} — ${quote.number ?? "původní"} archivována${needsApproval ? PENDING_SUFFIX : ""}`,
+        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision", itemsFromJob: fromJob, validUntil: copy.valid_until, ...(needsApproval ? { needsApproval: true } : {}) },
         actorId: user.id,
       });
     }

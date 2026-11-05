@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { anonApi, previewUrl } from "./anon-api";
 import { FileAnonBadge } from "./anon-badge";
+import { AnonDebugDetails } from "./anon-debug";
+import type { AnonDebugEntry } from "@/lib/anonymize/types";
 import { describeCounts, displayReason, drawingsWord, NOTHING_REMOVED, type AnonUiStatus } from "./anon-status";
 import { AnonymizeEditor } from "./anonymize-editor";
 
@@ -34,6 +36,8 @@ export interface AnonReviewRowView {
   crop?: { x: number; y: number; w: number; h: number } | null;
   /** Strana originálu pro miniaturu (první zahrnutá). */
   page?: number;
+  /** Diagnostika pokusů (jen super admin — server ji jinému nepošle). */
+  debug?: AnonDebugEntry[] | null;
 }
 
 const PREVIEWABLE = /\.(pdf|jpe?g|png|webp|tiff?)$/i;
@@ -154,6 +158,7 @@ export function AnonReviewList({ items, pendingFileIds, pendingCount }: { items:
                     {it.jobTitle ? ` · ${it.jobTitle}` : ""}
                   </p>
                   {reason && <p className={cn("text-xs", it.status === "failed" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300")}>{reason}</p>}
+                  <AnonDebugDetails entries={it.debug} />
                   {counts && <p className="text-xs"><span className="text-muted-foreground">Smaže se:</span> {counts}</p>}
                   {empty && <p className="flex items-start gap-1 text-xs font-medium text-amber-800 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {NOTHING_REMOVED}</p>}
                 </div>
