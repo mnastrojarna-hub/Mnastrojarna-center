@@ -32,6 +32,7 @@ import { QuoteSendDialog } from "./quote-send-dialog";
 import { PersonChip } from "./inline-field";
 import { PrintButton } from "@/components/print/print-button";
 import { useFlowActions } from "./flow-actions";
+import { pdfVersionsText, quoteDeletePlan } from "@/lib/jobs/quote-files";
 import {
   quoteActions, quoteDisplayOf, splitQuotes, quoteFormFromJob, quoteFormFromQuote, formatMoney, formatQty, longDate,
   type QuoteAction, type QuoteFormState,
@@ -385,6 +386,8 @@ export function QuotesTab({ job }: { job: JobDetail }) {
     setDialog({ kind: "none" });
   };
   const fallbackTo = job.customerContactEmail ?? job.customerDetail?.email ?? "";
+  // nabídka ↔ PDF: s nabídkou se smažou i její vystavená PDF v Dokumentech (nahrané soubory jen bez vazby)
+  const deletePlan = dialog.kind === "delete" ? quoteDeletePlan(dialog.quote, job.files) : null;
 
   const newQuote = () => setDialog({ kind: "editor", initial: quoteFormFromJob(job) });
 
@@ -497,12 +500,17 @@ export function QuotesTab({ job }: { job: JobDetail }) {
           onConfirm={async () => {
             const res = await deleteJobQuote(dialog.quote.id);
             if (!res.ok) return res.error ?? "Nepovedlo se.";
-            notify("success", `Nabídka ${dialog.quote.number} smazána.`);
+            notify("success", res.removedFiles ? `Nabídka ${dialog.quote.number} smazána i s PDF v Dokumentech.` : `Nabídka ${dialog.quote.number} smazána.`);
             refresh();
             return null;
           }}
         >
-          Nabídka zmizí i s položkami. Pokud ji chceš jen schovat, použij raději <em>Archivovat</em>.
+          Nabídka zmizí i s položkami
+          {deletePlan && deletePlan.pdfs > 0 && (
+            <> a <strong className="text-foreground">smaže se i její PDF v Dokumentech</strong> ({pdfVersionsText(deletePlan.pdfs)})</>
+          )}.
+          {deletePlan && deletePlan.linked > 0 && <> Nahrané soubory k nabídce ({deletePlan.linked}) zůstanou v Dokumentech bez vazby.</>}
+          {" "}Pokud ji chceš jen schovat, použij raději <em>Archivovat</em>.
         </ConfirmDialog>
       )}
     </div>

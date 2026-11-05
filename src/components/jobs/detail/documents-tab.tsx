@@ -21,13 +21,14 @@ import type { JobDocumentKind } from "@/app/actions/job-documents";
 import { setJobFileArchived, updateJobFile, deleteJobFile } from "@/app/actions/job-files";
 import { FILE_KINDS, FILE_KIND_ORDER, JOB_FILE_ACCEPT } from "@/lib/jobs/file-kinds";
 import type { JobFileKind } from "@/lib/supabase/database.types";
-import type { JobFile, JobQuote } from "@/lib/jobs/types";
+import type { JobFile } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
 import { formatTimestamp } from "@/lib/jobs/field-labels";
 import { useJobDetail } from "./detail-context";
 import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
+import { fileDeletePlan, pdfVersionsText, type QuoteRef } from "@/lib/jobs/quote-files";
 import { anonApi, downloadUrl as anonDownloadUrl } from "@/components/anonymize/anon-api";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import { unsupportedHowTo } from "@/lib/anonymize/candidate";
@@ -93,7 +94,7 @@ function FileRow({
   /** Anonymizace čeká déle než obvykle (UI přestalo čekat) → „Zkusit znovu" místo spinneru. */
   anonStalled?: boolean;
   all: JobFile[];
-  quotes: Pick<JobQuote, "id" | "number">[];
+  quotes: QuoteRef[];
   onEdit: (f: JobFile) => void;
   onDelete: (f: JobFile) => void;
   onPreview: (f: JobFile) => void;
@@ -109,6 +110,8 @@ function FileRow({
   const versionInput = React.useRef<HTMLInputElement>(null);
   const replaced = replacedByLabel(file, all);
   const quote = file.quoteId ? quotes.find((q) => q.id === file.quoteId) : null;
+  // nabídka ↔ PDF: poslední PDF nabídky bere nabídku s sebou, PDF odeslané nabídky smazat nejde (server hlídá znovu)
+  const deletePlan = fileDeletePlan(file, all, quotes);
   /** Má hotovou / ke kontrole kopii pro dodavatele → stažení originálu se označí „interně". */
   const forSupplier = supplierReady(file);
 
@@ -224,9 +227,15 @@ function FileRow({
             {perms.canDelete && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => onDelete(file)} className="text-red-600 focus:text-red-700 dark:text-red-400">
-                  <Trash2 className="!text-current" /> Smazat
-                </DropdownMenuItem>
+                {deletePlan.kind === "blocked" ? (
+                  <DropdownMenuItem disabled title={deletePlan.reason} data-testid="file-delete-blocked">
+                    <Lock /> Smazat — nabídka {deletePlan.quote.number} už byla odeslána
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onSelect={() => onDelete(file)} className="text-red-600 focus:text-red-700 dark:text-red-400">
+                    <Trash2 className="!text-current" /> {deletePlan.kind === "quoteGoes" ? `Smazat (i nabídku ${deletePlan.quote.number})` : "Smazat"}
+                  </DropdownMenuItem>
+                )}
               </>
             )}
           </DropdownMenuContent>
@@ -410,7 +419,7 @@ function LockedFileRow({ file }: { file: JobFile }) {
 }
 
 /** Záložka Dokumenty — po druzích, s verzemi a archivem. */
-export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick<JobQuote, "id" | "number">[] }) {
+export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: QuoteRef[] }) {
   const { jobId, notify, refresh } = useJobDetail();
   const { can, features } = useAccess();
   // oprávnění dorazí na klient po načtení layoutu; server akce je hlídá znovu
@@ -469,6 +478,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
 
   const groups = groupFiles(files);
   const archivedCount = files.filter((f) => f.archived).length;
+  const deletingPlan = deleting ? fileDeletePlan(deleting, files, quotes) : { kind: "file" as const };
   const visibleImages = files.filter((f) => !f.locked && isImageFile(f) && (showArchive || !f.archived));
   const openPreview = (f: JobFile) => {
     const i = visibleImages.findIndex((x) => x.id === f.id);
@@ -570,13 +580,24 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
           onConfirm={async () => {
             const res = await deleteJobFile(deleting.id);
             if (!res.ok) return res.error ?? "Nepovedlo se.";
-            notify("success", `Dokument ${deleting.filename} smazán.`);
+            notify("success", res.quoteDeleted
+              ? `Dokument ${deleting.filename} smazán i s nabídkou${res.quoteDeleted.number ? ` ${res.quoteDeleted.number}` : ""}.`
+              : `Dokument ${deleting.filename} smazán.`);
             refresh();
             return null;
           }}
         >
           <strong className="text-foreground">{deleting.title || deleting.filename}</strong> (v{deleting.version}) zmizí i z úložiště.
-          Když jde jen o starou verzi, stačí ji <em>archivovat</em>.
+          {deletingPlan.kind === "quoteGoes" && (
+            <>
+              {" "}<strong className="text-foreground">Smaže se i nabídka {deletingPlan.quote.number}</strong> v záložce Nabídky (toto je její poslední PDF) — včetně položek.
+              Pokud chceš jen nové PDF, místo mazání vystav nabídku znovu.
+            </>
+          )}
+          {deletingPlan.kind === "quoteStays" && (
+            <> Nabídka {deletingPlan.quote.number} zůstane — má ještě {pdfVersionsText(deletingPlan.others)} PDF.</>
+          )}
+          {deletingPlan.kind !== "quoteGoes" && <> Když jde jen o starou verzi, stačí ji <em>archivovat</em>.</>}
         </ConfirmDialog>
       )}
       {anonEditing && (

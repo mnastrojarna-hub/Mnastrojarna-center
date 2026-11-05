@@ -160,6 +160,19 @@ function Inner({
     setUploads((prev) => prev.filter((u) => u.phase !== "hotovo" && u.phase !== "chyba"));
   }, []);
 
+  // rozdělané nahrávání (fronta) — zavření / obnovení stránky by soubor potichu ztratilo
+  // (do úložiště odejde, záznam v Dokumentech už nevznikne) → prohlížeč se zeptá
+  const uploading = uploads.some((u) => u.phase !== "hotovo" && u.phase !== "chyba");
+  React.useEffect(() => {
+    if (!uploading) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [uploading]);
+
   const value = React.useMemo<DetailContextValue>(() => ({
     jobId, perms, options, notify, save, refresh, refreshing, uploads, startUpload, clearUploads,
   }), [jobId, perms, options, notify, save, refresh, refreshing, uploads, startUpload, clearUploads]);
