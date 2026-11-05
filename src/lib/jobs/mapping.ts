@@ -455,6 +455,108 @@ export function aiFilledColumns(events: { type: string; data: unknown; created_a
 
 // ── Nabídky a soubory ───────────────────────────────────────
 /** Číslo nové verze nabídky: NAB-2026-031 → NAB-2026-031-R2 (stará přípona -Rn se odřízne). */
+/** Řádek položky (zakázky nebo nabídky) pro sestavení nové verze nabídky — sloupce DB, hodnoty i jako text. */
+export interface QuoteRevisionSourceItem {
+  position?: number | null;
+  drawing_id?: string | null;
+  drawing_number?: string | null;
+  name?: string | null;
+  description?: string | null;
+  material?: string | null;
+  quantity?: number | string | null;
+  unit?: string | null;
+  unit_price?: number | string | null;
+  purchase_unit_price?: number | string | null;
+  vat_rate?: number | string | null;
+  note?: string | null;
+}
+
+const QUOTE_DEFAULT_VALID_DAYS = 30;
+
+/**
+ * Platnost nové verze nabídky (majitel 5. 11.: „nový doklad už má mít aktuální datum"): počítá se znovu
+ * ODE DNEŠKA — stejně dlouhá, jakou měla předchozí verze (1–365 dní od jejího vzniku), jinak 30 dní.
+ * Opsat starou platnost nejde: nová verze by mohla vzniknout už prošlá.
+ */
+export function quoteRevisionValidUntil(prev: { validUntil?: string | null; createdAt?: string | null }, today: string = todayIso()): string {
+  let days = QUOTE_DEFAULT_VALID_DAYS;
+  if (prev.validUntil && prev.createdAt) {
+    const from = Date.parse(String(prev.createdAt).slice(0, 10));
+    const to = Date.parse(String(prev.validUntil).slice(0, 10));
+    const d = Math.round((to - from) / 86_400_000);
+    if (Number.isFinite(d) && d >= 1 && d <= 365) days = d;
+  }
+  const t = new Date(`${today}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+}
+
+function validVat(v: unknown): number | null {
+  const n = cleanNumber(v);
+  return n !== null && n >= 0 && n <= 100 ? n : null;
+}
+
+/** Nejčastější sazba DPH položek předchozí verze (jinak 21 %). */
+function dominantVatRate(items: QuoteRevisionSourceItem[]): number {
+  const counts = new Map<number, number>();
+  for (const it of items) {
+    const v = validVat(it.vat_rate);
+    if (v !== null) counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  let best = 21;
+  let bestN = 0;
+  for (const [v, n] of counts) if (n > bestN) { best = v; bestN = n; }
+  return best;
+}
+
+function drawingKey(v: unknown): string {
+  // „VK-1", „VK 1" i „vk1" je totéž číslo výkresu
+  return String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Položky nové verze nabídky z AKTUÁLNÍCH položek zakázky (majitel 5. 11.: nový doklad = aktuální data —
+ * po změně počtu nebo ceny v zakázce „nabídka nesedí" a nová verze to má mít správně, ne opsané ze staré).
+ *  - položky, počty, názvy, materiál, jednotky a prodejní ceny ze zakázky;
+ *  - kde zakázka cenu nemá, zůstane cena z předchozí verze (párování podle čísla výkresu, bez něj podle pořadí);
+ *  - DPH a poznámka pro zákazníka z předchozí verze (poznámka položky zakázky je interní — na nabídku nepatří);
+ *  - nákupní cena jen s právem na marže.
+ */
+export function quoteItemsFromJobItems(
+  jobItems: QuoteRevisionSourceItem[],
+  prevItems: QuoteRevisionSourceItem[],
+  opts: { margins: boolean },
+): Record<string, unknown>[] {
+  const prev = [...prevItems].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
+  const byDrawing = new Map<string, QuoteRevisionSourceItem>();
+  for (const it of prev) {
+    const k = drawingKey(it.drawing_number);
+    if (k && !byDrawing.has(k)) byDrawing.set(k, it);
+  }
+  const vat = dominantVatRate(prev);
+  const sorted = [...jobItems].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
+  return sorted.map((it, i) => {
+    const k = drawingKey(it.drawing_number);
+    const match = k ? byDrawing.get(k) : prev[i];
+    const unitPrice = cleanMoney(it.unit_price) ?? cleanMoney(match?.unit_price);
+    const purchase = opts.margins ? (cleanMoney(it.purchase_unit_price) ?? cleanMoney(match?.purchase_unit_price)) : null;
+    return {
+      position: i,
+      drawing_id: it.drawing_id ?? null,
+      drawing_number: cleanText(it.drawing_number, 200) ?? cleanText(match?.drawing_number, 200),
+      name: cleanText(it.name, 500) ?? cleanText(match?.name, 500),
+      description: cleanText(it.description, 5000) ?? cleanText(match?.description, 5000),
+      material: cleanText(it.material, 200) ?? cleanText(match?.material, 200),
+      quantity: cleanQuantity(it.quantity),
+      unit: cleanText(it.unit, 20) ?? cleanText(match?.unit, 20) ?? "ks",
+      unit_price: unitPrice,
+      vat_rate: validVat(match?.vat_rate) ?? vat,
+      purchase_unit_price: purchase,
+      note: cleanText(match?.note, 2000),
+    };
+  });
+}
+
 export function quoteRevisionNumber(number: string, revision: number): string {
   const base = number.trim().replace(/-R\d+$/i, "");
   return `${base}-R${revision}`;
@@ -628,7 +730,7 @@ export const JOB_FILE_SELECT = [
   "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin",
   // anonymizace výkresů (odznak, menu) — bez anon_ai_cache (velké, jen pro službu)
   "anon_status, anon_filename, anon_at, anon_by, anon_actor_kind, anon_reason, anon_reviewed_at, anon_reviewed_by, anon_summary, anon_pages, anon_method",
-  "anon_priority, anon_lock_until",
+  "anon_priority, anon_lock_until, anon_attempts",
   `uploader:profiles!uploaded_by(${PERSON})`,
 ].join(", ");
 
@@ -909,6 +1011,7 @@ export interface FileRow {
   anon_method?: string | null;
   anon_priority?: number | null;
   anon_lock_until?: string | null;
+  anon_attempts?: number | null;
   uploader?: Embed<PersonEmbed>;
   job?: Embed<{ id: string; number: string | null; title: string | null; customer?: Embed<{ name: string }> }>;
 }
@@ -1271,6 +1374,7 @@ export function rowToFileAnon(row: FileRow): JobFileAnon | null {
     // backfill = priorita ≥ 9 (BACKFILL_PRIORITY v lib/anonymize/queue)
     backfill: status === "pending" && (row.anon_priority ?? 0) >= 9,
     lockUntil: row.anon_lock_until ?? null,
+    attempts: typeof row.anon_attempts === "number" ? row.anon_attempts : null,
   };
 }
 

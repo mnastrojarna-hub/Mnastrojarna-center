@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   jobInputToRow, validateJobInput, validateItems, diffJob, describeChanges, fieldEventMessage,
   computeItemTotals, cleanDate, cleanNumber, cleanQuantity, cleanCurrency, cleanTags, isUuid,
-  jobItemToRow, quoteItemToRow, quoteInputToRow, quoteRevisionNumber, safeStorageName,
+  jobItemToRow, quoteItemToRow, quoteInputToRow, quoteRevisionNumber, quoteItemsFromJobItems, quoteRevisionValidUntil, safeStorageName,
   isValidJobFilePath, jobFilePath, rowToJobListItem, rowToJobDetail, rowToJobEvent, rowToJobFile,
   resolveStageFilter, filterJobs, sortJobs, countJobStages, aiFilledColumns, stageEventMessage,
   computeMargin, todayIso, matchesDeadline, fetchPaged, isGenericCaptureName, translateDbError, type JobRow,
@@ -766,5 +766,44 @@ describe("kontaktní osoba zakázky z Karty zákazníka (3. 11.)", () => {
     } as JobRow, { quotes: [], files: [], events: [] }, { margins: true });
     expect(d.customerContactId).toBe("k1");
     expect(d.customerDetail?.contacts).toEqual([{ id: "k1", name: "Petr", email: "p@x.cz", phone: "+420 1", position: null, isPrimary: true }]);
+  });
+});
+
+describe("nová verze nabídky z aktuální zakázky (5. 11.)", () => {
+  it("quoteRevisionValidUntil: stejně dlouhá platnost jako předchozí verze, ale ode dneška", () => {
+    expect(quoteRevisionValidUntil({ validUntil: "2026-10-15", createdAt: "2026-10-01T08:00:00+02:00" }, "2026-11-05")).toBe("2026-11-19");
+  });
+  it("quoteRevisionValidUntil: bez platnosti, prošlá / nesmyslná délka → 30 dní", () => {
+    expect(quoteRevisionValidUntil({ validUntil: null, createdAt: "2026-10-01" }, "2026-11-05")).toBe("2026-12-05");
+    expect(quoteRevisionValidUntil({ validUntil: "2026-09-30", createdAt: "2026-10-01" }, "2026-11-05")).toBe("2026-12-05");
+    expect(quoteRevisionValidUntil({ validUntil: "2028-01-01", createdAt: "2026-10-01" }, "2026-11-05")).toBe("2026-12-05");
+    expect(quoteRevisionValidUntil({}, "2026-12-15")).toBe("2027-01-14");
+  });
+  it("quoteItemsFromJobItems: počty a ceny ze zakázky, chybějící cena a DPH / poznámka z předchozí verze", () => {
+    const job = [
+      { position: 1, drawing_number: "VK-2", name: "Deska", quantity: 3, unit: "ks", unit_price: null, purchase_unit_price: null, note: "Počet doplň — interní" },
+      { position: 0, drawing_number: "VK-1", name: "Hřídel", quantity: 5, unit: "ks", unit_price: 1200, purchase_unit_price: 800, note: null },
+      { position: 2, drawing_number: "VK-3", name: "Nový díl", quantity: 2, unit: "ks", unit_price: 50, purchase_unit_price: null, note: null },
+    ];
+    const prev = [
+      { position: 0, drawing_number: "vk 1", name: "Hřídel", quantity: 4, unit_price: 1000, vat_rate: 12, purchase_unit_price: 700, note: "Včetně balení" },
+      { position: 1, drawing_number: "VK-2", name: "Deska", quantity: 3, unit_price: 450, vat_rate: 12, purchase_unit_price: 300, note: null },
+    ];
+    const rows = quoteItemsFromJobItems(job, prev, { margins: true });
+    expect(rows.map((r) => [r.position, r.drawing_number, r.quantity, r.unit_price, r.purchase_unit_price, r.vat_rate, r.note])).toEqual([
+      [0, "VK-1", 5, 1200, 800, 12, "Včetně balení"],
+      [1, "VK-2", 3, 450, 300, 12, null],
+      [2, "VK-3", 2, 50, null, 12, null],
+    ]);
+    // bez práva na marže se nákupní cena nepřenáší
+    expect(quoteItemsFromJobItems(job, prev, { margins: false }).every((r) => r.purchase_unit_price === null)).toBe(true);
+  });
+  it("quoteItemsFromJobItems: bez čísel výkresů se páruje podle pořadí, DPH výchozí 21", () => {
+    const rows = quoteItemsFromJobItems(
+      [{ position: 0, name: "A", quantity: 1, unit_price: null }, { position: 1, name: "B", quantity: 2, unit_price: 10 }],
+      [{ position: 0, name: "A", quantity: 1, unit_price: 99 }],
+      { margins: false },
+    );
+    expect(rows.map((r) => [r.name, r.unit_price, r.vat_rate])).toEqual([["A", 99, 21], ["B", 10, 21]]);
   });
 });
