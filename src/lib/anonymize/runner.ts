@@ -18,6 +18,17 @@ import { appOrigin, kick, runClaimed, runnableIds, KICK_CONCURRENCY, type AnonDb
 
 /** Rezerva před termínem funkce: nový soubor se začne, jen když zbývá aspoň tolik času. */
 export const MIN_TIME_LEFT_MS = 45_000;
+/**
+ * Opakování / navázání v témže běhu (majitel 5. 11.: „aby to fungovalo na první pokus"): pauza před n-tým
+ * rychlým opakováním (přetížená AI / výpadek potřebují chvíli) a kolik času musí zbývat na celý další pokus
+ * (stránka s detekcí AI i kontrolou kopie) — jinak soubor zůstane pending bez odkladu pro další běh.
+ */
+export const IN_RUN_BACKOFF_MS: readonly number[] = [2_000, 8_000];
+export const CONTINUE_MIN_LEFT_MS = 100_000;
+/** Nejvýš tolik navazujících dávek stran jednoho souboru v jednom běhu (200 stran / 10 na dávku). */
+const MAX_CONTINUES_PER_RUN = 30;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface ProcessOptions {
   table?: AnonTable;
@@ -40,6 +51,8 @@ export interface ProcessOptions {
   db?: AnonDb;
   /** Jen testy: fetch pro kick. */
   fetchImpl?: typeof fetch;
+  /** Jen testy: pauzy před rychlým opakováním v témže běhu. */
+  retryBackoffMs?: readonly number[];
 }
 
 export interface ProcessOutcome {
@@ -49,13 +62,22 @@ export interface ProcessOutcome {
   kicked: number;
   kickFailed: number;
   stoppedBy: "empty" | "deadline" | "max";
+  /** Opakování / navázání téhož souboru v tomto běhu (přechodná chyba, únik názvu, další dávka stran). */
+  retried: number;
+  /** Id běhu (diagnostika anon_debug). */
+  runId: string;
 }
 
 /**
  * Zpracuje frontu (podle filtru) postupně po jednom souboru až do termínu: claim (atomický, „for update
  * skip locked" — souběžné běhy si soubory nikdy nevezmou dvakrát) → anonymizace → další. Přerušené běhy
  * (processing s prošlým zámkem) se převezmou; po 3 pokusech claim soubor označí jako selhaný.
- * Soubor, který v tomto běhu selhal (zůstal pending k opakování), se ve stejném běhu znovu nezkouší.
+ *
+ * Soubor, který v tomto běhu skončil pending BEZ odkladu (navazující dávka stran, přechodná chyba v rychlých
+ * pokusech, zbylý název firmy s AI → retryNow), vezme TENTÝŽ běh znovu, dokud má čas (krátká pauza, nejvýš
+ * IN_RUN_BACKOFF_MS.length opakování; dávky stran bez pauzy). Majitel 5. 11.: dřív se takový soubor ve stejném
+ * běhu nezkoušel a čekal na další šťouchnutí z prohlížeče nebo klik — proto „na třikrát". Soubor s odloženým
+ * pokusem (zámek v budoucnu) se nechá dalšímu běhu. Co zbude při termínu, se rozvětví (kick, best effort).
  */
 export async function processQueue(opts: ProcessOptions = {}): Promise<ProcessOutcome> {
   const table = opts.table ?? "job_files";
@@ -63,8 +85,13 @@ export async function processQueue(opts: ProcessOptions = {}): Promise<ProcessOu
   const deadline = opts.deadline ?? routeDeadline();
   const maxFiles = Math.max(1, Math.min(opts.maxFiles ?? 20, 100));
   const db = opts.db ?? (createAdminClient({ actor }) as AnonDb);
-  const out: ProcessOutcome = { results: [], remaining: 0, kicked: 0, kickFailed: 0, stoppedBy: "empty" };
+  const runId = crypto.randomUUID().slice(0, 8);
+  const backoff = opts.retryBackoffMs ?? IN_RUN_BACKOFF_MS;
+  const out: ProcessOutcome = { results: [], remaining: 0, kicked: 0, kickFailed: 0, stoppedBy: "empty", retried: 0, runId };
   const tried: string[] = [];
+  /** Rychlá opakování / navázání po souborech v tomto běhu. */
+  const retries = new Map<string, number>();
+  const continues = new Map<string, number>();
   const filter: { ids: string[] | null; jobIds: string[] | null; includeBackfill: boolean } = { ids: opts.ids ?? null, jobIds: table === "job_files" ? opts.jobIds ?? null : null, includeBackfill: Boolean(opts.includeBackfill) };
   let fannedOut = opts.fanOut === false;
   for (;;) {
@@ -86,7 +113,7 @@ export async function processQueue(opts: ProcessOptions = {}): Promise<ProcessOu
     tried.push(id);
     let res: AnonRunResult[] = [];
     try {
-      res = await runClaimed(db, table, [id], { actor, deadline, manual: Boolean(opts.manual) }, 1);
+      res = await runClaimed(db, table, [id], { actor, deadline, manual: Boolean(opts.manual), runId }, 1);
     } catch (err) {
       console.error(`[anonymize] Běh fronty ${table}/${id}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -94,8 +121,32 @@ export async function processQueue(opts: ProcessOptions = {}): Promise<ProcessOu
     // rozbalený archiv / e-mail: nové soubory zakázky se zpracují ve stejném běhu (jinak by čekaly na plánovač)
     const spawned = res.flatMap((r) => r.spawned ?? []);
     if (spawned.length && filter.ids) filter.ids = [...new Set([...filter.ids, ...spawned])];
+    // hned znovu v témže běhu: další dávka stran (bez pauzy), přechodná chyba / únik názvu (krátká pauza)
+    const r = res[0];
+    if (r && r.status === "pending" && r.retryNow) {
+      const map = r.continued ? continues : retries;
+      const n = (map.get(id) ?? 0) + 1;
+      const cap = r.continued ? MAX_CONTINUES_PER_RUN : backoff.length;
+      const wait = r.continued ? 0 : backoff[Math.min(n, backoff.length) - 1] ?? 0;
+      if (n <= cap && Date.now() + wait < deadline - CONTINUE_MIN_LEFT_MS) {
+        map.set(id, n);
+        if (wait > 0) await sleep(wait);
+        tried.splice(tried.indexOf(id), 1);
+        out.retried++;
+        if (out.results.length >= maxFiles) continue;
+      }
+    }
   }
-  out.remaining = (await runnableIds(db, table, { ...filter, limit: 50 })).length;
+  const left = await runnableIds(db, table, { ...filter, limit: 50 });
+  out.remaining = left.length;
+  // co zbylo k okamžitému zpracování (termín, limit souborů, opakování bez času), rozvětvit — další funkce
+  // pokračuje hned; když adresa nefunguje, vezme to další šťouchnutí z prohlížeče nebo plánovač
+  if (left.length && opts.fanOut !== false) {
+    const manualBy = opts.manual && actor.kind === "user" ? actor.id : null;
+    const k = await kick({ origin: opts.origin ?? appOrigin(null), table, ids: left.slice(0, KICK_CONCURRENCY), fetchImpl: opts.fetchImpl, manualBy }).catch(() => ({ kicked: 0, failed: 0 }));
+    out.kicked += k.kicked;
+    out.kickFailed += k.failed ?? 0;
+  }
   return out;
 }
 
@@ -110,7 +161,7 @@ export function processInBackground(opts: ProcessOptions & { label?: string; onD
       if (!hasServiceKey()) return;
       o = await processQueue(opts);
       if (o.results.length || o.remaining) {
-        console.info(`[anonymize] ${opts.label ?? "běh"}: zpracováno ${o.results.length} (${o.results.map((r) => r.status).join(", ") || "—"}), ve frontě ${o.remaining}${o.kickFailed ? `, rozvětvení selhalo ${o.kickFailed}×` : ""}`);
+        console.info(`[anonymize] ${opts.label ?? "běh"} ${o.runId}: zpracováno ${o.results.length} (${o.results.map((r) => `${r.status}${r.attempt ? `#${r.attempt}` : ""}`).join(", ") || "—"})${o.retried ? `, opakováno v běhu ${o.retried}×` : ""}, ve frontě ${o.remaining}${o.kickFailed ? `, rozvětvení selhalo ${o.kickFailed}×` : ""}`);
       }
     } catch (err) {
       console.error(`[anonymize] ${opts.label ?? "běh"} selhal: ${err instanceof Error ? err.message : String(err)}`);

@@ -1,5 +1,5 @@
 import "server-only";
-import { addUsage, AiCallError, classifyAiError, routeDeadline } from "@/lib/ai/ai-call";
+import { addUsage, AiCallError, aiFailureMessage, classifyAiError, isAiError, routeDeadline } from "@/lib/ai/ai-call";
 import { getAiConfig, getSetting } from "@/lib/settings";
 import { aiActor, SYSTEM_ACTOR, userActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
@@ -8,7 +8,7 @@ import { isAnonCandidate, isUnsupportedExt, needsDrawingCheck, sourceFormat, uns
 import { accToDecide, COMPANY_LEAK_RETRY_TEXT, COMPANY_LEAK_WARNING, companyLeakRetry, decideAnonStatus, mergeBatch, type DecideInput } from "./decide";
 import { consumeFakeFault, isFakeAnon, termsPrompt, usageUsd, type AiCallConfig } from "./detect-ai";
 import { anonFilename, outputExt, rebaseTwinFilename } from "./filename";
-import { classifyFailure, retryPlan, userFacingFailure } from "./failure-text";
+import { classifyAiFailure, classifyFailure, FAST_ATTEMPTS, retryPlan, userFacingFailure, type FailureInfo } from "./failure-text";
 import { describeSummary, summarize } from "./regions";
 import {
   ANON_COLS, SUBJECT_SELECT, afterSettled, claim, event, label, loadSettings, priceDocIds, subjectOf,
@@ -17,7 +17,7 @@ import {
 import { configHash, DETECTOR_VERSION, termsHash, type AnonSettings } from "./settings";
 import { gatherTerms } from "./terms";
 import { sha256Hex } from "./text";
-import { ANON_CATEGORIES, type AnonCategory, type AnonMethod, type AnonPages, type AnonRegion, type AnonStatus, type AnonSummary, type AnonUsage, type AnonWarning, type KeepField } from "./types";
+import { ANON_CATEGORIES, ANON_DEBUG_KEEP, type AnonCategory, type AnonDebugEntry, type AnonMethod, type AnonPages, type AnonRegion, type AnonStatus, type AnonSummary, type AnonUsage, type AnonWarning, type KeepField } from "./types";
 import type { RuleContext } from "./rules";
 
 export * from "./queue";
@@ -95,6 +95,8 @@ export interface RunContext {
   allowAi?: boolean;
   /** Uložení editoru: uživatel potvrdil zásah do chráněného pole (číslo výkresu, materiál, kóta). */
   confirmKeep?: boolean;
+  /** Id běhu fronty (diagnostika anon_debug — pokusy jednoho běhu jdou dohledat). */
+  runId?: string | null;
 }
 
 /** Ruční úprava zasahuje do chráněného / technického údaje → bez potvrzení zůstává ke kontrole. */
@@ -108,6 +110,14 @@ export interface AnonRunResult {
   status: AnonStatus;
   reason: string | null;
   continued?: boolean;
+  /**
+   * Soubor zůstal pending bez odkladu (navazující dávka stran, přechodná chyba v rychlých pokusech, únik názvu
+   * firmy s AI) → TENTÝŽ běh ho má vzít znovu, dokud má čas (runner.ts). Majitel 5. 11.: dřív čekal na další
+   * šťouchnutí / klik.
+   */
+  retryNow?: boolean;
+  /** Pořadí pokusu (anon_attempts po claimu). */
+  attempt?: number;
   summary?: AnonSummary;
   /** Nové soubory zakázky z rozbaleného archivu / e-mailu (zpracují se ve stejném běhu). */
   spawned?: string[];
@@ -130,6 +140,8 @@ interface PipelineOut {
   continued?: { pages: AnonPages; partBytes: Uint8Array | null };
   /** Navazující dávka: texty se přidají k textům předchozích dávek (nesmazat). */
   appendTexts?: boolean;
+  /** Chyba volání AI detekce zachycená uvnitř pipeline (varování ai_failed) — pro poctivé roztřídění. */
+  aiError?: unknown;
 }
 
 const BASE_DECIDE: Omit<DecideInput, "mode"> = {
@@ -177,6 +189,8 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
   manualBy?: string | null;
   /** Druh neznámý (Ostatní / Fotka): výkres musí potvrdit klasifikace, jinak „Není výkres". */
   drawingCheck?: boolean;
+  /** Průběžné uložení cache AI (po každém výsledku AI). */
+  onCache?: (cache: unknown) => Promise<void>;
 }): Promise<PipelineOut | { unsupported: string }> {
   if (fmt === "pdf") {
     const { anonymizePdf } = await import("./pdf-pipeline");
@@ -186,6 +200,7 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
       bytes, ctx: opts.ctx, ai: opts.ai, systemExtra: opts.systemExtra, keepValues: opts.keepValues, verifyPhotos: opts.settings.verifyPhotos,
       fillPdf: opts.settings.fillPdf, fillPhoto: opts.settings.fillPhoto, maxDpi: opts.settings.maxDpi, maxMpx: opts.settings.maxMpx,
       pageFrom, deadline: opts.deadline, manual: opts.manual, cache: (opts.cache as never) ?? null, requireDrawing: Boolean(opts.drawingCheck),
+      onCache: opts.onCache,
     });
     if (r.failure && !r.pages.length) {
       // vada souboru (heslo k otevření, nečitelné PDF, XFA, moc stran, obří sken) → „nelze"; jinak opakovat
@@ -216,10 +231,10 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
     const texts = r.pages.flatMap((p) => p.texts);
     // chyba stránky (písma, prázdný render, výstup) → hned failed, nenavazovat
     if (r.failure) {
-      return { method: "raster_pdf", bytes: null, mime: "application/pdf", ext: "pdf", regions, texts, pages, decide, usage: r.usage, calls: r.calls, aiCache: r.cache, appendTexts: pageFrom > 1 };
+      return { method: "raster_pdf", bytes: null, mime: "application/pdf", ext: "pdf", regions, texts, pages, decide, usage: r.usage, calls: r.calls, aiCache: r.cache, appendTexts: pageFrom > 1, aiError: r.aiError };
     }
     if (r.next !== null) {
-      return { method: "raster_pdf", bytes: null, mime: "application/pdf", ext: "pdf", regions, texts, pages, decide, usage: r.usage, calls: r.calls, aiCache: r.cache, continued: { pages, partBytes: r.partPdf }, appendTexts: pageFrom > 1 };
+      return { method: "raster_pdf", bytes: null, mime: "application/pdf", ext: "pdf", regions, texts, pages, decide, usage: r.usage, calls: r.calls, aiCache: r.cache, continued: { pages, partBytes: r.partPdf }, appendTexts: pageFrom > 1, aiError: r.aiError };
     }
     // spojení částí z předchozích běhů
     let out = r.partPdf;
@@ -238,7 +253,7 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
         if (!chk.ok || n !== included.length) decide.outputChecksPassed = false;
       }
     }
-    return { method: "raster_pdf", bytes: out, mime: "application/pdf", ext: "pdf", regions, texts, pages, decide, usage: r.usage, calls: r.calls, aiCache: r.cache, detected: acc.detected, appendTexts: pageFrom > 1 };
+    return { method: "raster_pdf", bytes: out, mime: "application/pdf", ext: "pdf", regions, texts, pages, decide, usage: r.usage, calls: r.calls, aiCache: r.cache, detected: acc.detected, appendTexts: pageFrom > 1, aiError: r.aiError };
   }
   if (fmt === "image" || fmt === "tiff" || fmt === "heic") {
     const { anonymizeImage } = await import("./photo-pipeline");
@@ -247,6 +262,7 @@ async function runPipeline(db: AnonDb, s: Subject, bytes: Uint8Array, fmt: Retur
     const r = await anonymizeImage({
       bytes, hasMaster: original, ctx: opts.ctx, ai: opts.ai, systemExtra: opts.systemExtra, keepValues: opts.keepValues,
       verify: opts.settings.verifyPhotos, fill: opts.settings.fillPhoto, manual: opts.manual, cache: (opts.cache as never) ?? null,
+      onCache: opts.onCache,
     });
     if (r.unsupported) return { unsupported: r.unsupported };
     const pages: AnonPages = { total: r.pages, included: Array.from({ length: r.pages }, (_, i) => i + 1), excluded: [] };
@@ -341,8 +357,23 @@ async function writeTexts(db: AnonDb, s: Subject, texts: { regionId?: string; ca
 
 
 
+/**
+ * Zápis stavu řádku. Diagnostika (anon_debug) nesmí nikdy shodit výsledek: když sloupec v DB ještě není (kód
+ * nasazený před migrací 20261105110000), zapíše se bez ní.
+ */
+async function updateRow(db: AnonDb, s: Subject, patch: Record<string, unknown>): Promise<{ message: string } | null> {
+  const { error } = await db.from(s.table).update(patch).eq("id", s.id);
+  if (error && "anon_debug" in patch && /anon_debug/i.test(error.message)) {
+    const { anon_debug: _d, ...rest } = patch;
+    void _d;
+    const again = await db.from(s.table).update(rest).eq("id", s.id);
+    return again.error ?? null;
+  }
+  return error ?? null;
+}
+
 async function finish(db: AnonDb, s: Subject, patch: Record<string, unknown>): Promise<void> {
-  const { error } = await db.from(s.table).update({ ...patch, anon_lock_until: null, ...(s.table === "drawing_anon_adhoc" ? { updated_at: new Date().toISOString() } : {}) }).eq("id", s.id);
+  const error = await updateRow(db, s, { ...patch, anon_lock_until: null, ...(s.table === "drawing_anon_adhoc" ? { updated_at: new Date().toISOString() } : {}) });
   if (error) throw new Error(`Uložení výsledku anonymizace selhalo: ${error.message}`);
 }
 
@@ -350,6 +381,21 @@ async function finish(db: AnonDb, s: Subject, patch: Record<string, unknown>): P
 interface Spend {
   usage: AiUsage | null;
   calls: number;
+}
+
+/**
+ * Diagnostika pokusu (anon_debug, jen super admin): předchozí záznamy řádku + nový, posledních ANON_DEBUG_KEEP.
+ * Majitel 5. 11.: aby šlo z DB říct, PROČ a ve které fázi se pokus nepovedl (surová chyba se uživateli neukazuje).
+ */
+export function debugEntries(prev: unknown, entry: AnonDebugEntry): AnonDebugEntry[] {
+  const list = Array.isArray(prev) ? (prev as unknown[]).filter((e): e is AnonDebugEntry => Boolean(e) && typeof e === "object") : [];
+  return [...list.slice(-(ANON_DEBUG_KEEP - 1)), entry];
+}
+
+/** Surová chyba pro diagnostiku: třída + zpráva, ≤ 300 znaků, bez tajných údajů (klíč nikdy není ve zprávě). */
+export function rawErrorText(err: unknown): string {
+  if (err instanceof Error) return `${err.name && err.name !== "Error" ? `${err.name}: ` : ""}${err.message}`.slice(0, 300);
+  return String(err ?? "Neočekávaná chyba.").slice(0, 300);
 }
 
 /** Zpracuje jeden (claimnutý) soubor. Útrata AI se zapíše do drawing_anon_usage_log vždy (i při chybě). */
@@ -376,6 +422,16 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
   const t0 = Date.now();
   const s = subjectOf(table, row);
   const baseVia = ctx.manual || ctx.manualSave ? "rucne" : (row.anon_via ?? "automaticky");
+  const attempt = Math.max(1, row.anon_attempts ?? 1);
+  /** Fáze běhu pro diagnostiku (ve které pokus skončil). */
+  let stage = "start";
+  const dbg = (status: string, extra: Partial<AnonDebugEntry> = {}): { anon_debug: AnonDebugEntry[] } => ({
+    anon_debug: debugEntries(row.anon_debug, {
+      at: new Date().toISOString(), run: ctx.runId ?? null, attempt, stage, ms: Date.now() - t0, status,
+      ...(spend.calls ? { calls: spend.calls, usd: Math.round(usageUsd(spend.usage ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }) * 10000) / 10000 } : {}),
+      ...extra,
+    }),
+  });
   try {
     const settings = await loadSettings(db);
     const mode = ctx.manualSave ? "full" : await moduleMode(db);
@@ -401,6 +457,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       return { id: s.id, table, status: "skipped", reason };
     }
     if (!s.sourcePath) throw new Error("Soubor nemá uloženou cestu.");
+    stage = "download";
     const bytes = await download(db, s.bucket, s.sourcePath);
     if (bytes.length > 50 * 1024 * 1024) {
       await finish(db, s, { anon_status: "failed", anon_reason: "Soubor je větší než 50 MB — rozděl ho (např. po stranách) a nahraj znovu.", anon_at: new Date().toISOString() });
@@ -419,6 +476,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       return { id: s.id, table, status: "unsupported", reason: r.reason, spawned: r.spawned };
     }
     const sha = await sha256Hex(bytes);
+    stage = "terms";
     // jen testy (AI_FAKE_ANON): jednorázová porucha prostředí → musí se opakovat, nikdy „poškozené"
     const fault = consumeFakeFault(sha);
     if (fault) throw new Error(fault);
@@ -431,6 +489,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     // cache výsledku AI podle obsahu (M11)
     let aiCache: unknown = null;
     if (ctx.manualSave || !ctx.forceAi) aiCache = await readAiCache(db, sha, cfgHash);
+    stage = "twin";
     // stejný obsah + stejné termíny + bez ručních zásahů → kopie hotového výstupu (bez AI i bez renderu)
     if (aiCache && !manual.length && !ctx.manualSave && table === "job_files") {
       const { data: twin } = await db.from("job_files").select(`id, job_id, ${ANON_COLS}`)
@@ -456,12 +515,13 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
             anon_method: tw.anon_method, anon_pages: tw.anon_pages, anon_regions: regions, anon_summary: summary, anon_confidence: tw.anon_confidence,
             anon_reason: null, anon_config_hash: cfgHash, anon_terms_hash: tHash,
             anon_ai_cache: { ref: sha }, anon_at: new Date().toISOString(), anon_by: actor.id, anon_actor_kind: actor.kind, anon_via: baseVia, anon_usage: asUsage(null, 0),
+            ...dbg("done", { kind: "twin" }),
           });
           const { data: tt } = await db.from("drawing_anon_texts").select("region_id, category, text").eq("job_file_id", tw.id);
           await writeTexts(db, s, ((tt ?? []) as { region_id: string; category: string; text: string }[]).map((x) => ({ regionId: x.region_id, category: x.category, text: x.text })));
           await event(db, s, actor, `AI anonymizovala výkres ${label(s)} (převzato ze stejného souboru) — ${describeSummary(summary)}`, { anonStatus: st, cached: true });
           await afterSettled(db, s);
-          return { id: s.id, table, status: st, reason: null, summary };
+          return { id: s.id, table, status: st, reason: null, summary, attempt };
         }
       }
     }
@@ -473,6 +533,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       ai = await aiConfigFor(ctx.deadline, sha);
       if (ai) ai.onUsage = (u) => { spend.usage = addUsage(spend.usage, u); spend.calls++; };
     }
+    stage = "budget";
     // denní limit jen pro automatiku — i s hotovou cache detekce (výstupní kontrola kopie obrazem volá AI vždy;
     // zdarma je jen převzetí hotové kopie dvojčete výše)
     if (ai && !ctx.manual && !isFakeAnon()) {
@@ -493,24 +554,35 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     const manualBy = ctx.manualSave ? ctx.actor.id : null;
     // neznámý druh (Ostatní / Fotka): anonymizuje se jen to, co klasifikace pozná jako výkres
     const drawingCheck = table === "job_files" && needsDrawingCheck(s.kind, s.filename);
+    // průběžné uložení cache AI: přerušený běh (termín funkce, pád) o zaplacený výsledek nepřijde → další pokus
+    // (hned v témže běhu) je rychlý a nestojí nic navíc (majitel 5. 11.: „někdy to musí dělat na třikrát")
+    const onCache = async (c: unknown) => { await writeAiCache(db, sha, cfgHash, fmt === "pdf" ? "raster_pdf" : "image", c, null).catch(() => undefined); };
+    stage = "pipeline";
+    let aiErr: unknown = null;
     try {
-      out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai, settings, systemExtra, keepValues, manual, cache: aiCache, deadline: ctx.deadline, manualBy, drawingCheck });
+      out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai, settings, systemExtra, keepValues, manual, cache: aiCache, deadline: ctx.deadline, manualBy, drawingCheck, onCache });
     } catch (err) {
       if (!(err instanceof AiCallError) || !ai) throw err;
       // AI selhala → jen pravidla (u vektoru deterministicky; sken / neznámý druh níže zopakuje běh)
+      aiErr = err;
       aiFailWarnings.push({ code: "ai_failed", message: `AI detekce selhala (${err.message}) — použita jen pravidla.` });
       out = await runPipeline(db, s, bytes, fmt, { ctx: ruleCtx, ai: null, settings, systemExtra, keepValues, manual, cache: null, deadline: ctx.deadline, manualBy, drawingCheck });
     }
     // AI je nastavená, ale teď selhala (výpadek, přetížení): sken / fotka by bez ní zůstala s názvem firmy
-    // a neznámý druh by se nepoznal jako výkres → přechodná chyba, běh se zopakuje sám (ne tiché „hotovo")
+    // a neznámý druh by se nepoznal jako výkres → přechodná chyba, běh se zopakuje sám (ne tiché „hotovo").
+    // Vektorové PDF: v rychlých pokusech (FAST_ATTEMPTS, hned za sebou v témže běhu) také znovu — bez AI by
+    // tiše přišlo o názvy jako křivky / logo a o kontrolu kopie obrazem; až po nich jen pravidla s poznámkou.
     if (ai && !ctx.manualSave && !("unsupported" in out)) {
       const aiFailed = aiFailWarnings.length > 0 || out.decide.warnings.some((w) => w.code === "ai_failed");
       const rasterOut = out.method === "image" || out.method === "image_pdf"
         || (out.method === "raster_pdf" && out.decide.warnings.some((w) => w.code === "scan_page" || w.code === "text_layer_untrusted"));
-      if (aiFailed && (rasterOut || drawingCheck)) throw new Error("AI detection failed: fetch failed (retry)");
+      if (aiFailed && (rasterOut || drawingCheck || attempt < FAST_ATTEMPTS)) {
+        const inner = aiErr ?? out.aiError;
+        throw inner instanceof Error ? inner : new Error(out.decide.warnings.find((w) => w.code === "ai_failed")?.message ?? "AI detection failed: fetch failed (retry)");
+      }
     }
     if ("unsupported" in out) {
-      await finish(db, s, { anon_status: "unsupported", anon_reason: out.unsupported, anon_at: new Date().toISOString(), anon_actor_kind: "system", anon_via: baseVia });
+      await finish(db, s, { anon_status: "unsupported", anon_reason: out.unsupported, anon_at: new Date().toISOString(), anon_actor_kind: "system", anon_via: baseVia, ...dbg("unsupported", { reason: out.unsupported }) });
       await event(db, s, SYSTEM_ACTOR, `Výkres ${label(s)} nelze anonymizovat — ${out.unsupported}`, { anonStatus: "unsupported" });
       await afterSettled(db, s);
       return { id: s.id, table, status: "unsupported", reason: out.unsupported };
@@ -529,13 +601,17 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
         if (upErr) throw new Error(`Uložení části selhalo: ${upErr.message}`);
       }
       const pages = { ...out.continued.pages, parts: [...(out.continued.pages.parts ?? []), ...(partPath ? [partPath] : [])] };
-      await db.from(s.table).update({
+      stage = "continue";
+      const contErr = await updateRow(db, s, {
         anon_status: "pending", anon_lock_until: null, anon_attempts: Math.max(0, (row.anon_attempts ?? 1) - 1), anon_pages: pages,
         anon_regions: [...out.regions.filter((r) => !r.manual), ...manual], anon_usage: usage,
-      }).eq("id", s.id);
+        ...dbg("pending", { next: pages.next ?? null, retryNow: true }),
+      });
+      if (contErr) throw new Error(`Uložení dávky stran selhalo: ${contErr.message}`);
       await writeTexts(db, s, out.texts, out.appendTexts);
       if (out.aiCache) await writeAiCache(db, sha, cfgHash, out.method, out.aiCache, null);
-      return { id: s.id, table, status: "pending", reason: null, continued: true };
+      // další dávka stran hned v témže běhu (runner), ne až po dalším šťouchnutí
+      return { id: s.id, table, status: "pending", reason: null, continued: true, retryNow: true, attempt };
     }
 
     // název, upload
@@ -569,7 +645,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       await finish(db, s, {
         anon_status: "skipped", anon_reason: "Není výkres", anon_at: new Date().toISOString(), anon_by: actor.id, anon_actor_kind: out.decide.aiUsed ? "ai" : "system",
         anon_via: baseVia, anon_pages: out.pages, anon_usage: usage, anon_config_hash: cfgHash, anon_terms_hash: tHash, anon_path: null,
-        anon_summary: { counts: {}, total: 0, warnings: [], srcSha: sha } as unknown as AnonSummary,
+        anon_summary: { counts: {}, total: 0, warnings: [], srcSha: sha } as unknown as AnonSummary, ...dbg("skipped"),
       });
       if (out.aiCache) await writeAiCache(db, sha, cfgHash, out.method, out.aiCache, null);
       await event(db, s, actor, `${out.decide.aiUsed ? "AI" : "Systém"}: ${label(s)} není výkres — anonymizace přeskočena`, { anonStatus: "skipped" });
@@ -583,18 +659,33 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       const leakRetry = companyLeakRetry({ status, reason, aiUsed: out.decide.aiUsed, manualSave: Boolean(ctx.manualSave), attempts: row.anon_attempts });
       const r = leakRetry ? COMPANY_LEAK_RETRY_TEXT : userFacingFailure(reason ?? "Výstup se nepodařilo vytvořit.");
       const retry: AnonStatus = status === "pending" || leakRetry ? "pending" : "failed";
+      stage = "decide";
+      const leaked = out.decide.warnings.filter((w) => w.code === "verify_leak").map((w) => w.message).slice(0, 3).join(" | ");
       // nový pokus začne od první strany (části předchozích dávek pryč)
-      await finish(db, s, { anon_status: retry, anon_reason: r, anon_at: new Date().toISOString(), anon_usage: usage, ...(out.method === "raster_pdf" ? { anon_pages: null } : {}) });
+      await finish(db, s, {
+        anon_status: retry, anon_reason: r, anon_at: new Date().toISOString(), anon_usage: usage, ...(out.method === "raster_pdf" ? { anon_pages: null } : {}),
+        ...dbg(retry, { reason: r, kind: leakRetry ? "company_leak" : "decide", ...(leaked ? { error: leaked.slice(0, 300) } : {}), retryNow: leakRetry }),
+      });
       await removeParts(db, s, row);
-      // opakování po úniku: detekce AI znovu od začátku (cache z předchozích dávek stran by vrátila totéž)
-      if (leakRetry) await db.from("drawing_anon_ai_cache").delete().eq("src_sha256", sha).eq("config_hash", cfgHash).then(() => undefined, () => undefined);
+      // opakování po úniku: detekce AI znovu od začátku (výsledky stránek z cache by vrátily totéž) — ale JMÉNA
+      // firem, která našla tato detekce a kontrola kopie, zůstanou (cache.found): další pokus je má jako termíny
+      // od začátku a najde všechny výskyty pravidly (majitel 5. 11.: dřív se zahodila s celou cache)
+      if (leakRetry) {
+        const found = (out.aiCache as { found?: string[] } | null)?.found ?? [];
+        const reset = out.method === "raster_pdf"
+          ? { v: 1, vector: {}, specs: [], vision: {}, model: null, fallback: false, confidence: 1, found }
+          : { v: 1, pages: {}, found };
+        await writeAiCache(db, sha, cfgHash, out.method, reset, null).catch(() => undefined);
+      }
       await event(db, s, actor, `Anonymizace výkresu ${label(s)} selhala — ${r}`, { anonStatus: retry });
       await afterSettled(db, s);
-      return { id: s.id, table, status: retry as AnonStatus, reason: r };
+      return { id: s.id, table, status: retry as AnonStatus, reason: r, retryNow: leakRetry, attempt };
     }
     const outPath = `${s.outPrefix}${crypto.randomUUID()}-${name.filename}`;
+    stage = "upload";
     const { error: upErr } = await db.storage.from(s.bucket).upload(outPath, out.bytes, { contentType: out.mime, upsert: false });
     if (upErr) throw new Error(`Uložení anonymizované kopie selhalo: ${upErr.message}`);
+    stage = "finish";
     const outSha = await sha256Hex(out.bytes);
     const summary: AnonSummary & { srcSha?: string } = {
       ...summarize(regions, decision.warnings), method: out.method, ms: Date.now() - t0, aiCalls: out.calls, srcSha: sha, detector: DETECTOR_VERSION,
@@ -607,7 +698,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       anon_regions: [...regions.filter((r) => !r.manual), ...manual], anon_summary: summary,
       anon_confidence: Math.max(0, Math.min(1, Math.round(out.decide.confidence * 1000) / 1000)), anon_reason: reason, anon_config_hash: cfgHash, anon_terms_hash: tHash,
       anon_ai_cache: out.aiCache ? { ref: sha } : null, anon_at: new Date().toISOString(), anon_by: actor.id, anon_actor_kind: actor.kind, anon_via: baseVia,
-      anon_usage: usage, ...reviewed,
+      anon_usage: usage, ...reviewed, ...dbg(status, { ...(reason ? { reason } : {}) }),
     });
     await writeTexts(db, s, out.texts, out.appendTexts);
     if (out.aiCache) await writeAiCache(db, sha, cfgHash, out.method, out.aiCache, null);
@@ -619,23 +710,26 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     await event(db, s, actor, msg, { anonStatus: status, counts: summary.counts, total: summary.total, ...(notes.length ? { notes: [...new Set(notes)].slice(0, 5) } : {}) });
     await removeOld(db, s, row, outPath);
     await afterSettled(db, s);
-    return { id: s.id, table, status, reason, summary };
+    return { id: s.id, table, status, reason, summary, attempt };
   } catch (err) {
-    const failure = classifyAiError(err);
-    const raw = err instanceof Error ? err.message.slice(0, 300) : "Neočekávaná chyba.";
-    // surová (anglická) chyba jen do logu serveru, uživatel dostane českou větu s radou
-    console.error(`[anonymize] ${table}/${row.id}: ${raw}`);
-    // poctivě: vada souboru → hned „nelze/selhalo" s důvodem; chyba prostředí / běhu → opakuje se sama
-    const aiRefused = failure === "auth" || failure === "spend_limit";
-    const info = aiRefused
-      ? { kind: "internal" as const, text: "AI požadavek odmítla (klíč nebo limit útraty) — zkontroluj Nastavení → Integrace a klikni Anonymizovat znovu.", transient: false }
-      : classifyFailure(raw);
-    const plan = retryPlan(row.anon_attempts ?? 1, info);
+    const raw = rawErrorText(err);
+    const message0 = err instanceof Error ? err.message.slice(0, 300) : "Neočekávaná chyba.";
+    // surová (anglická) chyba jen do logu serveru (a anon_debug pro super admina), uživatel dostane českou větu s radou
+    console.error(`[anonymize] ${table}/${row.id} (${stage}, pokus ${attempt}): ${raw}`);
+    // poctivě: vada souboru / odmítnutý klíč → hned „nelze/selhalo" s důvodem; chyba prostředí / běhu / přetížená AI
+    // → opakuje se sama (v rychlých pokusech hned v témže běhu — runner.ts). Třídí se podle ZPRÁVY (bez názvu třídy —
+    // české věty jádra se porovnávají celé), název třídy jde jen do diagnostiky.
+    const info: FailureInfo = isAiError(err) ? classifyAiFailure(classifyAiError(err), aiFailureMessage(err)) : classifyFailure(message0);
+    const plan = retryPlan(attempt, info);
     const status: AnonStatus = plan.status;
     const message = plan.text;
     const lockUntil = plan.status === "pending" && plan.delayMs > 0 ? new Date(Date.now() + plan.delayMs).toISOString() : null;
+    const retryNow = status === "pending" && plan.delayMs === 0;
     try {
-      await db.from(s.table).update({ anon_status: status, anon_reason: message, anon_lock_until: lockUntil, ...(status === "failed" ? { anon_at: new Date().toISOString() } : {}) }).eq("id", s.id);
+      await updateRow(db, s, {
+        anon_status: status, anon_reason: message, anon_lock_until: lockUntil, ...(status === "failed" ? { anon_at: new Date().toISOString() } : {}),
+        ...dbg(status, { reason: message, error: raw, kind: info.kind, delayMs: plan.delayMs, retryNow }),
+      });
       if (status === "failed") {
         await event(db, s, SYSTEM_ACTOR, `Anonymizace výkresu ${label(s)} selhala — ${message}`, { anonStatus: "failed" });
         await afterSettled(db, s);
@@ -643,7 +737,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
     } catch {
       // zápis chyby nesmí shodit běh
     }
-    return { id: s.id, table, status, reason: message };
+    return { id: s.id, table, status, reason: message, retryNow, attempt };
   }
 }
 
