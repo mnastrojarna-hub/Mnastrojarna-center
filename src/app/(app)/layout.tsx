@@ -9,6 +9,7 @@ import { listQuoteApprovers } from "@/lib/data/current-user";
 import { MailLiveProvider } from "@/components/mail/mail-live-provider";
 import { FileViewerProvider } from "@/components/file-viewer/file-viewer-provider";
 import { TabChunkPreload } from "@/components/jobs/detail/tab-chunk-preload";
+import { ChunkReload } from "@/components/layout/chunk-reload";
 import { UiPrefsProvider } from "@/components/ui-prefs/use-ui-prefs";
 import { getUiPrefs } from "@/lib/data/ui-prefs";
 import { ScrollMemory } from "@/components/nav/scroll-memory";
@@ -36,6 +37,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <FileViewerProvider>
           <div className="flex h-screen overflow-hidden">
             <TabChunkPreload />
+            {/* zastaralý JavaScript po nasazení (chunk se nestáhne) → stránka se jednou obnoví místo prázdného místa */}
+            <ChunkReload />
             {/* paměť posunu: Zpět / Vpřed a obnovení vrátí <main> i vnitřní panely tam, kde uživatel skončil */}
             <ScrollMemory />
             <Sidebar counts={counts} features={features} userName={user.fullName} roleLabel={user.roleLabel} />
