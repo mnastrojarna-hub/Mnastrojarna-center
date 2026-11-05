@@ -730,7 +730,7 @@ export const JOB_FILE_SELECT = [
   "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin",
   // anonymizace výkresů (odznak, menu) — bez anon_ai_cache (velké, jen pro službu)
   "anon_status, anon_filename, anon_at, anon_by, anon_actor_kind, anon_reason, anon_reviewed_at, anon_reviewed_by, anon_summary, anon_pages, anon_method",
-  "anon_priority, anon_lock_until, anon_attempts",
+  "anon_priority, anon_lock_until",
   `uploader:profiles!uploaded_by(${PERSON})`,
 ].join(", ");
 
@@ -1011,7 +1011,6 @@ export interface FileRow {
   anon_method?: string | null;
   anon_priority?: number | null;
   anon_lock_until?: string | null;
-  anon_attempts?: number | null;
   uploader?: Embed<PersonEmbed>;
   job?: Embed<{ id: string; number: string | null; title: string | null; customer?: Embed<{ name: string }> }>;
 }
@@ -1374,7 +1373,6 @@ export function rowToFileAnon(row: FileRow): JobFileAnon | null {
     // backfill = priorita ≥ 9 (BACKFILL_PRIORITY v lib/anonymize/queue)
     backfill: status === "pending" && (row.anon_priority ?? 0) >= 9,
     lockUntil: row.anon_lock_until ?? null,
-    attempts: typeof row.anon_attempts === "number" ? row.anon_attempts : null,
   };
 }
 
