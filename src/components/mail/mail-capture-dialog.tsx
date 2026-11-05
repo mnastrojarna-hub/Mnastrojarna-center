@@ -15,6 +15,8 @@ export interface MailCaptureRequest {
   key: MailActionKey;
   /** Přidat k zakázce: pevný cíl dávky. */
   jobId?: string | null;
+  /** „Změnit": vlákno dnes patří k jiné zakázce — po uložení dávky se přesune k cíli. */
+  relink?: boolean;
   plan: MailCapturePlan;
 }
 
@@ -91,7 +93,7 @@ export function MailCaptureDialog({
     const key = `${captureId}:${main.jobId}`;
     if (finished.current.has(key)) return;
     finished.current.add(key);
-    void finishMailCaptureAction({ emailId: request.emailId, captureId, jobId: main.jobId, created: main.created, addContact: addRef.current })
+    void finishMailCaptureAction({ emailId: request.emailId, captureId, jobId: main.jobId, created: main.created, addContact: addRef.current, relink: request.relink === true })
       .catch(() => ({ ok: false as const, error: "Spojení se nepovedlo — e-mail přiřaď k zakázce ručně." }))
       .then((r) => {
         const number = ("jobNumber" in r && r.jobNumber) || main.jobNumber;
@@ -99,11 +101,11 @@ export function MailCaptureDialog({
         onFinished({
           threadId: request.threadId, key: request.key, jobId: main.jobId, jobNumber: number, created: main.created, ok: r.ok,
           text: r.ok
-            ? `${main.created ? "Založena zakázka" : "Přílohy uloženy k zakázce"} ${number ?? ""} — e-mail přiřazen.${contact}`.replace(/\s+—/, " —")
+            ? `${main.created ? "Založena zakázka" : "Přílohy uloženy k zakázce"} ${number ?? ""} — ${request.relink ? "vlákno přesunuto" : "e-mail přiřazen"}.${contact}`.replace(/\s+—/, " —")
             : r.error ?? "E-mail se nepodařilo přiřadit k zakázce.",
         });
       });
-  }, [request.emailId, request.threadId, request.key, onFinished]);
+  }, [request.emailId, request.threadId, request.key, request.relink, onFinished]);
 
   const mail = React.useMemo(() => ({
     emailId: request.emailId,

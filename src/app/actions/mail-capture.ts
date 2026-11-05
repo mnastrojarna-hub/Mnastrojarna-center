@@ -21,7 +21,7 @@ export async function finishMailCaptureAction(input: FinishMailCaptureInput): Pr
     const o = (input ?? {}) as Partial<FinishMailCaptureInput>;
     return await finishMailCapture({
       emailId: String(o.emailId ?? ""), captureId: String(o.captureId ?? ""), jobId: String(o.jobId ?? ""),
-      created: o.created === true, addContact: o.addContact === true,
+      created: o.created === true, addContact: o.addContact === true, relink: o.relink === true,
     });
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Neočekávaná chyba." };

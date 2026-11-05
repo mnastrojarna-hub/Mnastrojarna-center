@@ -174,20 +174,36 @@ export function lineTotal(qty: string, price: string): number | null {
   return Math.round(q * p * 100) / 100;
 }
 
-export function formTotals(items: ItemDraft[], margins: boolean): { value: number | null; purchase: number | null } {
+/**
+ * Součty formuláře = co dostane zakázka (křížová konzistence 4. 11.): hodnota zakázky = Σ(počet × cena)
+ * položek s cenou (createJob ji z položek spočítá, DB hlídá), nákup = Σ nákupních cen; `unpriced` = položky
+ * bez prodejní ceny (hodnota je pak jen součet nacenených). Bez cen je hodnota null = doplní se později.
+ */
+export function formTotals(items: ItemDraft[], margins: boolean): { value: number | null; purchase: number | null; unpriced: number; count: number } {
   let value: number | null = null;
   let purchase: number | null = null;
+  let unpriced = 0;
+  let count = 0;
   for (const it of items) {
     if (isItemEmpty(it)) continue;
+    count += 1;
     const v = lineTotal(it.quantity, it.unitPrice);
     if (v !== null) value = (value ?? 0) + v;
+    else unpriced += 1;
     if (margins) {
       const p = lineTotal(it.quantity, it.purchaseUnitPrice);
       if (p !== null) purchase = (purchase ?? 0) + p;
     }
   }
   const r = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
-  return { value: r(value), purchase: r(purchase) };
+  return { value: r(value), purchase: r(purchase), unpriced, count };
+}
+
+/** Patička formuláře: „Hodnota zakázky = součet položek (2 bez ceny)". */
+export function formValueHint(t: Pick<ReturnType<typeof formTotals>, "value" | "unpriced">): string {
+  if (t.value === null) return "Cena se doplní později (nacenění dělá člověk).";
+  const un = t.unpriced;
+  return `= hodnota zakázky (součet položek${un ? `, ${un} ${un === 1 ? "položka bez ceny" : un < 5 ? "položky bez ceny" : "položek bez ceny"}` : ""})`;
 }
 
 function normalizeName(s: string): string {

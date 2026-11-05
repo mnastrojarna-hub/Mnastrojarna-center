@@ -25,6 +25,7 @@ import {
   userNeedsQuoteApproval,
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
+import { deleteQuoteWithPdfs, quoteDeleteBlock, type QuoteSyncRow } from "@/lib/jobs/quote-file-sync";
 import { supersedeEditedMailChanges } from "@/lib/email/job-link-store";
 import {
   invoicedValueBlock, itemsSaleValue, purchaseCostEditBlock, quotePriceWarning, activePurchaseOrders,
@@ -315,8 +316,10 @@ export async function createJob(
     const totals = computeItemTotals(items.map((it) => ({
       quantity: it.quantity, unitPrice: it.unitPrice, purchaseUnitPrice: margins ? it.purchaseUnitPrice : null,
     })));
-    if (input.value === undefined && totals.value !== null) row.value = totals.value;
-    if (margins && input.purchaseCost === undefined && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
+    // křížová konzistence (4. 11.): s nacenenými položkami je hodnota zakázky jejich součet (částka z hlavičky
+    // dokladu / formuláře ji nepřebije — DB by ji stejně srovnala); bez cen zůstane zadaná ručně
+    if (totals.value !== null) row.value = totals.value;
+    if (margins && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
 
     if (!row.title) {
       row.title = cleanText(items[0]?.name, 300) ?? cleanText(items[0]?.drawingNumber, 300) ?? "Nová zakázka";
@@ -1226,7 +1229,12 @@ export async function setJobQuoteArchived(quoteId: string, archived: boolean): P
   }
 }
 
-export async function deleteJobQuote(quoteId: string): Promise<ActionResult> {
+/**
+ * Smazání nabídky: odeslanou (sent_at / odesláno / přijato) smazat nejde — jen archivovat (stejné
+ * pravidlo jako menu Nabídky). S nabídkou se smažou i všechna její vystavená PDF v Dokumentech
+ * (`removedFiles`); nahrané soubory s vazbou zůstanou bez vazby (lib/jobs/quote-files).
+ */
+export async function deleteJobQuote(quoteId: string): Promise<ActionResult<{ removedFiles: number }>> {
   const c = await begin("delete");
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
@@ -1234,21 +1242,17 @@ export async function deleteJobQuote(quoteId: string): Promise<ActionResult> {
     const { db, user } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
-    // orders.quote_id se vynuluje samo (on delete set null)
-    const { error } = await db.from("quotes").delete().eq("id", quoteId);
-    if (error) return fail(error.message);
-    await logAudit({
-      action: "quote_deleted", entity: "quotes", entityId: quoteId,
-      diff: { number: quote.number, jobId: quote.job_id, total: quote.total },
-    });
-    if (quote.job_id) {
-      await logJobEvent(db, {
-        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} smazána`,
-        data: { quoteId, number: quote.number, action: "deleted" }, actorId: user.id,
-      });
-    }
+    const sync: QuoteSyncRow = {
+      id: quote.id, number: quote.number, job_id: quote.job_id, status: quote.status,
+      sent_at: (quote.sent_at as string | null | undefined) ?? null, storage_path: (quote.storage_path as string | null | undefined) ?? null, total: quote.total,
+    };
+    const block = quoteDeleteBlock(sync);
+    if (block) return fail(block);
+    // orders.quote_id se vynuluje samo (on delete set null); audit a historie zapíše jádro
+    const r = await deleteQuoteWithPdfs(db, sync, user.id, { cause: "quote" });
+    if (!r.ok) return fail(r.error);
     revalidateQuote(quote.job_id);
-    return { ok: true };
+    return { ok: true, removedFiles: r.removedFiles };
   } catch (err) {
     return fail(err);
   }

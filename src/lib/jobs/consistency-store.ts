@@ -1,7 +1,8 @@
 import type { JobsDb } from "@/lib/jobs/events";
 import { cleanNumber } from "@/lib/jobs/mapping";
 import {
-  DISTRIBUTE_MODE_LABELS, defaultMode, distributeJobValue, formatKc, isInvoiced, itemsSaleValue, pairQuoteItems, quotePriceWarning,
+  DISTRIBUTE_MODE_LABELS, activePurchaseOrders, defaultMode, distributeJobValue, formatKc, isInvoiced, itemsPurchaseValue, itemsSaleValue,
+  pairQuoteItems, quotePriceWarning, sameMoney,
   type ConsistencyPo, type ConsistencySnapshot, type DistributeMode, type QuoteRef,
 } from "@/lib/jobs/consistency";
 
@@ -17,6 +18,8 @@ export interface JobMoneyContext {
   itemIds: string[];
   number: string | null;
   quoteId: string | null;
+  /** Zakázka sloučená do jiné (archiv) — peníze se už nepřepočítávají. */
+  mergedInto: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -28,7 +31,7 @@ function itemLabel(r: Row): string {
 
 export async function loadJobMoneyContext(db: JobsDb, jobId: string, opts: { margins?: boolean } = {}): Promise<JobMoneyContext | null> {
   const [jobRes, itemsRes, quotesRes, posRes] = await Promise.all([
-    db.from("orders").select("id, number, status, value, purchase_cost, currency, invoice_number, invoiced_at, quote_id, due_date, customer_required_date, max_tolerated_date").eq("id", jobId).maybeSingle(),
+    db.from("orders").select("id, number, status, value, purchase_cost, currency, invoice_number, invoiced_at, quote_id, due_date, customer_required_date, max_tolerated_date, merged_into_id").eq("id", jobId).maybeSingle(),
     db.from("order_items").select("id, position, drawing_number, name, quantity, unit_price, purchase_unit_price").eq("order_id", jobId).order("position"),
     db.from("quotes").select("id, number, state, status, total, archived, sent_at").eq("job_id", jobId),
     opts.margins === false
@@ -52,6 +55,7 @@ export async function loadJobMoneyContext(db: JobsDb, jobId: string, opts: { mar
     jobId,
     number: (j.number as string | null) ?? null,
     quoteId: (j.quote_id as string | null) ?? null,
+    mergedInto: (j.merged_into_id as string | null) ?? null,
     itemIds: items.map((r) => String(r.id)),
     snapshot: {
       value: cleanNumber(j.value),
@@ -144,4 +148,38 @@ export async function applyQuotePricesToItems(db: JobsDb, jobId: string, quoteIt
     else changed += 1;
   }
   return { changed, invoiced: false };
+}
+
+/**
+ * Hodnota zakázky (a bez objednávek dodavatelům i nákupní náklady) srovnaná se součtem položek — server
+ * zrcadlí pravidla DB (trigger order_items_money_sync), aby na ně nebyl odkázaný: po každém zápisu položek
+ * z focení / pošty / sloučení platí hodnota = Σ(počet × prodejní cena) položek s cenou, nákup = Σ nákupních
+ * cen položek (jen bez aktivních objednávek dodavatelům). Vyfakturovaná zakázka se nemění.
+ */
+export async function syncJobMoneyFromItems(
+  db: JobsDb, jobId: string, opts: { margins: boolean },
+): Promise<{ value: number | null; purchaseCost: number | null; changed: ("value" | "purchase_cost")[] }> {
+  const ctx = await loadJobMoneyContext(db, jobId, { margins: opts.margins });
+  const changed: ("value" | "purchase_cost")[] = [];
+  if (!ctx) return { value: null, purchaseCost: null, changed };
+  const s = ctx.snapshot;
+  if (ctx.mergedInto) return { value: s.value, purchaseCost: s.purchaseCost, changed };
+  const update: Row = {};
+  const value = itemsSaleValue(s.items);
+  const invoiced = isInvoiced(s);
+  if (!invoiced && value !== null && !sameMoney(value, s.value)) update.value = value;
+  const purchase = opts.margins ? itemsPurchaseValue(s.items) : null;
+  if (!invoiced && purchase !== null && !activePurchaseOrders(s.purchaseOrders ?? []).length && !sameMoney(purchase, s.purchaseCost)) {
+    update.purchase_cost = purchase;
+  }
+  if (Object.keys(update).length) {
+    const { error } = await db.from("orders").update(update as never).eq("id", jobId);
+    if (error) console.error(`[consistency] Hodnotu zakázky se nepodařilo srovnat s položkami: ${error.message}`);
+    else changed.push(...(Object.keys(update) as ("value" | "purchase_cost")[]));
+  }
+  return {
+    value: update.value !== undefined ? (update.value as number) : s.value,
+    purchaseCost: update.purchase_cost !== undefined ? (update.purchase_cost as number) : s.purchaseCost,
+    changed,
+  };
 }

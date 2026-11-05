@@ -123,15 +123,50 @@ export async function eventually(fn, { timeout = 12_000, interval = 250 } = {}) 
 }
 
 /**
- * Počká na hydrataci prvku (React připojí __reactProps…) a na konec streamování
- * (žádná skrytá kopie div#S:…[hidden]) — kliknutí před hydratací se ztrácí.
+ * Počká na DOKONČENOU hydrataci prvku a na konec streamování (žádná skrytá kopie div#S:…[hidden]) — kliknutí
+ * / změna před hydratací se ztrácí. `__reactProps` React připojuje už při renderu hydratace (před commitem);
+ * když v tu chvíli přijde klik a hydratace čeká na chunk (velký formulář v hlavičce), React ji synchronně
+ * nedokončí a událost zahodí (03: „Nová zakázka" se neotevřela, řazení / záložka se nepřepnuly). Proto se
+ * kontroluje i commit: kořen už není „dehydrated" a na cestě k němu není nehydratovaná hranice Suspense — a to
+ * pro všechno, na co se v <main> kliká (hranice se hydratují po jedné; neshoda hydratace #418 v jiné hranici
+ * by jinak klik na Tabuli / záložku spolkla).
  */
 export async function waitHydrated(page, css, timeout = 15_000) {
   await page.waitForFunction((sel) => {
     const el = document.querySelector(sel);
     if (!el) return false;
     if (document.querySelector('div[hidden][id^="S:"]')) return false;
-    return Object.keys(el).some((k) => k.startsWith("__reactProps"));
+    const fiberOf = (x) => { const k = Object.keys(x).find((n) => n.startsWith("__reactFiber")); return k ? x[k] : null; };
+    // vlákno (fiber) prvku: od něj ke kořenu žádná hranice Suspense ještě „dehydrated" (HTML ze serveru čeká
+    // na chunk / hydrataci) a kořen s dokončenou hydratací — jinak React klik / change zahodí (synchronní
+    // hydrataci nedokončí, nepřehrává; po neshodě hydratace #418 překreslí hranici a klik padne do prázdna)
+    const committed = (fiber) => {
+      for (let f = fiber, i = 0; f && i < 2000; f = f.return, i++) {
+        if (f.tag === 13 && f.memoizedState && f.memoizedState.dehydrated) return false;
+        if (f.tag === 3) {
+          const current = f.stateNode && f.stateNode.current;
+          return Boolean(current) && !(current.memoizedState && current.memoizedState.isDehydrated);
+        }
+      }
+      return false; // vlákno z přerušeného pokusu o hydrataci (bez kořene) — čekat na další
+    };
+    if (!Object.keys(el).some((k) => k.startsWith("__reactProps"))) return false;
+    const own = fiberOf(el);
+    if (!own || !committed(own)) return false;
+    // i všechno, na co se v <main> kliká: hranice Suspense se hydratují po jedné (líně) — prvek bez vlákna je
+    // ještě HTML ze serveru (ledaže je to statické HTML přes dangerouslySetInnerHTML)
+    for (const x of document.querySelectorAll('main a[href], main button, main input, main select, main textarea, main [role="button"]')) {
+      const f = fiberOf(x);
+      if (f) {
+        if (!committed(f)) return false;
+        continue;
+      }
+      let p = x.parentElement; let pf = null;
+      while (p && !(pf = fiberOf(p))) p = p.parentElement;
+      if (pf && pf.memoizedProps && pf.memoizedProps.dangerouslySetInnerHTML) continue;
+      return false;
+    }
+    return true;
   }, css, { timeout });
 }
 

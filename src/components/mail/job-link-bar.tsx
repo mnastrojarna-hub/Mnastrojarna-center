@@ -63,8 +63,8 @@ export function JobLinkBar({
   /** Akce se serverovým krokem (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu, Založit zakázku). */
   onAction: (key: MailActionKey) => void;
   /**
-   * „Přiřadit k zakázce" s vybranou zakázkou: přílohy e-mailu se roztřídí dávkou „Přidat doklad (foto)"
-   * (useMailActionRunner.assign); bez něj jen přiřazení vlákna.
+   * „Přiřadit k zakázce" / „Změnit" s vybranou zakázkou: přílohy e-mailu se roztřídí dávkou „Přidat doklad
+   * (foto)" (useMailActionRunner.assign — co už u zakázky je, se znovu neukládá); bez něj jen přiřazení vlákna.
    */
   onAssign?: (job: JobPick) => void;
   /** „Zpracovat objednávku" našla víc možných zakázek → výběr. */
@@ -130,8 +130,8 @@ export function JobLinkBar({
   };
   const pick = (j: JobPick) => {
     setPicker(false);
-    // jen přiřazení vlákna bez zakázky (změna zakázky už přiřazeného vlákna přílohy znovu netřídí)
-    if (onAssign && !jobId) {
+    // Přidat k zakázce i Změnit: přílohy e-mailu projdou roztříděním k vybrané zakázce (už uložené se přeskočí)
+    if (onAssign) {
       onAssign(j);
       return;
     }

@@ -296,6 +296,25 @@ describe("dokumenty", () => {
     expect(g[0].current.map((x) => x.id)).toEqual(["2"]);
     expect(g[0].archived.map((x) => x.id)).toEqual(["3"]);
   });
+  it("groupFiles: každý nearchivovaný dokument je právě v jedné skupině (3D model vedle výkresu, neznámý druh v Ostatní)", () => {
+    // majitel (5. 11.): odznak záložky počítá nearchivované soubory — seznam musí ukázat všechny
+    const files = [
+      f({ id: "pdf", kind: "vykres" }),
+      f({ id: "step", kind: "model_3d", createdAt: "2026-10-01T00:01:00Z" }),
+      f({ id: "dxf", kind: "vykres", createdAt: "2026-10-01T00:02:00Z" }),
+      f({ id: "zip", kind: "neznamy_druh" }),
+      f({ id: "old", kind: "model_3d", archived: true, replacedBy: "step" }),
+    ];
+    const g = groupFiles(files);
+    expect(g.map((x) => x.kind)).toEqual(["vykres", "model_3d", "ostatni"]);
+    const shown = g.flatMap((x) => x.current.map((y) => y.id));
+    const expected = files.filter((x) => !x.archived).map((x) => x.id);
+    expect([...shown].sort()).toEqual([...expected].sort());
+    expect(shown.length).toBe(files.filter((x) => !x.archived).length);
+    expect(g.find((x) => x.kind === "model_3d")?.current.map((x) => x.id)).toEqual(["step"]);
+    expect(g.find((x) => x.kind === "model_3d")?.archived.map((x) => x.id)).toEqual(["old"]);
+    expect(g.find((x) => x.kind === "vykres")?.current.map((x) => x.id)).toEqual(["dxf", "pdf"]);
+  });
   it("replacedByLabel", () => {
     expect(replacedByLabel({ replacedBy: "2" }, [{ id: "2", version: 3 }])).toBe("nahrazeno v3");
     expect(replacedByLabel({ replacedBy: "x" }, [])).toBe("nahrazeno novější verzí");

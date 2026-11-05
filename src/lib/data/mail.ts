@@ -183,7 +183,7 @@ export async function getUnreadCount(): Promise<number> {
 }
 
 const SENT_SELECT = [
-  "id, mailbox_id, owner_id, to_email, subject, snippet, body_text, received_at, order_id",
+  "id, mailbox_id, owner_id, to_email, subject, snippet, body_text, received_at, order_id, customer_id, supplier_id, purchase_order_id, category",
   "job:orders!order_id(id, number)",
   "mailbox:mailboxes!mailbox_id(email)",
   "sender:profiles!owner_id(full_name)",

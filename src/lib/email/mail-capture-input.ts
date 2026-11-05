@@ -26,7 +26,13 @@ export interface MailAttachmentRow {
   size_bytes: number | null;
 }
 
-export interface MailAttachmentSkip { id: string; filename: string; reason: string }
+export interface MailAttachmentSkip {
+  id: string;
+  filename: string;
+  reason: string;
+  /** Příloha už je u cílové zakázky uložená (stejný obsah) — dokument, který ji drží. */
+  jobFileId?: string;
+}
 
 /** Menší obrázek je skoro jistě logo / ikona z podpisu (stejný práh jako kopie příloh k zakázce). */
 export const MAIL_MIN_IMAGE_BYTES = 15 * 1024;

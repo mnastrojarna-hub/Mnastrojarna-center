@@ -69,6 +69,17 @@ export function isApplied(pos: ScrollPos, scrollTop: number, scrollLeft: number)
   return Math.abs(scrollTop - pos.t) <= 2 && Math.abs(scrollLeft - pos.l) <= 2;
 }
 
+/**
+ * Je adresa, kterou zná Next (usePathname + useSearchParams().toString() — mezera jako „+"), táž jako adresa
+ * prohlížeče (location — mezera jako „%20")? Po Zpět / Vpřed na adresu, kterou Next už zná (vlastní zápis adresy
+ * se do Next ještě nestihl synchronizovat), Next svou adresu nezmění — obnovu posunu tedy nespustí změna
+ * adresy, ale rovnou popstate.
+ */
+export function sameAddress(nextUrl: string, pathname: string, search: string): boolean {
+  const q = new URLSearchParams(search).toString();
+  return nextUrl === `${pathname}${q ? `?${q}` : ""}`;
+}
+
 /** Typ načtení stránky, po kterém se posun obnovuje i bez popstate (obnovení, zpět/vpřed do jiné karty). */
 export function restoresOnLoad(navigationType: string | undefined): boolean {
   return navigationType === "reload" || navigationType === "back_forward";

@@ -192,6 +192,20 @@ export function supplierQuoteFormFrom(q: SupplierQuoteView): SupplierQuoteFormSt
   };
 }
 
+/**
+ * Zadaná celková cena nabídky dodavatele se liší od součtu nacenených položek (křížová konzistence 4. 11.):
+ * formulář ukáže oranžové upozornění a nabídne „Použít součet položek". Null = sedí / bez položek s cenou /
+ * bez zadané částky (pak celkem = Σ položek).
+ */
+export function supplierQuoteTotalMismatch(f: Pick<SupplierQuoteFormState, "total" | "items">): { explicit: number; sum: number; diff: number } | null {
+  const explicit = parseDecimal(f.total);
+  if (explicit === null || isInvalidDecimal(f.total)) return null;
+  const sum = purchaseDraftsTotal(f.items);
+  if (!sum.priced || sum.unpriced > 0) return null;
+  if (Math.abs(sum.total - explicit) < 0.005) return null;
+  return { explicit, sum: sum.total, diff: r2(explicit - sum.total) };
+}
+
 export function validateSupplierQuoteForm(f: SupplierQuoteFormState): string | null {
   if (!f.supplierId && !f.supplierName.trim()) return "Vyber dodavatele nebo napiš jeho název.";
   const bad = validatePurchaseDrafts(f.items, { allowEmpty: true });

@@ -36,12 +36,17 @@ let intended: { href: string; before: string; pop: number } | null = null;
 
 type AnyHeaders = Headers | Record<string, string> | [string, string][] | undefined | null;
 
-/** Má požadavek hlavičku Next-Action (= volání serverové akce)? */
+/**
+ * Je to požadavek routeru Next — serverová akce (hlavička Next-Action) nebo navigace / obnovení
+ * (hlavička RSC)? Obojí běží ve frontě akcí Next a RESTORE by to zahodil (navigace by se neprovedla:
+ * E2E 03 „URL po přepnutí na Tabuli neodpovídá", dialogy přes ?new=1 se neotevřely).
+ */
 export function hasServerActionHeader(headers: AnyHeaders): boolean {
+  const has = (k: string) => k.toLowerCase() === "next-action" || k.toLowerCase() === "rsc";
   if (!headers) return false;
-  if (typeof Headers !== "undefined" && headers instanceof Headers) return headers.has("next-action");
-  if (Array.isArray(headers)) return headers.some(([k]) => k.toLowerCase() === "next-action");
-  return Object.keys(headers).some((k) => k.toLowerCase() === "next-action");
+  if (typeof Headers !== "undefined" && headers instanceof Headers) return headers.has("next-action") || headers.has("rsc");
+  if (Array.isArray(headers)) return headers.some(([k]) => has(k));
+  return Object.keys(headers).some(has);
 }
 
 /** Je bezpečné teď poslat Next RESTORE? (žádná akce neběží a poslední skončila před chvílí) */

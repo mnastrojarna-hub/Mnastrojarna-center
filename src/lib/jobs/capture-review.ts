@@ -9,6 +9,7 @@ import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { docNumbersEqual, isSupplierSideDoc, normalizeCompanyName } from "@/lib/jobs/matching";
 import { fieldLabel } from "@/lib/jobs/field-labels";
 import { cleanDate, cleanNumber, isUuid, safeStorageName } from "@/lib/jobs/mapping";
+import { formatKc, itemsPurchaseValue, itemsSaleValue, sameMoney, unpricedCount, type MoneyItem } from "@/lib/jobs/consistency";
 import { plural } from "@/lib/jobs/deadlines";
 import type { BatchSortModel } from "@/lib/jobs/capture-batch-types";
 
@@ -974,9 +975,13 @@ function parsedField(key: ReviewFieldKey, raw: string): string | number {
   return raw;
 }
 
-/** Vyplněná (neprázdná, nezamčená) pole formuláře → JobInput. */
+/**
+ * Vyplněná (neprázdná, nezamčená) pole formuláře → JobInput. Se `state.items` platí křížová konzistence
+ * (4. 11.): hodnota zakázky (u dodavatelského dokladu nákupní náklady) = součet nacenených položek —
+ * částka z hlavičky dokladu ani ručně zadaná ji nepřebije (položky bez cen → částka zůstane ruční).
+ */
 export function reviewToJobInput(
-  state: Pick<ReviewState, "fields">,
+  state: Pick<ReviewState, "fields"> & Partial<Pick<ReviewState, "items" | "docKind" | "issuer">>,
   target: Pick<ReviewTarget, "mode" | "existing">,
   margins: boolean,
 ): JobInput {
@@ -988,7 +993,103 @@ export function reviewToJobInput(
     if (!v) continue;
     out[key] = parsedField(key, v);
   }
+  if (state.items && state.docKind && state.issuer) {
+    const linked = linkedTotal({ docKind: state.docKind, issuer: state.issuer, items: state.items }, margins);
+    if (linked && !isFieldLocked(target, linked.key)) out[linked.key] = linked.sum;
+  }
   return out as JobInput;
+}
+
+// ── Hodnota zakázky = součet položek (křížová konzistence 4. 11.) ──
+export type LinkedTotalKey = "value" | "purchaseCost";
+
+/** Řádky formuláře jako položky pro výpočty (prázdné řádky se nepočítají; nesmyslné číslo = bez ceny). */
+export function reviewMoneyItems(items: ReviewItem[], margins = true): MoneyItem[] {
+  return items.filter((i) => !isBlankReviewItem(i)).map((i) => {
+    const price = cleanNumber(i.unitPrice);
+    const purchase = margins ? cleanNumber(i.purchaseUnitPrice) : null;
+    return {
+      quantity: cleanNumber(i.quantity) ?? 0,
+      unitPrice: price !== null && price > 0 ? price : null,
+      purchaseUnitPrice: purchase !== null && purchase > 0 ? purchase : null,
+      label: [i.drawingNumber, i.name].map((x) => x.trim()).filter(Boolean).join(" ") || null,
+    };
+  });
+}
+
+export interface ReviewItemsTotals {
+  /** Σ(počet × prodejní cena) položek s cenou; null = žádná nemá cenu. */
+  value: number | null;
+  /** Σ(počet × nákupní cena); null = žádná nemá (nebo bez práva na marže). */
+  purchase: number | null;
+  /** Položky bez prodejní ceny. */
+  unpriced: number;
+  count: number;
+}
+
+/** Součty řádků formuláře (živě, stejně jako DB po uložení). */
+export function reviewItemsTotals(items: ReviewItem[], margins = true): ReviewItemsTotals {
+  const money = reviewMoneyItems(items, margins);
+  return { value: itemsSaleValue(money), purchase: itemsPurchaseValue(money), unpriced: unpricedCount(money), count: money.length };
+}
+
+/**
+ * Které pole celkové částky se u dokladu odvozuje z položek: zákaznický doklad → hodnota zakázky
+ * (z prodejních cen), dodavatelský → nákupní náklady (z nákupních cen; jen s právem na marže).
+ */
+export function linkedTotalKey(
+  doc: Pick<ReviewState, "docKind" | "issuer">, margins: boolean,
+  /** Strana dokladu natvrdo (vložený formulář dávky bere položky vždy jako zákaznické). */
+  opts: { supplierSide?: boolean } = {},
+): LinkedTotalKey | null {
+  const supplierSide = opts.supplierSide ?? isSupplierSideDoc(doc);
+  if (!supplierSide) return "value";
+  return margins ? "purchaseCost" : null;
+}
+
+export interface LinkedTotal { key: LinkedTotalKey; sum: number; priced: number; unpriced: number }
+
+/** Odvozená celková částka ze součtu položek; null = položky bez cen (částka zůstává ruční). */
+export function linkedTotal(
+  state: Pick<ReviewState, "docKind" | "issuer" | "items">,
+  margins: boolean,
+  opts: { supplierSide?: boolean } = {},
+): LinkedTotal | null {
+  const key = linkedTotalKey(state, margins, opts);
+  if (!key) return null;
+  const t = reviewItemsTotals(state.items, margins);
+  const sum = key === "value" ? t.value : t.purchase;
+  if (sum === null) return null;
+  const priced = key === "value" ? t.count - t.unpriced : reviewMoneyItems(state.items, margins).filter((i) => i.purchaseUnitPrice !== null).length;
+  return { key, sum, priced, unpriced: t.count - priced };
+}
+
+/**
+ * Stav formuláře s celkovou částkou srovnanou na součet položek (po každé změně položek). Zamčené pole
+ * existující zakázky se nemění (hodnotu srovná server / DB ze všech položek); bez cen zůstane, co je.
+ */
+export function syncLinkedTotals(
+  state: ReviewState, target: Pick<ReviewTarget, "mode" | "existing">, margins: boolean, opts: { supplierSide?: boolean } = {},
+): ReviewState {
+  const linked = linkedTotal(state, margins, opts);
+  if (!linked || isFieldLocked(target, linked.key)) return state;
+  const next = String(linked.sum);
+  if ((state.fields[linked.key] ?? "") === next) return state;
+  return { ...state, fields: { ...state.fields, [linked.key]: next } };
+}
+
+/**
+ * „Na dokladu je 107 000 Kč — položky dávají 98 000 Kč; uloží se součet položek." Null, když částka
+ * sedí nebo doklad žádnou nemá. `docTotal` = částka z hlavičky dokladu (návrh AI) nebo ručně zadaná.
+ */
+export function linkedTotalMismatch(
+  docTotal: string | null | undefined, sum: number, key: LinkedTotalKey, currency = "CZK", source: "doc" | "typed" = "doc",
+): string | null {
+  const doc = cleanNumber(docTotal ?? "");
+  if (doc === null || sameMoney(doc, sum)) return null;
+  const what = key === "value" ? "hodnota zakázky" : "nákupní náklady";
+  const lead = source === "doc" ? `Na dokladu je ${formatKc(doc, currency)}` : `Zadáno ${formatKc(doc, currency)}`;
+  return `${lead} — položky dávají ${formatKc(sum, currency)}. Uloží se součet položek (${what} = součet položek; změň cenu u položky).`;
 }
 
 /** Položky formuláře → vstup položek (prázdné řádky se vynechají). */
