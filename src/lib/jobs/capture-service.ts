@@ -447,9 +447,11 @@ async function analyzeMailCapture(c: Ctx, raw: AnalyzeCaptureInput, signal: Abor
         if (res.ok) return { ok: true, batch: { ...res.batch, extracts: res.extracts } };
       }
     }
-    const copied = await copyMailAttachmentsToCapture(c.db, c.user.id, email);
+    const copied = await copyMailAttachmentsToCapture(c.db, c.user.id, email, { jobId: fixedJobId });
     if ("error" in copied) return fail(copied.error);
-    if (!copied.refs.length && !extra.length) return fail(NO_MAIL_ATTACHMENTS);
+    if (!copied.refs.length && !extra.length) {
+      return fail(copied.ctx.skipped.some((x) => x.jobFileId) ? "Všechny přílohy e-mailu už jsou u zakázky uložené — není co roztřídit." : NO_MAIL_ATTACHMENTS);
+    }
     const res = await analyzeBatch(c, [...copied.refs, ...extra].slice(0, CAPTURE_BATCH_MAX_FILES), { fixedJobId, expectedKind, signal, mail: copied.ctx });
     if (!res.ok && copied.refs.length) await bucket(c.db).remove(copied.refs.map((r) => r.path));
     return res;

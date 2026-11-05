@@ -21,6 +21,7 @@ import { imageDimensions } from "@/lib/jobs/capture-files";
 import { CAPTURE_BUCKET, capturePagePath, type CaptureFileRef } from "@/lib/jobs/capture-review";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { updateJob } from "@/app/actions/jobs";
+import { setThreadJobAction } from "@/app/actions/mail-jobs";
 
 /**
  * Pošta → dávka „Přidat doklad (foto)" (serverová část). Přílohy e-mailu se zkopírují do capture/<uživatel>/…
@@ -59,9 +60,53 @@ async function customerOf(db: JobsDb, email: Pick<EmailRow, "customer_id" | "fro
   return row ? { id: row.id, name: row.name } : null;
 }
 
-async function attachmentRows(db: JobsDb, emailId: string): Promise<MailAttachmentRow[]> {
-  const { data } = await db.from("email_attachments").select("id, filename, mime_type, size_bytes").eq("email_id", emailId).order("filename", { ascending: true });
-  return (data ?? []) as MailAttachmentRow[];
+type AttachmentRowWithFile = MailAttachmentRow & { job_file_id?: string | null };
+
+async function attachmentRows(db: JobsDb, emailId: string): Promise<AttachmentRowWithFile[]> {
+  const { data } = await db.from("email_attachments").select("id, filename, mime_type, size_bytes, job_file_id").eq("email_id", emailId).order("filename", { ascending: true });
+  return (data ?? []) as AttachmentRowWithFile[];
+}
+
+export const ALREADY_IN_JOB = "už je u zakázky";
+
+/** Dokumenty zakázky podle obsahu (sha256 → id) — přílohy se stejným obsahem se znovu neukládají. */
+async function jobFilesBySha(db: JobsDb, jobId: string): Promise<Map<string, string>> {
+  const { data } = await db.from("job_files").select("id, content_sha256").eq("job_id", jobId).not("content_sha256", "is", null).limit(2000);
+  return new Map(((data ?? []) as { id: string; content_sha256: string | null }[]).filter((f) => f.content_sha256).map((f) => [f.content_sha256 as string, f.id]));
+}
+
+/**
+ * Přílohy, které už u cílové zakázky jsou („Přidat k zakázce" / „Změnit" u vlákna s přílohami, které tam
+ * dřív uložila automatika nebo dřívější dávka): podle vazby přílohy na dokument (email_attachments.job_file_id)
+ * a podle obsahu (sha256 — stejný soubor nahraný ručně). Vrací, co zbývá roztřídit, a vynechané s dokumentem.
+ */
+export async function splitAlreadyStored(
+  db: JobsDb, rows: readonly AttachmentRowWithFile[], jobId: string, opts: { hash?: boolean; bySha?: Map<string, string> } = {},
+): Promise<{ take: AttachmentRowWithFile[]; skipped: MailAttachmentSkip[] }> {
+  const bySha = opts.bySha ?? await jobFilesBySha(db, jobId);
+  const ids = new Set(bySha.values());
+  const take: AttachmentRowWithFile[] = [];
+  const skipped: MailAttachmentSkip[] = [];
+  for (const r of rows) {
+    const filename = (r.filename ?? "").trim() || "priloha";
+    if (r.job_file_id && ids.has(r.job_file_id)) {
+      skipped.push({ id: r.id, filename, reason: ALREADY_IN_JOB, jobFileId: r.job_file_id });
+      continue;
+    }
+    if (opts.hash !== false && bySha.size) {
+      const loaded = await loadEmailAttachment(r.id);
+      if (loaded.ok) {
+        const sha = createHash("sha256").update(new Uint8Array(loaded.file.content)).digest("hex");
+        const fileId = bySha.get(sha);
+        if (fileId) {
+          skipped.push({ id: r.id, filename, reason: ALREADY_IN_JOB, jobFileId: fileId });
+          continue;
+        }
+      }
+    }
+    take.push(r);
+  }
+  return { take, skipped };
 }
 
 /** Kontext e-mailu bez souborů (odesílatel, zákazník, text, telefon z podpisu). */
@@ -88,13 +133,22 @@ export async function mailContextOf(db: JobsDb, email: EmailRow): Promise<MailCa
  * přeskočí). Vrací odkazy pro analyzeBatch a kontext e-mailu se seznamem zkopírovaných příloh.
  */
 export async function copyMailAttachmentsToCapture(
-  db: JobsDb, userId: string, email: EmailRow,
+  db: JobsDb, userId: string, email: EmailRow, opts: { jobId?: string | null } = {},
 ): Promise<{ refs: CaptureFileRef[]; ctx: MailCaptureContext } | { error: string }> {
   const ctx = await mailContextOf(db, email);
-  const { take, skipped } = selectMailAttachments(await attachmentRows(db, email.id));
+  const selected = selectMailAttachments(await attachmentRows(db, email.id));
+  const skip: MailAttachmentSkip[] = [...selected.skipped];
+  let take: AttachmentRowWithFile[] = selected.take;
+  // pevný cíl (Přidat k zakázce / Změnit): co už u zakázky je, se znovu neukládá (podle vazby i obsahu)
+  const bySha = opts.jobId ? await jobFilesBySha(db, opts.jobId) : new Map<string, string>();
+  if (opts.jobId) {
+    // podle vazby hned; podle obsahu níže při kopírování (bajty se stejně načítají)
+    const split = await splitAlreadyStored(db, take, opts.jobId, { hash: false, bySha });
+    take = split.take;
+    skip.push(...split.skipped);
+  }
   const refs: CaptureFileRef[] = [];
   const seen = new Set<string>();
-  const skip: MailAttachmentSkip[] = [...skipped];
   for (const att of take) {
     const loaded = await loadEmailAttachment(att.id);
     const filename = (att.filename ?? "").trim() || "priloha";
@@ -111,6 +165,11 @@ export async function copyMailAttachmentsToCapture(
     const sha = createHash("sha256").update(bytes).digest("hex");
     if (seen.has(sha)) {
       skip.push({ id: att.id, filename, reason: "stejná příloha dvakrát" });
+      continue;
+    }
+    const stored = bySha.get(sha);
+    if (stored) {
+      skip.push({ id: att.id, filename, reason: ALREADY_IN_JOB, jobFileId: stored });
       continue;
     }
     seen.add(sha);
@@ -160,7 +219,15 @@ export async function mailCapturePlan(emailId: string, fixedJobId: string | null
   if (!email) return { ok: false, error: NOT_FOUND };
   const db = (await createOperatorClient()) as unknown as JobsDb;
   const [rows, ctx] = await Promise.all([attachmentRows(db, email.id), mailContextOf(db, email)]);
-  const { take, skipped } = selectMailAttachments(rows);
+  const selected = selectMailAttachments(rows);
+  let take = selected.take;
+  const skipped = [...selected.skipped];
+  if (fixedJobId && take.length) {
+    // Přidat k zakázce / Změnit: přílohy, které u zakázky už jsou, do dávky nejdou (bez nich = jen přiřazení vlákna)
+    const split = await splitAlreadyStored(db, take, fixedJobId);
+    take = split.take;
+    skipped.push(...split.skipped);
+  }
   let contacts: { id: string; name: string | null; email: string | null }[] = [];
   if (ctx.customerId) {
     const { data } = await db.from("customer_contacts").select("id, name, email").eq("customer_id", ctx.customerId).limit(300);
@@ -191,6 +258,8 @@ export interface FinishMailCaptureInput {
   created: boolean;
   /** Přidat odesílatele do Karty zákazníka a nastavit ho jako kontaktní osobu zakázky. */
   addContact: boolean;
+  /** „Změnit" u vlákna, které už patří k jiné zakázce: po uložení dávky vlákno přesunout k této zakázce. */
+  relink?: boolean;
 }
 
 export interface FinishMailCaptureResult {
@@ -226,9 +295,18 @@ export async function finishMailCapture(input: FinishMailCaptureInput): Promise<
   const jobId = job.merged_into_id ?? job.id;
   const out: FinishMailCaptureResult = { ok: true, jobNumber: job.number, linkedFiles: 0, changes: 0, contact: null };
 
-  // 1) vlákno → zakázka (e-mail už u jiné zakázky se nepřepisuje)
+  // 1) vlákno → zakázka (e-mail už u jiné zakázky se nepřepisuje — jen při výslovném „Změnit" se vlákno přesune)
   if (email.order_id && email.order_id !== jobId) {
-    return { ok: false, jobNumber: job.number, error: "E-mail už patří k jiné zakázce — přílohy jsou uložené, vlákno zůstalo u původní zakázky." };
+    if (!input.relink) return { ok: false, jobNumber: job.number, error: "E-mail už patří k jiné zakázce — přílohy jsou uložené, vlákno zůstalo u původní zakázky." };
+    if (email.thread_id) {
+      const r = await setThreadJobAction(email.thread_id, jobId);
+      if (!r.ok) return { ok: false, jobNumber: job.number, error: r.error ?? "Vlákno se nepodařilo přesunout k zakázce." };
+      out.changes = r.changes ?? 0;
+    } else {
+      await a.db.from("emails").update({
+        order_id: jobId, job_link_source: "manual", job_link_actor: "user", job_linked_at: new Date().toISOString(), job_linked_by: user.id, job_match_at: new Date().toISOString(),
+      }).eq("id", email.id);
+    }
   }
   if (!email.order_id) {
     const { data: em } = await a.db.from("emails").select("id, thread_id, subject, direction, category, supplier_id, customer_id, from_name, from_email").eq("id", email.id).maybeSingle();
@@ -253,6 +331,11 @@ export async function finishMailCapture(input: FinishMailCaptureInput): Promise<
       const { error } = await db.from("email_attachments").update({ job_file_id: fileId }).eq("id", f.attachmentId).eq("email_id", email.id);
       if (!error) out.linkedFiles = (out.linkedFiles ?? 0) + 1;
     }
+  }
+  // přílohy, které u zakázky už byly (vynechané z dávky) → vazba na jejich dokument (příště bez čtení obsahu)
+  for (const sk of mail?.emailId === email.id ? mail.skipped : []) {
+    if (!sk.jobFileId) continue;
+    await db.from("email_attachments").update({ job_file_id: sk.jobFileId }).eq("id", sk.id).eq("email_id", email.id).is("job_file_id", null);
   }
 
   // 3) zakázka založená z e-mailu: obchodník podle schránky (#25), zdroj e-mail

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  SCROLL_STORE_LIMIT, canApply, isApplied, parseScrollStore, restoresOnLoad, scrollEntry, scrollKey, withScrollPos,
+  SCROLL_STORE_LIMIT, canApply, isApplied, parseScrollStore, restoresOnLoad, sameAddress, scrollEntry, scrollKey, withScrollPos,
 } from "./scroll-memory";
 
 describe("paměť posunu", () => {
@@ -52,6 +52,15 @@ describe("paměť posunu", () => {
     expect(isApplied({ t: 800, l: 0 }, 800, 0)).toBe(true);
     expect(isApplied({ t: 800, l: 0 }, 798.5, 0)).toBe(true);
     expect(isApplied({ t: 800, l: 0 }, 790, 0)).toBe(false);
+  });
+
+  it("adresa Next = adresa prohlížeče i s jiným zápisem mezery (po Zpět na ni Next adresu nezmění → obnova z popstate)", () => {
+    expect(sameAddress("/inbox?q=E2E43+X", "/inbox", "?q=E2E43%20X")).toBe(true);
+    expect(sameAddress("/inbox?q=E2E43+X", "/inbox", "?q=E2E43+X")).toBe(true);
+    expect(sameAddress("/inbox", "/inbox", "")).toBe(true);
+    // otevřené vlákno (push) → Zpět: Next zná už adresu s vláknem → jeho adresa se změní, obnovu spustí ona
+    expect(sameAddress("/inbox?q=E2E43+X&vlakno=m%3A1&detail=1", "/inbox", "?q=E2E43%20X")).toBe(false);
+    expect(sameAddress("/orders", "/inbox", "")).toBe(false);
   });
 
   it("po načtení obnovuje jen obnovení stránky a zpět/vpřed", () => {

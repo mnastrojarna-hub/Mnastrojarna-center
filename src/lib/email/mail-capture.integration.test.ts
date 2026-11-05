@@ -190,7 +190,7 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
       await svc.from("drawings").delete().in("job_id", ids);
       await svc.from("orders").delete().in("id", ids);
     }
-    await svc.from("drawings").delete().in("drawing_number", ["8810-01", "8810-02", "8810-03", "8810-04", "8820-01", "8820-02"]).gte("created_at", startedAt);
+    await svc.from("drawings").delete().in("drawing_number", ["8810-01", "8810-02", "8810-03", "8810-04", "8810-06", "8820-01", "8820-02"]).gte("created_at", startedAt);
     if (emailIds.length) await svc.from("emails").delete().in("id", emailIds);
     if (storagePaths.length) await svc.storage.from("documents").remove(storagePaths);
     for (const id of captureIds) {
@@ -353,5 +353,70 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     expect(jf.filter((f) => f.kind === "vykres")).toHaveLength(4);
     const { data: em } = await svc.from("emails").select("order_id, job_link_source").eq("id", emailId).single();
     expect(em).toMatchObject({ order_id: jobB.id, job_link_source: "manual" });
+  }, 180_000);
+
+  it("„Změnit“ u vlákna jiné zakázky: příloha, která už u cílové zakázky je (stejný obsah), se znovu neukládá; nová projde dávkou a vlákno se přesune", async () => {
+    expect(jobB.id).toBeTruthy();
+    // vlákno dnes patří k jiné zakázce
+    const { data: other, error } = await svc.from("orders").insert({
+      number: `Z-MC-${RUN}`, title: `Jiná zakázka ${RUN}`, source: "manual", status: "objednavka", owner_id: admin.id, created_by: admin.id, inquiry_date: new Date().toISOString().slice(0, 10), priority: "stredni",
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    const otherId = (other as { id: string }).id;
+    jobIds.add(otherId);
+    // stejný obsah jako výkres 8810-04 uložený u jobB v minulém testu (PDF z pdf-lib nese datum → bajty vzít z úložiště)
+    const { data: stored } = await svc.from("job_files").select("id, filename, storage_path, content_sha256").eq("job_id", jobB.id).eq("kind", "vykres").ilike("filename", "8810-04%").single();
+    const dup = stored as { id: string; filename: string; storage_path: string; content_sha256: string };
+    const dl = await svc.storage.from("job-files").download(dup.storage_path);
+    if (dl.error || !dl.data) throw new Error(dl.error?.message ?? "soubor výkresu v úložišti chybí");
+    const dupBytes = Buffer.from(await dl.data.arrayBuffer());
+    const emailId = await mail({
+      subject: `Výkresy znovu ${jobB.number}`, from: `petra.${RUN}@strojmetal.cz`, fromName: "Petra Nová", category: "k_zakazce", customerId: STROJMETAL,
+      body: "Dobrý den,\nposíláme výkres 8810-04 ještě jednou a jeden nový:\n8810-06 – 2 ks\n\nPetra",
+      attachments: [
+        { filename: "8810-04__vykres-znovu.pdf", mime: "application/pdf", body: dupBytes },
+        { filename: "8810-06__vykres-gm1f.pdf", mime: "application/pdf", body: await vectorPdf(6) },
+      ],
+    });
+    await svc.from("emails").update({ order_id: otherId, job_link_source: "manual" }).eq("id", emailId);
+    const before = await filesOf(jobB.id);
+
+    // plán pro „Změnit" → jobB: duplicitní příloha vynechaná (s dokumentem, který ji drží), k roztřídění zbývá jedna
+    const plan = await mc.mailCapturePlan(emailId, jobB.id);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.files).toBe(1);
+    expect(plan.skipped).toEqual([{ id: expect.any(String), filename: "8810-04__vykres-znovu.pdf", reason: mc.ALREADY_IN_JOB, jobFileId: dup.id }]);
+    // bez pevného cíle (jiná zakázka / nová) jdou do dávky obě
+    const planNew = await mc.mailCapturePlan(emailId, null);
+    expect(planNew.ok && planNew.files).toBe(2);
+
+    const batch = await analyzeMail(emailId, jobB.id);
+    expect(batch.fixedJobId).toBe(jobB.id);
+    expect(batch.files.map((f) => f.filename)).toEqual(["8810-06__vykres-gm1f.pdf"]);
+    await extractAll(batch);
+    const rv = await review(batch);
+    const res = await apply(batch.captureId, rv.initial);
+    expect(res.status, JSON.stringify({ failed: res.docs.filter((d) => !d.ok), error: res.error })).toBe("done");
+    expect(res.groups[0]).toMatchObject({ jobId: jobB.id, created: false });
+
+    // bez výslovného „Změnit" se vlákno jiné zakázky nepřepíše
+    const kept = await mc.finishMailCapture({ emailId, captureId: batch.captureId, jobId: jobB.id, created: false, addContact: false });
+    expect(kept.ok).toBe(false);
+    const { data: still } = await svc.from("emails").select("order_id").eq("id", emailId).single();
+    expect(still).toMatchObject({ order_id: otherId });
+
+    const fin = await mc.finishMailCapture({ emailId, captureId: batch.captureId, jobId: jobB.id, created: false, addContact: false, relink: true });
+    expect(fin).toMatchObject({ ok: true, linkedFiles: 1 });
+    const after = await filesOf(jobB.id);
+    expect(after.filter((f) => f.content_sha256 === dup.content_sha256)).toHaveLength(1); // duplicitní výkres se znovu neuložil
+    expect(after.length).toBe(before.length + 1);
+    expect(after.some((f) => f.kind === "vykres" && /^8810-06/.test(f.filename))).toBe(true);
+    const { data: em } = await svc.from("emails").select("order_id, job_link_source").eq("id", emailId).single();
+    expect(em).toMatchObject({ order_id: jobB.id, job_link_source: "manual" });
+    const { data: atts } = await svc.from("email_attachments").select("filename, job_file_id").eq("email_id", emailId);
+    const byName = Object.fromEntries(((atts ?? []) as { filename: string; job_file_id: string | null }[]).map((a) => [a.filename, a.job_file_id]));
+    expect(byName["8810-04__vykres-znovu.pdf"]).toBe(dup.id); // vynechaná příloha ukazuje na dokument, který už u zakázky byl
+    expect(byName["8810-06__vykres-gm1f.pdf"]).toBeTruthy();
   }, 180_000);
 });

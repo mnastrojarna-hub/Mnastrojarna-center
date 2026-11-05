@@ -1,6 +1,6 @@
 import {
   MessageSquareQuote, ShoppingCart, Handshake, BadgeCheck, ReceiptText, BellRing, AlertTriangle,
-  PencilRuler, Ban, Mail, FileText, Factory, Bot, Send, FolderKanban, type LucideIcon,
+  PencilRuler, Ban, Mail, FileText, FileCheck, FilePenLine, Factory, Bot, Send, Sparkles, Truck, FolderKanban, type LucideIcon,
 } from "lucide-react";
 import type {
   ApprovalType, EmailCategory as DbEmailCategory, JobStage, PriorityLevel,
@@ -270,7 +270,7 @@ export interface SentKindStyle {
 
 export const SENT_KIND_STYLE: Record<SentKind, SentKindStyle> = {
   email: {
-    label: "E-mail", icon: Send,
+    label: "Odpověď / zpráva", icon: Send,
     chip: "border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300",
     active: "border-cyan-500 bg-cyan-500 text-white", text: "text-cyan-600 dark:text-cyan-400",
   },
@@ -279,15 +279,60 @@ export const SENT_KIND_STYLE: Record<SentKind, SentKindStyle> = {
     chip: "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300",
     active: "border-violet-500 bg-violet-500 text-white", text: "text-violet-600 dark:text-violet-400",
   },
+  ai_quote: {
+    label: "AI nabídka", icon: Sparkles,
+    chip: "border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300",
+    active: "border-purple-600 bg-purple-600 text-white", text: "text-purple-600 dark:text-purple-400",
+  },
+  confirmation: {
+    label: "Potvrzení objednávky", icon: BadgeCheck,
+    chip: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300",
+    active: "border-emerald-600 bg-emerald-600 text-white", text: "text-emerald-700 dark:text-emerald-400",
+  },
+  delivery_note: {
+    label: "Dodací list", icon: Truck,
+    chip: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300",
+    active: "border-sky-600 bg-sky-600 text-white", text: "text-sky-700 dark:text-sky-400",
+  },
+  invoice: {
+    label: "Faktura", icon: ReceiptText,
+    chip: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300",
+    active: "border-rose-600 bg-rose-600 text-white", text: "text-rose-700 dark:text-rose-400",
+  },
+  document: {
+    label: "Dokument k zakázce", icon: FileCheck,
+    chip: "border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-300",
+    active: "border-slate-600 bg-slate-600 text-white", text: "text-slate-700 dark:text-slate-400",
+  },
   reminder: {
-    label: "Upomínka", icon: BellRing,
+    label: "Upomínka / připomenutí", icon: BellRing,
     chip: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300",
     active: "border-amber-500 bg-amber-500 text-white", text: "text-amber-600 dark:text-amber-400",
   },
-  supplier: {
-    label: "Dodavateli", icon: Factory,
+  rfq: {
+    label: "Poptávka dodavateli", icon: Handshake,
     chip: "border-lime-200 bg-lime-50 text-lime-800 dark:border-lime-500/30 dark:bg-lime-500/10 dark:text-lime-300",
     active: "border-lime-600 bg-lime-600 text-white", text: "text-lime-700 dark:text-lime-400",
+  },
+  po: {
+    label: "Objednávka dodavateli", icon: ShoppingCart,
+    chip: "border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-300",
+    active: "border-teal-600 bg-teal-600 text-white", text: "text-teal-700 dark:text-teal-400",
+  },
+  po_change: {
+    label: "Změna objednávky", icon: FilePenLine,
+    chip: "border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300",
+    active: "border-orange-600 bg-orange-600 text-white", text: "text-orange-700 dark:text-orange-400",
+  },
+  po_cancel: {
+    label: "Storno objednávky", icon: Ban,
+    chip: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300",
+    active: "border-red-600 bg-red-600 text-white", text: "text-red-700 dark:text-red-400",
+  },
+  supplier: {
+    label: "Dodavateli (ostatní)", icon: Factory,
+    chip: "border-stone-200 bg-stone-50 text-stone-800 dark:border-stone-500/30 dark:bg-stone-500/10 dark:text-stone-300",
+    active: "border-stone-600 bg-stone-600 text-white", text: "text-stone-700 dark:text-stone-400",
   },
 };
 
@@ -298,33 +343,78 @@ export const SENT_AUTO_STYLE: SentKindStyle = {
   active: "border-fuchsia-500 bg-fuchsia-500 text-white", text: "text-fuchsia-600 dark:text-fuchsia-400",
 };
 
-export const SENT_KINDS: SentKind[] = ["email", "quote", "reminder", "supplier"];
+/** Pořadí druhů v archivu (čipy): zákazníkovi → upomínky → dodavateli. Čip se ukáže, jen když takové odeslání existuje. */
+export const SENT_KINDS: SentKind[] = [
+  "email", "quote", "ai_quote", "confirmation", "delivery_note", "invoice", "document", "reminder",
+  "rfq", "po", "po_change", "po_cancel", "supplier",
+];
 
 export function isSentKind(v: unknown): v is SentKind {
   return typeof v === "string" && (SENT_KINDS as string[]).includes(v);
 }
 
-/** Druh odeslaného e-mailu podle předmětu (odpověď = e-mail). */
-export function inferSentKind(subject: string | null | undefined): SentKind {
+/** Vazby záznamu odeslané pošty, které druh upřesní (emails.purchase_order_id, supplier_id, customer_id, category). */
+export interface SentKindHints {
+  /** Objednávka dodavateli, ke které e-mail patří — vystavení / změna / storno podle předmětu. */
+  purchaseOrderId?: string | null;
+  supplierId?: string | null;
+  customerId?: string | null;
+  category?: string | null;
+}
+
+const REPLY_RE = /^(re|odp|aw|fw|fwd|wg)\s*:/i;
+const SUPPLIER_RE = /dodavatel|\brfq\b|anfrage|lieferant/i;
+const PO_RE = /objedn[aá]vk|purchase order|bestellung/i;
+
+/**
+ * Druh odeslaného e-mailu z dat: vazba na objednávku dodavateli a předmět (doklady odcházejí s pevnými
+ * předměty: „Cenová nabídka …", „Potvrzení objednávky …", „Dodací list …", „Faktura …", „Dokument k zakázce …",
+ * „Poptávka <číslo>" dodavateli, „Objednávka OV-…" / „Změna objednávky" / „Storno objednávky"). Odpověď a
+ * přeposlání (Re:, Fwd:, Odp:) = běžná zpráva, i dodavateli. AI nabídku pozná až položka fronty schvalování.
+ */
+export function inferSentKind(subject: string | null | undefined, hints: SentKindHints = {}): SentKind {
   const s = (subject ?? "").trim();
-  if (!s || /^(re|odp|aw|fw|fwd|wg)\s*:/i.test(s)) return "email";
-  if (/upom[ií]nk|reminder|mahnung/i.test(s)) return "reminder";
-  if (/(popt[aá]vk[ay]?|objedn[aá]vk[ay]?)\s+(u\s+)?dodavatel|dodavateli|\brfq\b|anfrage/i.test(s)) return "supplier";
+  const po = Boolean(hints.purchaseOrderId);
+  const toSupplier = po || Boolean(hints.supplierId) || SUPPLIER_RE.test(s);
+  if (!s) return po ? "po" : "email";
+  if (REPLY_RE.test(s)) return "email";
+  if (/upom[ií]nk|p[řr]ipomenut|p[řr]ipom[ií]nk|reminder|mahnung/i.test(s)) return "reminder";
+  if (PO_RE.test(s) && (toSupplier || /\bOV-\d/i.test(s))) {
+    if (/storno|zru[šs]en|cancel/i.test(s)) return "po_cancel";
+    if (/zm[ěe]n|pozastav|revize|aktualiz|change|hold/i.test(s)) return "po_change";
+    if (!/potvrzen[ií]/i.test(s)) return "po";
+  }
+  if (po) return "po";
+  if (/potvrzen[ií] objedn|order confirmation|auftragsbest/i.test(s)) return "confirmation";
+  if (/dodac[ií] list|delivery note|lieferschein/i.test(s)) return "delivery_note";
+  if (/^(z[aá]lohov[aá] |proforma )?faktura|\binvoice\b|rechnung/i.test(s)) return "invoice";
+  if (/popt[aá]vk|\brfq\b|anfrage|request for quot/i.test(s) && toSupplier) return "rfq";
   if (/nab[ií]dk|quotation|angebot|\bnab-\d/i.test(s)) return "quote";
+  if (/^dokument\b/i.test(s)) return "document";
+  if (hints.supplierId) return "supplier";
   return "email";
 }
 
-export function sentKindFromApproval(type: ApprovalType): SentKind {
-  if (type === "quote") return "quote";
+/** Druh podle položky fronty schvalování (název rozliší vystavení / změnu / storno objednávky dodavateli). */
+export function sentKindFromApproval(type: ApprovalType, title?: string | null): SentKind {
+  if (type === "quote") return "ai_quote";
   if (type === "reminder") return "reminder";
-  if (type === "supplier_request" || type === "purchase_order") return "supplier";
+  if (type === "supplier_request") return "rfq";
+  if (type === "purchase_order") {
+    const t = title ?? "";
+    if (/storno|zru[šs]en/i.test(t)) return "po_cancel";
+    if (/zm[ěe]n|pozastav/i.test(t)) return "po_change";
+    return "po";
+  }
   return "email";
 }
 
+/** Typ položky fronty pro druh (rawType záznamu z pošty — starší kód rozlišuje jen hrubě). */
 export function approvalTypeForKind(kind: SentKind): ApprovalType {
-  if (kind === "quote") return "quote";
+  if (kind === "quote" || kind === "ai_quote") return "quote";
   if (kind === "reminder") return "reminder";
-  if (kind === "supplier") return "supplier_request";
+  if (kind === "rfq" || kind === "supplier") return "supplier_request";
+  if (kind === "po" || kind === "po_change" || kind === "po_cancel") return "purchase_order";
   return "email_reply";
 }
 
@@ -433,6 +523,11 @@ export interface SentMailRow {
   body_text: string | null;
   received_at: string;
   order_id?: string | null;
+  customer_id?: string | null;
+  supplier_id?: string | null;
+  /** Objednávka dodavateli (vystavení / změna / storno) — druh v archivu. */
+  purchase_order_id?: string | null;
+  category?: string | null;
   job?: { id: string; number: string | null } | { id: string; number: string | null }[] | null;
   mailbox?: { email: string | null } | { email: string | null }[] | null;
   sender?: { full_name: string | null } | { full_name: string | null }[] | null;
@@ -444,7 +539,9 @@ export function toSentItemFromMail(row: SentMailRow): SentItem {
   const job = one(row.job);
   const mailbox = one(row.mailbox);
   const sender = one(row.sender);
-  const kind = inferSentKind(row.subject);
+  const kind = inferSentKind(row.subject, {
+    purchaseOrderId: row.purchase_order_id ?? null, supplierId: row.supplier_id ?? null, customerId: row.customer_id ?? null, category: row.category ?? null,
+  });
   const to = clean(row.to_email);
   return {
     id: row.id,
@@ -480,7 +577,7 @@ export const SENT_APPROVAL_TYPES: ApprovalType[] = ["email_reply", "quote", "sup
 
 export function toSentItemFromApproval(row: ApprovalSentRow): SentItem | null {
   if (!SENT_APPROVAL_TYPES.includes(row.type)) return null;
-  const kind = sentKindFromApproval(row.type);
+  const kind = sentKindFromApproval(row.type, row.title);
   const payload = (row.payload ?? {}) as { body?: unknown };
   const target = clean(row.target);
   return {
@@ -718,7 +815,8 @@ export function filterSent(
 }
 
 export function countSentKinds(items: readonly SentItem[]): Record<SentFilter, number> {
-  const out: Record<SentFilter, number> = { all: items.length, email: 0, quote: 0, reminder: 0, supplier: 0, auto: 0 };
+  const out = { all: items.length, auto: 0 } as Record<SentFilter, number>;
+  for (const k of SENT_KINDS) out[k] = 0;
   for (const i of items) {
     out[sentItemKind(i)] += 1;
     if (i.auto) out.auto += 1;

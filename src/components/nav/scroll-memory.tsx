@@ -3,7 +3,7 @@
 import * as React from "react";
 import * as nav from "next/navigation";
 import {
-  RESTORE_WINDOW_MS, SCROLL_STORE_KEY, canApply, isApplied, parseScrollStore, restoresOnLoad, scrollEntry, scrollKey, withScrollPos,
+  RESTORE_WINDOW_MS, SCROLL_STORE_KEY, canApply, isApplied, parseScrollStore, restoresOnLoad, sameAddress, scrollEntry, scrollKey, withScrollPos,
   type ScrollEntry, type ScrollStore,
 } from "@/lib/nav/scroll-memory";
 import { URL_WRITE_EVENT } from "@/lib/nav/safe-history";
@@ -17,6 +17,10 @@ import { URL_WRITE_EVENT } from "@/lib/nav/safe-history";
  * - Obnova: jen po Zpět / Vpřed (popstate) a po obnovení stránky — nová navigace (odkaz, menu) začíná nahoře
  *   jako dřív. Nastaví se, až má obsah dost výšky (seznam se načítá i na klientu), nejvýš RESTORE_WINDOW_MS;
  *   vlastní posun uživatele (kolečko, prst, klávesy) obnovu okamžitě ukončí.
+ * - Kdy začít po Zpět / Vpřed: až Next překreslí cílovou adresu (změna usePathname / useSearchParams) — obsah
+ *   stránky už patří k ní. Výjimka: Next cílovou adresu zná jako svou SOUČASNOU (vlastní zápis adresy přes
+ *   writeUrlSafely — otevřené vlákno na telefonu — se do Next synchronizuje až v klidu a Zpět přišel dřív);
+ *   pak se jeho adresa nezmění a obnova začne rovnou z popstate (E2E 43: telefon, 2305 → 0).
  * - router.refresh / živá pošta adresu nemění → nic neobnovují, posun zůstává.
  */
 
@@ -84,6 +88,9 @@ export function ScrollMemory() {
   const sp = useSearchParamsSafe();
   const search = sp?.toString() ?? "";
   const url = `${pathname}${search ? `?${search}` : ""}`;
+  /** Adresa, jak ji zná Next (po Zpět / Vpřed na tutéž se nezmění → obnova rovnou z popstate). */
+  const nextUrl = React.useRef(url);
+  nextUrl.current = url;
 
   // paměť v RAM (sessionStorage se zapisuje odloženě)
   const store = React.useRef<ScrollStore | null>(null);
@@ -91,6 +98,8 @@ export function ScrollMemory() {
   const restoring = React.useRef<{ key: string; entry: ScrollEntry; done: Set<string>; until: number; raf: number } | null>(null);
   const lastHref = React.useRef<string>("");
   const pendingTraversal = React.useRef(false);
+  /** Změna adresy (definice níže) — popstate ji volá, když ji Next sám nevyvolá. */
+  const onUrlChangedRef = React.useRef<() => void>(() => {});
 
   const getStore = React.useCallback((): ScrollStore => {
     if (!store.current) store.current = readStore();
@@ -164,10 +173,13 @@ export function ScrollMemory() {
     const onIntent = () => stopRestore();
     const onPop = () => {
       const href = window.location.href;
-      if (href !== lastHref.current) {
-        pendingTraversal.current = true;
-        traversalUntil = Date.now() + RESTORE_WINDOW_MS;
-      }
+      if (href === lastHref.current) return;
+      pendingTraversal.current = true;
+      traversalUntil = Date.now() + RESTORE_WINDOW_MS;
+      // Next tuhle adresu zná jako svou současnou (naše poslední adresa se do něj nestihla synchronizovat) →
+      // jeho adresa se po Zpět nezmění a účinek změny adresy níže by nepřišel: obnovit rovnou. Pozice se
+      // nastaví, až má obsah dost výšky (seznam se po zavření vlákna teprve překreslí), takže není třeba čekat.
+      if (sameAddress(nextUrl.current, window.location.pathname, window.location.search)) onUrlChangedRef.current();
     };
     const onHide = () => {
       // odchod (obnovení stránky, zavření karty): poslední pozice hned do úložiště
@@ -223,6 +235,7 @@ export function ScrollMemory() {
     const snap = snapshot();
     for (const [elKey, pos] of Object.entries(snap)) save(key, elKey, pos.t, pos.l);
   }, [getStore, restore, save, stopRestore]);
+  onUrlChangedRef.current = onUrlChanged;
   React.useEffect(() => { onUrlChanged(); }, [url, onUrlChanged]);
   // vlastní zápis adresy (useUrlState → writeUrlSafely) se do useSearchParams dostane až při synchronizaci
   // s Next — pozice převzít hned (než uživatel odejde odkazem pryč)
