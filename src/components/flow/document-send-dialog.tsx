@@ -375,7 +375,7 @@ export function DocumentSendDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
@@ -450,7 +450,8 @@ export function DocumentSendDialog({
               )}
             </>
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-popover/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-5 sm:-mb-5 sm:flex-row sm:justify-end sm:p-4">
             <Button type="button" variant="ghost" className="h-11 sm:h-10" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
             {/* faktura: „Vystavit, neposílat" jen před vystavením (vystavenou zavře i Zrušit) */}
             {saveOnly && (pending || (file && !deferred)) && !blocked && (

@@ -167,7 +167,7 @@ export function QuoteSendDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[8%] sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[8%] sm:max-w-2xl">
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
@@ -219,7 +219,8 @@ export function QuoteSendDialog({
               <MailFields mail={mail} onChange={setMail} context={{ jobId }} idPrefix="quote-mail" onToneSaved={(c) => void redraft(c.salutation)} />
             </>
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-popover/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-5 sm:-mb-5 sm:flex-row sm:justify-end sm:p-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
             <Button type="submit" variant="send" disabled={busy || !file}>
               {step === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

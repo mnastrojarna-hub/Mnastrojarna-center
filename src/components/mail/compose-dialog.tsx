@@ -265,7 +265,7 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
     <Dialog open={open} onOpenChange={(o) => !o && !sending && onClose()}>
       <DialogContent
         hideClose
-        className="inset-0 top-0 flex h-[100dvh] max-w-none translate-x-0 flex-col rounded-none sm:inset-auto sm:left-1/2 sm:top-[5%] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-xl"
+        className="inset-0 top-0 flex h-[100dvh] max-h-[100dvh] max-w-none translate-x-0 flex-col rounded-none sm:inset-auto sm:left-1/2 sm:top-[5%] sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-xl"
         data-testid="compose-dialog"
         onPointerDownOutside={(e) => e.preventDefault()}
       >

@@ -33,7 +33,9 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-[15%] z-50 w-full max-w-lg -translate-x-1/2 rounded-xl border bg-popover p-0 text-popover-foreground shadow-2xl data-[state=open]:animate-fade-in",
+        // výška nejvýš do viditelné části obrazovky (dvh — na telefonu bez lišty prohlížeče; vh by sahalo pod ni a spodní
+        // tlačítka by nešla dosáhnout, majitel 6. 11.), obsah se posouvá uvnitř dialogu, ne stránka pod ním
+        "fixed left-1/2 top-[15%] z-50 max-h-[calc(100dvh-15%-1rem)] w-full max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-0 text-popover-foreground shadow-2xl data-[state=open]:animate-fade-in",
         className,
       )}
       {...props}

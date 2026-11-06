@@ -25,7 +25,7 @@ export function SupplierFromInvoiceDialog({ className }: { className?: string })
           <ReceiptText className="h-4 w-4" /> Přiložit fakturu
         </Button>
       </DialogTrigger>
-      <DialogContent className="top-[4%] max-h-[90vh] w-[calc(100%-1.5rem)] max-w-xl space-y-3 overflow-y-auto p-4 sm:top-[8%] sm:p-5">
+      <DialogContent className="top-[4%] max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-xl space-y-3 overflow-y-auto p-4 sm:top-[8%] sm:p-5">
         <DialogTitle>Dodavatel z faktury</DialogTitle>
         <p className="text-sm text-muted-foreground">
           Vyfoť nebo nahraj fakturu od dodavatele — AI z hlavičky založí dodavatele (nebo doplní chybějící údaje u existujícího podle IČO).

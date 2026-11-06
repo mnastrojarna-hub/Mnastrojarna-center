@@ -101,8 +101,8 @@ export function NewJobDialog({
           if (el instanceof HTMLElement && el.closest("[data-combobox-open]")) e.preventDefault();
         }}
         className={cn(
-          "top-0 flex h-[100dvh] max-w-4xl flex-col overflow-hidden rounded-none",
-          "sm:top-[3vh] sm:h-auto sm:max-h-[94vh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
+          "top-0 flex h-[100dvh] max-h-[100dvh] max-w-4xl flex-col overflow-hidden rounded-none",
+          "sm:top-[3dvh] sm:h-auto sm:max-h-[94dvh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
         )}
       >
         <div className="flex items-start gap-3 border-b px-4 py-3 pr-12 sm:px-6">

@@ -101,7 +101,7 @@ export function QuickInquiryDialog({
         <Plus className="h-4 w-4" /> {label}
       </Button>
       <Dialog open={open} onOpenChange={(o) => !busy && (setOpen(o), setError(null))}>
-        <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[8%] sm:max-w-lg">
+        <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[8%] sm:max-w-lg">
           <DialogHead
             icon={MessageSquareQuote}
             tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"

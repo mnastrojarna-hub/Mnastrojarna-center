@@ -45,7 +45,7 @@ export function NoteDialog({ op, mode, onClose }: { op: JobOperation; mode: "pro
 
   return (
     <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent aria-describedby={undefined} className="top-[6%] max-h-[90vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[12%] sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="top-[6%] max-h-[90dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[12%] sm:max-w-md">
         <DialogHead
           icon={problem ? AlertTriangle : StickyNote}
           tone={problem ? "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400" : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"}

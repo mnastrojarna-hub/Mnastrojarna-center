@@ -283,7 +283,7 @@ function FileEditDialog({ file, onOpenChange }: { file: JobFile; onOpenChange: (
 
   return (
     <Dialog open onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[10%] sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[10%] sm:max-w-lg">
         <DialogHead icon={Pencil} tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" title="Upravit dokument" subtitle={file.filename} />
         <form onSubmit={submit} className="space-y-4 p-5">
           <ErrorBox error={error} />
@@ -354,7 +354,7 @@ function Lightbox({ images, index, onIndex, onClose }: { images: JobFile[]; inde
       <DialogContent
         aria-describedby={undefined}
         hideClose
-        className="top-0 h-[100dvh] max-w-none rounded-none border-0 bg-black/95 p-0 text-white sm:top-[3%] sm:h-[94vh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:rounded-xl"
+        className="top-0 h-[100dvh] max-h-[100dvh] max-w-none rounded-none border-0 bg-black/95 p-0 text-white sm:top-[3%] sm:h-[94dvh] sm:max-h-[94dvh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:rounded-xl"
       >
         <div className="flex items-center gap-2 px-4 py-3">
           <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium text-white">{f.title || f.filename}</DialogTitle>
