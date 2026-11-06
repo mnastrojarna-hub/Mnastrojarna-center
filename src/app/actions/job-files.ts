@@ -257,7 +257,46 @@ export async function updateJobFile(
  * PDF odeslané nabídky smazat nejde; poslední PDF nabídky bere nabídku s sebou (`quoteDeleted`),
  * starší / jiná verze nabídku nechá (jen srovná quotes.storage_path).
  */
-export async function deleteJobFile(fileId: string): Promise<ActionResult<{ quoteDeleted: { id: string; number: string | null } | null }>> {
+export interface InvoiceRelease {
+  number: string;
+  /** Číslo bylo v řadě poslední — nová faktura dostane totéž. */
+  numberFree: boolean;
+  /** Stav „Vyfakturováno" vrácen na „Dodáno zákazníkovi". */
+  stageReturned: boolean;
+}
+
+/**
+ * Po smazání posledního PDF faktury z aplikace: zrušit vystavení faktury u zakázky (RPC release_job_invoice —
+ * číslo, datum, splatnost, záznam v knize faktur; čítač řady FV zpět, když bylo číslo poslední) a vrátit stav
+ * „Vyfakturováno" na „Dodáno zákazníkovi". Jiná zbylá PDF faktury / uhrazená faktura → nic.
+ */
+async function releaseInvoiceAfterDelete(db: JobsDb, jobId: string, actorId: string, filename: string): Promise<InvoiceRelease | null> {
+  const { count } = await db.from("job_files").select("id", { count: "exact", head: true })
+    .eq("job_id", jobId).eq("kind", "faktura").eq("archived", false);
+  if ((count ?? 0) > 0) return null;
+  const { data: job } = await db.from("orders").select("invoice_number").eq("id", jobId).maybeSingle();
+  const j = (job ?? {}) as { invoice_number?: string | null };
+  const number = (j.invoice_number ?? "").trim();
+  if (!number) return null;
+  const rpc = db.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  const { data, error } = await rpc.call(db, "release_job_invoice", { p_job: jobId, p_number: number });
+  if (error) {
+    console.error(`[job-files] Zrušení faktury ${number} selhalo: ${error.message}`);
+    return null;
+  }
+  const r = (data ?? {}) as { released?: boolean; numberFree?: boolean; stageReturned?: boolean };
+  if (!r.released) return null;
+  const stageReturned = r.stageReturned === true;
+  const out: InvoiceRelease = { number, numberFree: r.numberFree === true, stageReturned };
+  await logJobEvent(db, {
+    jobId, type: "file", actorId,
+    message: `Faktura ${number} zrušena (smazáno PDF ${filename}) — lze vystavit novou${out.numberFree ? " se stejným číslem" : ""}${stageReturned ? "; stav vrácen na Dodáno zákazníkovi" : ""}`,
+    data: { action: "invoice_released", number, numberFree: out.numberFree, stageReturned },
+  });
+  return out;
+}
+
+export async function deleteJobFile(fileId: string): Promise<ActionResult<{ quoteDeleted: { id: string; number: string | null } | null; invoiceReleased: InvoiceRelease | null }>> {
   const c = await begin("delete");
   if ("error" in c) return fail(c.error);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
@@ -309,6 +348,13 @@ export async function deleteJobFile(fileId: string): Promise<ActionResult<{ quot
       data: { fileId, action: "deleted", ...(quote ? { quoteId: quote.id } : {}) }, actorId: user.id,
     });
 
+    // faktura (6. 11.): smazání posledního PDF faktury z aplikace = zrušení vystavení — číslo, datum a záznam
+    // faktury se uvolní, „Vyfakturováno" se vrátí na „Dodáno" a hned jde vystavit novou fakturu (stejné číslo,
+    // když bylo v řadě poslední)
+    const invoiceReleased = kind === "faktura" && file.origin === "generated" && !prevIds.length
+      ? await releaseInvoiceAfterDelete(db, file.job_id, user.id, file.filename)
+      : null;
+
     // nabídka ↔ PDF: bez dalšího PDF nabídka zmizí i z Nabídek; jinak jen srovnat odkaz na aktuální PDF
     let quoteDeleted: { id: string; number: string | null } | null = null;
     if (quote) {
@@ -322,7 +368,8 @@ export async function deleteJobFile(fileId: string): Promise<ActionResult<{ quot
       }
     }
     revalidateFiles(file.job_id);
-    return { ok: true, quoteDeleted };
+    if (invoiceReleased) revalidatePath("/", "layout");
+    return { ok: true, quoteDeleted, invoiceReleased };
   } catch (err) {
     return fail(err);
   }
