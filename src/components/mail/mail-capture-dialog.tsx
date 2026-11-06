@@ -40,7 +40,8 @@ export function primaryJobOf(res: Pick<BatchResult, "groups">): { jobId: string;
 export function SenderContactPanel({ plan, add, onAdd }: { plan: MailCapturePlan; add: boolean; onAdd: (v: boolean) => void }) {
   const s = plan.sender;
   if (!s.email) return null;
-  const who = [s.name, `<${s.email}>`].filter(Boolean).join(" ");
+  // jméno z podpisu / hlavičky (nikdy surová adresa), pozice z podpisu
+  const who = [s.name || "(jméno doplníš v kontrole)", s.position ? `(${s.position})` : "", `<${s.email}>`].filter(Boolean).join(" ");
   return (
     <div className="mb-3 space-y-1.5 rounded-xl border bg-muted/30 p-2.5 text-sm" data-testid="mail-capture-contact">
       <div className="flex items-start gap-2">
@@ -54,7 +55,7 @@ export function SenderContactPanel({ plan, add, onAdd }: { plan: MailCapturePlan
             <input type="checkbox" className="mt-1 h-4 w-4 shrink-0" checked={add} onChange={(e) => onAdd(e.target.checked)} data-testid="mail-capture-add-contact" />
             <span className="min-w-0">
               Přidat odesílatele <strong>{who}</strong>{s.phone ? ` · ${s.phone}` : ""} do kontaktů zákazníka
-              {plan.customer ? ` ${plan.customer.name}` : " zakázky"} a nastavit ho jako kontaktní osobu.
+              {plan.customer ? ` ${plan.customer.name}` : s.company ? ` ${s.company} (nový, z podpisu e-mailu)` : " zakázky"} a nastavit ho jako kontaktní osobu.
             </span>
           </label>
         )}

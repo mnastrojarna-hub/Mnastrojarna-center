@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyMailContextToReview, isSignatureImage, isSignatureImageSize, mailClassifyContext, mailSubjectTitle, phoneFromSignature,
-  selectMailAttachments, senderContactPlan, type MailCaptureContext,
+  applyMailContextToReview, companyFromDomain, deadlineFromMailText, isSignatureImage, isSignatureImageSize, looksLikePerson, mailClassifyContext,
+  mailDocKindOf, mailDocTypeOf, mailSubjectTitle, mailTextExtractRules, mergeMailExtract, nameFromLocalPart, phoneFromSignature,
+  selectMailAttachments, senderContactPlan, senderNameOf, signatureInfo, type MailCaptureContext,
 } from "@/lib/email/mail-capture-input";
+import { emptyExtracted, emptyParty } from "@/lib/jobs/extracted-normalize";
 import type { BatchReviewModel, DrawingReviewState } from "@/lib/jobs/capture-batch-types";
 import type { ReviewState } from "@/lib/jobs/capture-review";
 
@@ -142,5 +144,112 @@ describe("applyMailContextToReview — co doklady neříkají, doplní e-mail", 
   it("vynechané přílohy jako upozornění", () => {
     const r = applyMailContextToReview(review(), ctx({ skipped: [{ id: "a5", filename: "image001.png", reason: "logo / obrázek z podpisu" }] }));
     expect(r.warnings.some((w) => /image001\.png/.test(w.message))).toBe(true);
+  });
+});
+
+// ── Podpis e-mailu a text jako doklad (majitel 6. 11.) ─────
+const CEJKA = [
+  "Dobrý den,",
+  "prosím o cenovou nabídku na výrobu dle přiloženého výkresu SDF000637.4, 20 ks, termín dodání do 15. 12. 2026.",
+  "Materiál dle výkresu, dodat s atestem 3.1.",
+  "",
+  "S pozdravem",
+  "Jan Čejka",
+  "Nákup",
+  "STEELING, s.r.o.",
+  "Tovární 1402/12, 796 01 Prostějov",
+  "IČO: 08542311, DIČ: CZ08542311",
+  "Tel.: +420 777 248 197",
+  "jan.cejka@steeling.cz | www.steeling.cz",
+  "",
+  "Dne 5. 11. 2026 napsal Mnástrojárna <obchod@mnastrojarna.cz>:",
+  "> Dobrý den, posíláme ceník.",
+].join("\n");
+
+describe("podpis e-mailu → kontaktní osoba, firma, hlavička", () => {
+  it("jméno, pozice, firma, IČO / DIČ, adresa, telefon, e-mail z podpisu (citace se ignoruje)", () => {
+    const sig = signatureInfo(CEJKA, "jan.cejka@steeling.cz");
+    expect(sig).toMatchObject({
+      name: "Jan Čejka", position: "Nákup", company: "STEELING, s.r.o.", ico: "08542311", dic: "CZ08542311",
+      street: "Tovární 1402/12", city: "Prostějov", zip: "796 01", phone: "+420 777 248 197", email: "jan.cejka@steeling.cz",
+    });
+  });
+
+  it("jméno odesílatele nikdy surová adresa: podpis > zobrazované jméno osoby > místní část adresy", () => {
+    expect(senderNameOf({ fromName: "jan.cejka@steeling.cz", fromEmail: "jan.cejka@steeling.cz", body: CEJKA })).toBe("Jan Čejka");
+    expect(senderNameOf({ fromName: "jan.cejka@steeling.cz", fromEmail: "jan.cejka@steeling.cz", body: "Díky, pošlu zítra." })).toBe("Jan Cejka");
+    expect(senderNameOf({ fromName: "Ing. Petra Nová", fromEmail: "petra@firma.cz", body: "Díky" })).toBe("Ing. Petra Nová");
+    expect(senderNameOf({ fromName: "Nákup STEELING", fromEmail: "nakup@steeling.cz", body: "Díky" })).toBe("");
+    expect(senderNameOf({ fromName: "Novák Jan (Strojmetal)", fromEmail: "x@strojmetal.cz", body: "" })).toBe("Novák Jan");
+    expect(nameFromLocalPart("info@firma.cz")).toBe("");
+    expect(looksLikePerson("STEELING, s.r.o.")).toBe(false);
+    expect(looksLikePerson("Ing. Jan Novák, Ph.D.")).toBe(true);
+    expect(companyFromDomain("jan@steeling.cz")).toBe("Steeling");
+    expect(companyFromDomain("jan@gmail.com")).toBe("");
+    expect(companyFromDomain("jan@firma.co.uk")).toBe("Firma");
+  });
+
+  it("podpis „Jan Novák | vedoucí nákupu“ a firma bez přípony velkými písmeny", () => {
+    const sig = signatureInfo("Prosím nabídku.\n\nS pozdravem\nJan Novák | vedoucí nákupu\nKOVO PLUS\nmobil 603 222 333", "jan@kovoplus.cz");
+    expect(sig).toMatchObject({ name: "Jan Novák", position: "vedoucí nákupu", company: "KOVO PLUS", phone: "603 222 333" });
+  });
+
+  it("bez značky podpisu: poslední odstavec s telefonem je podpis, běžný text ne", () => {
+    expect(signatureInfo("Objednáváme 10 ks.\n\nPetr Malý\nTel: 777 111 222", "petr@firma.cz")).toMatchObject({ name: "Petr Malý", phone: "777 111 222" });
+    expect(signatureInfo("Objednáváme 10 ks dle výkresu.\nDodat do 20. 12.", "petr@firma.cz").name).toBe("");
+  });
+
+  it("termín a druh z textu", () => {
+    const now = new Date("2026-11-06T10:00:00Z");
+    expect(deadlineFromMailText("termín dodání do 15. 12. 2026", now)).toBe("2026-12-15");
+    expect(deadlineFromMailText("Dodat do 20.1.", now)).toBe("2027-01-20");
+    expect(deadlineFromMailText("delivery by 2026-12-01", now)).toBe("2026-12-01");
+    expect(deadlineFromMailText("materiál 1.4301, 10 ks", now)).toBe("");
+    expect(mailDocKindOf({ category: "objednavka", subject: "x", body: "" })).toBe("objednavka");
+    expect(mailDocKindOf({ category: "ostatni", subject: "Poptávka šroubů", body: "" })).toBe("poptavka");
+    expect(mailDocKindOf({ category: null, subject: "Objednávka č. 4471", body: "" })).toBe("objednavka");
+    expect(mailDocKindOf({ category: null, subject: "Výkresy", body: "Objednáváme 10 ks." })).toBe("objednavka");
+    expect(mailDocKindOf({ category: null, subject: "RE: výkresy", body: "v příloze" })).toBe("poptavka");
+    expect(mailDocTypeOf({ docKind: "potvrzeni", issuer: "zakaznik" })).toBe("objednavka_zakaznik");
+    expect(mailDocTypeOf({ docKind: "nabidka", issuer: "dodavatel" })).toBeNull();
+    // e-mail dodavatelské kategorie (potvrzení naší objednávky, nabídka dodavatele) není doklad zákazníka
+    const sup = mailTextExtractRules({ subject: "Potvrzení objednávky OV-1", fromName: "", fromEmail: "objednavky@hruby-cnc.cz", category: "potvrzeni_objednavky", body: "", rawBody: "Potvrzujeme.\nPavel Hrubý\ntel 315 700 120" });
+    expect(sup.doc.issuer).toBe("dodavatel");
+    expect(mailDocTypeOf(sup.doc)).toBeNull();
+    expect(sup.person.name).toBe("Pavel Hrubý");
+  });
+
+  it("pravidla: text e-mailu jako poptávka — zákazník z podpisu, kontakt, položka s počtem z textu, termín", () => {
+    const ex = mailTextExtractRules({
+      subject: "RE: Poptávka – stud bolt M42", fromName: "jan.cejka@steeling.cz", fromEmail: "jan.cejka@steeling.cz", category: "poptavka", body: "", rawBody: CEJKA,
+    }, ["SDF000637.4.pdf"], new Date("2026-11-06T10:00:00Z"));
+    expect(ex.aiUsed).toBe(false);
+    expect(ex.doc).toMatchObject({ docKind: "poptavka", issuer: "zakaznik", requiredDeliveryDate: "2026-12-15", summary: "Poptávka – stud bolt M42" });
+    expect(ex.doc.customer).toMatchObject({ name: "STEELING, s.r.o.", ico: "08542311", dic: "CZ08542311", city: "Prostějov", zip: "796 01", email: "jan.cejka@steeling.cz", phone: "+420 777 248 197", contactPerson: "Jan Čejka" });
+    expect(ex.doc.items).toEqual([expect.objectContaining({ drawingNumber: "SDF000637.4", quantity: 20, unit: "ks" })]);
+    expect(ex.person).toEqual({ name: "Jan Čejka", position: "Nákup", email: "jan.cejka@steeling.cz", phone: "+420 777 248 197" });
+  });
+
+  it("pravidla: neznámý odesílatel bez podpisu → firma podle domény, jméno z adresy, objednávka s číslem", () => {
+    const ex = mailTextExtractRules({
+      subject: "Objednávka PO-4471", fromName: "", fromEmail: "petr.hora@kovoplus.cz", category: null, body: "", rawBody: "Objednáváme dle nabídky NAB-2026-031:\n4711-02 – 10 ks\n4711-03 – 4 ks\nDíky",
+    }, ["4711-02.pdf", "4711-03.pdf"]);
+    expect(ex.doc).toMatchObject({ docKind: "objednavka", documentNumber: "PO-4471", customerOrderNumber: "PO-4471", ourQuoteNumber: "NAB-2026-031" });
+    expect(ex.doc.customer).toMatchObject({ name: "Kovoplus", contactPerson: "Petr Hora", email: "petr.hora@kovoplus.cz" });
+    expect(ex.doc.items.map((i) => [i.drawingNumber, i.quantity])).toEqual([["4711-02", 10], ["4711-03", 4]]);
+  });
+
+  it("sloučení AI + pravidla: AI má přednost, mezery doplní podpis; adresa jako jméno se nahradí", () => {
+    const rules = mailTextExtractRules({ subject: "Poptávka", fromName: "jan.cejka@steeling.cz", fromEmail: "jan.cejka@steeling.cz", category: "poptavka", body: "", rawBody: CEJKA }, ["SDF000637.4.pdf"]);
+    const ai = { ...emptyExtracted(), docKind: "ostatni" as const, issuer: "neznamy" as const, customer: { ...emptyParty(), name: "Steeling s. r. o.", contactPerson: "jan.cejka@steeling.cz" },
+      items: [{ drawingNumber: "SDF000637.4", revision: "A", name: "Stud bolt M42", description: "", material: "", quantity: 0, unit: "ks", unitPrice: 0, deliveryDate: "" }], confidence: 0.9 };
+    const m = mergeMailExtract({ doc: ai, position: "" }, rules);
+    expect(m.aiUsed).toBe(true);
+    expect(m.doc.docKind).toBe("poptavka");
+    expect(m.doc.issuer).toBe("zakaznik");
+    expect(m.doc.customer).toMatchObject({ name: "Steeling s. r. o.", ico: "08542311", contactPerson: "Jan Čejka", phone: "+420 777 248 197" });
+    expect(m.doc.items[0]).toMatchObject({ name: "Stud bolt M42", quantity: 20 });
+    expect(m.doc.requiredDeliveryDate).toBe("2026-12-15");
+    expect(m.person).toMatchObject({ name: "Jan Čejka", position: "Nákup" });
   });
 });

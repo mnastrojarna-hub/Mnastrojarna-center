@@ -1,0 +1,41 @@
+{
+  "docKind": "objednavka",
+  "issuer": "zakaznik",
+  "documentNumber": "PO-MAIL-HM-7",
+  "documentDate": "2026-11-02",
+  "customer": {
+    "name": "Hydraulika Morava s.r.o.",
+    "ico": "08542311",
+    "dic": "CZ08542311",
+    "street": "Tovární 1402/12",
+    "city": "Prostějov",
+    "zip": "796 01",
+    "country": "CZ",
+    "email": "horakova@hydraulika-morava.cz",
+    "phone": "+420 582 333 410",
+    "contactPerson": "Lenka Horáková"
+  },
+  "supplier": { "name": "", "ico": "", "dic": "", "street": "", "city": "", "zip": "", "country": "", "email": "", "phone": "", "contactPerson": "" },
+  "customerOrderNumber": "PO-MAIL-HM-7",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "2026-12-18",
+  "promisedDeliveryDate": "",
+  "items": [
+    { "drawingNumber": "HM-1050-03", "revision": "C", "name": "Těleso ventilu", "description": "", "material": "11SMnPb30", "quantity": 40, "unit": "ks", "unitPrice": 1250, "deliveryDate": "" },
+    { "drawingNumber": "HM-1050-07", "revision": "A", "name": "Víko", "description": "", "material": "EN AW-6082", "quantity": 40, "unit": "ks", "unitPrice": 310, "deliveryDate": "" }
+  ],
+  "totalWithoutVat": 62400,
+  "currency": "CZK",
+  "paymentTerms": "30 dní",
+  "deliveryTerms": "",
+  "deliveryLeadTime": null,
+  "note": "",
+  "summary": "Objednávka PO-MAIL-HM-7 od Hydraulika Morava s.r.o. na těleso ventilu a víko, 40 ks, termín 18. 12. 2026.",
+  "confidence": 0.93,
+  "needsClarification": [],
+  "roleEmails": []
+}

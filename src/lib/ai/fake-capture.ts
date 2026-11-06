@@ -89,6 +89,16 @@ export function fakeExtractRaw(type: BatchDocType, group: string | null): unknow
   return readJson(base) ?? {};
 }
 
+/**
+ * Fixture čtení TEXTU e-mailu (mail-text-reader): batch/mail-<značka>.json podle značky „__mail-<značka>"
+ * v textu e-mailu; bez značky null = text se čte jen pravidly (mailTextExtractRules).
+ */
+export function fakeMailRaw(tag: string | null | undefined): unknown {
+  const dir = fakeBatchDir();
+  if (!dir || !tag || !NAME_RE.test(`mail-${tag.toLowerCase()}`)) return null;
+  return readJson(safeBatchFile(dir, `mail-${tag.toLowerCase()}`));
+}
+
 /** Skupina fixture dokladu podle značek jeho souborů (null = bez značky → AI_FAKE_CAPTURE). */
 export function fakeGroupFor(type: BatchDocType, filenames: string[]): string | null {
   for (const f of filenames) {

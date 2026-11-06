@@ -1,0 +1,40 @@
+{
+  "docKind": "dodaci_list",
+  "issuer": "dodavatel",
+  "documentNumber": "DL-MAIL-91",
+  "documentDate": "2026-11-04",
+  "customer": { "name": "", "ico": "", "dic": "", "street": "", "city": "", "zip": "", "country": "", "email": "", "phone": "", "contactPerson": "" },
+  "supplier": {
+    "name": "Kovoobrábění Hrubý s.r.o.",
+    "ico": "25874411",
+    "dic": "CZ25874411",
+    "street": "Dělnická 455",
+    "city": "Kralupy nad Vltavou",
+    "zip": "278 01",
+    "country": "CZ",
+    "email": "objednavky@hruby-cnc.cz",
+    "phone": "+420 315 700 120",
+    "contactPerson": "Pavel Hrubý"
+  },
+  "customerOrderNumber": "OV-MAIL-NONE-1",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "",
+  "items": [
+    { "drawingNumber": "9100-77", "revision": "A", "name": "Hřídel", "description": "", "material": "42CrMo4", "quantity": 5, "unit": "ks", "unitPrice": 0, "deliveryDate": "" }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "deliveryLeadTime": null,
+  "note": "",
+  "summary": "Dodací list dodavatele DL-MAIL-91 k objednávce OV-MAIL-NONE-1.",
+  "confidence": 0.92,
+  "needsClarification": [],
+  "roleEmails": []
+}

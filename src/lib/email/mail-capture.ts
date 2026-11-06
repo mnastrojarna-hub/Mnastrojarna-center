@@ -9,12 +9,13 @@ import { getVisibleEmailRow } from "@/lib/data/mail";
 import { logAudit } from "@/lib/audit";
 import { loadEmailAttachment } from "@/lib/email/attachments";
 import { extractAndApply, linkThread, type MailJobActor } from "@/lib/email/job-link-store";
-import { cleanMailText } from "@/lib/email/job-instructions";
+import { cleanMailText, mailOwnText } from "@/lib/email/job-instructions";
 import { matchPartyByEmail, type PartyRef } from "@/lib/email/match";
 import { isUuidLike, jobPeopleFromEmail } from "@/lib/email/visibility";
 import { customerOwnerOf, mailboxOwnerOf } from "@/lib/email/mail-job-people";
 import {
-  isImageAttachment, isSignatureImageSize, mailBodyForContext, phoneFromSignature, selectMailAttachments, senderContactPlan,
+  isImageAttachment, isSignatureImageSize, mailBodyForContext, mailTextExtractRules, phoneFromSignature, selectMailAttachments, senderContactPlan,
+  senderNameOf, signatureInfo,
   type MailAttachmentRow, type MailAttachmentSkip, type MailCaptureContext, type SenderContactPlan,
 } from "@/lib/email/mail-capture-input";
 import { imageDimensions } from "@/lib/jobs/capture-files";
@@ -109,23 +110,33 @@ export async function splitAlreadyStored(
   return { take, skipped };
 }
 
-/** Kontext e-mailu bez souborů (odesílatel, zákazník, text, telefon z podpisu). */
-export async function mailContextOf(db: JobsDb, email: EmailRow): Promise<MailCaptureContext> {
+/**
+ * Kontext e-mailu bez souborů: odesílatel (jméno z podpisu / hlavičky — nikdy surová adresa), zákazník,
+ * text, telefon z podpisu a text e-mailu vytěžený pravidly jako doklad (AI ho doplní při roztřídění).
+ */
+export async function mailContextOf(db: JobsDb, email: EmailRow, filenames: readonly string[] = []): Promise<MailCaptureContext> {
   const customer = await customerOf(db, email);
-  return {
+  const fromEmail = (email.from_email ?? "").trim().toLowerCase();
+  const sig = signatureInfo(email.body_text, fromEmail);
+  const fromName = senderNameOf({ fromName: email.from_name, fromEmail, body: email.body_text }, sig);
+  const ctx: MailCaptureContext = {
     emailId: email.id,
     threadId: email.thread_id,
     subject: (email.subject ?? "").trim(),
-    fromName: (email.from_name ?? "").trim(),
-    fromEmail: (email.from_email ?? "").trim().toLowerCase(),
+    fromName,
+    fromEmail,
     category: email.category,
     customerId: customer?.id ?? null,
     customerName: customer?.name ?? null,
+    supplierId: customer ? null : email.supplier_id ?? null,
     body: mailBodyForContext(email.body_text),
-    phone: phoneFromSignature(email.body_text),
+    ownText: mailOwnText(email.body_text).slice(0, 8000),
+    phone: sig.phone || phoneFromSignature(email.body_text),
     files: [],
     skipped: [],
   };
+  ctx.extract = mailTextExtractRules({ ...ctx, rawBody: email.body_text }, filenames);
+  return ctx;
 }
 
 /**
@@ -183,6 +194,8 @@ export async function copyMailAttachmentsToCapture(
     ctx.files.push({ attachmentId: att.id, path, sha256: sha });
   }
   ctx.skipped = skip;
+  // položky z textu podle čísel výkresů v názvech příloh
+  ctx.extract = mailTextExtractRules({ ...ctx, rawBody: email.body_text }, refs.map((r) => r.filename));
   return { refs, ctx };
 }
 
@@ -243,7 +256,10 @@ export async function mailCapturePlan(emailId: string, fixedJobId: string | null
     skipped,
     subject: ctx.subject,
     customer: ctx.customerId ? { id: ctx.customerId, name: ctx.customerName ?? "" } : null,
-    sender: senderContactPlan({ name: ctx.fromName, email: ctx.fromEmail, phone: ctx.phone }, ctx.customerId, contacts),
+    sender: senderContactPlan({
+      name: ctx.fromName, email: ctx.fromEmail, phone: ctx.phone,
+      position: ctx.extract?.person.position, company: ctx.customerId ? undefined : ctx.extract?.doc.customer.name,
+    }, ctx.customerId, contacts),
     jobId: email.order_id,
     resumable,
   };
@@ -358,25 +374,33 @@ export async function finishMailCapture(input: FinishMailCaptureInput): Promise<
     out.changes = r.changes;
   }
 
-  // 5) kontaktní osoba = odesílatel (Karta zákazníka): existující kontakt se propojí, nový jen se souhlasem
+  // 5) kontaktní osoba = odesílatel (Karta zákazníka): jméno z podpisu / hlavičky (nikdy surová adresa),
+  //    telefon a pozice z podpisu; existující kontakt se propojí, nový jen se souhlasem
   const { data: fresh } = await db.from("orders").select("customer_id, customer_contact_id").eq("id", jobId).maybeSingle();
   const now = fresh as { customer_id: string | null; customer_contact_id: string | null } | null;
   const fromEmail = (email.from_email ?? "").trim().toLowerCase();
   if (now?.customer_id && fromEmail) {
+    const person = mail?.emailId === email.id ? mail.extract?.person ?? null : null;
+    const sig = signatureInfo(email.body_text, fromEmail);
+    const name = person?.name || senderNameOf({ fromName: email.from_name, fromEmail, body: email.body_text }, sig);
+    const phone = person?.phone || sig.phone;
+    const position = person?.position || sig.position;
     const { data: contacts } = await db.from("customer_contacts").select("id, name, email, phone").eq("customer_id", now.customer_id).limit(300);
     const list = (contacts ?? []) as { id: string; name: string; email: string | null; phone: string | null }[];
     const existing = list.find((k) => (k.email ?? "").trim().toLowerCase() === fromEmail) ?? null;
     if ((existing && now.customer_contact_id !== existing.id && (input.created || !now.customer_contact_id)) || (!existing && input.addContact)) {
-      const r = await updateJob(jobId, { newCustomerContact: { name: (email.from_name ?? "").trim() || undefined, email: fromEmail } });
-      if (r.ok) {
-        out.contact = existing ? "linked" : "added";
-        const phone = phoneFromSignature(email.body_text);
-        if (!existing && phone) {
-          const { data: k } = await db.from("customer_contacts").select("id, phone").eq("customer_id", now.customer_id).eq("email", fromEmail).maybeSingle();
-          const row = k as { id: string; phone: string | null } | null;
-          if (row && !row.phone) await db.from("customer_contacts").update({ phone } as never).eq("id", row.id);
-        }
-      } else console.error(`[mail-capture] Kontakt odesílatele: ${r.error}`);
+      const r = await updateJob(jobId, { newCustomerContact: { name: name || undefined, email: fromEmail } });
+      if (r.ok) out.contact = existing ? "linked" : "added";
+      else console.error(`[mail-capture] Kontakt odesílatele: ${r.error}`);
+    }
+    // telefon a pozice z podpisu do Karty zákazníka (jen prázdné)
+    if (phone || position) {
+      const { data: k } = await db.from("customer_contacts").select("id, phone, position").eq("customer_id", now.customer_id).eq("email", fromEmail).maybeSingle();
+      const row = k as { id: string; phone: string | null; position: string | null } | null;
+      const patch: Record<string, string> = {};
+      if (row && !row.phone && phone) patch.phone = phone;
+      if (row && !row.position && position) patch.position = position.slice(0, 120);
+      if (row && Object.keys(patch).length) await db.from("customer_contacts").update(patch as never).eq("id", row.id);
     }
   }
 

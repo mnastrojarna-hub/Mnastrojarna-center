@@ -1,0 +1,41 @@
+{
+  "docKind": "poptavka",
+  "issuer": "zakaznik",
+  "documentNumber": "",
+  "documentDate": "",
+  "customer": {
+    "name": "STEELING, s.r.o.",
+    "ico": "25931644",
+    "dic": "CZ25931644",
+    "street": "Tovární 1402/12",
+    "city": "Prostějov",
+    "zip": "796 01",
+    "country": "CZ",
+    "email": "jan.cejka@steeling.cz",
+    "phone": "+420 777 248 197",
+    "contactPerson": "Jan Čejka"
+  },
+  "contactPosition": "nákup",
+  "supplier": { "name": "", "ico": "", "dic": "", "street": "", "city": "", "zip": "", "country": "", "email": "", "phone": "", "contactPerson": "" },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "2026-12-15",
+  "promisedDeliveryDate": "",
+  "items": [
+    { "drawingNumber": "SDF000641.2", "revision": "A", "name": "Stud bolt M42", "description": "dodat s atestem 3.1", "material": "", "quantity": 20, "unit": "ks", "unitPrice": 0, "deliveryDate": "" }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "deliveryLeadTime": null,
+  "note": "Dodat s atestem 3.1",
+  "summary": "Poptávka na závrtné šrouby M42 dle výkresu SDF000641.2, 20 ks, termín do 15. 12. 2026.",
+  "confidence": 0.9,
+  "needsClarification": [],
+  "roleEmails": []
+}

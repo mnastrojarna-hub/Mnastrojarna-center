@@ -22,7 +22,7 @@ import {
   uniqueWarnings, validateBatchSort,
 } from "@/lib/jobs/capture-batch";
 import {
-  NEW_GROUP_ASSIGN, canAutoApplyBatch, drawingDocMatch, groupBatch, ownDrawingNumbers, groupDocOf, journalConflictOf, reconcileGroup, sameDocParty, sanitizeBatchApplyState, sanitizeBatchSort, swapParties,
+  MAIL_DOC_ID, NEW_GROUP_ASSIGN, canAutoApplyBatch, drawingDocMatch, groupBatch, ownDrawingNumbers, groupDocOf, journalConflictOf, reconcileGroup, sameDocParty, sanitizeBatchApplyState, sanitizeBatchSort, swapParties,
   type GroupJobCandidate, type ReconcileDoc, type StrongMatch,
 } from "@/lib/jobs/capture-batch-reconcile";
 import {
@@ -38,7 +38,7 @@ import {
   type CaptureFileRef, type PartyMatchView, type ReviewOptions,
 } from "@/lib/jobs/capture-review";
 import { moveMaster } from "@/lib/anonymize/master";
-import type { CaptureDocKind, CustomerMatchCandidate, ExtractedBusinessDoc } from "@/lib/jobs/capture-types";
+import type { CaptureDocKind, CustomerMatchCandidate, ExtractedBusinessDoc, ExtractedItem } from "@/lib/jobs/capture-types";
 import { emptyExtracted, normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { docNumbersEqual, matchCustomer, matchJob, matchParty, type JobMatchCandidateExt } from "@/lib/jobs/matching";
 import { recordTrainingExample } from "@/lib/jobs/training";
@@ -75,7 +75,11 @@ import { businessDocFromInvoice } from "@/lib/supplier-invoices/extract";
 import { createInvoiceFromBatchDoc, isSupplierInvoiceDoc } from "@/lib/supplier-invoices/capture-bridge";
 import { supplierInvoicePerms } from "@/lib/supplier-invoices/access";
 import { THANKS_TEXT } from "@/lib/supplier-invoices/types";
-import { applyMailContextToReview, mailClassifyContext, type MailCaptureContext } from "@/lib/email/mail-capture-input";
+import {
+  applyMailContextToReview, mailClassifyContext, mailDocTypeOf, mailTextExtractRules, mergeMailExtract, type MailCaptureContext, type MailTextExtract,
+} from "@/lib/email/mail-capture-input";
+import { itemHintsFromMail } from "@/lib/email/job-instructions";
+import { readMailText } from "@/lib/ai/mail-text-reader";
 
 /**
  * Dávkové focení — serverová orchestrace (relace v DB, servisní klíč, oprávnění hlídá každá funkce):
@@ -306,6 +310,14 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
   const mail = opts.mail ?? null;
   const prep = await prepareBatchFiles(db, user.id, mail ? files.map((f) => ({ ...f, bundle: `mail:${mail.emailId}` })) : files);
   if (!prep.files.length) return fail("Soubory se nepodařilo načíst z úložiště — nahraj je prosím znovu.");
+  // text e-mailu jako doklad dávky (majitel 6. 11.): pravidla hned, AI souběžně s roztříděním příloh
+  if (mail && !mail.extract) mail.extract = mailTextExtractRules({ ...mail, rawBody: mail.ownText ?? mail.body }, prep.files.map((f) => f.filename));
+  const mailAi = mail && ai.available
+    ? readMailText({
+      subject: mail.subject, fromName: mail.fromName, fromEmail: mail.fromEmail, text: mail.ownText ?? mail.body,
+      attachmentNames: prep.files.map((f) => f.filename), category: mail.category, deadline, clientSignal: opts.signal,
+    }).then((r) => ({ ok: true as const, r }), (err: unknown) => ({ ok: false as const, err }))
+    : null;
   const expectedType = opts.expectedKind ? batchTypeFor(opts.expectedKind, opts.expectedKind === "poptavka" || opts.expectedKind === "objednavka" ? "zakaznik" : "neznamy") : null;
   const visual = prep.pages.filter((p) => p.source !== "file");
   const readable = visual.filter((p) => prep.files.find((f) => f.id === p.fileId)?.aiReadable);
@@ -418,6 +430,16 @@ export async function analyzeBatch(c: Ctx, files: CaptureFileRef[], opts: Analyz
       const ids = readable.map((p) => p.id);
       const d = activeDocs(sort).find((x) => isBusinessType(x.type) && x.pageIds.length === ids.length && ids.every((id) => x.pageIds.includes(id)));
       if (d && !isSupplierInvoiceDoc(d.type)) whole = { doc: wholeRes.doc, usage: wholeRes.usage, pageIds: d.pageIds };
+    }
+  }
+
+  if (mail && mailAi) {
+    const res = await mailAi;
+    if (res.ok && res.r) mail.extract = mergeMailExtract(res.r, mail.extract!);
+    else if (!res.ok) {
+      const why = aiFailureMessage(res.err).replace(/\.$/, "");
+      mail.extract = { ...mail.extract!, reason: why };
+      warnings.push(makeWarning("ai_failed", "info", [], `Text e-mailu AI nepřečetla (${why}) — zákazník, kontakt a počty kusů z textu jen podle pravidel.`));
     }
   }
 
@@ -736,7 +758,61 @@ async function reviewContext(c: Ctx, session: BatchSession, sort: BatchSort): Pr
       jobHints: loose.hints,
     });
   }
+  const mailDoc = await mailReconcileDoc(db, session, md, docs);
+  if (mailDoc) docs.push(mailDoc);
   return { session, sort, rows, md, docs, typeConflicts };
+}
+
+/**
+ * Položky z textu e-mailu podle čísel výkresů, která AI přečetla z příloh (názvy souborů bývají „scan.pdf"):
+ * „8820-01 – 10 ks" v textu → položka 8820-01 × 10. Pravidla: položky celé znovu; AI: jen doplnit počet /
+ * chybějící výkres s výslovným počtem v textu.
+ */
+function mailItemsWithDrawings(ex: MailTextExtract, mail: MailCaptureContext, drawingNumbers: string[], filenames: string[]): ExtractedItem[] {
+  const names = [...drawingNumbers.map((n) => `${n}.pdf`), ...filenames];
+  const hints = itemHintsFromMail(mail.body, names).filter((h) => h.quantity !== null && h.quantity > 0);
+  const fromHints = hints.map((h): ExtractedItem => ({
+    drawingNumber: h.drawingNumber, revision: "", name: h.name ?? "", description: "", material: "", quantity: h.quantity ?? 0, unit: "ks", unitPrice: 0, deliveryDate: "",
+  }));
+  if (!ex.aiUsed) return fromHints;
+  const items = ex.doc.items.map((i) => ({ ...i }));
+  for (const h of fromHints) {
+    const hit = items.find((i) => i.drawingNumber && docNumbersEqual(i.drawingNumber, h.drawingNumber));
+    if (hit) { if (!(hit.quantity > 0)) hit.quantity = h.quantity; }
+    else items.push(h);
+  }
+  return items;
+}
+
+/**
+ * Text e-mailu jako doklad dávky bez souboru (Pošta → zakázka): zákaznická poptávka / objednávka z textu,
+ * zákazník podle odesílatele (CRM), jinak podle hlavičky podpisu (IČO / název / e-mail), shoda se zakázkou
+ * podle čísel v textu (naše nabídka, objednávka zákazníka). E-mail od dodavatele / bez vytěžení = nic.
+ */
+async function mailReconcileDoc(db: JobsDb, session: BatchSession, md: MatchData, fileDocs: ReconcileDoc[]): Promise<ReconcileDoc | null> {
+  const mail = session.mail;
+  const ex = mail?.extract;
+  if (!mail || !ex || mail.supplierId) return null;
+  const type = mailDocTypeOf(ex.doc);
+  if (!type) return null;
+  const meta = BATCH_TYPES[type];
+  const drawingNumbers = fileDocs.filter((d) => !isBusinessType(d.type)).flatMap((d) => ownDrawingNumbers(d));
+  const doc: ExtractedBusinessDoc = {
+    ...ex.doc, docKind: meta.docKind ?? ex.doc.docKind, issuer: "zakaznik",
+    items: mailItemsWithDrawings(ex, mail, drawingNumbers, session.files.map((f) => f.filename)),
+  };
+  const pm = partyMatches(doc, type, md);
+  const customerMatch: PartyMatchView | null = mail.customerId
+    ? { id: mail.customerId, name: mail.customerName || md.customers.find((c) => c.id === mail.customerId)?.name || "", reason: "odesílatel e-mailu", score: 95 }
+    : pm.customerMatch;
+  const strongMatch = await strongMatchOf(db, type, doc, md, customerMatch?.id ?? null, null);
+  return {
+    id: MAIL_DOC_ID, type, flags: [], documentNumber: doc.documentNumber,
+    drawingNumbers: doc.items.map((i) => i.drawingNumber).filter(Boolean), title: "Text e-mailu", filename: "",
+    aiType: type, extract: { kind: "business", doc }, aiUsed: ex.aiUsed, reason: ex.reason ?? null,
+    confidence: ex.aiUsed ? doc.confidence : null, customerMatch, supplierMatch: null, strongMatch,
+    bundleKey: `mail:${mail.emailId}`, source: "mail",
+  };
 }
 
 async function candidateJobs(
@@ -788,6 +864,7 @@ async function candidateJobs(
 async function duplicatesOf(db: JobsDb, session: BatchSession, docs: ReconcileDoc[], targetJobs: Map<string, JobDetail>): Promise<Record<string, DuplicateRef>> {
   const out: Record<string, DuplicateRef> = {};
   for (const d of docs) {
+    if (d.source === "mail") continue;
     const meta = BATCH_TYPES[d.type];
     const f = fileOfPageOfDoc(session, d);
     const kind: JobFileKind = meta.fileKind;
@@ -969,8 +1046,10 @@ async function reviewModel(
   const keepCustomers = new Set<string>();
   for (const g of grouped.groups) {
     const gdocs = g.docIds.map((id) => ctx.docs.find((d) => d.id === id)!).filter(Boolean);
-    // e-mail (Založit zakázku / Vytvořit nabídku): skupina bez dokladu a bez shody → nová zakázka (ne „vyber")
-    const override = opts.targets[g.key] ?? (session.mail && g.targetRequired && !g.targetJobId && !session.fixedJobId ? "new" : null);
+    // e-mail (Založit zakázku / Vytvořit nabídku): skupina výkresů bez shody → nová zakázka (ne „vyber");
+    // dodavatelský doklad z e-mailu (DL, potvrzení…) zakázku nezakládá — cíl vybere člověk jako u focení
+    const supplierDocs = gdocs.some((d) => isBusinessType(d.type) && sideOf(d.type) === "supplier");
+    const override = opts.targets[g.key] ?? (session.mail && g.targetRequired && !g.targetJobId && !session.fixedJobId && !supplierDocs ? "new" : null);
     const jobs = await candidateJobs(ctx, gdocs, g.targetJobId, override, session.fixedJobId, db);
     const jobMap = new Map(jobs.map((j) => [j.job.id, j.job as JobDetail]));
     const { data: winners } = jobs.length
@@ -1005,6 +1084,11 @@ async function reviewModel(
   // přílohy e-mailu: zákazník odesílatele, kontaktní osoba, předmět a počty kusů z textu (jen prázdná místa)
   const mailCtx = session.mail ?? null;
   if (mailCtx?.customerId) keepCustomers.add(mailCtx.customerId);
+  for (const d of ctx.docs) if (d.source === "mail" && d.customerMatch) keepCustomers.add(d.customerMatch.id);
+  // doklad z textu e-mailu nemá kartu — upozornění na něj míří jen na skupinu / ostatní doklady
+  for (const [i, w] of warnings.entries()) {
+    if (w.docIds.includes(MAIL_DOC_ID)) warnings[i] = { ...w, docIds: w.docIds.filter((id) => id !== MAIL_DOC_ID) };
+  }
   const recentJobs = [...ctx.md.jobs].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 300);
   for (const j of recentJobs.slice(0, 50)) if (j.customerId) keepCustomers.add(j.customerId);
   const options = trimOptions({
@@ -1356,7 +1440,7 @@ async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown)
       parties[d.id] = b ? { name: b.customer.name, ico: b.customer.ico } : null;
     }
   }
-  const sane = sanitizeBatchApplyState(rawState, { pages: session.pages, margins, ourIco: ourIco(), customerParties: parties });
+  const sane = sanitizeBatchApplyState(rawState, { pages: session.pages, margins, ourIco: ourIco(), customerParties: parties, mailItems: Boolean(session.mail?.extract) });
   if (!sane.ok) return { ok: false, status: "failed", error: sane.error, aiUsed: session.aiUsed, groups: [], docs: [], pending: [], warnings: [] };
   let state = sane.state;
   const auto = state.auto === true;
@@ -1392,8 +1476,10 @@ async function applyLocked(cUser: Ctx, session: BatchSession, rawState: unknown)
     return has(a) - has(b);
   });
 
+  // text e-mailu (doklad bez souboru) patří ke každé skupině dávky — stejný sloučený doklad jako v kontrole
+  const mailDocs = ctx.docs.filter((d) => d.source === "mail");
   for (const g of groupsOrdered) {
-    const gdocs = g.docIds.map((id) => ctx.docs.find((d) => d.id === id)).filter((d): d is ReconcileDoc => Boolean(d));
+    const gdocs = [...g.docIds.map((id) => ctx.docs.find((d) => d.id === id)).filter((d): d is ReconcileDoc => Boolean(d)), ...mailDocs];
     const gd = groupDocOf(gdocs, ourIco());
     const primary = gdocs.find((d) => d.id === gd.primaryId) ?? null;
     const stepKey = `group:${g.key}`;
@@ -1887,11 +1973,16 @@ async function applyDoc(
   }
 
   if (ds.kind === "drawing") {
-    const st = ds.state;
+    let st = ds.state;
     if (st.onDuplicate === "skip" && rdoc && (await isDuplicate(db, session, rdoc, jobId))) {
       await removeStoragePaths(db, draftPaths(session, draft));
       return { ...base, skipped: "duplicate", title: `Výkres ${st.drawingNumber}`.trim(), summary: "Už uloženo dříve — neukládá se znovu." };
     }
+    // řádek Položek založený z tohoto výkresu (vazba docItem): počet doplněný v Položkách platí i pro kartu
+    // výkresu a archiv (karta prázdná → z řádku; řádek prázdný → z karty níže při doplnění položky)
+    const rowOfDrawing = st.link.mode === "docItem" ? g.job.items.find((i) => i.key === (st.link as { itemKey: string }).itemKey) ?? null : null;
+    const rowQty = rowOfDrawing ? cleanNumber(rowOfDrawing.quantity) : null;
+    if (!(cleanNumber(st.quantity) ?? 0) && rowQty && rowQty > 0) st = { ...st, quantity: String(rowQty) };
     const number = st.drawingNumber.trim();
     const title = `Výkres${number ? ` ${number}` : ""}${st.revision ? ` rev. ${st.revision}` : ""}`;
     const itemId = await resolveItemLink(db, st.link, jobId, done, `${session.captureId}:${g.key}:draw-${draft.id}`, {
