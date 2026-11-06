@@ -83,20 +83,37 @@ const HEADER_LINE_RE = /^\s*(od|from|odesl[aá]no|sent|datum|date|komu|to|kopie|
 const SIGNATURE_START_RE = /^\s*(--\s*|s\s+pozdravem|s\s+p[rř][aá]telsk[yý]m\s+pozdravem|se\s+srde[cč]n[yý]m\s+pozdravem|d[eě]kuji\s+a\s+zdrav[ií]m|zdrav[ií]m|pozdravem|best\s+regards|kind\s+regards|regards|mit\s+freundlichen\s+gr[uü](ß|ss)en|mfg|viele\s+gr[uü](ß|ss)e|sent\s+from\s+my|odesl[aá]no\s+z\s+(m[eé]ho\s+)?(iphone|androidu|mobilu|telefonu))[,.!]?\s*$/i;
 const DISCLAIMER_RE = /^\s*(tento\s+e-?mail|this\s+e-?mail|upozorn[eě]n[ií]\s*:|disclaimer|confidentiality|obsah\s+t[eé]to\s+zpr[aá]vy|p[rř]ed\s+vytisknut[ií]m)/i;
 
-/** Tělo e-mailu bez citované historie, hlavičky přeposlání, podpisu a doložek. */
-export function cleanMailText(body: string | null | undefined): string {
+/** Řádek, kterým začíná podpis („S pozdravem", „--", „Best regards"…). */
+export function isSignatureStart(line: string): boolean {
+  return SIGNATURE_START_RE.test(line);
+}
+
+/**
+ * Vlastní text e-mailu (bez citované historie a hlavičky přeposlání), ale VČETNĚ podpisu a doložek —
+ * pro čtení podpisu (jméno, pozice, firma, IČO, telefon) a pro AI, která z textu zakládá zakázku.
+ */
+export function mailOwnText(body: string | null | undefined): string {
   const lines = (body ?? "").replace(/\r\n?/g, "\n").split("\n");
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/^\s*>/.test(line)) continue;
     if (QUOTE_HEADER_RE.test(line)) break;
-    // „Dne … <" + zalomený řádek „adresa> napsal:" (Gmail / Outlook zalamují hlavičku citace)
     if (/^\s*(dne|on|am)\s/i.test(line) && /(napsal\w*(\(a\))?|wrote|schrieb)\s*:?\s*$/i.test(lines[i + 1] ?? "")) break;
     if (HEADER_LINE_RE.test(line) && /^\s*(od|from|von)\s*:/i.test(line)) {
       const next = lines.slice(i + 1, i + 5);
-      if (next.some((l) => HEADER_LINE_RE.test(l))) break; // hlavička citované / přeposlané zprávy
+      if (next.some((l) => HEADER_LINE_RE.test(l))) break;
     }
+    out.push(line);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Tělo e-mailu bez citované historie, hlavičky přeposlání, podpisu a doložek. */
+export function cleanMailText(body: string | null | undefined): string {
+  const lines = mailOwnText(body).split("\n");
+  const out: string[] = [];
+  for (const line of lines) {
     if (SIGNATURE_START_RE.test(line)) break;
     if (DISCLAIMER_RE.test(line)) break;
     out.push(line);

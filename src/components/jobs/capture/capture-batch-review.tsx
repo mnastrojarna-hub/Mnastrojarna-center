@@ -15,14 +15,63 @@ import { CaptureSupplierInvoices } from "@/components/jobs/capture/capture-suppl
 import { viewerPages, type LocalUrls } from "@/components/jobs/capture/capture-sort";
 import { jobsGenitive, mergeAllPlan, saveCountInfo, warningResolved, type BatchProblem } from "@/components/jobs/capture/capture-flow";
 import { BATCH_TYPES } from "@/lib/jobs/capture-batch";
-import { missingHardness } from "@/lib/jobs/drawing-spec";
+import { initialSpecState, missingHardness, recomputeSpecEstimate } from "@/lib/jobs/drawing-spec";
 import { formatIsoDate } from "@/lib/jobs/field-labels";
 import type { ReviewItem } from "@/lib/jobs/capture-review";
 import type {
   BatchApplyState, BatchDocDraft, BatchDocReview, BatchDocType, BatchGroupState, BatchReviewModel, BatchSortModel, BatchWarning,
-  BatchWarningAction, DocApplyState,
+  BatchWarningAction, DocApplyState, DrawingReviewState, ModelReviewState,
 } from "@/lib/jobs/capture-batch-types";
 import { cn } from "@/lib/utils";
+
+/** Řádek Položek založený z karty výkresu / modelu (klíč draw-<docId> / model-<docId>). */
+const ROW_OF_DOC_RE = /^(draw|model)-(.+)$/;
+type CardState = DrawingReviewState | ModelReviewState;
+/** Pole karty ↔ pole řádku položky (název ↔ title). */
+const SYNC: [keyof ReviewItem, "drawingNumber" | "revision" | "title" | "material" | "quantity"][] = [
+  ["drawingNumber", "drawingNumber"], ["revision", "revision"], ["name", "title"], ["material", "material"], ["quantity", "quantity"],
+];
+function cardField(st: CardState, f: (typeof SYNC)[number][1]): string | null {
+  return f in st ? String((st as unknown as Record<string, unknown>)[f] ?? "") : null;
+}
+
+/** Změna na kartě výkresu / modelu → stejná pole řádku Položek (jen to, co se na kartě změnilo). */
+function rowFromCard(row: ReviewItem, st: CardState, before: CardState | null): ReviewItem {
+  let next = row;
+  for (const [rf, cf] of SYNC) {
+    const v = cardField(st, cf);
+    if (v === null) continue;
+    const was = before ? cardField(before, cf) : null;
+    if (was !== null && was === v) continue;
+    if (next[rf] === v) continue;
+    next = { ...next, [rf]: v };
+  }
+  return next;
+}
+
+/** Změna řádku Položek → karta výkresu / modelu (jen změněná pole; u výkresu přepočet odhadu polotovaru). */
+function cardFromRow(d: DocApplyState, row: ReviewItem, was: ReviewItem | undefined, doc: BatchDocReview | undefined): DocApplyState {
+  if (d.kind !== "drawing" && d.kind !== "model") return d;
+  const patch: Record<string, string> = {};
+  for (const [rf, cf] of SYNC) {
+    const v = String(row[rf] ?? "");
+    if (was && String(was[rf] ?? "") === v) continue;
+    const cur = cardField(d.state, cf);
+    if (cur === null || cur === v) continue;
+    patch[cf] = v;
+  }
+  if (!Object.keys(patch).length) return d;
+  if (d.kind === "model") return { kind: "model", state: { ...d.state, ...patch } as ModelReviewState };
+  const state: DrawingReviewState = { ...d.state, ...patch };
+  if (doc?.kind === "drawing" && ("material" in patch || "title" in patch || "quantity" in patch)) {
+    const sp = state.spec ?? doc.initial.spec ?? initialSpecState(doc.drawing, { aiUsed: doc.aiUsed, title: doc.initial.title, quantity: doc.initial.quantity });
+    state.spec = recomputeSpecEstimate(sp, {
+      material: state.material, dimensions: state.dimensions, title: state.title, quantity: state.quantity,
+      overallDims: doc.drawing.overallDims, shapeHint: doc.drawing.shapeHint, blankDimensions: doc.drawing.blankDimensions,
+    });
+  }
+  return { kind: "drawing", state };
+}
 
 /**
  * Krok Kontrola dávky: skupiny = zakázky (hlavička s cílem, stavem a údaji zakázky),
@@ -175,8 +224,32 @@ export function CaptureBatchReview({
     });
   }, [attention, attentionKey, docsKey]);
 
-  const setGroup = (g: BatchGroupState) => onChange({ ...state, groups: state.groups.map((x) => (x.key === g.key ? g : x)) });
-  const setDoc = (docId: string, d: DocApplyState) => onChange({ ...state, docs: { ...state.docs, [docId]: d } });
+  // položka ↔ karta výkresu / modelu, ze které vznikla (draw-<docId>): počet, název, číslo, revize, materiál
+  // se upravují na jednom místě a platí na obou (uloží se to, co je v Položkách)
+  const setGroup = (g: BatchGroupState) => {
+    const prev = state.groups.find((x) => x.key === g.key);
+    let docs = state.docs;
+    for (const row of g.job.items) {
+      const m = ROW_OF_DOC_RE.exec(row.key);
+      const d = m ? docs[m[2]] : undefined;
+      if (!m || !d) continue;
+      const next = cardFromRow(d, row, prev?.job.items.find((i) => i.key === row.key), review.docs.find((x) => x.docId === m[2]));
+      if (next !== d) docs = { ...docs, [m[2]]: next };
+    }
+    onChange({ ...state, groups: state.groups.map((x) => (x.key === g.key ? g : x)), docs });
+  };
+  const setDoc = (docId: string, d: DocApplyState) => {
+    let groups = state.groups;
+    if ((d.kind === "drawing" || d.kind === "model") && d.state.link.mode === "docItem" && ROW_OF_DOC_RE.test(d.state.link.itemKey)) {
+      const key = d.state.link.itemKey;
+      const prev = state.docs[docId];
+      const before = prev && prev.kind === d.kind ? (prev.state as CardState) : null;
+      groups = groups.map((g) => (g.job.items.some((i) => i.key === key)
+        ? { ...g, job: { ...g.job, items: g.job.items.map((i) => (i.key === key ? rowFromCard(i, d.state, before) : i)) } }
+        : g));
+    }
+    onChange({ ...state, docs: { ...state.docs, [docId]: d }, groups });
+  };
   const toggleRow = (groupKey: string, row: ReviewItem, on: boolean) => {
     const g = state.groups.find((x) => x.key === groupKey);
     if (!g) return;
