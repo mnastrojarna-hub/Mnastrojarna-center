@@ -100,14 +100,15 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
   const captureIds = new Set<string>();
   let customerId = "";
   let jobB = { id: "", number: "" };
+  const createdCustomers = new Set<string>();
 
   async function mail(input: {
-    subject: string; from: string; fromName: string; category: string; body: string; customerId?: string | null;
+    subject: string; from: string; fromName: string; category: string; body: string; customerId?: string | null; supplierId?: string | null;
     attachments: { filename: string; mime: string; body: Buffer }[];
   }): Promise<string> {
     const { data, error } = await svc.from("emails").insert({
       subject: input.subject, from_email: input.from, from_name: input.fromName, category: input.category, body_text: input.body,
-      direction: "in", thread_id: `t-${RUN}-${emailIds.length}`, customer_id: input.customerId ?? null, received_at: new Date().toISOString(),
+      direction: "in", thread_id: `t-${RUN}-${emailIds.length}`, customer_id: input.customerId ?? null, supplier_id: input.supplierId ?? null, received_at: new Date().toISOString(),
       has_attachments: input.attachments.length > 0, owner_id: admin.id,
     }).select("id").single();
     if (error) throw new Error(error.message);
@@ -200,6 +201,10 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
       await svc.from("capture_sessions").delete().eq("id", id);
     }
     await svc.from("customer_contacts").delete().eq("customer_id", STROJMETAL).like("email", `%${RUN}%`);
+    for (const id of createdCustomers) {
+      await svc.from("customer_contacts").delete().eq("customer_id", id);
+      await svc.from("customers").delete().eq("id", id);
+    }
     if (customerId) {
       await svc.from("customer_contacts").delete().eq("customer_id", customerId);
       await svc.from("customers").delete().eq("id", customerId);
@@ -306,7 +311,9 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     const g = rv.initial.groups[0];
     expect(g.job.customer).toEqual({ mode: "existing", id: customerId, name: `Mail Capture ${RUN}`, reason: "odesílatel e-mailu" });
     expect(g.job.fields).toMatchObject({ customerContact: "Jan Malý", customerContactEmail: sender });
-    expect(g.jobDraftTitle).toBe("Čep 8820-01"); // název z výkresu má dávka sama (předmět jen když chybí)
+    // text e-mailu je primární doklad: položky z textu dostaly název z výkresů → název z položek
+    expect(g.jobDraftTitle).toBe("Čep 8820-01 + 1 další");
+    expect(g.job.items.map((i) => [i.key, i.drawingNumber, i.quantity])).toEqual([["ai-0", "8820-01", "10"], ["ai-1", "8820-02", "4"]]);
     const q = rv.docs.filter((d) => d.kind === "drawing").map((d) => {
       const st = rv.initial.docs[d.docId];
       return st.kind === "drawing" ? [st.state.drawingNumber, st.state.quantity] : null;
@@ -322,7 +329,7 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     expect((await itemsOf(jobId)).map((i) => [i.drawing_number, i.quantity])).toEqual([["8820-01", 10], ["8820-02", 4]]);
     expect((await filesOf(jobId)).map((f) => f.kind)).toEqual(["vykres", "vykres"]);
     const { data: job } = await svc.from("orders").select("status, title, customer_id, customer_contact_id").eq("id", jobId).single();
-    expect(job).toMatchObject({ status: "poptavka", title: "Čep 8820-01", customer_id: customerId });
+    expect(job).toMatchObject({ status: "poptavka", title: "Čep 8820-01 + 1 další", customer_id: customerId });
     expect((job as { customer_contact_id: string | null }).customer_contact_id).toBeTruthy();
   }, 180_000);
 
@@ -342,7 +349,9 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     expect(rv.initial.groups[0].job.targetKey).toBe(jobB.id);
     const d = rv.docs.find((x) => x.kind === "drawing")!;
     const st = rv.initial.docs[d.docId];
-    expect(st.kind === "drawing" && [st.state.quantity, st.state.link.mode]).toEqual(["6", "add"]);
+    // text e-mailu „8810-04 – 6 ks" = položka z textu (ai-0), výkres na ni míří; řádek je vidět v Položkách
+    expect(st.kind === "drawing" && [st.state.quantity, st.state.link.mode]).toEqual(["6", "docItem"]);
+    expect(rv.initial.groups[0].job.items.map((i) => [i.drawingNumber, i.quantity])).toEqual([["8810-04", "6"]]);
     const res = await apply(batch.captureId, rv.initial);
     expect(res.status).toBe("done");
     expect(res.groups[0]).toMatchObject({ jobId: jobB.id, created: false });
@@ -418,5 +427,189 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     const byName = Object.fromEntries(((atts ?? []) as { filename: string; job_file_id: string | null }[]).map((a) => [a.filename, a.job_file_id]));
     expect(byName["8810-04__vykres-znovu.pdf"]).toBe(dup.id); // vynechaná příloha ukazuje na dokument, který už u zakázky byl
     expect(byName["8810-06__vykres-gm1f.pdf"]).toBeTruthy();
+  }, 180_000);
+
+  // ── majitel 6. 11.: e-mail + výkres → vše provázané (text, zákazník z hlavičky, položka, kontakt) ──
+  const STEEL_ICO = "25931644";
+  const steelingMail = (over: { subject?: string; body?: string; from?: string } = {}) => {
+    const from = over.from ?? `jan.cejka@steeling-${RUN}.test`;
+    return {
+      subject: over.subject ?? "Poptávka – stud bolt M42", from, fromName: from, category: "poptavka",
+      body: over.body ?? [
+        "Dobrý den,",
+        "prosím o cenovou nabídku na výrobu dle přiloženého výkresu SDF000637.4, 20 ks, termín dodání do 15. 12. 2026.",
+        "Dodat s atestem 3.1.",
+        "",
+        "S pozdravem",
+        "Jan Čejka",
+        "Nákup",
+        `STEELING ${RUN}, s.r.o.`,
+        "Tovární 1402/12, 796 01 Prostějov",
+        `IČO: ${STEEL_ICO}, DIČ: CZ${STEEL_ICO}`,
+        "Tel.: +420 777 248 197",
+        `${from} | www.steeling.cz`,
+        "",
+        "Dne 5. 11. 2026 napsal Mnástrojárna <obchod@mnastrojarna.cz>:",
+        "> Dobrý den, posíláme ceník.",
+      ].join("\n"),
+    };
+  };
+
+  it("poptávka v textu + 1 výkres, neznámý odesílatel bez jména v hlavičce → zákazník z podpisu (nový, IČO, adresa), kontakt jménem, položka z textu s počtem, výkres na ni; uložení založí vše provázané", async () => {
+    const m = steelingMail();
+    const emailId = await mail({ ...m, attachments: [{ filename: "SDF000637.4__vykres-gm3.pdf", mime: "application/pdf", body: await vectorPdf(7) }] });
+
+    // plán dialogu: jméno z podpisu, nikdy surová adresa; pozice a firma pro nového zákazníka
+    const plan = await mc.mailCapturePlan(emailId, null);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.customer).toBeNull();
+    expect(plan.sender).toMatchObject({ status: "none", name: "Jan Čejka", position: "Nákup", company: `STEELING ${RUN}, s.r.o.`, phone: "+420 777 248 197" });
+
+    const batch = await analyzeMail(emailId);
+    expect(batch.sort.docs.filter((d) => !d.excluded).map((d) => d.type)).toEqual(["vykres"]);
+    await extractAll(batch);
+    const rv = await review(batch);
+    expect(rv.groups).toHaveLength(1);
+    expect(rv.docs.map((d) => d.kind)).toEqual(["drawing"]); // text e-mailu nemá kartu dokladu
+    const rg = rv.groups[0];
+    const g = rv.initial.groups[0];
+    expect(g.job.targetKey).toBe("new");
+    expect(g.job.stage).toBe("poptavka");
+    // zákazník z hlavičky podpisu — návrh „Založit nového zákazníka" s vyplněnými údaji
+    expect(g.job.customer).toEqual({
+      mode: "new",
+      party: expect.objectContaining({ name: `STEELING ${RUN}, s.r.o.`, ico: STEEL_ICO, dic: `CZ${STEEL_ICO}`, street: "Tovární 1402/12", city: "Prostějov", zip: "796 01", email: m.from, phone: "+420 777 248 197", contactPerson: "Jan Čejka" }),
+    });
+    expect(g.job.fields).toMatchObject({ customerContact: "Jan Čejka", customerContactEmail: m.from, customerContactPhone: "+420 777 248 197", customerRequiredDate: "2026-12-15", title: "Stud bolt M42 / Schraubenbolzen M42 SDF000637.4" });
+    expect(rg.fieldSources.customerContact?.label).toBe("z podpisu e-mailu");
+    expect(rg.visibleFields).toEqual(expect.arrayContaining(["customerContact", "customerContactEmail", "customerContactPhone", "customerRequiredDate"]));
+    // položka z textu („SDF000637.4, 20 ks") v Položkách, výkres na ni míří, karta výkresu má počet z textu
+    expect(g.job.items.map((i) => [i.key, i.drawingNumber, i.quantity, i.revision, i.name])).toEqual([["ai-0", "SDF000637.4", "20", "A", "Stud bolt M42 / Schraubenbolzen M42"]]);
+    const d = rv.docs[0];
+    const st = rv.initial.docs[d.docId];
+    expect(st.kind === "drawing" && [st.state.quantity, st.state.link]).toEqual(["20", { mode: "docItem", itemKey: "ai-0" }]);
+    expect(d.kind === "drawing" && d.sources?.quantity).toBe("z textu e-mailu");
+    expect(rg.itemOptions.new.map((o) => o.link.mode)).toEqual(["docItem", "add", "none"]);
+    expect(rv.warnings.filter((w) => w.code === "drawing_quantity_missing" || w.code === "unlinked_drawing" || w.severity === "block")).toEqual([]);
+    expect(rv.warnings.every((w) => !w.docIds.includes("mail"))).toBe(true);
+
+    const res = await apply(batch.captureId, rv.initial);
+    expect(res.status, JSON.stringify({ failed: res.docs.filter((x) => !x.ok), error: res.error })).toBe("done");
+    expect(res.groups[0]).toMatchObject({ created: true, customerCreated: true });
+    const jobId = res.groups[0].jobId!;
+    const { data: job0 } = await svc.from("orders").select("customer_id").eq("id", jobId).single();
+    const custId = (job0 as { customer_id: string }).customer_id;
+    createdCustomers.add(custId);
+    const fin = await mc.finishMailCapture({ emailId, captureId: batch.captureId, jobId, created: true, addContact: true });
+    expect(fin.ok).toBe(true);
+
+    expect((await itemsOf(jobId)).map((i) => [i.drawing_number, i.quantity])).toEqual([["SDF000637.4", 20]]);
+    const jf = await filesOf(jobId);
+    expect(jf.map((f) => f.kind)).toEqual(["vykres"]);
+    expect(jf[0].order_item_id).toBe((await itemsOf(jobId))[0].id);
+    const { data: cust } = await svc.from("customers").select("name, ico, dic, city, zip, email").eq("id", custId).single();
+    expect(cust).toMatchObject({ name: `STEELING ${RUN}, s.r.o.`, ico: STEEL_ICO, city: "Prostějov", zip: "796 01", email: m.from });
+    const { data: k } = await svc.from("customer_contacts").select("id, name, email, phone, position").eq("customer_id", custId).eq("email", m.from).single();
+    expect(k).toMatchObject({ name: "Jan Čejka", phone: "+420 777 248 197", position: "Nákup" });
+    const { data: job } = await svc.from("orders").select("status, title, customer_contact, customer_contact_email, customer_contact_id, customer_required_date, email_id").eq("id", jobId).single();
+    expect(job).toMatchObject({ status: "poptavka", title: "Stud bolt M42 / Schraubenbolzen M42 SDF000637.4", customer_contact: "Jan Čejka", customer_contact_email: m.from, customer_contact_id: (k as { id: string }).id, customer_required_date: "2026-12-15", email_id: emailId });
+  }, 180_000);
+
+  it("AI čte text e-mailu (fixture): položka s názvem a popisem z textu, pozice kontaktu, údaje označené zdrojem", async () => {
+    // jiný díl než v předchozím testu (stejné číslo výkresu by správně spárovalo tu zakázku); sken = výkres bez čísla v názvu
+    const m = steelingMail({ subject: "Poptávka – stud bolt M42 (2)", body: `${steelingMail().body.replace("SDF000637.4", "SDF000641.2")}\n__mail-steeling` });
+    const emailId = await mail({ ...m, attachments: [{ filename: "sken_vykresu__vykres-gm6.pdf", mime: "application/pdf", body: await vectorPdf(9) }] });
+    const batch = await analyzeMail(emailId);
+    await extractAll(batch);
+    const rv = await review(batch);
+    const g = rv.initial.groups[0];
+    expect(rv.groups[0].model.aiUsed).toBe(true);
+    expect(g.job.targetKey).toBe("new");
+    // stejný odesílatel jako v předchozím testu → zákazník už v CRM (podle adresy), kontakt se znovu nezakládá
+    expect(g.job.customer).toMatchObject({ mode: "existing", reason: "odesílatel e-mailu" });
+    expect(createdCustomers.has((g.job.customer as { id: string }).id)).toBe(true);
+    const plan = await mc.mailCapturePlan(emailId, null);
+    expect(plan.ok && plan.sender).toMatchObject({ status: "existing", name: "Jan Čejka" });
+    expect(g.job.items.map((i) => [i.key, i.drawingNumber, i.quantity, i.name, i.description])).toEqual([["ai-0", "SDF000641.2", "20", "Stud bolt M42", "dodat s atestem 3.1"]]);
+    expect(g.job.fields).toMatchObject({ customerContact: "Jan Čejka", customerRequiredDate: "2026-12-15" });
+    const dst = rv.initial.docs[rv.docs[0].docId];
+    expect(dst.kind === "drawing" && [dst.state.drawingNumber, dst.state.quantity, dst.state.link]).toEqual(["SDF000641.2", "20", { mode: "docItem", itemKey: "ai-0" }]);
+    const { data: sess } = await svc.from("capture_sessions").select("data").eq("id", batch.captureId).single();
+    const ex = (sess as { data: { mail?: { extract?: { aiUsed: boolean; person: { name: string; position: string } } } } }).data.mail?.extract;
+    expect(ex).toMatchObject({ aiUsed: true, person: { name: "Jan Čejka", position: "nákup" } });
+  }, 180_000);
+
+  it("objednávka zákazníka v příloze e-mailu (neznámý zákazník) → stejná kontrola jako focení: položky s cenami, nový zákazník z dokladu, stav Objednávka; text e-mailu jen doplní", async () => {
+    const from = `horakova@hydraulika-morava-${RUN}.test`;
+    const emailId = await mail({
+      subject: "Objednávka PO-MAIL-HM-7", from, fromName: "Lenka Horáková", category: "objednavka",
+      body: "Dobrý den,\nv příloze zasílám objednávku, termín prosím dodržet.\n\nS pozdravem\nLenka Horáková\nnákup\nHydraulika Morava s.r.o.\nmobil: +420 602 555 777",
+      attachments: [{ filename: "Objednavka__objednavka_zakaznik-gm4.pdf", mime: "application/pdf", body: await orderPdf() }],
+    });
+    const batch = await analyzeMail(emailId);
+    await extractAll(batch);
+    const rv = await review(batch);
+    expect(rv.groups).toHaveLength(1);
+    const rg = rv.groups[0];
+    const g = rv.initial.groups[0];
+    expect(rg.primaryDocId).toBe(rv.docs[0].docId);           // přiložená objednávka je primární, ne text
+    expect(rv.docs[0].kind === "business" && rv.docs[0].primary).toBe(true);
+    expect(g.job.targetKey).toBe("new");
+    expect(g.job.stage).toBe("objednavka");
+    expect(g.job.customer).toEqual({ mode: "new", party: expect.objectContaining({ name: "Hydraulika Morava s.r.o.", ico: "08542311", contactPerson: "Lenka Horáková" }) });
+    expect(g.job.items.map((i) => [i.drawingNumber, i.quantity, i.unitPrice])).toEqual([["HM-1050-03", "40", "1250"], ["HM-1050-07", "40", "310"]]);
+    expect(g.job.fields).toMatchObject({ customerOrderNumber: "PO-MAIL-HM-7", customerRequiredDate: "2026-12-18", customerContact: "Lenka Horáková" });
+    expect(rv.warnings.some((w) => w.code === "multiple_orders")).toBe(false);
+    const res = await apply(batch.captureId, rv.initial);
+    expect(res.status, JSON.stringify({ failed: res.docs.filter((x) => !x.ok), error: res.error })).toBe("done");
+    const jobId = res.groups[0].jobId!;
+    const { data: job0 } = await svc.from("orders").select("customer_id, status, customer_order_number").eq("id", jobId).single();
+    createdCustomers.add((job0 as { customer_id: string }).customer_id);
+    expect(job0).toMatchObject({ status: "objednavka", customer_order_number: "PO-MAIL-HM-7" });
+    expect((await itemsOf(jobId)).map((i) => [i.drawing_number, i.quantity])).toEqual([["HM-1050-03", 40], ["HM-1050-07", 40]]);
+    expect((await filesOf(jobId)).map((f) => f.kind)).toEqual(["objednavka"]);
+    const fin = await mc.finishMailCapture({ emailId, captureId: batch.captureId, jobId, created: true, addContact: true });
+    expect(fin.ok).toBe(true);
+    const { data: k } = await svc.from("customer_contacts").select("name, phone, position").eq("customer_id", (job0 as { customer_id: string }).customer_id).eq("email", from).maybeSingle();
+    expect(k).toMatchObject({ name: "Lenka Horáková", phone: "+420 602 555 777", position: "nákup" });
+  }, 180_000);
+
+  it("objednávka v příloze se stejným číslem jako existující zakázka → spárování se zakázkou (ne nová), upozornění na už uložený doklad", async () => {
+    expect(jobB.id).toBeTruthy();
+    const emailId = await mail({
+      subject: "FW: Objednávka PO-E2E-MAIL-1", from: `petra.${RUN}@strojmetal.cz`, fromName: "Petra Nová", category: "objednavka", customerId: STROJMETAL,
+      body: "Posílám objednávku ještě jednou.\nPetra",
+      attachments: [{ filename: "Objednavka__objednavka_zakaznik-gm1.pdf", mime: "application/pdf", body: await orderPdf() }],
+    });
+    const batch = await analyzeMail(emailId);
+    await extractAll(batch);
+    const rv = await review(batch);
+    const g = rv.initial.groups[0];
+    expect(g.job.targetKey).toBe(jobB.id);
+    const t = rv.groups[0].model.targets.find((x) => x.key === jobB.id);
+    expect(t?.reason ?? "").toMatch(/objednávky/);
+    expect(rv.warnings.some((w) => w.code === "already_saved")).toBe(true);
+    expect(g.job.customer).toMatchObject({ mode: "existing", id: STROJMETAL });
+  }, 180_000);
+
+  it("dodací list dodavatele v příloze e-mailu od dodavatele → jako u focení: cíl vybere člověk (žádná nová zakázka), dodavatel podle IČO", async () => {
+    const emailId = await mail({
+      subject: "Dodací list DL-MAIL-91", from: "objednavky@hruby-cnc.cz", fromName: "", category: "potvrzeni_objednavky", supplierId: "d4000000-0000-0000-0000-000000000001",
+      body: "Dobrý den,\nv příloze dodací list k dnešní dodávce.\n\nPavel Hrubý\nKovoobrábění Hrubý s.r.o.\ntel. +420 315 700 120",
+      attachments: [{ filename: "DL__dodaci_list_dodavatel-gm5.pdf", mime: "application/pdf", body: await orderPdf() }],
+    });
+    const batch = await analyzeMail(emailId);
+    expect(batch.sort.docs.filter((d) => !d.excluded).map((d) => d.type)).toEqual(["dodaci_list_dodavatel"]);
+    await extractAll(batch);
+    const rv = await review(batch);
+    expect(rv.groups).toHaveLength(1);
+    const g = rv.initial.groups[0];
+    expect(g.job.targetKey).toBe("");                                   // ne vynucená nová zakázka
+    expect(rv.warnings.find((w) => w.code === "target_required")?.severity).toBe("block");
+    const d = rv.docs[0];
+    expect(d.kind === "business" && d.supplierMatch?.id).toBe("d4000000-0000-0000-0000-000000000001");
+    expect(rv.docs).toHaveLength(1);                                    // text e-mailu od dodavatele není doklad zákazníka
+    expect(g.job.items).toEqual([]);
   }, 180_000);
 });

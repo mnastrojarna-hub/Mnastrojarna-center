@@ -4,6 +4,7 @@ import {
   type CaptureFileRef, type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
 import { BATCH_TYPES, distinctJobCount, pagesKey } from "@/lib/jobs/capture-batch";
+import { cleanNumber } from "@/lib/jobs/mapping";
 import { applyGroupFills } from "@/lib/jobs/capture-batch-reconcile";
 import type {
   BatchApplyState, BatchDocType, BatchGroupReview, BatchGroupState, BatchResult, BatchReviewModel, BatchSort,
@@ -485,6 +486,22 @@ export function warningResolved(w: BatchWarning, state: BatchApplyState): boolea
         if (!sortDoc || sortDoc.excluded) return true;
         if (!d || d.kind === "file") return false;
         return d.kind === "business" ? d.state.onDuplicate !== null || d.state.fileOnly : d.state.onDuplicate !== null;
+      });
+    case "drawing_quantity_missing":
+      // počet doplněný na kartě výkresu NEBO v řádku Položek, na který výkres míří
+      return w.docIds.length > 0 && w.docIds.every((id) => {
+        const d = state.docs[id];
+        if (!d || d.kind !== "drawing") return false;
+        if ((cleanNumber(d.state.quantity) ?? 0) > 0) return true;
+        const link = d.state.link;
+        const row = link.mode === "docItem" && group ? group.job.items.find((i) => i.key === link.itemKey) : null;
+        return Boolean(row && (cleanNumber(row.quantity) ?? 0) > 0);
+      });
+    case "unlinked_drawing":
+    case "unlinked_model":
+      return w.docIds.length > 0 && w.docIds.every((id) => {
+        const d = state.docs[id];
+        return Boolean(d && (d.kind === "drawing" || d.kind === "model") && d.state.link.mode !== "none");
       });
     default:
       return false;
