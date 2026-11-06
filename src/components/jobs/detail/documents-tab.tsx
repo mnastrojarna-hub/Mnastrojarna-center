@@ -593,9 +593,12 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
           onConfirm={async () => {
             const res = await deleteJobFile(deleting.id);
             if (!res.ok) return res.error ?? "Nepovedlo se.";
+            const inv = res.invoiceReleased;
             notify("success", res.quoteDeleted
               ? `Dokument ${deleting.filename} smazán i s nabídkou${res.quoteDeleted.number ? ` ${res.quoteDeleted.number}` : ""}.`
-              : `Dokument ${deleting.filename} smazán.`);
+              : inv
+                ? `Faktura ${inv.number} zrušena — teď můžeš vystavit novou (tlačítko „Vystavit fakturu“ na kartě)${inv.numberFree ? ", dostane stejné číslo" : ""}.`
+                : `Dokument ${deleting.filename} smazán.`);
             refresh();
             return null;
           }}
@@ -610,7 +613,10 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
           {deletingPlan.kind === "quoteStays" && (
             <> Nabídka {deletingPlan.quote.number} zůstane — má ještě {pdfVersionsText(deletingPlan.others)} PDF.</>
           )}
-          {deletingPlan.kind !== "quoteGoes" && <> Když jde jen o starou verzi, stačí ji <em>archivovat</em>.</>}
+          {deleting.kind === "faktura" && deleting.origin === "generated" && (
+            <> <strong className="text-foreground">Faktura se tím zruší</strong> — zakázka půjde vyfakturovat znovu (tlačítko „Vystavit fakturu“), a když je to poslední vystavená faktura, nová dostane stejné číslo. Platby zůstávají.</>
+          )}
+          {deletingPlan.kind !== "quoteGoes" && deleting.kind !== "faktura" && <> Když jde jen o starou verzi, stačí ji <em>archivovat</em>.</>}
         </ConfirmDialog>
       )}
       {anonEditing && (

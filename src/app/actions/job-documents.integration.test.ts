@@ -394,4 +394,34 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     expect(r.status).toBe(307);
     expect(r.headers.get("location")).toBe(`http://localhost/api/pdf/job/${jobId}?type=dodaci-list`);
   }, 60_000);
+
+  // majitel 6. 11.: fakturu je potřeba předělat → smazat PDF v Dokumentech = zrušit fakturu; hned jde vystavit
+  // novou (stejné číslo, když bylo v řadě poslední), stav se vrátí z Vyfakturováno na Dodáno
+  it("faktura: smazání PDF v Dokumentech fakturu zruší, nová dostane stejné číslo", async () => {
+    expect(invoiceNumber).toMatch(/^FV-/);
+    const files = await import("./job-files");
+    const { data: pdfs } = await db.from("job_files").select("id").eq("job_id", jobId).eq("kind", "faktura").eq("archived", false);
+    expect(pdfs ?? []).toHaveLength(1);
+    const del = await files.deleteJobFile((pdfs as { id: string }[])[0].id);
+    expect(del.ok, del.error).toBe(true);
+    expect(del.invoiceReleased).toMatchObject({ number: invoiceNumber, numberFree: true, stageReturned: true });
+    const jj = await job();
+    expect(jj.invoice_number).toBeNull();
+    expect(jj.invoice_date).toBeNull();
+    expect(jj.status).toBe("dodano_zakaznikovi");
+    const { data: invs } = await db.from("invoices").select("id").eq("number", invoiceNumber);
+    expect(invs ?? []).toHaveLength(0);
+    const { data: ev } = await db.from("job_events").select("message").eq("job_id", jobId).like("message", `Faktura ${invoiceNumber} zrušena%`);
+    expect(ev ?? []).toHaveLength(1);
+
+    const again = await d.generateJobDocument(jobId, "faktura");
+    expect(again.ok, again.error).toBe(true);
+    expect(again.existing).toBe(false);
+    expect(again.number).toBe(invoiceNumber);
+    const j2 = await job();
+    expect(j2.invoice_number).toBe(invoiceNumber);
+    expect(j2.status).toBe("fakturovano");
+    const { data: invs2 } = await db.from("invoices").select("id").eq("order_id", jobId);
+    expect(invs2 ?? []).toHaveLength(1);
+  }, 60_000);
 });
