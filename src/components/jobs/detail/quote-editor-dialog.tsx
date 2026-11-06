@@ -109,7 +109,7 @@ export function QuoteEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[5%] sm:max-w-5xl">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[5%] sm:max-w-5xl">
         <DialogHead
           icon={editing ? Pencil : FilePlus2}
           tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"

@@ -132,7 +132,7 @@ export function AddUserDialog({
       </DialogTrigger>
       <DialogContent
         aria-describedby={undefined}
-        className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[6%] sm:max-w-xl"
+        className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[6%] sm:max-w-xl"
       >
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-popover/95 px-5 py-4 backdrop-blur">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-success/15 text-success">

@@ -145,7 +145,7 @@ export function OperationDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[8%] sm:max-w-xl">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[8%] sm:max-w-xl">
         <DialogHead
           icon={meta?.icon ?? Icon}
           tone={meta?.badge ?? "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300"}

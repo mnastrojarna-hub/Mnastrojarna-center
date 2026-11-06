@@ -50,7 +50,7 @@ export function TemplateDialog({ templateKey, onClose }: { templateKey: string; 
 
   return (
     <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[8%] sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[8%] sm:max-w-lg">
         <DialogHead
           icon={Workflow}
           tone="bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300"
@@ -145,7 +145,7 @@ export function CompleteDeliveryDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[10%] sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[10%] sm:max-w-md">
         <DialogHead
           icon={PackageCheck}
           tone={OPERATION_KINDS.kompletni_dodavka.badge}

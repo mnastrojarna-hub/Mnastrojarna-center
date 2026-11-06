@@ -868,8 +868,8 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         // kliknutí uvnitř dialogu nesmí probublat do řádku knihy, ze kterého se otevřel
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "top-0 flex h-[100dvh] max-w-6xl flex-col overflow-hidden rounded-none p-0",
-          "sm:top-[3vh] sm:h-[94vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl",
+          "top-0 flex h-[100dvh] max-h-[100dvh] max-w-6xl flex-col overflow-hidden rounded-none p-0",
+          "sm:top-[3dvh] sm:h-[94dvh] sm:max-h-[94dvh] sm:w-[calc(100%-2rem)] sm:rounded-2xl",
         )}
       >
         <div className="flex shrink-0 items-center gap-3 border-b px-3 py-2.5 sm:px-5 sm:py-3">
@@ -1006,7 +1006,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
           // mobil: fotka nahoře a odjede s formulářem (tlačítko „Fotka" vrátí nahoru); počítač: vedle sebe
           <div ref={reviewScroll} className="relative min-h-0 flex-1 overflow-y-auto scrollbar-thin lg:flex lg:overflow-hidden">
             <div className={cn("border-b bg-muted/20 p-2 sm:p-3 lg:w-[42%] lg:shrink-0 lg:border-b-0 lg:border-r", !showPreview && "hidden lg:block")}>
-              <CapturePages pages={viewer} className="h-[46vh] sm:h-[52vh] lg:h-full" />
+              <CapturePages pages={viewer} className="h-[46dvh] sm:h-[52dvh] lg:h-full" />
             </div>
             <div className="scrollbar-thin p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
               <button

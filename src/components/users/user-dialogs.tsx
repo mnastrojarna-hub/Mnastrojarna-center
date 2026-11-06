@@ -387,7 +387,7 @@ export function EditUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[8%] sm:max-w-xl">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[8%] sm:max-w-xl">
         <DialogHeader icon={Pencil} tone="bg-sky-500/15 text-sky-600 dark:text-sky-400" title="Upravit uživatele" user={user} />
         <form onSubmit={submit} className="space-y-5 p-5" noValidate>
           <ErrorBox error={error} />

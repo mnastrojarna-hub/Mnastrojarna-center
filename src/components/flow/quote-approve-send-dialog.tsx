@@ -84,7 +84,7 @@ export function QuoteApproveSendDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
@@ -110,7 +110,8 @@ export function QuoteApproveSendDialog({
               <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} />
             </>
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-popover/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-5 sm:-mb-5 sm:flex-row sm:justify-end sm:p-4">
             <Button type="button" variant="ghost" className="min-h-11 sm:min-h-9" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
             <Button type="submit" variant="send" className="min-h-11 sm:min-h-9" disabled={step !== "form"}>
               {step === "sending" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}

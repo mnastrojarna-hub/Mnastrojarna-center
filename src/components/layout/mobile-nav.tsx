@@ -121,7 +121,7 @@ export function MobileNav({ features, counts, user }: {
       </nav>
 
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
-        <DialogContent className="bottom-0 top-auto max-h-[85vh] translate-y-0 overflow-y-auto rounded-b-none p-4 sm:bottom-auto sm:top-[10%] sm:rounded-b-xl">
+        <DialogContent className="bottom-0 top-auto max-h-[85dvh] translate-y-0 overflow-y-auto rounded-b-none p-4 sm:bottom-auto sm:top-[10%] sm:rounded-b-xl">
           <DialogTitle className="mb-3">Menu</DialogTitle>
           <div className="space-y-4">
             {sections.map((section, i) => (
