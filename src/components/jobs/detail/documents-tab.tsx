@@ -611,7 +611,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
             <span className="text-muted-foreground">
               {bulk
                 ? <>Převádím {bulk.done + 1} / {bulk.total}: <strong className="font-medium text-foreground">{bulk.current}</strong>…</>
-                : <>Výkresy DXF / DWG: {cadFiles.length}{cadWithoutPdf.length < cadFiles.length ? ` (${cadFiles.length - cadWithoutPdf.length} už má PDF)` : ""} — PDF otevře každý.</>}
+                : <>Výkresy DXF / DWG: {cadFiles.length}{cadWithoutPdf.length < cadFiles.length ? ` (${cadFiles.length - cadWithoutPdf.length} už ${cadFiles.length - cadWithoutPdf.length === 1 ? "má" : "mají"} PDF)` : ""} — PDF otevře každý.</>}
             </span>
             <Button type="button" size="sm" variant="outline" onClick={() => void convertAll()} disabled={!!bulk} data-testid="cad-pdf-all">
               {bulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
