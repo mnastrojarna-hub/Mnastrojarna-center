@@ -268,7 +268,7 @@ export function FileViewer({
   const infoNumber = drawingNumberText(info);
   const infoQty = drawingQuantityText(info);
   const subtitle = rasterMode
-    ? `${/\.hei[cf]$/i.test(title) ? "HEIC" : "TIFF"}${raster?.pages && raster.pages > 1 ? ` · ${raster.pages} stran` : ""}`
+    ? `${/\.hei[cf]$/i.test(title) ? "HEIC" : "TIFF"}${raster?.pages && raster.pages > 1 ? ` · ${raster.pages} ${raster.pages < 5 ? "strany" : "stran"}` : ""}`
     : data ? `${data.has3D ? "3D PDF" : data.sniffed.label} · ${fmtSize(data.bytes.length)}` : null;
 
   return (

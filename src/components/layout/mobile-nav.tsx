@@ -60,15 +60,25 @@ function ignoredScroller(el: Element): boolean {
   return Boolean(el.closest("[role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper], [role=menu], [role=listbox], nav"));
 }
 
+/** Je otevřený dialog přes obrazovku (ne vyskakovací nabídka / popover)? */
+export function overlayOpen(doc: Pick<Document, "querySelectorAll" | "body">): boolean {
+  if (doc.body?.hasAttribute("data-scroll-locked")) return true;
+  const open = doc.querySelectorAll('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
+  for (const el of Array.from(open)) if (!el.closest("[data-radix-popper-content-wrapper]")) return true;
+  return false;
+}
+
 /**
  * Schovávání lišty: poslouchá posun <main> i vnitřních panelů (zachycením — posun prvků nebublá),
- * schová ji i pod otevřeným dialogem / prohlížečem dokumentu (zámek posunu Radixu na <body>).
+ * schová ji i pod otevřeným dialogem / prohlížečem dokumentu (portál dialogu v <body>).
  * Stav je i na <html data-mobile-nav> (CSS proměnná --mn-nav-offset pro přilepené prvky nad lištou).
  */
 export function useAutoHideNav(pathname: string): { hidden: boolean; overlay: boolean; show: () => void } {
   const [state, setState] = React.useState<NavScrollState>({ hidden: false, acc: 0 });
   const [overlay, setOverlay] = React.useState(false);
   const last = React.useRef(new WeakMap<Element, number>());
+  /** Panel, jehož posun lištu schoval (zavřené vlákno Pošty apod. → lišta zpět). */
+  const hider = React.useRef<Element | null>(null);
 
   React.useEffect(() => {
     const onScroll = (e: Event) => {
@@ -81,20 +91,38 @@ export function useAutoHideNav(pathname: string): { hidden: boolean; overlay: bo
       const max = el.scrollHeight - el.clientHeight;
       setState((s) => {
         const n = navScrollStep(s, prev, top, max);
+        if (n.hidden && !s.hidden) hider.current = el;
         return n.hidden === s.hidden && n.acc === s.acc ? s : n;
       });
     };
+    // ťuknutí, po kterém panel, co lištu schoval, zmizel (Zpět na seznam, zavřené vlákno) nebo je nahoře → lišta zpět
+    let raf = 0;
+    const onClick = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const h = hider.current;
+        if (h && (!h.isConnected || h.clientHeight === 0 || h.scrollTop <= NAV_TOP_ZONE)) {
+          hider.current = null;
+          setState((s) => (s.hidden ? { hidden: false, acc: 0 } : s));
+        }
+      });
+    };
     document.addEventListener("scroll", onScroll, { capture: true, passive: true });
-    return () => document.removeEventListener("scroll", onScroll, { capture: true });
+    document.addEventListener("click", onClick, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("scroll", onScroll, { capture: true });
+      document.removeEventListener("click", onClick, { capture: true });
+    };
   }, []);
 
-  // otevřený dialog / prohlížeč (Radix zamkne posun body) → lišta pryč
+  // otevřený dialog / prohlížeč dokumentu (portál Radixu v <body>) → lišta pryč
   React.useEffect(() => {
     const body = document.body;
-    const sync = () => setOverlay(body.hasAttribute("data-scroll-locked"));
+    const sync = () => setOverlay(overlayOpen(document));
     sync();
     const mo = new MutationObserver(sync);
-    mo.observe(body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
+    mo.observe(body, { childList: true, attributes: true, attributeFilter: ["data-scroll-locked", "style"] });
     return () => mo.disconnect();
   }, []);
 
@@ -159,7 +187,8 @@ export function MobileNav({ features, counts, user }: {
         className={cn(
           "fixed inset-x-0 bottom-0 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden",
           "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
-          bar.hidden && "pointer-events-none translate-y-full",
+          // i s tlačítkem Vyfotit, které přesahuje lištu nahoru (-mt-6)
+          bar.hidden && "pointer-events-none translate-y-[calc(100%+2rem)]",
         )}
         data-testid="mobile-nav"
         data-hidden={bar.hidden ? "1" : undefined}
