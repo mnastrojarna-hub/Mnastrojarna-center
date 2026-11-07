@@ -247,6 +247,10 @@ export interface JobFile {
   locked?: FileLock;
   /** Anonymizace výkresu pro dodavatele (null = netýká se — náš doklad, jiný typ souboru). */
   anon?: JobFileAnon | null;
+  /** Položka zakázky, ke které dokument patří (job_files.order_item_id). */
+  orderItemId?: string | null;
+  /** Číslo výkresu, které AI z dokumentu přečetla (ai_extracted.drawingNumber). */
+  drawingNumber?: string | null;
 }
 
 export type JobFileAnonStatus = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";

@@ -58,23 +58,10 @@ export function drawingsForItems(
   items: readonly { id: string; drawingNumber: string | null }[],
   files: readonly PricingDrawingSource[],
 ): Record<string, PricingDrawing[]> {
-  const ids = new Set(items.map((i) => i.id));
-  const keyed = items.map((i) => ({ id: i.id, n: norm(i.drawingNumber) })).filter((i) => i.n.length >= 3);
+  const itemOf = fileItemMatcher(items);
   const buckets = new Map<string, { f: PricingDrawingSource; view: PricingDrawingView }[]>();
   for (const f of files) {
-    let target: string | null = null;
-    if (f.itemId) {
-      target = ids.has(f.itemId) ? f.itemId : null;
-    } else {
-      const flat = norm(f.filename.replace(/\.[a-z0-9_]{1,8}$/i, ""));
-      let best = 0;
-      for (const it of keyed) {
-        if (it.n.length > best && flat.includes(it.n)) {
-          best = it.n.length;
-          target = it.id;
-        }
-      }
-    }
+    const target = itemOf(f);
     if (!target) continue;
     const list = buckets.get(target) ?? [];
     list.push({ f, view: drawingView(f.filename, f.mimeType, f.kind) });
@@ -87,4 +74,34 @@ export function drawingsForItems(
       .map(({ f, view }) => ({ id: f.id, filename: f.filename, view }));
   }
   return out;
+}
+
+/**
+ * Položka souboru (id položky / null): vazba job_files.order_item_id, jinak číslo výkresu v názvu souboru
+ * (nejdelší shoda vyhraje). Soubor navázaný na položku, která tu není, se podle názvu nepřiřadí.
+ * `drawingNumber` = číslo, které AI z výkresu přečetla — shoda čísla platí stejně jako shoda v názvu.
+ */
+export function fileItemMatcher(
+  items: readonly { id: string; drawingNumber: string | null }[],
+): (f: { itemId?: string | null; filename: string; drawingNumber?: string | null }) => string | null {
+  const ids = new Set(items.map((i) => i.id));
+  const keyed = items.map((i) => ({ id: i.id, n: norm(i.drawingNumber) })).filter((i) => i.n.length >= 3);
+  return (f) => {
+    if (f.itemId) return ids.has(f.itemId) ? f.itemId : null;
+    const read = norm(f.drawingNumber);
+    if (read.length >= 3) {
+      const exact = keyed.find((it) => it.n === read);
+      if (exact) return exact.id;
+    }
+    const flat = norm(f.filename.replace(/\.[a-z0-9_]{1,8}$/i, ""));
+    let best = 0;
+    let target: string | null = null;
+    for (const it of keyed) {
+      if (it.n.length > best && flat.includes(it.n)) {
+        best = it.n.length;
+        target = it.id;
+      }
+    }
+    return target;
+  };
 }

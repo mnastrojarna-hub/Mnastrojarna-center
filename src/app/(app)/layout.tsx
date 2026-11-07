@@ -35,7 +35,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <UiPrefsProvider userId={user.id} server={uiPrefs}>
       <MailLiveProvider enabled={features.includes("mail")} initialUnread={counts?.inbox}>
         <FileViewerProvider>
-          <div className="flex h-screen overflow-hidden">
+          {/* výška = VIDITELNÁ část okna (dvh): 100vh na telefonu počítá i místo pod adresním řádkem, takže spodek
+                stránky byl pod okrajem obrazovky a pod spodní lištou (majitel 7. 11.) */}
+          <div className="flex h-screen overflow-hidden supports-[height:100dvh]:h-dvh">
             <TabChunkPreload />
             {/* zastaralý JavaScript po nasazení (chunk se nestáhne) → stránka se jednou obnoví místo prázdného místa */}
             <ChunkReload />
@@ -45,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="flex flex-1 flex-col overflow-hidden">
               <Topbar user={user} features={features} />
               <PasswordChangeGate required={user.mustChangePassword} />
-              <main data-scroll-key="main" className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-4 pb-28 pt-5 sm:px-6 md:pb-14">
+              <main data-scroll-key="main" className="flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 md:pb-14">
                 <div className="mx-auto w-full max-w-7xl animate-fade-in">{children}</div>
               </main>
               <MobileNav features={features} counts={counts} user={{ fullName: user.fullName, roleLabel: user.roleLabel }} />

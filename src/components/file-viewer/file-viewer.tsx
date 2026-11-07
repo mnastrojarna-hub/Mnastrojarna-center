@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { AlertTriangle, ArrowLeft, Box, Download, ExternalLink, FileQuestion, FileText, Loader2, Printer } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Box, ChevronLeft, ChevronRight, Download, ExternalLink, FileQuestion, FileText, Loader2, Printer } from "lucide-react";
 import { filenameFromDisposition, sniffFile, type Sniffed } from "@/lib/viewer3d/sniff";
 import { pdfHas3D } from "@/lib/viewer3d/formats/pdf3d";
 import { printModeFor, safePrintSrc } from "@/lib/print/print-links";
@@ -10,7 +10,10 @@ import { printDocument } from "@/components/print/print-action";
 import { cn } from "@/lib/utils";
 import { PdfView } from "./pdf-view";
 import { ImageView } from "./image-view";
-import { standaloneViewerHref } from "./viewer-links";
+import { downloadHref, standaloneViewerHref } from "./viewer-links";
+import { RasterView, isServerRasterBytes, rasterPreviewHref, type RasterState } from "./raster-view";
+import { swipeAllowed, swipeDirection, swipeGateOf, type SwipeGate, type SwipePoint } from "./swipe";
+import { drawingNumberText, drawingQuantityText, isServerRasterName, type DrawingInfo } from "@/lib/jobs/drawing-set";
 
 // three.js + OpenCascade jen když se otevírá 3D model
 const ModelViewer = dynamic(() => import("@/components/viewer3d/model-viewer").then((m) => m.ModelViewer), {
@@ -30,6 +33,16 @@ export interface ViewerRequest {
   blob?: Blob;
   /** Vlastní tlačítka v hlavičce (jen při otevření z kódu, např. „Mít vedle" na Nacenění). */
   toolbar?: React.ReactNode;
+  /** Výkres zakázky: číslo, název, počet kusů a materiál navázané položky (bez cen). */
+  info?: DrawingInfo | null;
+}
+
+/** Listování sadou výkresů (swipe, ‹ ›, šipky). */
+export interface ViewerNav {
+  index: number;
+  count: number;
+  prev: () => void;
+  next: () => void;
 }
 
 interface Loaded {
@@ -83,7 +96,7 @@ function filenameFromUrl(url: string): string | null {
  * text; ostatní ke stažení. Nahoře vždy velké „Zpět" (i na telefonu).
  */
 export function FileViewer({
-  request, onBack, standalone = false, backLabel = "Zpět", toolbar,
+  request, onBack, standalone = false, backLabel = "Zpět", toolbar, nav,
 }: {
   request: ViewerRequest;
   onBack: () => void;
@@ -92,11 +105,17 @@ export function FileViewer({
   backLabel?: string;
   /** Vlastní tlačítka v hlavičce (před tiskem a stažením). */
   toolbar?: React.ReactNode;
+  /** Sada výkresů zakázky — swipe / ‹ › / šipky na další výkres. */
+  nav?: ViewerNav;
 }) {
+  // TIFF / HEIC dokumentu zakázky: originál se nestahuje, náhled strany připraví server
+  const rasterDirect = !request.blob && isServerRasterName(request.filename) && rasterPreviewHref(request.href, 1) !== null;
+  const [raster, setRaster] = React.useState<RasterState | null>(null);
   const [state, setState] = React.useState<{ loading: true; done: number; total: number } | { loading: false; error: string } | { loading: false; data: Loaded }>({ loading: true, done: 0, total: 0 });
   const [mode, setMode] = React.useState<"3d" | "pages">("3d");
 
   React.useEffect(() => {
+    if (rasterDirect) return;
     const ac = new AbortController();
     let blobUrl: string | null = null;
     (async () => {
@@ -139,14 +158,17 @@ export function FileViewer({
       ac.abort();
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-  }, [request.href, request.filename, request.blob]);
+  }, [request.href, request.filename, request.blob, rasterDirect]);
 
   const data = "data" in state ? state.data : null;
+  // TIFF / HEIC poznaný až podle obsahu (bez přípony) → náhled ze serveru, jinak ke stažení
+  const rasterLate = Boolean(data && isServerRasterBytes(data.bytes));
+  const rasterMode = rasterDirect || (rasterLate && rasterPreviewHref(request.href, 1) !== null);
   const title = data?.filename ?? request.filename ?? "Dokument";
   const isModel = data?.sniffed.kind === "model" || !!data?.has3D;
   const modelBytes = React.useMemo(() => (data && (data.sniffed.kind === "model" || data.has3D) ? (data.bytes.buffer as ArrayBuffer) : null), [data]);
   // tisk: PDF (u 3D PDF v režimu Stránky), obrázky, text — 3D model má vlastní „Tisknout pohled"
-  const printable = Boolean(data) && (data!.sniffed.kind === "pdf" || data!.sniffed.kind === "image" || data!.sniffed.kind === "text") && !(data!.has3D && mode === "3d");
+  const printable = Boolean(data) && !rasterLate && (data!.sniffed.kind === "pdf" || data!.sniffed.kind === "image" || data!.sniffed.kind === "text") && !(data!.has3D && mode === "3d");
   const print = React.useCallback(() => {
     if (!data) return;
     const href = request.blob ? null : safePrintSrc(request.href);
@@ -173,6 +195,82 @@ export function FileViewer({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [printable, print]);
 
+  // listování výkresy: šipky ← → (ne v poli formuláře, ne když šipky posouvají přiblížené PDF)
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  const navRef = React.useRef(nav);
+  navRef.current = nav;
+  const hasNav = Boolean(nav);
+  React.useEffect(() => {
+    if (!hasNav) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const pdf = contentRef.current?.querySelector<HTMLElement>("[data-testid=pdf-view]");
+      if (pdf && pdf.scrollWidth > pdf.clientWidth + 2) return;
+      e.preventDefault();
+      if (e.key === "ArrowLeft") navRef.current?.prev();
+      else navRef.current?.next();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hasNav]);
+
+  // swipe jedním prstem (dva prsty = přiblížení → swipe se ruší)
+  React.useEffect(() => {
+    const root = contentRef.current;
+    if (!root || !hasNav) return;
+    let start: (SwipePoint & { gate: SwipeGate; scroller: Element | null }) | null = null;
+    let cancelled = false;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        cancelled = true;
+        start = null;
+        return;
+      }
+      cancelled = false;
+      const p = e.touches[0];
+      const { gate, scroller } = swipeGateOf(e.target, root);
+      start = { x: p.clientX, y: p.clientY, t: Date.now(), gate, scroller };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length > 1) cancelled = true;
+    };
+    const onEnd = (e: TouchEvent) => {
+      const s = start;
+      if (e.touches.length === 0) start = null;
+      if (!s || cancelled || e.touches.length > 0) return;
+      const p = e.changedTouches[0];
+      if (!p) return;
+      const dir = swipeDirection(s, { x: p.clientX, y: p.clientY, t: Date.now() });
+      if (!dir || !swipeAllowed(s.gate, dir, s.scroller ? s.scroller.scrollLeft : null)) return;
+      if (dir === 1) navRef.current?.next();
+      else navRef.current?.prev();
+    };
+    const onCancel = () => {
+      start = null;
+      cancelled = false;
+    };
+    root.addEventListener("touchstart", onStart, { passive: true, capture: true });
+    root.addEventListener("touchmove", onMove, { passive: true, capture: true });
+    root.addEventListener("touchend", onEnd, { passive: true, capture: true });
+    root.addEventListener("touchcancel", onCancel, { passive: true, capture: true });
+    return () => {
+      root.removeEventListener("touchstart", onStart, { capture: true });
+      root.removeEventListener("touchmove", onMove, { capture: true });
+      root.removeEventListener("touchend", onEnd, { capture: true });
+      root.removeEventListener("touchcancel", onCancel, { capture: true });
+    };
+  }, [hasNav]);
+
+  const info = request.info ?? null;
+  const infoNumber = drawingNumberText(info);
+  const infoQty = drawingQuantityText(info);
+  const subtitle = rasterMode
+    ? `${/\.hei[cf]$/i.test(title) ? "HEIC" : "TIFF"}${raster?.pages && raster.pages > 1 ? ` · ${raster.pages} stran` : ""}`
+    : data ? `${data.has3D ? "3D PDF" : data.sniffed.label} · ${fmtSize(data.bytes.length)}` : null;
+
   return (
     <div className="flex h-full flex-col bg-background" data-testid="file-viewer">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-2 pt-[env(safe-area-inset-top)] sm:px-3">
@@ -186,8 +284,13 @@ export function FileViewer({
         </button>
         <div className="min-w-0 flex-1 px-1">
           <p className="truncate text-sm font-semibold" title={title}>{title}</p>
-          {data && <p className="truncate text-[11px] text-muted-foreground">{data.has3D ? "3D PDF" : data.sniffed.label} · {fmtSize(data.bytes.length)}</p>}
+          {subtitle && <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>}
         </div>
+        {nav && (
+          <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-semibold tabular-nums" data-testid="viewer-counter" aria-label={`Výkres ${nav.index + 1} z ${nav.count}`}>
+            {nav.index + 1} / {nav.count}
+          </span>
+        )}
         {data?.has3D && (
           <div className="flex shrink-0 rounded-lg border p-0.5 text-xs font-medium" role="tablist" aria-label="Zobrazení 3D PDF">
             <button type="button" role="tab" aria-selected={mode === "3d"} onClick={() => setMode("3d")} className={cn("inline-flex h-9 items-center gap-1 rounded-md px-2", mode === "3d" ? "bg-foreground text-background" : "hover:bg-accent")}>
@@ -211,7 +314,18 @@ export function FileViewer({
             <Printer className="h-5 w-5" />
           </button>
         )}
-        {data && (
+        {rasterMode && (
+          <a
+            href={downloadHref(request.href)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-accent"
+            aria-label="Stáhnout originál"
+            title="Stáhnout originál"
+            data-no-viewer=""
+          >
+            <Download className="h-5 w-5" />
+          </a>
+        )}
+        {data && !rasterMode && (
           <a
             href={data.blobUrl}
             download={data.filename}
@@ -238,8 +352,26 @@ export function FileViewer({
         )}
       </header>
 
-      <div className="relative min-h-0 flex-1">
-        {state.loading ? (
+      {info && (infoNumber || info.name || infoQty || info.material) && (
+        // výkres zakázky: počet kusů a materiál z položky (nahoře, ať je vidět i na telefonu)
+        <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b bg-muted/40 px-3 py-1.5 text-xs scrollbar-thin" data-testid="viewer-drawing-info">
+          {infoNumber && <span className="shrink-0 font-mono font-semibold" data-field="drawing">{infoNumber}</span>}
+          {info.name && <span className="min-w-0 max-w-[45%] shrink truncate text-muted-foreground" data-field="name">{info.name}</span>}
+          {infoQty && (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary tabular-nums" data-field="quantity">{infoQty}</span>
+          )}
+          {info.material && (
+            <span className="shrink-0 rounded-full bg-background px-2 py-0.5 font-medium ring-1 ring-border" data-field="material">
+              <span className="text-muted-foreground">Materiál</span> {info.material}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div ref={contentRef} className="relative min-h-0 flex-1" data-testid="viewer-content">
+        {rasterMode ? (
+          <RasterView href={request.href} filename={title} onState={setRaster} />
+        ) : state.loading ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <span>
@@ -271,6 +403,14 @@ export function FileViewer({
               </div>
             )}
           </>
+        ) : data && rasterLate ? (
+          <Message
+            icon={FileQuestion}
+            tone="text-muted-foreground"
+            title="Náhled TIFF / HEIC tady neumím"
+            text="Soubor si stáhni a otevři v programu, který ho umí."
+            action={<a href={data.blobUrl} download={data.filename} data-no-viewer="" className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background"><Download className="h-4 w-4" /> Stáhnout {data.filename}</a>}
+          />
         ) : data?.sniffed.kind === "pdf" ? (
           <PdfView data={data.bytes} />
         ) : data?.sniffed.kind === "image" ? (
@@ -286,6 +426,30 @@ export function FileViewer({
             action={<a href={data.blobUrl} download={data.filename} data-no-viewer="" className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background"><Download className="h-4 w-4" /> Stáhnout {data.filename}</a>}
           />
         ) : null}
+        {nav && (
+          <>
+            <button
+              type="button"
+              onClick={nav.prev}
+              className="absolute left-1.5 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border bg-background/85 shadow-md backdrop-blur hover:bg-accent sm:left-3"
+              aria-label="Předchozí výkres"
+              title="Předchozí výkres (←)"
+              data-testid="viewer-prev"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <button
+              type="button"
+              onClick={nav.next}
+              className="absolute right-1.5 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border bg-background/85 shadow-md backdrop-blur hover:bg-accent sm:right-3"
+              aria-label="Další výkres"
+              title="Další výkres (→)"
+              data-testid="viewer-next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

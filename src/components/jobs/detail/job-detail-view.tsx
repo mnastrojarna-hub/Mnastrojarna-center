@@ -26,6 +26,8 @@ import type { JobRfqData } from "@/lib/rfq/store";
 import { RfqProvider } from "@/components/rfq/rfq-context";
 import { RfqSection } from "@/components/rfq/rfq-panel";
 import { isTraversalNavigation } from "@/components/nav/scroll-memory";
+import { registerViewerSet } from "@/components/file-viewer/viewer-bus";
+import { jobDrawingSet, viewerSetIndex } from "@/lib/jobs/drawing-set";
 
 /** Podrobné stavy a „kdo · kdy" karty (načítá stránka; bez nich karta funguje se sloupci zakázky). */
 export interface JobFlowData {
@@ -121,6 +123,16 @@ export function JobDetailView({
     }
     return out;
   }, [production?.operations]);
+
+  // výkresy zakázky: otevření kteréhokoli z nich (Dokumenty, Přehled…) dovolí v prohlížeči listovat swipem
+  const drawingSet = React.useMemo(() => jobDrawingSet(job.files, job.items), [job.files, job.items]);
+  React.useEffect(() => {
+    if (!drawingSet.length) return;
+    return registerViewerSet((href) => {
+      const index = viewerSetIndex(drawingSet, href);
+      return index >= 0 ? { list: drawingSet, index } : null;
+    });
+  }, [drawingSet]);
 
   const mailCount = useJobMailCount();
   const counts: Record<DetailTab, number> = {

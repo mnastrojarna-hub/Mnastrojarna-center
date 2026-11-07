@@ -971,7 +971,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
               "min-w-0",
               // mobil / tablet: detail vlákna přes celou obrazovku (nad hlavičkou, nad spodní lištou zůstává navigace)
               mobileDetail
-                ? "fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 overflow-y-auto overscroll-contain bg-background p-3 md:bottom-0"
+                ? "fixed inset-x-0 top-0 bottom-[var(--mn-nav-offset,0px)] z-40 overflow-y-auto overscroll-contain bg-background p-3 pb-6 motion-safe:transition-[bottom] md:bottom-0"
                 : "hidden",
               // počítač: vlastní sloupec, roluje sám (hlavička vlákna s akcemi zůstává nahoře)
               "lg:static lg:z-auto lg:block lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:bg-transparent lg:p-0 scrollbar-thin",

@@ -26,6 +26,95 @@ export function mobileMenuCount(features: readonly Feature[], counts: Partial<Ba
   return Math.max(0, counts.quotes ?? 0);
 }
 
+/** Posun (px) jedním směrem, po kterém se lišta schová / ukáže, a pásmo nahoře, kde je vždy vidět. */
+export const NAV_HIDE_AFTER = 24;
+export const NAV_SHOW_AFTER = 12;
+export const NAV_TOP_ZONE = 56;
+
+export interface NavScrollState {
+  hidden: boolean;
+  /** Posun nasbíraný jedním směrem (+ dolů, − nahoru). */
+  acc: number;
+}
+
+/**
+ * Lišta při posunu (majitel 7. 11.: „dole mi furt překáží menu"): dolů → schovat, nahoru → ukázat,
+ * nahoře na stránce vždy vidět. `top` = nová poloha posunu, `prevTop` = předchozí, `max` = konec obsahu
+ * (pružení na konci stránky na iOS lištu nevrací).
+ */
+export function navScrollStep(state: NavScrollState, prevTop: number, top: number, max: number): NavScrollState {
+  const t = Math.min(Math.max(0, top), Math.max(0, max));
+  const p = Math.min(Math.max(0, prevTop), Math.max(0, max));
+  if (t <= NAV_TOP_ZONE) return { hidden: false, acc: 0 };
+  const d = t - p;
+  if (d === 0) return state;
+  const acc = Math.sign(d) === Math.sign(state.acc) ? state.acc + d : d;
+  if (acc >= NAV_HIDE_AFTER) return { hidden: true, acc };
+  if (acc <= -NAV_SHOW_AFTER) return { hidden: false, acc };
+  return { hidden: state.hidden, acc };
+}
+
+/** Posun, který lištu neřídí: dialogy a vyskakovací menu (lištu stejně překrývají), malé vnitřní okénka. */
+function ignoredScroller(el: Element): boolean {
+  if (el.clientHeight < 160) return true;
+  return Boolean(el.closest("[role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper], [role=menu], [role=listbox], nav"));
+}
+
+/**
+ * Schovávání lišty: poslouchá posun <main> i vnitřních panelů (zachycením — posun prvků nebublá),
+ * schová ji i pod otevřeným dialogem / prohlížečem dokumentu (zámek posunu Radixu na <body>).
+ * Stav je i na <html data-mobile-nav> (CSS proměnná --mn-nav-offset pro přilepené prvky nad lištou).
+ */
+export function useAutoHideNav(pathname: string): { hidden: boolean; overlay: boolean; show: () => void } {
+  const [state, setState] = React.useState<NavScrollState>({ hidden: false, acc: 0 });
+  const [overlay, setOverlay] = React.useState(false);
+  const last = React.useRef(new WeakMap<Element, number>());
+
+  React.useEffect(() => {
+    const onScroll = (e: Event) => {
+      const el = e.target;
+      if (!(el instanceof Element) || ignoredScroller(el)) return;
+      const top = el.scrollTop;
+      const prev = last.current.get(el);
+      last.current.set(el, top);
+      if (prev === undefined || prev === top) return; // první událost prvku / jen vodorovný posun
+      const max = el.scrollHeight - el.clientHeight;
+      setState((s) => {
+        const n = navScrollStep(s, prev, top, max);
+        return n.hidden === s.hidden && n.acc === s.acc ? s : n;
+      });
+    };
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
+  }, []);
+
+  // otevřený dialog / prohlížeč (Radix zamkne posun body) → lišta pryč
+  React.useEffect(() => {
+    const body = document.body;
+    const sync = () => setOverlay(body.hasAttribute("data-scroll-locked"));
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
+    return () => mo.disconnect();
+  }, []);
+
+  // jiná stránka → lišta zase vidět
+  React.useEffect(() => {
+    setState({ hidden: false, acc: 0 });
+  }, [pathname]);
+
+  const hidden = state.hidden || overlay;
+  React.useEffect(() => {
+    const root = document.documentElement;
+    if (hidden) root.setAttribute("data-mobile-nav", "hidden");
+    else root.removeAttribute("data-mobile-nav");
+  }, [hidden]);
+  React.useEffect(() => () => document.documentElement.removeAttribute("data-mobile-nav"), []);
+
+  const show = React.useCallback(() => setState({ hidden: false, acc: 0 }), []);
+  return { hidden, overlay, show };
+}
+
 function CountBadge({ n, className }: { n: number; className?: string }) {
   if (!n) return null;
   return (
@@ -56,6 +145,7 @@ export function MobileNav({ features, counts, user }: {
   const unread = badgeCounts.inbox ?? 0;
 
   React.useEffect(() => setMenuOpen(false), [pathname]);
+  const bar = useAutoHideNav(pathname);
 
   const items = [
     { title: "Zakázky", href: "/orders", icon: ClipboardList, feature: "orders" as Feature },
@@ -65,7 +155,16 @@ export function MobileNav({ features, counts, user }: {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+      <nav
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden",
+          "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
+          bar.hidden && "pointer-events-none translate-y-full",
+        )}
+        data-testid="mobile-nav"
+        data-hidden={bar.hidden ? "1" : undefined}
+        onFocusCapture={bar.show}
+      >
         {items.map((item) => {
           const active = matchesNavPath(pathname, item.href);
           return (
