@@ -14,6 +14,8 @@ import { downloadHref, standaloneViewerHref } from "./viewer-links";
 import { RasterView, isServerRasterBytes, rasterPreviewHref, type RasterState } from "./raster-view";
 import { swipeAllowed, swipeDirection, swipeGateOf, type SwipeGate, type SwipePoint } from "./swipe";
 import { drawingNumberText, drawingQuantityText, isServerRasterName, type DrawingInfo } from "@/lib/jobs/drawing-set";
+import { jobFileIdFromHref } from "@/lib/jobs/drawing-convert-names";
+import { ConvertPdfButton } from "./convert-pdf-button";
 
 // three.js + OpenCascade jen když se otevírá 3D model
 const ModelViewer = dynamic(() => import("@/components/viewer3d/model-viewer").then((m) => m.ModelViewer), {
@@ -264,6 +266,7 @@ export function FileViewer({
     };
   }, [hasNav]);
 
+  const cadFileId = jobFileIdFromHref(request.href);
   const info = request.info ?? null;
   const infoNumber = drawingNumberText(info);
   const infoQty = drawingQuantityText(info);
@@ -302,6 +305,8 @@ export function FileViewer({
           </div>
         )}
         {toolbar ?? request.toolbar}
+        {/* výkres DXF / DWG zakázky → PDF (nový dokument zakázky, otevře se hned) */}
+        {data && !request.blob && cadFileId && (data.sniffed.format === "dxf" || data.sniffed.format === "dwg") && <ConvertPdfButton fileId={cadFileId} />}
         {printable && (
           <button
             type="button"

@@ -45,6 +45,10 @@ import type {
 import { aciColor, insunitsToMm, plainText, trueColor, type DrawColor, type DrawEntity, type DrawLayer, type Drawing2D, type Pt } from "../drawing2d";
 import { ModelImportError } from "../types";
 import {
+  detectDecimalSeparator, dimFallbackGeometry, dimTextFrame, dimTextHeight, dimValueText, mergeDimStyle, readableAngle, resolveDimText,
+  type DimDef, type DimStyle,
+} from "../dimension";
+import {
   IDENTITY,
   apply,
   applyVec,
@@ -448,6 +452,26 @@ interface Ctx {
   /** Verze souboru (AC10xx) a kódování 8bitových řetězců — oprava textů MULTILEADER v R2004 a starších. */
   version: string;
   encoding: string;
+  /** Styly kót (hlavička + tabulka DIMSTYLE podle jména velkými písmeny). */
+  dimHeader: DimStyle;
+  dimStyles: Map<string, DimStyle>;
+  /** Právě vykreslovaná kóta: texty z jejího bloku a výška textu podle stylu. */
+  curDim: { texts: Extract<DrawEntity, { kind: "text" }>[]; height: number } | null;
+  /** Texty všech kót (desetinný oddělovač výkresu) a doplnění textů kót po převodu celého výkresu. */
+  dimTexts: string[];
+  fixups: ((sep: string) => void)[];
+}
+
+/** Proměnné kót z hlavičky / záznamu DIMSTYLE (LibreDWG: stejná jména jako v AutoCADu). */
+function dwgDimStyle(v: Record<string, unknown> | null | undefined): DimStyle {
+  if (!v) return {};
+  const n = (k: string): number | undefined => (typeof v[k] === "number" && Number.isFinite(v[k]) ? (v[k] as number) : undefined);
+  const post = typeof v.DIMPOST === "string" ? v.DIMPOST : undefined;
+  const tol = n("DIMTOL");
+  return {
+    dec: n("DIMDEC"), adec: n("DIMADEC"), scale: n("DIMSCALE"), txt: n("DIMTXT"), lfac: n("DIMLFAC"), post,
+    tol: tol === undefined ? undefined : tol !== 0, tp: n("DIMTP"), tm: n("DIMTM"), tdec: n("DIMTDEC"), asz: n("DIMASZ"),
+  };
 }
 
 /** Kontext vykreslení: transformace do světa (mm), zděděná hladina a barva BYBLOCK. */
@@ -504,7 +528,17 @@ export function dwgDatabaseToDrawing(db: DwgDatabase, opts: DwgConvertOptions = 
     limitHit: false,
     version: opts.version ?? "",
     encoding: opts.encoding || "windows-1252",
+    dimHeader: dwgDimStyle(db.header as unknown as Record<string, unknown>),
+    dimStyles: new Map(),
+    curDim: null,
+    dimTexts: [],
+    fixups: [],
   };
+  for (const st of db.tables?.DIMSTYLE?.entries ?? []) {
+    if (st && typeof st.name === "string" && !ctx.dimStyles.has(st.name.toUpperCase())) {
+      ctx.dimStyles.set(st.name.toUpperCase(), dwgDimStyle(st as unknown as Record<string, unknown>));
+    }
+  }
 
   const scale = insunitsToMm(typeof db.header?.INSUNITS === "number" ? db.header.INSUNITS : undefined);
   const root: Env = { m: scale === 1 ? IDENTITY : [scale, 0, 0, scale, 0, 0], layer: null, byBlock: null, inDim: false };
@@ -526,6 +560,11 @@ export function dwgDatabaseToDrawing(db: DwgDatabase, opts: DwgConvertOptions = 
       if (ctx.out.length) warnings.push("Modelový prostor je prázdný — zobrazuje se rozvržení (paper space) bez obsahu výřezů.");
     }
   }
+
+  // texty kót až teď — desetinný oddělovač podle kót, které výkres už má (jinak čárka)
+  const sep = detectDecimalSeparator(ctx.dimTexts) ?? ",";
+  for (const f of ctx.fixups) f(sep);
+  ctx.out = ctx.out.filter((x) => x.kind !== "text" || x.text.trim() !== "");
 
   const unsupported = [...ctx.skipped.entries()].sort((a, b) => b[1] - a[1]);
   if (unsupported.length) {
@@ -728,12 +767,17 @@ function pushText(
   const dir = applyVec(m, Math.cos(rotation), Math.sin(rotation));
   const dl = Math.hypot(dir[0], dir[1]);
   if (!(dl > 0)) return;
-  const h = (height > 0 ? height : 2.5) * (Math.abs(det(m)) / dl);
-  const out: DrawEntity = {
+  // výška 0 = „podle stylu": v kótě výška textu kóty
+  const h = (height > 0 ? height : ctx.curDim?.height ?? 2.5) * (Math.abs(det(m)) / dl);
+  const out: Extract<DrawEntity, { kind: "text" }> = {
     kind: "text", layer, color, p: apply(m, x, y), text, height: h, rotation: Math.atan2(dir[1], dir[0]), hAlign, vAlign,
   };
   if (width && width > 0) out.width = width * dl;
   push(ctx, out);
+  if (ctx.curDim) {
+    ctx.curDim.texts.push(out);
+    ctx.dimTexts.push(text);
+  }
 }
 
 const H_ALIGN = ["left", "center", "right"] as const;
@@ -1049,34 +1093,65 @@ function emitInsert(ctx: Ctx, ins: DwgInsertEntity, env: Env, layer: string, col
   }
 }
 
+const pt2 = (p: { x?: number; y?: number } | null | undefined): Pt | null =>
+  p && Number.isFinite(p.x) && Number.isFinite(p.y) ? [p.x as number, p.y as number] : null;
+
+/**
+ * Kóta: blok *D… (už ve světových souřadnicích), bez bloku náhradní kresba. Když z kóty nevzejde
+ * žádný text (LibreDWG text nepřečetl, prázdný, výška 0), doplní se hodnota; „<>" se nahradí hodnotou.
+ */
 function emitDimension(ctx: Ctx, d: DwgDimensionEntity, env: Env, layer: string, color: DrawColor): void {
   const name = String(d.name ?? "");
   const block = name ? findBlock(ctx, name) : undefined;
+  const style = mergeDimStyle(ctx.dimHeader, d.styleName ? ctx.dimStyles.get(String(d.styleName).toUpperCase()) : ctx.dimStyles.get("STANDARD"));
+  const a = d as DwgDimensionEntity & Record<string, { x?: number; y?: number } | undefined>;
+  const def: DimDef = {
+    type: num(d.dimensionType),
+    p10: pt2(d.definitionPoint), p11: pt2(d.textPoint), p13: pt2(a.subDefinitionPoint1), p14: pt2(a.subDefinitionPoint2),
+    p15: pt2(a.centerPoint), p16: pt2(a.arcPoint),
+    // LibreDWG (ins_rotation) natočení otočené kóty spolehlivě nedává — směr se dopočítá z bodů
+    angle: null,
+    textRotation: Number.isFinite(d.textRotation) && d.textRotation ? (d.textRotation as number) : null,
+    measurement: Number.isFinite(d.measurement) ? (d.measurement as number) : null,
+    text: typeof d.text === "string" ? d.text : null,
+  };
+  const height = dimTextHeight(style);
+  const cur = { texts: [] as Extract<DrawEntity, { kind: "text" }>[], height };
+  const prev = ctx.curDim;
   if (block && (block.entities ?? []).length) {
     if (!enterBlock(ctx, name)) return;
+    ctx.curDim = cur;
     try {
       // geometrie kóty je v bloku *D… už ve světových souřadnicích (identita)
       noteDropped(ctx, block.name);
       emitAll(ctx, block.entities, { m: env.m, layer, byBlock: color, inDim: true });
     } finally {
       ctx.stack.pop();
+      ctx.curDim = prev;
     }
-    return;
+  } else {
+    for (const g of dimFallbackGeometry(def, style)) {
+      if (g.kind === "line") push(ctx, { kind: "line", layer, color, a: apply(env.m, g.a[0], g.a[1]), b: apply(env.m, g.b[0], g.b[1]) });
+      else if (g.kind === "polyline") emitPolyline(ctx, env.m, g.points.map((p) => p[0]), g.points.map((p) => p[1]), null, g.closed, layer, color);
+      else emitArc(ctx, env.m, g.c[0], g.c[1], g.r, g.start, g.end, false, layer, color);
+    }
   }
-  // blok kóty chybí → aspoň text s naměřenou hodnotou
-  const measured = num(d.measurement, NaN);
-  const raw = typeof d.text === "string" ? d.text : "";
-  if (raw === " ") return; // potlačený text
-  const value = Number.isFinite(measured) ? formatMeasurement(d, measured) : "";
-  const text = plainText(raw ? raw.replace(/<>/g, value) : value);
-  if (!text.trim() || !d.textPoint) return;
-  pushText(ctx, env.m, px(d.textPoint), py(d.textPoint), num(d.textRotation), 2.5, text, "center", "middle", undefined, layer, color);
-}
-
-function formatMeasurement(d: DwgDimensionEntity, v: number): string {
-  const t = num(d.dimensionType) & 15;
-  if (t === 2 || t === 5) return `${(Math.round(((v * 180) / Math.PI) * 100) / 100).toString().replace(".", ",")}°`;
-  return (Math.round(v * 100) / 100).toString().replace(".", ",");
+  ctx.fixups.push((sep) => {
+    const value = dimValueText(def, style, sep);
+    for (const t of cur.texts) if (t.text.includes("<>")) t.text = value ? t.text.replace(/<>/g, value) : t.text.replace(/<>/g, "").trim();
+    if (cur.texts.some((t) => t.text.trim())) return;
+    const resolved = resolveDimText(def.text, value);
+    const text = resolved === null ? "" : plainText(resolved).trim();
+    const frame = text ? dimTextFrame(def) : null;
+    if (!frame) return;
+    const dir = applyVec(env.m, Math.cos(frame.rotation), Math.sin(frame.rotation));
+    const dl = Math.hypot(dir[0], dir[1]);
+    if (!(dl > 0)) return;
+    push(ctx, {
+      kind: "text", layer, color, p: apply(env.m, frame.p[0], frame.p[1]), text, height: height * (Math.abs(det(env.m)) / dl),
+      rotation: readableAngle(Math.atan2(dir[1], dir[0])), hAlign: "center", vAlign: "middle",
+    });
+  });
 }
 
 function emitHatch(ctx: Ctx, h: DwgHatchEntity, env: Env, layer: string, color: DrawColor): void {

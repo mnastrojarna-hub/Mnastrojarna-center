@@ -1252,6 +1252,7 @@ export class ViewerEngine {
     void import("troika-three-text").then((troika) => {
       if (this.disposed) return;
       const byPart = new Map<number, typeof texts>();
+      let pending = 0;
       for (const t of texts.slice(0, 20000)) {
         const list = byPart.get(t.part) ?? [];
         list.push(t);
@@ -1282,12 +1283,35 @@ export class ViewerEngine {
         batch.visible = !p.hidden;
         p.texts = batch;
         this.modelGroup.add(batch);
-        batch.sync(() => this.requestRender());
+        pending++;
+        batch.sync(() => {
+          this.requestRender();
+          if (--pending === 0) this.markTextsReady(byPart);
+        });
       }
       this.requestRender();
     }).catch(() => {
       /* texty se nenačetly — výkres zůstane bez nich */
     });
+  }
+
+  /**
+   * Texty výkresu vysázené (písmo načtené) → skrytý seznam textů v kontejneru prohlížeče
+   * (data-testid „viewer2d-texts", data-count) — kontrola E2E, že se čísla kót opravdu vykreslují.
+   */
+  private markTextsReady(byPart: Map<number, { text: string }[]>) {
+    if (this.disposed) return;
+    const list: string[] = [];
+    for (const items of byPart.values()) for (const t of items) list.push(t.text);
+    let el = this.container.querySelector<HTMLElement>("[data-testid=viewer2d-texts]");
+    if (!el) {
+      el = document.createElement("div");
+      el.hidden = true;
+      el.dataset.testid = "viewer2d-texts";
+      this.container.appendChild(el);
+    }
+    el.dataset.count = String(list.length);
+    el.textContent = list.slice(0, 5000).join("\n");
   }
 
   /** Tmavé / světlé pozadí: barva popředí (ACI 7) černá ↔ bílá. */
