@@ -201,7 +201,7 @@ export function ItemsTab({ items, currency, value, onDirtyChange }: { items: Job
       )}
 
       {(dirty || saving) && (
-        <div className="sticky bottom-20 z-20 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50/95 px-4 py-3 shadow-lg backdrop-blur dark:border-amber-500/40 dark:bg-amber-950/80 sm:flex-row sm:items-center sm:justify-between md:bottom-4">
+        <div className="sticky bottom-[calc(var(--mn-nav-offset,0px)+0.75rem)] z-20 motion-safe:transition-[bottom] flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50/95 px-4 py-3 shadow-lg backdrop-blur dark:border-amber-500/40 dark:bg-amber-950/80 sm:flex-row sm:items-center sm:justify-between md:bottom-4">
           <span className="text-sm font-medium text-amber-900 dark:text-amber-200">Máš neuložené změny v položkách.</span>
           <div className="flex gap-2">
             <Button type="button" variant="ghost" onClick={discard} disabled={saving}>

@@ -13,6 +13,9 @@ export function isViewerPath(pathname: string): boolean {
 
 const VIEWABLE = new Set([
   "pdf", "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "txt", "csv", "log", "json", "xml",
+  // TIFF / HEIC (sken, iPhone): dokument zakázky převede server na obrázek, jinak prohlížeč nabídne stažení —
+  // vždy s hlavičkou a „Zpět" (dřív se otevřel holý soubor bez cesty zpět)
+  "tif", "tiff", "heic", "heif",
   ...Object.keys(MODEL_EXTENSIONS),
 ]);
 
@@ -20,7 +23,7 @@ const VIEWABLE = new Set([
 const NOT_VIEWABLE = new Set([
   "doc", "docx", "xls", "xlsx", "xlsm", "ppt", "pptx", "odt", "ods", "zip", "rar", "7z", "msg", "eml",
   "x_t", "x_b", "sldprt", "sldasm", "slddrw", "catpart", "catproduct", "catdrawing", "prt", "asm",
-  "ipt", "iam", "idw", "par", "psm", "jt", "sat", "3dm", "f3d", "heic", "heif", "tif", "tiff",
+  "ipt", "iam", "idw", "par", "psm", "jt", "sat", "3dm", "f3d",
 ]);
 
 /** Dá se soubor s tímto názvem zobrazit? (null = nevíme → rozhodne obsah). */
