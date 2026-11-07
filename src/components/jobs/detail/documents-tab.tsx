@@ -4,7 +4,7 @@ import * as React from "react";
 import { useUrlState } from "@/components/nav/use-url-state";
 import {
   ExternalLink, Download, MoreHorizontal, Upload, Pencil, Archive, ArchiveRestore, Trash2, Sparkles, FileText,
-  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send, Lock,
+  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send, Lock, FileDown, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { fileLockText } from "@/components/flow/file-lock";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,8 @@ import {
 } from "@/components/anonymize/anon-file-menu";
 import { AnonymizeEditor } from "@/components/anonymize/anonymize-editor";
 import { PrintButton, PrintMenuItem } from "@/components/print/print-button";
+import { convertDrawingToPdf } from "@/components/file-viewer/convert-pdf";
+import { convertNote, isCadDrawingName } from "@/lib/jobs/drawing-convert-names";
 
 /** Doklady, které jde z karty poslat zákazníkovi e-mailem (PDF v příloze). */
 const SENDABLE: Partial<Record<JobFileKind, { kind: JobDocumentKind; what: string }>> = {
@@ -110,8 +112,12 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
 }
 
 function FileRow({
-  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload, anonStalled,
+  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload, anonStalled, onConvertPdf, converting,
 }: {
+  /** Výkres DXF / DWG → PDF (nový dokument zakázky). */
+  onConvertPdf?: (f: JobFile) => void;
+  /** Právě se převádí na PDF. */
+  converting?: boolean;
   file: JobFile;
   /** Anonymizace čeká déle než obvykle (UI přestalo čekat) → „Zkusit znovu" místo spinneru. */
   anonStalled?: boolean;
@@ -212,8 +218,8 @@ function FileRow({
         <PrintButton href={fileUrl(file.id)} filename={file.filename} label={forSupplier ? "Tisknout originál (interně)" : "Tisknout"} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Další akce dokumentu" disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+            <Button variant="ghost" size="icon-sm" aria-label="Další akce dokumentu" disabled={busy || converting}>
+              {busy || converting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -228,6 +234,11 @@ function FileRow({
               <a href={fileUrl(file.id, true)}><Download /> {forSupplier ? "Stáhnout originál (interně)" : "Stáhnout"}</a>
             </DropdownMenuItem>
             <PrintMenuItem href={fileUrl(file.id)} filename={file.filename} label={forSupplier ? "Tisknout originál (interně)" : "Tisknout"} />
+            {onConvertPdf && !file.archived && isCadDrawingName(file.filename) && (
+              <DropdownMenuItem onSelect={() => onConvertPdf(file)} data-testid="file-convert-pdf">
+                <FileDown /> Převést na PDF
+              </DropdownMenuItem>
+            )}
             {forSupplier && (
               <PrintMenuItem href={anonDownloadUrl(file.id)} filename={file.anon?.filename ?? null} label="Tisknout pro dodavatele (anonymizovaný)" testId="print-anon-menu-item" />
             )}
@@ -442,6 +453,22 @@ function LockedFileRow({ file }: { file: JobFile }) {
   );
 }
 
+/** Souhrn hromadného převodu DXF / DWG → PDF. */
+export interface CadPdfSummary {
+  total: number;
+  converted: string[];
+  skipped: string[];
+  failed: { name: string; error: string }[];
+}
+
+/** „Převedeno 3 z 4; 1 se nepodařilo: X.dwg" (+ přeskočené, které PDF už mají). */
+export function cadPdfSummaryText(s: CadPdfSummary): string {
+  const parts = [`Převedeno ${s.converted.length} z ${s.total}`];
+  if (s.skipped.length) parts.push(`${s.skipped.length} už PDF ${s.skipped.length === 1 ? "má" : "mají"} (přeskočeno)`);
+  if (s.failed.length) parts.push(`${s.failed.length} se nepodařil${s.failed.length === 1 ? "o" : s.failed.length <= 4 ? "y" : "o"}: ${s.failed.map((f) => f.name).join(", ")}`);
+  return parts.join("; ") + ".";
+}
+
 /** Záložka Dokumenty — po druzích, s verzemi a archivem. */
 export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: QuoteRef[] }) {
   const { jobId, notify, refresh } = useJobDetail();
@@ -458,6 +485,47 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
   const [preview, setPreview] = React.useState<number | null>(null);
   const [anonEditing, setAnonEditing] = React.useState<JobFile | null>(null);
   const [reviewDl, setReviewDl] = React.useState<JobFile | null>(null);
+  // převod výkresů DXF / DWG na PDF: jednotlivě (menu) i hromadně (postupně, s průběhem a souhrnem)
+  const [convertingIds, setConvertingIds] = React.useState<Set<string>>(new Set());
+  const [bulk, setBulk] = React.useState<{ done: number; total: number; current: string } | null>(null);
+  const [bulkSummary, setBulkSummary] = React.useState<CadPdfSummary | null>(null);
+  const cadFiles = files.filter((f) => !f.archived && !f.locked && isCadDrawingName(f.filename));
+  const cadWithoutPdf = cadFiles.filter((c) => !files.some((f) => !f.archived && f.note === convertNote(c.filename)));
+
+  async function convertOne(f: JobFile) {
+    setConvertingIds((s) => new Set(s).add(f.id));
+    try {
+      const r = await convertDrawingToPdf(f.id);
+      if (!r.ok) notify("error", `${f.filename}: ${r.error}`);
+      else notify("success", `${f.filename} převeden na PDF → ${r.file.filename}${r.file.version && r.file.version > 1 ? ` (v${r.file.version})` : ""}.`);
+      refresh();
+    } finally {
+      setConvertingIds((s) => {
+        const n = new Set(s);
+        n.delete(f.id);
+        return n;
+      });
+    }
+  }
+
+  async function convertAll() {
+    const list = cadFiles;
+    if (!list.length || bulk) return;
+    setBulkSummary(null);
+    const sum: CadPdfSummary = { total: list.length, converted: [], skipped: [], failed: [] };
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      setBulk({ done: i, total: list.length, current: f.filename });
+      const r = await convertDrawingToPdf(f.id, { skipIfConverted: true });
+      if (!r.ok) sum.failed.push({ name: f.filename, error: r.error });
+      else if (r.skipped) sum.skipped.push(f.filename);
+      else sum.converted.push(f.filename);
+    }
+    setBulk(null);
+    setBulkSummary(sum);
+    notify(sum.failed.length ? "error" : "success", cadPdfSummaryText(sum));
+    refresh();
+  }
 
   // výkresy v anonymizaci → šťouchnout do fronty (zpracuje route na serveru, bez plánovače) a obnovovat,
   // dokud nedoběhnou. Klíč = vše, co se při postupu mění (stav, pokus, zámek, důvod) — každý postup vynuluje
@@ -537,6 +605,41 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
         </div>
       )}
 
+      {cadFiles.length > 0 && (
+        <div className="rounded-xl border bg-card px-3 py-2 text-sm" data-testid="cad-pdf-bar">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-muted-foreground">
+              {bulk
+                ? <>Převádím {bulk.done + 1} / {bulk.total}: <strong className="font-medium text-foreground">{bulk.current}</strong>…</>
+                : <>Výkresy DXF / DWG: {cadFiles.length}{cadWithoutPdf.length < cadFiles.length ? ` (${cadFiles.length - cadWithoutPdf.length} už ${cadFiles.length - cadWithoutPdf.length === 1 ? "má" : "mají"} PDF)` : ""} — PDF otevře každý.</>}
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={() => void convertAll()} disabled={!!bulk} data-testid="cad-pdf-all">
+              {bulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {cadFiles.length === 1 ? "Převést DXF / DWG na PDF" : "Převést všechny DXF / DWG na PDF"}
+            </Button>
+          </div>
+          {bulk && (
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={bulk.total} aria-valuenow={bulk.done}>
+              <div className="h-full bg-primary transition-all" style={{ width: `${Math.round((bulk.done / bulk.total) * 100)}%` }} />
+            </div>
+          )}
+          {bulkSummary && !bulk && (
+            <div
+              className={cn("mt-2 flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs", bulkSummary.failed.length ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" : "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200")}
+              role="status"
+              data-testid="cad-pdf-summary"
+            >
+              {bulkSummary.failed.length ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{cadPdfSummaryText(bulkSummary)}</p>
+                {bulkSummary.failed.map((x) => <p key={x.name} className="mt-0.5"><strong>{x.name}</strong>: {x.error}</p>)}
+              </div>
+              <button type="button" onClick={() => setBulkSummary(null)} className="rounded p-0.5 hover:bg-black/5" aria-label="Zavřít souhrn"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
+        </div>
+      )}
+
       {visibleGroups.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border bg-card px-4 py-10 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
@@ -568,6 +671,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
                         key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview}
                         onSend={canSend ? setSending : undefined} onAnonEdit={setAnonEditing} onAnonAction={(x, a) => void anonAction(x, a)} onReviewDownload={setReviewDl}
                         anonStalled={anonStalled && anonInFlight(f)}
+                        onConvertPdf={(x) => void convertOne(x)} converting={convertingIds.has(f.id)}
                       />
                     )
                   ))}

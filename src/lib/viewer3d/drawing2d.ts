@@ -104,6 +104,8 @@ export function insunitsToMm(code: number | undefined): number {
 export function plainText(s: string): string {
   return s
     .replace(/\\P/g, "\n")
+    // \X = konec první části textu kóty (nad / pod kótovací čarou)
+    .replace(/\\X/g, "\n")
     .replace(/\\[Ss]([^;]*?)[#^/]([^;]*?);/g, "$1/$2")
     .replace(/\\[fFHhWwQqTtAaCcpL][^;\\]*;?/g, (m) => (/^\\[Ll]$/.test(m) ? "" : ""))
     .replace(/\\[LlOoKk]/g, "")
@@ -114,6 +116,7 @@ export function plainText(s: string): string {
     .replace(/%%[dD]/g, "°")
     .replace(/%%[pP]/g, "±")
     .replace(/%%%/g, "%")
+    .replace(/%%(\d{3})/g, (_, n: string) => String.fromCharCode(Number(n)))
     .replace(/%%[uUoO]/g, "")
     .replace(/\\U\+([0-9a-fA-F]{4})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
 }
