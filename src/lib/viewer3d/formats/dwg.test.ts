@@ -326,7 +326,7 @@ interface Blk {
   flags?: number;
   handle?: string;
 }
-function mkDb(blocks: Record<string, Blk>, opts: { layers?: AnyEnt[]; header?: AnyEnt } = {}): DwgDatabase {
+function mkDb(blocks: Record<string, Blk>, opts: { layers?: AnyEnt[]; header?: AnyEnt; dimStyles?: AnyEnt[] } = {}): DwgDatabase {
   const layers = opts.layers ?? [{ name: "0", colorIndex: 7, color: 0xffffff }];
   return {
     tables: {
@@ -336,6 +336,7 @@ function mkDb(blocks: Record<string, Blk>, opts: { layers?: AnyEnt[]; header?: A
         })),
       },
       LAYER: { entries: layers.map((l, i) => ({ handle: `L${i}`, off: false, frozen: false, color: 0xffffff, ...l })) },
+      DIMSTYLE: { entries: opts.dimStyles ?? [] },
     },
     header: opts.header ?? {},
     entities: [],
@@ -521,7 +522,7 @@ describe("dwgDatabaseToDrawing — bloky, barvy, transformace", () => {
           entities: [
             { type: "DIMENSION", layer: "DIM", colorIndex: 1, name: "*D1", textPoint: { x: 0, y: 0 } },
             { type: "DIMENSION", layer: "DIM", colorIndex: 256, name: "*D404", measurement: 12.345, text: "", textPoint: { x: 7, y: 8 }, dimensionType: 32 },
-            { type: "DIMENSION", layer: "DIM", colorIndex: 256, name: "*D405", measurement: 5, text: "R<> mm", textPoint: { x: 1, y: 1 }, dimensionType: 4 },
+            { type: "DIMENSION", layer: "DIM", colorIndex: 256, name: "*D405", measurement: 5, text: "<> mm", textPoint: { x: 1, y: 1 }, dimensionType: 4 },
           ],
         },
         "*D1": {
@@ -540,6 +541,48 @@ describe("dwgDatabaseToDrawing — bloky, barvy, transformace", () => {
     expect(ofKind(d, "point")).toHaveLength(0);
     expect(texts(d)).toEqual(["12,35", "R5 mm"]);
     expect(near(ofKind(d, "text")[0].p, [7, 8])).toBe(true);
+  });
+
+  it("kóta: blok bez čísla / text s výškou 0 / „<>“ / bez bloku → hodnota podle stylu (DIMSCALE, DIMDEC), kresba bez bloku", () => {
+    const mtext = (text: string, extra: AnyEnt = {}): AnyEnt => ({
+      type: "MTEXT", layer: "0", colorIndex: 0, text, insertionPoint: { x: 25, y: 21, z: 0 }, textHeight: 0, rectWidth: 0, attachmentPoint: 8, ...extra,
+    });
+    const lin = (name: string, extra: AnyEnt): AnyEnt => ({
+      type: "DIMENSION", subclassMarker: "AcDbAlignedDimension", layer: "DIM", colorIndex: 256, name, dimensionType: 32, styleName: "ISO-25",
+      definitionPoint: { x: 50, y: 20, z: 0 }, textPoint: { x: 25, y: 23 }, subDefinitionPoint1: { x: 0, y: 0, z: 0 }, subDefinitionPoint2: { x: 50, y: 0, z: 0 },
+      rotationAngle: 0, text: "", ...extra,
+    });
+    const db = mkDb(
+      {
+        "*Model_Space": {
+          entities: [
+            lin("*D1", { measurement: 50 }), // blok jen s čárou a prázdným MTEXT
+            lin("*D2", { measurement: 12.345 }), // MTEXT „\\A1;<>" s výškou 0
+            lin("*D404", { measurement: 7.5, styleName: "VELKE" }), // blok chybí → kresba + text
+            { type: "DIMENSION", subclassMarker: "AcDbDiametricDimension", layer: "DIM", colorIndex: 256, name: "", dimensionType: 3, styleName: "ISO-25", definitionPoint: { x: -5, y: 0, z: 0 }, centerPoint: { x: 5, y: 0, z: 0 }, textPoint: { x: 12, y: 6 }, text: "4x <>" },
+          ],
+        },
+        "*D1": { entities: [line(0, 20, 50, 20, { colorIndex: 0 }), mtext("{\\fArial|b0;}")] },
+        "*D2": { entities: [line(0, 20, 50, 20, { colorIndex: 0 }), mtext("\\A1;<>")] },
+      },
+      {
+        layers: [{ name: "0", colorIndex: 7 }, { name: "DIM", colorIndex: 3 }],
+        header: { DIMDEC: 4, DIMSCALE: 1, DIMTXT: 0.18 },
+        dimStyles: [{ name: "ISO-25", DIMDEC: 2, DIMSCALE: 1, DIMTXT: 2.5, DIMDSEP: "," }, { name: "VELKE", DIMDEC: 1, DIMSCALE: 10, DIMTXT: 2.5 }],
+      },
+    );
+    const d = dwgDatabaseToDrawing(db);
+    const ts = ofKind(d, "text");
+    expect(ts.map((t) => t.text).sort()).toEqual(["12,35", "4x Ø10", "50", "7,5"]);
+    const t50 = ts.find((t) => t.text === "50")!;
+    expect(near(t50.p, [25, 23])).toBe(true);
+    expect(t50.height).toBeCloseTo(2.5);
+    const t12 = ts.find((t) => t.text === "12,35")!;
+    expect(near(t12.p, [25, 21])).toBe(true); // poloha z bloku
+    expect(t12.height).toBeCloseTo(2.5); // výška 0 → DIMTXT × DIMSCALE stylu
+    expect(ts.find((t) => t.text === "7,5")!.height).toBeCloseTo(25);
+    // kóta bez bloku: vynášecí + kótovací čára (3 úsečky) a šipky; 2 bloky po 1 úsečce; Ø: čára
+    expect(ofKind(d, "line")).toHaveLength(2 + 3 + 1);
   });
 
   it("šrafa: obrys z polyčáry s bulge i z hran (úsečky + oblouk po směru hodin) navazuje", () => {

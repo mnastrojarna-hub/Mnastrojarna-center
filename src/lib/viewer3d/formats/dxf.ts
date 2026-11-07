@@ -85,6 +85,8 @@ interface Ctx {
 interface DimExtra {
   style?: string;
   textRot?: number;
+  /** Kód 1 přesně (dxf-parser hodnoty ořezává — „ " = potlačený text by se ztratil). */
+  text?: string;
   ov: DimStyle;
 }
 
@@ -138,7 +140,13 @@ export function scanDimInfo(text: string): DimInfo {
   let dvar = -1;
   const flush = () => {
     if (style?.name) info.styles.set(style.name.toUpperCase(), style.st);
-    if (dim?.handle) info.dims.set(dim.handle.toUpperCase(), { style: dim.style, textRot: dim.textRot, ov: dim.ov });
+    if (dim?.handle) {
+      const d: DimExtra = { ov: dim.ov };
+      if (dim.style !== undefined) d.style = dim.style;
+      if (dim.textRot !== undefined) d.textRot = dim.textRot;
+      if (dim.text !== undefined) d.text = dim.text;
+      info.dims.set(dim.handle.toUpperCase(), d);
+    }
     style = null;
     dim = null;
     xdataApp = "";
@@ -192,6 +200,7 @@ export function scanDimInfo(text: string): DimInfo {
       } else if (!xdataApp) {
         if (code === 5) dim.handle = raw.trim();
         else if (code === 3) dim.style = raw.trim();
+        else if (code === 1) dim.text = raw.replace(/\r$/, "");
         else if (code === 53) {
           const n = Number(raw.trim());
           if (Number.isFinite(n)) dim.textRot = n;
@@ -467,7 +476,7 @@ function emitDimension(ctx: Ctx, e: Any, m: M2, layer: string, color: DrawColor)
     p10: optPt(e.anchorPoint), p11: optPt(e.middleOfText), p13: optPt(e.linearOrAngularPoint1), p14: optPt(e.linearOrAngularPoint2),
     p15: optPt(e.diameterOrRadiusPoint), p16: optPt(e.arcPoint),
     angle: deg(e.angle), textRotation: deg(extra?.textRot), measurement: typeof e.actualMeasurement === "number" ? e.actualMeasurement : null,
-    text: typeof e.text === "string" ? e.text : null,
+    text: extra?.text ?? (typeof e.text === "string" ? e.text : null),
   };
   const block = e.block ? ctx.blocks[String(e.block)] : undefined;
   const ents = (block?.entities ?? []) as Any[];
