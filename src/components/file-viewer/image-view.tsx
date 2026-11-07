@@ -77,6 +77,7 @@ export function ImageView({ src, alt }: { src: string; alt: string }) {
           else zoomAt(2.5, e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
         }}
         data-testid="image-view"
+        data-zoomed={t.s > 1 ? "1" : undefined}
       >
         <img
           src={src}

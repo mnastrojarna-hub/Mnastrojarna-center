@@ -727,7 +727,7 @@ export const QUOTE_LIST_SELECT = [
 
 export const JOB_FILE_SELECT = [
   "id, job_id, kind, title, filename, mime_type, size_bytes, storage_path, version, archived, replaced_by",
-  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin",
+  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin, order_item_id",
   // anonymizace výkresů (odznak, menu) — bez anon_ai_cache (velké, jen pro službu)
   "anon_status, anon_filename, anon_at, anon_by, anon_actor_kind, anon_reason, anon_reviewed_at, anon_reviewed_by, anon_summary, anon_pages, anon_method",
   "anon_priority, anon_lock_until, anon_attempts",
@@ -996,6 +996,7 @@ export interface FileRow {
   note?: string | null;
   created_at: string;
   uploaded_by?: string | null;
+  order_item_id?: string | null;
   issuer?: string | null;
   origin?: string | null;
   anon_status?: string | null;
@@ -1336,6 +1337,9 @@ export function rowToJobFile(row: FileRow): JobFile {
     issuer: FILE_ISSUERS.includes(row.issuer as DocIssuerKey) ? (row.issuer as DocIssuerKey) : null,
     origin: FILE_ORIGINS.includes(row.origin as JobFileOrigin) ? (row.origin as JobFileOrigin) : null,
     anon: rowToFileAnon(row),
+    // výkres ↔ položka (prohlížeč výkresů zakázky: počet kusů a materiál v hlavičce)
+    ...(row.order_item_id !== undefined ? { orderItemId: row.order_item_id ?? null } : {}),
+    ...((row.kind === "vykres" || row.kind === "model_3d") && ai && typeof ai.drawingNumber === "string" && ai.drawingNumber.trim() ? { drawingNumber: ai.drawingNumber.trim().slice(0, 120) } : {}),
   };
 }
 

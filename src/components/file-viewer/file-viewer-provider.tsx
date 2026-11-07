@@ -4,7 +4,8 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { FileViewer, type ViewerRequest } from "./file-viewer";
 import { filenameFromAnchor, isViewableName, isViewerPath } from "./viewer-links";
-import { FILE_VIEWER_EVENT, markFileViewerReady } from "./viewer-bus";
+import { FILE_VIEWER_EVENT, markFileViewerReady, resolveViewerSet } from "./viewer-bus";
+import { stepIndex, type ViewerSetEntry } from "@/lib/jobs/drawing-set";
 
 /**
  * Otevírání dokumentů v aplikaci: klik na PDF / výkres / 3D model / fotku (odkazy na /api/…)
@@ -15,6 +16,9 @@ import { FILE_VIEWER_EVENT, markFileViewerReady } from "./viewer-bus";
  *
  * Prohlížeč je vrstvený dialog (Radix) — funguje i nad otevřeným dialogem (náhled PDF
  * při odesílání nabídky): Esc a klikání patří prohlížeči, dialog pod ním zůstane, jak byl.
+ *
+ * Výkres zakázky (sada z registerViewerSet) jde swipem / ‹ › / šipkami přepnout na další výkres
+ * bez zavření; přepnutí historii nemění (jedno „Zpět" prohlížeč zavře).
  */
 
 interface Ctx {
@@ -32,6 +36,7 @@ const STATE_KEY = "__mnFileViewer";
 
 export function FileViewerProvider({ children }: { children: React.ReactNode }) {
   const [req, setReq] = React.useState<ViewerRequest | null>(null);
+  const [set, setSet] = React.useState<{ list: ViewerSetEntry[]; index: number } | null>(null);
   const pushed = React.useRef(false);
   const reqRef = React.useRef<ViewerRequest | null>(null);
   reqRef.current = req;
@@ -46,7 +51,22 @@ export function FileViewerProvider({ children }: { children: React.ReactNode }) 
         pushed.current = false;
       }
     }
-    setReq(r);
+    // výkres zakázky → sada k listování (jen u odkazu bez vlastního obsahu / tlačítek)
+    const hit = r.blob || r.toolbar ? null : resolveViewerSet(r.href);
+    setSet(hit);
+    const entry = hit?.list[hit.index];
+    setReq(entry ? { ...r, filename: r.filename || entry.filename, info: r.info ?? entry.info } : r);
+  }, []);
+
+  const setRef = React.useRef(set);
+  setRef.current = set;
+  const go = React.useCallback((dir: 1 | -1) => {
+    const cur = setRef.current;
+    if (!cur || cur.list.length < 2 || !reqRef.current) return;
+    const index = stepIndex(cur.index, cur.list.length, dir);
+    const e = cur.list[index];
+    setSet({ ...cur, index });
+    setReq({ href: e.href, filename: e.filename, info: e.info });
   }, []);
 
   const close = React.useCallback(() => {
@@ -56,6 +76,7 @@ export function FileViewerProvider({ children }: { children: React.ReactNode }) 
       return;
     }
     setReq(null);
+    setSet(null);
   }, []);
 
   // systémové / prohlížečové zpět zavře prohlížeč — jen když historie opravdu opustila jeho položku
@@ -68,6 +89,7 @@ export function FileViewerProvider({ children }: { children: React.ReactNode }) 
       if (state && state[STATE_KEY]) return;
       pushed.current = false;
       setReq(null);
+      setSet(null);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -124,7 +146,14 @@ export function FileViewerProvider({ children }: { children: React.ReactNode }) 
             data-testid="file-viewer-layer"
           >
             <DialogPrimitive.Title className="sr-only">Prohlížeč dokumentu</DialogPrimitive.Title>
-            {req && <FileViewer key={req.href} request={req} onBack={close} />}
+            {req && (
+              <FileViewer
+                key={req.href}
+                request={req}
+                onBack={close}
+                nav={set && set.list.length > 1 ? { index: set.index, count: set.list.length, prev: () => go(-1), next: () => go(1) } : undefined}
+              />
+            )}
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>

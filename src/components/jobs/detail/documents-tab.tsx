@@ -52,6 +52,28 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
   const [broken, setBroken] = React.useState(false);
   const k = FILE_KINDS[file.kind] ?? FILE_KINDS.ostatni;
   const Icon = isPdfFile(file) ? FileText : k.icon;
+  // výkres (i fotka výkresu) → prohlížeč se sadou výkresů zakázky (swipe), ostatní fotky → galerie
+  if (isImageFile(file) && !broken && file.kind === "vykres") {
+    return (
+      <a
+        href={fileUrl(file.id)}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-filename={file.filename}
+        className="group/thumb relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={`Otevřít ${file.filename}`}
+      >
+        <img
+          src={fileUrl(file.id)}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(true)}
+          className="h-full w-full object-cover transition group-hover/thumb:scale-105"
+        />
+      </a>
+    );
+  }
   if (isImageFile(file) && !broken) {
     return (
       <button
@@ -140,8 +162,10 @@ function FileRow({
             href={fileUrl(file.id)}
             target="_blank"
             rel="noopener noreferrer"
+            data-filename={file.filename}
+            data-testid="file-open"
             onClick={(e) => {
-              if (isImageFile(file)) {
+              if (isImageFile(file) && file.kind !== "vykres") {
                 e.preventDefault();
                 onPreview(file);
               }
@@ -492,7 +516,8 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
   const groups = groupFiles(files);
   const archivedCount = files.filter((f) => f.archived).length;
   const deletingPlan = deleting ? fileDeletePlan(deleting, files, quotes) : { kind: "file" as const };
-  const visibleImages = files.filter((f) => !f.locked && isImageFile(f) && (showArchive || !f.archived));
+  // galerie fotek; výkresy (i jako obrázek) listuje prohlížeč výkresů zakázky
+  const visibleImages = files.filter((f) => !f.locked && isImageFile(f) && f.kind !== "vykres" && (showArchive || !f.archived));
   const openPreview = (f: JobFile) => {
     const i = visibleImages.findIndex((x) => x.id === f.id);
     if (i >= 0) setPreview(i);
