@@ -19,7 +19,7 @@ vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "light", setTh
 vi.mock("@/components/automation-mode-toggle", () => ({ AutomationModeToggle: () => <span data-automation>Auto | Schvál.</span> }));
 vi.mock("@/components/layout/sign-out", () => ({ signOutEverywhere: vi.fn() }));
 
-import { MobileNav, mobileMenuCount } from "./mobile-nav";
+import { MobileNav, mobileMenuCount, navScrollStep, NAV_TOP_ZONE, overlayOpen } from "./mobile-nav";
 import type { Feature } from "@/lib/auth/permissions";
 
 const ADMIN: Feature[] = ["orders", "workflow", "documents", "mail", "margins", "pricing", "quote_approval", "flow_all", "dashboard"];
@@ -73,5 +73,44 @@ describe("mobilní lišta — odznaky", () => {
     const admin = html(<MobileNav features={ADMIN} counts={COUNTS} user={user} />);
     expect(admin).toContain("data-automation");
     dialogOpen.value = false;
+  });
+});
+
+describe("mobilní lišta — schování při posunu (majitel 7. 11.)", () => {
+  const shown = { hidden: false, acc: 0 };
+  it("posun dolů schová, posun nahoru ukáže; drobné cuknutí nic nemění", () => {
+    let s = navScrollStep(shown, 200, 210, 2000);
+    expect(s.hidden).toBe(false);
+    s = navScrollStep(s, 210, 240, 2000);
+    expect(s.hidden).toBe(true);
+    s = navScrollStep(s, 240, 236, 2000);
+    expect(s.hidden).toBe(true);
+    s = navScrollStep(s, 236, 220, 2000);
+    expect(s.hidden).toBe(false);
+  });
+
+  it("nahoře na stránce je lišta vždy vidět; pružení za koncem stránky ji nevrací", () => {
+    expect(navScrollStep({ hidden: true, acc: 40 }, 100, NAV_TOP_ZONE - 1, 2000).hidden).toBe(false);
+    // iOS pružení: scrollTop za maximem a zpět — poloha se ořízne na konec obsahu
+    expect(navScrollStep({ hidden: true, acc: 40 }, 2080, 2000, 2000).hidden).toBe(true);
+  });
+
+  it("pod otevřeným dialogem / prohlížečem dokumentu se lišta schová, pod popoverem ne", () => {
+    const el = (popper: boolean) => ({ closest: (sel: string) => (popper && sel.includes("popper") ? {} : null) });
+    const doc = (list: { closest: (s: string) => unknown }[], locked = false) =>
+      ({ body: { hasAttribute: () => locked }, querySelectorAll: () => list }) as unknown as Parameters<typeof overlayOpen>[0];
+    expect(overlayOpen(doc([]))).toBe(false);
+    expect(overlayOpen(doc([], true))).toBe(true);
+    expect(overlayOpen(doc([el(false)]))).toBe(true);
+    expect(overlayOpen(doc([el(true)]))).toBe(false);
+  });
+
+  it("vykreslení: lišta vidět, s testid a bez data-hidden; výška počítá i spodní okraj iPhonu", () => {
+    dialogOpen.value = false;
+    const out = html(<MobileNav features={SALES} counts={COUNTS} />);
+    expect(out).toContain('data-testid="mobile-nav"');
+    expect(out).not.toContain("data-hidden");
+    expect(out).toContain("h-[calc(4rem+env(safe-area-inset-bottom))]");
+    expect(out).toContain("motion-safe:transition-transform");
   });
 });

@@ -60,9 +60,17 @@ function ignoredScroller(el: Element): boolean {
   return Boolean(el.closest("[role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper], [role=menu], [role=listbox], nav"));
 }
 
+/** Je otevřený dialog přes obrazovku (ne vyskakovací nabídka / popover)? */
+export function overlayOpen(doc: Pick<Document, "querySelectorAll" | "body">): boolean {
+  if (doc.body?.hasAttribute("data-scroll-locked")) return true;
+  const open = doc.querySelectorAll('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
+  for (const el of Array.from(open)) if (!el.closest("[data-radix-popper-content-wrapper]")) return true;
+  return false;
+}
+
 /**
  * Schovávání lišty: poslouchá posun <main> i vnitřních panelů (zachycením — posun prvků nebublá),
- * schová ji i pod otevřeným dialogem / prohlížečem dokumentu (zámek posunu Radixu na <body>).
+ * schová ji i pod otevřeným dialogem / prohlížečem dokumentu (portál dialogu v <body>).
  * Stav je i na <html data-mobile-nav> (CSS proměnná --mn-nav-offset pro přilepené prvky nad lištou).
  */
 export function useAutoHideNav(pathname: string): { hidden: boolean; overlay: boolean; show: () => void } {
@@ -88,13 +96,13 @@ export function useAutoHideNav(pathname: string): { hidden: boolean; overlay: bo
     return () => document.removeEventListener("scroll", onScroll, { capture: true });
   }, []);
 
-  // otevřený dialog / prohlížeč (Radix zamkne posun body) → lišta pryč
+  // otevřený dialog / prohlížeč dokumentu (portál Radixu v <body>) → lišta pryč
   React.useEffect(() => {
     const body = document.body;
-    const sync = () => setOverlay(body.hasAttribute("data-scroll-locked"));
+    const sync = () => setOverlay(overlayOpen(document));
     sync();
     const mo = new MutationObserver(sync);
-    mo.observe(body, { attributes: true, attributeFilter: ["data-scroll-locked"] });
+    mo.observe(body, { childList: true, attributes: true, attributeFilter: ["data-scroll-locked", "style"] });
     return () => mo.disconnect();
   }, []);
 
