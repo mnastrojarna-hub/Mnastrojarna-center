@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { getJob } from "@/lib/data/jobs";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import {
   FLOW_QUOTE_COLUMNS, QUOTE_ADMIN_ONLY, canApproveQuote, mayManageQuoteApproval, quoteFactsFromRow, quoteUnpriced,
   type QuoteApproverCtx, type QuoteFacts,
@@ -141,6 +142,8 @@ export async function approveQuoteCore(
       message: `${label} schválena${author ? ` — připravil(a) ${author}` : ""}${note ? ` — ${note}` : ""}`,
       data: { quoteId, number, action: "approved", ...(author ? { author } : {}) },
     });
+    // nabídka → zakázka (9. 11.): schválená nabídka je pořád ta aktuální — propsat, co v zakázce ještě není
+    await syncJobFromQuote(db, jobId, { actorId: user.id, reason: "approved" });
   }
   return { ok: true, jobId, number };
 }

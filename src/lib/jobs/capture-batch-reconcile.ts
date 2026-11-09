@@ -3,7 +3,7 @@ import { initialSpecState, materialDifference, sanitizeSpecState } from "@/lib/j
 import type { CaptureDocKind, ExtractedBusinessDoc, ExtractedItem, ExtractedParty } from "@/lib/jobs/capture-types";
 import type {
   BatchApplyState, BatchDocExtract, BatchDocReview, BatchDocType, BatchGroupReview, BatchGroupState, BatchPage,
-  BatchReviewModel, BatchSort, BatchWarning, BusinessDocState, DocApplyState, DocExtractSummary, DocFlag,
+  BatchReviewModel, BatchSort, BatchWarning, BatchWarningAction, BusinessDocState, DocApplyState, DocExtractSummary, DocFlag,
   DrawingExtract, DrawingReviewState, DuplicateRef, FieldSource, FileReviewState, ItemLinkChoice, ItemOption,
   ModelMeta, ModelReviewState, SupplierQuoteLineState,
 } from "@/lib/jobs/capture-batch-types";
@@ -18,7 +18,7 @@ import {
   type ReviewFieldKey, type ReviewItem, type ReviewState, type ReviewTarget, type TargetJob,
 } from "@/lib/jobs/capture-review";
 import { docFieldValues, planJobUpdate, planNewJob, type JobUpdatePlan, type NewJobPlan } from "@/lib/jobs/apply-extraction";
-import { docNumbersEqual, nameSimilarity, normalizeCompanyName } from "@/lib/jobs/matching";
+import { docNumbersEqual, nameSimilarity, normalizeCompanyName, normalizeDocNumber } from "@/lib/jobs/matching";
 import { PAIR_SURE, pairDocLines, scoreLinePair } from "@/lib/jobs/item-pairing";
 import { emptyExtracted, emptyParty } from "@/lib/jobs/extracted-normalize";
 import { guessFileKind, isJobFileKind } from "@/lib/jobs/file-kinds";
@@ -1349,9 +1349,14 @@ export function groupDocOf(docs: ReconcileDoc[], ourIco: string, opts: { today?:
       const drMat = (dr?.material ?? "").trim();
       const diff = docMaterial && drMat ? materialDifference(docMaterial, drMat) : null;
       if (!diff) continue;
+      // rozhodnutí na místě: platí doklad (výchozí) / materiál z výkresu (položka, na kterou výkres míří)
       warnings.push(makeWarning(
         "material_conflict", diff === "group" ? "warn" : "info", [...(baseId ? [baseId] : []), d.id],
-        `Materiál se liší: ${docMaterial}${baseSrc ? ` (${baseSrc})` : ""} × ${drMat} (z výkresu ${num}) — u položky platí ${docMaterial}, zkontroluj revizi výkresu.`,
+        `Materiál se liší: ${docMaterial}${baseSrc ? ` (${baseSrc})` : ""} × ${drMat} (z výkresu ${num}) — u položky zatím platí ${docMaterial}. Potvrď, nebo vezmi materiál z výkresu.`,
+        [
+          { kind: "ack", label: `Platí ${docMaterial}${baseSrc ? ` (${baseSrc})` : ""}`, docId: d.id },
+          { kind: "use_drawing_material", label: `Platí materiál z výkresu (${drMat})`, docId: d.id, value: drMat },
+        ],
       ));
     }
     for (const { d, dr, num } of drawingHits) {
@@ -1499,6 +1504,69 @@ function orderQuantityMerges(t: ReviewTarget, job: TargetJob & { items?: JobItem
   return notes;
 }
 
+const numKey = (v: string) => normalizeDocNumber(v).replace(/[^A-Z0-9]/gi, "").toUpperCase();
+
+/**
+ * Dva (a víc) výkresy míří na TUTÉŽ položku a jiná položka skupiny (s číslem výkresu) výkres nemá —
+ * typicky OCR přečetla podobné číslo (A290-7904-Y823 jako …Y832). Rozhodnutí na místě: „Je to výkres
+ * <číslo položky>" (vazba + číslo na kartě), nebo „Jsou to listy téhož výkresu". Nikdy neblokuje uložení.
+ */
+export function sharedItemWarnings(
+  docs: Pick<ReconcileDoc, "id" | "type" | "filename" | "documentNumber">[],
+  docStates: Record<string, DocApplyState>,
+  options: ItemOption[],
+  quantities: Record<string, string>,
+  groupKey: string,
+): BatchWarning[] {
+  const keyOf = (l: ItemLinkChoice) => (l.mode === "docItem" ? `docItem:${l.itemKey}` : l.mode === "item" ? `item:${l.itemId}` : "");
+  const byLink = new Map<string, string[]>();
+  for (const d of docs) {
+    const st = docStates[d.id];
+    if (st?.kind !== "drawing") continue;
+    const k = keyOf(st.state.link);
+    if (k) byLink.set(k, [...(byLink.get(k) ?? []), d.id]);
+  }
+  const free = options.filter((o) => {
+    const k = keyOf(o.link);
+    return k && o.drawingNumber.trim() && !byLink.has(k) && !(o.link.mode === "docItem" && /^(draw|model)-/.test(o.link.itemKey));
+  });
+  const out: BatchWarning[] = [];
+  if (!free.length) return out;
+  for (const ids of byLink.values()) {
+    if (ids.length < 2) continue;
+    const cards = ids.map((id) => ({ id, d: docs.find((x) => x.id === id)!, st: docStates[id] as Extract<DocApplyState, { kind: "drawing" }> }));
+    // který výkres je ten „jiný": název souboru obsahuje číslo volné položky; jinak poslední v pořadí
+    let pick: { id: string; opts: ItemOption[] } | null = null;
+    for (const c of cards) {
+      const fname = numKey(c.d.filename);
+      const hits = free.filter((o) => numKey(o.drawingNumber) && fname.includes(numKey(o.drawingNumber)));
+      if (hits.length) { pick = { id: c.id, opts: hits }; break; }
+    }
+    if (!pick) pick = { id: cards[cards.length - 1].id, opts: free };
+    const card = cards.find((c) => c.id === pick!.id)!;
+    const num = card.st.state.drawingNumber || card.d.documentNumber;
+    const fname = card.d.filename.replace(/__[a-z_]+(?:\+[a-z_]+)*(?:-[a-z0-9]+)*(?=\.[A-Za-z0-9]+$)/i, "");
+    const label = fname ? `„${fname}“` : "Druhý výkres";
+    out.push(makeWarning(
+      "drawing_item_shared", "warn", ids,
+      `${ids.length} výkresy jsou přečtené jako ${num || "stejné číslo"} a míří na stejnou položku; položka ${free.map((o) => o.drawingNumber).join(", ")} výkres nemá. Čísla jsou si podobná — rozhodni, ke které položce ${label} patří.`,
+      [
+        ...pick.opts.slice(0, 3).map((o): BatchWarningAction => {
+          const qty = quantities[keyOf(o.link)] ?? "";
+          return {
+            kind: "link_item", docId: pick!.id, value: o.drawingNumber,
+            ...(o.link.mode === "docItem" ? { itemKey: o.link.itemKey } : o.link.mode === "item" ? { itemId: o.link.itemId } : {}),
+            label: `${label} je ${o.drawingNumber}${cleanNumber(qty) ? ` (${qty} ks)` : ""}`,
+          };
+        }),
+        { kind: "ack", label: "Jsou to listy téhož výkresu" },
+      ],
+      groupKey,
+    ));
+  }
+  return out;
+}
+
 /** Návrh kontroly jedné skupiny: cíle, údaje zakázky se zdroji, doklady a jejich výchozí stav. */
 export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
   const { group, docs, margins, ourIco } = input;
@@ -1621,12 +1689,33 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
   // výchozí cíl
   let initialKey: string;
   const override = input.targetOverride?.toLowerCase() ?? null;
+  // opakovaná poptávka (majitel 9. 11.): nová poptávka zákazníka na díl, který má starší zakázka už po fázi
+  // poptávky / nabídky (objednáno, výroba, hotovo…), a shoda jen podle čísla výkresu → NOVÁ zakázka
+  // (stará zůstane v nabídce cílů; výkres se uloží i sem, u staré je historie a poslední cena)
+  const inquiryPrimary = primarySide === "customer" && groupDoc.docKind === "poptavka" && !input.fixedJobId;
+  const repeatOf = (t: ReviewTarget | undefined): boolean => Boolean(
+    inquiryPrimary && t && t.mode === "existing" && t.stage && !["poptavka", "nabidka"].includes(t.stage)
+    && /výkres/.test(t.reason ?? "") && !/čísla (nabídky|objednávky|poptávky)|čísla zakázky/.test(t.reason ?? ""),
+  );
+  const groupTarget = group.targetJobId ? targets.find((t) => t.key === group.targetJobId) : undefined;
+  let repeat: ReviewTarget | null = null;
   if (override && (override === "new" || targets.some((t) => t.key === override))) initialKey = override;
-  else if (group.targetJobId && targets.some((t) => t.key === group.targetJobId)) initialKey = group.targetJobId;
-  else if (group.targetRequired) initialKey = "";
+  else if (groupTarget && !repeatOf(groupTarget)) initialKey = groupTarget.key;
+  else if (group.targetRequired && !groupTarget) initialKey = "";
   else {
-    const best = targets.find((t) => t.mode === "existing" && (t.score ?? 0) >= 60);
+    const best = targets.find((t) => t.mode === "existing" && (t.score ?? 0) >= 60 && !repeatOf(t));
+    repeat = best ? null : (groupTarget ?? targets.find((t) => t.mode === "existing" && (t.score ?? 0) >= 60 && repeatOf(t)) ?? null);
     initialKey = best?.key ?? "new";
+  }
+  if (repeat && initialKey === "new") {
+    warnings.push({
+      ...makeWarning(
+        "repeat_inquiry", "info", fileDocs.map((d) => d.id),
+        `Díl už byl u zakázky ${repeat.number ?? ""} (${repeat.reason ?? "stejný výkres"}) — nová poptávka jde do nové zakázky. Patří-li k ní, vyber ji nahoře.`.replace(/\s+\(/, " ("),
+        [], group.key,
+      ),
+      links: [{ label: `Otevřít ${repeat.number ?? "zakázku"}`, href: `/orders/${repeat.key}` }],
+    });
   }
   const initTarget = targets.find((t) => t.key === initialKey) ?? newTarget;
   for (const msg of qtyNotes[initTarget.key] ?? []) warnings.push(makeWarning("quantity_conflict", "info", primaryId ? [primaryId] : [], msg, [], group.key));
@@ -1759,7 +1848,23 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
   for (const d of docs) {
     if (d.source === "mail") continue; // text e-mailu nemá kartu dokladu (údaje jsou ve skupině)
     const meta = BATCH_TYPES[d.type];
-    const dup = input.duplicates?.[d.id] ?? null;
+    const dupAny = input.duplicates?.[d.id] ?? null;
+    const fileForm = meta.form === "drawing" || meta.form === "model";
+    // výkres / model u JINÉ zakázky než výchozí cíl: uloží se i sem (opakovaná poptávka / objednávka téhož
+    // dílu je běžná) — jen informace s odkazem; „neukládat znovu" se nabízí jen u téže zakázky
+    const dup = fileForm && dupAny && dupAny.jobId !== initTarget.key ? null : dupAny;
+    if (fileForm && dupAny && !dup) {
+      const what = meta.form === "model" ? "3D model" : "Výkres";
+      const num = d.documentNumber || d.drawingNumbers[0] || "";
+      warnings.push({
+        ...makeWarning(
+          "also_in_job", "info", [d.id],
+          `${what}${num ? ` ${num}` : ""} je už i u zakázky ${dupAny.jobNumber}${dupAny.date ? ` (${dupAny.date})` : ""} — uloží se i sem; tam najdeš historii a poslední cenu.`,
+          [], group.key,
+        ),
+        links: [{ label: `Otevřít ${dupAny.jobNumber}`, href: `/orders/${dupAny.jobId}` }],
+      });
+    }
     if (meta.form === "business") {
       const doc = businessDoc(d) ?? emptyExtracted();
       const side = meta.side;
@@ -1886,7 +1991,7 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
       if (title && titleSource) sources.title = titleSource;
       docReviews.push({
         kind: "drawing", docId: d.id, groupKey: group.key, aiUsed: d.aiUsed, reason: d.reason, drawing,
-        duplicateOf: dup, archiveConflict: input.archiveConflicts?.[d.id] ?? null,
+        duplicateOf: dupAny, archiveConflict: input.archiveConflicts?.[d.id] ?? null,
         ...(Object.keys(sources).length ? { sources } : {}), initial: state,
       });
       if (!(quantity > 0)) {
@@ -1910,7 +2015,8 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
         warnings.push(makeWarning("unlinked_drawing", "warn", [d.id], `Výkres ${number || d.title || ""} nesedí na žádnou položku — vyber ji, nebo založ novou.`.replace(/\s+—/, " —"), [], group.key));
       }
       if (input.archiveConflicts?.[d.id]) {
-        warnings.push(makeWarning("drawing_archive_conflict", "warn", [d.id], input.archiveConflicts[d.id], [], group.key));
+        // jen informace: výkres se k zakázce uloží, do archivu výkresů (jiný zákazník) se nezapíše
+        warnings.push(makeWarning("drawing_archive_conflict", "info", [d.id], `${input.archiveConflicts[d.id]} K zakázce se výkres uloží, do archivu výkresů se nezapíše.`, [], group.key));
       }
       if (dup) {
         warnings.push(makeWarning(
@@ -1934,7 +2040,7 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
         note: "", onDuplicate: dup && !dup.weak ? "skip" : null,
       };
       docStates[d.id] = { kind: "model", state };
-      docReviews.push({ kind: "model", docId: d.id, groupKey: group.key, meta: m, duplicateOf: dup, initial: state });
+      docReviews.push({ kind: "model", docId: d.id, groupKey: group.key, meta: m, duplicateOf: dupAny, initial: state });
       if (state.link.mode === "none" && !sameAsDrawing) {
         warnings.push(makeWarning("unlinked_model", "info", [d.id], `3D model ${m.drawingNumber || d.filename} není přiřazený k položce.`, [], group.key));
       }
@@ -1952,6 +2058,13 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
     const state: FileReviewState = { fileKind, title: d.title || d.filename, note: "" };
     docStates[d.id] = { kind: "file", state };
     docReviews.push({ kind: "file", docId: d.id, groupKey: group.key, initial: state });
+  }
+
+  {
+    const qty: Record<string, string> = {};
+    for (const i of jobState.items) qty[`docItem:${i.key}`] = i.quantity;
+    for (const i of jobItemsByTarget[initTarget.key] ?? []) qty[`item:${i.id}`] = i.quantity ? String(i.quantity) : "";
+    warnings.push(...sharedItemWarnings(docs, docStates, itemOptions[initialKey] ?? [], qty, group.key));
   }
 
   if (initialKey === "") {
@@ -2315,7 +2428,12 @@ export function sanitizeBatchApplyState(
       const st = docs[d.id];
       if ((st.kind === "drawing" || st.kind === "model") && st.state.link.mode === "docItem") {
         const key = st.state.link.itemKey;
-        if (!job.state.items.some((i) => i.key === key)) st.state.link = { mode: "none" };
+        if (!job.state.items.some((i) => i.key === key)) {
+          // řádek v Položkách už není → řádek se stejným číslem výkresu, jinak bez vazby
+          const num = st.state.drawingNumber.trim();
+          const row = num ? job.state.items.find((i) => i.drawingNumber && docNumbersEqual(i.drawingNumber, num)) : undefined;
+          st.state.link = row ? { mode: "docItem", itemKey: row.key } : { mode: "none" };
+        }
       }
     }
     groups.push({

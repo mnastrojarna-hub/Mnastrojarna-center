@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   JOURNAL_CONFLICT, applyGroupFills, canAutoApplyBatch, groupBatch, groupDocOf, journalConflictOf, mergeGroupDoc, primaryDocId, reconcileGroup,
-  sameDocParty,
+  sameDocParty, sharedItemWarnings,
   sanitizeBatchApplyState, swapParties, type GroupDraft, type GroupJobCandidate, type ReconcileDoc,
 } from "./capture-batch-reconcile";
 import type { BatchApplyState, BatchDocType, BatchPage, BatchReviewModel, DocApplyState, DocExtractSummary } from "./capture-batch-types";
@@ -654,5 +654,39 @@ describe("text e-mailu jako doklad bez souboru", () => {
     expect(bad.ok).toBe(false);
     const onlyDraw = sanitizeBatchApplyState({ ...raw, groups: [{ ...raw.groups[0], job: { ...job, items: [job.items[0]] } }] }, { pages, margins: true, ourIco: OUR });
     expect(onlyDraw.ok).toBe(true);
+  });
+});
+
+describe("sharedItemWarnings — dva výkresy na jedné položce (OCR podobné číslo)", () => {
+  const drawingSt = (num: string, itemKey: string): DocApplyState => ({
+    kind: "drawing",
+    state: {
+      drawingNumber: num, revision: "", title: "", material: "", dimensions: "", generalTolerance: "", tightestTolerance: "", quantity: "1",
+      link: { mode: "docItem", itemKey }, archive: true, note: "", onDuplicate: null,
+    },
+  });
+  const opts = [
+    { link: { mode: "docItem" as const, itemKey: "ai-0" }, label: "Y832", drawingNumber: "A290-7904-Y832", revision: "" },
+    { link: { mode: "docItem" as const, itemKey: "ai-1" }, label: "Y823", drawingNumber: "A290-7904-Y823", revision: "" },
+    { link: { mode: "add" as const }, label: "Založit", drawingNumber: "", revision: "" },
+  ];
+  const docs = [
+    { id: "d1", type: "vykres" as const, filename: "A290-7904-Y832.pdf", documentNumber: "A290-7904-Y832" },
+    { id: "d2", type: "vykres" as const, filename: "A290-7904-Y823.pdf", documentNumber: "A290-7904-Y832" },
+  ];
+
+  it("navrhne výkres podle názvu souboru → volná položka; „listy téhož výkresu“ jako druhá volba; nikdy neblokuje", () => {
+    const ws = sharedItemWarnings(docs, { d1: drawingSt("A290-7904-Y832", "ai-0"), d2: drawingSt("A290-7904-Y832", "ai-0") }, opts, { "docItem:ai-1": "4" }, "g1");
+    expect(ws).toHaveLength(1);
+    expect(ws[0]).toMatchObject({ code: "drawing_item_shared", severity: "warn", docIds: ["d1", "d2"], groupKey: "g1" });
+    expect(ws[0].actions).toEqual([
+      { kind: "link_item", docId: "d2", itemKey: "ai-1", value: "A290-7904-Y823", label: "„A290-7904-Y823.pdf“ je A290-7904-Y823 (4 ks)" },
+      { kind: "ack", label: "Jsou to listy téhož výkresu" },
+    ]);
+  });
+
+  it("každý výkres na své položce / žádná volná položka → nic", () => {
+    expect(sharedItemWarnings(docs, { d1: drawingSt("A290-7904-Y832", "ai-0"), d2: drawingSt("A290-7904-Y823", "ai-1") }, opts, {}, "g1")).toEqual([]);
+    expect(sharedItemWarnings(docs, { d1: drawingSt("A290-7904-Y832", "ai-0"), d2: drawingSt("A290-7904-Y832", "ai-0") }, opts.slice(0, 1), {}, "g1")).toEqual([]);
   });
 });

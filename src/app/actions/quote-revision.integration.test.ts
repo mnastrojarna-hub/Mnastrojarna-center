@@ -154,7 +154,8 @@ describe.skipIf(!ENABLED)("nová verze nabídky ↔ aktuální zakázka (lokáln
 
     const { quote: old } = await quoteWithItems(first.id);
     expect(old.archived).toBe(true);
-    const { data: ev } = await svc.from("job_events").select("message, data").eq("job_id", jobId).eq("type", "quote").order("created_at", { ascending: false }).limit(1);
+    // poslední událost nabídky (propsání nové verze do zakázky — 9. 11. — je samostatná událost „Z nabídky …")
+    const { data: ev } = await svc.from("job_events").select("message, data").eq("job_id", jobId).eq("type", "quote").eq("data->>action", "revision").order("created_at", { ascending: false }).limit(1);
     const e = ((ev ?? []) as { message: string; data: Row }[])[0];
     expect(e?.message).toContain("podle aktuálních položek zakázky");
     expect(e?.data?.itemsFromJob).toBe(true);

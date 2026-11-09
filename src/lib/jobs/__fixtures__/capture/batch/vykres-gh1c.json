@@ -1,0 +1,36 @@
+{
+  "drawingNumber": "A290-7904-Y832",
+  "revision": "",
+  "title": "klamp-delaí",
+  "material": "PET100 (POLYPENCO)",
+  "dimensions": "80 × 40 × 12 mm",
+  "weightKg": 0.05,
+  "generalTolerance": "",
+  "tightestTolerance": "",
+  "surface": "",
+  "heatTreatment": "",
+  "surfaceTreatment": "",
+  "quantity": 1,
+  "customerName": "HOFMEISTER s.r.o.",
+  "drawingDate": "",
+  "sheet": "List 1/1",
+  "scale": "1:1",
+  "notes": "",
+  "summary": "Výkres A290-7904-Y832 — klamp-delaí.",
+  "confidence": 0.5,
+  "needsClarification": [
+    "Razítko je špatně čitelné."
+  ],
+  "drawingNumbers": [
+    "A290-7904-Y832"
+  ],
+  "materialGroup": "plasty",
+  "overallDims": [],
+  "shapeHint": "hranol",
+  "blankDimensions": "",
+  "heatStatus": "bez",
+  "heatSteps": [],
+  "surfaceStatus": "bez",
+  "surfaceSteps": [],
+  "drawingNotes": []
+}

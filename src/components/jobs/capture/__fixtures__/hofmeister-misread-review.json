@@ -1,0 +1,1315 @@
+{
+ "review": {
+  "captureId": "adcc9b53-7724-47eb-b49e-dc44a4fc3193",
+  "aiUsed": true,
+  "mode": "approval",
+  "margins": true,
+  "drawingsAccess": true,
+  "fixedJobId": null,
+  "options": {
+   "customers": [],
+   "suppliers": [],
+   "jobs": []
+  },
+  "groups": [
+   {
+    "key": "g1",
+    "docIds": [
+     "d1",
+     "d2"
+    ],
+    "primaryDocId": null,
+    "label": "HOFMEISTER s.r.o.",
+    "autoReason": null,
+    "model": {
+     "captureId": "adcc9b53-7724-47eb-b49e-dc44a4fc3193",
+     "aiUsed": true,
+     "reason": null,
+     "docKind": "poptavka",
+     "issuer": "zakaznik",
+     "chipExact": true,
+     "documentNumber": "",
+     "confidence": 0.9,
+     "summary": "Poptávka na 2 díly z POM dle výkresů A290-7904-Y832 (8 ks) a A290-7904-Y823 (4 ks).",
+     "needsClarification": [],
+     "docCustomer": {
+      "dic": "",
+      "ico": "",
+      "zip": "",
+      "city": "",
+      "name": "HOFMEISTER s.r.o.",
+      "email": "petr.fous@hofmeister-mw936dxj-4.test",
+      "phone": "",
+      "street": "",
+      "country": "CZ",
+      "contactPerson": "Petr Fous"
+     },
+     "docSupplier": {
+      "name": "",
+      "ico": "",
+      "dic": "",
+      "street": "",
+      "city": "",
+      "zip": "",
+      "country": "",
+      "email": "",
+      "phone": "",
+      "contactPerson": ""
+     },
+     "customerMatch": {
+      "id": "efc8781a-ce7b-40f9-af40-09a6479fb146",
+      "name": "HOFMEISTER mw936dxj-4 s.r.o.",
+      "reason": "odesílatel e-mailu",
+      "score": 95
+     },
+     "supplierMatch": null,
+     "fixedJobId": null,
+     "targets": [
+      {
+       "key": "c3fd336c-5ae5-4c9b-a1fa-4e3a68750017",
+       "mode": "existing",
+       "jobId": "c3fd336c-5ae5-4c9b-a1fa-4e3a68750017",
+       "number": "Z-2026-8374",
+       "title": "klamp-delaí A290-7904-Y832 + 1 další",
+       "customerId": "bfcbb4f4-d7e1-4ff6-b0b4-5b99c2307a50",
+       "customerName": "HOFMEISTER mw936dxj-3 s.r.o.",
+       "supplierId": null,
+       "supplierName": null,
+       "stage": "poptavka",
+       "reason": "stejný výkres A290-7904-Y832",
+       "score": 50,
+       "existing": {
+        "title": "klamp-delaí A290-7904-Y832 + 1 další",
+        "inquiryDate": "2026-11-09",
+        "customerContact": "Petr Fous",
+        "customerContactEmail": "petr.fous@hofmeister-mw936dxj-3.test",
+        "currency": "CZK"
+       },
+       "proposed": {},
+       "conflicts": {},
+       "newItems": [],
+       "merges": [],
+       "existingItems": 2,
+       "totals": null,
+       "stageTo": null
+      },
+      {
+       "key": "bff0c8de-2250-4e8f-9c7e-11239222d05f",
+       "mode": "existing",
+       "jobId": "bff0c8de-2250-4e8f-9c7e-11239222d05f",
+       "number": "Z-HG-mw936dxj",
+       "title": "klamp — jiná",
+       "customerId": "bfcbb4f4-d7e1-4ff6-b0b4-5b99c2307a50",
+       "customerName": "HOFMEISTER mw936dxj-3 s.r.o.",
+       "supplierId": null,
+       "supplierName": null,
+       "stage": "dokonceno",
+       "reason": "stejný výkres A290-7904-Y832",
+       "score": 50,
+       "existing": {
+        "title": "klamp — jiná",
+        "inquiryDate": "2026-02-01",
+        "currency": "CZK"
+       },
+       "proposed": {
+        "customerContact": "Petr Fous",
+        "customerContactEmail": "petr.fous@hofmeister-mw936dxj-4.test"
+       },
+       "conflicts": {
+        "inquiryDate": "2026-11-09"
+       },
+       "newItems": [
+        {
+         "key": "ai-0",
+         "drawingNumber": "A290-7904-Y823",
+         "revision": "",
+         "name": "",
+         "material": "POM",
+         "quantity": "4",
+         "unit": "ks",
+         "unitPrice": "",
+         "purchaseUnitPrice": "",
+         "description": "",
+         "note": "",
+         "aiFilled": true
+        }
+       ],
+       "merges": [
+        {
+         "itemId": "d5e97455-91d8-43fe-ba8d-500b3efadfec",
+         "label": "A290-7904-Y832 klamp",
+         "drawingNumber": "A290-7904-Y832",
+         "patch": {
+          "material": "POM"
+         },
+         "apply": true
+        }
+       ],
+       "existingItems": 1,
+       "totals": null,
+       "stageTo": null
+      },
+      {
+       "key": "e9bfe49e-896a-4f3d-a1a5-f2a7c60c64ef",
+       "mode": "existing",
+       "jobId": "e9bfe49e-896a-4f3d-a1a5-f2a7c60c64ef",
+       "number": "Z-2026-8373",
+       "title": "klamp-delaí A290-7904-Y832 + 1 další",
+       "customerId": "ca1d2e48-70d6-499b-97f8-01b7f7121092",
+       "customerName": "HOFMEISTER mw936dxj-2 s.r.o.",
+       "supplierId": null,
+       "supplierName": null,
+       "stage": "poptavka",
+       "reason": "stejný výkres A290-7904-Y832",
+       "score": 50,
+       "existing": {
+        "title": "klamp-delaí A290-7904-Y832 + 1 další",
+        "inquiryDate": "2026-11-09",
+        "customerContact": "Petr Fous",
+        "customerContactEmail": "petr.fous@hofmeister-mw936dxj-2.test",
+        "currency": "CZK"
+       },
+       "proposed": {},
+       "conflicts": {},
+       "newItems": [],
+       "merges": [],
+       "existingItems": 2,
+       "totals": null,
+       "stageTo": null
+      },
+      {
+       "key": "ba8cbbd9-f29b-4d8b-9775-1cddf9405259",
+       "mode": "existing",
+       "jobId": "ba8cbbd9-f29b-4d8b-9775-1cddf9405259",
+       "number": "Z-HF-mw936dxj",
+       "title": "klamp — starší",
+       "customerId": "ca1d2e48-70d6-499b-97f8-01b7f7121092",
+       "customerName": "HOFMEISTER mw936dxj-2 s.r.o.",
+       "supplierId": null,
+       "supplierName": null,
+       "stage": "objednavka",
+       "reason": "stejný výkres A290-7904-Y832",
+       "score": 50,
+       "existing": {
+        "title": "klamp — starší",
+        "inquiryDate": "2026-03-01",
+        "currency": "CZK"
+       },
+       "proposed": {
+        "customerContact": "Petr Fous",
+        "customerContactEmail": "petr.fous@hofmeister-mw936dxj-4.test"
+       },
+       "conflicts": {
+        "inquiryDate": "2026-11-09"
+       },
+       "newItems": [
+        {
+         "key": "ai-0",
+         "drawingNumber": "A290-7904-Y823",
+         "revision": "",
+         "name": "",
+         "material": "POM",
+         "quantity": "4",
+         "unit": "ks",
+         "unitPrice": "",
+         "purchaseUnitPrice": "",
+         "description": "",
+         "note": "",
+         "aiFilled": true
+        }
+       ],
+       "merges": [
+        {
+         "itemId": "75198568-1b99-421b-bf58-e1a0ed95271b",
+         "label": "A290-7904-Y832 klamp",
+         "drawingNumber": "A290-7904-Y832",
+         "patch": {
+          "material": "POM"
+         },
+         "apply": true
+        }
+       ],
+       "existingItems": 1,
+       "totals": null,
+       "stageTo": null
+      },
+      {
+       "key": "a0d394e9-af7f-45cd-a020-0162ae65d2af",
+       "mode": "existing",
+       "jobId": "a0d394e9-af7f-45cd-a020-0162ae65d2af",
+       "number": "Z-2026-8372",
+       "title": "klamp-delaí A290-7904-Y832 + 1 další",
+       "customerId": "3faff922-3c97-46a2-8bf5-71add7a4486d",
+       "customerName": "HOFMEISTER mw936dxj-1 s.r.o.",
+       "supplierId": null,
+       "supplierName": null,
+       "stage": "poptavka",
+       "reason": "stejný výkres A290-7904-Y832",
+       "score": 50,
+       "existing": {
+        "title": "klamp-delaí A290-7904-Y832 + 1 další",
+        "inquiryDate": "2026-11-09",
+        "customerContact": "Petr Fous",
+        "customerContactEmail": "petr.fous@hofmeister-mw936dxj-1.test",
+        "currency": "CZK"
+       },
+       "proposed": {},
+       "conflicts": {},
+       "newItems": [],
+       "merges": [],
+       "existingItems": 2,
+       "totals": null,
+       "stageTo": null
+      },
+      {
+       "key": "new",
+       "mode": "new",
+       "jobId": null,
+       "number": null,
+       "title": null,
+       "customerId": null,
+       "customerName": null,
+       "supplierId": null,
+       "supplierName": null,
+       "stage": null,
+       "reason": null,
+       "score": null,
+       "existing": {},
+       "proposed": {
+        "title": "klamp-delaí A290-7904-Y832 + 1 další",
+        "inquiryDate": "2026-11-09",
+        "customerContact": "Petr Fous",
+        "customerContactEmail": "petr.fous@hofmeister-mw936dxj-4.test"
+       },
+       "conflicts": {},
+       "newItems": [
+        {
+         "key": "ai-0",
+         "drawingNumber": "A290-7904-Y832",
+         "revision": "",
+         "name": "klamp-delaí",
+         "material": "POM",
+         "quantity": "8",
+         "unit": "ks",
+         "unitPrice": "",
+         "purchaseUnitPrice": "",
+         "description": "",
+         "note": "",
+         "aiFilled": true
+        },
+        {
+         "key": "ai-1",
+         "drawingNumber": "A290-7904-Y823",
+         "revision": "",
+         "name": "",
+         "material": "POM",
+         "quantity": "4",
+         "unit": "ks",
+         "unitPrice": "",
+         "purchaseUnitPrice": "",
+         "description": "",
+         "note": "",
+         "aiFilled": true
+        }
+       ],
+       "merges": [],
+       "existingItems": 0,
+       "stageTo": "poptavka"
+      }
+     ],
+     "margins": true,
+     "mode": "approval",
+     "initial": {
+      "chip": "poptavka_zakaznik",
+      "docKind": "poptavka",
+      "issuer": "zakaznik",
+      "fileKind": "poptavka",
+      "targetKey": "new",
+      "customer": {
+       "mode": "existing",
+       "id": "efc8781a-ce7b-40f9-af40-09a6479fb146",
+       "name": "HOFMEISTER mw936dxj-4 s.r.o.",
+       "reason": "odesílatel e-mailu"
+      },
+      "supplier": {
+       "mode": "none"
+      },
+      "fields": {
+       "title": "klamp-delaí A290-7904-Y832 + 1 další",
+       "inquiryDate": "2026-11-09",
+       "customerContact": "Petr Fous",
+       "customerContactEmail": "petr.fous@hofmeister-mw936dxj-4.test"
+      },
+      "items": [
+       {
+        "key": "ai-0",
+        "drawingNumber": "A290-7904-Y832",
+        "revision": "",
+        "name": "klamp-delaí",
+        "material": "POM",
+        "quantity": "8",
+        "unit": "ks",
+        "unitPrice": "",
+        "purchaseUnitPrice": "",
+        "description": "",
+        "note": "",
+        "aiFilled": true
+       },
+       {
+        "key": "ai-1",
+        "drawingNumber": "A290-7904-Y823",
+        "revision": "",
+        "name": "",
+        "material": "POM",
+        "quantity": "4",
+        "unit": "ks",
+        "unitPrice": "",
+        "purchaseUnitPrice": "",
+        "description": "",
+        "note": "",
+        "aiFilled": true
+       }
+      ],
+      "merges": [],
+      "stage": "poptavka",
+      "docNote": ""
+     }
+    },
+    "visibleFields": [
+     "title",
+     "customerInquiryNumber",
+     "inquiryDate",
+     "customerRequiredDate",
+     "customerContact",
+     "customerContactEmail",
+     "customerContactPhone"
+    ],
+    "fieldSources": {
+     "customerContact": {
+      "docId": "mail",
+      "label": "z podpisu e-mailu"
+     },
+     "customerContactEmail": {
+      "docId": "mail",
+      "label": "z e-mailu"
+     },
+     "inquiryDate": {
+      "docId": "mail",
+      "label": "z textu e-mailu"
+     }
+    },
+    "itemSources": {
+     "ai-0": [
+      {
+       "docId": "d1",
+       "label": "název z výkresu A290-7904-Y832"
+      }
+     ]
+    },
+    "itemOptions": {
+     "c3fd336c-5ae5-4c9b-a1fa-4e3a68750017": [
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "94b95d8a-c7f5-494c-96fd-e836ef0a24a8"
+       },
+       "label": "A290-7904-Y832 klamp-delaí",
+       "drawingNumber": "A290-7904-Y832",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "40c09b33-04d3-4e3c-b2ce-cc8562a8e953"
+       },
+       "label": "A290-7904-Y823 klamp-delaí",
+       "drawingNumber": "A290-7904-Y823",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "add"
+       },
+       "label": "Založit novou položku",
+       "drawingNumber": "",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "none"
+       },
+       "label": "Nepřiřazovat k položce",
+       "drawingNumber": "",
+       "revision": ""
+      }
+     ],
+     "bff0c8de-2250-4e8f-9c7e-11239222d05f": [
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "d5e97455-91d8-43fe-ba8d-500b3efadfec"
+       },
+       "label": "A290-7904-Y832 klamp",
+       "drawingNumber": "A290-7904-Y832",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "docItem",
+        "itemKey": "ai-0"
+       },
+       "label": "A290-7904-Y823 (nová)",
+       "drawingNumber": "A290-7904-Y823",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "add"
+       },
+       "label": "Založit novou položku",
+       "drawingNumber": "",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "none"
+       },
+       "label": "Nepřiřazovat k položce",
+       "drawingNumber": "",
+       "revision": ""
+      }
+     ],
+     "e9bfe49e-896a-4f3d-a1a5-f2a7c60c64ef": [
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "c0e3d32f-c4a3-4f1c-9018-dcbab5d1ad39"
+       },
+       "label": "A290-7904-Y832 klamp-delaí",
+       "drawingNumber": "A290-7904-Y832",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "e76f9cfc-1fad-4c52-adce-4ac73d0ee44d"
+       },
+       "label": "A290-7904-Y823 klamp-delaí",
+       "drawingNumber": "A290-7904-Y823",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "add"
+       },
+       "label": "Založit novou položku",
+       "drawingNumber": "",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "none"
+       },
+       "label": "Nepřiřazovat k položce",
+       "drawingNumber": "",
+       "revision": ""
+      }
+     ],
+     "ba8cbbd9-f29b-4d8b-9775-1cddf9405259": [
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "75198568-1b99-421b-bf58-e1a0ed95271b"
+       },
+       "label": "A290-7904-Y832 klamp",
+       "drawingNumber": "A290-7904-Y832",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "docItem",
+        "itemKey": "ai-0"
+       },
+       "label": "A290-7904-Y823 (nová)",
+       "drawingNumber": "A290-7904-Y823",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "add"
+       },
+       "label": "Založit novou položku",
+       "drawingNumber": "",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "none"
+       },
+       "label": "Nepřiřazovat k položce",
+       "drawingNumber": "",
+       "revision": ""
+      }
+     ],
+     "a0d394e9-af7f-45cd-a020-0162ae65d2af": [
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "dd67dadc-a205-4e3e-899d-05df24f98d27"
+       },
+       "label": "A290-7904-Y832 klamp-delaí",
+       "drawingNumber": "A290-7904-Y832",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "item",
+        "itemId": "b9255230-1723-4412-bde6-4ef0645386f0"
+       },
+       "label": "A290-7904-Y823 klamp-delaí",
+       "drawingNumber": "A290-7904-Y823",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "add"
+       },
+       "label": "Založit novou položku",
+       "drawingNumber": "",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "none"
+       },
+       "label": "Nepřiřazovat k položce",
+       "drawingNumber": "",
+       "revision": ""
+      }
+     ],
+     "new": [
+      {
+       "link": {
+        "mode": "docItem",
+        "itemKey": "ai-0"
+       },
+       "label": "A290-7904-Y832 klamp-delaí (nová)",
+       "drawingNumber": "A290-7904-Y832",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "docItem",
+        "itemKey": "ai-1"
+       },
+       "label": "A290-7904-Y823 (nová)",
+       "drawingNumber": "A290-7904-Y823",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "add"
+       },
+       "label": "Založit novou položku",
+       "drawingNumber": "",
+       "revision": ""
+      },
+      {
+       "link": {
+        "mode": "none"
+       },
+       "label": "Nepřiřazovat k položce",
+       "drawingNumber": "",
+       "revision": ""
+      }
+     ]
+    }
+   }
+  ],
+  "docs": [
+   {
+    "kind": "drawing",
+    "docId": "d1",
+    "groupKey": "g1",
+    "aiUsed": true,
+    "reason": null,
+    "drawing": {
+     "notes": "",
+     "scale": "1:1",
+     "sheet": "List 1/1",
+     "title": "klamp-delaí",
+     "summary": "Výkres A290-7904-Y832 — klamp-delaí.",
+     "surface": "",
+     "material": "PET100 (POLYPENCO)",
+     "quantity": 1,
+     "revision": "",
+     "weightKg": 0.05,
+     "heatSteps": [],
+     "shapeHint": "hranol",
+     "confidence": 0.5,
+     "dimensions": "80 × 40 × 12 mm",
+     "heatStatus": "bez",
+     "drawingDate": "",
+     "overallDims": [],
+     "customerName": "HOFMEISTER s.r.o.",
+     "drawingNotes": [],
+     "surfaceSteps": [],
+     "drawingNumber": "A290-7904-Y832",
+     "heatTreatment": "",
+     "materialGroup": "plasty",
+     "surfaceStatus": "bez",
+     "drawingNumbers": [
+      "A290-7904-Y832"
+     ],
+     "ourQuoteNumber": "",
+     "blankDimensions": "",
+     "generalTolerance": "",
+     "surfaceTreatment": "",
+     "tightestTolerance": "",
+     "needsClarification": [
+      "Razítko je špatně čitelné."
+     ],
+     "customerOrderNumber": ""
+    },
+    "duplicateOf": {
+     "jobId": "ba8cbbd9-f29b-4d8b-9775-1cddf9405259",
+     "jobNumber": "Z-HF-mw936dxj",
+     "fileId": "ecb5ab30-2c9d-47ee-8e96-66d94939cc71",
+     "what": "Výkres A290-7904-Y832",
+     "date": "9. 11. 2026"
+    },
+    "archiveConflict": "Číslo A290-7904-Y832 je v archivu výkresů u jiného zákazníka.",
+    "sources": {
+     "quantity": "z textu e-mailu",
+     "title": "název z výkresu A290-7904-Y832"
+    },
+    "initial": {
+     "drawingNumber": "A290-7904-Y832",
+     "revision": "",
+     "title": "klamp-delaí",
+     "material": "PET100 (POLYPENCO)",
+     "dimensions": "80 × 40 × 12 mm",
+     "generalTolerance": "",
+     "tightestTolerance": "",
+     "quantity": "8",
+     "link": {
+      "mode": "docItem",
+      "itemKey": "ai-0"
+     },
+     "archive": true,
+     "note": "",
+     "onDuplicate": null,
+     "spec": {
+      "materialGroup": "plasty",
+      "weightKg": "0,05",
+      "weightSource": "vykres",
+      "blankWeightKg": "0,075",
+      "blankDims": "85 × 45 × 15 mm",
+      "blankShape": "plocha_tyc",
+      "blankNote": "plochá tyč 85 × 45 × 15 mm ≈ 0,08 kg, plast 1,30 g/cm³",
+      "heatStatus": "bez",
+      "heatSteps": [],
+      "surfaceStatus": "bez",
+      "surfaceSteps": [],
+      "notes": "",
+      "manual": []
+     }
+    }
+   },
+   {
+    "kind": "drawing",
+    "docId": "d2",
+    "groupKey": "g1",
+    "aiUsed": true,
+    "reason": null,
+    "drawing": {
+     "notes": "",
+     "scale": "1:1",
+     "sheet": "List 1/1",
+     "title": "klamp-delaí",
+     "summary": "Výkres A290-7904-Y832 — klamp-delaí.",
+     "surface": "",
+     "material": "PET100 (POLYPENCO)",
+     "quantity": 1,
+     "revision": "",
+     "weightKg": 0.05,
+     "heatSteps": [],
+     "shapeHint": "hranol",
+     "confidence": 0.55,
+     "dimensions": "80 × 40 × 12 mm",
+     "heatStatus": "bez",
+     "drawingDate": "",
+     "overallDims": [],
+     "customerName": "HOFMEISTER s.r.o.",
+     "drawingNotes": [],
+     "surfaceSteps": [],
+     "drawingNumber": "A290-7904-Y832",
+     "heatTreatment": "",
+     "materialGroup": "plasty",
+     "surfaceStatus": "bez",
+     "drawingNumbers": [
+      "A290-7904-Y832"
+     ],
+     "ourQuoteNumber": "",
+     "blankDimensions": "",
+     "generalTolerance": "",
+     "surfaceTreatment": "",
+     "tightestTolerance": "",
+     "needsClarification": [
+      "Razítko je špatně čitelné — číslo výkresu a revizi ověř.",
+      "Materiál na výkresu: S400 (japonská norma JIS) — potvrdit.",
+      "Tolerance nejsou čitelné."
+     ],
+     "customerOrderNumber": ""
+    },
+    "duplicateOf": {
+     "jobId": "ba8cbbd9-f29b-4d8b-9775-1cddf9405259",
+     "jobNumber": "Z-HF-mw936dxj",
+     "fileId": "ecb5ab30-2c9d-47ee-8e96-66d94939cc71",
+     "what": "Výkres A290-7904-Y832",
+     "date": "9. 11. 2026"
+    },
+    "archiveConflict": "Číslo A290-7904-Y832 je v archivu výkresů u jiného zákazníka.",
+    "sources": {
+     "quantity": "z textu e-mailu",
+     "title": "název z výkresu A290-7904-Y832"
+    },
+    "initial": {
+     "drawingNumber": "A290-7904-Y832",
+     "revision": "",
+     "title": "klamp-delaí",
+     "material": "PET100 (POLYPENCO)",
+     "dimensions": "80 × 40 × 12 mm",
+     "generalTolerance": "",
+     "tightestTolerance": "",
+     "quantity": "8",
+     "link": {
+      "mode": "docItem",
+      "itemKey": "ai-0"
+     },
+     "archive": true,
+     "note": "",
+     "onDuplicate": null,
+     "spec": {
+      "materialGroup": "plasty",
+      "weightKg": "0,05",
+      "weightSource": "vykres",
+      "blankWeightKg": "0,075",
+      "blankDims": "85 × 45 × 15 mm",
+      "blankShape": "plocha_tyc",
+      "blankNote": "plochá tyč 85 × 45 × 15 mm ≈ 0,08 kg, plast 1,30 g/cm³",
+      "heatStatus": "bez",
+      "heatSteps": [],
+      "surfaceStatus": "bez",
+      "surfaceSteps": [],
+      "notes": "",
+      "manual": []
+     }
+    }
+   }
+  ],
+  "warnings": [
+   {
+    "id": "duplicate_doc:d2,d1",
+    "code": "duplicate_doc",
+    "docIds": [
+     "d2",
+     "d1"
+    ],
+    "actions": [
+     {
+      "kind": "ack",
+      "label": "Ponechat oba"
+     },
+     {
+      "kind": "exclude_doc",
+      "docId": "d2",
+      "label": "Vyřadit duplicitu"
+     }
+    ],
+    "message": "Výkres A290-7904-Y832 je v dávce dvakrát. Jsou-li to různé výkresy (podobná čísla), oprav číslo na kartě výkresu — uloží se oba.",
+    "groupKey": null,
+    "severity": "warn"
+   },
+   {
+    "id": "material_conflict:mail,d1",
+    "code": "material_conflict",
+    "severity": "warn",
+    "docIds": [
+     "d1"
+    ],
+    "groupKey": "g1",
+    "message": "Materiál se liší: POM (z textu e-mailu) × PET100 (POLYPENCO) (z výkresu A290-7904-Y832) — u položky zatím platí POM. Potvrď, nebo vezmi materiál z výkresu.",
+    "actions": [
+     {
+      "kind": "ack",
+      "label": "Platí POM (z textu e-mailu)",
+      "docId": "d1"
+     },
+     {
+      "kind": "use_drawing_material",
+      "label": "Platí materiál z výkresu (PET100 (POLYPENCO))",
+      "docId": "d1",
+      "value": "PET100 (POLYPENCO)"
+     }
+    ]
+   },
+   {
+    "id": "material_conflict:mail,d2",
+    "code": "material_conflict",
+    "severity": "warn",
+    "docIds": [
+     "d2"
+    ],
+    "groupKey": "g1",
+    "message": "Materiál se liší: POM (z textu e-mailu) × PET100 (POLYPENCO) (z výkresu A290-7904-Y832) — u položky zatím platí POM. Potvrď, nebo vezmi materiál z výkresu.",
+    "actions": [
+     {
+      "kind": "ack",
+      "label": "Platí POM (z textu e-mailu)",
+      "docId": "d2"
+     },
+     {
+      "kind": "use_drawing_material",
+      "label": "Platí materiál z výkresu (PET100 (POLYPENCO))",
+      "docId": "d2",
+      "value": "PET100 (POLYPENCO)"
+     }
+    ]
+   },
+   {
+    "id": "quantity_conflict:mail,d1,d2",
+    "code": "quantity_conflict",
+    "severity": "info",
+    "docIds": [
+     "d1",
+     "d2"
+    ],
+    "groupKey": "g1",
+    "message": "Platí poptávka: 8 ks (výkres 1 ks, výkres 1 ks) — A290-7904-Y832",
+    "actions": []
+   },
+   {
+    "id": "also_in_job:d1",
+    "code": "also_in_job",
+    "severity": "info",
+    "docIds": [
+     "d1"
+    ],
+    "groupKey": "g1",
+    "message": "Výkres A290-7904-Y832 je už i u zakázky Z-HF-mw936dxj (9. 11. 2026) — uloží se i sem; tam najdeš historii a poslední cenu.",
+    "actions": [],
+    "links": [
+     {
+      "label": "Otevřít Z-HF-mw936dxj",
+      "href": "/orders/ba8cbbd9-f29b-4d8b-9775-1cddf9405259"
+     }
+    ]
+   },
+   {
+    "id": "drawing_archive_conflict:d1",
+    "code": "drawing_archive_conflict",
+    "severity": "info",
+    "docIds": [
+     "d1"
+    ],
+    "groupKey": "g1",
+    "message": "Číslo A290-7904-Y832 je v archivu výkresů u jiného zákazníka. K zakázce se výkres uloží, do archivu výkresů se nezapíše.",
+    "actions": []
+   },
+   {
+    "id": "also_in_job:d2",
+    "code": "also_in_job",
+    "severity": "info",
+    "docIds": [
+     "d2"
+    ],
+    "groupKey": "g1",
+    "message": "Výkres A290-7904-Y832 je už i u zakázky Z-HF-mw936dxj (9. 11. 2026) — uloží se i sem; tam najdeš historii a poslední cenu.",
+    "actions": [],
+    "links": [
+     {
+      "label": "Otevřít Z-HF-mw936dxj",
+      "href": "/orders/ba8cbbd9-f29b-4d8b-9775-1cddf9405259"
+     }
+    ]
+   },
+   {
+    "id": "drawing_archive_conflict:d2",
+    "code": "drawing_archive_conflict",
+    "severity": "info",
+    "docIds": [
+     "d2"
+    ],
+    "groupKey": "g1",
+    "message": "Číslo A290-7904-Y832 je v archivu výkresů u jiného zákazníka. K zakázce se výkres uloží, do archivu výkresů se nezapíše.",
+    "actions": []
+   },
+   {
+    "id": "drawing_item_shared:d1,d2",
+    "code": "drawing_item_shared",
+    "severity": "warn",
+    "docIds": [
+     "d1",
+     "d2"
+    ],
+    "groupKey": "g1",
+    "message": "2 výkresy jsou přečtené jako A290-7904-Y832 a míří na stejnou položku; položka A290-7904-Y823 výkres nemá. Čísla jsou si podobná — rozhodni, ke které položce „A290-7904-Y823.pdf“ patří.",
+    "actions": [
+     {
+      "kind": "link_item",
+      "docId": "d1",
+      "value": "A290-7904-Y823",
+      "itemKey": "ai-1",
+      "label": "„A290-7904-Y823.pdf“ je A290-7904-Y823 (4 ks)"
+     },
+     {
+      "kind": "ack",
+      "label": "Jsou to listy téhož výkresu"
+     }
+    ]
+   }
+  ],
+  "initial": {
+   "sort": {
+    "docs": [
+     {
+      "id": "d1",
+      "type": "vykres",
+      "pageIds": [
+       "p1"
+      ],
+      "aiType": "vykres",
+      "confidence": 0.9,
+      "reason": "testovací roztřídění",
+      "title": "Výkres A290-7904-Y832",
+      "documentNumber": "A290-7904-Y832",
+      "partyName": "",
+      "drawingNumbers": [
+       "A290-7904-Y832"
+      ],
+      "format": null,
+      "flags": [],
+      "issuerCheck": "unknown",
+      "excluded": false
+     },
+     {
+      "id": "d2",
+      "type": "vykres",
+      "pageIds": [
+       "p2"
+      ],
+      "aiType": "vykres",
+      "confidence": 0.9,
+      "reason": "testovací roztřídění",
+      "title": "Výkres A290-7904-Y832",
+      "documentNumber": "A290-7904-Y832",
+      "partyName": "",
+      "drawingNumbers": [
+       "A290-7904-Y832"
+      ],
+      "format": null,
+      "flags": [],
+      "issuerCheck": "unknown",
+      "excluded": false
+     }
+    ],
+    "excludedPageIds": []
+   },
+   "groups": [
+    {
+     "key": "g1",
+     "docIds": [
+      "d1",
+      "d2"
+     ],
+     "job": {
+      "chip": "poptavka_zakaznik",
+      "docKind": "poptavka",
+      "issuer": "zakaznik",
+      "fileKind": "poptavka",
+      "targetKey": "new",
+      "customer": {
+       "mode": "existing",
+       "id": "efc8781a-ce7b-40f9-af40-09a6479fb146",
+       "name": "HOFMEISTER mw936dxj-4 s.r.o.",
+       "reason": "odesílatel e-mailu"
+      },
+      "supplier": {
+       "mode": "none"
+      },
+      "fields": {
+       "title": "klamp-delaí A290-7904-Y832 + 1 další",
+       "inquiryDate": "2026-11-09",
+       "customerContact": "Petr Fous",
+       "customerContactEmail": "petr.fous@hofmeister-mw936dxj-4.test"
+      },
+      "items": [
+       {
+        "key": "ai-0",
+        "drawingNumber": "A290-7904-Y832",
+        "revision": "",
+        "name": "klamp-delaí",
+        "material": "POM",
+        "quantity": "8",
+        "unit": "ks",
+        "unitPrice": "",
+        "purchaseUnitPrice": "",
+        "description": "",
+        "note": "",
+        "aiFilled": true
+       },
+       {
+        "key": "ai-1",
+        "drawingNumber": "A290-7904-Y823",
+        "revision": "",
+        "name": "",
+        "material": "POM",
+        "quantity": "4",
+        "unit": "ks",
+        "unitPrice": "",
+        "purchaseUnitPrice": "",
+        "description": "",
+        "note": "",
+        "aiFilled": true
+       }
+      ],
+      "merges": [],
+      "stage": "poptavka",
+      "docNote": ""
+     },
+     "customerConfirmed": false,
+     "jobDraftTitle": "klamp-delaí A290-7904-Y832 + 1 další"
+    }
+   ],
+   "docs": {
+    "d1": {
+     "kind": "drawing",
+     "state": {
+      "drawingNumber": "A290-7904-Y832",
+      "revision": "",
+      "title": "klamp-delaí",
+      "material": "PET100 (POLYPENCO)",
+      "dimensions": "80 × 40 × 12 mm",
+      "generalTolerance": "",
+      "tightestTolerance": "",
+      "quantity": "8",
+      "link": {
+       "mode": "docItem",
+       "itemKey": "ai-0"
+      },
+      "archive": true,
+      "note": "",
+      "onDuplicate": null,
+      "spec": {
+       "materialGroup": "plasty",
+       "weightKg": "0,05",
+       "weightSource": "vykres",
+       "blankWeightKg": "0,075",
+       "blankDims": "85 × 45 × 15 mm",
+       "blankShape": "plocha_tyc",
+       "blankNote": "plochá tyč 85 × 45 × 15 mm ≈ 0,08 kg, plast 1,30 g/cm³",
+       "heatStatus": "bez",
+       "heatSteps": [],
+       "surfaceStatus": "bez",
+       "surfaceSteps": [],
+       "notes": "",
+       "manual": []
+      }
+     }
+    },
+    "d2": {
+     "kind": "drawing",
+     "state": {
+      "drawingNumber": "A290-7904-Y832",
+      "revision": "",
+      "title": "klamp-delaí",
+      "material": "PET100 (POLYPENCO)",
+      "dimensions": "80 × 40 × 12 mm",
+      "generalTolerance": "",
+      "tightestTolerance": "",
+      "quantity": "8",
+      "link": {
+       "mode": "docItem",
+       "itemKey": "ai-0"
+      },
+      "archive": true,
+      "note": "",
+      "onDuplicate": null,
+      "spec": {
+       "materialGroup": "plasty",
+       "weightKg": "0,05",
+       "weightSource": "vykres",
+       "blankWeightKg": "0,075",
+       "blankDims": "85 × 45 × 15 mm",
+       "blankShape": "plocha_tyc",
+       "blankNote": "plochá tyč 85 × 45 × 15 mm ≈ 0,08 kg, plast 1,30 g/cm³",
+       "heatStatus": "bez",
+       "heatSteps": [],
+       "surfaceStatus": "bez",
+       "surfaceSteps": [],
+       "notes": "",
+       "manual": []
+      }
+     }
+    }
+   }
+  }
+ },
+ "batch": {
+  "captureId": "adcc9b53-7724-47eb-b49e-dc44a4fc3193",
+  "aiUsed": true,
+  "reason": null,
+  "aiFailure": null,
+  "mode": "approval",
+  "margins": true,
+  "drawingsAccess": true,
+  "fixedJobId": null,
+  "fixedJobNumber": null,
+  "files": [
+   {
+    "path": "capture/5ff3e3a5-29d4-4eba-845d-75b2fb8c5041/04b89d66-6790-4da3-987f-e87345d92e65-A290-7904-Y823__vykres-gh1c.pdf",
+    "filename": "A290-7904-Y823__vykres-gh1c.pdf",
+    "mimeType": "application/pdf",
+    "size": 597,
+    "id": "f1",
+    "pageCount": 1,
+    "sniffedMime": "application/pdf",
+    "format": null,
+    "fromZip": null,
+    "bundle": "mail:0569b660-4d6a-411c-943a-27bc4cbf0271",
+    "splittable": true,
+    "aiReadable": true,
+    "aiSkipReason": null,
+    "sha256": "41e3e64c08090ded0a611b5a99701d0bdbd1d970671480c49454dfd298b6c526"
+   },
+   {
+    "path": "capture/5ff3e3a5-29d4-4eba-845d-75b2fb8c5041/8881dcc5-f793-4fac-a507-fc1e27341c24-A290-7904-Y832__vykres-gh1a.pdf",
+    "filename": "A290-7904-Y832__vykres-gh1a.pdf",
+    "mimeType": "application/pdf",
+    "size": 597,
+    "id": "f2",
+    "pageCount": 1,
+    "sniffedMime": "application/pdf",
+    "format": null,
+    "fromZip": null,
+    "bundle": "mail:0569b660-4d6a-411c-943a-27bc4cbf0271",
+    "splittable": true,
+    "aiReadable": true,
+    "aiSkipReason": null,
+    "sha256": "2d6c98c77cedd6b7e08cd256cebdf00aacc6d9b538597a167b7a4731468d00f9"
+   }
+  ],
+  "pages": [
+   {
+    "id": "p1",
+    "fileId": "f1",
+    "page": 1,
+    "source": "pdf_page",
+    "label": "A290-7904-Y823__vykres-gh1c.pdf",
+    "aiLabel": "",
+    "duplicateOf": null
+   },
+   {
+    "id": "p2",
+    "fileId": "f2",
+    "page": 1,
+    "source": "pdf_page",
+    "label": "A290-7904-Y832__vykres-gh1a.pdf",
+    "aiLabel": "",
+    "duplicateOf": null
+   }
+  ],
+  "previews": [
+   {
+    "fileId": "f1",
+    "path": "capture/5ff3e3a5-29d4-4eba-845d-75b2fb8c5041/04b89d66-6790-4da3-987f-e87345d92e65-A290-7904-Y823__vykres-gh1c.pdf",
+    "filename": "A290-7904-Y823__vykres-gh1c.pdf",
+    "mimeType": "application/pdf",
+    "size": 597,
+    "url": "http://localhost:54321/storage/v1/object/sign/job-files/capture/5ff3e3a5-29d4-4eba-845d-75b2fb8c5041/04b89d66-6790-4da3-987f-e87345d92e65-A290-7904-Y823__vykres-gh1c.pdf?token=eyJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJqb2ItZmlsZXMvY2FwdHVyZS81ZmYzZTNhNS0yOWQ0LTRlYmEtODQ1ZC03NWIyZmI4YzUwNDEvMDRiODlkNjYtNjc5MC00ZGEzLTk4N2YtZTg3MzQ1ZDkyZTY1LUEyOTAtNzkwNC1ZODIzX192eWtyZXMtZ2gxYy5wZGYiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzk0MjE4MTgxLCJleHAiOjE3OTQyMjE3ODF9.I2ZvHqgry5l6tlNSJrOtM2_5B5w1EaZ-J2g2Al0ltL4",
+    "sortUrl": null,
+    "pageCount": 1,
+    "format": null
+   },
+   {
+    "fileId": "f2",
+    "path": "capture/5ff3e3a5-29d4-4eba-845d-75b2fb8c5041/8881dcc5-f793-4fac-a507-fc1e27341c24-A290-7904-Y832__vykres-gh1a.pdf",
+    "filename": "A290-7904-Y832__vykres-gh1a.pdf",
+    "mimeType": "application/pdf",
+    "size": 597,
+    "url": "http://localhost:54321/storage/v1/object/sign/job-files/capture/5ff3e3a5-29d4-4eba-845d-75b2fb8c5041/8881dcc5-f793-4fac-a507-fc1e27341c24-A290-7904-Y832__vykres-gh1a.pdf?token=eyJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJqb2ItZmlsZXMvY2FwdHVyZS81ZmYzZTNhNS0yOWQ0LTRlYmEtODQ1ZC03NWIyZmI4YzUwNDEvODg4MWRjYzUtZjc5My00ZmFjLWE1MDctZmMxZTI3MzQxYzI0LUEyOTAtNzkwNC1ZODMyX192eWtyZXMtZ2gxYS5wZGYiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzk0MjE4MTgxLCJleHAiOjE3OTQyMjE3ODF9.1BPfyfvHamuVeWZ5CqGTE2HIoJ5BPY6KCenVh2nd_f8",
+    "sortUrl": null,
+    "pageCount": 1,
+    "format": null
+   }
+  ],
+  "sort": {
+   "docs": [
+    {
+     "id": "d1",
+     "type": "vykres",
+     "pageIds": [
+      "p1"
+     ],
+     "aiType": "vykres",
+     "confidence": 0.9,
+     "reason": "testovací roztřídění",
+     "title": "Výkres A290-7904-Y832",
+     "documentNumber": "A290-7904-Y832",
+     "partyName": "",
+     "drawingNumbers": [
+      "A290-7904-Y832"
+     ],
+     "format": null,
+     "flags": [],
+     "issuerCheck": "unknown",
+     "excluded": false
+    },
+    {
+     "id": "d2",
+     "type": "vykres",
+     "pageIds": [
+      "p2"
+     ],
+     "aiType": "vykres",
+     "confidence": 0.9,
+     "reason": "testovací roztřídění",
+     "title": "Výkres A290-7904-Y832",
+     "documentNumber": "A290-7904-Y832",
+     "partyName": "",
+     "drawingNumbers": [
+      "A290-7904-Y832"
+     ],
+     "format": null,
+     "flags": [],
+     "issuerCheck": "unknown",
+     "excluded": false
+    }
+   ],
+   "excludedPageIds": []
+  },
+  "warnings": [
+   {
+    "id": "duplicate_doc:d2,d1",
+    "code": "duplicate_doc",
+    "severity": "warn",
+    "docIds": [
+     "d2",
+     "d1"
+    ],
+    "groupKey": null,
+    "message": "Výkres A290-7904-Y832 je v dávce dvakrát.",
+    "actions": [
+     {
+      "kind": "exclude_doc",
+      "label": "Vyřadit duplicitu",
+      "docId": "d2"
+     }
+    ]
+   }
+  ],
+  "extracts": [],
+  "skipSort": false
+ }
+}

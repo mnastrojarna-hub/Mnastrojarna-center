@@ -285,13 +285,31 @@ export type BatchWarningCode =
   /** Výkres bez spárované položky a bez počtu kusů. */
   | "drawing_quantity_missing"
   /** Objednávka / nabídka uvádí jiný materiál než výkres — u položky platí objednávka. */
-  | "material_conflict";
+  | "material_conflict"
+  /** Dva výkresy dávky míří na tutéž položku, jiná položka výkres nemá (OCR přečetla podobné číslo). */
+  | "drawing_item_shared"
+  /** Výkres / model už je u JINÉ zakázky — uloží se i sem (jen informace, historie / poslední cena). */
+  | "also_in_job"
+  /** Nová poptávka na díl, který už má starší zakázka (opakovaná poptávka) → nová zakázka. */
+  | "repeat_inquiry";
 export type BatchWarningActionKind =
   | "same_customer" | "split_group" | "move_to_group" | "exclude_doc" | "restore_page" | "set_type"
-  | "skip_duplicate" | "save_version";
+  | "skip_duplicate" | "save_version"
+  /** Rozhodnutí člověka „beru na vědomí / platí doklad" (id upozornění do BatchApplyState.ack). */
+  | "ack"
+  /** Materiál položky podle výkresu (value = materiál z výkresu; položka, na kterou výkres míří). */
+  | "use_drawing_material"
+  /** Výkres patří k položce itemKey (value = číslo výkresu položky — opraví i číslo na kartě). */
+  | "link_item";
 export interface BatchWarningAction {
   kind: BatchWarningActionKind; label: string;
   docId?: string; groupKey?: string; pageId?: string; type?: BatchDocType;
+  /** link_item: klíč řádku Položek (docItem). */
+  itemKey?: string;
+  /** link_item: položka existující cílové zakázky (vazba item). */
+  itemId?: string;
+  /** use_drawing_material: materiál; link_item: číslo výkresu položky. */
+  value?: string;
   /** split_group: doklady, které odejdou společně do nové zakázky (přiřazení „new:<první>"). */
   docIds?: string[];
 }
@@ -307,6 +325,8 @@ export interface BatchWarning {
   message: string;
   /** První = výchozí. */
   actions: BatchWarningAction[];
+  /** Odkazy k upozornění (např. „Otevřít Z-2026-031" — historie, poslední cena). */
+  links?: BatchResultLink[];
 }
 
 export interface BatchReviewModel {
@@ -356,6 +376,12 @@ export interface BatchApplyState {
   groups: BatchGroupState[];
   docs: Record<string, DocApplyState>;
   auto?: boolean;
+  /**
+   * Jen v prohlížeči (server ho zahodí): rozhodnutí člověka u upozornění a poznámek AI — id upozornění
+   * („material_conflict:d2"), `note:<docId>:<n>` (poznámka AI u výkresu potvrzena), `checked:<docId>`
+   * (výkres s nízkou jistotou zkontrolován).
+   */
+  ack?: string[];
 }
 
 /** „/orders/<id>?tab=nakup|dokumenty|polozky" */

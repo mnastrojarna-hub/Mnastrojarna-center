@@ -861,7 +861,15 @@ async function candidateJobs(
 }
 
 /** Dříve uložené doklady (stejné číslo / hash) — výchozí „Neukládat znovu". */
-async function duplicatesOf(db: JobsDb, session: BatchSession, docs: ReconcileDoc[], targetJobs: Map<string, JobDetail>): Promise<Record<string, DuplicateRef>> {
+/**
+ * Už uložené doklady. Obchodní doklad kdekoli; výkres / model: s `anyJob` (kontrola) i u JINÉ zakázky —
+ * přednost má cílová / kandidátní zakázka; rozhodnutí „neukládat znovu" nabízí kontrola jen u téže
+ * zakázky, jinde je to informace (opakovaná poptávka / objednávka téhož dílu je běžná, majitel 9. 11.).
+ * Při ukládání (bez `anyJob`) jen cílová zakázka.
+ */
+async function duplicatesOf(
+  db: JobsDb, session: BatchSession, docs: ReconcileDoc[], targetJobs: Map<string, JobDetail>, opts: { anyJob?: boolean } = {},
+): Promise<Record<string, DuplicateRef>> {
   const out: Record<string, DuplicateRef> = {};
   for (const d of docs) {
     if (d.source === "mail") continue;
@@ -886,24 +894,30 @@ async function duplicatesOf(db: JobsDb, session: BatchSession, docs: ReconcileDo
       }
       if (!hit && weakHit) { hit = weakHit; weak = true; }
     }
-    if (num && (meta.form === "drawing" || meta.form === "model") && targetJobs.size) {
-      // výkres / model stejného čísla a revize (formátu) jen u cílové zakázky (ne z této dávky)
-      {
-        const { data: dr } = await db.from("job_files").select("id, job_id, created_at, ai_extracted")
-          .eq("kind", kind).eq("ai_extracted->>drawingNumber", num).or(notThisCapture).limit(20);
-        const rev = d.extract?.kind === "drawing" ? d.extract.drawing.revision : d.extract?.kind === "model" ? d.extract.model.revision : "";
-        const fmt = d.extract?.kind === "model" ? d.extract.model.format : null;
-        hit = ((dr ?? []) as { id: string; job_id: string; created_at: string; ai_extracted: Record<string, unknown> | null }[])
-          .find((r) => targetJobs.has(r.job_id) && String(r.ai_extracted?.revision ?? "").toUpperCase() === rev.toUpperCase()
-            && (meta.form !== "model" || (r.ai_extracted?.format ?? null) === fmt)) ?? null;
-      }
+    const fileForm = meta.form === "drawing" || meta.form === "model";
+    /** Výkres / model: shoda u cílové (kandidátní) zakázky má přednost, s anyJob pak nejnovější jinde. */
+    const pickJobRow = <T extends { job_id: string; created_at: string }>(rows: T[]): T | null => {
+      const inTarget = rows.find((r) => targetJobs.has(r.job_id));
+      if (inTarget || !opts.anyJob) return inTarget ?? null;
+      return [...rows].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null;
+    };
+    if (num && fileForm && (targetJobs.size || opts.anyJob)) {
+      // výkres / model stejného čísla a revize (formátu), ne z této dávky
+      const { data: dr } = await db.from("job_files").select("id, job_id, created_at, ai_extracted")
+        .eq("kind", kind).eq("ai_extracted->>drawingNumber", num).or(notThisCapture).limit(50);
+      const rev = d.extract?.kind === "drawing" ? d.extract.drawing.revision : d.extract?.kind === "model" ? d.extract.model.revision : "";
+      const fmt = d.extract?.kind === "model" ? d.extract.model.format : null;
+      hit = pickJobRow(((dr ?? []) as { id: string; job_id: string; created_at: string; ai_extracted: Record<string, unknown> | null }[])
+        .filter((r) => String(r.ai_extracted?.revision ?? "").toUpperCase() === rev.toUpperCase()
+          && (meta.form !== "model" || (r.ai_extracted?.format ?? null) === fmt)));
     }
-    if ((!hit || weak) && f?.sha256 && !f.sha256.startsWith("p:")) {
-      // stejný obsah: obchodní doklad kdekoli, výkres / model jen u cílové zakázky
-      const { data } = await db.from("job_files").select("id, job_id, created_at").eq("content_sha256", f.sha256).or(notThisCapture).limit(20);
+    if ((!hit || weak || fileForm) && f?.sha256 && !f.sha256.startsWith("p:")) {
+      // stejný obsah: obchodní doklad kdekoli; výkres / model: stejný soubor má přednost před shodou čísla
+      // (u cílové zakázky vždy, jinde jen když číslo cílovou zakázku nenašlo)
+      const { data } = await db.from("job_files").select("id, job_id, created_at").eq("content_sha256", f.sha256).or(notThisCapture).limit(50);
       const rows = (data ?? []) as { id: string; job_id: string; created_at: string }[];
-      const same = (meta.form === "business" ? rows[0] : rows.find((r) => targetJobs.has(r.job_id))) ?? null;
-      if (same) { hit = same; weak = false; }
+      const same = meta.form === "business" ? rows[0] ?? null : pickJobRow(rows);
+      if (same && (!hit || weak || targetJobs.has(same.job_id) || !targetJobs.has(hit.job_id))) { hit = same; weak = false; }
     }
     if (!hit && meta.form === "business" && num && d.type === "faktura_my") {
       // číslo faktury zapsané u zakázky, ale bez souboru → jen upozornit (soubor se hodí uložit)
@@ -941,7 +955,7 @@ async function archiveConflictsOf(db: JobsDb, docs: ReconcileDoc[], customerId: 
     const rev = (d.extract?.kind === "drawing" ? d.extract.drawing.revision : "").trim() || "-";
     const { data } = await db.from("drawings").select("id, revision, customer_id").eq("drawing_number", num);
     const hit = ((data ?? []) as { revision: string; customer_id: string | null }[]).find((r) => r.revision.toLowerCase() === rev.toLowerCase());
-    if (hit && hit.customer_id && hit.customer_id !== customerId) out[d.id] = `Číslo ${num} ${rev} je v archivu u jiného zákazníka.`;
+    if (hit && hit.customer_id && hit.customer_id !== customerId) out[d.id] = `Číslo ${num}${rev !== "-" ? ` rev. ${rev}` : ""} je v archivu výkresů u jiného zákazníka.`;
   }
   return out;
 }
@@ -1039,6 +1053,18 @@ async function reviewModel(
     return true;
   }));
   warnings.push(...grouped.warnings, ...ctx.typeConflicts);
+  // dva výkresy / modely se stejným číslem: často jen podobná čísla přečtená stejně, nebo listy téhož výkresu
+  // → „Ponechat oba" (nic se nevyřadí); vyřazení jen jako druhá volba
+  for (const [i, w] of warnings.entries()) {
+    if (w.code !== "duplicate_doc" || w.actions.some((a) => a.kind === "ack")) continue;
+    const forms = w.docIds.map((id) => BATCH_TYPES[ctx.docs.find((d) => d.id === id)?.type ?? "ostatni"].form);
+    if (!forms.length || !forms.every((f) => f === "drawing" || f === "model")) continue;
+    warnings[i] = {
+      ...w,
+      message: `${w.message} Jsou-li to různé výkresy (podobná čísla), oprav číslo na kartě výkresu — uloží se oba.`,
+      actions: [{ kind: "ack", label: "Ponechat oba" }, ...w.actions],
+    };
+  }
   const groups: BatchReviewModel["groups"] = [];
   const docReviews: BatchReviewModel["docs"] = [];
   const states: BatchApplyState["groups"] = [];
@@ -1067,7 +1093,7 @@ async function reviewModel(
       jobs,
       targetOverride: override,
       jobsWithWinner: ((winners ?? []) as { job_id: string }[]).map((w) => w.job_id),
-      duplicates: await duplicatesOf(db, session, gdocs, jobMap),
+      duplicates: await duplicatesOf(db, session, gdocs, jobMap, { anyJob: true }),
       archiveConflicts: await archiveConflictsOf(db, gdocs, customerId),
     });
     groups.push(rec.review);
@@ -1987,10 +2013,14 @@ async function applyDoc(
     const title = `Výkres${number ? ` ${number}` : ""}${st.revision ? ` rev. ${st.revision}` : ""}`;
     const itemId = await resolveItemLink(db, st.link, jobId, done, `${session.captureId}:${g.key}:draw-${draft.id}`, {
       drawingNumber: number, revision: st.revision, name: st.title, material: st.material, quantity: cleanNumber(st.quantity) ?? 1,
-    }, margins);
+    }, margins, { rows: g.job.items, warnings });
     // verze: stejné číslo a novější revize → nová verze; prázdná / starší revize se uloží vedle (upozornění)
     const prevVer = number ? await previousVersion(db, jobId, "vykres", number, st.revision, null) : { id: null, conflict: null };
-    const replaceFileId = (st.onDuplicate === "version" && rdoc ? await duplicateFileInJob(db, session, rdoc, jobId) : null) ?? prevVer.id;
+    // bez volby (výkres byl v kontrole jen u jiné zakázky, cíl se pak změnil na zakázku, kde už je) → nová
+    // verze místo druhé kopie téhož výkresu v zakázce
+    const sameInJob = (st.onDuplicate === "version" || st.onDuplicate === null) && rdoc ? await duplicateFileInJob(db, session, rdoc, jobId) : null;
+    if (sameInJob && st.onDuplicate === null) warnings.push(`${title} už u zakázky byl — uložen jako nová verze.`);
+    const replaceFileId = sameInJob ?? prevVer.id;
     if (!replaceFileId && prevVer.conflict) warnings.push(prevVer.conflict);
     const drawingData = fromDb?.extract.kind === "drawing" ? fromDb.extract.drawing : null;
     // materiál, hmotnost, TZ / PÚ, poznámky: stav z kontroly, jinak návrh AI (stejný výpočet jako v kontrole)
@@ -2042,7 +2072,7 @@ async function applyDoc(
       const itemMat = String(cur.material ?? "").trim();
       let itemCols = specCols;
       if (itemMat && materialDifference(itemMat, st.material)) {
-        warnings.push(`Materiál: objednávka ${itemMat} × výkres ${st.material.trim()} — u položky platí objednávka.`);
+        warnings.push(`Materiál: položka ${itemMat} × výkres ${st.material.trim()} — u položky platí ${itemMat} (podle dokladu).`);
         itemCols = specColumns(specForMaterial(spec, itemMat, {
           dimensions: st.dimensions, title: st.title, quantity: st.quantity,
           overallDims: drawingData?.overallDims, shapeHint: drawingData?.shapeHint, blankDimensions: drawingData?.blankDimensions,
@@ -2119,7 +2149,7 @@ async function applyDoc(
     const title = `3D model${number ? ` ${number}` : ""}${format ? ` (${format})` : ""}`;
     const itemId = await resolveItemLink(db, st.link, jobId, done, `${session.captureId}:${g.key}:model-${draft.id}`, {
       drawingNumber: number, revision: st.revision, name: st.title, material: "", quantity: 1,
-    }, margins);
+    }, margins, { rows: g.job.items, warnings });
     const replaceFileId = number ? (await previousVersion(db, jobId, "model_3d", number, null, format)).id : null;
     const aiExtracted: Record<string, unknown> = { format, drawingNumber: number, revision: st.revision, title: st.title, documentNumber: number, captureDocId: draft.id };
     const att = await attachDocFiles(c, session, draft, jobId, { kind: "model_3d", title, note: st.note || undefined, aiExtracted, orderItemId: itemId, replaceFileId }, warnings);
@@ -2232,7 +2262,12 @@ async function logDrawingEvent(
   });
 }
 
-/** Vazba výkresu / modelu na položku zakázky (existující, nová ze skupiny, nebo založit). */
+/**
+ * Vazba výkresu / modelu na položku zakázky (existující, nová ze skupiny, nebo založit). Vazba, která
+ * do zakázky nepatří (položka jiné zakázky po přepnutí cíle, řádek, který v Položkách už není), uložení
+ * NESHODÍ (majitel 9. 11.: „Vybraná položka nepatří k zakázce" → uložil se jen jeden výkres): výkres se
+ * připojí k položce této zakázky se stejným číslem výkresu, jinak se položka založí — s poznámkou.
+ */
 async function resolveItemLink(
   db: JobsDb,
   link: { mode: "item"; itemId: string } | { mode: "docItem"; itemKey: string } | { mode: "add" } | { mode: "none" },
@@ -2241,14 +2276,38 @@ async function resolveItemLink(
   captureKey: string,
   item: { drawingNumber: string; revision: string; name: string; material: string; quantity: number },
   margins: boolean,
+  ctx: { rows: { key: string; drawingNumber: string }[]; warnings: string[] } = { rows: [], warnings: [] },
 ): Promise<string | null> {
   void margins;
+  /** Položka této zakázky se stejným číslem výkresu (řádek dávky, pak už uložená položka). */
+  const byNumber = async (): Promise<string | null> => {
+    const num = item.drawingNumber.trim();
+    if (!num) return null;
+    const row = ctx.rows.find((r) => r.drawingNumber && docNumbersEqual(r.drawingNumber, num) && done.itemIds[r.key]);
+    if (row) return done.itemIds[row.key];
+    const { data } = await db.from("order_items").select("id, drawing_number").eq("order_id", jobId).limit(500);
+    const hit = ((data ?? []) as { id: string; drawing_number: string | null }[]).find((r) => r.drawing_number && docNumbersEqual(r.drawing_number, num));
+    return hit?.id ?? null;
+  };
+  const label = item.drawingNumber.trim() ? `Výkres ${item.drawingNumber.trim()}` : "Výkres";
   if (link.mode === "item") {
     const { data } = await db.from("order_items").select("id").eq("id", link.itemId).eq("order_id", jobId).maybeSingle();
-    if (!data) throw new Error("Vybraná položka nepatří k zakázce — vyber ji znovu.");
-    return link.itemId;
+    if (data) return link.itemId;
+    const other = await byNumber();
+    if (other) {
+      ctx.warnings.push(`${label}: vybraná položka patřila k jiné zakázce — připojeno k položce se stejným číslem.`);
+      return other;
+    }
+    ctx.warnings.push(`${label}: vybraná položka patřila k jiné zakázce — založena nová položka.`);
+    return resolveItemLink(db, { mode: "add" }, jobId, done, captureKey, item, margins, ctx);
   }
-  if (link.mode === "docItem") return done.itemIds[link.itemKey] ?? null;
+  if (link.mode === "docItem") {
+    const id = done.itemIds[link.itemKey];
+    if (id) return id;
+    const other = await byNumber();
+    if (other) ctx.warnings.push(`${label}: řádek Položek už v zakázce není — připojeno k položce se stejným číslem.`);
+    return other;
+  }
   if (link.mode === "add") {
     const key = captureKey.slice(0, 300);
     const { data: ex } = await db.from("order_items").select("id").eq("capture_key", key).maybeSingle();

@@ -405,6 +405,24 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     expect(names).not.toContain(prep.masterPath);
   }, 60_000);
 
+  /** Soubor dokladu v relaci dočasně pryč (uložení dokladu selže); vrací obnovu. */
+  async function hideDocFile(batch: BatchSortModel, docId: string): Promise<() => Promise<void>> {
+    const { data } = await db.from("capture_sessions").select("data").eq("id", batch.captureId).single();
+    const sd = (data as { data: { files: { id: string; path: string; mimeType?: string }[]; pages: { id: string; fileId: string }[] } }).data;
+    const pageId = batch.sort.docs.find((x) => x.id === docId)!.pageIds[0];
+    const fileId = sd.pages.find((p) => p.id === pageId)!.fileId;
+    const paths = sd.files.filter((f) => f.id === fileId).map((f) => f.path);
+    const saved: { path: string; bytes: Buffer }[] = [];
+    for (const p of paths) {
+      const dl = await db.storage.from("job-files").download(p);
+      if (dl.data) saved.push({ path: p, bytes: Buffer.from(await dl.data.arrayBuffer()) });
+    }
+    await db.storage.from("job-files").remove(paths);
+    return async () => {
+      for (const x of saved) await db.storage.from("job-files").upload(x.path, x.bytes, { upsert: true });
+    };
+  }
+
   it("částečné selhání → ostatní uloženy, zavření přiloží neuložené jako Ostatní", async () => {
     h.user = admin;
     const batch = await analyze([
@@ -418,13 +436,15 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     expect(rv.warnings.some((w) => w.code === "already_saved")).toBe(true);
     saveAgain(state);
     const vid = state.sort.docs.find((d) => d.type === "vykres")!.id;
-    const v = state.docs[vid];
-    if (v.kind === "drawing") v.state.link = { mode: "item", itemId: "99999999-9999-4999-8999-999999999999" };
+    // vazba na cizí položku už uložení neshodí (9. 11.: server výkres připojí podle čísla) — selhání = soubor
+    // výkresu v relaci dočasně chybí (výpadek úložiště)
+    const restore = await hideDocFile(batch, vid);
     const res = await apply(batch.captureId, state);
     expect(res.status, JSON.stringify(res).slice(0, 1500)).toBe("partial");
     expect(res.pending).toEqual([vid]);
-    expect(res.docs.find((d) => d.docId === vid)?.error).toMatch(/položka/i);
+    expect(res.docs.find((d) => d.docId === vid)?.error).toBeTruthy();
     const jobId = res.groups[0].jobId!;
+    await restore();
     // zavření → neuložený výkres k zakázce jako „Ostatní"
     const d = await s.discardCapture({ captureId: batch.captureId });
     expect(d.ok).toBe(true);
@@ -447,9 +467,7 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     const state = structuredClone(rv.initial);
     saveAgain(state);
     const vid = state.sort.docs.find((d) => d.type === "vykres")!.id;
-    const v = state.docs[vid];
-    const goodLink = v.kind === "drawing" ? v.state.link : null;
-    if (v.kind === "drawing") v.state.link = { mode: "item", itemId: "99999999-9999-4999-8999-999999999999" };
+    const restore = await hideDocFile(batch, vid);
     const first = await apply(batch.captureId, state);
     expect(first.status, JSON.stringify(first).slice(0, 800)).toBe("partial");
     const jobId = first.groups[0].jobId!;
@@ -467,11 +485,9 @@ describe.skipIf(!ENABLED)("Dávkové focení ↔ lokální Supabase", () => {
     const { count: jobsWithKey } = await db.from("orders").select("id", { count: "exact", head: true }).eq("capture_key", `${batch.captureId}:g9`);
     expect(jobsWithKey).toBe(0);
 
-    // stejné skupiny, opravená vazba výkresu → doloží se jen výkres
-    const fixed = structuredClone(state);
-    const fv = fixed.docs[vid];
-    if (fv.kind === "drawing" && goodLink) fv.state.link = goodLink.mode === "docItem" ? { mode: "add" } : goodLink;
-    const second = await apply(batch.captureId, fixed);
+    // stejné skupiny, soubor zase k dispozici → doloží se jen výkres
+    await restore();
+    const second = await apply(batch.captureId, structuredClone(state));
     expect(second.status, JSON.stringify(second).slice(0, 800)).toBe("done");
     const jf = (await files(jobId)).filter((f) => f.capture_id === batch.captureId);
     expect(jf.filter((f) => f.kind === "vykres")).toHaveLength(1);

@@ -291,7 +291,7 @@ describe.skipIf(!ENABLED)("Výkres → materiál a úpravy ↔ lokální Supabas
 
     // 1) rev. B, C45 na výkresu, objednávka 42CrMo4 → u položky platí objednávka (skupina, označení), upozornění
     const one = await apply("vykres-g19a", 11);
-    expect(one.res.docs[0].summary).toMatch(/Materiál: objednávka 42CrMo4 × výkres C45 — u položky platí objednávka/);
+    expect(one.res.docs[0].summary).toMatch(/Materiál: položka 42CrMo4 × výkres C45 — u položky platí 42CrMo4/);
     expect(one.row).toMatchObject({
       material: "42CrMo4", material_group: "zuslechtena_ocel", material_designation: "42CrMo4", revision: "B",
       heat_status: "uvedeno", heat_treatment: "kalení 60 HRC", surface_treatment: "černění", weight_kg: 2.6, weight_source: "vykres",

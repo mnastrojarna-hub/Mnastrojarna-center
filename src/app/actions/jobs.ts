@@ -30,7 +30,8 @@ import { supersedeEditedMailChanges } from "@/lib/email/job-link-store";
 import {
   invoicedValueBlock, itemsSaleValue, purchaseCostEditBlock, quotePriceWarning, activePurchaseOrders,
 } from "@/lib/jobs/consistency";
-import { applyJobValueToItems, applyQuotePricesToItems, loadJobMoneyContext, type JobMoneyContext } from "@/lib/jobs/consistency-store";
+import { applyJobValueToItems, loadJobMoneyContext, type JobMoneyContext } from "@/lib/jobs/consistency-store";
+import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -876,6 +877,8 @@ export async function createJobQuote(
       data: { quoteId, number, revision, total: totals.value, action: "created", ...(needsApproval ? { needsApproval: true } : {}) },
       actorId: user.id,
     });
+    // nabídka → zakázka (majitel 9. 11.): položky, ceny, hodnota, nákup a termín dodání podle nabídky
+    await syncJobFromQuote(db, jobId, { actorId: user.id, reason: "created" });
     if (needsApproval) await scheduleQuoteApprovalNotice({ quoteId, jobId, authorId: user.id });
     revalidateQuote(jobId);
     return { ok: true, id: quoteId, number, needsApproval };
@@ -969,6 +972,7 @@ export async function updateJobQuote(
         data: { quoteId, number: quote.number, action: "updated", total: update.total ?? null, approvalReset: resetApproval, contentChanged },
         actorId: user.id,
       });
+      await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "updated" });
     }
     if (pendingNow && (resetApproval || (!isAdmin && now.adminApprovalRequired && quote.approval_returned_at))) {
       await scheduleQuoteApprovalNotice({ quoteId, jobId: quote.job_id, authorId: user.id });
@@ -1037,6 +1041,8 @@ export async function markJobQuoteSent(quoteId: string): Promise<ActionResult> {
         const err = await applyStage(db, quote.job_id, from, "nabidka", user.id);
         if (err) return fail(err);
       }
+      // termín dodání běží od odeslání nabídky
+      await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "sent" });
     }
     revalidateQuote(quote.job_id);
     return { ok: true };
@@ -1064,11 +1070,13 @@ export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
     if (error) return fail(error.message);
 
     const total = cleanNumber(quote.total);
-    // křížová konzistence (4. 11.): ceny přijaté nabídky → prodejní ceny položek zakázky (spárované podle
-    // výkresu / názvu / pozice); hodnota zakázky = Σ položek (DB). Bez položek s cenou = cena nabídky.
-    const priced = await applyQuotePricesToItems(db, quote.job_id, quote.items ?? []);
+    // křížová konzistence (4. 11.) + nabídka → zakázka (9. 11.): přijatá nabídka = aktuální nabídka zakázky →
+    // položky (chybějící přibudou), prodejní ceny spárovaných položek, termín; hodnota zakázky = Σ položek (DB).
+    // Bez položek s cenou = cena nabídky.
+    const priced = await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "accepted", force: true });
+    const pricedCount = priced.pricesUpdated + priced.itemsCreated;
     const jobUpdate: Row = { quote_id: quoteId };
-    if (total !== null && !priced.invoiced) jobUpdate.value = total;
+    if (total !== null && priced.skipped !== "invoiced") jobUpdate.value = total;
     const { error: jobErr } = await db.from("orders").update(jobUpdate as never).eq("id", quote.job_id);
     if (jobErr) return fail(jobErr.message);
 
@@ -1079,8 +1087,8 @@ export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
     const differs = total !== null && valueNow !== null && Math.abs(total - valueNow) >= 0.005;
     await logJobEvent(db, {
       jobId: quote.job_id, type: "quote",
-      message: `${quoteLabel(quote)} přijata zákazníkem${valueText}${priced.changed ? ` (ceny ${priced.changed} ${priced.changed === 1 ? "položky" : "položek"} podle nabídky)` : ""}${differs ? ` — pozor: nabídka je na ${formatFieldValue("value", total)}, položky zakázky se liší` : ""}`,
-      data: { quoteId, number: quote.number, action: "accepted", total, value: valueNow, previousValue: cleanNumber(job.value), itemsPriced: priced.changed },
+      message: `${quoteLabel(quote)} přijata zákazníkem${valueText}${pricedCount ? ` (ceny ${pricedCount} ${pricedCount === 1 ? "položky" : "položek"} podle nabídky)` : ""}${differs ? ` — pozor: nabídka je na ${formatFieldValue("value", total)}, položky zakázky se liší` : ""}`,
+      data: { quoteId, number: quote.number, action: "accepted", total, value: valueNow, previousValue: cleanNumber(job.value), itemsPriced: pricedCount },
       actorId: user.id,
     });
 
@@ -1212,6 +1220,7 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
         actorId: user.id,
       });
     }
+    if (quote.job_id) await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "revision" });
     if (needsApproval) await scheduleQuoteApprovalNotice({ quoteId: createdId, jobId: quote.job_id, authorId: user.id });
     revalidateQuote(quote.job_id);
     return { ok: true, id: createdId, number };
