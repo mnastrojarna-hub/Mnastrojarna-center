@@ -13,6 +13,7 @@ import { ChunkReload } from "@/components/layout/chunk-reload";
 import { UiPrefsProvider } from "@/components/ui-prefs/use-ui-prefs";
 import { getUiPrefs } from "@/lib/data/ui-prefs";
 import { ScrollMemory } from "@/components/nav/scroll-memory";
+import { ActivityHeartbeat } from "@/components/activity-heartbeat";
 
 // Každý požadavek ověřuje přihlášení a oprávnění — nikdy statické předrenderování
 // (bez env při buildu by se jinak stránky aplikace „zapekly" jako statické).
@@ -43,6 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <ChunkReload />
             {/* paměť posunu: Zpět / Vpřed a obnovení vrátí <main> i vnitřní panely tam, kde uživatel skončil */}
             <ScrollMemory />
+            {/* poslední aktivita (kdy kdo naposledy kliknul) — vidí super admin ve Správě uživatelů */}
+            <ActivityHeartbeat />
             <Sidebar counts={counts} features={features} userName={user.fullName} roleLabel={user.roleLabel} />
             <div className="flex flex-1 flex-col overflow-hidden">
               <Topbar user={user} features={features} />

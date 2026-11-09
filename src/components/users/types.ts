@@ -13,7 +13,11 @@ export interface ManagedUser {
   position: string | null;
   /** Provize v procentech (8.5 = 8,5 %). */
   commissionPercent: number;
+  /** Poslední přihlášení (pro majitele nepodstatné — zůstává jen v title). */
   lastSeenAt: string | null;
+  /** 9. 11.: poslední skutečná akce v aplikaci (kliknutí / klávesa, ~1 min) a stránka, kde k ní došlo. */
+  lastActiveAt?: string | null;
+  lastActivePath?: string | null;
   createdAt: string;
   /** Smlouvy o provizi (historie, nejnovější první); prázdné = sazba z profilu. */
   commissionRules?: CommissionRuleView[];

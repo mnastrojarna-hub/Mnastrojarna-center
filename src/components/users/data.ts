@@ -40,7 +40,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       }
       return res;
     };
-    const [profilesRes, mailboxesRes, rules, stageChangers, salesContacts, queueMargins] = await Promise.all([
+    const [profilesRes, mailboxesRes, rules, stageChangers, salesContacts, queueMargins, activity] = await Promise.all([
       loadProfiles(),
       db
         .from("mailboxes")
@@ -62,6 +62,11 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
         .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; can_resolve_queue: boolean | null; can_see_margins: boolean | null }[])
           .map((r) => [r.id, { queue: r.can_resolve_queue === true, margins: r.can_see_margins === true }] as const)))
         .catch(() => new Map<string, { queue: boolean; margins: boolean }>()),
+      // 9. 11. poslední aktivita (kliknutí v aplikaci) zvlášť — DB bez migrace 20261109140000 → bez ní
+      Promise.resolve(db.from("profiles").select("id, last_active_at, last_active_path"))
+        .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; last_active_at: string | null; last_active_path: string | null }[])
+          .map((r) => [r.id, { at: r.last_active_at ?? null, path: r.last_active_path ?? null }] as const)))
+        .catch(() => new Map<string, { at: string | null; path: string | null }>()),
     ]);
     if (profilesRes.error) return { users: [], mailboxes: [], ready: true, error: profilesRes.error.message };
 
@@ -78,6 +83,8 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       position: p.position ?? null,
       commissionPercent: commissionToPercent(p.commission_rate),
       lastSeenAt: p.last_seen_at ?? null,
+      lastActiveAt: activity.get(p.id)?.at ?? null,
+      lastActivePath: activity.get(p.id)?.path ?? null,
       createdAt: p.created_at,
       commissionRules: rules.filter((r) => r.ownerId === p.id),
       quoteNeedsApproval: p.quote_needs_approval !== false,
