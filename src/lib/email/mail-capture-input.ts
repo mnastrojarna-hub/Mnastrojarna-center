@@ -113,6 +113,8 @@ export interface MailCaptureContext {
   ownText?: string;
   /** Telefon z podpisu odesílatele ("" = není). */
   phone: string;
+  /** Kdy e-mail přišel (ISO) — datum poptávky / objednávky, když ho doklad sám neuvádí (majitel 9. 11.). */
+  receivedAt?: string | null;
   /**
    * Text e-mailu vytěžený jako obchodní doklad dávky (pravidla hned při přípravě, AI při roztřídění —
    * mailTextExtractRules / readMailText). Chybí u starších relací.
@@ -434,8 +436,16 @@ function docNumberIn(re: RegExp, ...texts: string[]): string {
  * předmětu, zákazník z podpisu (jinak firma podle domény), kontaktní osoba z podpisu (nikdy surová
  * adresa), položky = výkresy s počtem kusů v textu, termín, čísla objednávky / poptávky / naší nabídky.
  */
+/** Den (RRRR-MM-DD) v pražském čase z ISO času; null = neplatné / chybí. */
+export function pragueDateOf(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
 export function mailTextExtractRules(
-  ctx: Pick<MailCaptureContext, "subject" | "fromName" | "fromEmail" | "category" | "body"> & { rawBody?: string | null },
+  ctx: Pick<MailCaptureContext, "subject" | "fromName" | "fromEmail" | "category" | "body"> & { rawBody?: string | null; receivedAt?: string | null },
   filenames: readonly string[] = [],
   now: Date = new Date(),
 ): MailTextExtract {
@@ -470,6 +480,9 @@ export function mailTextExtractRules(
     customerInquiryNumber: inquiryNo,
     ourQuoteNumber: docNumberIn(QUOTE_NO_RE, ctx.subject ?? "", body),
     requiredDeliveryDate: deadlineFromMailText(body, now),
+    // datum dokladu = den, kdy e-mail přišel (pražský čas) — z něj datum poptávky / objednávky (majitel 9. 11.:
+    // „termín poptávky má být jasně vyplněný z datumu přijatého mailu"); datum uvedené v textu / dokladu má přednost
+    documentDate: pragueDateOf(ctx.receivedAt) ?? "",
     items,
     // název zakázky bez výkresu a položek = předmět e-mailu (planNewJob bere první větu shrnutí)
     summary: subject,
@@ -488,6 +501,8 @@ const PARTY_KEYS: (keyof ExtractedParty)[] = ["name", "ico", "dic", "street", "c
 export function mergeMailExtract(ai: { doc: ExtractedBusinessDoc; position?: string }, rules: MailTextExtract): MailTextExtract {
   const doc: ExtractedBusinessDoc = { ...ai.doc, customer: { ...ai.doc.customer }, supplier: { ...ai.doc.supplier }, items: [...ai.doc.items] };
   if (doc.docKind === "ostatni" || doc.docKind === "vykres") doc.docKind = rules.doc.docKind;
+  // AI datum v textu nenašla → den přijetí e-mailu
+  if (!String(doc.documentDate ?? "").trim() && rules.doc.documentDate) doc.documentDate = rules.doc.documentDate;
   if (doc.issuer === "neznamy") doc.issuer = "zakaznik";
   for (const k of PARTY_KEYS) if (!String(doc.customer[k] ?? "").trim() && rules.doc.customer[k]) doc.customer[k] = rules.doc.customer[k];
   // kontaktní osoba nikdy adresa; jméno z podpisu má přednost před odhadem AI, který není jméno

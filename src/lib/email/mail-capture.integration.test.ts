@@ -311,6 +311,11 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     const g = rv.initial.groups[0];
     expect(g.job.customer).toEqual({ mode: "existing", id: customerId, name: `Mail Capture ${RUN}`, reason: "odesílatel e-mailu" });
     expect(g.job.fields).toMatchObject({ customerContact: "Jan Malý", customerContactEmail: sender });
+    // 9. 11.: datum poptávky = den přijetí e-mailu (pražský čas), požadovaný termín v textu není → prázdný
+    const { data: em } = await svc.from("emails").select("received_at").eq("id", emailId).single();
+    const received = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(new Date((em as { received_at: string }).received_at));
+    expect(g.job.fields.inquiryDate).toBe(received);
     // text e-mailu je primární doklad: položky z textu dostaly název z výkresů → název z položek
     expect(g.jobDraftTitle).toBe("Čep 8820-01 + 1 další");
     expect(g.job.items.map((i) => [i.key, i.drawingNumber, i.quantity])).toEqual([["ai-0", "8820-01", "10"], ["ai-1", "8820-02", "4"]]);
@@ -330,6 +335,8 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → dávka focení ↔ lokální Supabas
     expect((await filesOf(jobId)).map((f) => f.kind)).toEqual(["vykres", "vykres"]);
     const { data: job } = await svc.from("orders").select("status, title, customer_id, customer_contact_id").eq("id", jobId).single();
     expect(job).toMatchObject({ status: "poptavka", title: "Čep 8820-01 + 1 další", customer_id: customerId });
+    const { data: dates } = await svc.from("orders").select("inquiry_date").eq("id", jobId).single();
+    expect((dates as { inquiry_date: string | null }).inquiry_date).toBe(received);
     expect((job as { customer_contact_id: string | null }).customer_contact_id).toBeTruthy();
   }, 180_000);
 
