@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  * starý a nový podpis, když super admin přepne na schránku jiného vlastníka (dialog podpis v textu vymění).
  */
 export function SenderPicker({
-  value, onChange, onSignatureChange, sourceEmailId, className, disabled, compact, adminOnly,
+  value, onChange, onSignatureChange, sourceEmailId, className, disabled, compact, adminOnly, fromTestId,
 }: {
   value: string | null;
   onChange: (mailboxId: string | null) => void;
@@ -27,6 +27,8 @@ export function SenderPicker({
   compact?: boolean;
   /** Ostatním nic neukazovat (dialog adresu odesílatele ukazuje sám). */
   adminOnly?: boolean;
+  /** Pod výběrem i řádek „Odešle se z <adresa>" se zvolenou adresou (data-testid — nové okno e-mailu). */
+  fromTestId?: string;
 }) {
   const [choice, setChoice] = useState<SenderChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +104,14 @@ export function SenderPicker({
         {choice.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
       </select>
       {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+      {fromTestId && (() => {
+        const email = choice.options.find((o) => o.id === current)?.email ?? choice.defaultEmail;
+        return (
+          <span className="basis-full" data-testid={fromTestId}>
+            {email ? <>Odešle se z <b className="text-foreground">{email}</b></> : choice.error ?? "Odešle se přes firemní odesílání."}
+          </span>
+        );
+      })()}
     </label>
   );
 }

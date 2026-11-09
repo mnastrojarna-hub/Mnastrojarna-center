@@ -288,6 +288,7 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
             <SenderPicker
               value={fromMailboxId}
               onChange={setFromMailboxId}
+              fromTestId="compose-from"
               sourceEmailId={request?.source?.id ?? null}
               onSignatureChange={(prev, next) => {
                 setBody((b) => swapSignature(b, prev, next));
