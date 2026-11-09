@@ -41,6 +41,17 @@ export interface CurrentUser {
    */
   canChangeStage?: boolean;
   /**
+   * 9. 11.: „Smí řešit frontu ke schválení" (profiles.can_resolve_queue) → funkce „approval_queue": stránka Fronta ke
+   * schválení — odchozí e-maily, objednávky dodavatelům, stav zakázky z pošty (AI návrh nabídky dál super admin).
+   * Super admin smí vždy.
+   */
+  canResolveQueue?: boolean;
+  /**
+   * 9. 11.: „Vidí nákupní ceny a marže" (profiles.can_see_margins) → funkce „margins" i pro zaměstnance (Šponer).
+   * Obchodník a super admin vždy. Provize ostatních tím nevidí.
+   */
+  canSeeMargins?: boolean;
+  /**
    * 2. 11.: „Plný přístup" (profiles.full_access; Volný, Šponer) — v aplikaci se chová jako super admin
    * (`role` = "super_admin", skutečná role v `realRole`), KROMĚ správy uživatelů a pošty ostatních schránek
    * (vidí jen svou poštu, nespravuje schránky). Výjimky hlídá permissions.ts (FULL_ACCESS_DENIED).
@@ -95,13 +106,21 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     let canApproveQuotes = false;
     let canRfq = false;
     let canChangeStage = false;
+    let canResolveQueue = false;
+    let canSeeMargins = false;
     let fullAccess = false;
 
     // Profil: servisním klíčem, jinak vlastní session (RLS povoluje číst sám sebe).
     const db = hasServiceKey() ? createAdminClient() : supabase;
     const base = "full_name, role, ai_access, active, password_change_required";
     let res = await db.from("profiles")
-      .select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq, full_access, can_change_stage`).eq("id", user.id).maybeSingle();
+      .select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq, full_access, can_change_stage, can_resolve_queue, can_see_margins`)
+      .eq("id", user.id).maybeSingle();
+    // DB bez migrace 20261109130000 (can_resolve_queue, can_see_margins) — bez obou příznaků, zbytek beze změny
+    if (res.error && /can_resolve_queue|can_see_margins/.test(res.error.message ?? "")) {
+      res = await db.from("profiles")
+        .select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq, full_access, can_change_stage`).eq("id", user.id).maybeSingle() as typeof res;
+    }
     // DB bez migrace 20261109100000 (can_change_stage) — bez příznaku změny stavu, zbytek beze změny
     if (res.error && /can_change_stage/.test(res.error.message ?? "")) {
       res = await db.from("profiles").select(`${base}, quote_needs_approval, can_approve_quotes, can_rfq, full_access`).eq("id", user.id).maybeSingle() as typeof res;
@@ -122,6 +141,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       full_name?: string; role?: UserRole; ai_access?: boolean; active?: boolean; password_change_required?: boolean;
       quote_needs_approval?: boolean | null; can_approve_quotes?: boolean | null; can_rfq?: boolean | null;
       full_access?: boolean | null; can_change_stage?: boolean | null;
+      can_resolve_queue?: boolean | null; can_see_margins?: boolean | null;
     } | null;
     if (profile) {
       hasProfile = true;
@@ -135,6 +155,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       canApproveQuotes = role === "super_admin" || profile.can_approve_quotes === true;
       canRfq = role === "super_admin" || role === "obchodnik" || profile.can_rfq === true;
       canChangeStage = role === "super_admin" || role === "obchodnik" || profile.can_change_stage === true;
+      canResolveQueue = role === "super_admin" || profile.can_resolve_queue === true;
+      canSeeMargins = role === "super_admin" || role === "obchodnik" || profile.can_see_margins === true;
     }
 
     const email = user.email ?? "";
@@ -146,6 +168,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       canApproveQuotes = true;
       canRfq = true;
       canChangeStage = true;
+      canResolveQueue = true;
+      canSeeMargins = true;
       aiAccess = true;
     }
     return {
@@ -163,6 +187,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       canApproveQuotes,
       canRfq,
       canChangeStage,
+      canResolveQueue,
+      canSeeMargins,
       fullAccess,
       realRole,
     };

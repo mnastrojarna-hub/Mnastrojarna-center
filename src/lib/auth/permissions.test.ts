@@ -111,6 +111,42 @@ describe("oprávnění dle rolí", () => {
     expect(allowedFeatures(staff, ctx())).not.toContain("stage_any");
   });
 
+  it("9. 11.: fronta ke schválení (approval_queue) — super admin vždy, ostatní jen se „Smí řešit frontu ke schválení“", () => {
+    expect(can(admin, "approval_queue", ctx())).toBe(true);
+    expect(can({ ...admin, fullAccess: true }, "approval_queue", ctx())).toBe(true);
+    expect(can(sales, "approval_queue", ctx())).toBe(false);
+    expect(can(staff, "approval_queue", ctx())).toBe(false);
+    expect(can({ ...sales, canResolveQueue: true }, "approval_queue", ctx())).toBe(true);
+    const q: AccessSubject = { ...staff, canResolveQueue: true };
+    expect(can(q, "approval_queue", ctx())).toBe(true);
+    expect(can({ ...q, active: false }, "approval_queue", ctx())).toBe(false);
+    // jen fronta — ne AI přehled, schvalování nabídek, marže, provize, nastavení…
+    for (const f of ["dashboard", "quote_approval", "margins", "commissions", "commissions_all", "settings", "users", "delete", "pricing", "flow_all", "mail_all"] as const) {
+      expect(can(q, f, ctx())).toBe(false);
+    }
+    expect(allowedFeatures(q, ctx())).toContain("approval_queue");
+    expect(allowedFeatures(staff, ctx())).not.toContain("approval_queue");
+  });
+
+  it("9. 11.: nákupní ceny a marže (margins) — zaměstnanec jen s „Vidí nákupní ceny a marže“, bez provizí ostatních", () => {
+    expect(can(staff, "margins", ctx())).toBe(false);
+    const m: AccessSubject = { ...staff, canSeeMargins: true };
+    expect(can(m, "margins", ctx())).toBe(true);
+    expect(can({ ...m, active: false }, "margins", ctx())).toBe(false);
+    expect(can(sales, "margins", ctx())).toBe(true);
+    expect(can(admin, "margins", ctx())).toBe(true);
+    // příznak dává jen marže — ne provize (vlastní ani ostatních), nacenění, nastavení, uživatele, mazání, poštu ostatních ani tok všech
+    for (const f of ["commissions", "commissions_all", "pricing", "settings", "users", "delete", "mail_all", "flow_all", "dashboard", "approval_queue", "quote_approval"] as const) {
+      expect(can(m, f, ctx())).toBe(false);
+    }
+    // Šponer: všechny čtyři příznaky — fronta, marže, poptávky, stav; zakázané funkce dál ne
+    const sponer: AccessSubject = { ...staff, canResolveQueue: true, canSeeMargins: true, canRfq: true, canChangeStage: true };
+    expect(allowedFeatures(sponer, ctx())).toEqual(expect.arrayContaining(["approval_queue", "margins", "rfq", "stage_any"]));
+    for (const f of ["commissions_all", "settings", "users", "delete", "mail_all", "pricing", "flow_all", "dashboard"] as const) {
+      expect(can(sponer, f, ctx())).toBe(false);
+    }
+  });
+
   it("#25: AI focení pro všechny je výchozí — s klíčem ho má obchodník i zaměstnanec", () => {
     expect(DEFAULT_ACCESS_CONTEXT.aiCaptureForAll).toBe(true);
     const withKey = { ...DEFAULT_ACCESS_CONTEXT, aiConfigured: true };

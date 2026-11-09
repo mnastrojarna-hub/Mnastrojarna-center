@@ -30,7 +30,7 @@ const ROLE_ICONS: Record<UserRole, React.ComponentType<{ className?: string }>> 
 /** Funkce, které má smysl ukazovat uživateli (technické podfunkce vynecháme). */
 const SHOWN_FEATURES: Feature[] = [
   "orders", "workflow", "flow_all", "documents", "customers", "suppliers", "mail", "mail_all", "ai_capture",
-  "pricing", "quote_approval", "margins", "commissions", "commissions_all", "dashboard", "ai_assistant", "drawings",
+  "pricing", "quote_approval", "margins", "commissions", "commissions_all", "dashboard", "approval_queue", "ai_assistant", "drawings",
   "knowledge", "ai_tuning", "users", "settings",
 ];
 

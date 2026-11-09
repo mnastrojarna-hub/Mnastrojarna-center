@@ -16,6 +16,7 @@ import {
 } from "@/lib/email/mail-stage-store";
 import { isLostReason } from "@/lib/jobs/flow-status";
 import { isClaimReason } from "@/lib/jobs/flow-exceptions";
+import { maySeeQueue } from "@/lib/auth/approval-queue-access";
 import type { JobStage } from "@/lib/supabase/database.types";
 
 /**
@@ -93,7 +94,8 @@ export async function getApprovalStageSignalAction(approvalId: string): Promise<
   const c = await begin();
   if ("error" in c || !isUuidLike(approvalId)) return null;
   const { can } = await getAccess();
-  if (!can("dashboard")) return null;
+  // fronta ke schválení: super admin, 9. 11. i „Smí řešit frontu ke schválení"
+  if (!maySeeQueue(can)) return null;
   const r = await stageRowForApproval(c.a.db, approvalId);
   return r ? (await stageViews(c.a.db, [r], { quote: true }))[0] ?? null : null;
 }

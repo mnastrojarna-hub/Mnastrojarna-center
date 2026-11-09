@@ -40,7 +40,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       }
       return res;
     };
-    const [profilesRes, mailboxesRes, rules, stageChangers, salesContacts] = await Promise.all([
+    const [profilesRes, mailboxesRes, rules, stageChangers, salesContacts, queueMargins] = await Promise.all([
       loadProfiles(),
       db
         .from("mailboxes")
@@ -57,6 +57,11 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
         .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; sales_contact_id: string | null }[])
           .map((r) => [r.id, r.sales_contact_id ?? null] as const)))
         .catch(() => new Map<string, string | null>()),
+      // 9. 11. „Smí řešit frontu ke schválení" a „Vidí nákupní ceny a marže" zvlášť — DB bez migrace 20261109130000 → bez nich
+      Promise.resolve(db.from("profiles").select("id, can_resolve_queue, can_see_margins"))
+        .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; can_resolve_queue: boolean | null; can_see_margins: boolean | null }[])
+          .map((r) => [r.id, { queue: r.can_resolve_queue === true, margins: r.can_see_margins === true }] as const)))
+        .catch(() => new Map<string, { queue: boolean; margins: boolean }>()),
     ]);
     if (profilesRes.error) return { users: [], mailboxes: [], ready: true, error: profilesRes.error.message };
 
@@ -84,6 +89,8 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       canRfq: p.role !== "zamestnanec" || (p as Profile & { can_rfq?: boolean | null }).can_rfq === true,
       fullAccess: p.role !== "super_admin" && (p as Profile & { full_access?: boolean | null }).full_access === true,
       canChangeStage: p.role !== "zamestnanec" || stageChangers.has(p.id),
+      canResolveQueue: p.role === "super_admin" || queueMargins.get(p.id)?.queue === true,
+      canSeeMargins: p.role !== "zamestnanec" || queueMargins.get(p.id)?.margins === true,
       salesContactId: salesContacts.get(p.id) ?? null,
     }));
 

@@ -30,7 +30,7 @@ interface Ctx {
   db: JobsDb;
   user: CurrentUser;
   actor: HandoffActor;
-  can: (f: "dashboard" | "margins" | "mail_all") => boolean;
+  can: (f: "dashboard" | "margins" | "mail_all" | "approval_queue") => boolean;
 }
 
 async function begin(): Promise<Ctx | { error: string }> {
@@ -186,8 +186,9 @@ export async function sendStepPurchaseOrder(
     const { data } = await c.db.from("purchase_orders").select("id, job_id, created_by, job:orders!job_id(owner_id)").eq("id", purchaseOrderId).maybeSingle();
     const po = data as { id: string; job_id: string; created_by: string | null; job?: { owner_id: string | null } | { owner_id: string | null }[] | null } | null;
     if (!po) return fail("Objednávka nenalezena.");
-    // cizí objednávku (zakázka jiného obchodníka) posílá jen super admin — stejně jako ve frontě (mayResolve)
-    if (!c.can("dashboard")) {
+    // cizí objednávku (zakázka jiného obchodníka) posílá jen super admin — stejně jako ve frontě (mayResolve);
+    // 9. 11. i kolega se „Smí řešit frontu ke schválení" (objednávku ve frontě vyřídí taky)
+    if (!c.can("dashboard") && !c.can("approval_queue")) {
       const owner = (Array.isArray(po.job) ? po.job[0] : po.job)?.owner_id ?? null;
       const { data: q } = await c.db.from("approval_queue").select("owner_id").eq("purchase_order_id", po.id).eq("status", "pending");
       const rowOwners = ((q ?? []) as { owner_id: string | null }[]).map((r) => r.owner_id);
