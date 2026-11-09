@@ -16,6 +16,7 @@ import { setOrderStatus } from "@/app/actions/flow-status";
 import type { OrderMismatch, OrderDocStatus } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 import { AttachmentChip, MailFields, mailDraftError, type MailDraft } from "./document-send-dialog";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { czDay } from "./flow-utils";
 import type { OrderRevisionView } from "./flow-state";
 
@@ -70,6 +71,8 @@ export function ConfirmOrderDialog({
   const [warning, setWarning] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<{ id: string; filename: string; number: string } | null>(null);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
 
   const [wasOpen, setWasOpen] = React.useState(false);
   if (open !== wasOpen) {
@@ -83,6 +86,7 @@ export function ConfirmOrderDialog({
       setWarning(null);
       setFile(null);
       setMail({ to: "", cc: "", subject: "", body: "" });
+      setFromMailboxId(null);
     }
   }
 
@@ -165,6 +169,7 @@ export function ConfirmOrderDialog({
     try {
       const res = await sendJobDocument(job.id, file.id, {
         to: mail.to.trim(), cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body,
+        ...(fromMailboxId ? { fromMailboxId } : {}),
       });
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
@@ -208,6 +213,13 @@ export function ConfirmOrderDialog({
           <form onSubmit={send} className="space-y-4 p-4 sm:p-5" noValidate>
             <ErrorBox error={error} />
             {file && <AttachmentChip fileId={file.id} filename={file.filename} />}
+            <SenderPicker
+              value={fromMailboxId}
+              onChange={setFromMailboxId}
+              onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+              disabled={step === "sending"}
+              className="px-1"
+            />
             <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId: job.id }} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" className="min-h-11 sm:min-h-9" disabled={step === "sending"} onClick={() => void confirmOther(file)}>

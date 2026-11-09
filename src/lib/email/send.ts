@@ -32,7 +32,9 @@ import type { EmailCategory as DbEmailCategory } from "@/lib/supabase/database.t
  *    firemní (bez vlastníka) → firemní schránka → globální SMTP (Nastavení → API klíče a integrace).
  *    NIKDY z osobní schránky jiného uživatele. Má-li uživatel vlastní schránku, ale bez odesílání /
  *    vypnutou → NEodeslat a říct proč (žádné tiché odeslání z cizí adresy).
- *  - `mailboxId` — výslovně zadaná schránka (objednávka dodavateli ze schránky obchodníka zakázky),
+ *  - `mailboxId` — výslovně zadaná schránka: JEN přes sender-rules.ts (volba super admina „Odeslat z")
+ *    nebo test schránky. Pravidlo majitele (9. 11.): každý posílá ze SVÉ schránky, vybírat smí jen
+ *    super admin — viz resolveSender v sender-rules.ts, kterým jde každé odeslání uživatele.
  *  - `system: true` — systémový e-mail (obnova hesla, pozvánka): firemní schránka → globální SMTP.
  *
  * Každý odeslaný e-mail: zápis do `emails` (direction out, vlákno přes In-Reply-To / References —
@@ -85,10 +87,11 @@ export type SmtpPreference =
   | { ownerId: string; replyMailboxId?: string | null; mailboxId?: never; system?: never }
   | { system: true; mailboxId?: never; ownerId?: never; replyMailboxId?: never };
 
-type BoxRow = {
+export type SendBoxRow = {
   id: string; email: string; config: MailboxConfig; owner_id: string | null; active: boolean | null;
   provider?: MailboxProvider | null; display_name?: string | null;
 };
+type BoxRow = SendBoxRow;
 
 export type SmtpPick = { ok: true; box: BoxRow | null } | { ok: false; reason: string };
 
@@ -142,6 +145,11 @@ export function pickSmtpMailbox(rows: BoxRow[], pref: SmtpPreference): SmtpPick 
 }
 
 type SmtpLookup = { ok: true; cfg: SmtpConfig } | { ok: false; reason: string };
+
+/** Všechny schránky od nejstarší (servisní klient) — pro výběr odesílatele (sender-rules.ts). */
+export async function loadSendBoxes(): Promise<SendBoxRow[]> {
+  return loadBoxes();
+}
 
 async function loadBoxes(): Promise<BoxRow[]> {
   const db = createAdminClient();
@@ -582,7 +590,9 @@ export async function sendMail(input: SendMailInput): Promise<SendResult> {
       body_html: html ? signatureHtmlForApp(html) : null,
       // náhled v seznamu bez podpisu (oddělovač „-- ")
       snippet: (text.split(/\r?\n-- \r?\n/)[0] || text).replace(/\s+/g, " ").trim().slice(0, 200),
-      owner_id: input.senderId ?? s.ownerId ?? null,
+      // Odeslané patří vlastníkovi schránky, ze které zpráva opravdu odešla (super admin poslal ze schránky
+      // kolegy → v jeho Odeslaných); firemní schránka / globální SMTP → odesílatel
+      owner_id: s.box?.owner_id ?? input.senderId ?? s.ownerId ?? null,
       order_id: input.jobId ?? null,
       customer_id: input.customerId ?? null,
       supplier_id: input.supplierId ?? null,

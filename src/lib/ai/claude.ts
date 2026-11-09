@@ -37,7 +37,14 @@ export interface EmailAnalysis {
   is_spam: boolean;
   summary: string;
   confidence: number; // 0–1
+  /**
+   * 9. 11.: signál pro speciální stav zakázky (reklamace, nerealizováno, zrušeno, pozastaveno, pokračovat,
+   * reklamace vyřízena) — server ho po přiřazení k zakázce spojí s pravidly a stavem zakázky (mail-stage-signal.ts).
+   */
+  job_signal?: { kind: string; reason: string; confidence: number };
 }
+
+const JOB_SIGNAL_ENUM = ["none", "reklamace", "nerealizovano", "zruseno", "pozastaveno", "pokracovat", "reklamace_vyrizena"];
 
 const CATEGORY_ENUM: EmailCategory[] = [
   "poptavka", "objednavka", "nabidka_dodavatele", "potvrzeni_objednavky",
@@ -74,8 +81,18 @@ export async function categorizeEmail(input: {
       is_spam: { type: "boolean" },
       summary: { type: "string" },
       confidence: { type: "number" },
+      job_signal: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          kind: { type: "string", enum: JOB_SIGNAL_ENUM },
+          reason: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["kind", "reason", "confidence"],
+      },
     },
-    required: ["category", "priority", "importance", "is_spam", "summary", "confidence"],
+    required: ["category", "priority", "importance", "is_spam", "summary", "confidence", "job_signal"],
   };
 
   const message = await new Anthropic({ apiKey }).messages.create({
@@ -93,6 +110,14 @@ export async function categorizeEmail(input: {
       "k_zakazce = komunikace k již běžící zakázce nebo poptávce (doplnění, upřesnění, změna počtu, " +
       "materiálu, úpravy, termínu, dotaz k rozpracované věci, odpověď na naši nabídku či objednávku) — " +
       "NE nová poptávka ani nová objednávka (ty zůstávají poptavka / objednavka)." +
+      "\n\njob_signal = co e-mail ZÁKAZNÍKA znamená pro jeho zakázku (jen vlastní text, ne citovaná historie): " +
+      "reklamace (vada, rozměry mimo toleranci, chybějící kusy, poškození, reklamuje dodané díly), " +
+      "nerealizovano (nabídku nepřijme — vybral jiného dodavatele, cena je vysoká, termín nevyhovuje, projekt zrušen, poptávku stahuje), " +
+      "zruseno (ruší / stornuje už odeslanou objednávku), pozastaveno (pozastavit výrobu, počkat, odložit), " +
+      "pokracovat (pozastavenou zakázku zase uvolňuje — můžete pokračovat), reklamace_vyrizena (potvrzuje vyřízení reklamace), " +
+      "jinak none. reason = krátce česky proč (věta pro zakázku, bez cen), confidence 0–1. " +
+      "Dodavatel (zpoždění, jeho storno, jeho reklamace k nám) NENÍ signál zakázky zákazníka → none. " +
+      "Popření („nejde o reklamaci“) a pouhý dotaz → none." +
       (input.rules ? `\n\n${input.rules}` : ""),
     messages: [
       {

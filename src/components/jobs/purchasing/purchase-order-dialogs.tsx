@@ -17,6 +17,7 @@ import { parseEmailList } from "@/lib/jobs/purchasing";
 import type { Notify } from "@/components/jobs/detail/toast";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { isoToday } from "@/components/jobs/detail/detail-helpers";
 import { PurchaseOrderForm } from "./purchase-order-form";
 import { FULLSCREEN_DIALOG, Field } from "./ui-bits";
@@ -116,6 +117,8 @@ export function SendPurchaseOrderDialog({
   const [missing, setMissing] = React.useState<string[]>([]);
   const [deviations, setDeviations] = React.useState<{ ref: string; lines: string[] }[]>([]);
   const [mode, setMode] = React.useState<"issue" | "change">("issue");
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   const orderId = order?.id ?? null;
 
@@ -132,6 +135,7 @@ export function SendPurchaseOrderDialog({
     setPicked(new Set());
     setMissing([]);
     setDeviations([]);
+    setFromMailboxId(null);
     setMail({ to: "", cc: "", subject: "", body: "" });
     void (async () => {
       try {
@@ -168,7 +172,10 @@ export function SendPurchaseOrderDialog({
     try {
       const res = await sendPurchaseOrder(
         order.id, { to: mail.to, cc: mail.cc || undefined, subject: mail.subject, body: mail.body },
-        { attachmentIds: files.filter((f) => picked.has(f.fileId)).map((f) => f.fileId), ...(drawingChange ? { drawingChange: true } : {}) },
+        {
+          attachmentIds: files.filter((f) => picked.has(f.fileId)).map((f) => f.fileId), ...(drawingChange ? { drawingChange: true } : {}),
+          ...(fromMailboxId ? { fromMailboxId } : {}),
+        },
       );
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
@@ -233,6 +240,13 @@ export function SendPurchaseOrderDialog({
                   </ul>
                 </div>
               )}
+              <SenderPicker
+                value={fromMailboxId}
+                onChange={setFromMailboxId}
+                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                disabled={step === "sending"}
+                className="px-1"
+              />
               <MailFields mail={mail} onChange={setMail} context={supplierId ? { supplierId } : null} idPrefix="po-mail" />
             </>
           )}

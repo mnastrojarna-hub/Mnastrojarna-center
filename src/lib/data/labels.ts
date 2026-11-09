@@ -67,6 +67,7 @@ export const approvalTypeLabel: Record<ApprovalType, string> = {
   supplier_request: "Poptávka dodavateli",
   purchase_order: "Objednávka dodavateli",
   supplier_invoice: "Faktura dodavatele",
+  job_stage: "Stav zakázky z pošty",
   categorization: "Kategorizace",
   order_match: "Párování objednávky",
   reminder: "Upomínka",

@@ -230,6 +230,11 @@ export interface UpdateUserChanges {
   canApproveQuotes?: boolean;
   /** „Smí poptávat dodavatele" (31. 10.; jen zaměstnanec — obchodník a super admin smí vždy). Vidí ceny dodavatelů v poptávkovém kole. */
   canRfq?: boolean;
+  /**
+   * „Smí ručně měnit stav zakázky" (9. 11.; jen zaměstnanec — obchodník a super admin smí vždy): Korekce stavu na
+   * kterýkoli stav dopředu i dozadu, včetně koncových. Marže a ceny tím nevidí.
+   */
+  canChangeStage?: boolean;
   /** „Plný přístup" (2. 11.; ne u super admina) — vše kromě pošty ostatních schránek a správy uživatelů. */
   fullAccess?: boolean;
   /**
@@ -261,6 +266,23 @@ async function salesContactChange(
   if (!row) return { error: "Kontakt pro obchod a ceny nenalezen." };
   if (row.active === false) return { error: "Kontaktem pro obchod a ceny může být jen aktivní uživatel." };
   return { value: normalized };
+}
+
+/**
+ * Ověří a připraví změnu „Smí ručně měnit stav zakázky" (undefined = beze změny, string = chyba pro uživatele).
+ * Ukládá se jen u zaměstnance (obchodník a super admin smí vždy). Čte se zvlášť — DB bez migrace 20261109100000
+ * ho nemá: vypnutí pak nic nemění, zapnutí vysvětlí, co chybí.
+ */
+async function stageChangeFlagChange(
+  db: AdminDb, id: string, value: unknown, finalRole: UserRole,
+): Promise<{ value: boolean } | { error: string } | undefined> {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") return { error: "Neplatné nastavení ruční změny stavu zakázky." };
+  if (finalRole !== "zamestnanec") return undefined;
+  const { data: cur, error } = await db.from("profiles").select("can_change_stage").eq("id", id).maybeSingle();
+  if (error) return value ? { error: "Ruční změna stavu zakázky vyžaduje aktualizaci databáze (migrace 20261109100000)." } : undefined;
+  const current = (cur as { can_change_stage?: boolean | null } | null)?.can_change_stage === true;
+  return value === current ? undefined : { value };
 }
 
 /** Neodeslané nabídky autora, které čekají na schválení (přepočet po změně schvalování dělá DB trigger). */
@@ -342,6 +364,9 @@ export async function updateUser(
       const next = finalRole !== "super_admin" && changes.fullAccess;
       if (next !== (target.full_access === true)) update.full_access = next;
     }
+    const stageChange = await stageChangeFlagChange(db, id, changes.canChangeStage, (update.role as UserRole | undefined) ?? (target.role as UserRole));
+    if (stageChange && "error" in stageChange) return { ok: false, error: stageChange.error };
+    if (stageChange) update.can_change_stage = stageChange.value;
     const salesContact = await salesContactChange(db, id, changes.salesContactId);
     if (salesContact && "error" in salesContact) return { ok: false, error: salesContact.error };
     if (salesContact) update.sales_contact_id = salesContact.value;
@@ -377,6 +402,8 @@ export async function updateUser(
       diff: pendingQuotes && pendingQuotes.before !== pendingQuotes.after ? { ...update, pending_quotes: pendingQuotes } : update,
     });
     revalidateUsers();
+    // změna práva měnit stav → karty a kniha ukážou / skryjí koncové stavy v Korekci stavu
+    if (update.can_change_stage !== undefined) revalidatePath("/orders", "layout");
     if (approvalChange || update.can_approve_quotes !== undefined) {
       // čekající nabídky se uvolnily / zamkly, nebo se změnilo, kdo je schvaluje — tok, nabídky a karty zakázek
       revalidatePath("/quotes");

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { sendMail } from "@/lib/email/send";
+import { resolveSender } from "@/lib/email/sender-rules";
 import { replyHeaders, replySubject } from "@/lib/email/threading";
 import { recordCorrection } from "@/app/actions/corrections";
 import { logAudit } from "@/lib/audit";
@@ -31,6 +32,7 @@ interface QueueRow {
 }
 
 const NO_RIGHT = "K této akci nemáš oprávnění.";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Objednávku dodavateli ve frontě vyřídí super admin (fronta) nebo obchodník u své zakázky (owner_id = já).
@@ -45,12 +47,13 @@ function mayResolve(row: Pick<QueueRow, "type" | "owner_id">, userId: string, ca
  * Vyřízení položky fronty ke schválení (kdo vyřídil zapíše DB do resolved_by z hlavičky autora).
  * Schválení odchozí akce (odpověď, nabídka, upomínka…) e-mail SKUTEČNĚ odešle; schválení AI
  * nabídky zapíše quotes.approved_by (stejná pravidla jako „Schválit" u nabídky — R10).
- * Objednávka dodavateli (předání do výroby): super admin posílá ze své schránky (má-li ji); jinak ze schránky obchodníka zakázky, když ji schvaluje
- * admin a obchodník schránku má (odpověď dodavatele dojde jemu); zamítnutí ji nechá vystavenou.
+ * Odesílá se VŽDY ze schránky toho, kdo schvaluje (majitel 9. 11.); jen super admin si může vybrat jinou
+ * (`opts.fromMailboxId`, „Odeslat z" — sender-rules.ts). Objednávka dodavateli: zamítnutí ji nechá vystavenou.
  */
 export async function resolveApproval(
   id: string,
   action: "approved" | "rejected",
+  opts: { fromMailboxId?: string | null } = {},
 ): Promise<Result> {
   // řádek se načte PŘED kontrolou práv (objednávku smí vyřídit i obchodník u své zakázky)
   const auth = await checkFeature("orders");
@@ -63,6 +66,7 @@ export async function resolveApproval(
   try {
     const { can } = await getAccess();
     const actor = userActor(auth.user);
+    const fromMailboxId = typeof opts?.fromMailboxId === "string" && UUID_RE.test(opts.fromMailboxId) ? opts.fromMailboxId : null;
     const supabase = await createOperatorClient({ actor });
     const { data } = await supabase
       .from("approval_queue")
@@ -71,12 +75,15 @@ export async function resolveApproval(
       .maybeSingle();
     const row = data as QueueRow | null;
     if (!row) return can("dashboard") ? { ok: false, error: "Položka fronty nenalezena." } : { ok: false, error: NO_RIGHT };
+    // stav zakázky z pošty má vlastní potvrzení (stav / důvod jde změnit, přepnutí, korekce) — tady by se jen
+    // označil jako vyřízený bez přepnutí stavu
+    if ((row.type as string) === "job_stage") return { ok: false, error: "Návrh stavu zakázky z pošty potvrď v jeho řádku (Přepnout / Žádná změna)." };
     if (!mayResolve(row, auth.user.id, can)) return { ok: false, error: NO_RIGHT };
     if (row.status !== "pending") return { ok: false, error: "Položku už někdo vyřídil — obnov stránku." };
 
     // objednávka dodavateli: vlastní větev (bez korekcí AI, bez obecného odeslání níže)
     if (row.type === "purchase_order") {
-      const res = await resolvePurchaseOrderQueue(supabase, { id: auth.user.id, fullName: auth.user.fullName, mailAll: can("mail_all") }, id, action);
+      const res = await resolvePurchaseOrderQueue(supabase, { id: auth.user.id, fullName: auth.user.fullName, mailAll: can("mail_all"), fromMailboxId }, id, action);
       if (!res.ok) return { ok: false, error: res.error };
       // odeslaná objednávka = zakázka ve výrobě (objednávky z předání už u kroku jsou → nic se nestane)
       if (res.sent && row.purchase_order_id) {
@@ -132,11 +139,12 @@ export async function resolveApproval(
           reply = (em as unknown as ReplySource | null) ?? null;
         }
         const headers = reply ? replyHeaders({ messageId: reply.message_id, references: reply.message_refs, subject: reply.subject }) : null;
+        const who = await resolveSender(auth.user.id, { mailboxId: fromMailboxId, replyMailboxId: reply?.mailbox_id ?? null });
         const res = await sendMail({
           to: row.target,
           subject: row.payload.subject || (reply ? replySubject(reply.subject) : row.title),
           text: row.payload.body,
-          from: { ownerId: auth.user.id, replyMailboxId: reply?.mailbox_id ?? null },
+          from: who.from,
           senderId: auth.user.id,
           inReplyTo: headers?.inReplyTo ?? null,
           references: headers?.references ?? null,
@@ -144,7 +152,7 @@ export async function resolveApproval(
           customerId: reply?.customer_id ?? null,
           supplierId: reply?.supplier_id ?? null,
           // text připravila AI bez podpisu → podpis schvalujícího s logem (pozdrav z AI pryč, jen jednou)
-          signature: { userId: auth.user.id, mode: "append" },
+          signature: { userId: who.signerId, mode: "append" },
           category: reply?.category && reply.category !== "spam" && reply.category !== "ostatni" ? reply.category : undefined,
         });
         if (!res.sent) {

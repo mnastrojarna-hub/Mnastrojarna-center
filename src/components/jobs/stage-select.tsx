@@ -16,7 +16,7 @@ import { previewJobStage } from "@/app/actions/job-flow";
 import { STAGE_ORDER, SIDE_STAGES, stageMeta } from "@/lib/jobs/stages";
 import { useRouter } from "next/navigation";
 import {
-  FLOW_ACTIONS, exceptionActions, reasonRequired, stageEffect, stageEffectText, transitionFeature, type FlowFacts, type QuoteFacts,
+  FLOW_ACTIONS, canMoveJobStage, exceptionActions, reasonRequired, stageEffect, stageEffectText, type FlowFacts, type QuoteFacts,
 } from "@/lib/jobs/flow-status";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { stageMoveIntent } from "@/lib/jobs/production-handoff";
@@ -211,7 +211,7 @@ export function StageSelect({
   const happened = exceptions && flow && known ? exceptionActions({ ...flow, stage }, { can }) : [];
 
   const item = (s: JobStage) => {
-    const allowed = !known || can(transitionFeature("job", s));
+    const allowed = !known || canMoveJobStage(can, s);
     return (
       <DropdownMenuItem
         key={s}
@@ -223,7 +223,7 @@ export function StageSelect({
         }}
         className={cn("items-center gap-2.5 py-1.5", s === stage && "bg-accent/60 opacity-100")}
       >
-        <StageRow stage={s} current={s === stage} hint={allowed ? null : "Uzavřít smí obchodník nebo admin — navrhni v menu ⋯"} />
+        <StageRow stage={s} current={s === stage} hint={allowed ? null : "Vyfakturovat a dokončit smí obchodník, admin nebo kdo smí ručně měnit stav"} />
       </DropdownMenuItem>
     );
   };
@@ -313,7 +313,7 @@ export function StagePickerDialog({
   const id = React.useId();
   React.useEffect(() => { if (open) setTarget(null); }, [open]);
   const pick = (s: JobStage) => {
-    const allowed = !known || can(transitionFeature("job", s));
+    const allowed = !known || canMoveJobStage(can, s);
     const m = stageMeta(s);
     return (
       <button

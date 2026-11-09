@@ -70,10 +70,11 @@ describe.skipIf(!LOCAL_ENABLED)("review: práva rozhodnutí a pojistky v DB", ()
     if (customers.length) await svc.from("audit_log").delete().in("entity_id", customers);
   }, 60_000);
 
-  it("zaměstnanec (REST i náš server) neodmítne poptávku, nestornuje ani neuzavře zakázku — obchodník ano", async () => {
+  it("zaměstnanec (REST i náš server) neodmítne poptávku ani nestornuje objednávku — obchodník ano; uzavře jen s důvodem", async () => {
     const id = await newJob();
-    const rest = await worker.from("orders").update({ status: "nerealizovano", lost_reason: "kapacita" }).eq("id", id).select("id");
-    expect(rest.error?.code).toBe("42501");
+    // 9. 11.: speciální stavy smí každý — uzavřít zakázku bez důvodu ale ne
+    const rest = await worker.from("orders").update({ status: "nerealizovano" }).eq("id", id).select("id");
+    expect(rest.error?.message).toContain("jen s důvodem");
     const app = await localAdmin(userActor({ id: workerId })).from("orders").update({ inquiry_status: "odmitnuta", lost_reason: "kapacita" }).eq("id", id).select("id");
     expect(app.error?.code).toBe("42501");
     expect((await job(id)).status).toBe("poptavka");
@@ -89,6 +90,14 @@ describe.skipIf(!LOCAL_ENABLED)("review: práva rozhodnutí a pojistky v DB", ()
     const storno = await worker.from("orders").update({ order_status: "stornovana", lost_reason: "zakaznik_stahl" }).eq("id", ord).select("id");
     expect(storno.error?.code).toBe("42501");
     expect((await job(ord)).order_status).toBe("dorucena");
+
+    // 9. 11.: s důvodem zakázku uzavře i zaměstnanec (REST i náš server)
+    const closeRest = await newJob();
+    expect((await worker.from("orders").update({ status: "nerealizovano", lost_reason: "kapacita" }).eq("id", closeRest).select("id")).error).toBeNull();
+    expect(await job(closeRest)).toMatchObject({ status: "nerealizovano", lost_reason: "kapacita", lost_by: workerId });
+    const closeApp = await newJob();
+    expect((await localAdmin(userActor({ id: workerId })).from("orders").update({ status: "zruseno", lost_reason: "jine", lost_note: "test" }).eq("id", closeApp).select("id")).error).toBeNull();
+    expect((await job(closeApp)).status).toBe("zruseno");
   });
 
   it("nabídku zaměstnanec neschválí, neodešle ani nezamítne (ani RPC flow_reject_quote)", async () => {

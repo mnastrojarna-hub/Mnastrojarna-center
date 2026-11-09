@@ -5,7 +5,7 @@ import {
   CAUSE_LABELS, CHIP_BASE, CONFIRMATION_STATES, DELIVERY_STATES, FLOW_ACTIONS, FLOW_EXCEPTION_KEYS, FLOW_PALETTE, FULFILMENT_STATES,
   INQUIRY_STATES, INQUIRY_TRANSITIONS, LOST_REASONS, NO_PLAN_META, LOST_JOB_META, CANCELLED_JOB_META, PROPOSAL_META,
   ORDER_STATES, ORDER_TRANSITIONS, PAYMENT_STATES, PILL_FILL, PILL_TRACK, PRICING_STATES, PURCHASE_EXTRA_STATES,
-  QUOTE_STATES, QUOTE_TRANSITIONS, VIA_META, actorName, activeQuote, canApproveQuote, canTransition, chipsForTab,
+  QUOTE_STATES, QUOTE_TRANSITIONS, VIA_META, actorName, activeQuote, canApproveQuote, canMoveJobStage, canTransition, chipsForTab,
   deliveryProgress, deriveFlow, expectedSubStates, flowRank, initialInquiryStatus, initialOrderStatus, isLostReason,
   lostReasonsFor, menuActions, nextAction, paymentProgress, phaseTrail, primaryChip, productionProgress,
   quoteDisplayState, quoteStateOf, reasonRequired, relativeStampTime, stageEffect, stageEffectText, stampFromRow,
@@ -128,6 +128,33 @@ describe("přechody, práva a důvody", () => {
     expect(reasonRequired("inquiry", "ceka_na_podklady")).toBe(false);
   });
 
+  it("9. 11.: ruční změna hlavního stavu — speciální stavy každý, finanční konce s právem přechodu nebo stage_any", () => {
+    const has = (...fs: Feature[]) => (f: Feature) => fs.includes(f);
+    const staff = has("orders", "workflow");
+    const sponer = has("orders", "workflow", "stage_any");
+    const sales = has("orders", "workflow", "margins");
+    // běžný tok i speciální stavy (pozastaveno, reklamace, nerealizováno, zrušeno) a návrat z nich = každý se zakázkou
+    for (const to of STAGE_ORDER.filter((s) => s !== "fakturovano" && s !== "dokonceno")) {
+      expect(transitionFeature("job", to)).toBe("orders");
+      expect(canMoveJobStage(staff, to)).toBe(true);
+    }
+    for (const to of ["fakturovano", "dokonceno"]) {
+      expect(transitionFeature("job", to)).toBe("margins");
+      expect(canMoveJobStage(staff, to)).toBe(false);
+      expect(canMoveJobStage(sponer, to)).toBe(true);
+      expect(canMoveJobStage(sales, to)).toBe(true);
+    }
+    // důvod u uzavření zůstává povinný pro všechny
+    expect(reasonRequired("job", "nerealizovano")).toBe(true);
+    expect(reasonRequired("job", "zruseno")).toBe(true);
+    expect(reasonRequired("job", "reklamace")).toBe(false);
+    expect(reasonRequired("job", "dokonceno")).toBe(false);
+    // výjimky „Zákazník neobjednal / Nebudeme nabízet / Obnovit poptávku" vidí i zaměstnanec
+    for (const k of ["job.notOrdered", "job.decline", "job.reopenLost", "job.pause", "job.resume", "claim.open"] as const) {
+      expect(FLOW_ACTIONS[k].feature).toBe("orders");
+    }
+  });
+
   it("nabídka", () => {
     expect(canTransition("quote", "rozpracovana", "odeslana")).toBe(true);
     expect(canTransition("quote", "ke_schvaleni", "odeslana")).toBe(false);
@@ -158,7 +185,8 @@ describe("přechody, práva a důvody", () => {
     expect(transitionFeature("order", "stornovana")).toBe("margins");
     expect(transitionFeature("order", "dorucena", "stornovana")).toBe("delete");
     expect(transitionFeature("order", "rozpor", "dorucena")).toBe("workflow");
-    expect(transitionFeature("job", "nerealizovano")).toBe("margins");
+    expect(transitionFeature("job", "nerealizovano")).toBe("orders"); // 9. 11.: speciální stavy každý
+    expect(transitionFeature("job", "fakturovano")).toBe("margins");
     expect(transitionFeature("job", "ve_vyrobe")).toBe("orders");
     expect(reasonRequired("order", "stornovana")).toBe(true);
     expect(reasonRequired("job", "zruseno")).toBe(true);

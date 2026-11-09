@@ -15,7 +15,7 @@ const MODES: AutomationMode[] = ["full", "approval"];
 /** Moduly, které jdou nastavit (řádek se případně založí — např. „capture" přibyl později). */
 const MODULES = [
   "categorize", "spam", "reply", "quote", "supplier_request", "order_match", "drawing_extract", "capture", "purchase_order", "supplier_invoice",
-  "mail_job_link", "mail_job_changes",
+  "mail_job_link", "mail_job_changes", "mail_job_stage",
 ];
 
 /** Režim automatiky je systémové nastavení: ladění AI + nastavení (super admin). */

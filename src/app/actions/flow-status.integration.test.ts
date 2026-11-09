@@ -236,7 +236,8 @@ describe.skipIf(!ENABLED)("akce podrobných stavů toku ↔ lokální Supabase",
     expect(await a.setInquiryStatus(jobId, "prijata")).toMatchObject({ ok: true, stage: "poptavka", inquiryStatus: "prijata" });
     expect(await job(jobId)).toMatchObject({ lost_reason: null, lost_at: null, stage_change_cause: "obnoveni" });
     as("worker");
-    expect((await a.moveJobStage(jobId, "nerealizovano", { reason: "cena" })).error).toBe("K této akci nemáš oprávnění.");
+    // 9. 11.: speciální stavy smí každý; finanční konce jen obchodník / admin (nebo „Smí ručně měnit stav zakázky")
+    expect((await a.moveJobStage(jobId, "fakturovano")).error).toBe("K této akci nemáš oprávnění.");
     expect((await a.setInquiryStatus(jobId, "ceka_na_podklady")).error).toContain("Napiš, co chybí");
     expect(await a.setInquiryStatus(jobId, "ceka_na_podklady", { note: "chybí STEP model" })).toMatchObject({ ok: true, inquiryStatus: "ceka_na_podklady" });
     expect((await job(jobId)).waiting_note).toBe("chybí STEP model");

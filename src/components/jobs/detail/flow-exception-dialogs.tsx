@@ -319,7 +319,7 @@ function PoArrivedDialog({ job, onClose, onProgress, onSwitch }: Props) {
 }
 
 // ── Výroba se nepovedla ─────────────────────────────────────
-function ProductionFailedDialog({ job, onClose, onDone, margins, switchTo }: Props & { switchTo: (k: FlowActionKey, m: string) => void }) {
+function ProductionFailedDialog({ job, onClose, onDone, switchTo }: Props & { switchTo: (k: FlowActionKey, m: string) => void }) {
   const [itemId, setItemId] = React.useState(job.items.length === 1 ? job.items[0].id : "");
   const [qty, setQty] = React.useState("");
   const [reason, setReason] = React.useState<string | null>(null);
@@ -330,7 +330,7 @@ function ProductionFailedDialog({ job, onClose, onDone, margins, switchTo }: Pro
   const id = React.useId();
   const item = job.items.find((i) => i.id === itemId) ?? null;
   const partial = item && Number(qty) > 0 && Number(qty) < item.quantity;
-  const nexts = (Object.keys(FAILURE_NEXT) as FailureNext[]).filter((k) => (k !== "cancel" || margins) && (k !== "short" || partial));
+  const nexts = (Object.keys(FAILURE_NEXT) as FailureNext[]).filter((k) => k !== "short" || partial); // 9. 11.: zrušit smí každý (důvod „Výroba se nepovedla")
   return (
     <Dialog open onOpenChange={(o) => !busy && onClose(o)}>
       <DialogContent aria-describedby={undefined} className={SHEET}>

@@ -16,7 +16,7 @@ import type {
 } from "@/lib/supabase/database.types";
 import {
   FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, INQUIRY_STATES, ORDER_STATES, QUOTE_ADMIN_ONLY, QUOTE_STATES, actorName,
-  canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
+  canMoveJobStage, canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
   isQuoteState, lostReasonLabel, lostReasonsFor, paymentKey, quoteFactsFromRow, quoteLabel, quoteSendBlock, reasonRequired,
   relativeStampTime, stageEffect, transitionFeature, userNeedsQuoteApproval, type ActionCtx, type PaymentState, type StageEffect,
 } from "@/lib/jobs/flow-status";
@@ -465,7 +465,7 @@ async function applyQuote(
  */
 export async function approveAndSendQuote(
   quoteId: string,
-  email?: { to: string; cc?: string; subject: string; body: string } | null,
+  email?: { to: string; cc?: string; subject: string; body: string; fromMailboxId?: string | null } | null,
   /** Ze seznamu / karty: schválí jen nezměněnou nabídku (quotes.updated_at, §15.11). */
   opts: { expectedUpdatedAt?: string | null } = {},
 ): Promise<FlowResult> {
@@ -485,7 +485,7 @@ export async function approveAndSendQuote(
       const { generateJobDocument, sendJobDocument } = await import("@/app/actions/job-documents");
       const doc = await generateJobDocument(jobId, "nabidka", { quoteId, reuse: true });
       if (!doc.ok || !doc.fileId) return fail(doc.error ?? "PDF nabídky se nepodařilo vystavit.");
-      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body });
+      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body, fromMailboxId: email.fromMailboxId ?? null });
       if (!sent.ok) return fail(sent.error ?? "Odeslání e-mailem selhalo.");
       return quoteResult(c.db, quoteId, jobId);
     }
@@ -686,7 +686,8 @@ export async function moveJobStage(
   const c = await begin("orders");
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
-  if (!c.can(transitionFeature("job", stage))) return deny();
+  // právo přechodu, nebo „Smí ručně měnit stav zakázky" (stage_any, 9. 11.) — DB to hlídá u uzavření taky
+  if (!canMoveJobStage(c.can, stage)) return deny();
   const text = note(opts.note);
   try {
     const [job, quotes] = await Promise.all([

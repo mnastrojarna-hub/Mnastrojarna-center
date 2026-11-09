@@ -125,8 +125,9 @@ describe.skipIf(!ENABLED)("výjimky v toku ↔ lokální Supabase", () => {
     const jobId = await newJob();
     const { data: q } = await svc.from("quotes").insert({ number: `${PREFIX}-Q1`, job_id: jobId, status: "odeslano", sent_at: new Date().toISOString(), total: 1000, revision: 1, owner_id: id("sales") }).select("id").single();
     expect((await job(jobId)).status).toBe("nabidka");
+    // 9. 11.: uzavřít smí i zaměstnanec — ale jen s důvodem zákazníka (zbytek scénáře dělá obchodník)
     as("worker");
-    expect((await x.closeJobAsLost(jobId, "notOrdered", { reason: "cena" })).ok).toBe(false);
+    expect((await x.closeJobAsLost(jobId, "notOrdered", { reason: "kapacita" })).error).toBe("Vyber důvod.");
     as("sales");
     expect((await x.closeJobAsLost(jobId, "decline", { reason: "kapacita" })).error).toMatch(/Nabídka už odešla/);
     expect((await x.closeJobAsLost(jobId, "notOrdered", { reason: "jine" })).error).toMatch(/poznámku/);
@@ -218,7 +219,8 @@ describe.skipIf(!ENABLED)("výjimky v toku ↔ lokální Supabase", () => {
     const r = await x.recordProductionFailure(jobId, { itemId: item, qty: 2, reason: "Chyba výroby", next: "remake" });
     expect(r).toMatchObject({ ok: true, handoff: "plan" });
     expect((await events(jobId)).some((e) => e.data?.exception === "production_failed" && /2 ks z 10/.test(e.message))).toBe(true);
-    expect((await x.recordProductionFailure(jobId, { reason: "Chyba", next: "cancel" })).ok).toBe(false);
+    // 9. 11.: zrušit smí i zaměstnanec, ale jen s tím, co se stalo
+    expect((await x.recordProductionFailure(jobId, { reason: "", next: "cancel" })).error).toBe("Vyber, co se stalo.");
     expect((await x.recordProductionFailure(jobId, { itemId: item, qty: 20, reason: "Chyba", next: "short" })).ok).toBe(false);
     as("sales");
     const c = await x.recordProductionFailure(jobId, { reason: "Vada materiálu", note: "praskliny", next: "cancel" });

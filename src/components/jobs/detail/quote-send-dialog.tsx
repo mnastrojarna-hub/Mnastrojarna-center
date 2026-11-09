@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { generateJobDocument, sendJobDocument, draftJobDocumentEmail } from "@/app/actions/job-documents";
 import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { applySalutation } from "@/lib/contacts/tone";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
@@ -45,6 +46,8 @@ export function QuoteSendDialog({
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
   const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   /** Text posledního návrhu ze serveru — po změně tykání se připraví znovu, jen když ho uživatel neupravil. */
   const lastDraftBody = React.useRef<string | null>(null);
@@ -116,6 +119,7 @@ export function QuoteSendDialog({
       setWarning(null);
       setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
+      setFromMailboxId(null);
       setStep("preparing");
     }
   }
@@ -147,6 +151,7 @@ export function QuoteSendDialog({
     try {
       const res = await sendJobDocument(jobId, file.id, {
         to, cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body,
+        ...(fromMailboxId ? { fromMailboxId } : {}),
       });
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
@@ -216,6 +221,12 @@ export function QuoteSendDialog({
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
               )}
+              <SenderPicker
+                value={fromMailboxId}
+                onChange={setFromMailboxId}
+                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                className="px-1"
+              />
               <MailFields mail={mail} onChange={setMail} context={{ jobId }} idPrefix="quote-mail" onToneSaved={(c) => void redraft(c.salutation)} />
             </>
           )}

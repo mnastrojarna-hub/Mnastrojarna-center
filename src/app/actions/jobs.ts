@@ -21,7 +21,7 @@ import {
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
 import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
 import {
-  FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
+  FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, canMoveJobStage, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
   userNeedsQuoteApproval,
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
@@ -200,6 +200,8 @@ function rawValue(v: unknown, refs: Record<string, string>): string {
 /** Změna stavu + záznam do historie (sdílí setJobStage i nabídky). */
 /** Uzavření zakázky (nerealizováno / zrušeno) jen přes moveJobStage — s právem marže a důvodem. */
 const CLOSE_NEEDS_REASON = "Uzavřít zakázku jako nerealizovanou nebo zrušenou jde jen přes Korekci stavu s důvodem.";
+/** Ruční změna stavu bez práva přechodu (vyfakturováno, dokončeno … bez marží a bez „Smí ručně měnit stav zakázky"). */
+const STAGE_DENIED = "Do tohoto stavu přesune zakázku obchodník, admin nebo kdo smí ručně měnit stav — navrhni to.";
 
 /** Nabídka vzniká jen jako rozpracovaná / ke schválení; další stavy mění setQuoteState (práva, přechody). */
 const NEW_QUOTE_STATUSES = new Set(["navrh_ai", "ke_schvaleni"]);
@@ -435,6 +437,7 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     const fromStage = isJobStage(before.status) ? before.status : null;
     const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
     if (stageTo && reasonRequired("job", stageTo)) return fail(CLOSE_NEEDS_REASON);
+    if (stageTo && !canMoveJobStage(c.can, stageTo)) return fail(STAGE_DENIED);
 
     // křížová konzistence (4. 11.): hodnota s naceněnými položkami se rozpočítá na položky,
     // vyfakturovaná zakázka se nepřeceňuje, nákup s objednávkami dodavatelům se mění v objednávce
@@ -541,6 +544,8 @@ export async function setJobStage(id: string, stage: JobStage, note?: string): P
   if (!isUuid(id)) return fail(NOT_FOUND);
   if (!isJobStage(stage)) return fail("Neznámý stav zakázky.");
   if (reasonRequired("job", stage)) return fail(CLOSE_NEEDS_REASON);
+  // stejné právo jako Korekce stavu (moveJobStage): přechod, nebo „Smí ručně měnit stav zakázky"
+  if (!canMoveJobStage(c.can, stage)) return fail(STAGE_DENIED);
   try {
     const job = await loadJob(c.db, id, "id, status");
     if (!job) return fail(NOT_FOUND);

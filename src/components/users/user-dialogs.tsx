@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, AlertTriangle, Crown, FileCheck2, KeyRound, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeftRight, Crown, FileCheck2, KeyRound, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,6 +222,48 @@ export function RfqToggle({
   );
 }
 
+/**
+ * 9. 11. „Smí ručně měnit stav zakázky" (profiles.can_change_stage): zaměstnanec přesune zakázku Korekcí stavu na
+ * kterýkoli stav dopředu i dozadu, včetně koncových (vyfakturováno, dokončeno; nerealizováno / zrušeno s důvodem).
+ * Marže, ceny ani faktury tím nevidí. Obchodník a super admin smí vždy.
+ */
+export function StageChangeToggle({
+  id, checked, onChange, role, disabled,
+}: { id: string; checked: boolean; onChange: (v: boolean) => void; role: UserRole; disabled?: boolean }) {
+  const always = role !== "zamestnanec";
+  const on = always || checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-stage-toggle={always ? "role" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-teal-500/15 text-teal-600 dark:text-teal-400" : "bg-muted text-muted-foreground",
+        )}>
+          <ArrowLeftRight className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Smí ručně měnit stav zakázky</label>
+          <p className="text-xs text-muted-foreground">
+            {always
+              ? "Obchodník a super admin mění stav zakázky vždy."
+              : on
+                ? "Korekcí stavu přesune zakázku dopředu i dozadu, včetně Vyfakturováno a Dokončeno (uzavření s důvodem) — marže a ceny tím nevidí."
+                : "Stav mění jen v běžném toku; vyfakturovat, dokončit nebo uzavřít zakázku navrhne obchodníkovi."}
+          </p>
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={always || disabled}
+        aria-label="Smí ručně měnit stav zakázky"
+        className="mt-1 data-[state=checked]:bg-teal-600"
+      />
+    </div>
+  );
+}
+
 /** Kolega do volby „Kontakt pro obchod a ceny". */
 export interface SalesContactOption {
   id: string;
@@ -333,6 +375,7 @@ export function EditUserDialog({
   const [quoteApproval, setQuoteApproval] = React.useState(user.quoteNeedsApproval !== false);
   const [quoteApprover, setQuoteApprover] = React.useState(user.canApproveQuotes === true);
   const [rfq, setRfq] = React.useState(user.canRfq === true);
+  const [stageAny, setStageAny] = React.useState(user.canChangeStage === true);
   const [fullAccess, setFullAccess] = React.useState(user.fullAccess === true);
   const [salesContact, setSalesContact] = React.useState(user.salesContactId ?? "");
   const [busy, setBusy] = React.useState(false);
@@ -348,6 +391,7 @@ export function EditUserDialog({
     setQuoteApproval(user.quoteNeedsApproval !== false);
     setQuoteApprover(user.canApproveQuotes === true);
     setRfq(user.canRfq === true);
+    setStageAny(user.canChangeStage === true);
     setFullAccess(user.fullAccess === true);
     setSalesContact(user.salesContactId ?? "");
     setError(null);
@@ -368,6 +412,7 @@ export function EditUserDialog({
         quoteNeedsApproval: role === "super_admin" ? undefined : quoteApproval,
         canApproveQuotes: role === "super_admin" ? undefined : quoteApprover,
         canRfq: role === "zamestnanec" ? rfq : undefined,
+        canChangeStage: role === "zamestnanec" ? stageAny : undefined,
         fullAccess: isSelf || role === "super_admin" ? undefined : fullAccess,
         salesContactId: salesContact === (user.salesContactId ?? "") ? undefined : salesContact || null,
       });
@@ -433,6 +478,8 @@ export function EditUserDialog({
           />
 
           <RfqToggle id={`eu-rfq-${user.id}`} checked={rfq} onChange={setRfq} role={role} />
+
+          <StageChangeToggle id={`eu-stage-${user.id}`} checked={stageAny} onChange={setStageAny} role={role} />
 
           <SalesContactSelect id={`eu-sales-contact-${user.id}`} value={salesContact} onChange={setSalesContact} options={salesContacts} />
 

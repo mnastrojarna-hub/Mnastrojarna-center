@@ -33,7 +33,6 @@ import { lineDeviations, loadDeviationContext } from "@/lib/jobs/po-deviations-s
 import type { PoDeviation } from "@/lib/jobs/po-deviations";
 import { nextStepAfterConfirmedHint, purchaseOrderSender, type HandoffActor } from "@/lib/jobs/production-handoff-store";
 import { autoHandoffForPurchaseOrder, resetStepsOfCancelledPurchaseOrder, type PoAutoResult } from "@/lib/jobs/production-po-auto";
-import { getAccess } from "@/lib/auth/session";
 import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
 import type {
   JobCommissionView, PurchaseItem, PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseOrderMail,
@@ -79,6 +78,11 @@ async function begin(): Promise<Ctx | { error: string }> {
 /** Kdo předává do výroby po vystavení / odeslání objednávky (Nákup = obchodník / admin). */
 function poActor(c: Ctx): HandoffActor {
   return { id: c.user.id, fullName: c.user.fullName, margins: true, mailAll: false, via: "rucne" };
+}
+
+/** „Odeslat z" z klienta: jen platné id (platí jen pro super admina — ověří sender-rules.ts). */
+function uuidOrNull(v: unknown): string | null {
+  return typeof v === "string" && isUuid(v) ? v : null;
 }
 
 function fail(err: unknown): { ok: false; error: string } {
@@ -1001,7 +1005,7 @@ function drawingChangeMode(po: PurchaseOrderView, drawingChange: boolean | undef
  */
 export async function draftPurchaseOrderEmail(
   id: string,
-  opts: { drawingChange?: boolean } = {},
+  opts: { drawingChange?: boolean; fromMailboxId?: string | null } = {},
 ): Promise<ActionResult<{
   to: string; cc: string; recipientReason: string; supplierId: string | null; subject: string; body: string; attachmentName: string;
   mode: "issue" | "change"; attachments: PoMailAttachmentView[]; missingDrawing: string[]; deviations: { ref: string; lines: string[] }[];
@@ -1015,9 +1019,9 @@ export async function draftPurchaseOrderEmail(
     const change = drawingChangeMode(po, opts.drawingChange);
     await refreshCompanyFromSettings();
     const me = await fetchProfileContact(c.db, c.user.id);
-    // podpis toho, z čí schránky objednávka odejde (stejná volba jako sendPurchaseOrder)
-    const { data: jobRow } = await c.db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
-    const sender = await purchaseOrderSender(c.db, { id: c.user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+    // podpis toho, z čí schránky objednávka odejde (stejná volba jako sendPurchaseOrder: moje schránka,
+    // super admin si může vybrat jinou)
+    const sender = await purchaseOrderSender({ id: c.user.id, fromMailboxId: uuidOrNull(opts?.fromMailboxId) });
     const signatureText = await senderSignatureText(sender.signerId, sender.from);
     // dodavatel → e-mail pro objednávky (karta dodavatele), tykání / vykání podepisujícího s adresátem
     const pick = await recipientsFor(c.db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null);
@@ -1090,7 +1094,7 @@ function drawingChangeRefs(extras: PoMailExtras): string[] {
 export async function sendPurchaseOrder(
   id: string,
   mail: PurchaseOrderMail,
-  opts: { attachmentIds?: string[]; drawingChange?: boolean } = {},
+  opts: { attachmentIds?: string[]; drawingChange?: boolean; fromMailboxId?: string | null } = {},
 ): Promise<ActionResult<{ sent: boolean; emailId?: string; queued?: boolean; production?: PoAutoResult }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -1102,9 +1106,8 @@ export async function sendPurchaseOrder(
     const po = await fetchPurchaseOrder(db, id);
     if (!po) return fail(PO_NOT_FOUND);
     // jádro: PDF v příloze, stav Odeslána, schránka odeslání; čekající řádek fronty („issue") vyřídí DB trigger.
-    // Odesílá se ze schránky obchodníka zakázky, když ji má použitelnou (jako každé odeslání objednávky).
-    const { data: jobRow } = await db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
-    const sender = await purchaseOrderSender(db, { id: user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+    // Odesílá se z MÉ schránky (majitel 9. 11.); vybrat jinou smí jen super admin („Odeslat z").
+    const sender = await purchaseOrderSender({ id: user.id, fromMailboxId: uuidOrNull(opts?.fromMailboxId) });
     const author = { id: user.id, fullName: user.fullName };
     const change = drawingChangeMode(po, opts?.drawingChange);
     if (opts?.drawingChange) {
@@ -1119,7 +1122,7 @@ export async function sendPurchaseOrder(
       if ("error" in stored) return fail(`PDF objednávky se nepodařilo přegenerovat: ${stored.error}`);
     }
     const res = await sendPurchaseOrderCore(db, author, id, mail, {
-      from: sender.from, kind: change ? "change" : "issue", ...(attachmentIds ? { attachmentIds } : {}),
+      from: sender.from, signerId: sender.signerId, kind: change ? "change" : "issue", ...(attachmentIds ? { attachmentIds } : {}),
       ...(opts?.drawingChange ? { eventData: { drawingChange: true } } : {}),
     });
     if (!res.ok) return fail(res.error);
@@ -1143,7 +1146,7 @@ export async function sendPurchaseOrder(
  */
 export async function notifySuppliers(
   jobId: string,
-  input: { kind: "cancel" | "hold"; purchaseOrderIds: string[]; reason?: string; mails?: Record<string, Partial<PurchaseOrderMail>> },
+  input: { kind: "cancel" | "hold"; purchaseOrderIds: string[]; reason?: string; mails?: Record<string, Partial<PurchaseOrderMail>>; fromMailboxId?: string | null },
 ): Promise<ActionResult<{ sent: string[]; queued: string[]; cancelled: string[]; errors: string[] }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -1154,7 +1157,6 @@ export async function notifySuppliers(
   const reason = cleanText(input.reason, 500) ?? (input.kind === "cancel" ? "Zákazník zakázku zrušil" : "Zakázka je pozastavená");
   try {
     const { db, user } = c;
-    const { can } = await getAccess();
     const { data: jobRow } = await db.from("orders").select("id, owner_id").eq("id", jobId).maybeSingle();
     if (!jobRow) return fail(JOB_NOT_FOUND);
     const ownerId = (jobRow as { owner_id: string | null }).owner_id ?? null;
@@ -1175,11 +1177,11 @@ export async function notifySuppliers(
         }
         continue;
       }
-      const sender = await purchaseOrderSender(db, { id: user.id, mailAll: can("mail_all") }, ownerId);
-      const built = await purchaseOrderMailFor(db, po, sender.signerId, input.kind, { reason, fallbackName: user.fullName });
+      const sender = await purchaseOrderSender({ id: user.id, fromMailboxId: uuidOrNull(input.fromMailboxId) });
+      const built = await purchaseOrderMailFor(db, po, sender.signerId, input.kind, { reason, fallbackName: user.fullName, from: sender.from });
       const over = input.mails?.[poId] ?? {};
       const mail = { to: over.to ?? built.to, cc: over.cc, subject: over.subject ?? built.subject, body: over.body ?? built.body };
-      const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, poId, mail, { from: sender.from, kind: input.kind, reason });
+      const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, poId, mail, { from: sender.from, signerId: sender.signerId, kind: input.kind, reason });
       if (res.ok) { sent.push(poId); continue; }
       // e-mail neodešel → fronta (cancel / hold), DB ho sama nevyřídí
       const { error: qErr } = await db.from("approval_queue").insert({

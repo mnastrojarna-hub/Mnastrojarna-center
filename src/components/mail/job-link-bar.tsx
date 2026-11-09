@@ -16,6 +16,7 @@ import { MAIL_ACTION_LABEL, mailActionHref, mailActionPlan, type MailActionKey }
 import type { JobSuggestionRef } from "@/lib/email/mail-types";
 import type { EmailCategory } from "@/lib/data/types";
 import { isJobStage, stageMeta } from "@/lib/jobs/stages";
+import { MailStageSignals } from "@/components/mail/mail-stage-signal";
 import { cn } from "@/lib/utils";
 
 const ACTION_ICON: Record<MailActionKey, React.ComponentType<{ className?: string }>> = {
@@ -173,6 +174,11 @@ export function JobLinkBar({
               )}
             </p>
           )}
+          {/* 9. 11.: reklamace / nerealizováno / storno / pozastavení z e-mailu — návrh nebo přepnuto (Vrátit / Změnit) */}
+          <MailStageSignals
+            threadId={threadId} jobId={jobId} onError={onError}
+            onChanged={(text) => onChanged({ jobId, jobNumber: jobNumber ?? undefined, text })}
+          />
           {suggestion && suggestion.jobId !== jobId && (
             // odpověď ve vlákně jmenuje jinou zakázku: ta zpráva zůstala nepřiřazená, změny z ní se nepropsaly
             <div className="space-y-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="thread-message-suggestion">

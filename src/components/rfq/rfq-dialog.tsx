@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { FULLSCREEN_DIALOG } from "@/components/jobs/purchasing/ui-bits";
 import { previewRfqAction, rfqSetupAction, sendRfqAction } from "@/app/actions/rfq";
+import { SenderPicker } from "@/components/mail/sender-picker";
 import type { RfqPreview, RfqSetup } from "@/lib/rfq/store";
 import {
   RFQ_MAX_SUPPLIERS, czDay, parseQuantities, rankRfqSuppliers, whatText, type RankedSupplier, type RfqScope,
@@ -48,6 +49,8 @@ export function RfqDialog({ jobId, opts, onClose }: { jobId: string; opts: RfqOp
   const [search, setSearch] = React.useState("");
   const [preview, setPreview] = React.useState<RfqPreview | null>(null);
   const [skipPending, setSkipPending] = React.useState(false);
+  /** „Odeslat z" (jen super admin; null = moje schránka) — změna připraví náhled znovu (podpis). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [done, setDone] = React.useState<string | null>(null);
 
@@ -88,7 +91,7 @@ export function RfqDialog({ jobId, opts, onClose }: { jobId: string; opts: RfqOp
     setStep(2);
   }
 
-  function input() {
+  function input(from: string | null = fromMailboxId) {
     return {
       jobId, scope, operationKinds: kinds,
       items: chosen.map((i) => {
@@ -98,7 +101,22 @@ export function RfqDialog({ jobId, opts, onClose }: { jobId: string; opts: RfqOp
       requiredDate: requiredDate || null, replyBy: replyBy || null, note: note.trim() || null,
       recipients: Object.entries(picked).map(([supplierId, emails]) => ({ supplierId, emails: emails.split(/[,;\s]+/).filter(Boolean) })),
       skipPending,
+      ...(from ? { fromMailboxId: from } : {}),
     };
+  }
+
+  async function changeSender(id: string | null) {
+    setFromMailboxId(id);
+    setBusy(true);
+    try {
+      const r = await previewRfqAction(input(id));
+      if (r.ok) setPreview(r.preview);
+      else setError(r.error);
+    } catch {
+      setError("Spojení se nepovedlo — zkus to znovu.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function goPreview() {
@@ -308,6 +326,7 @@ export function RfqDialog({ jobId, opts, onClose }: { jobId: string; opts: RfqOp
             </div>
           ) : setup && step === 3 && preview ? (
             <div className="space-y-3" data-testid="rfq-preview">
+              <SenderPicker value={fromMailboxId} onChange={(id) => void changeSender(id)} disabled={busy} />
               {preview.leaks.length > 0 && (
                 <p className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> Text obsahuje údaj zákazníka ({preview.leaks.join(", ")}) — uprav poznámku, jinak se neodešle.

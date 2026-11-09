@@ -9,10 +9,10 @@ import type {
   EmailItem, ApprovalItem, QuoteItem, DrawingItem, CommissionRow, BadgeCounts,
 } from "@/lib/data/types";
 import { periodStart } from "@/lib/data/periods";
-import { getAccess } from "@/lib/auth/session";
+import { getAccess, getSessionUser } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
-import { usableMailbox } from "@/lib/jobs/production-handoff-store";
+import { resolveSender } from "@/lib/email/sender-rules";
 import { fetchPaged, isUuid } from "@/lib/jobs/mapping";
 import type { JobListItem } from "@/lib/jobs/types";
 import { getEmails as getMailEmails, getSentMail, getUnreadCount, getMailScope } from "@/lib/data/mail";
@@ -76,7 +76,7 @@ export async function getEmails(): Promise<EmailItem[]> {
 export type ApprovalQueueItem = ApprovalItem & {
   proposedBy: string;
   quoteHref?: string | null;
-  /** Řádek „Objednávka dodavateli": PDF, zakázka a odkud e-mail odejde (schránka obchodníka zakázky, jinak moje). */
+  /** Řádek „Objednávka dodavateli": PDF, zakázka a odkud e-mail odejde (ze schránky toho, kdo schválí — moje). */
   purchaseOrder?: ApprovalPurchaseOrder | null;
 };
 
@@ -96,28 +96,24 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
     creator?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
     job?: { owner_id: string | null } | { owner_id: string | null }[] | null;
   };
-  // odkud objednávka odejde: schránka obchodníka zakázky (použitelná), jinak toho, kdo schvaluje
-  const senders = new Map<string, string | null>();
-  for (const a of data as (ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null })[]) {
-    const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
-    const job = po ? (Array.isArray(po.job) ? po.job[0] ?? null : po.job ?? null) : null;
-    const owner = job?.owner_id ?? null;
-    if (a.type !== "purchase_order" || !owner || senders.has(owner)) continue;
+  // odkud objednávka odejde: ze schránky toho, kdo ji schválí (= já; majitel 9. 11. — každý ze své schránky,
+  // super admin si může v řádku vybrat jinou)
+  let mySender: string | null = null;
+  if ((data as ApprovalItemRow[]).some((a) => a.type === "purchase_order")) {
     try {
-      const box = await usableMailbox(db as never, owner);
-      senders.set(owner, box?.email ?? null);
+      const me = await getSessionUser();
+      mySender = me ? (await resolveSender(me.id)).mailboxEmail : null;
     } catch {
-      senders.set(owner, null);
+      mySender = null;
     }
   }
   const poOf = (a: ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null }): ApprovalPurchaseOrder | null => {
     if (a.type !== "purchase_order") return null;
     const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
     if (!po?.id) return null;
-    const job = Array.isArray(po.job) ? po.job[0] ?? null : po.job ?? null;
     return {
       id: po.id, number: po.number ?? null, fileId: po.file_id ?? null, jobId: po.job_id ?? a.order_id ?? null,
-      senderEmail: job?.owner_id ? senders.get(job.owner_id) ?? null : null,
+      senderEmail: mySender,
       kind: ((a.payload as { kind?: unknown } | null)?.kind as ApprovalPurchaseOrder["kind"] | undefined) ?? "issue",
     };
   };
@@ -155,7 +151,7 @@ export interface ApprovalPurchaseOrder {
   number: string | null;
   fileId: string | null;
   jobId: string | null;
-  /** Schránka obchodníka zakázky, ze které e-mail odejde (null = schránka toho, kdo schvaluje). */
+  /** Adresa, ze které e-mail odejde, když ho schválím já (moje schránka; null = odeslat nejde / neznámá). */
   senderEmail: string | null;
   kind: "issue" | "change" | "cancel" | "hold";
 }
