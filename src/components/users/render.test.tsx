@@ -58,6 +58,25 @@ function render(node: React.ReactNode): string {
 }
 
 describe("správa uživatelů — render", () => {
+  it("9. 11.: naposledy aktivní — relativně, stránka z menu, přesný čas v title, tlumeně po 7 dnech", () => {
+    const list: ManagedUser[] = [
+      { ...users[0], lastActiveAt: new Date(Date.now() - 3 * 60_000).toISOString(), lastActivePath: "/orders/abc" },
+      { ...users[1], lastActiveAt: new Date(Date.now() - 10 * 86_400_000).toISOString(), lastActivePath: "/neco" },
+      { ...users[2], lastActiveAt: null },
+    ];
+    const html = render(<UserManagement users={list} mailboxes={mailboxes} currentUserId="u-admin" aiForAll={false} />);
+    expect(html).toContain('data-last-active="recent"');
+    expect(html).toContain("Naposledy aktivní před 3 min");
+    expect(html).toContain(" · Kniha zakázek");
+    expect(html).toMatch(/title="Naposledy aktivní \d{1,2}\. ?\d{1,2}\. ?\d{4}[^"]*stránka: Kniha zakázek · přihlášen teď"/);
+    expect(html).toContain('data-last-active="stale"');
+    expect(html).toContain("Naposledy aktivní před 10 d");
+    expect(html).toContain('data-last-active="never"');
+    expect(html).toContain("Zatím žádná aktivita");
+    expect(html).not.toContain("zatím nepřihlášen</span>");
+    expect(html).toContain('data-sort-activity="off"');
+  });
+
   it("3. 11.: kontakt pro obchod a ceny — štítek v seznamu, volba a kandidáti", () => {
     const list: ManagedUser[] = [
       users[0],

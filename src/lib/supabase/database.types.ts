@@ -64,6 +64,9 @@ export interface Profile {
   quote_approver_changed_at?: string | null;
   /** „Kontakt pro obchod a ceny" — kolega, na kterého e-mail k nabídce odkáže obchod a ceny (20261103130000). */
   sales_contact_id?: string | null;
+  /** Poslední skutečná akce v aplikaci (kliknutí / klávesa, ~1 min) a stránka, kde k ní došlo (20261109140000). */
+  last_active_at?: string | null;
+  last_active_path?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1319,6 +1322,9 @@ export interface Database {
       capture_try_lock: { Args: { p_capture: string; p_user: string; p_token: string; p_ttl_seconds: number }; Returns: boolean };
       capture_unlock: { Args: { p_capture: string; p_token: string }; Returns: undefined };
       app_whoami: { Args: Record<string, never>; Returns: Record<string, unknown> };
+      /** Tep poslední aktivity (20261109140000): přihlášený jen sebe / server (service role) za ověřeného uživatele. */
+      touch_my_activity: { Args: { p_path: string | null }; Returns: boolean };
+      user_activity_touch: { Args: { p_user: string; p_path: string | null }; Returns: boolean };
       production_apply: {
         Args: { p_job: string; p_token: string; p_kind: string; p_expected_stage: JobStage; p_expected_route: string; p_payload: Json };
         Returns: Json;
