@@ -10,6 +10,7 @@ import { getJob } from "@/lib/data/jobs";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import { isForward, isJobStage } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cleanText, isUuid, jobFilePath, translateDbError } from "@/lib/jobs/mapping";
@@ -762,6 +763,8 @@ export async function sendJobDocument(
         .eq("id", file.quote_id)
         .in("status", ["navrh_ai", "ke_schvaleni", "odeslano"]);
       if (error) console.error(`[job-documents] Označení nabídky jako odeslané selhalo: ${error.message}`);
+      // nabídka → zakázka (9. 11.): termín dodání běží od odeslání nabídky
+      else await syncJobFromQuote(db, jobId, { actorId: user.id, reason: "sent" });
     }
     // potvrzení: objednávku potvrdí DB z události e-mailu níže (podle revize odeslaného souboru);
     // zakázka bez dokladu objednávky (starší data) se posune sama zde

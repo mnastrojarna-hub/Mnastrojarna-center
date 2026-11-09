@@ -211,8 +211,13 @@ await T("detail Nabídky: nová nabídka z položek (ceny, platnost, lhůta) →
   const items = sql(`select drawing_number || '|' || quantity || '|' || unit_price || '|' || coalesce(purchase_unit_price::text,'-') from quote_items where quote_id = ${lit(qid)} order by position`).split("\n");
   expect(items.length === 2 && num(items[0].split("|")[2]) === 1250.5 && num(items[0].split("|")[3]) === PURCHASE, `položky nabídky (${items.join(" ; ")})`);
   expect(sql(`select priced_by from orders where id = ${lit(Q1.id)}`) === ID.obchod, "zakázka: nacenil = obchodník (první nacenená nabídka)");
-  const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'quote' order by created_at desc limit 1`);
+  const ev = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and type = 'quote' and coalesce(data->>'action', '') <> 'offer_sync' order by created_at desc limit 1`);
   expect(ev === `Nabídka ${number} vytvořena — čeká na schválení|${ID.obchod}`, `historie: ${ev}`);
+  // 9. 11.: nabídka se hned propíše do zakázky — ceny položek, hodnota = nabídka, termín = dnes + lhůta (jedna událost)
+  const synced = sql(`select string_agg(unit_price::text, ',' order by position) || '|' || o.value from order_items i join orders o on o.id = i.order_id where o.id = ${lit(Q1.id)} group by o.value`).split("|");
+  expect(synced[0].split(",").map(num).join(",") === "1250.5,89" && num(synced[1]) === 5892, `zakázka podle nabídky: ceny ${synced[0]}, hodnota ${synced[1]}`);
+  const syncEv = sql(`select message || '|' || actor_id from job_events where job_id = ${lit(Q1.id)} and data->>'action' = 'offer_sync'`);
+  expect(norm(syncEv).startsWith(`Z nabídky ${number} srovnáno: ceny 2 položek, hodnota 5 892 Kč`) && syncEv.endsWith(`|${ID.obchod}`), `historie propsání: ${syncEv}`);
 
   const card = quoteCard(page, number);
   await card.waitFor({ timeout: 10_000 });

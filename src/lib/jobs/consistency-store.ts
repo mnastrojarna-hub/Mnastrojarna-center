@@ -2,7 +2,7 @@ import type { JobsDb } from "@/lib/jobs/events";
 import { cleanNumber } from "@/lib/jobs/mapping";
 import {
   DISTRIBUTE_MODE_LABELS, activePurchaseOrders, defaultMode, distributeJobValue, formatKc, isInvoiced, itemsPurchaseValue, itemsSaleValue,
-  pairQuoteItems, quotePriceWarning, sameMoney,
+  quotePriceWarning, sameMoney,
   type ConsistencyPo, type ConsistencySnapshot, type DistributeMode, type QuoteRef,
 } from "@/lib/jobs/consistency";
 
@@ -119,35 +119,6 @@ export async function applyJobValueToItems(
   const value = cleanNumber(data) ?? r.achieved;
   const warning = quotePriceWarning(snapshot.quotes ?? [], value, cur) ?? undefined;
   return { ok: true, value, requested: r.requested, exact: r.exact, changed: r.changes.length, mode, ...(warning ? { warning } : {}) };
-}
-
-/**
- * Ceny přijaté nabídky na spárované položky zakázky (jen změněné). Vyfakturovanou zakázku nemění.
- * Vrací, kolik položek dostalo novou cenu.
- */
-export async function applyQuotePricesToItems(db: JobsDb, jobId: string, quoteItems: Row[]): Promise<{ changed: number; invoiced: boolean }> {
-  const { data: jobData } = await db.from("orders").select("invoice_number, invoiced_at").eq("id", jobId).maybeSingle();
-  const job = jobData as Row | null;
-  if (job && isInvoiced({ invoiceNumber: job.invoice_number as string | null, invoicedAt: job.invoiced_at as string | null })) {
-    return { changed: 0, invoiced: true };
-  }
-  const { data } = await db.from("order_items").select("id, position, drawing_number, name, quantity, unit_price").eq("order_id", jobId).order("position");
-  const jobItems = (data ?? []) as Row[];
-  const qItems = [...quoteItems].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
-  if (!jobItems.length || !qItems.length) return { changed: 0, invoiced: false };
-  const pairs = pairQuoteItems(
-    jobItems.map((r) => ({ drawingNumber: r.drawing_number as string | null, name: r.name as string | null })),
-    qItems.map((r) => ({ drawingNumber: r.drawing_number as string | null, name: r.name as string | null })),
-  );
-  let changed = 0;
-  for (const [ji, qi] of pairs) {
-    const price = cleanNumber(qItems[qi]?.unit_price);
-    if (price === null || cleanNumber(jobItems[ji].unit_price) === price) continue;
-    const { error } = await db.from("order_items").update({ unit_price: price } as never).eq("id", jobItems[ji].id as string).eq("order_id", jobId);
-    if (error) console.error(`[consistency] Cena položky z přijaté nabídky se nepodařila zapsat: ${error.message}`);
-    else changed += 1;
-  }
-  return { changed, invoiced: false };
 }
 
 /**

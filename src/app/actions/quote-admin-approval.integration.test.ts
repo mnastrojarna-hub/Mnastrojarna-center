@@ -112,8 +112,9 @@ describe.skipIf(!ENABLED)("#25 schvalování nabídek super adminem ↔ lokáln�
     return (await svc.from("quotes").select("*").eq("id", quoteId).single()).data as Row;
   }
   async function events(jobId: string): Promise<string[]> {
-    const { data } = await svc.from("job_events").select("message").eq("job_id", jobId).eq("type", "quote").order("created_at");
-    return ((data ?? []) as { message: string }[]).map((e) => e.message);
+    // propsání nabídky do zakázky (9. 11., „Z nabídky … doplněno") testuje quote-job-sync.integration.test.ts
+    const { data } = await svc.from("job_events").select("message, data").eq("job_id", jobId).eq("type", "quote").order("created_at");
+    return ((data ?? []) as { message: string; data: { action?: string } | null }[]).filter((e) => e.data?.action !== "offer_sync").map((e) => e.message);
   }
   async function quoteInput(quoteId: string, patch: Row = {}) {
     const row = await q(quoteId);
