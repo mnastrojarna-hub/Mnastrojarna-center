@@ -8,7 +8,7 @@ import { getJobFlow } from "@/lib/data/flow-status";
 import { logJobEvent } from "@/lib/jobs/events";
 import { isJobStage } from "@/lib/jobs/stages";
 import { cleanDate, isUuid, todayIso, translateDbError } from "@/lib/jobs/mapping";
-import { quoteFactsFromRow, quoteLabel, reasonRequired, stageEffect, stageEffectText, transitionFeature } from "@/lib/jobs/flow-status";
+import { canMoveJobStage, quoteFactsFromRow, quoteLabel, reasonRequired, stageEffect, stageEffectText } from "@/lib/jobs/flow-status";
 import type { ActionResult } from "@/lib/jobs/types";
 import type { JobStage } from "@/lib/supabase/database.types";
 
@@ -48,7 +48,7 @@ export async function previewJobStage(
       from: flow.facts.stage,
       lines: stageEffectText(effect),
       reasonRequired: reasonRequired("job", to),
-      allowed: can(transitionFeature("job", to)),
+      allowed: canMoveJobStage(can, to),
     };
   } catch (err) {
     return fail(err);

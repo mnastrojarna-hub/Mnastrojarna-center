@@ -30,6 +30,11 @@ export interface ManagedUser {
   /** 31. 10.: smí poptávat dodavatele (profil can_rfq; obchodník a super admin vždy). Výchozí ne. */
   canRfq?: boolean;
   /**
+   * 9. 11.: smí ručně měnit stav zakázky dopředu i dozadu, včetně koncových stavů (profil can_change_stage;
+   * obchodník a super admin vždy). Výchozí ne.
+   */
+  canChangeStage?: boolean;
+  /**
    * 2. 11.: „Plný přístup" (profil full_access; ne u super admina) — vše jako super admin kromě pošty ostatních
    * schránek a správy uživatelů. Výchozí ne.
    */

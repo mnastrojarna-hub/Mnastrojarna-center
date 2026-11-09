@@ -5,7 +5,7 @@ import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertCircle, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
+  AlertCircle, ArrowLeftRight, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
   KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature, FileCheck2, ShieldCheck, Handshake,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -497,6 +497,19 @@ function UserRow({
           >
             <ShieldCheck className="h-3 w-3 shrink-0" />
             <span className="truncate">poptává dodavatele</span>
+          </button>
+        )}
+        {/* 9. 11.: zaměstnanec smí ručně měnit stav zakázky (obchodník a super admin vždy — štítek nepotřebují) */}
+        {user.role === "zamestnanec" && user.canChangeStage === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-stage-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[11px] font-medium text-teal-700 transition hover:bg-teal-500/15 hover:shadow-sm dark:text-teal-300"
+            title="Ručně mění stav zakázky dopředu i dozadu, včetně Vyfakturováno a Dokončeno — změnit v Upravit"
+          >
+            <ArrowLeftRight className="h-3 w-3 shrink-0" />
+            <span className="truncate">mění stav zakázky</span>
           </button>
         )}
         {/* relativní čas se mezi serverem a prohlížečem může lišit o minutu */}

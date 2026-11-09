@@ -92,6 +92,25 @@ describe("oprávnění dle rolí", () => {
     expect(FEATURE_HINTS.rfq).toContain("Smí poptávat dodavatele");
   });
 
+  it("9. 11.: ruční změna stavu (stage_any) — super admin vždy, ostatní jen se „Smí ručně měnit stav zakázky“, bez marží", () => {
+    expect(can(admin, "stage_any", ctx())).toBe(true);
+    expect(can({ ...admin, fullAccess: true }, "stage_any", ctx())).toBe(true);
+    expect(can(staff, "stage_any", ctx())).toBe(false);
+    // obchodník bez příznaku v subjektu ne (current-user ho obchodníkovi dosadí — přechody má i tak přes marže)
+    expect(can(sales, "stage_any", ctx())).toBe(false);
+    expect(can({ ...sales, canChangeStage: true }, "stage_any", ctx())).toBe(true);
+    const sponer: AccessSubject = { ...staff, canChangeStage: true };
+    expect(can(sponer, "stage_any", ctx())).toBe(true);
+    expect(can({ ...sponer, active: false }, "stage_any", ctx())).toBe(false);
+    expect(can({ ...staff, canChangeStage: false }, "stage_any", ctx())).toBe(false);
+    // příznak dává jen změnu stavu — ne marže, ceny, provize, nacenění, mazání ani poptávky dodavatelům
+    for (const f of ["margins", "commissions", "commissions_all", "pricing", "delete", "rfq", "quote_approval", "flow_all", "supplier_invoices"] as const) {
+      expect(can(sponer, f, ctx())).toBe(false);
+    }
+    expect(allowedFeatures(sponer, ctx())).toContain("stage_any");
+    expect(allowedFeatures(staff, ctx())).not.toContain("stage_any");
+  });
+
   it("#25: AI focení pro všechny je výchozí — s klíčem ho má obchodník i zaměstnanec", () => {
     expect(DEFAULT_ACCESS_CONTEXT.aiCaptureForAll).toBe(true);
     const withKey = { ...DEFAULT_ACCESS_CONTEXT, aiConfigured: true };

@@ -40,13 +40,18 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       }
       return res;
     };
-    const [profilesRes, mailboxesRes, rules, salesContacts] = await Promise.all([
+    const [profilesRes, mailboxesRes, rules, stageChangers, salesContacts] = await Promise.all([
       loadProfiles(),
       db
         .from("mailboxes")
         .select("id, email, display_name, owner_id, active, provider")
         .order("email", { ascending: true }),
       fetchCommissionRules(db, null, { withAuthors: true }).catch((): CommissionRuleView[] => []),
+      // „Smí ručně měnit stav zakázky" zvlášť — DB bez migrace 20261109100000 → bez něj (správa uživatelů jede dál)
+      Promise.resolve(db.from("profiles").select("id, can_change_stage"))
+        .then(({ data, error }) => new Set(error ? [] : ((data ?? []) as { id: string; can_change_stage: boolean | null }[])
+          .filter((r) => r.can_change_stage === true).map((r) => r.id)))
+        .catch(() => new Set<string>()),
       // „Kontakt pro obchod a ceny" zvlášť — DB bez migrace 20261103130000 → bez něj (správa uživatelů jede dál)
       Promise.resolve(db.from("profiles").select("id, sales_contact_id"))
         .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; sales_contact_id: string | null }[])
@@ -78,6 +83,7 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       quoteApproverChangedAt: p.quote_approver_changed_at ?? null,
       canRfq: p.role !== "zamestnanec" || (p as Profile & { can_rfq?: boolean | null }).can_rfq === true,
       fullAccess: p.role !== "super_admin" && (p as Profile & { full_access?: boolean | null }).full_access === true,
+      canChangeStage: p.role !== "zamestnanec" || stageChangers.has(p.id),
       salesContactId: salesContacts.get(p.id) ?? null,
     }));
 

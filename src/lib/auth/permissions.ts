@@ -48,13 +48,15 @@ export type Feature =
   | "supplier_invoices_upload" // nahrát fakturu dodavatele (všichni)
   | "supplier_invoices"        // faktury dodavatelů — seznam, detail, rozdělení (super admin; přepínač → všichni)
   | "supplier_invoices_paid"   // zaplaceno / nezaplaceno faktury dodavatele (vždy jen super admin)
-  | "rfq";                     // poptávky dodavatelům — kolo, ceny dodavatelů v porovnání (obchodník, admin; zaměstnanec s příznakem)
+  | "rfq"                      // poptávky dodavatelům — kolo, ceny dodavatelů v porovnání (obchodník, admin; zaměstnanec s příznakem)
+  | "stage_any";               // ruční změna stavu zakázky na kterýkoli stav, dopředu i dozadu (super admin; ostatní s příznakem)
 
 export const ALL_FEATURES: Feature[] = [
   "orders", "workflow", "documents", "customers", "suppliers", "mail", "mail_all", "dashboard",
   "ai_assistant", "ai_tuning", "knowledge", "drawings", "ai_pricing", "ai_capture",
   "commissions", "commissions_all", "margins", "users", "settings", "delete",
   "pricing", "quote_approval", "flow_all", "supplier_invoices_upload", "supplier_invoices", "supplier_invoices_paid", "rfq",
+  "stage_any",
 ];
 
 export interface AccessSubject {
@@ -69,6 +71,12 @@ export interface AccessSubject {
    * Vidí ceny dodavatelů jen v poptávkovém kole (porovnání, výběr) — ne marže, provize ani objednávky dodavatelům.
    */
   canRfq?: boolean;
+  /**
+   * 9. 11.: „Smí ručně měnit stav zakázky" (profiles.can_change_stage; obchodník smí vždy) → stage_any: korekce stavu
+   * na kterýkoli stav dopředu i dozadu, včetně koncových (vyfakturováno, dokončeno, nerealizováno, zrušeno) — zaměstnanec
+   * Šponer. Jen stav: marže, ceny ani faktury tím neuvidí.
+   */
+  canChangeStage?: boolean;
   /**
    * 2. 11.: „Plný přístup" (profiles.full_access) — vše jako super admin kromě FULL_ACCESS_DENIED
    * („každý bude vidět jen svůj mail, jinak budou moci vše"; správu uživatelů ne).
@@ -122,6 +130,8 @@ export function can(subject: AccessSubject | null | undefined, feature: Feature,
   if (feature === "quote_approval") return subject.canApproveQuotes === true;
   // 31. 10.: poptávky dodavatelům — zaměstnanec jen s příznakem „Smí poptávat dodavatele"
   if (feature === "rfq" && subject.role === "zamestnanec") return subject.canRfq === true;
+  // 9. 11.: ruční změna stavu zakázky na kterýkoli stav — jen s příznakem „Smí ručně měnit stav zakázky"
+  if (feature === "stage_any") return subject.canChangeStage === true;
   if (ADMIN_ONLY.includes(feature)) return false;
   // faktury dodavatelů: jeden přepínač (Nastavení faktur) — zatím jen super admin
   if (feature === "supplier_invoices") return ctx.supplierInvoicesForAll === true;
@@ -148,7 +158,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Vidí a nastavuje vše — obchodní tok všech, Nacenění, schvalování nabídek, AI, poštu všech schránek a uživatele.",
   obchodnik: "Kniha zakázek, zákazníci a dodavatelé — vše. Obchodní tok a pošta — jen své. Marže, nákupní ceny a vlastní provize. Nabídku odešle po schválení super adminem nebo schvalovatelem (schvalování lze uživateli vypnout).",
-  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem nebo schvalovatelem odešle sám (schvalování lze uživateli vypnout). Poptávky dodavatelům (a jejich ceny v porovnání) jen se „Smí poptávat dodavatele“.",
+  zamestnanec: "Kniha zakázek, zákazníci a dodavatelé — vše, bez nákupních cen a marží. Obchodní tok a pošta — jen své. Svou nabídku po schválení super adminem nebo schvalovatelem odešle sám (schvalování lze uživateli vypnout). Poptávky dodavatelům (a jejich ceny v porovnání) jen se „Smí poptávat dodavatele“. Speciální stavy zakázky (pozastaveno, reklamace, nerealizováno, zrušeno) smí; vyfakturovat a dokončit jen se „Smí ručně měnit stav zakázky“.",
 };
 
 /** Popis plného přístupu (profiles.full_access, 2. 11.) pro Můj účet. */
@@ -184,6 +194,7 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   supplier_invoices: "Faktury dodavatelů",
   supplier_invoices_paid: "Zaplaceno u faktur dodavatelů",
   rfq: "Poptávky dodavatelům",
+  stage_any: "Ruční změna stavu zakázky",
 };
 
 /** Doplňující vysvětlení u odepřené funkce (AccessBanner) — co dělat místo toho. */
