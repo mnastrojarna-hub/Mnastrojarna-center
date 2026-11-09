@@ -67,7 +67,7 @@ export function withJobMatches(
 export function toFlowQuote(
   q: JobQuote & {
     job: { id: string; number: string; title: string; stage: JobStage } | null;
-    customer: { id: string; name: string } | null;
+    customer: { id: string; name: string; isPremium?: boolean } | null;
   },
   info: FlowQuoteInfo | null | undefined,
   opts: { today: string; onlyOpen: boolean },
@@ -156,6 +156,7 @@ export function toPricingJob(j: JobDetail, flow: FlowJobState | null = null, fil
     priority: j.priority,
     customerName: j.customer?.name ?? null,
     customerNumber: j.customer?.customerNumber ?? null,
+    customerPremium: j.customerPremium === true,
     customerInquiryNumber: j.customerInquiryNumber,
     customerRequiredDate: j.customerRequiredDate,
     dueDate: j.dueDate,

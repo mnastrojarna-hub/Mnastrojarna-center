@@ -102,6 +102,8 @@ export interface Customer {
   risk_level?: "nizke" | "stredni" | "vysoke" | null;
   annual_revenue_czk?: number | null;
   repeat_customer?: boolean;
+  /** Prémiový zákazník (20261109150000) — zakázky výrazně označené. */
+  is_premium?: boolean;
 }
 
 export interface CustomerContact {

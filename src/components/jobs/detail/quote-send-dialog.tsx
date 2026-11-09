@@ -8,6 +8,7 @@ import { generateJobDocument, sendJobDocument, draftJobDocumentEmail } from "@/a
 import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
 import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { applySalutation } from "@/lib/contacts/tone";
+import { PremiumBanner } from "@/components/customers/premium-badge";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
 import { PrintButton } from "@/components/print/print-button";
@@ -31,13 +32,16 @@ function invalidAddress(list: string): string | null {
  * Položky bez ceny → varování s „Zpět — doplním ceny" / „Přesto odeslat".
  */
 export function QuoteSendDialog({
-  open, onOpenChange, quote, fallback,
+  open, onOpenChange, quote, fallback, premium = false, customerName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quote: { id: string; number: string; status: string };
   /** Předvyplnění, když návrh e-mailu ze serveru selže. */
   fallback: { to: string; jobNumber: string; title: string; contact: string | null };
+  /** 9. 11.: prémiový zákazník — výrazný pruh „Pozor — prémiový zákazník" nahoře. */
+  premium?: boolean;
+  customerName?: string | null;
 }) {
   const { jobId, notify, refresh } = useJobDetail();
   const [step, setStep] = React.useState<Step>("preparing");
@@ -180,6 +184,7 @@ export function QuoteSendDialog({
           subtitle="Zkontroluj adresu a text — e-mail odejde z tvé schránky s PDF v příloze."
         />
         <form onSubmit={send} className="space-y-4 p-4 sm:p-5" noValidate>
+          {premium && <PremiumBanner customerName={customerName} />}
           <ErrorBox error={error} />
           {step === "preparing" ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">

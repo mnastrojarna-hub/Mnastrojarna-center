@@ -1,5 +1,6 @@
 "use client";
 
+import { TriangleAlert } from "lucide-react";
 import { useBookNav } from "@/components/jobs/book/book-nav";
 import { EXCEPTION_FILTERS, type ExceptionFilterKey } from "@/lib/jobs/flow-exceptions";
 import { LOST_REASONS, LOST_REASON_ORDER, type LostReason } from "@/lib/jobs/flow-status";
@@ -17,13 +18,46 @@ const chipCls = (active: boolean, alert = false) => cn(
     : "border border-border bg-background text-foreground hover:bg-accent",
 );
 
-export function ExceptionChips({ counts }: { counts: Record<string, number> }) {
+const ROW_CLS = "-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0";
+
+/**
+ * 9. 11.: chip „Prémioví" — jen zakázky prémiových zákazníků (URL premiovi=1). Počet = v aktuálním pohledu
+ * (záložka + filtry); bez prémiových zakázek se chip neukáže (kromě zapnutého filtru).
+ */
+function PremiumChip({ count }: { count: number }) {
   const { params, navigate } = useBookNav();
+  const active = params.premium === true;
+  if (!active && count === 0) return null;
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      data-testid="premium-chip"
+      title="Jen zakázky prémiových zákazníků (nastavuje se v kartě zákazníka)"
+      className={cn(
+        "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active ? "bg-red-600 text-white shadow-sm shadow-red-600/30"
+          : "border border-red-400 bg-red-50 text-red-800 hover:bg-red-100 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-200 dark:hover:bg-red-500/20",
+      )}
+      onClick={() => navigate({ premium: !active })}
+    >
+      <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
+      Prémioví
+      <span className="tabular-nums opacity-80">{count}</span>
+    </button>
+  );
+}
+
+export function ExceptionChips({ counts, premium = 0 }: { counts: Record<string, number>; premium?: number }) {
+  const { params, navigate } = useBookNav();
+  const premiumChip = <PremiumChip count={premium} />;
+  const showPremium = premium > 0 || params.premium === true;
   if (params.segment === "nerealizovane") {
     const reasons = LOST_REASON_ORDER.filter((r) => (counts[`duvod.${r}`] ?? 0) > 0 || params.reason === r);
-    if (!reasons.length) return null;
+    if (!reasons.length) return showPremium ? <div role="group" aria-label="Zákazníci" className={ROW_CLS}>{premiumChip}</div> : null;
     return (
-      <div role="group" aria-label="Důvod" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" data-testid="lost-reason-chips">
+      <div role="group" aria-label="Důvod" className={ROW_CLS} data-testid="lost-reason-chips">
+        {premiumChip}
         {reasons.map((r: LostReason) => {
           const active = params.reason === r;
           return (
@@ -37,9 +71,10 @@ export function ExceptionChips({ counts }: { counts: Record<string, number> }) {
     );
   }
   const shown = EXCEPTION_FILTERS.filter((x) => (params.segment === "objednavky" && ALWAYS.includes(x.key)) || (counts[x.key] ?? 0) > 0 || params.exception === x.key);
-  if (!shown.length) return null;
+  if (!shown.length) return showPremium ? <div role="group" aria-label="Zákazníci" className={ROW_CLS}>{premiumChip}</div> : null;
   return (
-    <div role="group" aria-label="Výjimky" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" data-testid="exception-chips">
+    <div role="group" aria-label="Výjimky" className={ROW_CLS} data-testid="exception-chips">
+      {premiumChip}
       {shown.map((x) => {
         const active = params.exception === x.key;
         const n = counts[x.key] ?? 0;

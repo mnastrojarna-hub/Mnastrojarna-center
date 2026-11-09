@@ -68,14 +68,19 @@ async function saveBookAfter(db: unknown, kind: PartyKind, partyId: string, book
   return res.ok ? null : `Údaje firmy jsou uložené, ale kontakty a e-maily ne: ${res.error}`;
 }
 
-function revalidateCustomer(id?: string) {
+function revalidateCustomer(id?: string, everywhere = false) {
+  // prémiový zákazník mění vzhled zakázek všude (Kniha, karty zakázek, tok, přehled) → celé rozvržení
+  if (everywhere) {
+    revalidatePath("/", "layout");
+    return;
+  }
   revalidatePath("/customers");
   if (id) revalidatePath(`/customers/${id}`);
   revalidatePath("/orders");
 }
 
 // ── Zákazníci ───────────────────────────────────────────────
-type CustomerColumns = Record<string, string | number | null>;
+type CustomerColumns = Record<string, string | number | boolean | null>;
 
 /** Formulář → sloupce customers (null = vymazat). Chyba = text. */
 function customerColumns(input: CustomerFormValues): { cols: CustomerColumns } | { error: string } {
@@ -110,6 +115,8 @@ function customerColumns(input: CustomerFormValues): { cols: CustomerColumns } |
       supplier_number_at_customer: clean(input.supplierNumberAtCustomer, 120),
       note: clean(input.note, 5000),
       owner_id: isUuid(input.ownerId) ? input.ownerId : null,
+      // 9. 11.: prémiový zákazník — jen když ho formulář poslal (starší klient bez pole nic nemění)
+      ...(typeof input.isPremium === "boolean" ? { is_premium: input.isPremium } : {}),
     },
   };
 }
@@ -237,7 +244,7 @@ export async function updateCustomer(
   if (checked.book) mapped.cols.contact_person = bookContactPerson(checked.book);
   try {
     const db = await createOperatorClient({ actor: userActor(auth.user) });
-    const { data: current } = await db.from("customers").select("id, customer_number, owner_id").eq("id", id).maybeSingle();
+    const { data: current } = await db.from("customers").select("id, customer_number, owner_id, is_premium").eq("id", id).maybeSingle();
     if (!current) return { ok: false, error: "Zákazník neexistuje (možná ho někdo smazal)." };
     // #25: obchodníka zákazníka mění jen super admin (ostatní ho jen ponechají)
     if (auth.user.role !== "super_admin"
@@ -262,17 +269,52 @@ export async function updateCustomer(
     const { data, error } = await db.from("customers").update(row as never).eq("id", id).select("id, customer_number").maybeSingle();
     if (error || !data) return { ok: false, error: dbError(error?.message ?? "Zákazníka se nepodařilo uložit.", number) };
     const ownerJobs = ownerChanged ? await logOwnerFollow(db, id, jobsBefore, auth.user.id) : 0;
+    const prevPremium = (current as { is_premium?: boolean | null }).is_premium === true;
+    const premiumChanged = typeof row.is_premium === "boolean" && row.is_premium !== prevPremium;
     await logAudit({
       action: "customer_updated", entity: "customers", entityId: id,
-      diff: { name: row.name, ...(ownerChanged ? { owner_id: { from: prevOwner, to: nextOwner }, ownerJobs } : {}) },
+      diff: {
+        name: row.name,
+        ...(ownerChanged ? { owner_id: { from: prevOwner, to: nextOwner }, ownerJobs } : {}),
+        ...(premiumChanged ? { isPremium: { from: prevPremium, to: row.is_premium } } : {}),
+      },
     });
     let bookError: string | null = null;
     if (checked.book) bookError = await saveBookAfter(db, "customer", id, checked.book);
     else await ensureContactPerson(db, { customerId: id }, { name: row.contact_person as string | null, email: row.email as string | null, phone: row.phone as string | null }).catch(() => null);
-    revalidateCustomer(id);
+    revalidateCustomer(id, premiumChanged);
     const customerNumber = (data as { customer_number: string | null }).customer_number;
     if (bookError) return { ok: false, error: bookError, customerNumber, partySaved: true };
     return { ok: true, customerNumber, ...(ownerChanged ? { ownerJobs } : {}) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
+  }
+}
+
+/**
+ * Prémiový zákazník (9. 11.) — přepínač v kartě zákazníka. Smí každý, kdo smí zákazníka upravit (oprávnění
+ * „customers"; DB: RLS customers_update = aktivní uživatel). Zakázky se zvýrazní živě (čtou příznak ze zákazníka).
+ */
+export async function setCustomerPremium(id: string, premium: boolean): Promise<ActionResult<{ isPremium: boolean }>> {
+  const auth = await checkFeature("customers");
+  if ("error" in auth) return { ok: false, error: auth.error };
+  if (!isUuid(id)) return { ok: false, error: "Neplatný zákazník." };
+  if (typeof premium !== "boolean") return { ok: false, error: "Neplatná hodnota." };
+  if (!isSupabaseConfigured()) return { ok: false, error: NO_DB };
+  try {
+    const db = await createOperatorClient({ actor: userActor(auth.user) });
+    const { data: current } = await db.from("customers").select("id, name, is_premium").eq("id", id).maybeSingle();
+    if (!current) return { ok: false, error: "Zákazník neexistuje (možná ho někdo smazal)." };
+    const cur = current as { name: string; is_premium: boolean | null };
+    if ((cur.is_premium === true) === premium) return { ok: true, isPremium: premium };
+    const { data, error } = await db.from("customers").update({ is_premium: premium } as never).eq("id", id).select("id, is_premium").maybeSingle();
+    if (error || !data) return { ok: false, error: translateDbError(error?.message ?? "Zákazníka se nepodařilo uložit.") };
+    await logAudit({
+      action: "customer_premium_changed", entity: "customers", entityId: id,
+      diff: { name: cur.name, isPremium: { from: cur.is_premium === true, to: premium } },
+    });
+    revalidateCustomer(id, true);
+    return { ok: true, isPremium: (data as { is_premium: boolean }).is_premium === true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Chyba ukládání" };
   }

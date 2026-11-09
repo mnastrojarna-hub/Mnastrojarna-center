@@ -17,7 +17,7 @@ import {
   JOB_FILE_LIST_SELECT, JOB_EVENT_SELECT, JOB_COUNT_SELECT, MATCH_JOB_SELECT, MATCH_CUSTOMER_SELECT,
   rowToJobListItem, rowToJobDetail, rowToJobQuote, rowToJobFile, resolveStageFilter, filterJobs,
   sortJobs, countJobStages, emptyStageCounts, isUuid, one, searchNormalize, isQuoteStatus, fetchPaged,
-  OVERDUE_INVOICE_SELECT, isOverdueInvoiceRow,
+  OVERDUE_INVOICE_SELECT, isOverdueInvoiceRow, isPremiumCustomer,
   type JobRow, type QuoteRow, type FileRow, type EventRow, type JobStageCounts, type ViewOptions,
 } from "@/lib/jobs/mapping";
 import type { FlowScope } from "@/lib/auth/flow-scope";
@@ -190,7 +190,7 @@ function lightEligible(filters: JobFilters, narrowed: FlowScope | null): boolean
   return !narrowed && limit > 0 && limit <= LIGHT_MAX && LIGHT_SORTS.has(filters.sort ?? "created")
     && !(filters.q ?? "").trim() && !(filters.step ?? "").trim() && !(filters.location ?? "").trim() && !filters.payment
     && !(filters.inquiry ?? []).length && !(filters.order ?? []).length && !(filters.delivery ?? []).length
-    && !filters.exception && !filters.lostReason
+    && !filters.exception && !filters.lostReason && !filters.premium
     // dodáno zákazníkovi potřebuje items_count / items_delivered, zaplaceno paid_at (lehké řádky je nemají)
     && typeof filters.deliveredToCustomer !== "boolean" && typeof filters.paid !== "boolean"
     && filters.deadline !== "krok";
@@ -232,7 +232,7 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
     const filtered = filterJobs(items, {
       q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
       inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery, deliveredToCustomer: filters.deliveredToCustomer,
-      paid: filters.paid, exception: filters.exception, lostReason: filters.lostReason,
+      paid: filters.paid, exception: filters.exception, lostReason: filters.lostReason, premium: filters.premium,
     });
     const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
@@ -497,7 +497,8 @@ export async function getJobFormOptions(): Promise<JobFormOptions> {
 // ── Nabídky napříč zakázkami ────────────────────────────────
 export type QuoteListItem = JobQuote & {
   job: { id: string; number: string; title: string; stage: JobStage } | null;
-  customer: { id: string; name: string } | null;
+  /** isPremium = prémiový zákazník (9. 11.) — štítek „Pozor, prémiový zákazník" v přehledu nabídek. */
+  customer: { id: string; name: string; isPremium?: boolean } | null;
 };
 
 /** Nabídky; s scope jen „moje" (moje zakázky ∪ nabídky, které jsem vytvořil / jsem jejich obchodník / žádal). */
@@ -536,7 +537,9 @@ export async function listQuotes(
         job: job
           ? { id: job.id, number: job.number ?? "—", title: job.title ?? "", stage: isJobStage(job.status) ? job.status : "poptavka" }
           : null,
-        customer: customer ? { id: customer.id, name: customer.name } : null,
+        customer: customer
+          ? { id: customer.id, name: customer.name, ...(isPremiumCustomer(customer) ? { isPremium: true } : {}) }
+          : null,
       };
     });
     const tokens = searchNormalize(opts.q ?? "").split(/\s+/).filter(Boolean);

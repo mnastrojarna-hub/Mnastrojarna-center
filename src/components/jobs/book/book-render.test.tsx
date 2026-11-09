@@ -262,4 +262,27 @@ describe("Kniha zakázek — vykreslení", () => {
     const sales = render(<JobForm options={OPTIONS} initial={init} onSubmit={() => {}} />);
     expect(sales).toContain("Nákup / MJ");
   });
+
+  it("9. 11.: prémiový zákazník — řádek i karta tabule výrazně červeně „Pozor, prémiový zákazník“, ostatní beze změny", () => {
+    const premium = job({ id: "jp", number: "Z-2026-777", customerPremium: true, customer: { id: "c9", name: "Hitachi Energy", customerNumber: "ZK0009", ico: null } });
+    const rows = render(<JobRows jobs={[premium, job()]} today="2026-10-22" />);
+    // jen prémiová zakázka: štítek s výstražnou ikonou, červený okraj / podklad a pruh
+    expect(rows.match(/data-testid="premium-badge"/g)).toHaveLength(1);
+    expect(rows.match(/data-premium="1"/g)).toHaveLength(1);
+    expect(rows).toContain("Pozor, prémiový zákazník"); // od sm celý text
+    expect(rows).toContain(">Prémiový<"); // mobil: ikona + „Prémiový"
+    expect(rows).toContain("Prémiový zákazník"); // úzký sloupec širokého desktopu
+    expect(rows).toMatch(/<li[^>]*border-red-500\/70[^>]*data-premium="1"/);
+    expect(rows).toContain("dark:bg-red-950/30"); // tmavý režim
+    // štítek je silnější než chip priority: plná červená s bílým textem
+    expect(rows).toMatch(/data-testid="premium-badge"[^>]*bg-red-600[^>]*text-white|bg-red-600[^>]*text-white[^>]*data-testid="premium-badge"/);
+    const plain = render(<JobRows jobs={[job()]} today="2026-10-22" />);
+    expect(plain).not.toContain("premium-badge");
+    expect(plain).not.toContain("data-premium");
+
+    const board = render(<JobBoard jobs={[premium, job()]} stages={["objednavka", "potvrzeno"]} today="2026-10-22" />);
+    expect(board.match(/data-testid="premium-badge"/g)).toHaveLength(1);
+    expect(board.match(/data-premium="1"/g)).toHaveLength(1);
+    expect(board).toContain("Pozor, prémiový zákazník");
+  });
 });

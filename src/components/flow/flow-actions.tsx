@@ -64,6 +64,9 @@ export interface FlowActionTarget {
   onlyOpenQuote?: boolean;
   /** Autor nabídky (toast schválení / vrácení — #25). */
   quoteAuthor?: string | null;
+  /** 9. 11.: prémiový zákazník — pruh „Pozor — prémiový zákazník" v dialogu odeslání nabídky. */
+  premium?: boolean;
+  customerName?: string | null;
   today: string;
 }
 
@@ -398,6 +401,8 @@ export function FlowActionBar({
               quoteId={q.id}
               number={qName}
               updatedAt={q.updatedAt ?? null}
+              premium={target.premium === true}
+              customerName={target.customerName}
               onDone={(text) => refresh(text)}
             />
           )}

@@ -29,6 +29,11 @@ export interface JobListItem {
   stage: JobStage;
   priority: PriorityLevel;
   customer: JobCustomerRef | null;
+  /**
+   * Zákazník je prémiový (customers.is_premium) — zakázka se všude výrazně označí „Pozor, prémiový zákazník".
+   * Živě ze zákazníka (mapping.ts isPremiumCustomer), ne kopie na zakázce. Chybí = ne.
+   */
+  customerPremium?: boolean;
   customerOrderNumber: string | null;
   customerInquiryNumber: string | null;
   drawingNumbers: string[];
@@ -456,6 +461,8 @@ export interface JobFilters {
   exception?: string;
   /** Důvod prohry / storna (Nerealizované & zrušené). */
   lostReason?: string;
+  /** Jen zakázky prémiových zákazníků (Kniha → chip „Prémioví"). */
+  premium?: boolean;
   sort?: JobSort;
   dir?: "asc" | "desc";
   limit?: number;

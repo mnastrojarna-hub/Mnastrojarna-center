@@ -439,6 +439,8 @@ export interface PendingQuoteApproval {
   /** Název zakázky (řádek fronty říká, k čemu nabídka je). */
   jobTitle?: string | null;
   customerName: string | null;
+  /** Prémiový zákazník (9. 11.) — štítek „Pozor, prémiový zákazník". */
+  customerPremium?: boolean;
   authorName: string | null;
   total: number | null;
   currency: string;
@@ -467,8 +469,8 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
       let qb = db.from("quotes")
         .select([
           "id, number, job_id, total, currency, updated_at, created_at",
-          "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name))",
-          "customer:customers!customer_id(name)",
+          "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name, is_premium))",
+          "customer:customers!customer_id(name, is_premium)",
           "creator:profiles!created_by(full_name, email)",
           "items:quote_items!quote_id(unit_price)",
         ].join(", "))
@@ -498,7 +500,9 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
     for (const r of data) {
       const id = String(r.id);
       if (queued.has(id)) continue;
-      const job = first(r.job as Embed<{ id: string; number: string | null; title?: string | null; status: string; customer?: Embed<{ name: string }> }>);
+      type Cust = { name: string; is_premium?: boolean | null };
+      const job = first(r.job as Embed<{ id: string; number: string | null; title?: string | null; status: string; customer?: Embed<Cust> }>);
+      const cust = first(r.customer as Embed<Cust>) ?? first(job?.customer);
       if (job && closed.includes(job.status)) continue;
       const creator = first(r.creator as Embed<{ full_name: string | null; email: string | null }>);
       const items = (Array.isArray(r.items) ? r.items : []) as { unit_price: number | string | null }[];
@@ -509,7 +513,8 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
         jobId: job?.id ?? ((r.job_id as string | null) ?? null),
         jobNumber: job?.number ?? null,
         jobTitle: job?.title?.trim() || null,
-        customerName: first(r.customer as Embed<{ name: string }>)?.name ?? first(job?.customer)?.name ?? null,
+        customerName: cust?.name ?? null,
+        ...(cust?.is_premium === true ? { customerPremium: true } : {}),
         authorName: (creator?.full_name ?? "").trim() || (creator?.email ?? "").trim() || null,
         total: total !== null && Number.isFinite(total) ? total : null,
         currency: (r.currency as string | null) || "CZK",

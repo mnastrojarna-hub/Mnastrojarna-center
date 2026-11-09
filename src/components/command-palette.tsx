@@ -8,6 +8,7 @@ import {
   Sparkles, Users,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { PremiumBadge } from "@/components/customers/premium-badge";
 import { allNavItems } from "@/lib/nav";
 import { useAccess } from "@/components/access-provider";
 import { STAGES, isJobStage } from "@/lib/jobs/stages";
@@ -31,6 +32,8 @@ export interface SearchEntry {
   /** Normalizovaný text pro hledání (bez diakritiky, malými písmeny). */
   keywords: string;
   stage?: JobStage;
+  /** Prémiový zákazník (zakázky, nabídky, zákazníci) — červený štítek „Prémiový" (9. 11.). */
+  premium?: boolean;
 }
 
 export type SearchGroupKey = "jobs" | "customers" | "suppliers" | "quotes" | "drawings" | "supplierInvoices";
@@ -234,6 +237,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
                         iconTone={g.tone}
                         hint={e.hint}
                         stage={e.stage && isJobStage(e.stage) ? e.stage : undefined}
+                        premium={e.premium === true}
                       >
                         {e.label}
                       </Item>
@@ -280,6 +284,7 @@ function Item({
   iconTone,
   hint,
   stage,
+  premium,
 }: {
   children: React.ReactNode;
   value: string;
@@ -288,6 +293,7 @@ function Item({
   iconTone?: string;
   hint?: string;
   stage?: JobStage;
+  premium?: boolean;
 }) {
   const m = stage ? STAGES[stage] : null;
   return (
@@ -304,6 +310,7 @@ function Item({
         <span className="block truncate">{children}</span>
         {hint && <span className="block truncate text-xs text-muted-foreground">{hint}</span>}
       </span>
+      {premium && <PremiumBadge label="compact" size="xs" />}
       {m && (
         <span className={cn("hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline", m.badge)}>{m.short}</span>
       )}

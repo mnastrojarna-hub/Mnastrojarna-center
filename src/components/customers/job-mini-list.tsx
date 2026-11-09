@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarClock, ChevronRight, FileText, Hash, Sparkles } from "lucide-react";
 import { StageBadge } from "@/components/jobs/stage-badge";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
 import { stageMeta } from "@/lib/jobs/stages";
 import { deadlineInfo, DEADLINE_BADGE, type DeadlineInfo } from "@/lib/jobs/deadlines";
 import type { JobListItem } from "@/lib/jobs/types";
@@ -52,17 +53,25 @@ export function JobMiniList({
         const m = stageMeta(job.stage);
         const dl = jobDeadline(job, today);
         const value = money(job.value, job.currency);
+        // v kartě zákazníka je prémiový celý zákazník (hlavička) — zvýraznění jen v přehledu napříč zákazníky
+        const premium = showCustomer && job.customerPremium === true;
         return (
           <li key={job.id}>
             <Link
               href={`/orders/${job.id}`}
-              className="group relative flex items-center gap-3 overflow-hidden rounded-xl border bg-card py-2.5 pl-4 pr-3 transition hover:border-foreground/20 hover:shadow-sm"
+              className={cn(
+                "group relative flex items-center gap-3 overflow-hidden rounded-xl border bg-card py-2.5 pl-4 pr-3 transition hover:border-foreground/20 hover:shadow-sm",
+                premium && PREMIUM_ROW,
+              )}
+              data-premium={premium ? "1" : undefined}
             >
               <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", m.bar)} />
+              {premium && <span aria-hidden className={PREMIUM_STRIPE} />}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-sm font-semibold">{job.number}</span>
                   <StageBadge stage={job.stage} size="xs" />
+                  {premium && <PremiumBadge label="flow" size="xs" />}
                   {job.aiFilled && (
                     <span title="Vyplnila AI z dokladu" className="inline-flex items-center gap-0.5 text-[10px] font-medium text-fuchsia-600 dark:text-fuchsia-400">
                       <Sparkles className="h-3 w-3" /> AI

@@ -12,6 +12,8 @@ import { cn, relativeTime } from "@/lib/utils";
 import { QuoteReturnDialog } from "./quote-return-dialog";
 import { QuoteApproveSendDialog } from "./quote-approve-send-dialog";
 import { approvedToast } from "./quote-approval-copy";
+import { PremiumBadge } from "@/components/customers/premium-badge";
+import { premiumFirst } from "@/lib/jobs/premium";
 
 function money(value: number | null, currency: string): string | null {
   if (value === null || value === undefined) return null;
@@ -49,7 +51,8 @@ function List({ items, className, stacked, canSend }: { items: PendingQuoteAppro
   const [done, setDone] = React.useState<string[]>([]);
   const [returning, setReturning] = React.useState<PendingQuoteApproval | null>(null);
   const [sending, setSending] = React.useState<PendingQuoteApproval | null>(null);
-  const shown = items.filter((i) => !done.includes(i.quoteId));
+  // 9. 11.: nabídky prémiových zákazníků přednostně nahoře (stabilně)
+  const shown = premiumFirst(items.filter((i) => !done.includes(i.quoteId)), (i) => i.customerPremium);
 
   async function approve(p: PendingQuoteApproval) {
     if (busy) return;
@@ -82,7 +85,16 @@ function List({ items, className, stacked, canSend }: { items: PendingQuoteAppro
           const total = money(p.total, p.currency);
           const href = p.jobId ? `/orders/${p.jobId}?tab=nabidky` : "/quotes";
           return (
-            <li key={p.quoteId} className={cn("flex flex-col gap-2 p-3", !stacked && "lg:flex-row lg:items-center lg:gap-3")} data-pending-quote={p.quoteId}>
+            <li
+              key={p.quoteId}
+              className={cn(
+                "relative flex flex-col gap-2 p-3",
+                !stacked && "lg:flex-row lg:items-center lg:gap-3",
+                p.customerPremium && "bg-red-50/70 shadow-[inset_4px_0_0_0_rgb(220_38_38)] dark:bg-red-950/30",
+              )}
+              data-pending-quote={p.quoteId}
+              data-premium={p.customerPremium ? "1" : undefined}
+            >
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-sm font-bold tracking-tight">{p.number ?? "Nabídka"}</span>
@@ -93,6 +105,7 @@ function List({ items, className, stacked, canSend }: { items: PendingQuoteAppro
                     <ShieldAlert className="h-3.5 w-3.5" aria-hidden /> Neschválená
                   </span>
                   {p.jobNumber && <span className="font-mono text-xs text-muted-foreground">{p.jobNumber}</span>}
+                  {p.customerPremium && <PremiumBadge label="flow" size="xs" />}
                 </div>
                 {/* zákazník · zakázka smí být useknuté (celé v title), autor ne */}
                 <p className="min-w-0 truncate text-sm" title={[p.customerName, p.jobTitle].filter(Boolean).join(" · ") || undefined}>
@@ -160,6 +173,8 @@ function List({ items, className, stacked, canSend }: { items: PendingQuoteAppro
           quoteId={sending.quoteId}
           number={sending.number}
           updatedAt={sending.updatedAt ?? null}
+          premium={sending.customerPremium === true}
+          customerName={sending.customerName}
           onDone={(text) => {
             setDone((d) => [...d, sending.quoteId]);
             notify("success", text);
