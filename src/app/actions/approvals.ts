@@ -75,6 +75,9 @@ export async function resolveApproval(
       .maybeSingle();
     const row = data as QueueRow | null;
     if (!row) return can("dashboard") ? { ok: false, error: "Položka fronty nenalezena." } : { ok: false, error: NO_RIGHT };
+    // stav zakázky z pošty má vlastní potvrzení (stav / důvod jde změnit, přepnutí, korekce) — tady by se jen
+    // označil jako vyřízený bez přepnutí stavu
+    if ((row.type as string) === "job_stage") return { ok: false, error: "Návrh stavu zakázky z pošty potvrď v jeho řádku (Přepnout / Žádná změna)." };
     if (!mayResolve(row, auth.user.id, can)) return { ok: false, error: NO_RIGHT };
     if (row.status !== "pending") return { ok: false, error: "Položku už někdo vyřídil — obnov stránku." };
 

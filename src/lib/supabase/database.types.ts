@@ -32,7 +32,9 @@ export type ApprovalType = "email_reply" | "quote" | "supplier_request" | "categ
   // objednávka dodavateli vystavená při předání do výroby (migrace 20261023150000)
   | "purchase_order"
   // návrh AI, jak rozdělit fakturu dodavatele na zakázky (migrace 20261029110000)
-  | "supplier_invoice";
+  | "supplier_invoice"
+  // speciální stav zakázky z pošty — reklamace, nerealizováno, zrušeno, pozastaveno… (migrace 20261109110000)
+  | "job_stage";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "edited" | "auto_executed";
 export type MailboxProvider = "outlook" | "imap" | "gmail";
 

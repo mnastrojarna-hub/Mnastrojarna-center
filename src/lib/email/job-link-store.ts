@@ -27,6 +27,7 @@ import { isSignatureImage } from "@/lib/email/mail-capture-input";
 import { jobFilePath } from "@/lib/jobs/mapping";
 import type { JobsDb } from "@/lib/jobs/events";
 import { noteRfqReply } from "@/lib/rfq/reply";
+import { detectMailStageSignal } from "@/lib/email/mail-stage-store";
 import type { EmailCategory } from "@/lib/supabase/database.types";
 
 /**
@@ -692,6 +693,14 @@ export async function extractAndApply(a: MailJobActor, emailId: string, jobId: s
   const { items, drawings } = await loadItems(db, jobId);
   const drawingNumbers = items.map((i) => i.drawing_number).filter((x): x is string => Boolean(x));
   const party: MailParty = opts.party ?? partyOf(e, job);
+  // 9. 11.: reklamace / nerealizováno / zrušeno / pozastaveno / pokračovat z pošty → návrh nebo přepnutí (režim mail_job_stage)
+  if (!opts.allowOld) {
+    try {
+      await detectMailStageSignal(db, { email: e, jobId, party, text, hold: Boolean(opts.hold) });
+    } catch (err) {
+      console.error(`[mail-job] Stav zakázky z e-mailu selhal: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   let list: MailInstruction[] | null = null;
   let aiUsed = false;
   if (opts.useAi && opts.aiBudget && opts.aiBudget.left > 0 && timeLeft(opts.stopAt) > 25_000 && isRecent(e.received_at, opts.recentDays ?? 30)) {
@@ -809,6 +818,20 @@ export async function extractAndApply(a: MailJobActor, emailId: string, jobId: s
   if (quantityChanged) await recomputeValue(db, jobId);
   await markDone();
   return res;
+}
+
+/**
+ * Stav zakázky z už přiřazeného e-mailu (AI ho roztřídila až po přiřazení — dotřídění, „Roztřídit AI"):
+ * stejné rozpoznání jako při vytěžení, jednou na vlákno + zakázku + druh.
+ */
+export async function stageSignalForLinkedEmail(a: MailJobActor, emailId: string): Promise<void> {
+  const e = await loadEmail(a.db, emailId);
+  if (!e || !e.order_id || e.direction !== "in" || !isRecent(e.received_at, MAIL_JOB_CHANGES_MAX_AGE_DAYS)) return;
+  const job = await jobBrief(a.db, e.order_id);
+  if (!job) return;
+  const text = cleanMailText(e.body_text);
+  if (!text || isNoiseOnly(text)) return;
+  await detectMailStageSignal(a.db, { email: e, jobId: job.id, party: partyOf(e, job), text });
 }
 
 type ChangeRow = {
