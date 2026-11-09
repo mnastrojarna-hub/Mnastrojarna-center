@@ -35,6 +35,13 @@ export interface ManagedUser {
    */
   canChangeStage?: boolean;
   /**
+   * 9. 11.: smí řešit frontu ke schválení (profil can_resolve_queue; super admin vždy) — odchozí e-maily, objednávky
+   * dodavatelům, stav zakázky z pošty; AI návrh nabídky ne. Výchozí ne.
+   */
+  canResolveQueue?: boolean;
+  /** 9. 11.: vidí nákupní ceny a marže (profil can_see_margins; obchodník a super admin vždy). Výchozí ne. */
+  canSeeMargins?: boolean;
+  /**
    * 2. 11.: „Plný přístup" (profil full_access; ne u super admina) — vše jako super admin kromě pošty ostatních
    * schránek a správy uživatelů. Výchozí ne.
    */

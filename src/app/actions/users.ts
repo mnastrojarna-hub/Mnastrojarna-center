@@ -235,6 +235,13 @@ export interface UpdateUserChanges {
    * kterýkoli stav dopředu i dozadu, včetně koncových. Marže a ceny tím nevidí.
    */
   canChangeStage?: boolean;
+  /**
+   * „Smí řešit frontu ke schválení" (9. 11.; obchodník i zaměstnanec — super admin smí vždy): odchozí e-maily,
+   * objednávky dodavatelům, stav zakázky z pošty. AI návrh nabídky dál jen super admin.
+   */
+  canResolveQueue?: boolean;
+  /** „Vidí nákupní ceny a marže" (9. 11.; jen zaměstnanec — obchodník a super admin vždy). Provize ostatních ne. */
+  canSeeMargins?: boolean;
   /** „Plný přístup" (2. 11.; ne u super admina) — vše kromě pošty ostatních schránek a správy uživatelů. */
   fullAccess?: boolean;
   /**
@@ -282,6 +289,24 @@ async function stageChangeFlagChange(
   const { data: cur, error } = await db.from("profiles").select("can_change_stage").eq("id", id).maybeSingle();
   if (error) return value ? { error: "Ruční změna stavu zakázky vyžaduje aktualizaci databáze (migrace 20261109100000)." } : undefined;
   const current = (cur as { can_change_stage?: boolean | null } | null)?.can_change_stage === true;
+  return value === current ? undefined : { value };
+}
+
+/**
+ * 9. 11.: obecná změna příznaku profilu (undefined = beze změny, string = chyba pro uživatele). Ukládá se jen u rolí
+ * v `roles` (ostatní ho mají vždy / nepotřebují). Čte se zvlášť — DB bez migrace ho nemá: vypnutí pak nic nemění,
+ * zapnutí vysvětlí, co chybí.
+ */
+async function profileFlagChange(
+  db: AdminDb, id: string, value: unknown, finalRole: UserRole,
+  opts: { column: "can_resolve_queue" | "can_see_margins"; roles: UserRole[]; label: string; migration: string },
+): Promise<{ value: boolean } | { error: string } | undefined> {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") return { error: `Neplatné nastavení „${opts.label}“.` };
+  if (!opts.roles.includes(finalRole)) return undefined;
+  const { data: cur, error } = await db.from("profiles").select(opts.column).eq("id", id).maybeSingle();
+  if (error) return value ? { error: `„${opts.label}“ vyžaduje aktualizaci databáze (migrace ${opts.migration}).` } : undefined;
+  const current = (cur as Record<string, boolean | null> | null)?.[opts.column] === true;
   return value === current ? undefined : { value };
 }
 
@@ -367,6 +392,18 @@ export async function updateUser(
     const stageChange = await stageChangeFlagChange(db, id, changes.canChangeStage, (update.role as UserRole | undefined) ?? (target.role as UserRole));
     if (stageChange && "error" in stageChange) return { ok: false, error: stageChange.error };
     if (stageChange) update.can_change_stage = stageChange.value;
+    const finalRoleNow = (update.role as UserRole | undefined) ?? (target.role as UserRole);
+    // 9. 11.: fronta ke schválení (ne super admin — ten vždy) a nákupní ceny / marže (jen zaměstnanec)
+    const queueChange = await profileFlagChange(db, id, changes.canResolveQueue, finalRoleNow, {
+      column: "can_resolve_queue", roles: ["obchodnik", "zamestnanec"], label: "Smí řešit frontu ke schválení", migration: "20261109130000",
+    });
+    if (queueChange && "error" in queueChange) return { ok: false, error: queueChange.error };
+    if (queueChange) update.can_resolve_queue = queueChange.value;
+    const marginsChange = await profileFlagChange(db, id, changes.canSeeMargins, finalRoleNow, {
+      column: "can_see_margins", roles: ["zamestnanec"], label: "Vidí nákupní ceny a marže", migration: "20261109130000",
+    });
+    if (marginsChange && "error" in marginsChange) return { ok: false, error: marginsChange.error };
+    if (marginsChange) update.can_see_margins = marginsChange.value;
     const salesContact = await salesContactChange(db, id, changes.salesContactId);
     if (salesContact && "error" in salesContact) return { ok: false, error: salesContact.error };
     if (salesContact) update.sales_contact_id = salesContact.value;
@@ -404,6 +441,8 @@ export async function updateUser(
     revalidateUsers();
     // změna práva měnit stav → karty a kniha ukážou / skryjí koncové stavy v Korekci stavu
     if (update.can_change_stage !== undefined) revalidatePath("/orders", "layout");
+    // fronta / marže → navigace, karty zakázek, nákup a doklady se překreslí podle nových práv
+    if (update.can_resolve_queue !== undefined || update.can_see_margins !== undefined) revalidatePath("/", "layout");
     if (approvalChange || update.can_approve_quotes !== undefined) {
       // čekající nabídky se uvolnily / zamkly, nebo se změnilo, kdo je schvaluje — tok, nabídky a karty zakázek
       revalidatePath("/quotes");

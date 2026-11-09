@@ -21,6 +21,7 @@ import {
   Receipt,
   FileUp,
   UserRound,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -61,6 +62,8 @@ export const navSections: NavSection[] = [
       },
       // jedna položka Pošta (beta 29. 10.): Přijaté / Odeslané / K zakázkám … jsou složky uvnitř; /sent → složka Odeslané
       { title: "Pošta", href: "/inbox", icon: Inbox, feature: "mail", badgeKey: "inbox", description: "Přijatá i odeslaná pošta ve vláknech", color: "text-blue-500" },
+      // 9. 11.: „Smí řešit frontu ke schválení" (ne super admin — ten ji má v AI přehledu)
+      { title: "Fronta ke schválení", href: "/approvals", icon: ListChecks, feature: "approval_queue", hideWith: "dashboard", badgeKey: "approvals", description: "Odchozí e-maily, objednávky dodavatelům a návrhy AI ke schválení", color: "text-fuchsia-500" },
     ],
   },
   {

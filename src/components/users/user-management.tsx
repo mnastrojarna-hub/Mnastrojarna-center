@@ -5,7 +5,7 @@ import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertCircle, ArrowLeftRight, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
+  AlertCircle, ArrowLeftRight, CheckCircle2, Coins, ListChecks, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
   KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature, FileCheck2, ShieldCheck, Handshake,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -510,6 +510,32 @@ function UserRow({
           >
             <ArrowLeftRight className="h-3 w-3 shrink-0" />
             <span className="truncate">mění stav zakázky</span>
+          </button>
+        )}
+        {/* 9. 11.: řeší frontu ke schválení (super admin vždy — štítek nepotřebuje) */}
+        {user.role !== "super_admin" && user.canResolveQueue === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-queue-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-2 py-0.5 text-[11px] font-medium text-fuchsia-700 transition hover:bg-fuchsia-500/15 hover:shadow-sm dark:text-fuchsia-300"
+            title="Schvaluje odchozí e-maily, objednávky dodavatelům a změny stavu z pošty (Fronta ke schválení) — změnit v Upravit"
+          >
+            <ListChecks className="h-3 w-3 shrink-0" />
+            <span className="truncate">řeší frontu</span>
+          </button>
+        )}
+        {/* 9. 11.: zaměstnanec vidí nákupní ceny a marže (obchodník a super admin vždy) */}
+        {user.role === "zamestnanec" && user.canSeeMargins === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-margins-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 transition hover:bg-emerald-500/15 hover:shadow-sm dark:text-emerald-300"
+            title="Vidí nákupní ceny a marže — změnit v Upravit"
+          >
+            <Coins className="h-3 w-3 shrink-0" />
+            <span className="truncate">vidí marže</span>
           </button>
         )}
         {/* relativní čas se mezi serverem a prohlížečem může lišit o minutu */}

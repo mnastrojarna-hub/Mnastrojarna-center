@@ -11,6 +11,7 @@ import type {
 import { periodStart } from "@/lib/data/periods";
 import { getAccess, getSessionUser } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
+import { hiddenQueueTypes } from "@/lib/auth/approval-queue-access";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
 import { resolveSender } from "@/lib/email/sender-rules";
 import { fetchPaged, isUuid } from "@/lib/jobs/mapping";
@@ -81,14 +82,18 @@ export type ApprovalQueueItem = ApprovalItem & {
 };
 
 export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
-  if (!(await allowedAccess("dashboard"))) return [];
+  // super admin (AI přehled) vše; 9. 11. „Smí řešit frontu ke schválení" bez AI návrhů nabídek (approval-queue-access)
+  const access = await allowedAccess("dashboard", "approval_queue");
+  if (!access) return [];
   const db = await supa();
   if (!db) return [];
-  const { data, error } = await db
+  const hidden = hiddenQueueTypes(access.can);
+  let query = db
     .from("approval_queue")
     .select("*, po:purchase_orders!purchase_order_id(id, number, file_id, job_id, creator:profiles!created_by(id, full_name, email), job:orders!job_id(owner_id))")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .eq("status", "pending");
+  if (hidden.length) query = query.not("type", "in", `(${hidden.join(",")})`);
+  const { data, error } = await query.order("created_at", { ascending: false });
   warn("approval_queue", error);
   if (error || !data) return [];
   type PoEmbed = {
@@ -167,13 +172,17 @@ export interface ResolvedApproval {
 }
 
 export async function getResolvedApprovals(limit = 6): Promise<ResolvedApproval[]> {
-  if (!(await allowedAccess("dashboard"))) return [];
+  const access = await allowedAccess("dashboard", "approval_queue");
+  if (!access) return [];
   const db = await supa();
   if (!db) return [];
-  const { data, error } = await db
+  const hidden = hiddenQueueTypes(access.can);
+  let query = db
     .from("approval_queue")
     .select("id, type, title, status, resolved_at, resolved_by, resolver:profiles!resolved_by(id, full_name, email)")
-    .neq("status", "pending")
+    .neq("status", "pending");
+  if (hidden.length) query = query.not("type", "in", `(${hidden.join(",")})`);
+  const { data, error } = await query
     .not("resolved_at", "is", null)
     .order("resolved_at", { ascending: false })
     .limit(Math.max(1, Math.min(50, limit)));
@@ -395,7 +404,11 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
       db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", `(${CLOSED_STAGES.join(",")})`),
       can("dashboard")
         ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
-        : Promise.resolve({ count: 0 }),
+        // 9. 11.: „Smí řešit frontu ke schválení" — odznak stránky Fronta ke schválení (bez AI návrhů nabídek)
+        : can("approval_queue")
+          ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
+            .not("type", "in", `(${hiddenQueueTypes(can).join(",")})`)
+          : Promise.resolve({ count: 0 }),
       getUnreadCount(),
       peerApprover ? listPendingQuoteApprovals().then((l) => l.length) : Promise.resolve(0),
     ]);
@@ -410,7 +423,7 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
       confirmations: n("confirmations"),
       orders: orders.count ?? 0,
       // AI přehled = fronta AI návrhů + ruční nabídky kolegů ke schválení (panel „Nabídky ke schválení")
-      approvals: can("dashboard") ? (approvals.count ?? 0) + n("quotes_pending_manual") : 0,
+      approvals: can("dashboard") ? (approvals.count ?? 0) + n("quotes_pending_manual") : can("approval_queue") ? approvals.count ?? 0 : 0,
     };
   } catch {
     return empty;

@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, AlertTriangle, ArrowLeftRight, Crown, FileCheck2, KeyRound, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX } from "lucide-react";
+import {
+  AlertCircle, AlertTriangle, ArrowLeftRight, Coins, Crown, FileCheck2, KeyRound, ListChecks, Loader2, Pencil, Send, ShieldCheck, Trash2, UserX,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -264,6 +266,90 @@ export function StageChangeToggle({
   );
 }
 
+/**
+ * 9. 11. „Smí řešit frontu ke schválení" (profiles.can_resolve_queue): odchozí e-maily, objednávky dodavatelům v režimu
+ * „se schválením", návrhy stavu zakázky z pošty — schválí, upraví nebo zamítne sám (stránka Fronta ke schválení).
+ * AI návrh nabídky dál schvaluje super admin. Super admin smí vždy.
+ */
+export function QueueToggle({
+  id, checked, onChange, role, disabled,
+}: { id: string; checked: boolean; onChange: (v: boolean) => void; role: UserRole; disabled?: boolean }) {
+  const always = role === "super_admin";
+  const on = always || checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-queue-toggle={always ? "role" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400" : "bg-muted text-muted-foreground",
+        )}>
+          <ListChecks className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Smí řešit frontu ke schválení</label>
+          <p className="text-xs text-muted-foreground">
+            {always
+              ? "Super admin řeší frontu ke schválení vždy (AI přehled)."
+              : on
+                ? "Schválí, upraví nebo zamítne odchozí e-maily, objednávky dodavatelům a změny stavu z pošty (Fronta ke schválení) — AI návrhy nabídek dál schvaluje super admin."
+                : "Frontu ke schválení nevidí — vyřizuje ji super admin."}
+          </p>
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={always || disabled}
+        aria-label="Smí řešit frontu ke schválení"
+        className="mt-1 data-[state=checked]:bg-fuchsia-600"
+      />
+    </div>
+  );
+}
+
+/**
+ * 9. 11. „Vidí nákupní ceny a marže" (profiles.can_see_margins): zaměstnanec vidí nákupní ceny, marže a nákupní doklady,
+ * posílá objednávky dodavatelům, vystaví fakturu a zapíše úhradu — jako obchodník. Provize ostatních ne.
+ * Obchodník a super admin vždy.
+ */
+export function MarginsToggle({
+  id, checked, onChange, role, disabled,
+}: { id: string; checked: boolean; onChange: (v: boolean) => void; role: UserRole; disabled?: boolean }) {
+  const always = role !== "zamestnanec";
+  const on = always || checked;
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border p-3" data-margins-toggle={always ? "role" : on ? "on" : "off"}>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={cn(
+          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+          on ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground",
+        )}>
+          <Coins className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-sm font-medium">Vidí nákupní ceny a marže</label>
+          <p className="text-xs text-muted-foreground">
+            {always
+              ? "Obchodník a super admin vidí nákupní ceny a marže vždy."
+              : on
+                ? "Nákupní ceny, marže a nákupní doklady; objednávky dodavatelům, faktura a úhrady jako obchodník — provize ostatních ne."
+                : "Nákupní ceny, marže a nákupní doklady nevidí."}
+          </p>
+        </div>
+      </div>
+      <Switch
+        id={id}
+        checked={on}
+        onCheckedChange={onChange}
+        disabled={always || disabled}
+        aria-label="Vidí nákupní ceny a marže"
+        className="mt-1 data-[state=checked]:bg-emerald-600"
+      />
+    </div>
+  );
+}
+
 /** Kolega do volby „Kontakt pro obchod a ceny". */
 export interface SalesContactOption {
   id: string;
@@ -376,6 +462,8 @@ export function EditUserDialog({
   const [quoteApprover, setQuoteApprover] = React.useState(user.canApproveQuotes === true);
   const [rfq, setRfq] = React.useState(user.canRfq === true);
   const [stageAny, setStageAny] = React.useState(user.canChangeStage === true);
+  const [queue, setQueue] = React.useState(user.canResolveQueue === true);
+  const [margins, setMargins] = React.useState(user.canSeeMargins === true);
   const [fullAccess, setFullAccess] = React.useState(user.fullAccess === true);
   const [salesContact, setSalesContact] = React.useState(user.salesContactId ?? "");
   const [busy, setBusy] = React.useState(false);
@@ -392,6 +480,8 @@ export function EditUserDialog({
     setQuoteApprover(user.canApproveQuotes === true);
     setRfq(user.canRfq === true);
     setStageAny(user.canChangeStage === true);
+    setQueue(user.canResolveQueue === true);
+    setMargins(user.canSeeMargins === true);
     setFullAccess(user.fullAccess === true);
     setSalesContact(user.salesContactId ?? "");
     setError(null);
@@ -413,6 +503,8 @@ export function EditUserDialog({
         canApproveQuotes: role === "super_admin" ? undefined : quoteApprover,
         canRfq: role === "zamestnanec" ? rfq : undefined,
         canChangeStage: role === "zamestnanec" ? stageAny : undefined,
+        canResolveQueue: role === "super_admin" ? undefined : queue,
+        canSeeMargins: role === "zamestnanec" ? margins : undefined,
         fullAccess: isSelf || role === "super_admin" ? undefined : fullAccess,
         salesContactId: salesContact === (user.salesContactId ?? "") ? undefined : salesContact || null,
       });
@@ -480,6 +572,10 @@ export function EditUserDialog({
           <RfqToggle id={`eu-rfq-${user.id}`} checked={rfq} onChange={setRfq} role={role} />
 
           <StageChangeToggle id={`eu-stage-${user.id}`} checked={stageAny} onChange={setStageAny} role={role} />
+
+          <QueueToggle id={`eu-queue-${user.id}`} checked={queue} onChange={setQueue} role={role} />
+
+          <MarginsToggle id={`eu-margins-${user.id}`} checked={margins} onChange={setMargins} role={role} />
 
           <SalesContactSelect id={`eu-sales-contact-${user.id}`} value={salesContact} onChange={setSalesContact} options={salesContacts} />
 
