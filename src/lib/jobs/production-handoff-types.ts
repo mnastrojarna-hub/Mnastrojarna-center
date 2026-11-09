@@ -107,6 +107,8 @@ export interface HandoffInput {
   acceptLate?: boolean;
   /** Skupiny objednávek k odeslání hned po potvrzení (margins). */
   sendNow?: string[];
+  /** „Odeslat z" (jen super admin; ostatní posílají vždy ze své schránky — sender-rules.ts). */
+  fromMailboxId?: string | null;
   /** zpet */
   undoHandoffId?: string | null;
   /** ≤ 500; poznámka ke změně stavu. */

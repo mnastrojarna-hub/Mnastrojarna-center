@@ -14,7 +14,7 @@ import type { HandoffInput, HandoffPlan, HandoffStepInput } from "@/lib/jobs/pro
  * krok u nás bez objednávky, dva kroky stejné firmy = jedna objednávka, existující objednávka z Nákupu se použije
  * (druhá = po_duplicate), změna dodavatele / termínu po vystavení (neodeslaná → nové PDF; odeslaná → změna ve
  * frontě), vrácení předání, doplnění ceny u odeslané objednávky přepočte provizi, focení potvrzení dodavatele,
- * zaměstnanec předá, ale ceny nevidí, schválení ve frontě ze schránky obchodníka zakázky, další krok po dodání.
+ * zaměstnanec předá, ale ceny nevidí, schválení ve frontě ze schránky schvalujícího (majitel 9. 11.), další krok po dodání.
  * Skutečný PostgREST a SMTP (lokální mailcatcher); mockuje se jen přihlášení a revalidace Next.js.
  *   set -a; . .local-supabase/env; set +a; LOCAL_SUPABASE=1 npx vitest run src/lib/jobs/production-handoff.integration.test.ts
  */
@@ -395,13 +395,18 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await ops(C.id))[0].deadline_state).toBe("pozadovano");
   }, 90_000);
 
-  it("odesílatel je vždy stejný: „Rovnou odeslat“ adminem i jiným obchodníkem i „Odeslat“ v Nákupu → schránka obchodníka zakázky", async () => {
-    const boxOwner = async (poId: unknown) => {
+  it("majitel 9. 11.: objednávka odchází ze schránky TOHO, KDO POSÍLÁ (admin, jiný obchodník, Nákup) — ne obchodníka zakázky; jen super admin si vybere", async () => {
+    // schránka, ze které objednávka odešla (null = globální SMTP bez schránky), a vlastník záznamu v Odeslaných
+    const sentFrom = async (poId: unknown) => {
       const po = (await svc.from("purchase_orders").select("status, sent_mailbox_id").eq("id", String(poId)).single()).data as Row;
       expect(po.status).toBe("odeslana");
-      return ((await svc.from("mailboxes").select("owner_id").eq("id", po.sent_mailbox_id as string).single()).data as Row).owner_id;
+      const box = po.sent_mailbox_id ? ((await svc.from("mailboxes").select("owner_id").eq("id", po.sent_mailbox_id as string).single()).data as Row).owner_id : null;
+      const mail = ((await svc.from("emails").select("owner_id, mailbox_id").eq("purchase_order_id", String(poId)).eq("direction", "out")).data ?? []) as Row[];
+      return { box, mailOwner: mail[0]?.owner_id ?? null, mailBox: mail[0]?.mailbox_id ?? null, sentBox: po.sent_mailbox_id ?? null };
     };
-    // admin předá zakázku obchodníka a rovnou odešle (dřív: schránka admina)
+    const ownBox = async (u: U) => ((await svc.from("mailboxes").select("id").eq("owner_id", id(u)).limit(1)).data as Row[] | null)?.[0]?.id as string | undefined;
+    const adminBox = await ownBox("admin");
+    // admin předá zakázku obchodníka a rovnou odešle → ze SVÉ schránky (dřív: schránka obchodníka zakázky)
     as("admin");
     const D1 = await newJob();
     await newQuote(D1.id, novak, [40, 42]);
@@ -410,9 +415,24 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const r1 = await act.submitProductionHandoff(D1.id, inputOf(p1, { sendNow: ["*"] }));
     expect(r1.ok, r1.error).toBe(true);
     expect(r1.result!.purchaseOrders[0].send, r1.result!.purchaseOrders[0].sendError).toBe("odeslano");
-    expect(await boxOwner(r1.result!.purchaseOrders[0].id)).toBe(id("sales"));
+    const f1 = await sentFrom(r1.result!.purchaseOrders[0].id);
+    expect(f1.box).not.toBe(id("sales"));
+    expect(f1.box).toBe(adminBox ? id("admin") : null);
+    expect(f1.mailOwner).toBe(id("admin"));
 
-    // „Odeslat“ v Nákupu (adminem) — taky ze schránky obchodníka zakázky
+    // super admin si v dialogu vybere „Odeslat z: schránka obchodníka" → odejde z ní, v Odeslaných obchodníka
+    const salesBox = await ownBox("sales");
+    if (salesBox) {
+      const D0 = await newJob();
+      await newQuote(D0.id, novak, [40, 42]);
+      const p0 = await plan(D0.id);
+      const r0 = await act.submitProductionHandoff(D0.id, { ...inputOf(p0, { sendNow: ["*"] }), fromMailboxId: salesBox });
+      expect(r0.ok, r0.error).toBe(true);
+      expect(r0.result!.purchaseOrders[0].send, r0.result!.purchaseOrders[0].sendError).toBe("odeslano");
+      expect(await sentFrom(r0.result!.purchaseOrders[0].id)).toMatchObject({ box: id("sales"), mailOwner: id("sales"), mailBox: salesBox });
+    }
+
+    // „Odeslat“ v Nákupu (adminem) — taky z jeho schránky
     as("sales");
     const D2 = await newJob();
     await newQuote(D2.id, novak, [40, 42]);
@@ -423,18 +443,21 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     const pl = m.payload as Row;
     const s2 = await pur.sendPurchaseOrder(String(po2.id), { to: String(pl.to), subject: String(pl.subject), body: String(pl.body) } as never);
     expect(s2.ok, s2.error).toBe(true);
-    expect(await boxOwner(po2.id)).toBe(id("sales"));
+    expect(await sentFrom(po2.id)).toMatchObject({ box: adminBox ? id("admin") : null, mailOwner: id("admin") });
 
-    // jiný obchodník (bez pošty všech schránek) předá cizí zakázku s „Rovnou odeslat“ → schránka obchodníka zakázky
+    // jiný obchodník (bez pošty všech schránek) předá cizí zakázku s „Rovnou odeslat“ → z JEHO schránky, i když
+    // klient pošle schránku obchodníka zakázky (vybírat smí jen super admin)
     if (who.users.sales2) {
       as("sales2");
       const D3 = await newJob();
       await newQuote(D3.id, novak, [40, 42]);
       const p3 = await plan(D3.id);
-      const r3 = await act.submitProductionHandoff(D3.id, inputOf(p3, { sendNow: ["*"] }));
+      const r3 = await act.submitProductionHandoff(D3.id, { ...inputOf(p3, { sendNow: ["*"] }), fromMailboxId: salesBox ?? null });
       expect(r3.ok, r3.error).toBe(true);
       expect(r3.result!.purchaseOrders[0].send, r3.result!.purchaseOrders[0].sendError).toBe("odeslano");
-      expect(await boxOwner(r3.result!.purchaseOrders[0].id)).toBe(id("sales"));
+      const f3 = await sentFrom(r3.result!.purchaseOrders[0].id);
+      expect(f3.box).not.toBe(id("sales"));
+      expect(f3.mailOwner).toBe(id("sales2"));
     }
     as("sales");
   }, 150_000);
@@ -745,7 +768,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await pur.updatePurchaseOrder(String(po.id), { prices: [{ itemId: String(items[1].id), unitPrice: 1 }] })).ok).toBe(false);
   }, 120_000);
 
-  it("schválení ve frontě: admin schválí objednávku obchodníkovy zakázky → odejde ze schránky obchodníka s jeho podpisem; obchodník smí jen svou", async () => {
+  it("schválení ve frontě: admin schválí objednávku obchodníkovy zakázky s „Odeslat z: schránka obchodníka“ → odejde z ní s jeho podpisem; obchodník smí jen svou", async () => {
     as("sales");
     const Q = await newJob();
     await newQuote(Q.id, novak, [40, 42]);
@@ -758,7 +781,9 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await appr.resolveApproval(String(row.id), "approved")).ok).toBe(false);
     const corrBefore = (await svc.from("ai_corrections").select("id", { count: "exact", head: true })).count ?? 0;
     as("admin");
-    const ok = await appr.resolveApproval(String(row.id), "approved");
+    // majitel 9. 11.: bez volby by odešla ze schránky admina — schránku obchodníka si vybírá jen super admin
+    const salesBox = ((await svc.from("mailboxes").select("id").eq("owner_id", id("sales")).limit(1)).data as Row[])[0]?.id as string;
+    const ok = await appr.resolveApproval(String(row.id), "approved", { fromMailboxId: salesBox });
     expect(ok, ok.error).toMatchObject({ ok: true, sent: true });
     const [po] = await pos(Q.id);
     expect(po.status).toBe("odeslana");
@@ -1287,7 +1312,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     as("admin");
     const p2 = await plan(W2.id);
     expect((await act.submitProductionHandoff(W2.id, inputOf(p2))).ok).toBe(true);
-    const sender = await store.purchaseOrderSender(svc as never, { id: id("admin"), mailAll: true }, id("worker"));
+    const sender = await store.purchaseOrderSender({ id: id("admin") });
     expect(sender.signerId).toBe(id("admin"));
     expect("mailboxId" in sender.from && sender.from.mailboxId).toBeFalsy();
   }, 120_000);
@@ -1477,18 +1502,22 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
     expect((await act.recordPhoneQuote(P.id, { supplierId: hruby, kind: "vyroba" })).error).toMatch(/termín/);
   }, 120_000);
 
-  it("odesílatel bez vlastní schránky = jako každý e-mail (send.ts: firemní schránka / globální SMTP), nikdy cizí osobní", async () => {
-    const ownerId = id("sales");
-    const sender = await store.purchaseOrderSender(svc as never, { id: id("worker") }, null);
-    // zaměstnanec nemá vlastní schránku → odešle se tak, jak by odešel jeho e-mail (bez schránky obchodníka)
+  it("odesílatel = jako každý e-mail uživatele (send.ts: vlastní → firemní schránka / globální SMTP), nikdy cizí osobní; volbu má jen super admin", async () => {
+    const salesBox = ((await svc.from("mailboxes").select("id").eq("owner_id", id("sales")).limit(1)).data as Row[])[0]?.id as string | undefined;
+    // zaměstnanec → jeho e-mail (i když požádá o schránku obchodníka)
+    const sender = await store.purchaseOrderSender({ id: id("worker"), fromMailboxId: salesBox ?? null });
     expect(sender.from).toEqual({ ownerId: id("worker") });
+    expect(sender.signerId).toBe(id("worker"));
     const send = await import("@/lib/email/send");
     const d = await send.describeSender({ ownerId: id("worker") });
     expect(sender.mailboxEmail).toBe(d.ok ? d.from ?? null : null);
-    // zakázka obchodníka se schránkou → jeho schránka (i když posílá někdo jiný)
-    const viaOwner = await store.purchaseOrderSender(svc as never, { id: id("admin") }, ownerId);
-    expect(viaOwner.signerId).toBe(ownerId);
-    expect("mailboxId" in viaOwner.from && viaOwner.from.ownerId).toBe(ownerId);
+    // super admin bez volby → jeho (ne obchodníka zakázky); s volbou schránky obchodníka → ta, podpis obchodníka
+    const admin = await store.purchaseOrderSender({ id: id("admin") });
+    expect(admin).toMatchObject({ from: { ownerId: id("admin") }, signerId: id("admin") });
+    if (salesBox) {
+      const chosen = await store.purchaseOrderSender({ id: id("admin"), fromMailboxId: salesBox });
+      expect(chosen).toMatchObject({ from: { mailboxId: salesBox }, signerId: id("sales") });
+    }
   }, 60_000);
 
   const jobCost = async (jid: string): Promise<{ cost: number; known: boolean }> => {

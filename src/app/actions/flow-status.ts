@@ -465,7 +465,7 @@ async function applyQuote(
  */
 export async function approveAndSendQuote(
   quoteId: string,
-  email?: { to: string; cc?: string; subject: string; body: string } | null,
+  email?: { to: string; cc?: string; subject: string; body: string; fromMailboxId?: string | null } | null,
   /** Ze seznamu / karty: schválí jen nezměněnou nabídku (quotes.updated_at, §15.11). */
   opts: { expectedUpdatedAt?: string | null } = {},
 ): Promise<FlowResult> {
@@ -485,7 +485,7 @@ export async function approveAndSendQuote(
       const { generateJobDocument, sendJobDocument } = await import("@/app/actions/job-documents");
       const doc = await generateJobDocument(jobId, "nabidka", { quoteId, reuse: true });
       if (!doc.ok || !doc.fileId) return fail(doc.error ?? "PDF nabídky se nepodařilo vystavit.");
-      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body });
+      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body, fromMailboxId: email.fromMailboxId ?? null });
       if (!sent.ok) return fail(sent.error ?? "Odeslání e-mailem selhalo.");
       return quoteResult(c.db, quoteId, jobId);
     }

@@ -27,6 +27,7 @@ import { HandoffStepCard } from "./handoff-step-card";
 import { AiLabel, SuggestionBanner } from "./handoff-suggestions";
 import { AdvanceOptions, FinishOptions, ReceiptBlock } from "./advance-options";
 import { HandoffResultView } from "./handoff-result";
+import { SenderPicker } from "@/components/mail/sender-picker";
 
 export interface HandoffDone {
   kind: HandoffKind;
@@ -647,6 +648,9 @@ function SendNowBlock({ plan, state, setState, plain, className }: {
             </span>
           </span>
         </label>
+      )}
+      {(auto || (canSend && state.sendNow && !disabled)) && (
+        <SenderPicker adminOnly value={state.fromMailboxId ?? null} onChange={(id) => setState({ ...state, fromMailboxId: id })} className="pl-6" />
       )}
       {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
     </div>

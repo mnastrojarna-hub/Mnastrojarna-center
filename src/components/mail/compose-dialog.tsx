@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RecipientField } from "@/components/mail/recipient-field";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import {
   composeContextAction, draftComposeAction, prepareMailUploadAction, sendComposedAction, type BlockedAttachment, type ComposeAttachmentRef, type SendComposedResult,
 } from "@/app/actions/mail-compose";
@@ -95,6 +96,9 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
   const [atts, setAtts] = React.useState<LocalAttachment[]>([]);
   const [from, setFrom] = React.useState<string | null>(null);
   const [fromError, setFromError] = React.useState<string | null>(null);
+  /** Super admin: „Odeslat z" (null = výchozí — moje schránka, u odpovědi ta, kam e-mail přišel). */
+  const [canChooseSender, setCanChooseSender] = React.useState(false);
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const [jobFiles, setJobFiles] = React.useState<{ id: string; filename: string; sizeBytes: number | null }[]>([]);
   const [showJobFiles, setShowJobFiles] = React.useState(false);
   const [sending, setSending] = React.useState(false);
@@ -179,11 +183,14 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
         : (request.jobAttachments ?? []).map((a) => ({ key: `j-${a.id}`, ref: { kind: "job" as const, ref: a.id, filename: a.filename }, name: a.filename, size: null, state: "ready" as const })),
     );
     setBody(initialBody(request, ""));
+    setCanChooseSender(false);
+    setFromMailboxId(null);
     let alive = true;
     void composeContextAction({ sourceEmailId: src?.id ?? null, jobId: request.jobId ?? src?.jobId ?? null }).then((ctx) => {
       if (!alive) return;
       setFrom(ctx.from ?? null);
       setFromError(ctx.fromError ?? (ctx.ok ? null : ctx.error ?? null));
+      setCanChooseSender(Boolean(ctx.canChooseSender));
       setJobFiles(ctx.jobFiles ?? []);
       setSignature(ctx.signature ?? "");
       if (ctx.signature) {
@@ -243,6 +250,7 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
       attachments: list.filter((a) => a.state === "ready").map((a) => a.ref),
       jobId: request.jobId ?? null,
       outboxId,
+      ...(fromMailboxId ? { fromMailboxId } : {}),
     }).catch((e: unknown) => ({ ok: false, error: e instanceof Error ? e.message : "Odeslání selhalo." }) as SendComposedResult);
     setSending(false);
     if (!res.ok) {
@@ -276,9 +284,22 @@ export function ComposeDialog({ request, onClose, onSent, onQueued, onOpenSettin
           </Button>
         </div>
         <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
-          <p className="text-xs text-muted-foreground" data-testid="compose-from">
-            {from ? <>Odešle se z <b className="text-foreground">{from}</b></> : fromError ? <span className="text-destructive">{fromError}</span> : "Zjišťuji, odkud se odešle…"}
-          </p>
+          {canChooseSender ? (
+            <SenderPicker
+              value={fromMailboxId}
+              onChange={setFromMailboxId}
+              sourceEmailId={request?.source?.id ?? null}
+              onSignatureChange={(prev, next) => {
+                setBody((b) => swapSignature(b, prev, next));
+                setSignature(next);
+              }}
+              disabled={sending}
+            />
+          ) : (
+            <p className="text-xs text-muted-foreground" data-testid="compose-from">
+              {from ? <>Odešle se z <b className="text-foreground">{from}</b></> : fromError ? <span className="text-destructive">{fromError}</span> : "Zjišťuji, odkud se odešle…"}
+            </p>
+          )}
           <RecipientField id="compose-to" label="Komu" value={to} onChange={setTo} context={composeCtx} autoFocus={request?.mode === "new" || request?.mode === "forward"} />
           {showCc ? (
             <>

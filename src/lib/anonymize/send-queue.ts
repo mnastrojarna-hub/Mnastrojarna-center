@@ -43,6 +43,11 @@ export interface SendPayload {
    * nikdy původní název (často nese jméno zákazníka). Jen bezpečné znaky, přípona zůstane z odesílaného souboru.
    */
   neutralNames?: Record<string, string>;
+  /**
+   * 9. 11. „Odeslat z" super admina — při odeslání z fronty se znovu ověří (sender-rules.ts: platí jen, je-li
+   * tvůrce řádku super admin; ostatní posílají vždy ze své schránky).
+   */
+  fromMailboxId?: string;
 }
 
 /** Bezpečný název přílohy (bez cesty a řídicích znaků). */
@@ -83,6 +88,7 @@ function cleanPayload(p: SendPayload): SendPayload {
     reviewedFileIds: ids(p.reviewedFileIds),
     ...(p.purchaseOrderId && /^[0-9a-f-]{36}$/i.test(p.purchaseOrderId) ? { purchaseOrderId: p.purchaseOrderId } : {}),
     ...(p.recipientLabel ? { recipientLabel: String(p.recipientLabel).slice(0, 200) } : {}),
+    ...(typeof p.fromMailboxId === "string" && /^[0-9a-f-]{36}$/i.test(p.fromMailboxId) ? { fromMailboxId: p.fromMailboxId.toLowerCase() } : {}),
     ...(p.neutralNames && typeof p.neutralNames === "object" ? {
       neutralNames: Object.fromEntries(Object.entries(p.neutralNames)
         .filter(([k]) => /^[0-9a-f-]{36}$/i.test(k)).slice(0, 80)
@@ -191,19 +197,26 @@ export type Sender = (args: {
   to: string; cc?: string; subject: string; text: string; html?: string;
   attachments: { filename: string; content: Buffer; contentType?: string }[];
   ownerId: string | null; jobId: string | null;
+  /** „Odeslat z" tvůrce řádku (platí jen pro super admina — sender-rules.ts). */
+  fromMailboxId?: string | null;
   /** Vazby záznamu v Pošta → Odeslané (dodavatel, objednávka, kategorie) — odvozené na serveru z řádku fronty. */
   supplierId?: string | null; customerId?: string | null; purchaseOrderId?: string | null; category?: EmailCategory | null;
 }) => Promise<{ sent: boolean; reason?: string; emailId?: string }>;
 
 async function defaultSender(): Promise<Sender> {
   const { sendMail } = await import("@/lib/email/send");
-  return async (a) => sendMail({
-    to: a.to, cc: a.cc, subject: a.subject, text: a.text, html: a.html, attachments: a.attachments,
-    from: a.ownerId ? { ownerId: a.ownerId } : { system: true }, jobId: a.jobId ?? undefined, senderId: a.ownerId ?? undefined,
-    supplierId: a.supplierId ?? null, customerId: a.customerId ?? null, purchaseOrderId: a.purchaseOrderId ?? null, category: a.category ?? null,
-    // text z dialogu (objednávka / výkresy) nese podpis autora → grafický s logem
-    signature: a.ownerId ? { userId: a.ownerId, mode: "inline" } : null,
-  });
+  const { resolveSender } = await import("@/lib/email/sender-rules");
+  return async (a) => {
+    // ze schránky toho, kdo odeslání zařadil (super admin: jeho volba „Odeslat z", znovu ověřená)
+    const who = a.ownerId ? await resolveSender(a.ownerId, { mailboxId: a.fromMailboxId ?? null }) : null;
+    return sendMail({
+      to: a.to, cc: a.cc, subject: a.subject, text: a.text, html: a.html, attachments: a.attachments,
+      from: who ? who.from : { system: true }, jobId: a.jobId ?? undefined, senderId: a.ownerId ?? undefined,
+      supplierId: a.supplierId ?? null, customerId: a.customerId ?? null, purchaseOrderId: a.purchaseOrderId ?? null, category: a.category ?? null,
+      // text z dialogu (objednávka / výkresy) nese podpis autora (vlastníka zvolené schránky) → grafický s logem
+      signature: who ? { userId: who.signerId, mode: "inline" } : null,
+    });
+  };
 }
 
 /**
@@ -274,7 +287,7 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
   if (total > MAX_ATTACHMENTS_BYTES) return { status: "failed", reason: "Přílohy se nevejdou do e-mailu (> 20 MB) — pošli odkaz nebo ZIP." };
   const res = await sender({
     to: p.to.join(", "), cc: p.cc?.length ? p.cc.join(", ") : undefined, subject: p.subject, text: p.body, html: p.html,
-    attachments, ownerId: row.created_by, jobId: row.job_id, ...(await sentMailLinks(db, row)),
+    attachments, ownerId: row.created_by, jobId: row.job_id, fromMailboxId: p.fromMailboxId ?? null, ...(await sentMailLinks(db, row)),
   });
   if (!res.sent) return { status: row.attempts >= MAX_ATTEMPTS ? "failed" : "waiting", reason: res.reason ?? "E-mail se nepodařilo odeslat." };
 

@@ -19,6 +19,7 @@ import { applySalutation } from "@/lib/contacts/tone";
 import { useAutomation } from "@/components/automation-provider";
 import { OUTBOUND_APPROVAL_TYPES, type ApprovalItem } from "@/lib/data/types";
 import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
+import { SenderPicker } from "@/components/mail/sender-picker";
 import { relativeTime, cn } from "@/lib/utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ApprovalPurchaseOrder, ResolvedApproval } from "@/lib/data/queries";
@@ -81,6 +82,8 @@ function ApprovalRow({
   const [error, setError] = React.useState<string | null>(null);
   const [learned, setLearned] = React.useState(false);
 
+  /** „Odeslat z" (jen super admin, v rozbaleném řádku; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const isOutbound = OUTBOUND_APPROVAL_TYPES.includes(item.rawType);
   // objednávka dodavateli: šablona serveru (ne AI) — PDF, odkud odejde, odeslat / upravit e-mail / zamítnout
   const po = item.rawType === "purchase_order" ? item.purchaseOrder ?? null : null;
@@ -88,7 +91,7 @@ function ApprovalRow({
   const approve = async () => {
     setBusy("approve");
     setError(null);
-    const res = await resolveApproval(item.id, "approved");
+    const res = await resolveApproval(item.id, "approved", fromMailboxId ? { fromMailboxId } : {});
     setBusy(null);
     if (res.ok) onResolved(item.id);
     else setError(res.error ?? "Chyba");
@@ -251,6 +254,7 @@ function ApprovalRow({
           ) : (
             <>
               <pre className="whitespace-pre-wrap rounded-md bg-background p-3 font-sans text-sm">{savedBody || "—"}</pre>
+              {(isOutbound || po) && <SenderPicker adminOnly value={fromMailboxId} onChange={setFromMailboxId} disabled={busy !== null} />}
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                   <Pencil className="h-4 w-4" /> {item.rawType === "purchase_order" ? "Upravit e-mail" : "Upravit text"}

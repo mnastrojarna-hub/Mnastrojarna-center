@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AlertTriangle, Eye, ExternalLink, Info, Loader2, Paperclip, RotateCcw, Save, Send } from "lucide-react";
 import { RecipientInput, isValidRecipient, tokensOf, type RecipientContext } from "@/components/mail/recipient-field";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { ToneToggle, type ToneChange } from "@/components/contacts/tone-toggle";
 import { applySalutation } from "@/lib/contacts/tone";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -170,6 +171,8 @@ export function DocumentSendDialog({
   const [pending, setPending] = React.useState<{ filename: string; force: boolean } | null>(null);
   const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   const onPreparedRef = React.useRef(onPrepared);
   onPreparedRef.current = onPrepared;
@@ -273,6 +276,7 @@ export function DocumentSendDialog({
       setError(null);
       setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
+      setFromMailboxId(null);
       setStep("preparing");
     }
   }
@@ -333,6 +337,7 @@ export function DocumentSendDialog({
       }
       const res = await sendJobDocument(jobId, target.id, {
         to: out.to.trim(), cc: out.cc.trim() || undefined, subject: out.subject.trim(), body: out.body,
+        ...(fromMailboxId ? { fromMailboxId } : {}),
       });
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
@@ -441,6 +446,15 @@ export function DocumentSendDialog({
                 <Button type="button" variant="outline" onClick={() => void prepare()}>
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
+              )}
+              {!blocked && (
+                <SenderPicker
+                  value={fromMailboxId}
+                  onChange={setFromMailboxId}
+                  onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                  disabled={step === "sending"}
+                  className="px-1"
+                />
               )}
               {!blocked && (
                 <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} onToneSaved={(c) => void redraft(c.salutation)} />

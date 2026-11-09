@@ -8,6 +8,7 @@ import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { draftQuoteEmail } from "@/app/actions/job-documents";
 import { approveAndSendQuote } from "@/app/actions/flow-status";
 import { MailFields, mailDraftError, type MailDraft } from "./document-send-dialog";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 
 /**
  * „Schválit a odeslat“ (#25, jen super admin): návrh e-mailu se připraví BEZ PDF (draftQuoteEmail),
@@ -30,6 +31,8 @@ export function QuoteApproveSendDialog({
   const [filename, setFilename] = React.useState<string | null>(null);
   const [step, setStep] = React.useState<"preparing" | "form" | "sending">("preparing");
   const [error, setError] = React.useState<string | null>(null);
+  /** „Odeslat z" (super admin; null = jeho schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
 
   React.useEffect(() => {
@@ -38,6 +41,7 @@ export function QuoteApproveSendDialog({
       return;
     }
     const token = ++run.current;
+    setFromMailboxId(null);
     setStep("preparing");
     setError(null);
     draftQuoteEmail(jobId, quoteId).then((d) => {
@@ -66,7 +70,7 @@ export function QuoteApproveSendDialog({
     try {
       const res = await approveAndSendQuote(
         quoteId,
-        { to: mail.to.trim(), cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body },
+        { to: mail.to.trim(), cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body, ...(fromMailboxId ? { fromMailboxId } : {}) },
         { expectedUpdatedAt: updatedAt },
       );
       if (!res.ok) {
@@ -107,6 +111,13 @@ export function QuoteApproveSendDialog({
                   <span className="shrink-0 text-xs text-muted-foreground">vystaví se po schválení</span>
                 </p>
               )}
+              <SenderPicker
+                value={fromMailboxId}
+                onChange={setFromMailboxId}
+                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                disabled={step === "sending"}
+                className="px-1"
+              />
               <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} />
             </>
           )}

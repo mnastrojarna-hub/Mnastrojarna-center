@@ -273,13 +273,15 @@ export async function purchaseOrderMailFor(
     previousRequiredDate?: string | null; reason?: string | null; fallbackName?: string | null; fallbackEmail?: string | null;
     /** Vybrané přílohy (výkresy / modely); undefined = výchozí výběr. */
     attachmentIds?: string[] | null;
+    /** Schránka, ze které e-mail odejde (purchaseOrderSender) — podpis pro ni; výchozí vlastní schránka podepisujícího. */
+    from?: SmtpPreference | null;
   } = {},
 ): Promise<PurchaseOrderMail & { attachmentName: string; recipientReason: string; extras: PoMailExtras }> {
   await refreshCompanyFromSettings();
   const [me, signatureText, pick] = await Promise.all([
     signerId ? fetchProfileContact(db, signerId) : Promise.resolve({ name: null, email: null, phone: null }),
     // podpis podepisujícího z Nastavení pošty (při odeslání z jeho schránky → grafický s logem)
-    senderSignatureText(signerId, { ownerId: signerId ?? "" }),
+    senderSignatureText(signerId, extra.from ?? { ownerId: signerId ?? "" }),
     // dodavatel → e-mail pro objednávky (karta dodavatele → E-maily podle účelu), jinak e-mail firmy / kontakt
     recipientsFor(db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null),
   ]);
@@ -319,7 +321,10 @@ export async function purchaseOrderMailFor(
 }
 
 export interface SendPoOptions {
+  /** Odkud (vždy z purchaseOrderSender / sender-rules.ts — schránka toho, kdo posílá; volbu má jen super admin). */
   from: SmtpPreference;
+  /** Čí podpis (vlastník schránky, ze které objednávka odchází); výchozí `from.ownerId`, jinak odesílatel. */
+  signerId?: string | null;
   via?: "rucne" | "automaticky";
   kind?: PoMailKind;
   /** Důvod storna (kind cancel) — do objednávky i historie. */
@@ -416,6 +421,8 @@ export async function sendPurchaseOrderCore(
           kind: "purchase_order", jobId: po.jobId, refId: po.id, createdBy: sender.id,
           payload: {
             to, cc: copies(to, cc), subject, body, extraFileIds: [po.fileId as string], purchaseOrderId: po.id,
+            // volba super admina „Odeslat z" — při odeslání z fronty se znovu ověří (sender-rules.ts)
+            ...("mailboxId" in opts.from && opts.from.mailboxId ? { fromMailboxId: opts.from.mailboxId } : {}),
             recipientLabel: `dodavateli ${po.supplier?.name ?? ""} (objednávka ${po.number})`.replace(/\s+/g, " "),
             neutralNames: { ...files.names, [po.fileId as string]: f.filename || purchaseOrderFileName(po.number) },
           },
@@ -450,7 +457,8 @@ export async function sendPurchaseOrderCore(
     supplierId: po.supplier?.id ?? null,
     purchaseOrderId: po.id,
     // podpis vlastníka schránky (podepisující návrhu) je v textu → grafický s logem; systém bez podpisu
-    signature: "ownerId" in opts.from && opts.from.ownerId ? { userId: opts.from.ownerId, mode: "inline" } : null,
+    signature: "system" in opts.from && opts.from.system ? null
+      : { userId: opts.signerId ?? ("ownerId" in opts.from && opts.from.ownerId ? opts.from.ownerId : sender.id), mode: "inline" },
     category: "objednavka",
   });
   if (!res.sent) return { ok: false, error: res.reason ?? "E-mail se nepodařilo odeslat." };
