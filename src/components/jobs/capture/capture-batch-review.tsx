@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, Combine, Eye, EyeOff, Info, PenLine, Sparkles, Star } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Combine, Eye, EyeOff, Info, PenLine, Sparkles, Star, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/jobs/book/native-select";
-import { GROUP_BAR, TONES, TypeChip } from "@/components/jobs/capture/capture-parts";
+import { GROUP_BAR, TONES, TypeChip, WarningRow } from "@/components/jobs/capture/capture-parts";
 import { CapturePages } from "@/components/jobs/capture/capture-pages";
 import { CaptureGroupHeader } from "@/components/jobs/capture/capture-group-header";
 import { CaptureDocForm } from "@/components/jobs/capture/capture-doc-form";
@@ -13,7 +13,9 @@ import { CaptureModelForm } from "@/components/jobs/capture/capture-model-form";
 import { CaptureFileForm } from "@/components/jobs/capture/capture-file-form";
 import { CaptureSupplierInvoices } from "@/components/jobs/capture/capture-supplier-invoices";
 import { viewerPages, type LocalUrls } from "@/components/jobs/capture/capture-sort";
-import { jobsGenitive, mergeAllPlan, saveCountInfo, warningResolved, type BatchProblem } from "@/components/jobs/capture/capture-flow";
+import {
+  duplicateInTarget, jobsGenitive, mergeAllPlan, relinkGroupDocs, saveCountInfo, warningResolved, withAck, type BatchProblem,
+} from "@/components/jobs/capture/capture-flow";
 import { BATCH_TYPES } from "@/lib/jobs/capture-batch";
 import { initialSpecState, missingHardness, recomputeSpecEstimate } from "@/lib/jobs/drawing-spec";
 import { formatIsoDate } from "@/lib/jobs/field-labels";
@@ -86,6 +88,8 @@ export interface CaptureBatchReviewProps {
   local: LocalUrls;
   /** Už uložené doklady (po částečném uložení) — jen ke čtení. */
   locked: Set<string>;
+  /** Doklady, které se při minulém uložení neuložily: docId → důvod (u karty s nápravou). */
+  failed?: Record<string, string>;
   /** Skupina, pro kterou se načítá jiná zakázka. */
   picking: string | null;
   onChange: (state: BatchApplyState) => void;
@@ -106,7 +110,7 @@ function groupNeedsAttention(groupKey: string, review: BatchReviewModel, state: 
   const g = state.groups.find((x) => x.key === groupKey);
   if (!g) return false;
   if (!g.job.targetKey) return true;
-  return review.warnings.some((w) => w.groupKey === groupKey && w.severity === "block" && !warningResolved(w, state));
+  return review.warnings.some((w) => w.groupKey === groupKey && w.severity === "block" && !warningResolved(w, state, review));
 }
 
 function groupElement(key: string): HTMLElement | null {
@@ -117,24 +121,42 @@ function docTypeOf(review: BatchDocReview, sortDoc: BatchDocDraft | undefined): 
   return review.kind === "business" ? review.type : sortDoc?.type ?? (review.kind === "drawing" ? "vykres" : review.kind === "model" ? "model_3d" : "ostatni");
 }
 
-function docWarnings(review: BatchReviewModel, docId: string): BatchWarning[] {
-  return review.warnings.filter((w) => w.docIds.includes(docId) && !w.groupKey);
+/** Výkres: AI si není jistá (nízká jistota, poznámky „potvrdit") a člověk to ještě nepotvrdil. */
+export function drawingUnconfirmed(r: Extract<BatchDocReview, { kind: "drawing" }>, state: BatchApplyState): boolean {
+  const ack = new Set(state.ack ?? []);
+  if (ack.has(`checked:${r.docId}`)) return false;
+  const notesOpen = r.drawing.needsClarification.some((_, i) => !ack.has(`note:${r.docId}:${i}`));
+  if (r.drawing.needsClarification.length) return notesOpen;
+  return !r.aiUsed || r.drawing.confidence < 0.85;
 }
 
 /** Sekce potřebuje pohled člověka (rozbalit automaticky, „Další ⚠"). */
-function needsAttention(r: BatchDocReview, review: BatchReviewModel, state: BatchApplyState): boolean {
-  if (docWarnings(review, r.docId).some((w) => w.severity !== "info" && !warningResolved(w, state))) return true;
+function needsAttention(r: BatchDocReview, review: BatchReviewModel, state: BatchApplyState, failed?: Record<string, string>): boolean {
+  if (failed?.[r.docId]) return true;
+  if (cardWarnings(review, r.docId).some((w) => w.severity !== "info" && !warningResolved(w, state, review))) return true;
   if (r.kind === "business") return !r.aiUsed || (r.confidence !== null && r.confidence < 0.85) || r.needsClarification.length > 0 || Boolean(r.duplicateOf);
   if (r.kind === "drawing") {
     // „Nezjištěno — doplň" u tepelného zpracování / povrchové úpravy → rozbalit
     // … a kalení / cementace bez tvrdosti („kolik je tam kalení")
     const unknown = r.initial.spec?.heatStatus === "nezjisteno" || r.initial.spec?.surfaceStatus === "nezjisteno"
       || missingHardness(r.initial.spec?.heatSteps ?? []);
-    return !r.aiUsed || r.drawing.confidence < 0.85 || Boolean(r.duplicateOf) || Boolean(r.archiveConflict) || unknown;
+    // výkres u JINÉ zakázky / v archivu u jiného zákazníka = jen informace (uloží se); u cílové zakázky = volba
+    return drawingUnconfirmed(r, state) || Boolean(duplicateInTarget(review, state, r.docId)) || unknown;
   }
-  if (r.kind === "model") return Boolean(r.duplicateOf);
+  if (r.kind === "model") return Boolean(duplicateInTarget(review, state, r.docId));
   return false;
 }
+
+/** Upozornění u karty dokladu: doklad je jmenovaný a upozornění se týká jen dokladů (ne údajů zakázky). */
+function cardWarnings(review: BatchReviewModel, docId: string): BatchWarning[] {
+  return review.warnings.filter((w) => w.docIds.includes(docId) && (!w.groupKey || CARD_CODES.has(w.code)));
+}
+/** Upozornění, která patří ke kartě výkresu / modelu (rozhodnutí přímo u výkresu). */
+const CARD_CODES = new Set<BatchWarning["code"]>([
+  "material_conflict", "quantity_conflict", "drawing_item_shared", "also_in_job", "already_saved", "drawing_archive_conflict",
+  "unlinked_drawing", "unlinked_model", "revision_conflict", "drawing_quantity_missing", "duplicate_doc",
+]);
+
 
 function sectionTitle(r: BatchDocReview, st: DocApplyState | undefined, sortDoc: BatchDocDraft | undefined): string {
   const type = docTypeOf(r, sortDoc);
@@ -148,7 +170,8 @@ function sectionTitle(r: BatchDocReview, st: DocApplyState | undefined, sortDoc:
   return `${label}${num ? ` ${num}` : ""}${pages > 1 ? ` (${pages} str.)` : ""}`;
 }
 
-function statusText(r: BatchDocReview, st: DocApplyState | undefined, groupItems: number): string {
+function statusText(r: BatchDocReview, st: DocApplyState | undefined, groupItems: number, rows: ReviewItem[] = []): string {
+  const rowNo = (l: { mode: string; itemKey?: string }) => (l.mode === "docItem" ? rows.find((i) => i.key === l.itemKey)?.drawingNumber ?? "" : "");
   if (r.kind === "business" && st?.kind === "business") {
     if (st.state.fileOnly) return "jen soubor";
     if (st.state.onDuplicate === "skip") return "neuloží se znovu";
@@ -159,7 +182,8 @@ function statusText(r: BatchDocReview, st: DocApplyState | undefined, groupItems
     return "přiloží se";
   }
   if (r.kind === "drawing" && st?.kind === "drawing") {
-    const link = st.state.link.mode === "add" ? "nová položka" : st.state.link.mode === "none" ? "bez položky" : "→ položka";
+    const no = rowNo(st.state.link);
+    const link = st.state.link.mode === "add" ? "nová položka" : st.state.link.mode === "none" ? "bez položky" : no ? `→ položka ${no}` : "→ položka";
     return `${link}${st.state.archive ? " · do archivu" : ""}`;
   }
   if (r.kind === "model" && st?.kind === "model") return st.state.link.mode === "none" ? "bez položky" : st.state.link.mode === "add" ? "nová položka" : "→ položka";
@@ -200,11 +224,11 @@ function SaveCountBanner({ review, state, locked, busy, onMergeAll }: {
 }
 
 export function CaptureBatchReview({
-  review, state, batch, local, locked, picking, onChange, onPickJob, onAssign, onAction, onChangeType, onMergeAll, busy, jumpRef,
+  review, state, batch, local, locked, failed, picking, onChange, onPickJob, onAssign, onAction, onChangeType, onMergeAll, busy, jumpRef,
 }: CaptureBatchReviewProps) {
   // pravidlo rozbalení se počítá z odpovědi serveru (ne při každém psaní) — klíč = seznam id
   const attentionKey = review.docs
-    .filter((r) => !locked.has(r.docId) && needsAttention(r, review, state))
+    .filter((r) => !locked.has(r.docId) && needsAttention(r, review, state, failed))
     .map((r) => r.docId)
     .join(",");
   const attention = React.useMemo(() => new Set(attentionKey ? attentionKey.split(",") : []), [attentionKey]);
@@ -231,25 +255,47 @@ export function CaptureBatchReview({
     let docs = state.docs;
     for (const row of g.job.items) {
       const m = ROW_OF_DOC_RE.exec(row.key);
-      const d = m ? docs[m[2]] : undefined;
-      if (!m || !d) continue;
-      const next = cardFromRow(d, row, prev?.job.items.find((i) => i.key === row.key), review.docs.find((x) => x.docId === m[2]));
-      if (next !== d) docs = { ...docs, [m[2]]: next };
+      if (m) {
+        const d = docs[m[2]];
+        if (!d) continue;
+        const next = cardFromRow(d, row, prev?.job.items.find((i) => i.key === row.key), review.docs.find((x) => x.docId === m[2]));
+        if (next !== d) docs = { ...docs, [m[2]]: next };
+        continue;
+      }
+      // řádek z dokladu (objednávka / text e-mailu): počet kusů upravený v Položkách platí i na kartě výkresu,
+      // který na řádek míří (uloží se to, co je v Položkách — karta nesmí ukazovat jiný počet)
+      const was = prev?.job.items.find((i) => i.key === row.key);
+      if (!was || was.quantity === row.quantity) continue;
+      for (const id of g.docIds) {
+        const d = docs[id];
+        if (d?.kind !== "drawing" || d.state.link.mode !== "docItem" || d.state.link.itemKey !== row.key || d.state.quantity === row.quantity) continue;
+        docs = { ...docs, [id]: cardFromRow(d, { ...was, quantity: row.quantity }, was, review.docs.find((x) => x.docId === id)) };
+      }
     }
-    onChange({ ...state, groups: state.groups.map((x) => (x.key === g.key ? g : x)), docs });
+    let next: BatchApplyState = { ...state, groups: state.groups.map((x) => (x.key === g.key ? g : x)), docs };
+    // jiný cíl skupiny → vazby výkresů znovu podle čísla (položka staré zakázky / „ai-0" jiného cíle neplatí)
+    if (prev && prev.job.targetKey !== g.job.targetKey) next = relinkGroupDocs(review, next, g.key);
+    onChange(next);
   };
   const setDoc = (docId: string, d: DocApplyState) => {
     let groups = state.groups;
+    const prevDoc = state.docs[docId];
     if ((d.kind === "drawing" || d.kind === "model") && d.state.link.mode === "docItem" && ROW_OF_DOC_RE.test(d.state.link.itemKey)) {
       const key = d.state.link.itemKey;
-      const prev = state.docs[docId];
-      const before = prev && prev.kind === d.kind ? (prev.state as CardState) : null;
+      const before = prevDoc && prevDoc.kind === d.kind ? (prevDoc.state as CardState) : null;
       groups = groups.map((g) => (g.job.items.some((i) => i.key === key)
         ? { ...g, job: { ...g.job, items: g.job.items.map((i) => (i.key === key ? rowFromCard(i, d.state, before) : i)) } }
+        : g));
+    } else if (d.kind === "drawing" && d.state.link.mode === "docItem" && prevDoc?.kind === "drawing" && prevDoc.state.quantity !== d.state.quantity) {
+      // počet na kartě výkresu → řádek Položek, na který výkres míří (jedno místo pravdy)
+      const key = d.state.link.itemKey;
+      groups = groups.map((g) => (g.docIds.includes(docId)
+        ? { ...g, job: { ...g.job, items: g.job.items.map((i) => (i.key === key ? { ...i, quantity: d.state.quantity } : i)) } }
         : g));
     }
     onChange({ ...state, docs: { ...state.docs, [docId]: d }, groups });
   };
+  const ack = (...ids: string[]) => onChange(withAck(state, ...ids));
   const toggleRow = (groupKey: string, row: ReviewItem, on: boolean) => {
     const g = state.groups.find((x) => x.key === groupKey);
     if (!g) return;
@@ -330,7 +376,8 @@ export function CaptureBatchReview({
               margins={review.margins}
               aiUsed={review.aiUsed}
               fixedJobId={review.fixedJobId}
-              warnings={review.warnings.filter((w) => w.groupKey === g.key)}
+              warnings={review.warnings.filter((w) => w.groupKey === g.key && !(CARD_CODES.has(w.code) && w.docIds.some((id) => review.docs.some((d) => d.docId === id))))}
+              review={review}
               locked={groupLocked}
               picking={picking === g.key}
               onChange={setGroup}
@@ -344,7 +391,12 @@ export function CaptureBatchReview({
                 const meta = BATCH_TYPES[type];
                 const open = expanded.has(r.docId);
                 const isLocked = locked.has(r.docId);
-                const warn = docWarnings(review, r.docId).filter((w) => !warningResolved(w, state));
+                // u více karet (dva výkresy) jen u první otevřené, ať se rozhodnutí neopakuje
+                // „je i u zakázky" a archiv u jiného zákazníka ukazuje karta výkresu sama (s odkazem) — ne dvakrát
+                const warn = cardWarnings(review, r.docId).filter((w) => !warningResolved(w, state, review)
+                  && w.code !== "also_in_job" && !(r.kind === "drawing" && w.code === "drawing_archive_conflict")
+                  && (w.code !== "drawing_item_shared" || w.actions.find((a) => a.docId)?.docId === r.docId || !w.actions.some((a) => a.docId)));
+                const failedMsg = !isLocked ? failed?.[r.docId] : undefined;
                 const flagged = attention.has(r.docId);
                 const viewer = sortDoc ? viewerPages(batch, sortDoc.pageIds, local) : [];
                 const idPrefix = `cap-${r.docId}`;
@@ -376,28 +428,29 @@ export function CaptureBatchReview({
                         {/* mobil: kam se doklad uloží jako druhý řádek pod chipem */}
                         <span className={cn("ml-auto flex shrink-0 items-center gap-1 text-xs sm:order-none", isLocked ? "text-emerald-700 dark:text-emerald-400" : flagged ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")}>
                           {isLocked ? <CheckCircle2 className="h-3.5 w-3.5" /> : flagged ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
-                          <span className="hidden sm:inline">{isLocked ? "uloženo" : statusText(r, st2, st.job.items.length)}</span>
+                          <span className="hidden sm:inline">{isLocked ? "uloženo" : failedMsg ? "neuložilo se — oprav" : statusText(r, st2, st.job.items.length, st.job.items)}</span>
                         </span>
-                        <span className="block w-full pl-6 text-[11px] text-muted-foreground sm:hidden">{isLocked ? "uloženo" : statusText(r, st2, st.job.items.length)}</span>
+                        <span className="block w-full pl-6 text-[11px] text-muted-foreground sm:hidden">{isLocked ? "uloženo" : failedMsg ? "neuložilo se — oprav" : statusText(r, st2, st.job.items.length, st.job.items)}</span>
                       </button>
                       {open && st2 && (
                         <div className="border-t px-3 pb-3 pt-2.5 sm:px-4">
+                          {failedMsg && (
+                            <div data-testid="capture-doc-failed" className="mb-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100">
+                              <p className="flex items-start gap-1.5 font-medium"><XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Neuložilo se: {failedMsg}</p>
+                              <p className="mt-1">Oprav níže (např. „Patří k položce“) a dej <b>Uložit zbývající</b> — uložené doklady zůstanou.</p>
+                              {(st2.kind === "drawing" || st2.kind === "model") && (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setDoc(r.docId, { ...st2, state: { ...st2.state, link: { mode: "none" } } } as DocApplyState)}>
+                                    Uložit bez vazby na položku
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                           {warn.length > 0 && (
                             <ul className="mb-3 space-y-1.5">
                               {warn.map((w) => (
-                                <li key={w.id} className={cn("rounded-xl border p-2.5 text-xs", w.severity === "info" ? "border-sky-200 bg-sky-50 dark:border-sky-500/30 dark:bg-sky-500/10" : "border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10")}>
-                                  <p className="flex items-start gap-1.5">
-                                    {w.severity === "info" ? <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />}
-                                    {w.message}
-                                  </p>
-                                  {w.actions.length > 0 && !isLocked && (
-                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                      {w.actions.map((a, n) => (
-                                        <Button key={n} type="button" size="sm" variant={n === 0 ? "default" : "outline"} className="h-8" onClick={() => onAction(w, a)}>{a.label}</Button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </li>
+                                <WarningRow key={w.id} w={w} disabled={isLocked} onAction={onAction} />
                               ))}
                             </ul>
                           )}
@@ -442,6 +495,9 @@ export function CaptureBatchReview({
                                   drawingsAccess={review.drawingsAccess}
                                   idPrefix={idPrefix}
                                   disabled={isLocked}
+                                  duplicateInTarget={Boolean(duplicateInTarget(review, state, r.docId))}
+                                  acked={state.ack ?? []}
+                                  onAck={ack}
                                 />
                               )}
                               {r.kind === "model" && st2.kind === "model" && (
@@ -452,6 +508,7 @@ export function CaptureBatchReview({
                                   itemOptions={itemOptions}
                                   idPrefix={idPrefix}
                                   disabled={isLocked}
+                                  duplicateInTarget={Boolean(duplicateInTarget(review, state, r.docId))}
                                 />
                               )}
                               {r.kind === "file" && st2.kind === "file" && (

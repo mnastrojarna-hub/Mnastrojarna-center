@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StageBadge } from "@/components/jobs/stage-badge";
 import { StagePicker } from "@/components/jobs/book/stage-picker";
-import { GROUP_BAR, Segmented, SideBadge, TONES } from "@/components/jobs/capture/capture-parts";
+import { GROUP_BAR, Segmented, SideBadge, TONES, WarningRow } from "@/components/jobs/capture/capture-parts";
 import { CaptureReviewForm, TargetCard } from "@/components/jobs/capture/capture-review-form";
 import { batchJobsRequest } from "@/components/jobs/capture/capture-client";
 import { normalizeSearch } from "@/components/jobs/book/combobox";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/jobs/capture-review";
 import { nextStage, stageMeta } from "@/lib/jobs/stages";
 import type {
-  BatchApplyState, BatchDocDraft, BatchGroupReview, BatchGroupState, BatchWarning, BatchWarningAction,
+  BatchApplyState, BatchDocDraft, BatchGroupReview, BatchReviewModel, BatchGroupState, BatchWarning, BatchWarningAction,
 } from "@/lib/jobs/capture-batch-types";
 import { warningResolved } from "@/components/jobs/capture/capture-flow";
 import { plural } from "@/lib/jobs/deadlines";
@@ -155,6 +155,8 @@ export interface GroupHeaderProps {
   aiUsed: boolean;
   fixedJobId: string | null;
   warnings: BatchWarning[];
+  /** Celá kontrola (vyřešení upozornění podle stavu). */
+  review?: BatchReviewModel;
   /** Všechny doklady skupiny už uložené (po částečném uložení). */
   locked: boolean;
   picking: boolean;
@@ -164,12 +166,12 @@ export interface GroupHeaderProps {
 }
 
 export function CaptureGroupHeader({
-  index, group, state, apply, docs, options, margins, aiUsed, fixedJobId, warnings, locked, picking, onChange, onPickJob, onAction,
+  index, group, state, apply, docs, options, margins, aiUsed, fixedJobId, warnings, review, locked, picking, onChange, onPickJob, onAction,
 }: GroupHeaderProps) {
   const side = groupSide(docs, group.primaryDocId);
   const targets = group.model.targets;
   const target: ReviewTarget | null = targets.find((t) => t.key === state.job.targetKey) ?? null;
-  const open = warnings.filter((w) => !warningResolved(w, apply));
+  const open = warnings.filter((w) => !warningResolved(w, apply, review));
   const autoOpen = !aiUsed || open.some((w) => w.severity !== "info") || (group.model.confidence ?? 1) < 0.85;
   const [dataOpen, setDataOpen] = React.useState(autoOpen);
   const fullModel: ReviewModel = { ...group.model, options, previews: [] };
@@ -294,33 +296,7 @@ export function CaptureGroupHeader({
         {/* Upozornění */}
         {open.length > 0 && (
           <ul className="space-y-1.5">
-            {open.map((w) => (
-              <li
-                key={w.id}
-                className={cn(
-                  "rounded-xl border p-2.5 text-xs",
-                  w.severity === "block"
-                    ? "border-red-200 bg-red-50 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100"
-                    : w.severity === "warn"
-                      ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
-                      : "border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100",
-                )}
-              >
-                <p className="flex items-start gap-1.5">
-                  {w.severity === "block" ? <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : w.severity === "warn" ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" /> : <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
-                  {w.message}
-                </p>
-                {w.actions.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {w.actions.map((a, i) => (
-                      <Button key={i} type="button" size="sm" variant={i === 0 && w.severity !== "info" ? "default" : "outline"} className="h-8" onClick={() => onAction(w, a)}>
-                        {a.label}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
+            {open.map((w) => <WarningRow key={w.id} w={w} disabled={locked} onAction={onAction} />)}
           </ul>
         )}
 

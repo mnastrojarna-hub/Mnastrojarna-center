@@ -83,7 +83,7 @@ export async function upsertDrawingFromCapture(db: JobsDb, input: CaptureDrawing
   const existing = await findSame(db, number, revision);
   if (existing) {
     if (existing.customer_id && customerId && existing.customer_id !== customerId) {
-      return { status: "conflict", message: `Číslo ${number} ${revision} je v archivu u jiného zákazníka — do archivu se nezapsalo.` };
+      return { status: "conflict", message: `Číslo ${number}${revision && revision !== "-" ? ` rev. ${revision}` : ""} je v archivu výkresů u jiného zákazníka — k zakázce uloženo, do archivu se nezapsalo.` };
     }
     // zakázka bez zákazníka se nepropojí s výkresem konkrétního zákazníka (stejné číslo ≠ stejný díl)
     if (existing.customer_id && !customerId) {
