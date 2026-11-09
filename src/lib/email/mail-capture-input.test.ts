@@ -1,3 +1,4 @@
+import { pragueDateOf } from "./mail-capture-input";
 import { describe, expect, it } from "vitest";
 import {
   applyMailContextToReview, companyFromDomain, deadlineFromMailText, isSignatureImage, isSignatureImageSize, looksLikePerson, mailClassifyContext,
@@ -251,5 +252,28 @@ describe("podpis e-mailu → kontaktní osoba, firma, hlavička", () => {
     expect(m.doc.items[0]).toMatchObject({ name: "Stud bolt M42", quantity: 20 });
     expect(m.doc.requiredDeliveryDate).toBe("2026-12-15");
     expect(m.person).toMatchObject({ name: "Jan Čejka", position: "Nákup" });
+  });
+});
+
+describe("datum dokladu z e-mailu (9. 11.)", () => {
+  it("den přijetí v pražském čase (i přes půlnoc UTC)", () => {
+    expect(pragueDateOf("2026-11-05T09:12:00Z")).toBe("2026-11-05");
+    expect(pragueDateOf("2026-11-05T23:30:00Z")).toBe("2026-11-06");
+    expect(pragueDateOf("2026-07-31T22:30:00Z")).toBe("2026-08-01");
+    expect(pragueDateOf(null)).toBeNull();
+    expect(pragueDateOf("nesmysl")).toBeNull();
+  });
+  it("poptávka z e-mailu dostane datum = den přijetí", () => {
+    const ex = mailTextExtractRules({
+      subject: "Poptávka", fromName: "Petr Fous", fromEmail: "fous@hofmeister.cz", category: "poptavka",
+      body: "Dobrý den, prosím o nabídku dle přiložených výkresů.", receivedAt: "2026-11-06T07:45:00Z",
+    });
+    expect(ex.doc.docKind).toBe("poptavka");
+    expect(ex.doc.documentDate).toBe("2026-11-06");
+  });
+  it("AI bez data → doplní se den přijetí; AI s datem má přednost", () => {
+    const rules = mailTextExtractRules({ subject: "Poptávka", fromName: "", fromEmail: "a@b.cz", category: "poptavka", body: "Poptávka", receivedAt: "2026-11-06T07:45:00Z" });
+    expect(mergeMailExtract({ doc: { ...rules.doc, documentDate: "" } }, rules).doc.documentDate).toBe("2026-11-06");
+    expect(mergeMailExtract({ doc: { ...rules.doc, documentDate: "2026-11-02" } }, rules).doc.documentDate).toBe("2026-11-02");
   });
 });

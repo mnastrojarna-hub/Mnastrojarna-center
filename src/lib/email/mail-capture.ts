@@ -132,6 +132,7 @@ export async function mailContextOf(db: JobsDb, email: EmailRow, filenames: read
     body: mailBodyForContext(email.body_text),
     ownText: mailOwnText(email.body_text).slice(0, 8000),
     phone: sig.phone || phoneFromSignature(email.body_text),
+    receivedAt: email.received_at ?? null,
     files: [],
     skipped: [],
   };
