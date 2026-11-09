@@ -157,6 +157,17 @@ describe("Karta zakázky — render", () => {
     expect(inv).not.toContain("Srovnat podle položek");
   });
 
+  it("9. 11.: prémiový zákazník — banner „Pozor — prémiový zákazník“ v hlavičce a štítek v liště", () => {
+    const html = render(fixture({ customerPremium: true }));
+    expect(html).toContain('data-testid="premium-banner"');
+    expect(html).toContain("Pozor — prémiový zákazník");
+    expect(html).toContain("Zakázka pro <strong class=\"font-semibold\">StrojMetal s.r.o.</strong> má přednost");
+    expect(html.match(/data-testid="premium-badge"/g)).toHaveLength(2); // lišta: mobil ikona, od sm „Prémiový"
+    const plain = render(fixture());
+    expect(plain).not.toContain("premium-banner");
+    expect(plain).not.toContain("premium-badge");
+  });
+
   it("zaměstnanec bez marží a bez mazání", () => {
     const html = render(fixture({ purchaseCost: null, margin: null }), WORKER);
     expect(html).not.toContain("Nákupní náklady");

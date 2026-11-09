@@ -214,6 +214,8 @@ export interface BookParams {
   exception?: ExceptionFilterKey | null;
   /** Důvod prohry / storna (URL duvod=) — záložka Nerealizované & zrušené. */
   reason?: LostReason | null;
+  /** 9. 11.: jen zakázky prémiových zákazníků (URL premiovi=1). */
+  premium?: boolean;
   sort: JobSort;
   dir: SortDir;
   view: BookView;
@@ -266,6 +268,7 @@ export const DEFAULT_PARAMS: BookParams = {
   changedBy: "",
   exception: null,
   reason: null,
+  premium: false,
   sort: DEFAULT_SORT,
   dir: defaultDirFor(DEFAULT_SORT),
   view: "radky",
@@ -300,6 +303,7 @@ export function parseBookParams(sp: RawSearchParams): BookParams {
     changedBy: cleanId(firstParam(sp, "zmenil")),
     exception: isExceptionFilter(firstParam(sp, "vyjimka")) ? (firstParam(sp, "vyjimka") as ExceptionFilterKey) : null,
     reason: isLostReason(firstParam(sp, "duvod")) ? (firstParam(sp, "duvod") as LostReason) : null,
+    premium: firstParam(sp, "premiovi") === "1",
     sort,
     dir,
     view: firstParam(sp, "view") === "tabule" ? "tabule" : "radky",
@@ -331,6 +335,7 @@ export function bookQuery(p: BookParams): string {
   if (cleanId(p.changedBy)) out.set("zmenil", cleanId(p.changedBy));
   if (p.exception && isExceptionFilter(p.exception)) out.set("vyjimka", p.exception);
   if (p.reason && isLostReason(p.reason)) out.set("duvod", p.reason);
+  if (p.premium) out.set("premiovi", "1");
   const sort = isSort(p.sort) ? p.sort : DEFAULT_SORT;
   if (sort !== DEFAULT_SORT) out.set("sort", sort);
   if (p.dir !== defaultDirFor(sort)) out.set("dir", p.dir);
@@ -380,7 +385,7 @@ export function toggleStagePatch(p: BookParams, stage: JobStage): BookPatch {
 /** „Zrušit filtry" — záložka, řazení a pohled zůstávají. */
 export const RESET_FILTERS: BookPatch = {
   stages: [], q: "", owner: "", assignee: "", customer: "", deadline: null, step: "", location: "", payment: null,
-  inquiry: [], order: [], delivery: [], changedBy: "", exception: null, reason: null,
+  inquiry: [], order: [], delivery: [], changedBy: "", exception: null, reason: null, premium: false,
 };
 
 export function activeFilterCount(p: BookParams): number {
@@ -388,7 +393,7 @@ export function activeFilterCount(p: BookParams): number {
     p.stages.length > 0, p.q.trim() !== "", p.owner !== "", p.assignee !== "", p.customer !== "", p.deadline !== null,
     Boolean(p.step), Boolean((p.location ?? "").trim()), Boolean(p.payment),
     (p.inquiry ?? []).length > 0, (p.order ?? []).length > 0, (p.delivery ?? []).length > 0, Boolean(p.changedBy),
-    Boolean(p.exception), Boolean(p.reason),
+    Boolean(p.exception), Boolean(p.reason), Boolean(p.premium),
   ].filter(Boolean).length;
 }
 
@@ -433,6 +438,7 @@ export function bookParamsToFilters(p: BookParams): JobFilters {
   if (p.changedBy) filters.changedBy = p.changedBy;
   if (p.exception) filters.exception = p.exception;
   if (p.reason) filters.lostReason = p.reason;
+  if (p.premium) filters.premium = true;
   return filters;
 }
 

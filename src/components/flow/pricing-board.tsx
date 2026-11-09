@@ -11,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StageBadge } from "@/components/jobs/stage-badge";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
+import { premiumFirst } from "@/lib/jobs/premium";
 import { createJobQuote, saveJobItems, updateJob } from "@/app/actions/jobs";
 import { stageMeta } from "@/lib/jobs/stages";
 import type { JobStage, PriorityLevel, QuoteStatus } from "@/lib/supabase/database.types";
@@ -42,6 +44,8 @@ export interface PricingJob {
   priority: PriorityLevel;
   customerName: string | null;
   customerNumber: string | null;
+  /** Prémiový zákazník (9. 11.) — štítek „Pozor, prémiový zákazník". */
+  customerPremium?: boolean;
   customerInquiryNumber: string | null;
   customerRequiredDate: string | null;
   dueDate: string | null;
@@ -231,15 +235,26 @@ export function PricingBoard({
     // vždy stejná struktura (seznam první) — zapnutí panelu nepřipojí formuláře znovu
     <div className={cn(docked && "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,40%)] lg:items-start lg:gap-4")}>
     <ul className="min-w-0 space-y-2">
-      {jobs.map((job) => {
+      {/* 9. 11.: prémioví zákazníci přednostně nahoře (stabilně) */}
+      {premiumFirst(jobs, (j) => j.customerPremium).map((job) => {
         const open = openId === job.id;
         const unpriced = job.items.filter((i) => i.unitPrice === null).length;
         const priced = job.items.length > 0 && unpriced === 0;
         const quotes = job.quotes.filter((q) => !q.archived);
         const m = stageMeta(job.stage);
         return (
-          <li key={job.id} id={`job-${job.id}`} className={cn("relative scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm transition", open && "shadow-md ring-1 ring-amber-300/60 dark:ring-amber-500/30")}>
+          <li
+            key={job.id}
+            id={`job-${job.id}`}
+            className={cn(
+              "relative scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm transition",
+              job.customerPremium && PREMIUM_ROW,
+              open && "shadow-md ring-1 ring-amber-300/60 dark:ring-amber-500/30",
+            )}
+            data-premium={job.customerPremium ? "1" : undefined}
+          >
             <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", m.bar)} />
+            {job.customerPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
             <button
               type="button"
               onClick={() => setOpenId(open ? null : job.id)}
@@ -250,6 +265,7 @@ export function PricingBoard({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-sm font-bold">{job.number}</span>
                   <StageBadge stage={job.stage} size="sm" />
+                  {job.customerPremium && <PremiumBadge label="flow" size="xs" />}
                   {job.priority === "vysoka" && (
                     <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
                       <Flame className="h-3 w-3" /> Spěchá
@@ -300,6 +316,7 @@ export function PricingBoard({
                     quote: job.flow.snapshot.activeQuote, today,
                     onlyOpenQuote: job.flow.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
                     quoteAuthor: job.flow.quoteAuthor ?? null,
+                    premium: job.customerPremium === true, customerName: job.customerName,
                   }}
                   next={job.flow.next}
                   menu={job.flow.menu}

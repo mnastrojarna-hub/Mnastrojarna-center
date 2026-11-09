@@ -36,6 +36,7 @@ import { approvalHint, jobApprovalFlag } from "./approval";
 import { useAccess } from "@/components/access-provider";
 import { quoteApproverWhoFor } from "@/lib/jobs/flow-status";
 import { ExceptionBanners } from "./exception-banners";
+import { PremiumBadge, PremiumBanner } from "@/components/customers/premium-badge";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 /** Čip DL v hlavičce: číslo z delivery_notes (jediný zdroj čísla DL); starší data bez řádku → ze souborů. */
@@ -66,6 +67,13 @@ export function JobToolbar({ job }: { job: JobDetail }) {
           <span className="min-w-0 truncate font-mono text-sm font-bold tracking-tight" title={job.number}>{job.number}</span>
           <StageBadge stage={job.stage} size="xs" short className="hidden min-[400px]:inline-flex sm:hidden" />
           <StageBadge stage={job.stage} size="sm" className="hidden sm:inline-flex" />
+          {/* 9. 11.: prémiový zákazník — vidět i po odrolování (mobil jen ikona, text v title) */}
+          {job.customerPremium && (
+            <>
+              <PremiumBadge label="icon" size="xs" className="sm:hidden" />
+              <PremiumBadge label="compact" size="xs" className="hidden sm:inline-flex" />
+            </>
+          )}
           {approval && approval.flag.kind !== "approved" && (
             <>
               {/* mobil: jen ikona (text v title / pro čtečky), od sm krátký text — nikdy useknutý */}
@@ -248,6 +256,8 @@ export function JobHeader({ job }: { job: JobDetail }) {
     >
       <div className={cn("h-1.5 w-full", m.bar)} />
       <div className="space-y-4 p-4 sm:p-5">
+        {/* 9. 11.: prémiový zákazník — výrazně nahoře (živě ze zákazníka) */}
+        {job.customerPremium && <PremiumBanner customerName={job.customer?.name} />}
         {/* výjimky v toku: nová revize výkresu (výrazně, dokud ji někdo nevezme na vědomí), reklamace, bez objednávky */}
         <ExceptionBanners job={job} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CustomerDialog, type OwnerOption } from "@/components/customers/customer-dialog";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
+import { PREMIUM_ROW, PremiumBadge } from "@/components/customers/premium-badge";
 import {
   CUSTOMER_FILTERS, avatarToneFor, customerFilterCounts, filterCustomers, initialsOf,
   type CustomerFilter, type CustomerView,
@@ -166,7 +167,13 @@ export function CustomersBrowser({
 function CustomerRowItem({ customer: c, owners }: { customer: CustomerView; owners: OwnerOption[] }) {
   const place = [c.city, c.country !== "CZ" ? c.country : null].filter(Boolean).join(", ");
   return (
-    <li className="group relative flex items-start gap-3 rounded-xl border bg-card p-3 shadow-sm transition hover:border-green-500/40 hover:shadow-md sm:items-center">
+    <li
+      className={cn(
+        "group relative flex items-start gap-3 rounded-xl border bg-card p-3 shadow-sm transition hover:border-green-500/40 hover:shadow-md sm:items-center",
+        c.isPremium && PREMIUM_ROW,
+      )}
+      data-premium={c.isPremium ? "1" : undefined}
+    >
       <span
         aria-hidden
         className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold", avatarToneFor(c.name))}
@@ -188,6 +195,7 @@ function CustomerRowItem({ customer: c, owners }: { customer: CustomerView; owne
                 <Hash className="h-3 w-3" />{c.customerNumber}
               </span>
             )}
+            {c.isPremium && <PremiumBadge label="short" size="xs" />}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
             {c.ico && <span>IČO {c.ico}</span>}

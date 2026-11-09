@@ -669,7 +669,7 @@ export const JOB_LIST_SELECT = [
   PRODUCTION_LIST_COLUMNS,
   "customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
   FLOW_LIST_COLUMNS,
-  "customer:customers!customer_id(id, name, customer_number, ico)",
+  "customer:customers!customer_id(id, name, customer_number, ico, is_premium)",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
   `creator:profiles!created_by(${PERSON})`,
@@ -687,7 +687,7 @@ export const JOB_LIST_SELECT = [
 
 export const JOB_DETAIL_SELECT = [
   "*",
-  "customer:customers!customer_id(id, name, customer_number, supplier_number_at_customer, ico, dic, street, city, zip, country, email, phone, contact_person, delivery_address, payment_terms_days, address, contacts:customer_contacts!customer_id(id, name, position, email, phone, is_primary))",
+  "customer:customers!customer_id(id, name, customer_number, supplier_number_at_customer, ico, dic, is_premium, street, city, zip, country, email, phone, contact_person, delivery_address, payment_terms_days, address, contacts:customer_contacts!customer_id(id, name, position, email, phone, is_primary))",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
   `creator:profiles!created_by(${PERSON})`,
@@ -722,7 +722,7 @@ export const JOB_QUOTE_SELECT = [
 export const QUOTE_LIST_SELECT = [
   JOB_QUOTE_SELECT,
   "job:orders!job_id(id, number, title, status, quote_id)",
-  "customer:customers!customer_id(id, name)",
+  "customer:customers!customer_id(id, name, is_premium)",
 ].join(", ");
 
 export const JOB_FILE_SELECT = [
@@ -783,6 +783,8 @@ export interface CustomerEmbed {
   delivery_address?: string | null;
   payment_terms_days?: number | null;
   address?: string | null;
+  /** Prémiový zákazník (20261109150000) — zvýraznění všech jeho zakázek. */
+  is_premium?: boolean | null;
   contacts?: CustomerContactEmbed[] | null;
 }
 
@@ -975,7 +977,7 @@ export interface QuoteRow {
   returner?: Embed<PersonEmbed>;
   items?: ItemRow[] | null;
   job?: Embed<{ id: string; number: string | null; title: string | null; status: string; quote_id?: string | null }>;
-  customer?: Embed<{ id: string; name: string }>;
+  customer?: Embed<{ id: string; name: string; is_premium?: boolean | null }>;
 }
 
 export interface FileRow {
@@ -1055,6 +1057,14 @@ function customerRef(c: Embed<CustomerEmbed>): JobCustomerRef | null {
   const x = one(c);
   if (!x || !x.id) return null;
   return { id: x.id, name: x.name, customerNumber: x.customer_number ?? null, ico: x.ico ?? null };
+}
+
+/**
+ * Prémiový zákazník (9. 11.): zakázka se zvýrazní „Pozor, prémiový zákazník". Čte se živě ze zákazníka (embed),
+ * na zakázku se nekopíruje — přepnutí v kartě zákazníka se hned projeví na všech jeho zakázkách.
+ */
+export function isPremiumCustomer(c: Embed<{ is_premium?: boolean | null }>): boolean {
+  return one(c)?.is_premium === true;
 }
 
 function stageOf(v: unknown): JobStage {
@@ -1177,6 +1187,7 @@ export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
     stage: stageOf(row.status),
     priority: isPriority(row.priority) ? row.priority : "stredni",
     customer: customerRef(row.customer),
+    customerPremium: isPremiumCustomer(row.customer),
     customerOrderNumber: row.customer_order_number ?? null,
     customerInquiryNumber: row.customer_inquiry_number ?? null,
     drawingNumbers,
@@ -1635,7 +1646,7 @@ export function matchesFlow(
 /** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
 export function filterJobs(
   items: JobListItem[],
-  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "paid" | "exception" | "lostReason">,
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "paid" | "exception" | "lostReason" | "premium">,
   today: Date = pragueToday(),
 ): JobListItem[] {
   const exception = filters.exception && isExceptionFilter(filters.exception) ? filters.exception : null;
@@ -1647,6 +1658,8 @@ export function filterJobs(
   const delivered = filters.deliveredToCustomer;
   const paid = filters.paid;
   return items.filter((j) => {
+    // 9. 11.: jen zakázky prémiových zákazníků (chip „Prémioví")
+    if (filters.premium && !j.customerPremium) return false;
     if (typeof delivered === "boolean" && isDeliveredToCustomer(j) !== delivered) return false;
     // Archiv (zaplacené) ↔ Dokončené (dodané, čekají na peníze)
     if (typeof paid === "boolean" && isPaidJob(j) !== paid) return false;

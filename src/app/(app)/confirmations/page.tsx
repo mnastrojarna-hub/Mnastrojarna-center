@@ -142,7 +142,7 @@ export default async function ConfirmationsPage({
                   const c = confirmById.get(j.id);
                   return c ? (
                     <FlowActionBar
-                      target={{ jobId: j.id, jobNumber: j.number, confirm: c, today }}
+                      target={{ jobId: j.id, jobNumber: j.number, confirm: c, today, premium: j.customerPremium, customerName: j.customer?.name }}
                       next={{ key: "order.confirm", label: FLOW_ACTIONS["order.confirm"].label }}
                       menu={[]}
                       palette="orange.action"
@@ -152,6 +152,7 @@ export default async function ConfirmationsPage({
                 return (
                   <FlowActionBar
                     target={{
+                      premium: j.customerPremium, customerName: j.customer?.name,
                       jobId: j.id, jobNumber: j.number, facts: st.facts, quotes: st.quotes, quote: st.snapshot.activeQuote,
                       confirm: confirmById.get(j.id) ? { ...confirmById.get(j.id)!, orderStatus: st.facts.orderStatus, orderRevision: st.facts.orderRevision } : null,
                       revision: revisions[j.id] ?? null, orderChangeStamp: st.stamps.orderChange,

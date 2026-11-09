@@ -183,6 +183,7 @@ export default async function InquiriesPage({
                       {st ? (
                         <FlowActionBar
                           target={{
+                            premium: j.customerPremium, customerName: j.customer?.name,
                             jobId: j.id, jobNumber: j.number, facts: st.facts, quotes: st.quotes, quote: st.snapshot.activeQuote,
                             today, onlyOpenQuote: st.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
                             quoteAuthor: st.quoteAuthor ?? null,
@@ -218,6 +219,7 @@ export default async function InquiriesPage({
                 return (
                   <FlowActionBar
                     target={{
+                      premium: j.customerPremium, customerName: j.customer?.name,
                       jobId: j.id, jobNumber: j.number, facts: st.facts, quotes: st.quotes, quote: st.snapshot.activeQuote,
                       today, onlyOpenQuote: st.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
                       quoteAuthor: st.quoteAuthor ?? null,

@@ -114,7 +114,8 @@ export default async function OrdersPage({
           <SegmentTabs counts={segmentCounts(counts.byStage, counts.deliveredByStage, counts.archivedByStage)} />
           <StageChips byStage={segmentStageCounts(counts.byStage, counts.deliveredByStage, params.segment, counts.archivedByStage)} />
           {chipSegment && <FlowFilterChips counts={flowCounts} />}
-          <ExceptionChips counts={exceptionCounts} />
+          {/* 9. 11.: chip „Prémioví" — počet prémiových zakázek v aktuálním pohledu */}
+          <ExceptionChips counts={exceptionCounts} premium={params.premium ? jobs.length : jobs.filter((j) => j.customerPremium).length} />
           <BookToolbar options={options} production={production} />
         </section>
 

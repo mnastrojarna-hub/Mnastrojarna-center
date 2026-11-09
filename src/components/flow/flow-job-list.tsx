@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Building2, CalendarClock, Flame, Package, Sparkles, UserRound, ChevronRight } from "lucide-react";
 import { StageBadge } from "@/components/jobs/stage-badge";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
 import { stageMeta } from "@/lib/jobs/stages";
+import { premiumFirst } from "@/lib/jobs/premium";
 import { deadlineInfo, DEADLINE_BADGE } from "@/lib/jobs/deadlines";
 import type { JobListItem } from "@/lib/jobs/types";
 import { cn, formatCZK } from "@/lib/utils";
@@ -82,14 +84,19 @@ export function FlowJobRow({
       className={cn(
         "group relative flex flex-col gap-3 overflow-hidden rounded-xl border bg-card p-3 pl-4 shadow-sm transition hover:shadow-md sm:flex-row sm:items-center",
         "hover:border-foreground/20",
+        // 9. 11.: prémiový zákazník — červený okraj, podklad a pruh vpravo
+        job.customerPremium && PREMIUM_ROW,
       )}
+      data-premium={job.customerPremium ? "1" : undefined}
     >
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", m.bar)} />
+      {job.customerPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
       <Link href={`/orders/${job.id}`} className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Otevřít zakázku ${job.number} — ${job.title}`} />
       <div className="pointer-events-none relative min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-mono text-sm font-bold tracking-tight">{job.number}</span>
           <StageBadge stage={job.stage} size="sm" />
+          {job.customerPremium && <PremiumBadge label="flow" size="xs" />}
           {job.priority === "vysoka" && (
             <span title="Vysoká priorita" className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
               <Flame className="h-3 w-3" /> Spěchá
@@ -164,9 +171,10 @@ export function FlowJobList({
   /** Odznak řádku (anonymizace výkresů). */
   renderBadge?: (job: JobListItem) => React.ReactNode;
 }) {
+  // 9. 11.: prémioví zákazníci přednostně nahoře (stabilně, jinak pořadí stránky)
   return (
     <ul className="space-y-2">
-      {jobs.map((j) => (
+      {premiumFirst(jobs, (j) => j.customerPremium).map((j) => (
         <FlowJobRow key={j.id} job={j} today={today} action={renderAction?.(j)} state={renderState?.(j)} badge={renderBadge?.(j)} />
       ))}
     </ul>

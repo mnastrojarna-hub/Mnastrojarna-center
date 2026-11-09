@@ -4,6 +4,7 @@ import * as React from "react";
 import { FileText, Loader2, Send } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PremiumBanner } from "@/components/customers/premium-badge";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { draftQuoteEmail } from "@/app/actions/job-documents";
 import { approveAndSendQuote } from "@/app/actions/flow-status";
@@ -16,7 +17,7 @@ import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
  * Zavřením se nic neschválí.
  */
 export function QuoteApproveSendDialog({
-  open, onOpenChange, jobId, quoteId, number, onDone, updatedAt = null,
+  open, onOpenChange, jobId, quoteId, number, onDone, updatedAt = null, premium = false, customerName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +27,9 @@ export function QuoteApproveSendDialog({
   /** quotes.updated_at, jak ho uživatel viděl — změněnou nabídku server neschválí. */
   updatedAt?: string | null;
   onDone: (message: string) => void;
+  /** 9. 11.: prémiový zákazník — výrazný pruh „Pozor — prémiový zákazník" nahoře. */
+  premium?: boolean;
+  customerName?: string | null;
 }) {
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const [filename, setFilename] = React.useState<string | null>(null);
@@ -96,6 +100,7 @@ export function QuoteApproveSendDialog({
           subtitle="Po potvrzení se nabídka schválí, vystaví se PDF a e-mail odejde z tvé schránky."
         />
         <form onSubmit={submit} className="space-y-4 p-4 sm:p-5" noValidate>
+          {premium && <PremiumBanner customerName={customerName} />}
           <ErrorBox error={error} />
           {step === "preparing" ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">

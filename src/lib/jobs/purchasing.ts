@@ -1089,7 +1089,7 @@ export const PURCHASE_ORDER_SELECT = [
 
 export const PURCHASE_ORDER_LIST_SELECT = [
   PURCHASE_ORDER_SELECT,
-  "job:orders!job_id(id, number, title, status, customer:customers!customer_id(id, name))",
+  "job:orders!job_id(id, number, title, status, customer:customers!customer_id(id, name, is_premium))",
 ].join(", ");
 
 export interface SupplierEmbedRow {
@@ -1196,7 +1196,7 @@ export interface PurchaseOrderDbRow {
   items?: PurchaseItemDbRow[] | null;
   job?: Embed<{
     id: string; number: string | null; title: string | null; status: string;
-    customer?: Embed<{ id: string; name: string }>;
+    customer?: Embed<{ id: string; name: string; is_premium?: boolean | null }>;
   }>;
 }
 
@@ -1425,7 +1425,7 @@ export function rowToPurchaseOrderListItem(row: PurchaseOrderDbRow): PurchaseOrd
     job: job
       ? { id: job.id, number: job.number ?? "—", title: job.title ?? "", stage: isJobStage(job.status) ? job.status : "poptavka" }
       : null,
-    customer: customer ? { id: customer.id, name: customer.name } : null,
+    customer: customer ? { id: customer.id, name: customer.name, ...(customer.is_premium === true ? { isPremium: true } : {}) } : null,
     itemCount: items.length,
     drawingNumbers,
   };
