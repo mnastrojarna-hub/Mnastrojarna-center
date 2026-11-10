@@ -2,6 +2,12 @@
 // prohlížeč se zavře." Kolečko musí jen posouvat obsah — prohlížeč zůstane otevřený, adresa se nezmění,
 // a to i na konci dokumentu, při rychlém točení, u obrázku a vodorovně (náklon kolečka / touchpad).
 //
+// Skutečná příčina (Dokumenty, Windows 7 + Chrome 109): výkres v anonymizaci → karta zakázky volá každých
+// 6 s router.refresh(). Přijde-li odpověď z novějšího nasazení (jiné buildId) nebo s chybou, Next.js načte
+// celou stránku znovu — prohlížeč (jen stav v paměti) zmizel a uživatel zůstal na kartě. Simulujeme to
+// odpovědí 500 na obnovení (RSC); obnovení se teď odloží až po zavření prohlížeče a po načtení stránky
+// znovu (F5, nové nasazení) se prohlížeč na stejné adrese otevře zase.
+//
 //   tools/e2e/run-app.sh && node tools/e2e/tests/47-viewer-wheel.mjs
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
@@ -53,8 +59,13 @@ async function setup() {
     values (next_job_number(), ${lit(`${PREFIX}Zakázka`)}, ${lit(cust)}, ${lit(adminId)}, ${lit(adminId)}, 'poptavka'::job_stage, 'manual', app_today()) returning id`).split("\n")[0];
   await upload(job, "dlouhy-vykres.pdf", await longPdf(4), "application/pdf", "vykres", 2);
   const png = await sharp({ create: { width: 1200, height: 3000, channels: 3, background: "#ddeeff" } }).png().toBuffer();
-  await upload(job, "vysoky-obrazek.png", png, "image/png", "ostatni", 1);
-  return { job };
+  await upload(job, "vysoky-obrazek.png", png, "image/png", "vykres", 1); // výkres (fotka) → prohlížeč; ostatní fotky jdou do galerie
+  // druhá zakázka: výkres čeká na anonymizaci (zámek v budoucnu → server nic nezpracuje, karta jen obnovuje)
+  const anonJob = sql(`insert into orders (number, title, customer_id, owner_id, created_by, status, source, inquiry_date)
+    values (next_job_number(), ${lit(`${PREFIX}Anonymizace`)}, ${lit(cust)}, ${lit(adminId)}, ${lit(adminId)}, 'poptavka'::job_stage, 'manual', app_today()) returning id`).split("\n")[0];
+  const anonFile = await upload(anonJob, "anonymizuje-se.pdf", await longPdf(4), "application/pdf", "vykres", 1);
+  sql(`update job_files set anon_status = 'pending', anon_lock_until = now() + interval '20 minutes' where id = ${lit(anonFile)}`);
+  return { job, anonJob };
 }
 
 const layer = (page) => page.getByTestId("file-viewer-layer");
@@ -72,6 +83,8 @@ async function viewerScroll(page) {
   });
 }
 
+const isRscRefresh = (req) => req.headers()["rsc"] === "1" && !req.headers()["next-router-prefetch"];
+
 async function openFile(page, job, name) {
   await page.goto(`${BASE}/orders/${job}?tab=dokumenty`);
   const link = page.getByTestId("file-open").filter({ hasText: name });
@@ -81,7 +94,7 @@ async function openFile(page, job, name) {
   await page.waitForTimeout(1200); // vykreslení stránek
 }
 
-const { job } = await setup();
+const { job, anonJob } = await setup();
 const browser = await launch();
 const errors = [];
 
@@ -134,6 +147,64 @@ await test("PC: obrázek — kolečko dolů ho posune, prohlížeč zůstane ote
     for (let i = 0; i < 30; i++) await page.mouse.wheel(0, 800);
     await page.waitForTimeout(800);
     expect(await layer(page).isVisible(), "obrázek: prohlížeč pořád otevřený");
+  });
+});
+
+await test("PC: Dokumenty s výkresem v anonymizaci — obnovení na pozadí (nové nasazení / chyba serveru) prohlížeč nezavře", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await login(page, USERS.admin);
+    await openFile(page, anonJob, "anonymizuje-se.pdf");
+    const url0 = page.url();
+    // obnovení stránky (RSC) odpoví chybou — Next.js by stránku načetl celou znovu
+    let failed = 0;
+    await page.route("**/*", (route) => {
+      if (!isRscRefresh(route.request())) return route.continue();
+      failed++;
+      return route.fulfill({ status: 500, body: "nasazeni" });
+    });
+    let reloads = 0;
+    page.on("framenavigated", (f) => { if (f === page.mainFrame()) reloads++; });
+    await page.mouse.move(683, 400);
+    // čte a točí kolečkem déle, než je interval obnovy karty (6 s)
+    for (let i = 0; i < 12; i++) {
+      await page.mouse.wheel(0, i < 8 ? 300 : -300);
+      await page.waitForTimeout(800);
+    }
+    expect(await layer(page).isVisible(), `prohlížeč je po 10 s čtení pořád otevřený (obnovení se chybou: ${failed}, načtení stránky: ${reloads})`);
+    expect(reloads === 0, `stránka se pod prohlížečem nenačetla znovu (${reloads}×)`);
+    expect(page.url() === url0, "adresa beze změny");
+    // po zavření se odložené obnovení dožene (už bez simulované chyby)
+    await page.unroute("**/*");
+    const refreshed = page.waitForRequest(isRscRefresh, { timeout: 15_000 }).then(() => true, () => false);
+    await page.getByTestId("viewer-back").click();
+    await layer(page).waitFor({ state: "hidden", timeout: 10_000 });
+    expect(await refreshed, "po zavření prohlížeče se karta obnoví");
+  });
+});
+
+await test("PC: načtení stránky znovu (F5 / nové nasazení) — prohlížeč se na stejné adrese otevře zase, Zpět ho zavře", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await login(page, USERS.admin);
+    await openFile(page, job, "dlouhy-vykres.pdf");
+    const url0 = page.url();
+    await page.reload();
+    await layer(page).waitFor({ timeout: 15_000 });
+    expect((await layer(page).textContent())?.includes("dlouhy-vykres.pdf"), "po načtení znovu je otevřený tentýž dokument");
+    await page.getByTestId("pdf-view").waitFor({ timeout: 15_000 });
+    expect(page.url() === url0, `adresa beze změny (${page.url()})`);
+    await page.getByTestId("viewer-back").click();
+    await layer(page).waitFor({ state: "hidden", timeout: 10_000 });
+    expect(page.url() === url0, "Zpět zavře prohlížeč a nechá kartu zakázky");
+    await page.getByTestId("file-open").first().waitFor({ timeout: 15_000 });
+    // zavřený prohlížeč se po dalším načtení neotevírá
+    await page.reload();
+    await page.getByTestId("file-open").first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(1000);
+    expect(!(await layer(page).isVisible()), "zavřený prohlížeč se po načtení znovu neotevře");
   });
 });
 

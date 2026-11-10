@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
+import { isFileViewerOpen } from "@/components/file-viewer/viewer-bus";
 
 /**
  * Neviditelný pomocník stránek se seznamem výkresů (Poptávky, Archiv výkresů): čekají-li výkresy na
@@ -26,6 +27,8 @@ export function AnonQueueNudge({ table = "job_files", ids, intervalMs = 25_000, 
     void nudgeAnonymize({ table, fileIds: list });
     const t = window.setInterval(() => {
       if (cancelled) return;
+      // otevřený prohlížeč dokumentu: neobnovovat (tvrdé načtení stránky by ho zavřelo) — další kolo to dožene
+      if (isFileViewerOpen()) return;
       n += 1;
       router.refresh();
       if (n >= rounds) window.clearInterval(t);

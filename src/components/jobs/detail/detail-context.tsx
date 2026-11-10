@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { runWhenFileViewerClosed } from "@/components/file-viewer/viewer-bus";
 import { updateJob } from "@/app/actions/jobs";
 import { uploadJobFiles, type UploadPhase } from "@/lib/jobs/upload-client";
 import { guessFileKind, JOB_FILE_MAX_BYTES, FILE_KINDS } from "@/lib/jobs/file-kinds";
@@ -82,9 +83,12 @@ function Inner({
   const [uploads, setUploads] = React.useState<UploadEntry[]>([]);
   const seq = React.useRef(0);
 
-  const refresh = React.useCallback(() => {
+  const doRefresh = React.useCallback(() => {
     startRefresh(() => router.refresh());
   }, [router]);
+  // s otevřeným prohlížečem dokumentu až po jeho zavření: odpověď z nového nasazení / chyba by Next vyřešil
+  // načtením celé stránky a prohlížeč by zmizel (majitel 10. 11. — anonymizace obnovuje každých 6 s)
+  const refresh = React.useCallback(() => runWhenFileViewerClosed(doRefresh), [doRefresh]);
 
   const save = React.useCallback(async (patch: JobInput): Promise<string | null> => {
     try {

@@ -51,3 +51,38 @@ export function resolveViewerSet(href: string): { list: ViewerSetEntry[]; index:
   }
   return null;
 }
+
+/**
+ * Je prohlížeč právě otevřený? Obnovení stránky na pozadí (router.refresh — fronta anonymizace výkresů
+ * v Dokumentech každých 6 s) se odloží až po zavření: odpověď z nového nasazení (jiné buildId) nebo chyba
+ * serveru by Next.js vyřešil tvrdým načtením stránky a prohlížeč by uživateli zmizel pod rukama
+ * (majitel 10. 11.: „otevřu PDF, točím kolečkem a zavře se to").
+ */
+let viewerOpen = false;
+const afterClose = new Set<() => void>();
+
+/** Volá FileViewerProvider při otevření / zavření prohlížeče. */
+export function setFileViewerOpen(open: boolean): void {
+  if (viewerOpen === open) return;
+  viewerOpen = open;
+  if (open) return;
+  const pending = [...afterClose];
+  afterClose.clear();
+  for (const fn of pending) {
+    try {
+      fn();
+    } catch {
+      // odložené obnovení nesmí shodit zavírání prohlížeče
+    }
+  }
+}
+
+export function isFileViewerOpen(): boolean {
+  return viewerOpen;
+}
+
+/** Spustí `fn` hned, nebo (je-li prohlížeč otevřený) jednou po jeho zavření — stejná funkce se nezdvojí. */
+export function runWhenFileViewerClosed(fn: () => void): void {
+  if (viewerOpen) afterClose.add(fn);
+  else fn();
+}
