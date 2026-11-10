@@ -189,3 +189,31 @@ describe("plný přístup (2. 11. — Volný, Šponer)", () => {
     expect(can(admin, "mail_all", ctx())).toBe(true);
   });
 });
+
+describe("10. 11.: Faktury vydané (issued_invoices) — jen super admin / plný přístup", () => {
+  it("super admin a plný přístup ano; obchodník a zaměstnanec ne — ani s příznaky", () => {
+    expect(can(admin, "issued_invoices", ctx())).toBe(true);
+    expect(can({ ...admin, fullAccess: true }, "issued_invoices", ctx())).toBe(true);
+    expect(can(sales, "issued_invoices", ctx())).toBe(false);
+    expect(can(staff, "issued_invoices", ctx())).toBe(false);
+    const flags: Partial<AccessSubject> = { canSeeMargins: true, canResolveQueue: true, canChangeStage: true, canApproveQuotes: true, canRfq: true, aiAccess: true };
+    expect(can({ ...sales, ...flags }, "issued_invoices", ctx({ supplierInvoicesForAll: true }))).toBe(false);
+    expect(can({ ...staff, ...flags }, "issued_invoices", ctx({ supplierInvoicesForAll: true }))).toBe(false);
+    expect(can({ ...admin, active: false }, "issued_invoices", ctx())).toBe(false);
+    expect(FEATURE_LABELS.issued_invoices).toBe("Faktury vydané");
+    expect(FEATURE_HINTS.issued_invoices).toMatch(/super admin/);
+  });
+
+  it("menu: položka „Faktury vydané“ vedle Faktur dodavatelů jen super adminovi", async () => {
+    const { navForFeatures } = await import("@/lib/nav");
+    const items = (s: AccessSubject) => navForFeatures(allowedFeatures(s, ctx())).flatMap((x) => x.items);
+    const adminItems = items(admin);
+    const idx = adminItems.findIndex((i) => i.href === "/issued-invoices");
+    expect(adminItems[idx]?.title).toBe("Faktury vydané");
+    expect(adminItems[idx + 1]?.href).toBe("/supplier-invoices");
+    expect(items({ ...admin, fullAccess: true }).some((i) => i.href === "/issued-invoices")).toBe(true);
+    for (const s of [sales, staff, { ...staff, canSeeMargins: true }]) {
+      expect(items(s).some((i) => i.href === "/issued-invoices")).toBe(false);
+    }
+  });
+});

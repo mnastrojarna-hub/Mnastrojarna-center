@@ -51,6 +51,7 @@ export type Feature =
   | "supplier_invoices_upload" // nahrát fakturu dodavatele (všichni)
   | "supplier_invoices"        // faktury dodavatelů — seznam, detail, rozdělení (super admin; přepínač → všichni)
   | "supplier_invoices_paid"   // zaplaceno / nezaplaceno faktury dodavatele (vždy jen super admin)
+  | "issued_invoices"          // Faktury vydané — kniha našich faktur, součty, hromadný export pro účetní (10. 11.: jen super admin)
   | "rfq"                      // poptávky dodavatelům — kolo, ceny dodavatelů v porovnání (obchodník, admin; zaměstnanec s příznakem)
   | "stage_any";               // ruční změna stavu zakázky na kterýkoli stav, dopředu i dozadu (super admin; ostatní s příznakem)
 // „margins": obchodník a super admin; 9. 11. i zaměstnanec s příznakem „Vidí nákupní ceny a marže"
@@ -60,7 +61,7 @@ export const ALL_FEATURES: Feature[] = [
   "ai_assistant", "ai_tuning", "knowledge", "drawings", "ai_pricing", "ai_capture",
   "commissions", "commissions_all", "margins", "users", "settings", "delete",
   "pricing", "quote_approval", "flow_all", "supplier_invoices_upload", "supplier_invoices", "supplier_invoices_paid", "rfq",
-  "stage_any", "approval_queue",
+  "stage_any", "approval_queue", "issued_invoices",
 ];
 
 export interface AccessSubject {
@@ -125,6 +126,8 @@ const SALES_EXTRA: Feature[] = ["commissions", "margins", "rfq"];
 const ADMIN_ONLY: Feature[] = [
   "mail_all", "dashboard", "ai_assistant", "ai_tuning", "knowledge", "drawings",
   "commissions_all", "users", "settings", "delete", "pricing", "quote_approval", "flow_all", "supplier_invoices_paid",
+  // 10. 11.: Faktury vydané — faktury všech zakázek (citlivé finance) jen super admin / plný přístup
+  "issued_invoices",
 ];
 /** Plný přístup (ne skutečný super admin): pošta jen vlastních schránek, bez správy uživatelů a schránek. */
 export const FULL_ACCESS_DENIED: Feature[] = ["users", "mail_all"];
@@ -215,6 +218,7 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   rfq: "Poptávky dodavatelům",
   stage_any: "Ruční změna stavu zakázky",
   approval_queue: "Fronta ke schválení",
+  issued_invoices: "Faktury vydané",
 };
 
 /** Doplňující vysvětlení u odepřené funkce (AccessBanner) — co dělat místo toho. */
@@ -222,5 +226,6 @@ export const FEATURE_HINTS: Partial<Record<Feature, string>> = {
   pricing: "Nacenění zatím dělá jen super admin. Nabídku připravíš ručně v kartě zakázky → záložka Nabídky; před odesláním ji schválí super admin nebo schvalovatel nabídek (pokud ti schvalování nevypnul).",
   rfq: "Poptávky dodavatelům posílá obchodník, super admin, nebo kolega se „Smí poptávat dodavatele“ (Správa uživatelů).",
   approval_queue: "Frontu ke schválení vyřizuje super admin, nebo kolega se „Smí řešit frontu ke schválení“ (Správa uživatelů).",
+  issued_invoices: "Faktury vydané (všechny naše faktury, součty a export pro účetní) zatím vidí jen super admin. Fakturu své zakázky najdeš v její kartě → Dokumenty.",
   supplier_invoices: "Faktury dodavatelů zatím zpracovává super admin. Fakturu nahraješ přes „Nahrát fakturu“ nebo vyfocením dokladu.",
 };
