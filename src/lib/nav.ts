@@ -22,6 +22,7 @@ import {
   FileUp,
   UserRound,
   ListChecks,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "@/lib/auth/permissions";
@@ -76,6 +77,8 @@ export const navSections: NavSection[] = [
       { title: "Potvrzení objednávek", href: "/confirmations", icon: PackageCheck, feature: "workflow", badgeKey: "confirmations", description: "Objednávky k potvrzení", color: "text-orange-500" },
       // #25: pro všechny — „moje" a bez práva na nákupní ceny maskované (bez cen, PDF a akcí)
       { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "workflow", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
+      // 10. 11.: naše vydané faktury po měsících — součty, export PDF / CSV pro účetní (zatím jen super admin)
+      { title: "Faktury vydané", href: "/issued-invoices", icon: FileSpreadsheet, feature: "issued_invoices", description: "Naše faktury po měsících, součty, export pro účetní", color: "text-teal-600" },
       // faktury dodavatelů: zatím jen super admin (přepínač viditelnosti); nahrát smí každý
       { title: "Faktury dodavatelů", href: "/supplier-invoices", icon: Receipt, feature: "supplier_invoices", color: "text-emerald-600", description: "Přijaté faktury, rozdělení na zakázky, zaplaceno" },
       { title: "Zanést fakturu", href: "/supplier-invoices/upload", icon: FileUp, feature: "supplier_invoices_upload", hideWith: "supplier_invoices", color: "text-emerald-600", description: "Fakturu od dodavatele (PDF nebo fotka) přečte a zapíše AI" },

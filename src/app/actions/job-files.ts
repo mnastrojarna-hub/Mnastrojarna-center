@@ -9,6 +9,7 @@ import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { isInvoiceRelease, releaseJobInvoiceCore, type InvoiceRelease } from "@/lib/jobs/invoice-release";
 import { FILE_KINDS, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
   isUuid, jobFilePath, jobMasterPath, cleanText, cleanNumber, JOB_FILE_SELECT, translateDbError, type FileRow,
@@ -252,23 +253,12 @@ export async function updateJobFile(
   }
 }
 
-/**
- * Smazání dokumentu. Naše vystavené PDF nabídky je s nabídkou svázané (lib/jobs/quote-files):
- * PDF odeslané nabídky smazat nejde; poslední PDF nabídky bere nabídku s sebou (`quoteDeleted`),
- * starší / jiná verze nabídku nechá (jen srovná quotes.storage_path).
- */
-export interface InvoiceRelease {
-  number: string;
-  /** Číslo bylo v řadě poslední — nová faktura dostane totéž. */
-  numberFree: boolean;
-  /** Stav „Vyfakturováno" vrácen na „Dodáno zákazníkovi". */
-  stageReturned: boolean;
-}
+export type { InvoiceRelease };
 
 /**
- * Po smazání posledního PDF faktury z aplikace: zrušit vystavení faktury u zakázky (RPC release_job_invoice —
- * číslo, datum, splatnost, záznam v knize faktur; čítač řady FV zpět, když bylo číslo poslední) a vrátit stav
- * „Vyfakturováno" na „Dodáno zákazníkovi". Jiná zbylá PDF faktury / uhrazená faktura → nic.
+ * Po smazání posledního PDF faktury z aplikace: zrušit vystavení faktury u zakázky (releaseJobInvoiceCore — RPC
+ * release_job_invoice: číslo, datum, splatnost, záznam v knize faktur; čítač řady FV zpět, když bylo číslo poslední)
+ * a vrátit stav „Vyfakturováno" na „Dodáno zákazníkovi". Jiná zbylá PDF faktury / uhrazená faktura → nic.
  */
 async function releaseInvoiceAfterDelete(db: JobsDb, jobId: string, actorId: string, filename: string): Promise<InvoiceRelease | null> {
   const { count } = await db.from("job_files").select("id", { count: "exact", head: true })
@@ -278,24 +268,15 @@ async function releaseInvoiceAfterDelete(db: JobsDb, jobId: string, actorId: str
   const j = (job ?? {}) as { invoice_number?: string | null };
   const number = (j.invoice_number ?? "").trim();
   if (!number) return null;
-  const rpc = db.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
-  const { data, error } = await rpc.call(db, "release_job_invoice", { p_job: jobId, p_number: number });
-  if (error) {
-    console.error(`[job-files] Zrušení faktury ${number} selhalo: ${error.message}`);
-    return null;
-  }
-  const r = (data ?? {}) as { released?: boolean; numberFree?: boolean; stageReturned?: boolean };
-  if (!r.released) return null;
-  const stageReturned = r.stageReturned === true;
-  const out: InvoiceRelease = { number, numberFree: r.numberFree === true, stageReturned };
-  await logJobEvent(db, {
-    jobId, type: "file", actorId,
-    message: `Faktura ${number} zrušena (smazáno PDF ${filename}) — lze vystavit novou${out.numberFree ? " se stejným číslem" : ""}${stageReturned ? "; stav vrácen na Dodáno zákazníkovi" : ""}`,
-    data: { action: "invoice_released", number, numberFree: out.numberFree, stageReturned },
-  });
-  return out;
+  const r = await releaseJobInvoiceCore(db, jobId, number, actorId, `smazáno PDF ${filename}`);
+  return isInvoiceRelease(r) ? r : null;
 }
 
+/**
+ * Smazání dokumentu. Naše vystavené PDF nabídky je s nabídkou svázané (lib/jobs/quote-files):
+ * PDF odeslané nabídky smazat nejde; poslední PDF nabídky bere nabídku s sebou (`quoteDeleted`),
+ * starší / jiná verze nabídku nechá (jen srovná quotes.storage_path).
+ */
 export async function deleteJobFile(fileId: string): Promise<ActionResult<{ quoteDeleted: { id: string; number: string | null } | null; invoiceReleased: InvoiceRelease | null }>> {
   const c = await begin("delete");
   if ("error" in c) return fail(c.error);
