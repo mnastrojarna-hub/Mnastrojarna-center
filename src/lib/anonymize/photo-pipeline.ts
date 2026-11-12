@@ -2,7 +2,7 @@ import "server-only";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { addUsage } from "@/lib/ai/ai-call";
 import { checkRasterCompanies } from "./company-check";
-import { COMPANY_LEAK_WARNING } from "./decide";
+import { companyLeakWarning } from "./decide";
 import type { AiCallConfig } from "./detect-ai";
 import { checkImageOutput, decodeImage, encodeImageOutput, heicToJpeg, imagePages, maybeGray, rasterToJpeg } from "./image";
 import { buildRasterPdf, type OutPage } from "./pdf-raster";
@@ -228,7 +228,7 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
       }
       if (!cc.clean) {
         res.outputProblems.push(`strana ${p}: zůstal název firmy`);
-        res.warnings.push({ code: "verify_leak", message: `${COMPANY_LEAK_WARNING} (strana ${p}).`, page: p });
+        res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p, cc.names), page: p });
       }
     }
     res.regions.push(...final);
