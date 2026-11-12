@@ -180,6 +180,16 @@ describe("render komponent anonymizace", () => {
     expect(out).toContain('data-approve="direct"');
   });
 
+  it("12. 11.: nahoře „Anonymizovat znovu vše, co se nepovedlo (n)“ — jen když selhaly aspoň dva", () => {
+    const failed = (id: string) => ({ id, jobId: "j1", jobNumber: "Z-26-001", jobTitle: null, filename: `${id}.pdf`, anonFilename: null, status: "failed" as const, reason: "Uložení kopie selhalo", counts: {}, at: null });
+    const two = html(<AnonReviewList pendingCount={0} pendingFileIds={[]} items={[failed("a"), failed("b"), failed("c")]} />);
+    expect(two).toContain("Anonymizovat znovu vše, co se nepovedlo (3)");
+    expect(two).toContain('data-testid="anon-retry-all"');
+    expect(two).toContain("3 výkresy");
+    const one = html(<AnonReviewList pendingCount={0} pendingFileIds={[]} items={[failed("a")]} />);
+    expect(one).not.toContain("anon-retry-all");
+  });
+
   it("samostatný nástroj odmítne nepodporovaný formát předem (ne „selhala“)", () => {
     expect(toolRejectReason({ name: "sestava.dwg", size: 10 })).toMatch(/Nelze anonymizovat/);
     expect(toolRejectReason({ name: "vykres.pdf", size: 10 })).toBeNull();
