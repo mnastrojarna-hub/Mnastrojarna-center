@@ -64,3 +64,7 @@ Zobrazeno prvních 400 – upřesněte hledání nebo použijte pravidlo.	The fi
 Zrcadlení: rovinu zvolte ve formuláři – základní rovinu, nebo plochu modelu tlačítkem Vybrat v poli Rovina zrcadlení · Enter = OK, Esc = Storno	Mirror: choose the plane in the form – a base plane, or a model face with the Select button in the Mirror plane field · Enter = OK, Esc = Cancel
 Zrcadlený prvek „{0}“ nemá nástrojové těleso – zrcadlit lze vysunutí, rotace, primitiva, díry, tažení a text.	The mirrored feature “{0}” has no tool body – extrusions, revolves, primitives, holes, sweeps and text can be mirrored.
 Zrušit odkaz (použít souřadnice)	Clear the reference (use coordinates)
++ přidat skicu…	+ add sketch…
+Název proměnné	Variable name
+Přidat skicu	Add sketch
+Výraz proměnné	Variable expression

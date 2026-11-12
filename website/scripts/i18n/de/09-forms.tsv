@@ -64,3 +64,7 @@ Zobrazeno prvních 400 – upřesněte hledání nebo použijte pravidlo.	Die er
 Zrcadlení: rovinu zvolte ve formuláři – základní rovinu, nebo plochu modelu tlačítkem Vybrat v poli Rovina zrcadlení · Enter = OK, Esc = Storno	Spiegeln: Ebene im Formular wählen – eine Grundebene oder eine Modellfläche mit der Schaltfläche Wählen im Feld Spiegelebene · Enter = OK, Esc = Abbrechen
 Zrcadlený prvek „{0}“ nemá nástrojové těleso – zrcadlit lze vysunutí, rotace, primitiva, díry, tažení a text.	Das gespiegelte Element „{0}“ hat keinen Werkzeugkörper – spiegeln lassen sich Extrusionen, Rotationen, Grundkörper, Bohrungen, Austragungen und Text.
 Zrušit odkaz (použít souřadnice)	Referenz entfernen (Koordinaten verwenden)
++ přidat skicu…	+ Skizze hinzufügen…
+Název proměnné	Variablenname
+Přidat skicu	Skizze hinzufügen
+Výraz proměnné	Variablenausdruck

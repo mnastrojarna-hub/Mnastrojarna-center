@@ -961,16 +961,43 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
               </Field>
             );
           case "sketches": {
-            const ids = Array.isArray(v) ? (v as string[]) : [];
+            // pořadí skic je významné (šablonování ploch jde v zadaném pořadí) – vybrané lze posouvat nahoru a dolů
+            const ids = (Array.isArray(v) ? (v as string[]) : []).filter((id) => sketches.some((sk) => sk.id === id));
+            const move = (i: number, d: -1 | 1) => {
+              const next = [...ids];
+              [next[i], next[i + d]] = [next[i + d], next[i]];
+              patch({ [p.key]: next });
+            };
+            const rest = sketches.filter((sk) => !ids.includes(sk.id));
             return (
               <Field key={p.key} label={p.label}>
-                <div className="space-y-1">
-                  {sketches.map((sk) => (
-                    <label key={sk.id} className="flex items-center gap-2 text-[12.5px]">
-                      <input type="checkbox" className="accent-[#E03930]" checked={ids.includes(sk.id)} onChange={(e) => patch({ [p.key]: e.target.checked ? [...ids, sk.id] : ids.filter((x) => x !== sk.id) })} />
-                      {sk.name}
-                    </label>
+                <div className="space-y-1" data-sketch-order={p.key}>
+                  {ids.map((id, i) => (
+                    <div key={id} className="flex items-center gap-1 rounded border border-ink-700/10 px-1.5 py-0.5 text-[12.5px]">
+                      <span className="w-4 text-ink-700/45">{i + 1}.</span>
+                      <span className="min-w-0 flex-1 truncate">{sketches.find((sk) => sk.id === id)?.name}</span>
+                      <button type="button" aria-label={tr("Posunout výš")} title={tr("Posunout výš")} disabled={i === 0} onClick={() => move(i, -1)} className="px-1 text-ink-700/60 hover:text-brand disabled:opacity-30">
+                        ↑
+                      </button>
+                      <button type="button" aria-label={tr("Posunout níž")} title={tr("Posunout níž")} disabled={i === ids.length - 1} onClick={() => move(i, 1)} className="px-1 text-ink-700/60 hover:text-brand disabled:opacity-30">
+                        ↓
+                      </button>
+                      <button type="button" aria-label={tr("Odebrat z výběru")} title={tr("Odebrat z výběru")} onClick={() => patch({ [p.key]: ids.filter((x) => x !== id) })} className="px-1 text-brand">
+                        ×
+                      </button>
+                    </div>
                   ))}
+                  {rest.length > 0 && (
+                    <select className="w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px]" aria-label={tr("Přidat skicu")} value="" onChange={(e) => e.target.value && patch({ [p.key]: [...ids, e.target.value] })}>
+                      <option value="">{tr("+ přidat skicu…")}</option>
+                      {rest.map((sk) => (
+                        <option key={sk.id} value={sk.id}>
+                          {sk.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {p.hint && <span className="block text-[11px] text-ink-700/45">{p.hint}</span>}
                 </div>
               </Field>
             );

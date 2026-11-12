@@ -310,6 +310,13 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
                     const name = e.target.value.trim().replace(/[^\p{L}\p{N}_]/gu, "_");
                     if (name && name !== v.name) set(vars.map((x, k) => (k === i ? { ...x, name } : x)));
                   }}
+                  onKeyDown={(e) => {
+                    // Enter potvrdí (jako u výrazu), Esc vrátí původní název
+                    const el = e.target as HTMLInputElement;
+                    if (e.key === "Escape") el.value = v.name;
+                    if (e.key === "Enter" || e.key === "Escape") el.blur();
+                  }}
+                  aria-label={tr("Název proměnné")}
                   className="w-full rounded border border-transparent px-1 py-0.5 font-mono hover:border-[#cfd6de] focus:border-brand focus:outline-none"
                 />
               </td>
@@ -318,7 +325,12 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
                   defaultValue={v.expr}
                   key={v.expr}
                   onBlur={(e) => e.target.value !== v.expr && set(vars.map((x, k) => (k === i ? { ...x, expr: e.target.value } : x)))}
-                  onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                  onKeyDown={(e) => {
+                    const el = e.target as HTMLInputElement;
+                    if (e.key === "Escape") el.value = v.expr;
+                    if (e.key === "Enter" || e.key === "Escape") el.blur();
+                  }}
+                  aria-label={tr("Výraz proměnné")}
                   className="w-full rounded border border-transparent px-1 py-0.5 font-mono hover:border-[#cfd6de] focus:border-brand focus:outline-none"
                 />
               </td>

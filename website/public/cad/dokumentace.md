@@ -152,7 +152,11 @@ Každý prvek má formulář s názvem, parametry a tlačítky OK (Enter) a Stor
 
 ### Řádek výzev a stavový řádek (dole)
 
-Vlevo program říká, co očekává („Vyberte hrany v modelu (vybráno 3) · Enter = OK“), vpravo je filtr výběru, počet vybraných entit, souřadnice kurzoru, jednotky a schéma myši.
+Vlevo program říká, co očekává („Zaoblení: klikáním vyberte hrany v modelu (vybráno 3) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK“), vpravo je filtr výběru, počet vybraných entit, souřadnice kurzoru, jednotky a schéma myši.
+
+### Průběh a zrušení výpočtu
+
+Trvá-li výpočet déle než vteřinu, objeví se u spodního okraje ukazatel „Počítám prvek 5/11: Pole 1“ s časem tohoto kroku a celkovým časem. Tlačítko Zrušit výpočet okamžitě ukončí: čekala-li na výpočet jen poslední úprava, vrátí se zpět (Ctrl+Y ji obnoví); u právě otevřeného souboru zůstane dokument beze změny a stav jádra v horní liště nabídne „Výpočet zrušen · přepočítat“. Jádro si pamatuje stav po jednotlivých prvcích, takže přidaný prvek nebo úprava posledního prvku nepřepočítává celou historii.
 
 ### Paleta příkazů
 
@@ -236,6 +240,14 @@ Osa Y nebo X skici, čára ve skici, hrana modelu, osa válcové plochy, dva bod
 ![Dialog Vybrat ze seznamu se záložkami Vrcholy, Hrany, Plochy a hledáním](https://www.mnastrojarna.cz/cad/docs/vyber-ze-seznamu.webp)
 
 *Všechny plochy, hrany a vrcholy tělesa s typem, středem a rozměrem – s filtrem a hledáním. Hodí se u malých entit a na mobilu.*
+
+### Hrany a plochy prvku: ze seznamu, pravidlem, z výběru
+
+U zaoblení, sražení, skořepiny, úkosu, přímých úprav a prvků rozšíření se hrany a plochy vybírají klikáním v modelu – nebo bez klikání. Odkaz „Ze seznamu / pravidlem…“ ve formuláři otevře seznam všech hran nebo ploch tělesa před prvkem s popisem (typ, směr, velikost, poloha), hledáním a zaškrtávátky. Do pole Pravidlo lze napsat totéž co v textových příkazech: svislé, horní kruhové, +Z, poloměr 5, boční, největší. „+ aktuální výběr“ přidá entity vybrané v modelu před otevřením formuláře a „Popis vybraných“ vypíše, co přesně je vybráno, s možností jednotlivé entity odebrat.
+
+### Dotaz na hodnotu
+
+Kde program potřebuje jedno číslo (odsazení roviny skici, poměr na hraně), zeptá se vlastním dialogem: lze napsat číslo s desetinnou čárkou, výraz (25/2) i proměnnou dílu, Enter potvrdí, Esc zruší.
 
 ## 5. Skica
 
@@ -353,7 +365,8 @@ Kvádr, Válec, Trubka, Kužel, Koule – poloha čísly nebo odkazem (vrchol, s
 
 - Typ: vrtaná, válcové zahloubení (pro ISO 4762), kuželové zahloubení (úhel 90°), závitová (M2–M48, vrtá se jádrový průměr; závit se uvede ve výkrese).
 - Pro šroub: průchozí díra podle ISO 273 v řadě jemná / střední / hrubá; rozměry zahloubení podle normy.
-- Ukončení: slepá (úhel špičky vrtáku nastavitelný, výchozí 118°), skrz vše, k dalšímu, k ploše (+ odsazení).
+- Ukončení: slepá (úhel špičky vrtáku nastavitelný, výchozí 118°), skrz vše, k dalšímu, k ploše (+ odsazení), k vrcholu / bodu, odsazeně od plochy.
+- Skrz vše vrtá od zadaného bodu jen ve směru vrtání – materiál nad bodem (například protější příruba) zůstane. Volba Skrz oběma směry provrtá celé těleso na obě strany. Když díra ve směru vrtání žádný materiál nezasáhne, prvek dostane upozornění ⚠.
 - Poloha: klik na plochu (bod i osa se doplní podle normály), nebo více poloh z vrcholů, středů kružnic, bodů skici a pomocných bodů – jedna díra se vyvrtá všude naráz. Osa libovolným směrem (8 způsobů).
 - Pokročilé úpravy obsahují i Díry v bodech (díry podle bodů skici).
 
@@ -410,6 +423,12 @@ Vytáhnout / Zatlačit plochy o vzdálenost nebo k vrcholu / k ploše / odsazen�
 ### Zrcadlit, Přesunout / otočit
 
 Zrcadlení podle základní roviny s posunem nebo kterékoli z 12 definic, s ponecháním originálu. Transformace tělesa: posun čísly nebo z bodu do bodu, otočení kolem osy X/Y/Z nebo hrany / osy válce / dvou bodů / pomocné osy, měřítko se středem odkazem; tažení gizmem přímo v 3D okně (G u tělesa či komponenty, R přepíná posun / otočení).
+
+Zrcadlit lze i jen vybrané prvky (díry, výstupky): ve formuláři zvolte „Vybrané prvky“ a zaškrtněte je – těleso zůstane a prvky se na druhé straně roviny zopakují.
+
+### Více těles v dílu
+
+Díl může obsahovat několik samostatných těles. Vždy jedno je aktivní – s ním pracují nové prvky. Další těleso vznikne operací Nové těleso u vysunutí, rotace nebo primitiva, nebo nástroji ve skupině Tvorba → Tělesa: Rozdělit na tělesa (rovina rozdělí těleso na dvě), Kopie tělesa (posunutá kopie) a Sloučit tělesa (sjednotit, odebrat nebo průnik dvou těles, volitelně s ponecháním nástroje). Jakmile má díl víc těles, správce historie ukáže jejich seznam s objemy – kliknutím se těleso stane aktivním – a formuláře prvků nabídnou pole Těleso, kterým prvek zamíříte na jiné než aktivní těleso.
 
 ### Reference: Rovina, Osa, Bod, Souřadný systém
 
@@ -509,6 +528,10 @@ Sestava skládá díly a podsestavy, drží je vazbami, kontroluje kolize a vytv
 - Rám vstřikovací formy: průvodce podle rozměrů dutiny vygeneruje desky, vodicí sloupky a pouzdra, středicí kroužek, vyhazovací paket a dosedky jako plnou sestavu s normáliemi.
 - Export sestavy do STEP (jeden soubor) a výkres sestavy s kusovníkem a pozicemi.
 
+### Vazby krok za krokem
+
+Vyberte komponentu a zvolte typ vazby (karta Sestava nebo panel komponenty). Panel vazby vás provede kroky: 1 · plocha této komponenty, 2 · cílová komponenta a její plocha. Plochu vyberete kliknutím v modelu, nebo ze seznamu v panelu – oba způsoby lze kombinovat a vybranou plochu vrátíte tlačítkem Změnit. Seznam nabízí jen plochy, které vazba umí (Souosost válcové a kuželové, ostatní vazby rovinné), u každé uvádí typ, směr normály nebo osy, polohu a velikost a při najetí myší plochu v modelu zvýrazní. U vazeb Vzdálenost a Úhel se hodnota zadává až po výběru obou ploch: pole je předvyplněné právě naměřenou hodnotou, takže pouhým potvrzením (Enter) se komponenty nepohnou; přepsáním hodnoty se komponenta přisune nebo natočí. Hotové vazby jsou v seznamu Vazby pod stromem komponent – hodnotu tam můžete kdykoli přepsat (i výrazem, např. 25/2), vazbu otočit, potlačit nebo smazat a sestava se ihned přepočítá. Tlačítko Ukotvit přidá vazbu Ukotvit: komponenta zůstane na místě a ostatní vazby hýbou druhou komponentou. U pole komponenty zadáte směr tlačítky X / Y / Z, obrátíte ho (±) nebo ho převezmete z plochy v modelu.
+
 ![Kusovník sestavy s pozicemi, počty, materiálem a hmotností](https://www.mnastrojarna.cz/cad/docs/sestava-kusovnik.webp)
 
 *Kusovník sestavy – export do CSV, pozice do výkresu.*
@@ -543,6 +566,10 @@ Výrobní výkres z modelu nebo sestavy během minuty – pohledy, kóty, tolera
 - Sestavy: kusovník na listu, pozice s odkazovými čarami, více listů.
 - Razítko: název, číslo, materiál, hmotnost, měřítko, autor (Nastavení → Výkres), nepředepsané tolerance (ISO 2768-mK výchozí), datum, logo.
 - Export: PDF (vektorový), DXF a DWG (verze R2000 až R2018, otevře AutoCAD, ZWCAD, BricsCAD, DraftSight), SVG. Výkres je uložený v projektu .mncad a při změně modelu se aktualizuje.
+
+### Kóty podle vybrané geometrie
+
+Nástroj Kóta (D) pozná, na co klikáte: kliknutím na kružnici vznikne kóta průměru Ø, na oblouk (zaoblení) kóta poloměru R – klávesa Shift nebo přepínač „Kružnice: Auto / Ø / R“ volbu obrátí. Kliknutím doprostřed hrany se okótuje její délka, kliknutím na druhou hranu úhel mezi nimi (u rovnoběžných hran jejich vzdálenost). Dva body (konce hran, středy děr) dají délkovou kótu. Pod kurzorem se zvýrazní, co by se vybralo, a po výběru se kóta kreslí u kurzoru jako náhled. Po umístění se u kurzoru otevře malé pole: do něj napíšete toleranci nebo příponu (H7, ±0,1) a případně odsazení kóty – Enter potvrdí. Kóty kružnic, hran a úhlů se drží své geometrie: změní-li se průměr díry nebo délka hrany, hodnota se přepočítá sama; když geometrie z pohledu zmizí, kóta se v seznamu označí ⚠. List výkresu se přejmenuje dvojklikem přímo na záložce.
 
 > Pro CAM a laser exportujte DXF (skica, rozvin nebo výkres); pro zákazníky a výrobu PDF; pro úpravy v 2D CADu DWG.
 
@@ -660,11 +687,11 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 | Ctrl+, | nastavení |
 | Ctrl+S / Ctrl+O | uložit projekt / otevřít |
 | Ctrl+Z / Ctrl+Y | zpět / znovu |
-| S | nová skica |
+| S | nová skica – na vybrané rovinné ploše hned, jinak nabídne roviny |
 | E | vysunutí |
 | H | díra |
-| B | zaoblení |
-| N | sražení |
+| B | zaoblení (vybrané hrany použije rovnou) |
+| N | sražení (vybrané hrany použije rovnou) |
 | M | měřit |
 | X | řez |
 | G | gizmo přesunu tělesa / komponenty (R přepne otočení) |
@@ -679,7 +706,7 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 | Skica: Tab / Enter | další pole číselného zadání (zámek) / potvrdit |
 | Shift+F · Shift+W | ohyb z hrany (plech) · konstrukční profil (svařence) |
 
-Zkratky jsou v Nastavení → Klávesové zkratky a v přehledu Klávesové zkratky a ovládání (nabídka Soubor).
+Zkratky 3D i nástrojů skici se mění v Nastavení → Klávesové zkratky (skupiny „3D model“ a „Skica“ – stejnou klávesu lze mít v obou). Přehled Klávesové zkratky a ovládání (nabídka Nápověda) vždy ukazuje aktuální nastavení.
 
 ## 20. Mobil a dotykové ovládání
 
@@ -690,7 +717,8 @@ Zkratky jsou v Nastavení → Klávesové zkratky a v přehledu Klávesové zkra
 - Jeden prst otáčí, dva prsty posouvají a přibližují, dlouhý stisk otevře kontextovou nabídku (jako pravé tlačítko).
 - Rozbalovací nabídky pásu a formuláře prvků se otevírají jako spodní listy, takže model zůstává vidět; výběr entit do pole odkazu funguje dotykem, dlouhý stisk na poli nabídne způsoby zadání a výběr ze seznamu.
 - Záložky otevřených dokumentů (díly, sestavy, výkresy) mají na telefonu vlastní řádek pod horní lištou, takže jsou vždy vidět. Tlačítko s počtem dokumentů vpravo otevře seznam všech otevřených záložek s přepnutím, novou záložkou a zavřením. Výkres se otevírá pod tímto řádkem – mezi dílem a výkresem lze přepínat kdykoli.
-- Pás karet se posouvá prstem; paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.
+- Skica dotykem: jeden prst dělá totéž co levé tlačítko myši (klepnutím kreslíte a vybíráte, tažením přesouváte entity, úchyty a kóty – tažení začne až po posunutí prstu asi o 8 px). Dlouhý stisk na místě otevře stejnou kontextovou nabídku jako pravé tlačítko a ukončí rozkreslený krok. Dvěma prsty skicu posouváte a roztažením nebo sevřením přibližujete.
+- Pás karet se při nedostatku místa sám zhustí (malá tlačítka bez pevné šířky, potom jen ikony s popiskem v bublině) a místo posuvníku má po stranách šipky; posouvá se i prstem. Paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.
 
 ## 21. Pro AI agenty a automatizaci
 
@@ -710,7 +738,14 @@ Nápověda → Textové příkazy, zkratka Ctrl+Shift+K, nebo paleta Ctrl+K → 
 | zaoblit R [hrany svislé\|horní\|kruhové\|+Z…] · srazit C [hrany …] · skořepina T [otevřít +Z] | výběr hran a ploch pravidlem – bez klikání do 3D |
 | pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N · zrcadlit YZ · text "ABC" výška 8 hloubka 1 v x y | pole, zrcadlení, nápis |
 | závit M18×1,5 délka 20 v x y z [vnitřní] [modelovat] · kolize | katalogový závit (hrubé i jemné stoupání, vnější / v díře) · kontrola kolizí sestavy do protokolu |
-| stav · smazat poslední · zobraz iso | zpětná vazba a správa; stav prvku ✓ / ⚠ / ✗ se vypíše až po výpočtu, řádek Geometrie říká, zda je výsledek platné těleso |
+| oblouk x1 y1 xm ym x2 y2 · spline x y … · čára x1 y1 x2 y2 r 5 x3 y3 … | ve skice: oblouk třemi body, hladká křivka, „r N“ za bodem čáry zaoblí roh |
+| skica počátek x y z normála nx ny nz [osax …] | skica na obecné rovině |
+| díra D skrz [obousměrně] … · díra D … směr vx vy vz · díra D … sklon 13,5 · díra D skrz v x y z v x y z | díra skrz jen ve směru vrtání / na obě strany · šikmá díra · více děr naráz |
+| rotovat [úhel] [odebrat\|přidat\|průnik\|nové] | rotace s booleovským režimem (vysoustružení profilu) |
+| těleso 2 · rozdělit XY odsazení 10 jako Spodek · kopie těleso 2 posun 0 0 30 · sloučit 1 2 odebrat | více těles v dílu; „… nové těleso Název“ a „… těleso 2“ u prvků |
+| prvek <typ\|rozšíření> klíč=hodnota … | kterýkoli typ prvku i prvek rozšíření bez JSON, např. prvek adv.twist sketch=$last height=30 angle=45 |
+| normálie M8x30 · vložit "Hřídel" v 0 0 10 ukotvit · výkres | díl z knihovny · komponenta sestavy z otevřené záložky · výkres dokumentu |
+| stav · smazat poslední · zobraz iso | zpětná vazba a správa; stav prvku ✓ / ⚠ / ✗ se vypíše až po výpočtu (u delších prvků s časem), řádek Geometrie říká, zda je výsledek platné těleso |
 | { … } / [ … ] | JSON: celý dokument .mncad, pole prvků nebo jeden prvek – všech 36 typů prvků včetně ploch, plechu, sestav; jeden prvek na jednom řádku lze míchat s textovými příkazy (např. tažení po šroubovici) |
 
 ### Příklad: příruba DN50 sedmi řádky
@@ -720,6 +755,8 @@ nový díl Příruba DN50 · skica XY: kružnice 165 · vysunout 18 · trubka 88
 ### JSON a JavaScript API
 
 - JSON dokumentu (formát .mncad) dává přístup ke všem typům prvků a sestavám; id a name lze vynechat, sketchId: "$last" odkazuje na poslední skicu. Vložit ho lze do konzole, přes Soubor → Otevřít nebo přetažením.
+- Vstup se zpracuje po řádcích: řádek s JSON prvku může stát kdekoli, i jako první. Protokol je v pořadí řádků vstupu a stav dokumentu se vypíše jednou na konci.
+- Během výpočtu vrací window.mncad.progress() počítaný prvek a čas, window.mncad.cancel() výpočet zruší (dokument zůstane beze změny).
 - window.mncad pro skripty a rozšíření: run(text), getDocument(), setDocument(json), status(), guide(), commands(), openConsole(), exportFile("step") (soubor jako base64 bez dialogu) – pro Playwright, Selenium nebo Claude in Chrome. Kdo chce i z nabídek ukládat bez dialogu, zapne v Nastavení → Soubory přímé stažení pod výchozím názvem.
 - Úplný návod se schématem (TypeScript typy přímo ze zdrojového kódu): /cad/schema-pro-ai.md – stačí ho dát agentovi do zadání (tlačítko „Kopírovat návod pro AI“ v konzoli). Odkaz je i v llms.txt webu.
 - Modelování myší jako člověk: Nápověda → „Popisky pro výběr myší“ (Ctrl+Shift+L) zobrazí na viditelných plochách, hranách a vrcholech štítky F1 / E2 / V3 (ve skice P1… a O v počátku). Štítek leží přesně na entitě a nepřijímá kliknutí – klik na jeho střed je klik na entitu. Agent, který ovládá prohlížeč, tak klikne na „plochu s normálou +Z“ bez trefování pixelů; člověku se bez zapnutí nic nemění.
@@ -783,6 +820,7 @@ Známá omezení: setback a skutečně asymetrické (eliptické) zaoblení, děl
 | 5. (listopad 2026) | referenční systém zadání (ukončení, směry, roviny, osy, odkazy s otiskem), 6 + 5 variant zaoblení a sražení, 5 druhů pole, tažení a šablonování s vodicími křivkami, pomocná osa / bod / souřadný systém, výběr ze seznamu, číselné zadání a automatické vazby ve skice, mini lišta, dotykové ovládání, tato dokumentace |
 | 5. – zpětná vazba z testu 3. 11. 2026 (III) | náběh závitu jako u závitového kalibru (vybroušený hřbet prvního závitu, plynule do plného profilu); pás karet: větší písmo tlačítek a výrazné názvy skupin (Skica, Tvar, Primitiva, Kreslení, Vazby, Kóty…) |
 | 5. – zpětná vazba z testu 3. 11. 2026 (II) | poctivý stav prvku: po každém prvku kontrola objemu/topologie a platnosti geometrie (⚠ „prvek těleso nezměnil“, „neplatná geometrie“, ✗ skořepina beze změny), řádek Geometrie ve stavu, protokol agenta s výsledkem až po výpočtu; závity s jemným stoupáním (M18×1,5), vnitřní závit v díře (prvek Závit i tažení po šroubovici se stranou a náběhem); tažení po spline jako hladká B-spline (forma zůstane solidem); kusovník s označením materiálu a číslem dílu, balónky uvnitř rámu, stav sestavy a kolize v textovém stavu; žádná ztráta rychlých změn ve formuláři ani formátu výkresu; kontrola kót pro rotační díly; poznámka v patičce jen na vyžádání |
+| 6. (12. 11. 2026) – test na výkresu oběžného kola a analýza nástrojů | díra skrz jen ve směru vrtání (+ volba oběma směry), průběh výpočtu po prvcích a tlačítko Zrušit, desetkrát rychlejší jádro u dílů s mnoha rotačními plochami a mezipaměť stavby, JSON na prvním řádku konzole; více těles v dílu (Rozdělit, Kopie, Sloučit, Nové těleso); textové příkazy pro všechny prvky (příkaz prvek, oblouk, spline, zaoblení rohu, šikmá díra, tělesa, normálie, vložit, výkres); výběr hran a ploch ze seznamu a pravidlem; vlastní dotaz na hodnotu místo systémového okna; rovina a bod odkazem u prvků rozšíření; vazby sestav ze seznamu ploch; kóty výkresu podle geometrie; dotyk ve skice a nastavitelné zkratky skici; samozhušťovací pás karet |
 | 5. – dodatky (listopad 2026) | sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu |
 
 ## Časté otázky
