@@ -1,8 +1,10 @@
 "use client";
 
 import { cadLocale, tr } from "@/cad/i18n";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type Ref } from "react";
+import { flushSync } from "react-dom";
 import { evalExpr } from "@/cad/params";
+import { currentShortcuts, keyCombo, shortcutOf, sketchShortcutAction } from "@/cad/settings";
 import { arcGeom, circleFrom3, entityPath, findLoops, keyPoints, loopPolygon, prims, type Prim } from "@/cad/sketch";
 import {
   allIntersections,
@@ -53,6 +55,7 @@ import {
   type AutoRef,
   type DrawOpts,
 } from "@/cad/sketch-tools";
+import { LongPress, TOUCH_SLOP_PX, TouchTracker, clickSlop, movedBeyond, pinchView } from "@/cad/sketch-touch";
 import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "./cad-icons";
@@ -118,6 +121,19 @@ type Props = {
   modelLines?: Float32Array | null;
   /** štítky bodů (O = počátek, P1… = konce, středy a rohy entit) – výběr a kreslení bez trefování (AI agenti, dotyk) */
   hints?: boolean;
+  /** ovládání skicáře zvenku (automatizace – `window.mncad.hints()` / `clickHint()`) */
+  ref?: Ref<SketcherHandle>;
+};
+
+/** Štítek bodu skici pro automatizaci: `x, y` = px vůči plátnu skici (levý horní roh), `index` = číslo za P (O = 0). */
+export type SketchHint = { id: string; kind: "origin" | "point"; index: number; x: number; y: number; title: string };
+
+/** Imperativní rozhraní skicáře (obdoba ViewportHandle ve 3D). */
+export type SketcherHandle = {
+  /** štítky bodů právě viditelných na plátně (O, P1…) – vrací je i při vypnutém zobrazení štítků */
+  hintList: () => SketchHint[];
+  /** „klikne“ na bod podle štítku stejnou cestou jako myš (pohyb, stisk a uvolnění levého tlačítka na plátně); additive = Ctrl */
+  clickHint: (id: string, additive?: boolean) => boolean;
 };
 
 /** Druhy uchopení (OSNAP) jako v ZW3D. */
@@ -235,7 +251,31 @@ const TOOL_LABEL: Partial<Record<SketchTool, string>> = {
   measure: "Měřit",
 };
 
-const KEYS: Record<string, SketchTool> = { v: "select", l: "line", k: "polyline", x: "centerline", r: "rect", c: "circle", a: "arc", e: "ellipse", n: "spline", b: "point", p: "polygon", s: "slot", t: "trim", o: "offset", d: "dimension", m: "measure" };
+/**
+ * Příkazy skici s nastavitelnou klávesovou zkratkou → nástroj. Klávesy se nastavují v Nastavení → Klávesové zkratky →
+ * Skica (výchozí hodnoty a pořadí: DEFAULT_SKETCH_SHORTCUTS v cad/settings.ts); kromě nástrojů tam jsou ještě
+ * „sketch.horizontal“ (vazba na výběr), „sketch.fit“ a „sketch.grid“, které skicář obsluhuje zvlášť.
+ */
+export const SKETCH_SHORTCUT_TOOLS: Record<string, SketchTool> = {
+  "sketch.select": "select",
+  "sketch.line": "line",
+  "sketch.polyline": "polyline",
+  "sketch.centerline": "centerline",
+  "sketch.rect": "rect",
+  "sketch.circle": "circle",
+  "sketch.arc": "arc",
+  "sketch.ellipse": "ellipse",
+  "sketch.spline": "spline",
+  "sketch.point": "point",
+  "sketch.polygon": "polygon",
+  "sketch.slot": "slot",
+  "sketch.trim": "trim",
+  "sketch.offset": "offset",
+  "sketch.dimension": "dimension",
+  "sketch.measure": "measure",
+};
+/** Právě platná klávesa příkazu skici (pro popisky v pásu karet a v kontextové nabídce) – čte se při vykreslení. */
+const sketchKey = (id: string): string | undefined => shortcutOf(currentShortcuts(), id) || undefined;
 
 /** Nástroje vyžadující nejdřív výběr entit. */
 const SEL_TOOLS = new Set<SketchTool>(["mirror", "move", "copy", "rotate", "scale", "patternLinear", "patternCircular", "explode", "construction"]);
@@ -247,8 +287,9 @@ const SEL_TOOLS = new Set<SketchTool>(["mirror", "move", "copy", "rotate", "scal
  * `setSketchSnap`) přidají skupinu přepínačů uchopení s živým stavem; bez nich zůstává panel uchopení ve skicáři.
  */
 export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => void; snapGrid: boolean; setSnapGrid: (v: boolean) => void; onExportDxf: () => void; onImportDxf: () => void; snaps?: SnapSettings; setSnap?: (k: keyof SnapSettings, v: boolean) => void }): RGroup[] {
-  const T = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ id: t, label: tr(TOOL_LABEL[t] ?? t), icon, tone: "sketch", kbd, hint, active: p.tool === t, onClick: () => p.setTool(t) });
-  const E = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ ...T(t, icon, kbd, hint), tone: "feature" });
+  // klávesa u tlačítka = právě nastavená zkratka příkazu „sketch.<nástroj>“ (Nastavení → Klávesové zkratky → Skica)
+  const T = (t: SketchTool, icon: CadIconName, hint?: string): RItem => ({ id: t, label: tr(TOOL_LABEL[t] ?? t), icon, tone: "sketch", kbd: SKETCH_SHORTCUT_TOOLS[`sketch.${t}`] ? sketchKey(`sketch.${t}`) : undefined, hint, active: p.tool === t, onClick: () => p.setTool(t) });
+  const E = (t: SketchTool, icon: CadIconName, hint?: string): RItem => ({ ...T(t, icon, hint), tone: "feature" });
   const K = (c: ConType): RItem => ({ id: `con-${c}`, label: CON_INFO[c].label, icon: CON_INFO[c].icon, tone: "pattern", hint: CON_INFO[c].hint, active: p.tool === `con-${c}`, onClick: () => p.setTool(`con-${c}`) });
   const snapGroup: RGroup[] =
     p.snaps && p.setSnap
@@ -269,38 +310,38 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
       label: tr("Kreslení"),
       big: 5,
       items: [
-        T("select", "select", "V"),
-        T("line", "line", "L", tr("řetěz úseček, Esc ukončí")),
-        T("rect", "rect", "R"),
-        T("circle", "circle", "C"),
-        T("arc", "arc", "A", tr("začátek, konec, bod na oblouku")),
-        T("polyline", "polyline", "K", tr("Enter/dvojklik ukončí")),
-        T("centerline", "centerline", "X", tr("pomocná osa")),
-        T("point", "point", "B"),
+        T("select", "select"),
+        T("line", "line", tr("řetěz úseček, Esc ukončí")),
+        T("rect", "rect"),
+        T("circle", "circle"),
+        T("arc", "arc", tr("začátek, konec, bod na oblouku")),
+        T("polyline", "polyline", tr("Enter/dvojklik ukončí")),
+        T("centerline", "centerline", tr("pomocná osa")),
+        T("point", "point"),
         T("rectCenter", "rectCenter"),
         T("circle3", "circle3"),
-        T("polygon", "polygon", "P"),
-        T("arcCenter", "arcCenter", undefined, tr("střed, začátek, konec")),
-        T("arcTangent", "arcTangent", undefined, tr("navazuje tečně na konec úsečky/oblouku")),
-        T("slot", "slot", "S"),
-        T("ellipse", "ellipse", "E", tr("střed, hlavní poloosa, vedlejší poloosa")),
-        T("spline", "spline", "N", tr("body křivky, Enter ukončí")),
-        T("rect3", "rect", undefined, tr("natočený obdélník: 2 rohy první strany + výška")),
-        T("circle2", "circle", undefined, tr("dva body na průměru")),
-        T("slotArc", "slot", undefined, tr("střed, začátek a konec osy, šířka")),
+        T("polygon", "polygon"),
+        T("arcCenter", "arcCenter", tr("střed, začátek, konec")),
+        T("arcTangent", "arcTangent", tr("navazuje tečně na konec úsečky/oblouku")),
+        T("slot", "slot"),
+        T("ellipse", "ellipse", tr("střed, hlavní poloosa, vedlejší poloosa")),
+        T("spline", "spline", tr("body křivky, Enter ukončí")),
+        T("rect3", "rect", tr("natočený obdélník: 2 rohy první strany + výška")),
+        T("circle2", "circle", tr("dva body na průměru")),
+        T("slotArc", "slot", tr("střed, začátek a konec osy, šířka")),
       ],
     },
     {
       label: tr("Úpravy"),
       big: 2,
       items: [
-        E("trim", "trim", "T", tr("klik na úsek, nebo táhněte přes více úseků (výkonný ořez)")),
-        E("offset", "offset", "O", tr("entita nebo řetězec, strana myší, vzdálenost číslem")),
-        E("extend", "extend", undefined, tr("klikněte u konce úsečky")),
-        E("split", "split", undefined, tr("rozdělit úsečku/oblouk v bodě, kružnici 2 body")),
-        E("project", "face", undefined, tr("promítnout hrany modelu do roviny skici")),
-        E("fillet", "fillet", undefined, tr("2 úsečky + poloměr")),
-        E("chamfer", "chamfer", undefined, tr("2 úsečky + vzdálenost")),
+        E("trim", "trim", tr("klik na úsek, nebo táhněte přes více úseků (výkonný ořez)")),
+        E("offset", "offset", tr("entita nebo řetězec, strana myší, vzdálenost číslem")),
+        E("extend", "extend", tr("klikněte u konce úsečky")),
+        E("split", "split", tr("rozdělit úsečku/oblouk v bodě, kružnici 2 body")),
+        E("project", "face", tr("promítnout hrany modelu do roviny skici")),
+        E("fillet", "fillet", tr("2 úsečky + poloměr")),
+        E("chamfer", "chamfer", tr("2 úsečky + vzdálenost")),
         E("move", "move"),
         E("copy", "copy"),
         E("rotate", "rotate"),
@@ -317,13 +358,13 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
       big: 0,
       items: (["horizontal", "vertical", "coincident", "parallel", "perpendicular", "tangent", "equal", "concentric", "midpoint", "pointOnCurve", "symmetric", "collinear", "fixed"] as ConType[]).map(K),
     },
-    { label: tr("Kóty"), items: [{ ...T("dimension", "dimension", "D", tr("inteligentní kóta – klikněte na entity")), tone: "tool" }] },
+    { label: tr("Kóty"), items: [{ ...T("dimension", "dimension", tr("inteligentní kóta – klikněte na entity")), tone: "tool" }] },
     {
       label: tr("Nástroje"),
       big: 1,
       items: [
-        { ...T("measure", "measure", "M"), tone: "tool" },
-        { id: "grid", label: tr("Přichytit k mřížce"), icon: "grid", tone: "view", kbd: "G", active: p.snapGrid, onClick: () => p.setSnapGrid(!p.snapGrid) },
+        { ...T("measure", "measure"), tone: "tool" },
+        { id: "grid", label: tr("Přichytit k mřížce"), icon: "grid", tone: "view", kbd: sketchKey("sketch.grid"), active: p.snapGrid, onClick: () => p.setSnapGrid(!p.snapGrid) },
         { id: "dxf", label: tr("Export skici DXF"), icon: "export", tone: "file", onClick: p.onExportDxf },
         { id: "imp", label: tr("Import DXF…"), icon: "open", tone: "file", onClick: p.onImportDxf },
       ],
@@ -568,7 +609,7 @@ type Snap = { p: Vec2; kind: SnapKind | "free"; ref?: SketchRef; hv?: "h" | "v" 
  * Profesionální 2D skicář: uchopování (OSNAP), vazby s numerickým řešičem, řídicí kóty,
  * editační nástroje, kontextové menu. Souřadnice v mm, osa Y nahoru.
  */
-export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines, hints }: Props) {
+export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines, hints, ref }: Props) {
   const entities = sketch.entities;
   const constraints = useMemo(() => sketch.constraints ?? [], [sketch.constraints]);
   const dims = useMemo(() => sketch.dims ?? [], [sketch.dims]);
@@ -604,10 +645,25 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const lastPt = useRef<Vec2 | null>(null);
   /** klíče hodnot zadaných číslem v předchozích krocích téže entity (např. poloměr oblouku středem) – pro kóty při kreslení */
   const typedKeys = useRef<Set<string>>(new Set());
+  // ---- dotyk (matematika gest: cad/sketch-touch.ts) ----
+  /** prsty na plátně: jeden = levé tlačítko myši, dva = posun + zoom */
+  const touch = useRef(new TouchTracker());
+  /** dlouhý stisk prstem / perem = pravé tlačítko (kontextová nabídka) */
+  const longPress = useRef(new LongPress());
+  /** pohled na začátku gesta dvěma prsty */
+  const pinchFrom = useRef<{ cx: number; cy: number; scale: number } | null>(null);
+  /** poslední ukazatel byl prst → větší tolerance zásahu entit, úchytů a uchopení (pero a myš jsou přesné) */
+  const coarse = useRef(false);
+  /** tažení prstem / perem začne až po překročení mrtvé zóny (klepnutí ani dlouhý stisk s entitou nepohnou) */
+  const dragArmed = useRef(true);
+  /** stav skici při stisku – zrušené tažení (druhý prst, přerušený dotyk) ho vrátí */
+  const pressUndo = useRef<SketchPatch | null>(null);
 
   useEffect(() => {
     hydrateSnaps();
     setOpts(loadOpts());
+    const lp = longPress.current;
+    return () => lp.cancel();
   }, []);
   const setSnap = setSketchSnap;
   const setOpt = <K extends keyof DrawOpts>(k: K, v: DrawOpts[K]) =>
@@ -740,9 +796,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     [view, size],
   );
   const toPx = useCallback((p: Vec2): Vec2 => [size.w / 2 + (p[0] - view.cx) * view.scale, size.h / 2 - (p[1] - view.cy) * view.scale], [view, size]);
-  /** štítky bodů skici (O, P1…) – leží přesně na bodu a nepřijímají kliknutí, klik na štítek = klik na bod (uchopení) */
-  const sketchHints = useMemo(() => {
-    if (!hints) return [] as { id: string; x: number; y: number; title: string }[];
+  /**
+   * štítky bodů skici (O, P1…) – leží přesně na bodu a nepřijímají kliknutí, klik na štítek = klik na bod (uchopení);
+   * počítají se z entit a aktuálního pohledu (jen body viditelné na plátně), stejně pro zobrazení i pro automatizaci
+   */
+  const buildHints = useCallback((): SketchHint[] => {
     const pts: { p: Vec2; title: string }[] = [{ p: [0, 0], title: tr("počátek skici [0; 0]") }];
     const f2 = (v: number) => (Math.round(v * 100) / 100).toString().replace(".", ",");
     const lab = (p: Vec2, what: string) => `${what} [${f2(p[0])}; ${f2(p[1])}]`;
@@ -775,7 +833,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         pts.push({ p: e.b, title: lab(e.b, tr("oblouk {0} – bod na oblouku", n)) });
       } else if (e.type === "point") pts.push({ p: e.p, title: lab(e.p, `bod ${n}`) });
     });
-    const out: { id: string; x: number; y: number; title: string }[] = [];
+    const out: SketchHint[] = [];
     const seen = new Set<string>();
     pts.forEach((q, i) => {
       if (out.length >= 200) return;
@@ -784,12 +842,41 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       const key = `${Math.round(x)}|${Math.round(y)}`;
       if (seen.has(key)) return;
       seen.add(key);
-      out.push({ id: i === 0 ? "O" : `P${out.length}`, x, y, title: q.title });
+      out.push(i === 0 ? { id: "O", kind: "origin", index: 0, x, y, title: q.title } : { id: `P${out.length}`, kind: "point", index: out.length, x, y, title: q.title });
     });
     return out;
-  }, [hints, entities, toPx, size]);
+  }, [entities, toPx, size]);
+  const sketchHints = useMemo(() => (hints ? buildHints() : []), [hints, buildHints]);
+  // rozhraní pro automatizaci (window.mncad.hints() / clickHint() při otevřené skice)
+  useImperativeHandle(
+    ref,
+    (): SketcherHandle => ({
+      hintList: () => buildHints(),
+      clickHint: (id, additive = false) => {
+        const el = svgRef.current;
+        const h = buildHints().find((x) => x.id.toUpperCase() === id.trim().toUpperCase());
+        if (!el || !h) return false;
+        const r = el.getBoundingClientRect();
+        const at: PointerEventInit = { clientX: r.left + h.x, clientY: r.top + h.y, bubbles: true, cancelable: true, pointerType: "mouse", pointerId: 1, isPrimary: true, ctrlKey: additive };
+        // stejná cesta jako myš: najetí na bod (uchopení, souřadnice kurzoru), stisk a uvolnění levého tlačítka na plátně;
+        // po každé události se skicář překreslí, takže další krok vidí stav po předchozím – jako u skutečné myši
+        const send = (type: string, init: PointerEventInit) => {
+          el.dispatchEvent(new PointerEvent(type, { ...at, ...init }));
+          flushSync(() => undefined);
+        };
+        send("pointermove", { button: -1, buttons: 0 });
+        send("pointerdown", { button: 0, buttons: 1 });
+        send("pointerup", { button: 0, buttons: 0 });
+        return true;
+      },
+    }),
+    [buildHints],
+  );
   const gridStep = niceStep(24 / view.scale);
-  const tol = 10 / view.scale;
+  /** tolerance v px podle ukazatele: prst zakryje víc než hrot kurzoru (hodnota pro myš × 1,8) */
+  const ptrPx = (mouse: number) => (coarse.current ? mouse * 1.8 : mouse);
+  /** tolerance uchopení [mm] – čte se až při použití (druh ukazatele se mění událost od události) */
+  const tolMm = () => ptrPx(10) / view.scale;
 
   // ---------- změny + řešič ----------
   const commitEdit = useCallback(
@@ -816,6 +903,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // ---------- uchopování ----------
   const computeSnap = (raw: Vec2, opts: { exclude?: Set<string>; from?: Vec2 | null } = {}): Snap => {
     const ex = opts.exclude;
+    const tol = tolMm();
     const H: { best: Snap | null; bd: number } = { best: null, bd: tol };
     const consider = (p: Vec2, kind: SnapKind, ref?: SketchRef) => {
       const d = dist(p, raw);
@@ -920,7 +1008,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // ---------- zásahy ----------
   const hitEntity = (p: Vec2, exclude?: Set<string>): string | null => {
     let best: string | null = null;
-    let bd = 9 / view.scale;
+    let bd = ptrPx(9) / view.scale;
     for (const e of entities) {
       if (exclude?.has(e.id)) continue;
       const d = distToEntity(e, p).d;
@@ -938,7 +1026,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const r = svgRef.current!.getBoundingClientRect();
     const x = clientX - r.left;
     const y = clientY - r.top;
-    return annHits.current.find((a) => x >= a.x && x <= a.x + a.w && y >= a.y && y <= a.y + a.h) ?? null;
+    const pad = coarse.current ? 6 : 0; // prst: značky vazeb a popisky kót mají větší zásahovou plochu
+    return annHits.current.find((a) => x >= a.x - pad && x <= a.x + a.w + pad && y >= a.y - pad && y <= a.y + a.h + pad) ?? null;
   };
 
   /** výběr pro kóty/vazby: bod jen u koncových bodů, středů a průsečíků; jinak celá entita */
@@ -1264,7 +1353,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
       case "polyline":
       case "spline": {
-        if (pts.length >= 2 && dist(p, pts[0]) < tol) return finishPoly(true);
+        if (pts.length >= 2 && dist(p, pts[0]) < tolMm()) return finishPoly(true);
         step();
         if (ev.detail >= 2) finishPoly(false, next);
         return;
@@ -1702,11 +1791,62 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     return { title: tr("Měření"), rows: [] };
   };
 
-  // ---------- myš ----------
+  // ---------- myš, pero a dotyk ----------
+  /**
+   * Zruší rozpracovanou akci jednoho ukazatele (tažení entity / úchytu / kóty, výběr oknem, ořez tažením, čekající
+   * klik): nic se nepotvrdí a tažené entity se vrátí do stavu při stisku. Volá se, když dosedne druhý prst, po
+   * dlouhém stisku a při přerušeném dotyku; zbytek doteku se pak až do zvednutí prstů ignoruje.
+   */
+  const cancelPress = () => {
+    longPress.current.cancel();
+    const d = drag.current;
+    const undo = pressUndo.current;
+    drag.current = null;
+    downAt.current = null;
+    pressUndo.current = null;
+    touch.current.swallow();
+    if (d?.kind === "trimPath") setTrimPreview(null);
+    if (d?.kind === "box") setCursor(null);
+    if (undo && dragArmed.current && (d?.kind === "handle" || d?.kind === "move" || d?.kind === "dimLabel")) onChange(undo, false);
+  };
+  /** Dlouhý stisk prstem / perem na místě = pravé tlačítko: stejná cesta jako pravý klik (nabídka, ukončení kroku). */
+  const fireLongPress = (at: Vec2) => {
+    cancelPress(); // zvednutí prstu už nesmí kliknout ani nic přetáhnout
+    openContext({ clientX: at[0], clientY: at[1] });
+  };
+  // časovač dlouhého stisku doběhne až po dalších vykresleních → vždy volá aktuální verzi (aktuální nástroj, výběr, pohled)
+  const fireLongPressRef = useRef(fireLongPress);
+  fireLongPressRef.current = fireLongPress;
+
   const onPointerDown = (ev: React.PointerEvent) => {
     if (ask) setAsk(null); // klik mimo zadávací pole = ponechat aktuální hodnotu
-    (ev.target as Element).setPointerCapture?.(ev.pointerId);
+    // zachycení na plátně: tažení pokračuje i mimo něj (syntetická událost bez aktivního ukazatele zachytit nejde)
+    try {
+      ev.currentTarget.setPointerCapture?.(ev.pointerId);
+    } catch {
+      /* ukazatel není aktivní */
+    }
+    const fine = ev.pointerType !== "touch" && ev.pointerType !== "pen"; // myš (a syntetické události)
+    coarse.current = ev.pointerType === "touch";
+    longPress.current.cancel();
+    if (ev.pointerType === "touch") {
+      // první dotek nové řady (primární ukazatel): zapomenout prsty, jejichž zvednutí prohlížeč případně neohlásil
+      if (ev.isPrimary) touch.current.reset();
+      const finger = touch.current.down(ev.pointerId, [ev.clientX, ev.clientY]);
+      if (finger === "second") {
+        // druhý prst: rozpracovaná akce prvního prstu se čistě zruší, dál už jen posun a zoom dvěma prsty
+        cancelPress();
+        pinchFrom.current = view;
+        setCursor(null);
+        setSnapState(null);
+        setHover(null);
+      }
+      if (finger !== "first") return;
+    }
     downAt.current = [ev.clientX, ev.clientY, ev.button];
+    dragArmed.current = fine; // myš táhne hned; prst a pero až po překročení mrtvé zóny
+    pressUndo.current = { entities, constraints, dims };
+    if (!fine && ev.button === 0) longPress.current.start(ev.pointerId, [ev.clientX, ev.clientY], (at) => fireLongPressRef.current(at));
     const raw = toMm(ev.clientX, ev.clientY);
     if (ev.button === 1 || ev.button === 2) {
       drag.current = { kind: "pan", from: [ev.clientX, ev.clientY], view };
@@ -1731,7 +1871,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     for (const id of sel) {
       const e = entities.find((x) => x.id === id);
       if (!e) continue;
-      const h = handlesOf(e).find((hh) => dist(hh.p, raw) * view.scale < 8);
+      const h = handlesOf(e).find((hh) => dist(hh.p, raw) * view.scale < ptrPx(8));
       if (h) {
         drag.current = { kind: "handle", id, key: h.key };
         return;
@@ -1751,9 +1891,27 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   };
 
   const onPointerMove = (ev: React.PointerEvent) => {
+    coarse.current = ev.pointerType === "touch";
+    if (ev.pointerType === "touch") {
+      // dva prsty: rozteč prstů přibližuje kolem středu sevření, společný pohyb posouvá
+      const g = touch.current.move(ev.pointerId, [ev.clientX, ev.clientY]);
+      if (g && pinchFrom.current) {
+        const r = svgRef.current!.getBoundingClientRect();
+        const rel = (p: [number, number]): [number, number] => [p[0] - r.left, p[1] - r.top];
+        setView(pinchView(pinchFrom.current, size, rel(g.a0), rel(g.b0), rel(g.a1), rel(g.b1)));
+      }
+      if (touch.current.swallowed) return; // po gestu / dlouhém stisku prst až do zvednutí nic nedělá
+    }
+    longPress.current.move(ev.pointerId, [ev.clientX, ev.clientY]);
     const raw = toMm(ev.clientX, ev.clientY);
     lastRaw.current = raw;
     const d = drag.current;
+    if (d && !dragArmed.current) {
+      // prst / pero: tažení začne až po překročení mrtvé zóny (klepnutí ani dlouhý stisk s ničím nepohnou)
+      const dn = downAt.current;
+      if (dn && !movedBeyond([dn[0], dn[1]], [ev.clientX, ev.clientY], TOUCH_SLOP_PX)) return;
+      dragArmed.current = true;
+    }
     if (d?.kind === "pan") {
       setView({ ...d.view, cx: d.view.cx - (ev.clientX - d.from[0]) / view.scale, cy: d.view.cy + (ev.clientY - d.from[1]) / view.scale });
       return;
@@ -1807,11 +1965,18 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   };
 
   const onPointerUp = (ev: React.PointerEvent) => {
+    longPress.current.cancel();
+    if (ev.pointerType === "touch") {
+      const ignore = touch.current.swallowed; // prst po gestu dvěma prsty / dlouhém stisku: zvednutí nic neprovede
+      if (touch.current.up(ev.pointerId)) pinchFrom.current = null;
+      if (ignore) return;
+    }
     const d = drag.current;
     drag.current = null;
     const dn = downAt.current;
     downAt.current = null;
-    const clicked = dn && Math.hypot(ev.clientX - dn[0], ev.clientY - dn[1]) < 4;
+    pressUndo.current = null;
+    const clicked = dn && Math.hypot(ev.clientX - dn[0], ev.clientY - dn[1]) < clickSlop(ev.pointerType);
     if (dn && dn[2] === 2 && clicked) return openContext(ev);
     if (d?.kind === "trimPath") {
       setTrimPreview(null);
@@ -1855,6 +2020,22 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     else toolClick(raw, ev);
   };
 
+  /** Přerušený ukazatel (systémové gesto, ztráta dotyku): rozpracovaná akce se zruší, nic se nepotvrdí. */
+  const onPointerCancel = (ev: React.PointerEvent) => {
+    if (ev.pointerType === "touch" && touch.current.up(ev.pointerId)) pinchFrom.current = null;
+    cancelPress();
+  };
+
+  /**
+   * Systémová nabídka se nikdy neotevírá. Některé prohlížeče (Chrome na Androidu) ale při dlouhém stisku prstem pošlou
+   * `contextmenu` dřív, než doběhne náš časovač – pak se dlouhý stisk vyřídí hned tady (jednou: časovač se zruší).
+   */
+  const onNativeContextMenu = (ev: React.MouseEvent) => {
+    ev.preventDefault();
+    const pointerType = (ev.nativeEvent as PointerEvent).pointerType;
+    if ((pointerType === "touch" || pointerType === "pen") && longPress.current.pending) fireLongPress([ev.clientX, ev.clientY]);
+  };
+
   const onDoubleClick = (ev: React.MouseEvent) => {
     if (tool === "polyline" || tool === "spline") return finishPoly(false);
     const ann = hitAnn(ev.clientX, ev.clientY);
@@ -1873,8 +2054,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     setView({ scale, cx: before[0] - (ev.clientX - r.left - size.w / 2) / scale, cy: before[1] + (ev.clientY - r.top - size.h / 2) / scale });
   };
 
-  // ---------- kontextové menu ----------
-  const openContext = (ev: React.PointerEvent) => {
+  // ---------- kontextové menu (pravé tlačítko myši, dlouhý stisk prstem / perem) ----------
+  const openContext = (ev: { clientX: number; clientY: number }) => {
     const raw = toMm(ev.clientX, ev.clientY);
     if (tool !== "select" && (pts.length || picks.length)) {
       // pravé tlačítko ukončí rozpracovaný krok (jako v ZW3D)
@@ -1925,7 +2106,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (es.length === 1) entries.push({ id: "off", label: tr("Odsadit…"), icon: "offset", onClick: () => { setTool("offset"); setTimeout(() => setPicks([{ kind: "entity", ref: { e: es[0].id, k: "self" } }]), 0); } });
       if (es.some((e) => ["rect", "polygon", "slot", "polyline"].includes(e.type))) entries.push({ id: "exp", label: tr("Rozložit na úsečky a oblouky"), icon: "explode", onClick: () => doExplode(current) });
       if (es.length === 1 && (es[0].type === "line" || es[0].type === "arc" || es[0].type === "circle")) entries.push({ id: "split", label: tr("Rozdělit v bodě…"), icon: "split", onClick: () => setTool("split") });
-      entries.push({ id: "dim", label: tr("Okótovat"), icon: "dimension", kbd: "D", onClick: () => setTool("dimension") });
+      entries.push({ id: "dim", label: tr("Okótovat"), icon: "dimension", kbd: sketchKey("sketch.dimension"), onClick: () => setTool("dimension") });
       if (es.length === 1 && es[0].type === "arc") {
         const arc = es[0];
         entries.push({ id: "alen", label: tr("Kóta délky oblouku"), icon: "dimension", onClick: () => placeDim("arcLength", [{ e: arc.id, k: "self" }], raw, circleFrom3(arc.a, arc.b, arc.c)?.c ?? raw) });
@@ -1941,9 +2122,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       for (const k of SNAP_ORDER) entries.push({ id: `s-${k}`, label: on(snaps[k], tr(SNAP_LABEL[k])), icon: "magnet", onClick: () => setSnap(k, !snaps[k]) });
       entries.push({ id: "s-infer", label: on(snaps.infer, tr("Zarovnání (vodítka)")), icon: "magnet", onClick: () => setSnap("infer", !snaps.infer) });
       entries.push({ id: "s-auto", label: on(snaps.auto, tr("Automatické vazby")), icon: "cCoincident", onClick: () => setSnap("auto", !snaps.auto) });
-      if (setSnapGrid) entries.push({ id: "grid", label: on(snapGrid, tr("Přichytit k mřížce")), icon: "grid", kbd: "G", onClick: () => setSnapGrid(!snapGrid) });
+      if (setSnapGrid) entries.push({ id: "grid", label: on(snapGrid, tr("Přichytit k mřížce")), icon: "grid", kbd: sketchKey("sketch.grid"), onClick: () => setSnapGrid(!snapGrid) });
       entries.push({ divider: true });
-      entries.push({ id: "fit", label: tr("Zobrazit vše"), icon: "fit", kbd: "F", onClick: fit });
+      entries.push({ id: "fit", label: tr("Zobrazit vše"), icon: "fit", kbd: sketchKey("sketch.fit"), onClick: fit });
       entries.push({ id: "all", label: tr("Vybrat vše"), icon: "select", kbd: "Ctrl+A", onClick: () => setSelection(entities.map((e) => e.id)) });
       if (tool !== "select") entries.push({ id: "cancel", label: tr("Zrušit příkaz"), icon: "x", kbd: "Esc", onClick: () => setTool("select") });
       if (onFinish) entries.push({ id: "finish", label: tr("Dokončit skicu"), icon: "check", tone: "pattern", onClick: onFinish });
@@ -2032,13 +2213,22 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         setSelection(entities.map((x) => x.id));
         return;
       }
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (k === "f") return fit();
-      if (k === "g" && setSnapGrid) return setSnapGrid(!snapGrid);
-      if (k === "h" && sel.size) return applyConstraintToSelection("horizontal");
-      if (k === "d" && sel.size === 1 && !pts.length && !picks.length) {
-        // D nad vybranou (právě nakreslenou) entitou = kóta hned: úsečka → délka, kružnice → průměr, oblouk → poloměr,
+      // zkratky skici dle nastavení (Nastavení → Klávesové zkratky → Skica): čtou se až při stisku, takže změna
+      // v nastavení platí hned; zkratky 3D se tu nehledají – stejná klávesa smí mít ve 3D jiný význam
+      const act = sketchShortcutAction(currentShortcuts(), keyCombo(e));
+      if (!act) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) e.preventDefault(); // kombinace s Ctrl / Alt nesmí spustit funkci prohlížeče
+      if (act === "sketch.fit") return fit();
+      if (act === "sketch.grid") {
+        if (setSnapGrid) setSnapGrid(!snapGrid);
+        return;
+      }
+      if (act === "sketch.horizontal") {
+        if (sel.size) applyConstraintToSelection("horizontal");
+        return;
+      }
+      if (act === "sketch.dimension" && sel.size === 1 && !pts.length && !picks.length) {
+        // kóta (D) nad vybranou (právě nakreslenou) entitou = kóta hned: úsečka → délka, kružnice → průměr, oblouk → poloměr,
         // obdélník / mnohoúhelník → délka první strany; další klik kótu umístí
         const e = emap.get([...sel][0]);
         if (e && e.type !== "point" && e.type !== "spline" && e.type !== "ellipse") {
@@ -2052,7 +2242,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           }
         }
       }
-      if (KEYS[k]) setTool(KEYS[k]);
+      const next = SKETCH_SHORTCUT_TOOLS[act];
+      if (next) setTool(next);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -2409,14 +2600,19 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           : "…";
 
   return (
-    <div className="absolute inset-0 select-none" onContextMenu={(e) => e.preventDefault()}>
+    <div className="absolute inset-0 select-none" style={{ touchAction: "none", WebkitTouchCallout: "none", WebkitTapHighlightColor: "transparent" }} onContextMenu={onNativeContextMenu}>
+      {/* touch-action: none – posun a zoom dvěma prsty obsluhuje skicář sám, prohlížeč stránku neposouvá ani nezvětšuje;
+          bez výběru textu a systémové nabídky při dlouhém stisku */}
       <svg
         ref={svgRef}
+        data-sketch-canvas
+        data-tool={tool}
         className="h-full w-full"
-        style={{ cursor: tool === "select" ? (hover || hoverAnn ? "pointer" : "default") : "crosshair", background: "#fbfcfd" }}
+        style={{ cursor: tool === "select" ? (hover || hoverAnn ? "pointer" : "default") : "crosshair", background: "#fbfcfd", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onPointerLeave={() => {
           setCursor(null);
           setHover(null);
@@ -2635,7 +2831,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       {hints && sketchHints.length > 0 && (
         <div data-sketch-hints className="pointer-events-none absolute inset-0 overflow-hidden">
           {sketchHints.map((h) => (
-            <div key={h.id} data-sketch-hint={h.id} title={h.title} className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[#2563eb]/85 px-1 font-mono text-[10px] font-semibold leading-[14px] text-white shadow" style={{ left: h.x, top: h.y }}>
+            <div key={h.id} data-sketch-hint={h.id} data-kind={h.kind} data-index={h.index} title={h.title} className="absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[#2563eb]/85 px-1 font-mono text-[10px] font-semibold leading-[14px] text-white shadow" style={{ left: h.x, top: h.y }}>
               {h.id}
             </div>
           ))}

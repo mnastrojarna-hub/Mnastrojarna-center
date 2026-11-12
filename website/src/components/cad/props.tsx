@@ -1,5 +1,6 @@
 "use client";
 
+import { bodiesAt, isNewBodyMode, nextBodyName } from "@/cad/bodies";
 import { tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ALL_THREADS, FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
@@ -240,7 +241,9 @@ export function Check({ label, value, onChange }: { label: string; value: boolea
   );
 }
 
-const MODES: { v: BoolMode; l: string }[] = [
+/** prvky bez geometrie – cílové těleso se u nich nevolí */
+const NO_GEOMETRY = new Set<string>(["sketch", "datum", "datumAxis", "datumPoint", "csys"]);
+const MODES: { v: BoolMode | "newbody"; l: string }[] = [
   { v: "add", l: tr("Přidat") },
   { v: "cut", l: tr("Odebrat") },
   { v: "intersect", l: tr("Průnik") },
@@ -299,7 +302,40 @@ export function FeatureProps({
   const before = idx >= 0 ? doc.features.slice(0, idx) : doc.features;
   const sketches = before.filter((x) => x.type === "sketch");
   const toolFeatures = before.filter((x) => TOOL_TYPES.includes(x.type) && x.id !== f.id);
-  const mode = "mode" in f ? <Seg label={tr("Operace")} value={f.mode === "new" ? "add" : f.mode} options={MODES} onChange={(v) => set({ mode: v })} /> : null;
+  // ── více těles: stav těles před tímto prvkem (názvy, aktivní) ──
+  const bs = bodiesAt(doc, idx >= 0 ? idx : doc.features.length);
+  /** prvek zakládá nové těleso (operace „Nové těleso“ s dosud neexistujícím názvem) */
+  const makesNewBody = bs.started && isNewBodyMode(f) && !!f.body && !bs.names.includes(f.body);
+  const mode =
+    "mode" in f ? (
+      <>
+        <Seg
+          label={tr("Operace")}
+          value={makesNewBody ? "newbody" : f.mode === "new" ? "add" : f.mode}
+          options={bs.started ? [...MODES, { v: "newbody" as const, l: tr("Nové těleso") }] : MODES}
+          onChange={(v) => (v === "newbody" ? set({ mode: "new", body: nextBodyName(bs.names) }) : set({ mode: v, body: makesNewBody ? undefined : f.body }))}
+        />
+        {makesNewBody && (
+          <Field label={tr("Název nového tělesa")}>
+            <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" aria-label={tr("Název nového tělesa")} value={f.body ?? ""} onChange={(e) => set({ body: e.target.value || nextBodyName(bs.names) })} />
+          </Field>
+        )}
+      </>
+    ) : null;
+  /** cílové těleso prvku – nabízí se, jakmile má díl víc těles (prvky pro práci s tělesy mají vlastní pole) */
+  const bodyPick =
+    bs.names.length > 1 && !makesNewBody && !NO_GEOMETRY.has(f.type) && f.type !== "combine" && f.type !== "copyBody" ? (
+      <Field label={tr("Těleso")}>
+        <select className={selectCls} aria-label={tr("Těleso, na kterém prvek pracuje")} value={f.body && bs.names.includes(f.body) ? f.body : ""} onChange={(e) => set({ body: e.target.value || undefined })}>
+          <option value="">{tr("naposledy aktivní ({0})", bs.active)}</option>
+          {bs.names.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </Field>
+    ) : null;
   const custom = getFeatureForm(f.type);
 
   return (
@@ -307,9 +343,81 @@ export function FeatureProps({
       <Field label={tr("Název")}>
         <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" value={f.name} onChange={(e) => set({ name: e.target.value })} />
       </Field>
+      {bodyPick}
       {(() => {
         if (custom) return custom({ f, doc, set, b, sketches, toolFeatures, mode, pickHint });
         switch (f.type) {
+          case "splitBodies": {
+            const ax = AXIS_PLANES.find((p) => p.v === f.plane)?.axis ?? "Z";
+            return (
+              <>
+                <PlaneDefField label={tr("Dělicí rovina")} value={f.planeDef} allowNone noneLabel={tr("Základní rovina (níže)")} onChange={(planeDef) => set({ planeDef })} />
+                {!f.planeDef && (
+                  <>
+                    <Seg label={tr("Základní rovina")} value={f.plane} options={AXIS_PLANES} onChange={(v) => set({ plane: v })} />
+                    <Num label={tr("Poloha roviny ({0})", ax)} value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
+                  </>
+                )}
+                <Field label={tr("Název nového tělesa (záporná strana roviny)")}>
+                  <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" aria-label={tr("Název nového tělesa")} value={f.nameB ?? ""} placeholder={nextBodyName(bs.names)} onChange={(e) => set({ nameB: e.target.value || undefined })} />
+                </Field>
+                <Info>{tr("Rovina rozdělí těleso „{0}“ na dvě: strana ve směru normály zůstane tímto tělesem, opačná strana je nové těleso. Další prvky pracují s tělesem, které vyberete v poli Těleso nebo ve správci.", f.body && bs.names.includes(f.body) ? f.body : bs.active)}</Info>
+              </>
+            );
+          }
+          case "copyBody":
+            return (
+              <>
+                <Field label={tr("Kopírované těleso")}>
+                  <select className={selectCls} aria-label={tr("Kopírované těleso")} value={f.source && bs.names.includes(f.source) ? f.source : ""} onChange={(e) => set({ source: e.target.value })}>
+                    <option value="">{tr("aktivní ({0})", bs.active)}</option>
+                    {bs.names.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Vec label={tr("Posunutí kopie")} value={f.translate} bind={b("translate")} onChange={(v) => set({ translate: v })} />
+                <Field label={tr("Název kopie")}>
+                  <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" aria-label={tr("Název kopie")} value={f.newName ?? ""} placeholder={nextBodyName(bs.names)} onChange={(e) => set({ newName: e.target.value || undefined })} />
+                </Field>
+                <Info>{tr("Kopie je samostatné těleso dílu – dá se dál upravovat, nebo sloučit s jiným tělesem (Sloučit tělesa).")}</Info>
+              </>
+            );
+          case "combine": {
+            const target = f.target && bs.names.includes(f.target) ? f.target : "";
+            const targetName = target || bs.active;
+            const tools = bs.names.filter((n) => n !== targetName);
+            return (
+              <>
+                {bs.names.length < 2 && <Info>{tr("Díl má zatím jedno těleso. Druhé vznikne operací „Nové těleso“ u vysunutí či primitiva, rozdělením (Rozdělit na tělesa) nebo kopií (Kopie tělesa).")}</Info>}
+                <Field label={tr("Cílové těleso (výsledek)")}>
+                  <select className={selectCls} aria-label={tr("Cílové těleso")} value={target} onChange={(e) => set({ target: e.target.value })}>
+                    <option value="">{tr("aktivní ({0})", bs.active)}</option>
+                    {bs.names.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={tr("Nástrojové těleso")}>
+                  <select className={selectCls} aria-label={tr("Nástrojové těleso")} value={f.tool && tools.includes(f.tool) ? f.tool : ""} onChange={(e) => set({ tool: e.target.value })}>
+                    <option value="">{tr("— vyberte těleso —")}</option>
+                    {tools.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Seg label={tr("Operace")} value={f.op} options={[{ v: "add", l: tr("Sjednotit") }, { v: "cut", l: tr("Odebrat") }, { v: "intersect", l: tr("Průnik") }]} onChange={(v) => set({ op: v })} />
+                <Check label={tr("Ponechat nástrojové těleso")} value={f.keepTool} onChange={(v) => set({ keepTool: v })} />
+                <Info>{tr("Výsledek zůstane v cílovém tělese; nástrojové těleso zanikne, pokud ho neponecháte.")}</Info>
+              </>
+            );
+          }
           case "ext":
             return <ExtForm f={f} doc={doc} set={set} sketches={sketches} toolFeatures={toolFeatures} />;
           case "sketch":
@@ -834,6 +942,12 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
       <RefListField label={tr("Polohy děr (více naráz)")} value={f.points ?? []} onChange={(points) => set({ points: points.length ? points : undefined })} />
       <DirectionField label={tr("Osa díry")} allowNormal={false} value={f.dirDef ?? { kind: "axis", axis: f.axis }} onChange={(d) => (!d || d.kind === "axis" ? set({ axis: d?.axis ?? f.axis, dirDef: undefined }) : set({ dirDef: d }))} />
       <Check label={tr("Vrtat v kladném směru osy")} value={f.flip} onChange={(v) => set({ flip: v })} />
+      {end.kind === "throughAll" && (
+        <>
+          <Check label={tr("Skrz oběma směry (celé těleso)")} value={!!f.bothWays} onChange={(v) => set({ bothWays: v || undefined })} />
+          <Info>{f.bothWays ? tr("Díra prochází celým tělesem na obě strany od zadaného bodu.") : tr("Díra „skrz“ vrtá od zadaného bodu jen ve směru vrtání – materiál nad bodem (např. protější příruba) zůstane.")}</Info>
+        </>
+      )}
       <p className="text-[11px] text-ink-700/50">{tr("Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).")}</p>
     </>
   );

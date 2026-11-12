@@ -2,6 +2,7 @@
  * Dotazy na topologii tělesa (worker): informace o ploše/hraně/bodu/tělese a měření mezi entitami
  * (vzdálenost přes BRepExtrema_DistShapeShape, úhel, poloměr, délka).
  */
+import { subShapes } from "./fastbox";
 import { cadLocale, tr } from "./i18n";
 import * as r from "replicad";
 import { eulerXYZ, type Mat3 } from "./assembly";
@@ -98,10 +99,11 @@ export function shapeFor(src: ShapeSrc, part: Shape | null, comp: (key: string) 
 export function vertexPositions(shape: Shape): Float32Array {
   const oc = r.getOC() as unknown as { BRep_Tool: { Pnt(v: unknown): { X(): number; Y(): number; Z(): number; delete(): void } } };
   const out: number[] = [];
-  for (const v of r.iterTopo(shape.wrapped, "vertex")) {
+  for (const v of subShapes(shape, "VERTEX")) {
     const p = oc.BRep_Tool.Pnt(v);
     out.push(p.X(), p.Y(), p.Z());
     p.delete();
+    (v as { delete(): void }).delete();
   }
   return new Float32Array(out);
 }

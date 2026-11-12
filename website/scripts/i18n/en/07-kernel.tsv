@@ -1,0 +1,118 @@
+# Jádro: více těles, díra skrz, průběh a zrušení výpočtu, obecné textové příkazy (report 604200.001)
+ · těles {0}	 · bodies {0}
+ (aktivní)	 (active)
+ skrz oběma směry	 through both ways
+✗ Výpočet zrušen – dokument zůstal beze změny.	✗ Computation cancelled – the document is unchanged.
+celkem {0} s	total {0} s
+Cílové a nástrojové těleso musí být dvě různá tělesa.	The target body and the tool body must be two different bodies.
+čas tohoto kroku · celkový čas výpočtu	time of this step · total computation time
+Díra „skrz“ vrtá od zadaného bodu jen ve směru vrtání – materiál nad bodem (např. protější příruba) zůstane.	A “through” hole drills from the given point in the drilling direction only – material above the point (e.g. the opposite flange) stays.
+Díra prochází celým tělesem na obě strany od zadaného bodu.	The hole goes through the whole body in both directions from the given point.
+Není co rozdělit – nejdřív vytvořte těleso.	Nothing to split – create a body first.
+Počítám díly sestavy…	Computing assembly parts…
+Počítám kolize…	Checking interference…
+Počítám model…	Computing the model…
+Počítám pohledy výkresu…	Computing drawing views…
+Počítám prvek {0}/{1}: {2}	Computing feature {0}/{1}: {2}
+Počítám síť modelu…	Meshing the model…
+Připravuji export…	Preparing export…
+Rovina těleso nerozdělí – musí jím procházet (změňte rovinu nebo posunutí).	The plane does not split the body – it must pass through it (change the plane or the offset).
+Skrz oběma směry (celé těleso)	Through both ways (whole body)
+Tělesa: {0}	Bodies: {0}
+Těleso „{0}“ už v dílu je – zvolte jiný název.	Body “{0}” already exists in the part – choose another name.
+Těleso „{0}“ v dílu není – zvolte existující těleso, nebo operaci „Nové těleso“.	Body “{0}” is not in the part – choose an existing body, or the operation “New body”.
+Těleso „{0}“ v dílu není (tělesa: {1}).	Body “{0}” is not in the part (bodies: {1}).
+Ukončí výpočet a vrátí dokument do stavu před ním	Stops the computation and returns the document to the state before it
+Vyberte nástrojové těleso.	Select the tool body.
+Výpočet byl zrušen – kliknutím se model přepočítá	The computation was cancelled – click to recompute the model
+Výpočet modelu: {0} s	Model computation: {0} s
+Výpočet zrušen – model není přepočítaný. Upravte nebo potlačte náročný prvek, nebo spusťte výpočet znovu kliknutím na stav jádra.	Computation cancelled – the model is not recomputed. Edit or suppress the demanding feature, or start the computation again by clicking the kernel status.
+Výpočet zrušen – poslední změna je vrácena (Ctrl+Y ji obnoví).	Computation cancelled – the last change was undone (Ctrl+Y restores it).
+Výpočet zrušen · přepočítat	Computation cancelled · recompute
+Výpočet zrušen.	Computation cancelled.
+
+# Více těles v rozhraní, nové textové příkazy (oblouk, spline, zaoblení rohu, šikmá díra, tělesa, prvek, normálie, vložit, výkres)
+ (ukotvená)	 (fixed)
+— vyberte těleso —	— select a body —
+, nástroj ponechán	, tool kept
+„{0}“ není ve tvaru klíč=hodnota	“{0}” is not in the form key=value
+„{0}“ v historii není – k dispozici: {1}	“{0}” is not in the history – available: {1}
+(aktivní)	(active)
+(další volný název)	(next free name)
+→ {0} ({1}) – {2} {3} podle pravidla „{4}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} {3} by rule “{4}” – result after computation below
+✓ další prvky pracují s tělesem „{0}“	✓ following features work on body “{0}”
+✓ komponenta „{0}“ vložena do sestavy{1}	✓ component “{0}” inserted into the assembly{1}
+✓ normálie „{0}“ – nová záložka	✓ standard part “{0}” – new tab
+✓ normálie „{0}“ vložena do sestavy jako komponenta	✓ standard part “{0}” inserted into the assembly as a component
+✓ výkres dokumentu se otevře v záložce	✓ the drawing of the document opens in a tab
+aktivní	active
+aktivní ({0})	active ({0})
+Aktivní těleso – pracují s ním nové prvky	Active body – new features work on it
+bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit	without z = starts on the body surface at that location (from the mesh) and drills down; “through” drills from the point in the drilling direction only, “both” in both directions; angled hole: “direction” = drilling direction, “tilt” = angle from the axis; several positions = several holes; thread also with fine pitch (M18×1.5) – as in the thread command
+Cílové těleso	Target body
+Cílové těleso (výsledek)	Target body (result)
+čára: neznámé slovo „{0}“ – body po dvojicích, „r N“ za bodem zaoblí roh, „uzavřít“ spojí konec se začátkem	polyline: unknown word “{0}” – points in pairs, “r N” after a point fillets that corner, “closed” joins the end with the start
+další entity; „r N“ za bodem čáry zaoblí tento roh; oblouk = začátek, bod na oblouku, konec; předpona „pomocná“ = konstrukční	more entities; “r N” after a polyline point fillets that corner; arc = start, point on the arc, end; prefix “construction” = construction geometry
+další těleso jako posunutá kopie	another body as a moved copy
+díl „{0}“ není mezi otevřenými záložkami – otevřené díly: {1}	part “{0}” is not among the open tabs – open parts: {1}
+Díl má zatím jedno těleso. Druhé vznikne operací „Nové těleso“ u vysunutí či primitiva, rozdělením (Rozdělit na tělesa) nebo kopií (Kopie tělesa).	The part has one body so far. A second one is created by the operation “New body” of an extrusion or primitive, by splitting (Split into bodies) or by copying (Copy body).
+díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta	library part from text (M8x30, bearing 6204, key 8x7x40): a new tab in a part, a component in an assembly
+hodnotu „{0}“ nelze přečíst jako JSON	the value “{0}” cannot be read as JSON
+hran	edges
+Kliknutím se těleso stane aktivním – nové prvky budou pracovat s ním	Click to make the body active – new features will work on it
+Kopie je samostatné těleso dílu – dá se dál upravovat, nebo sloučit s jiným tělesem (Sloučit tělesa).	The copy is a separate body of the part – it can be edited further or combined with another body (Combine bodies).
+kopie tělesa {0}, posun [{1}]	copy of body {0}, offset [{1}]
+Kopírované těleso	Body to copy
+krajní bod otevřené čáry zaoblit nelze (bod {0})	the end point of an open polyline cannot be filleted (point {0})
+kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId="Skica 1" pathId=$last · prvek draft angle=3 faces=boční · prvek "Ohyb plechu" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem	any feature type or extension feature without JSON: feature sweep profileId="Sketch 1" pathId=$last · feature draft angle=3 faces=side · feature sheet.bend angle=90; values: number, yes/no, list a;b;c, text in quotes; sketches and features by name or $last; faces and edges by numbers or by rule
+naposledy aktivní ({0})	last active ({0})
+Nástrojové těleso	Tool body
+Název kopie	Name of the copy
+Název nového tělesa	Name of the new body
+Název nového tělesa (záporná strana roviny)	Name of the new body (negative side of the plane)
+neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, oblouk, spline, bod, elipsa	unknown sketch entity “{0}” – rect, circle, polygon, slot, line, polyline, arc, spline, point, ellipse
+neznámý příkaz „{0}“ – příkazy: {1}	unknown command “{0}” – commands: {1}
+neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}	unknown feature type “{0}” – types: {1}; extensions: {2}
+normálie potřebuje označení: normálie M8x30 · normálie ložisko 6204 · normálie pero 8x7x40	library needs a designation: library M8x30 · library bearing 6204 · library key 8x7x40
+normálii „{0}“ knihovna nezná – zkuste např. M8x30, ložisko 6204, pero 8x7x40	the library does not know the standard part “{0}” – try e.g. M8x30, bearing 6204, key 8x7x40
+nová skica na základní nebo obecné rovině (osa X skici se bez zadání zvolí kolmo na normálu); entity i na dalších řádcích	new sketch on a base or general plane (without input the sketch X axis is chosen perpendicular to the normal); entities also on following lines
+oblouk potřebuje tři body (začátek, bod na oblouku, konec): oblouk x1 y1 xm ym x2 y2	arc needs three points (start, point on the arc, end): arc x1 y1 xm ym x2 y2
+odebrat od	subtract from
+orotuje poslední skicu (výchozí osa Y skici, 360°); „odebrat“ = vysoustružit z tělesa	revolves the last sketch (default sketch Y axis, 360°); “cut” = turn the profile out of the body
+otevře výkres otevřeného dokumentu v záložce	opens the drawing of the open document in a tab
+ploch	faces
+Ponechat nástrojové těleso	Keep the tool body
+Posunutí kopie	Offset of the copy
+pravidlem lze v jednom prvku vybrat jen jednu skupinu ploch nebo hran – ostatní zadejte čísly	only one group of faces or edges per feature can be selected by rule – enter the others by numbers
+prvek {0}: neznámý parametr „{1}“ – parametry: {2}	feature {0}: unknown parameter “{1}” – parameters: {2}
+prvek {0}: parametr „{1}“ má hodnoty {2}	feature {0}: parameter “{1}” takes the values {2}
+prvek potřebuje typ: prvek <typ> klíč=hodnota … (typy: {0})	feature needs a type: feature <type> key=value … (types: {0})
+prvek se nepodařilo vytvořit	the feature could not be created
+roh v bodě {0} je přímý – není co zaoblit	the corner at point {0} is straight – nothing to fillet
+rovina {0}{1} → nové těleso {2}	plane {0}{1} → new body {2}
+Rovina rozdělí těleso „{0}“ na dvě: strana ve směru normály zůstane tímto tělesem, opačná strana je nové těleso. Další prvky pracují s tělesem, které vyberete v poli Těleso nebo ve správci.	The plane splits body “{0}” in two: the side in the direction of the normal stays this body, the opposite side is a new body. Following features work on the body you choose in the Body field or in the manager.
+rovina rozdělí těleso na dvě samostatná tělesa	a plane splits the body into two separate bodies
+Rozdělit na tělesa	Split into bodies
+sestava: vloží díl z otevřené záložky jako komponentu (vazby se zadávají v panelu sestavy nebo v JSON dokumentu)	assembly: inserts a part from an open tab as a component (mates are entered in the assembly panel or in the JSON document)
+sjednotit	unite
+Sjednotit	Unite
+sjednotit, odebrat nebo průnik dvou těles	unite, subtract or intersect two bodies
+skica v obecné rovině potřebuje normálu třemi čísly: skica počátek x y z normála nx ny nz [osax ux uy uz]	a sketch on a general plane needs the normal as three numbers: sketch origin x y z normal nx ny nz [xdir ux uy uz]
+sloučit potřebuje dvě tělesa: sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat] – např. sloučit 1 2 odebrat	combine needs two bodies: combine <target> <tool> [cut|intersect] [keep] – e.g. combine 1 2 cut
+Sloučit tělesa	Combine bodies
+směr nesmí být nulový vektor	the direction must not be a zero vector
+spline potřebuje aspoň dva body po dvojicích: spline x1 y1 x2 y2 x3 y3 … [uzavřít]	spline needs at least two points in pairs: spline x1 y1 x2 y2 x3 y3 … [closed]
+Tělesa	Bodies
+Tělesa ({0})	Bodies ({0})
+těleso „{0}“ v dílu není – tělesa: {1}	body “{0}” is not in the part – bodies: {1}
+těleso potřebuje název nebo číslo: těleso 2 (= „Těleso 2“) – další prvky pak pracují s ním	body needs a name or a number: body 2 (= “Těleso 2”) – following features then work on it
+Těleso, na kterém prvek pracuje	Body the feature works on
+tři body oblouku leží v přímce – použijte úsečku	the three arc points lie on a straight line – use a line
+více děr jedním příkazem potřebuje u každé polohy tři souřadnice: díra 8 skrz v x1 y1 z1 v x2 y2 z2	several holes in one command need three coordinates for each position: hole 8 through at x1 y1 z1 at x2 y2 z2
+více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným	several bodies in a part: “body 2” switches following features to Těleso 2; splitbodies = two bodies by a plane; copybody = another body; combine = unite / subtract / intersect two bodies. On features: “… newbody [body Name]” starts a new body, “… body 2” works on the chosen one
+vložit potřebuje název otevřené záložky s dílem: vložit "Hřídel" v 0 0 10 [otočení 0 90 0] [ukotvit]	insert needs the name of an open tab with a part: insert "Shaft" at 0 0 10 [rotation 0 90 0] [fixed]
+vložit: otevřený dokument není sestava – nejdřív „nová sestava“	insert: the open document is not an assembly – first “new assembly”
+Výsledek zůstane v cílovém tělese; nástrojové těleso zanikne, pokud ho neponecháte.	The result stays in the target body; the tool body disappears unless you keep it.
+zaoblení rohu potřebuje aspoň tři body čáry	a corner fillet needs at least three polyline points
+zaoblení rohu se píše za bod: čára 0 0 50 0 r 5 50 30 … (r 5 zaoblí roh v bodě 50 0)	a corner fillet is written after the point: polyline 0 0 50 0 r 5 50 30 … (r 5 fillets the corner at point 50 0)
+zaoblení se nevejde na úsek mezi body {0} a {1} (délka {2}) – zmenšete poloměr	the fillet does not fit on the segment between points {0} and {1} (length {2}) – reduce the radius

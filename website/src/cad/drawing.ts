@@ -99,7 +99,7 @@ export const defaultDrawingOptions: DrawingOptions = {
 };
 
 /** Umístění pohledu na listu (pro mapování kliknutí → souřadnice pohledu a zpět). */
-export type PlacedView = { key: string; px: number; py: number; s: number; x0: number; y0: number; w: number; h: number };
+export type PlacedView = { key: string; px: number; py: number; s: number; x0: number; y0: number; w: number; h: number; /** hrany a kružnice pohledu (souřadnice pohledu) – výběr při kótování a dohledání geometrie kót */ ents?: ViewEnt[] };
 
 export type DrawingResult = {
   sheet: { name: SheetName; w: number; h: number };
@@ -226,8 +226,8 @@ export function pathToPolylines(d: string): Vec2[][] {
   return out;
 }
 
-function arcToPoints(p0: Vec2, p1: Vec2, rx: number, ry: number, phiDeg: number, large: boolean, sweep: boolean): Vec2[] {
-  if (rx === 0 || ry === 0) return [p1];
+/** Parametry oblouku SVG (příkaz A): střed, poloosy, počáteční úhel a rozsah (kladně = příznak sweep, v SVG po směru hodin). */
+function arcGeom(p0: Vec2, p1: Vec2, rx: number, ry: number, phiDeg: number, large: boolean, sweep: boolean) {
   const phi = (phiDeg * Math.PI) / 180;
   const cos = Math.cos(phi);
   const sin = Math.sin(phi);
@@ -254,6 +254,15 @@ function arcToPoints(p0: Vec2, p1: Vec2, rx: number, ry: number, phiDeg: number,
   let dt = ang((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry);
   if (!sweep && dt > 0) dt -= 2 * Math.PI;
   if (sweep && dt < 0) dt += 2 * Math.PI;
+  return { cx, cy, rx, ry, cos, sin, t1, dt };
+}
+
+function arcToPoints(p0: Vec2, p1: Vec2, rx: number, ry: number, phiDeg: number, large: boolean, sweep: boolean): Vec2[] {
+  if (rx === 0 || ry === 0) return [p1];
+  const g = arcGeom(p0, p1, rx, ry, phiDeg, large, sweep);
+  const { cx, cy, cos, sin, t1, dt } = g;
+  rx = g.rx;
+  ry = g.ry;
   const n = Math.max(4, Math.ceil(Math.abs(dt) / (Math.PI / 24)));
   const pts: Vec2[] = [];
   for (let k = 1; k <= n; k++) {
@@ -261,6 +270,286 @@ function arcToPoints(p0: Vec2, p1: Vec2, rx: number, ry: number, phiDeg: number,
     pts.push([cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin, cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos]);
   }
   return pts;
+}
+
+// ---------------------------------------------------------------- entity pohledu (výběr hrany / kružnice při kótování)
+
+/**
+ * Rozpoznaná entita promítnutého pohledu v souřadnicích pohledu (mm modelu, y dolů): souvislý přímý úsek čáry
+ * nebo kruhový oblouk / kružnice. Vzniká přímo z cesty SVG, kterou vrací projekce (úsečky L, oblouky A, křivky C/Q),
+ * ne zpětným odhadem z lomených čar – kružnice a oblouky z příkazu A tak mají přesný střed i poloměr
+ * (jen obrysy zaoblení, které projekce vrací jako Bézierovy křivky, se prokládají kružnicí).
+ */
+export type ViewEnt =
+  | { t: "line"; a: Vec2; b: Vec2; hidden?: boolean }
+  | { t: "arc"; c: Vec2; r: number; /** počáteční úhel a rozsah [rad] (atan2 v souřadnicích pohledu; ±2π = celá kružnice) */ a0: number; da: number; hidden?: boolean };
+
+const dist2 = (a: Vec2, b: Vec2) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+/** dovolená odchylka od přímky (výstup projekce je zaokrouhlen na 5 desetinných míst) */
+const lineTol = (span: number) => 1e-3 + 1e-4 * span;
+/** dovolená odchylka bodů křivky od proložené kružnice */
+const arcTol = (r: number) => 3e-5 + 2e-4 * r;
+const TWO_PI = 2 * Math.PI;
+
+/** Kružnice proložená body metodou nejmenších čtverců; `dev` = největší odchylka bodů. Null = body leží na přímce. */
+export function fitCircle(pts: Vec2[]): { c: Vec2; r: number; dev: number } | null {
+  const n = pts.length;
+  if (n < 3) return null;
+  let mx = 0;
+  let my = 0;
+  for (const p of pts) {
+    mx += p[0];
+    my += p[1];
+  }
+  mx /= n;
+  my /= n;
+  let suu = 0;
+  let suv = 0;
+  let svv = 0;
+  let suuu = 0;
+  let svvv = 0;
+  let suvv = 0;
+  let svuu = 0;
+  for (const p of pts) {
+    const u = p[0] - mx;
+    const v = p[1] - my;
+    suu += u * u;
+    suv += u * v;
+    svv += v * v;
+    suuu += u * u * u;
+    svvv += v * v * v;
+    suvv += u * v * v;
+    svuu += v * u * u;
+  }
+  const det = suu * svv - suv * suv;
+  if (Math.abs(det) < 1e-12 * Math.max(1, suu + svv) ** 2) return null;
+  const bu = (suuu + suvv) / 2;
+  const bv = (svvv + svuu) / 2;
+  const uc = (bu * svv - bv * suv) / det;
+  const vc = (bv * suu - bu * suv) / det;
+  const r = Math.sqrt(uc * uc + vc * vc + (suu + svv) / n);
+  const c: Vec2 = [uc + mx, vc + my];
+  let dev = 0;
+  for (const p of pts) dev = Math.max(dev, Math.abs(dist2(p, c) - r));
+  return { c, r, dev };
+}
+
+/** úhel bodu vůči středu */
+const angOf = (c: Vec2, p: Vec2) => Math.atan2(p[1] - c[1], p[0] - c[0]);
+/** rozdíl úhlů v (−π, π] */
+const angDiff = (a: number, b: number) => {
+  let d = (b - a) % TWO_PI;
+  if (d > Math.PI) d -= TWO_PI;
+  if (d <= -Math.PI) d += TWO_PI;
+  return d;
+};
+
+/**
+ * Rozloží cestu SVG pohledu na entity pro výběr: přímé úseky (sousední kolineární kroky se spojí – i kružnice viděná
+ * z boku, kterou projekce vrací jako řadu krátkých kroků tam a zpět), přesné kruhové oblouky (příkaz A se stejnými
+ * poloosami; navazující oblouky téže kružnice se spojí) a oblouky proložené Bézierovými křivkami (obrysy zaoblení).
+ * Obecné křivky (elipsy, spline, lomené náhrady křivek) se vynechají – nejde o hranu ani kružnici.
+ */
+export function pathToEntities(d: string, hidden = false): ViewEnt[] {
+  const tokens = d.match(/[MLHVACQZmlhvacqz]|-?\d*\.?\d+(?:e[-+]?\d+)?/g) ?? [];
+  const out: ViewEnt[] = [];
+  const h = hidden ? { hidden: true } : {};
+  // přímé úseky jedné souvislé části cesty (kvůli rozpoznání lomené náhrady křivky se ukládají až na jejím konci)
+  type Run = { lo: Vec2; hi: Vec2; dIn: Vec2; dOut: Vec2; next: boolean };
+  let runs: Run[] = [];
+  let run: Run | null = null;
+  let arc: { c: Vec2; r: number; a0: number; da: number } | null = null;
+  let fit: { pts: Vec2[] } | null = null;
+
+  const endRun = () => {
+    if (run) runs.push(run);
+    run = null;
+  };
+  /** uloží přímé úseky; hladký řetěz 4+ úseků (zlom < 15°) je lomená náhrada křivky → vynechá se (zůstane jen úsek výrazně delší než sousedé = hrana tečně navazující na křivku) */
+  const flushRuns = () => {
+    endRun();
+    const keep = runs.map(() => true);
+    const len = (q: Run) => dist2(q.lo, q.hi);
+    const turn = (a: Vec2, b: Vec2) => Math.abs(Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]));
+    const smooth = (k: number) => runs[k].next && turn(runs[k].dOut, runs[k + 1].dIn) < (15 * Math.PI) / 180;
+    for (let a = 0; a < runs.length; ) {
+      let b = a;
+      while (b + 1 < runs.length && smooth(b)) b++;
+      if (b - a + 1 >= 4)
+        for (let k = a; k <= b; k++) {
+          const near = Math.max(k > a ? len(runs[k - 1]) : 0, k < b ? len(runs[k + 1]) : 0);
+          if (len(runs[k]) <= 3 * near) keep[k] = false;
+        }
+      a = b + 1;
+    }
+    runs.forEach((q, k) => {
+      if (keep[k] && len(q) > 1e-6) out.push({ t: "line", a: q.lo, b: q.hi, ...h });
+    });
+    runs = [];
+  };
+  const flushArc = () => {
+    if (arc && arc.r > 1e-6 && Math.abs(arc.da) > 1e-9) out.push({ t: "arc", c: arc.c, r: arc.r, a0: arc.a0, da: Math.max(-TWO_PI, Math.min(TWO_PI, arc.da)), ...h });
+    arc = null;
+  };
+  /** oblouk proložený body křivek – jen když body na kružnici opravdu leží */
+  const fitted = (pts: Vec2[]) => {
+    const f = fitCircle(pts);
+    if (!f || f.dev > arcTol(f.r)) return null;
+    let da = 0;
+    for (let k = 1; k < pts.length; k++) da += angDiff(angOf(f.c, pts[k - 1]), angOf(f.c, pts[k]));
+    return { c: f.c, r: f.r, a0: angOf(f.c, pts[0]), da };
+  };
+  const flushFit = () => {
+    if (fit) {
+      const a = fitted(fit.pts);
+      // jen oblouk se smysluplným rozsahem (≥ 10° a vzepětí ≥ 0,001 mm) – kratší kousek křivky poloměr spolehlivě neurčí
+      if (a && Math.abs(a.da) >= (10 * Math.PI) / 180 && a.r * (1 - Math.cos(Math.min(Math.PI, Math.abs(a.da)) / 2)) >= 1e-3) {
+        const r3 = Math.round(a.r * 1e3) / 1e3; // šum aproximace obrysu: poloměr na 0,001 mm
+        out.push({ t: "arc", c: [Math.round(a.c[0] * 1e4) / 1e4, Math.round(a.c[1] * 1e4) / 1e4], r: Math.abs(r3 - a.r) < 5e-4 ? r3 : a.r, a0: a.a0, da: Math.max(-TWO_PI, Math.min(TWO_PI, a.da)), ...h });
+      }
+    }
+    fit = null;
+  };
+  const flush = () => {
+    flushRuns();
+    flushArc();
+    flushFit();
+  };
+  const lineTo = (p: Vec2, q: Vec2) => {
+    flushArc();
+    flushFit();
+    const L = dist2(p, q);
+    if (L < 1e-9) return;
+    const dir: Vec2 = [(q[0] - p[0]) / L, (q[1] - p[1]) / L];
+    if (run) {
+      const span = dist2(run.lo, run.hi);
+      const ux = (run.hi[0] - run.lo[0]) / span;
+      const uy = (run.hi[1] - run.lo[1]) / span;
+      const wx = q[0] - run.lo[0];
+      const wy = q[1] - run.lo[1];
+      if (Math.abs(ux * wy - uy * wx) <= lineTol(Math.max(span, Math.hypot(wx, wy)))) {
+        // kolineární pokračování (i zpětný chod)
+        const t = ux * wx + uy * wy;
+        if (t < 0) run.lo = q;
+        else if (t > span) run.hi = q;
+        run.dOut = dir;
+        return;
+      }
+      run.next = true;
+      endRun();
+    }
+    run = { lo: p, hi: q, dIn: dir, dOut: dir, next: false };
+  };
+  const curveTo = (pts: Vec2[]) => {
+    // křivka (Bézier): přímá → úsečka; jinak se zkouší kružnice společná s předchozími křivkami
+    const a = pts[0];
+    const b = pts[pts.length - 1];
+    const L = dist2(a, b);
+    if (L > 1e-9 && pts.every((q) => Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / L <= lineTol(L))) return lineTo(a, b);
+    flushRuns();
+    flushArc();
+    if (fit) {
+      const all = [...fit.pts, ...pts.slice(1)];
+      if (fitted(all)) {
+        fit.pts = all;
+        return;
+      }
+      flushFit();
+    }
+    fit = { pts };
+  };
+
+  let p: Vec2 = [0, 0];
+  let start: Vec2 = [0, 0];
+  let i = 0;
+  let cmd = "";
+  const num = () => Number(tokens[i++]);
+  while (i < tokens.length) {
+    if (/[A-Za-z]/.test(tokens[i])) cmd = tokens[i++].toUpperCase();
+    switch (cmd) {
+      case "M":
+        flush();
+        p = [num(), num()];
+        start = p;
+        cmd = "L";
+        break;
+      case "L": {
+        const q: Vec2 = [num(), num()];
+        lineTo(p, q);
+        p = q;
+        break;
+      }
+      case "H": {
+        const q: Vec2 = [num(), p[1]];
+        lineTo(p, q);
+        p = q;
+        break;
+      }
+      case "V": {
+        const q: Vec2 = [p[0], num()];
+        lineTo(p, q);
+        p = q;
+        break;
+      }
+      case "C": {
+        const c1: Vec2 = [num(), num()];
+        const c2: Vec2 = [num(), num()];
+        const e: Vec2 = [num(), num()];
+        const pts: Vec2[] = [p];
+        for (let k = 1; k <= 6; k++) {
+          const t = k / 6;
+          const u = 1 - t;
+          pts.push([u * u * u * p[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * e[0], u * u * u * p[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * e[1]]);
+        }
+        curveTo(pts);
+        p = e;
+        break;
+      }
+      case "Q": {
+        const c: Vec2 = [num(), num()];
+        const e: Vec2 = [num(), num()];
+        const pts: Vec2[] = [p];
+        for (let k = 1; k <= 6; k++) {
+          const t = k / 6;
+          const u = 1 - t;
+          pts.push([u * u * p[0] + 2 * u * t * c[0] + t * t * e[0], u * u * p[1] + 2 * u * t * c[1] + t * t * e[1]]);
+        }
+        curveTo(pts);
+        p = e;
+        break;
+      }
+      case "A": {
+        const rx = Math.abs(num());
+        const ry = Math.abs(num());
+        const rotDeg = num();
+        const large = num();
+        const sweep = num();
+        const e: Vec2 = [num(), num()];
+        if (rx > 1e-9 && Math.abs(rx - ry) <= 1e-6 * rx && dist2(p, e) > 1e-9) {
+          flushRuns();
+          flushFit();
+          const g = arcGeom(p, e, rx, ry, rotDeg, !!large, !!sweep);
+          const c: Vec2 = [g.cx, g.cy];
+          // navazující oblouk téže kružnice ve stejném smyslu → jeden oblouk (celá kružnice = dva půloblouky)
+          if (arc && Math.abs(arc.r - g.rx) <= 1e-4 && dist2(arc.c, c) <= 1e-3 && Math.sign(arc.da) === Math.sign(g.dt)) arc.da += g.dt;
+          else {
+            flushArc();
+            arc = { c, r: g.rx, a0: angOf(c, p), da: g.dt };
+          }
+        } else flush(); // elipsa (kružnice viděná šikmo) – není hrana ani kružnice
+        p = e;
+        break;
+      }
+      case "Z":
+        lineTo(p, start);
+        p = start;
+        break;
+      default:
+        i++;
+    }
+  }
+  flush();
+  return out;
 }
 
 // ---------------------------------------------------------------- vektory
@@ -292,6 +581,8 @@ type View = {
   key: string;
   cam: Cam;
   polys: Poly[];
+  /** hrany a kružnice pohledu pro výběr při kótování (souřadnice obrazu) */
+  ents: ViewEnt[];
   /** rozsah v souřadnicích obrazu (SVG: y dolů) */
   x0: number;
   y0: number;
@@ -322,6 +613,7 @@ function projectViewRaw(shape: r.Shape3D, key: string, cam: Cam, withHidden: boo
   const camera = new r.ProjectionCamera([0, 0, 0], cam.d, cam.x);
   const p = r.drawProjection(shape, camera);
   const polys: Poly[] = [];
+  const ents: ViewEnt[] = [];
   const collect = (d: r.Drawing, l: Layer) => {
     let paths: string[] = [];
     try {
@@ -329,11 +621,19 @@ function projectViewRaw(shape: r.Shape3D, key: string, cam: Cam, withHidden: boo
     } catch {
       paths = [];
     }
-    for (const path of paths) for (const pts of pathToPolylines(path)) polys.push({ pts, layer: l });
+    for (const path of paths) {
+      for (const pts of pathToPolylines(path)) polys.push({ pts, layer: l });
+      if (layer !== "visible") continue; // izometrie (tenká čára) se nekótuje
+      try {
+        ents.push(...pathToEntities(path, l === "hidden"));
+      } catch {
+        /* rozpoznání hran nesmí výkres shodit – v pohledu jen nepůjde vybrat hranu / kružnici */
+      }
+    }
   };
   collect(p.visible, layer);
   if (withHidden) collect(p.hidden, "hidden");
-  return { key, cam, polys, ...extent(polys.filter((x) => x.layer !== "hidden").length ? polys.filter((x) => x.layer !== "hidden") : polys) };
+  return { key, cam, polys, ents, ...extent(polys.filter((x) => x.layer !== "hidden").length ? polys.filter((x) => x.layer !== "hidden") : polys) };
 }
 
 function extent(polys: Poly[]) {
@@ -783,7 +1083,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
 
   return {
     sheet: { name: sheet, w: SW, h: SH },
-    views: [...placed.values()].map((p) => ({ key: p.key, px: p.px, py: p.py, s: p.s, x0: p.x0, y0: p.y0, w: p.w, h: p.h })),
+    views: [...placed.values()].map((p) => ({ key: p.key, px: p.px, py: p.py, s: p.s, x0: p.x0, y0: p.y0, w: p.w, h: p.h, ents: p.ents })),
     scale: scaleLabel(scale),
     scaleValue: scale,
     polys,
@@ -1687,6 +1987,372 @@ function gdtGlyph(polys: Poly[], c: Vec2, sym: GdtSymbol) {
   }
 }
 
+// ---------------- kóta podle vybrané geometrie (kružnice → Ø / R, hrana → délka, 2 hrany → úhel, 2 body → vzdálenost) ----------------
+
+/** Co leží pod kurzorem při kótování (souřadnice pohledu): bod, hrana, nebo kružnice / oblouk. */
+export type DimPick =
+  | { kind: "point"; p: Vec2 }
+  | { kind: "line"; a: Vec2; b: Vec2 }
+  | { kind: "circle"; c: Vec2; r: number; /** celá kružnice nebo oblouk > 180° (výchozí kóta průměr); kratší oblouk se kótuje poloměrem */ full: boolean };
+/** výběr pro kótu: pohled (`"sheet"` = mm listu) + entita v jeho souřadnicích */
+export type DimSel = { view: string; pick: DimPick };
+export type DimAnn = Extract<DrawingAnnotation, { type: "dim" }>;
+type RadialDim = Extract<DimAnn, { kind: "diameter" | "radius" }>;
+/** kóta průměru / poloměru (typová zábrana – zúžení podle `kind` se dvěma hodnotami TypeScript sám neudělá) */
+export const isRadialDim = (a: DimAnn): a is RadialDim => a.kind === "diameter" || a.kind === "radius";
+type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+/** nová kóta bez identifikátoru */
+export type NewDim = OmitEach<DimAnn, "id">;
+export type DimModes = {
+  /** druh délkové kóty (auto = podle směru) */
+  linear: "auto" | "aligned" | "horizontal" | "vertical";
+  /** kružnice / oblouk: auto = kružnice Ø, oblouk R */
+  circle: "auto" | "diameter" | "radius";
+  /** Shift při kliknutí: průměr ↔ poloměr */
+  invert?: boolean;
+};
+/** stav kóty vůči geometrii pohledu: v pořádku · geometrie v pohledu nenalezena · pohled není na listu */
+export type DimStatus = "ok" | "lost" | "noView";
+
+type ArcEnt = Extract<ViewEnt, { t: "arc" }>;
+const isFull = (e: ArcEnt) => Math.abs(e.da) >= TWO_PI - 1e-9;
+/** poloha úhlu `phi` na oblouku od jeho začátku [rad] (0…2π) */
+const arcPos = (e: ArcEnt, phi: number) => ((((e.da > 0 ? phi - e.a0 : e.a0 - phi) % TWO_PI) + TWO_PI) % TWO_PI);
+const arcPoint = (e: ArcEnt, t: number): Vec2 => [e.c[0] + e.r * Math.cos(e.a0 + e.da * t), e.c[1] + e.r * Math.sin(e.a0 + e.da * t)];
+
+/** Úhlové pokrytí kružnice (střed c, poloměr r) oblouky pohledu [rad] – viditelné i skryté části dohromady. */
+export function arcCoverage(ents: ViewEnt[], c: Vec2, r: number): number {
+  const tol = 1e-3 + 1e-4 * r;
+  const iv: [number, number][] = [];
+  for (const e of ents) {
+    if (e.t !== "arc" || Math.abs(e.r - r) > tol || dist2(e.c, c) > tol) continue;
+    if (isFull(e)) return TWO_PI;
+    const s = ((((e.da > 0 ? e.a0 : e.a0 + e.da) % TWO_PI) + TWO_PI) % TWO_PI);
+    const l = Math.abs(e.da);
+    if (s + l > TWO_PI) iv.push([s, TWO_PI], [0, s + l - TWO_PI]);
+    else iv.push([s, s + l]);
+  }
+  iv.sort((x, y) => x[0] - y[0]);
+  let total = 0;
+  let end = -1;
+  for (const [s, t] of iv) {
+    if (s > end) total += t - s;
+    else if (t > end) total += t - end;
+    end = Math.max(end, t);
+  }
+  return Math.min(TWO_PI, total);
+}
+
+/**
+ * Entita pohledu pod kurzorem `q` (souřadnice pohledu), `tol` = dosah v jednotkách pohledu.
+ * Body (konce hran a oblouků, středy kružnic) mají přednost v okolí konců; uprostřed hrany / na kružnici se vybere hrana / kružnice.
+ * `want`: "point" = jen body (druhý bod kóty), "line" = jen hrany (druhá hrana úhlové kóty).
+ */
+export function pickViewEnt(ents: ViewEnt[], q: Vec2, tol: number, want: "any" | "point" | "line" = "any"): DimPick | null {
+  const curveTol = 0.6 * tol;
+  const best: { p: Vec2 | null; pd: number; c: DimPick | null; cd: number; hidden: boolean; len: number } = { p: null, pd: Infinity, c: null, cd: Infinity, hidden: false, len: 0 };
+  const point = (p: Vec2) => {
+    const d = dist2(p, q);
+    if (d <= tol && d < best.pd) {
+      best.pd = d;
+      best.p = p;
+    }
+  };
+  // při stejné vzdálenosti (hrany ležící na sobě) má přednost viditelná před skrytou a delší před kratší
+  const better = (d: number, hidden: boolean, len: number) => d <= curveTol && (d < best.cd - 1e-9 || (Math.abs(d - best.cd) <= 1e-9 && (best.hidden === hidden ? len > best.len + 1e-9 : !hidden)));
+  const curve = (c: DimPick, d: number, hidden: boolean, len: number) => {
+    best.c = c;
+    best.cd = d;
+    best.hidden = hidden;
+    best.len = len;
+  };
+  for (const e of ents) {
+    if (e.t === "line") {
+      if (want !== "line") {
+        point(e.a);
+        point(e.b);
+      }
+      if (want === "point") continue;
+      const L = dist2(e.a, e.b);
+      if (L < 1e-9) continue;
+      const ux = (e.b[0] - e.a[0]) / L;
+      const uy = (e.b[1] - e.a[1]) / L;
+      const wx = q[0] - e.a[0];
+      const wy = q[1] - e.a[1];
+      const t = ux * wx + uy * wy;
+      const zone = want === "line" ? -curveTol : Math.min(tol, L / 3); // konce hrany patří jejím koncovým bodům
+      if (t < zone || t > L - zone) continue;
+      const d = Math.abs(ux * wy - uy * wx);
+      if (better(d, !!e.hidden, L)) curve({ kind: "line", a: e.a, b: e.b }, d, !!e.hidden, L);
+    } else {
+      const full = isFull(e);
+      if (want !== "line") {
+        point(e.c);
+        if (!full) {
+          point(arcPoint(e, 0));
+          point(arcPoint(e, 1));
+        }
+      }
+      if (want !== "any") continue;
+      const d = Math.abs(dist2(q, e.c) - e.r);
+      const len = e.r * Math.abs(e.da);
+      if (!better(d, !!e.hidden, len)) continue;
+      if (!full) {
+        const pos = arcPos(e, angOf(e.c, q));
+        const zone = Math.min(tol, (e.r * Math.abs(e.da)) / 3) / e.r;
+        if (pos < zone || pos > Math.abs(e.da) - zone) continue;
+      }
+      curve({ kind: "circle", c: e.c, r: e.r, full: arcCoverage(ents, e.c, e.r) > Math.PI + 1e-6 }, d, !!e.hidden, len);
+    }
+  }
+  if (best.p && (!best.c || best.pd * 0.6 <= best.cd)) return { kind: "point", p: best.p };
+  return best.c;
+}
+
+/**
+ * Geometrie úhlové kóty dvou přímek A–B a A2–B2 (souřadnice listu): průsečík X, ramena r1, r2 sektoru, do kterého míří
+ * směr `angDeg` (od průsečíku k místu kóty), počáteční úhel t1, orientovaný rozsah `sweep` [rad] a úhel [°]. Null = rovnoběžné.
+ */
+export function angleGeom(A: Vec2, B: Vec2, A2: Vec2, B2: Vec2, angDeg: number) {
+  const l1 = dist2(A, B);
+  const l2 = dist2(A2, B2);
+  if (l1 < 1e-9 || l2 < 1e-9) return null;
+  const d1: Vec2 = [(B[0] - A[0]) / l1, (B[1] - A[1]) / l1];
+  const d2: Vec2 = [(B2[0] - A2[0]) / l2, (B2[1] - A2[1]) / l2];
+  const cr = d1[0] * d2[1] - d1[1] * d2[0];
+  if (Math.abs(cr) < 1e-6) return null;
+  const t = ((A2[0] - A[0]) * d2[1] - (A2[1] - A[1]) * d2[0]) / cr;
+  const X: Vec2 = [A[0] + d1[0] * t, A[1] + d1[1] * t];
+  const rad = (angDeg * Math.PI) / 180;
+  const p: Vec2 = [Math.cos(rad), Math.sin(rad)];
+  // p = α·d1 + β·d2 → znaménka α, β určují ramena sektoru
+  const al = (p[0] * d2[1] - p[1] * d2[0]) / cr;
+  const be = (d1[0] * p[1] - d1[1] * p[0]) / cr;
+  const r1: Vec2 = al >= 0 ? d1 : [-d1[0], -d1[1]];
+  const r2: Vec2 = be >= 0 ? d2 : [-d2[0], -d2[1]];
+  const t1 = Math.atan2(r1[1], r1[0]);
+  const sweep = angDiff(t1, Math.atan2(r2[1], r2[0]));
+  return { X, r1, r2, t1, sweep, angle: (Math.abs(sweep) * 180) / Math.PI };
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Kóta podle vybrané geometrie a místa `at` (mm listu), kam ji uživatel položil:
+ * kružnice / oblouk → průměr nebo poloměr · hrana → její délka · dvě hrany → úhel (rovnoběžné → vzdálenost) · dva body → délková kóta.
+ * Null = výběr není úplný nebo ho nelze okótovat.
+ */
+export function dimFromPicks(d: Pick<DrawingResult, "views">, sel: DimSel[], at: Vec2, m: DimModes): NewDim | null {
+  const [s1, s2] = sel;
+  if (!s1) return null;
+  const view = s1.view;
+  const S = (q: Vec2) => annToSheet(d.views, view, q);
+  const local = (q: Vec2): Vec2 => {
+    const v = d.views.find((x) => x.key === view);
+    return view === "sheet" || !v ? q : sheetToAnn(v, q);
+  };
+  const linear = (a: Vec2, b: Vec2, edge: boolean): NewDim => {
+    const A = S(a);
+    const B = S(b);
+    const dx = B[0] - A[0];
+    const dy = B[1] - A[1];
+    const l = Math.hypot(dx, dy);
+    let kind: "aligned" | "horizontal" | "vertical";
+    if (m.linear !== "auto") kind = m.linear;
+    else if (edge) kind = Math.abs(dy) <= 1e-6 * l ? "horizontal" : Math.abs(dx) <= 1e-6 * l ? "vertical" : "aligned"; // délka hrany = skutečná délka
+    else kind = Math.abs(dx) > 3 * Math.abs(dy) ? "horizontal" : Math.abs(dy) > 3 * Math.abs(dx) ? "vertical" : "aligned";
+    if (l < 1e-6) kind = "horizontal";
+    const offset = kind === "horizontal" ? at[1] - A[1] : kind === "vertical" ? at[0] - A[0] : -(dy / (l || 1)) * (at[0] - A[0]) + (dx / (l || 1)) * (at[1] - A[1]);
+    return { view, type: "dim", a, b, kind, offset, ...(edge ? { edge: true } : {}) };
+  };
+  const p1 = s1.pick;
+  if (p1.kind === "point") {
+    if (!s2 || s2.pick.kind !== "point") return null;
+    return linear(p1.p, s2.view === view ? s2.pick.p : local(annToSheet(d.views, s2.view, s2.pick.p)), false);
+  }
+  if (p1.kind === "circle") {
+    const v = d.views.find((x) => x.key === view);
+    if (!v) return null;
+    const C = S(p1.c);
+    let ux = at[0] - C[0];
+    let uy = at[1] - C[1];
+    const dd = Math.hypot(ux, uy);
+    if (dd < 1e-6) {
+      ux = 1;
+      uy = -1;
+    }
+    const base = m.circle === "auto" ? (p1.full ? "diameter" : "radius") : m.circle;
+    const kind = m.invert ? (base === "diameter" ? "radius" : "diameter") : base;
+    return { view, type: "dim", kind, c: p1.c, r: p1.r, ang: round2((Math.atan2(uy, ux) * 180) / Math.PI), offset: round2(dd - p1.r * v.s) };
+  }
+  if (!s2 || s2.pick.kind !== "line" || s2.view !== view) return linear(p1.a, p1.b, true);
+  const p2 = s2.pick;
+  const A = S(p1.a);
+  const B = S(p1.b);
+  const A2 = S(p2.a);
+  const B2 = S(p2.b);
+  const g = angleGeom(A, B, A2, B2, 0);
+  if (!g) {
+    // rovnoběžné hrany → vzdálenost: bod první hrany nejblíž místu kóty a jeho pata na druhé hraně
+    const l1 = dist2(A, B);
+    const u: Vec2 = [(B[0] - A[0]) / l1, (B[1] - A[1]) / l1];
+    const t = Math.max(0, Math.min(l1, (at[0] - A[0]) * u[0] + (at[1] - A[1]) * u[1]));
+    const P: Vec2 = [A[0] + u[0] * t, A[1] + u[1] * t];
+    const k = (P[0] - A2[0]) * u[0] + (P[1] - A2[1]) * u[1];
+    const Q: Vec2 = [A2[0] + u[0] * k, A2[1] + u[1] * k];
+    if (dist2(P, Q) < 1e-6) return null; // hrany na téže přímce
+    return linear(local(P), local(Q), false);
+  }
+  const dd = dist2(g.X, at);
+  const ang = dd < 1e-6 ? Math.atan2(g.r1[1] + g.r2[1], g.r1[0] + g.r2[0]) : Math.atan2(at[1] - g.X[1], at[0] - g.X[0]);
+  return { view, type: "dim", kind: "angle", a: p1.a, b: p1.b, a2: p2.a, b2: p2.b, ang: round2((ang * 180) / Math.PI), offset: round2(Math.max(3, dd)) };
+}
+
+/** tolerance shody uložené kóty s geometrií pohledu [mm modelu] */
+const REF_TOL = 0.01;
+
+/** Hrana pohledu odpovídající uložené úsečce a–b: shodné konce, jinak jediná kolineární hrana, která se s ní překrývá (hrana se prodloužila / zkrátila). */
+function resolveLine(ents: ViewEnt[], a: Vec2, b: Vec2): [Vec2, Vec2] | null {
+  const L = dist2(a, b);
+  if (L < 1e-9) return null;
+  const ux = (b[0] - a[0]) / L;
+  const uy = (b[1] - a[1]) / L;
+  const cands: [Vec2, Vec2][] = [];
+  for (const e of ents) {
+    if (e.t !== "line") continue;
+    if ((dist2(e.a, a) <= REF_TOL && dist2(e.b, b) <= REF_TOL) || (dist2(e.a, b) <= REF_TOL && dist2(e.b, a) <= REF_TOL)) return [a, b];
+    const off = (p: Vec2) => Math.abs(ux * (p[1] - a[1]) - uy * (p[0] - a[0]));
+    if (off(e.a) > REF_TOL || off(e.b) > REF_TOL) continue;
+    const t0 = ux * (e.a[0] - a[0]) + uy * (e.a[1] - a[1]);
+    const t1 = ux * (e.b[0] - a[0]) + uy * (e.b[1] - a[1]);
+    if (Math.min(Math.max(t0, t1), L) - Math.max(Math.min(t0, t1), 0) <= REF_TOL) continue; // bez překryvu
+    const c: [Vec2, Vec2] = t0 <= t1 ? [e.a, e.b] : [e.b, e.a]; // zachovat smysl a → b
+    if (!cands.some((x) => dist2(x[0], c[0]) <= REF_TOL && dist2(x[1], c[1]) <= REF_TOL)) cands.push(c);
+  }
+  return cands.length === 1 ? cands[0] : null;
+}
+
+/** Poloměr kružnice pohledu se středem `c`: uložený, jinak jediný jiný poloměr v tomtéž středu (díra změnila průměr). */
+function resolveCircle(ents: ViewEnt[], c: Vec2, r: number): number | null {
+  const radii: number[] = [];
+  for (const e of ents) {
+    if (e.t !== "arc" || dist2(e.c, c) > REF_TOL) continue;
+    if (Math.abs(e.r - r) <= REF_TOL) return r;
+    if (!radii.some((x) => Math.abs(x - e.r) <= REF_TOL)) radii.push(e.r);
+  }
+  return radii.length === 1 ? radii[0] : null;
+}
+
+/**
+ * Dohledá geometrii, na kterou se kóta váže, v aktuálním pohledu. Kóty kružnic, hran a úhlů se drží své geometrie:
+ * změní-li se jednoznačně (jiný průměr v tomtéž středu, delší / kratší hrana na téže přímce), kóta ji následuje;
+ * když geometrie zmizí nebo ji nelze určit jednoznačně, vrátí stav „lost“ (kóta se kreslí podle uložených údajů a v seznamu je označená).
+ * Kóta dvou bodů se váže jen na souřadnice pohledu (jako dosud). Chybí-li pohled na listu, stav je „noView“.
+ */
+export function resolveDim(views: PlacedView[], a: DimAnn): { a: DimAnn; status: DimStatus } {
+  if (a.view === "sheet") return { a, status: "ok" };
+  const v = views.find((x) => x.key === a.view);
+  if (!v) return { a, status: "noView" };
+  if (!v.ents) return { a, status: "ok" };
+  if (isRadialDim(a)) {
+    const r = resolveCircle(v.ents, a.c, a.r);
+    return r == null ? { a, status: "lost" } : { a: r === a.r ? a : { ...a, r }, status: "ok" };
+  }
+  if (a.kind === "angle") {
+    const l1 = resolveLine(v.ents, a.a, a.b);
+    const l2 = resolveLine(v.ents, a.a2, a.b2);
+    return l1 && l2 ? { a: { ...a, a: l1[0], b: l1[1], a2: l2[0], b2: l2[1] }, status: "ok" } : { a, status: "lost" };
+  }
+  if (a.edge) {
+    const l = resolveLine(v.ents, a.a, a.b);
+    return l ? { a: { ...a, a: l[0], b: l[1] }, status: "ok" } : { a, status: "lost" };
+  }
+  return { a, status: "ok" };
+}
+
+/** Stav poznámek a kót vůči aktuálnímu výkresu (klíč = id): chybějící pohled, ztracená geometrie kóty. */
+export function annotationStatus(d: Pick<DrawingResult, "views">, annotations: DrawingAnnotation[]): Record<string, DimStatus> {
+  const out: Record<string, DimStatus> = {};
+  for (const a of annotations) out[a.id] = a.type === "dim" ? resolveDim(d.views, a).status : a.view === "sheet" || d.views.some((v) => v.key === a.view) ? "ok" : "noView";
+  return out;
+}
+
+/** Popisek kóty (hodnota s předponou Ø / R, úhel se °, přípona) – `value` v mm modelu nebo stupních. */
+export function dimLabel(a: Pick<DimAnn, "kind" | "prefix" | "suffix" | "text">, value: number): string {
+  if (a.text != null) return a.text;
+  const sym = a.kind === "diameter" ? "Ø" : a.kind === "radius" ? "R" : "";
+  return `${a.prefix ?? ""}${sym}${fmtVal(value)}${a.kind === "angle" ? "°" : ""}${a.suffix ?? ""}`;
+}
+
+/** Kóta průměru / poloměru: odkazová čára ve směru `ang` se šipkou na kružnici a vodorovnou policí s textem (uvnitř kružnice kótovací čára přes průměr / ze středu). */
+function radialDim(polys: Poly[], texts: DText[], views: PlacedView[], a: RadialDim) {
+  const v = views.find((x) => x.key === a.view);
+  if (!v) return;
+  const C = annToSheet(views, a.view, a.c);
+  const R = a.r * v.s;
+  const rad = (a.ang * Math.PI) / 180;
+  const u: Vec2 = [Math.cos(rad), Math.sin(rad)];
+  const E: Vec2 = [C[0] + u[0] * R, C[1] + u[1] * R];
+  const K: Vec2 = [C[0] + u[0] * (R + a.offset), C[1] + u[1] * (R + a.offset)];
+  const label = dimLabel(a, a.kind === "diameter" ? 2 * a.r : a.r);
+  const tw = label.length * 2.05 + 2;
+  const right = u[0] >= 0;
+  const shelf: Vec2 = [K[0] + (right ? tw : -tw), K[1]];
+  if (a.offset >= 0) {
+    polys.push({ layer: "dim", pts: [E, K, shelf] });
+    arrowAt(polys, E, [-u[0], -u[1]]);
+  } else {
+    // text uvnitř: průměr = čára přes celou kružnici se dvěma šipkami, poloměr = čára ze středu
+    const E2: Vec2 = [C[0] - u[0] * R, C[1] - u[1] * R];
+    polys.push({ layer: "dim", pts: [a.kind === "diameter" ? E2 : C, E] }, { layer: "dim", pts: [K, shelf] });
+    arrowAt(polys, E, u);
+    if (a.kind === "diameter") arrowAt(polys, E2, [-u[0], -u[1]]);
+  }
+  texts.push({ x: K[0] + (right ? 1 : -1), y: K[1] - 1, s: label, size: 3.5, anchor: right ? "start" : "end", layer: "dim" });
+}
+
+/** Úhlová kóta: oblouk se středem v průsečíku hran, šipky tečně k oblouku, vynášecí čáry tam, kde oblouk leží mimo hranu. */
+function angularDim(polys: Poly[], texts: DText[], views: PlacedView[], a: Extract<DimAnn, { kind: "angle" }>) {
+  const S = (q: Vec2) => annToSheet(views, a.view, q);
+  const lines: [Vec2, Vec2][] = [
+    [S(a.a), S(a.b)],
+    [S(a.a2), S(a.b2)],
+  ];
+  const g = angleGeom(lines[0][0], lines[0][1], lines[1][0], lines[1][1], a.ang);
+  if (!g) return;
+  const R = Math.max(1, a.offset);
+  const X = g.X;
+  const n = Math.max(2, Math.ceil(g.angle / 5));
+  const pts: Vec2[] = [];
+  for (let k = 0; k <= n; k++) {
+    const t = g.t1 + (g.sweep * k) / n;
+    pts.push([X[0] + R * Math.cos(t), X[1] + R * Math.sin(t)]);
+  }
+  polys.push({ layer: "dim", pts });
+  [g.r1, g.r2].forEach((r, i) => {
+    const ts = lines[i].map((p) => (p[0] - X[0]) * r[0] + (p[1] - X[1]) * r[1]);
+    const lo = Math.min(ts[0], ts[1]);
+    const hi = Math.max(ts[0], ts[1]);
+    const seg = (t0: number, t1: number) => {
+      if (t1 - t0 > 0.1) polys.push({ layer: "dim", pts: [[X[0] + r[0] * t0, X[1] + r[1] * t0], [X[0] + r[0] * t1, X[1] + r[1] * t1]] });
+    };
+    if (R > hi + 1e-6) seg(hi + 1, R + 1.5);
+    else if (R < lo - 1e-6) seg(R - 1.5, lo - 1);
+  });
+  const sg = Math.sign(g.sweep) || 1;
+  const tan = (t: number): Vec2 => [-Math.sin(t) * sg, Math.cos(t) * sg]; // tečna ve smyslu oblouku
+  const inside = R * Math.abs(g.sweep) > 8;
+  const t2 = g.t1 + g.sweep;
+  const d1 = tan(g.t1);
+  const d2 = tan(t2);
+  arrowAt(polys, pts[0], inside ? [-d1[0], -d1[1]] : d1);
+  arrowAt(polys, pts[n], inside ? d2 : [-d2[0], -d2[1]]);
+  const mid = g.t1 + g.sweep / 2;
+  const mx = Math.cos(mid);
+  const my = Math.sin(mid);
+  texts.push({ x: X[0] + mx * (R + 2), y: X[1] + my * (R + 2.6) + 1.2, s: dimLabel(a, g.angle), size: 3.5, anchor: mx > 0.5 ? "start" : mx < -0.5 ? "end" : "middle", layer: "dim" });
+}
+
 /** Geometrie (čáry + texty v mm listu) pro uživatelské poznámky a kóty. */
 export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue">, annotations: DrawingAnnotation[]): { polys: Poly[]; texts: DText[] } {
   const polys: Poly[] = [];
@@ -1701,23 +2367,35 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
   for (const a of annotations) {
     switch (a.type) {
       case "dim": {
-        const A = S(a.view, a.a);
-        const B = S(a.view, a.b);
+        // kóta hrany / kružnice / úhlu se dohledá v geometrii aktuálního pohledu; kóta pohledu, který na listu není, se nekreslí
+        const rs = resolveDim(d.views, a);
+        if (rs.status === "noView") break;
+        const dm = rs.a;
+        if (isRadialDim(dm)) {
+          radialDim(polys, texts, d.views, dm);
+          break;
+        }
+        if (dm.kind === "angle") {
+          angularDim(polys, texts, d.views, dm);
+          break;
+        }
+        const A = S(dm.view, dm.a);
+        const B = S(dm.view, dm.b);
         let A2: Vec2;
         let B2: Vec2;
         let value: number;
         let u: Vec2;
-        if (a.kind === "horizontal") {
-          const y = A[1] + a.offset;
+        if (dm.kind === "horizontal") {
+          const y = A[1] + dm.offset;
           A2 = [A[0], y];
           B2 = [B[0], y];
-          value = Math.abs(modelLen(a.view, [a.a[0], 0], [a.b[0], 0]));
+          value = Math.abs(modelLen(dm.view, [dm.a[0], 0], [dm.b[0], 0]));
           u = [Math.sign(B[0] - A[0]) || 1, 0];
-        } else if (a.kind === "vertical") {
-          const x = A[0] + a.offset;
+        } else if (dm.kind === "vertical") {
+          const x = A[0] + dm.offset;
           A2 = [x, A[1]];
           B2 = [x, B[1]];
-          value = Math.abs(modelLen(a.view, [0, a.a[1]], [0, a.b[1]]));
+          value = Math.abs(modelLen(dm.view, [0, dm.a[1]], [0, dm.b[1]]));
           u = [0, Math.sign(B[1] - A[1]) || 1];
         } else {
           const dx = B[0] - A[0];
@@ -1725,9 +2403,9 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
           const l = Math.hypot(dx, dy) || 1;
           u = [dx / l, dy / l];
           const n: Vec2 = [-u[1], u[0]];
-          A2 = [A[0] + n[0] * a.offset, A[1] + n[1] * a.offset];
-          B2 = [B[0] + n[0] * a.offset, B[1] + n[1] * a.offset];
-          value = modelLen(a.view, a.a, a.b);
+          A2 = [A[0] + n[0] * dm.offset, A[1] + n[1] * dm.offset];
+          B2 = [B[0] + n[0] * dm.offset, B[1] + n[1] * dm.offset];
+          value = modelLen(dm.view, dm.a, dm.b);
         }
         // vynášecí čáry (s přesahem 1,5 mm) a kótovací čára
         const ext = (P: Vec2, P2: Vec2) => {
@@ -1743,7 +2421,7 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
         const inside = span > 8;
         arrowAt(polys, A2, inside ? [-u[0], -u[1]] : [u[0], u[1]]);
         arrowAt(polys, B2, inside ? [u[0], u[1]] : [-u[0], -u[1]]);
-        const label = a.text ?? `${a.prefix ?? ""}${fmtVal(value)}${a.suffix ?? ""}`;
+        const label = dimLabel(dm, value);
         let ang = (Math.atan2(u[1], u[0]) * 180) / Math.PI;
         if (ang > 90 || ang <= -90) ang += 180;
         const rad = (ang * Math.PI) / 180;

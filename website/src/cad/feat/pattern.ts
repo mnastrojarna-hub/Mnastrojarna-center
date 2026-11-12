@@ -8,6 +8,7 @@
  * Zdrojem je nástrojové těleso dřívějšího prvku (`ctx.tools`), lze jich opakovat více naráz (`featureIds`).
  * Referenční bod zdroje (po křivce / podle skici / výplň) = střed obalového kvádru nástroje.
  */
+import { cutAll, fuseAll } from "../fastbool";
 import { tr } from "../i18n";
 import * as r from "replicad";
 import { applyMode, axisPlane, needSketch, sketchPathWire } from "../build";
@@ -347,7 +348,23 @@ function applyInstances(body: Shape, tools: Tool[], inst: Inst[], geometryOnly: 
     }
     return acc;
   }
-  for (const { xf } of inst) for (const { tool, mode } of tools) acc = applyMode(acc, xf(tool.clone()), mode);
+  // Všechny kopie nástroje se odeberou / přidají JEDNOU booleovskou operací se seznamem nástrojů (dřív N operací nad celým
+  // tělesem – u 36 drážek na tělese se stovkami ploch minuty). Výsledek má stejné plochy i hrany jako postupné operace.
+  // Průnik zůstává po jedné kopii (průnik se všemi naráz by byl průnikem všech kopií).
+  for (const { tool, mode } of tools) {
+    if (!inst.length) continue;
+    const copies = inst.map(({ xf }) => xf(tool.clone()));
+    if (mode === "intersect") {
+      for (const c of copies) acc = applyMode(acc, c, mode);
+      continue;
+    }
+    try {
+      acc = mode === "cut" ? cutAll(acc, copies) : fuseAll(acc, copies);
+    } catch {
+      // jádro seznam nástrojů nezvládlo → postupně po jedné kopii (pomalejší, stejný výsledek)
+      for (const c of copies) acc = applyMode(acc, c, mode);
+    }
+  }
   return acc;
 }
 

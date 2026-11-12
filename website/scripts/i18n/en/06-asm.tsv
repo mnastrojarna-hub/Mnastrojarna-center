@@ -1,0 +1,49 @@
+# Sestava: panel vazeb (výběr ploch ze seznamu, potvrzení hodnoty po výběru, vazba Ukotvit), úprava vazby v seznamu, směr pole komponenty
+
+# výzvy stavového řádku a hlášky
+Směr pole: klikněte na rovinnou plochu (normála) nebo válcovou plochu (osa) kterékoli komponenty · Esc zruší	Pattern direction: click a planar face (normal) or a cylindrical face (axis) of any component · Esc cancels
+Vazba: potvrďte hodnotu v panelu komponenty (Enter) · Esc zruší	Mate: confirm the value in the component panel (Enter) · Esc cancels
+Směr lze převzít jen z rovinné nebo válcové plochy.	The direction can only be taken from a planar or cylindrical face.
+
+# seznam ploch komponenty
+Načítám plochy komponenty…	Loading the component faces…
+Komponenta nemá žádnou rovinnou plochu.	The component has no planar face.
+Komponenta nemá žádnou válcovou ani kuželovou plochu.	The component has no cylindrical or conical face.
+Hledat plochu	Search faces
+Hledat plochu (např. +Z, Ø8, 120)…	Search faces (e.g. +Z, Ø8, 120)…
+{0} z {1} ploch	{0} of {1} faces
+ · upřesněte hledáním	 · refine by searching
+ · načteno prvních {0} ploch dílu, další vyberte kliknutím v modelu	 · the first {0} faces of the part are loaded, pick others by clicking in the model
+normála {0}	normal {0}
+osa {0}	axis {0}
+střed osy {0}	axis centre {0}
+délka {0} mm	length {0} mm
+Změnit	Change
+
+# panel rozpracované vazby
+1 · Plocha této komponenty	1 · Face of this component
+2 · Cílová komponenta a její plocha	2 · Target component and its face
+3 · Vzdálenost ploch	3 · Distance between the faces
+3 · Úhel mezi plochami	3 · Angle between the faces
+Cílová komponenta	Target component
+V sestavě není žádná další komponenta – vazba potřebuje dvě.	The assembly has no other component – a mate needs two.
+naměřeno	measured
+Předvyplněna je aktuálně naměřená hodnota – s ní komponenty zůstanou, kde jsou. Přepište ji a potvrďte (Enter).	The currently measured value is prefilled – with it the components stay where they are. Overwrite it and confirm (Enter).
+Vytvořit vazbu	Create mate
+Plochy lze místo klikání vybrat ze seznamů výše; hodnotu potvrdíte až po výběru obou ploch.	Instead of clicking, the faces can be picked from the lists above; the value is confirmed after both faces are chosen.
+Plochy lze místo klikání vybrat ze seznamů výše.	Instead of clicking, the faces can be picked from the lists above.
+Plochy lze vybrat i ze seznamu v tomto panelu; hotovou vazbu upravíte v seznamu Vazby pod stromem komponent.	Faces can also be picked from a list in this panel; an existing mate is edited in the Mates list below the component tree.
+
+# vazba Ukotvit
+Ukotví komponentu na místě: vazba Ukotvit se zapíše do seznamu vazeb, ostatní vazby pak hýbou druhou komponentou	Fixes the component in place: a Fix mate is added to the mates list, other mates then move the other component
+Komponenta má vazbu Ukotvit – kliknutím ji odeberete a komponentu uvolníte (totéž smazáním vazby v seznamu vazeb)	The component has a Fix mate – click to remove it and release the component (same as deleting the mate in the mates list)
+
+# seznam vazeb pod stromem komponent
+{0} konflikt	{0} in conflict
+Hodnotu vazby lze přepsat (číslo i výraz, např. 25/2) – Enter potvrdí a sestava se přepočítá	The mate value can be overwritten (a number or an expression, e.g. 25/2) – Enter confirms and the assembly is recomputed
+
+# směr pole komponenty
+Směr podél globální osy {0}	Direction along the global {0} axis
+Směr z plochy v modelu…	Direction from a face in the model…
+Klikněte na plochu v modelu…	Click a face in the model…
+Rovinná plocha dá směr své normály, válcová směr své osy (plocha kterékoli komponenty).	A planar face gives the direction of its normal, a cylindrical face the direction of its axis (a face of any component).

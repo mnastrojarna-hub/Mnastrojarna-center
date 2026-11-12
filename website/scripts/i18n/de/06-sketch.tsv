@@ -1,0 +1,9 @@
+# Skizze: einstellbare Tastenkürzel der Skizzenwerkzeuge (Einstellungen → Tastenkürzel → Gruppe „Skizze“)
+
+# nadpisy a vysvětlení skupin zkratek
+3D model	3D-Modell
+Platí v prostoru dílu a sestavy.	Gilt im Arbeitsbereich von Teil und Baugruppe.
+Platí při otevřené skice – stejnou klávesu lze použít zároveň ve 3D.	Gilt bei geöffneter Skizze – dieselbe Taste kann zugleich in 3D verwendet werden.
+
+#!dynamic – popisky příkazů zkratek se překládají za běhu (tr(SHORTCUT_LABELS[id])), v kódu jako literál tr("…") nejsou
+Vazba vodorovně (vybrané entity)	Beziehung Horizontal (gewählte Elemente)

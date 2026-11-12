@@ -3,7 +3,7 @@
 import { setLang, tr, type CadLang } from "./i18n";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
-import { buildDoc, faceInfo } from "./build";
+import { buildDoc, faceInfo, type BuildProgress } from "./build";
 import { drawingDoc } from "./drawing-doc";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
@@ -58,6 +58,9 @@ function refCtx(doc: CadDoc) {
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
+/** průběh stavby do UI: právě počítaný prvek (zpráva bez `ok` – odpověď na požadavek přijde až po dokončení) */
+const progressTo = (id: number) => (p: BuildProgress) => ctx.postMessage({ id, progress: p });
+
 ctx.onmessage = async (e: MessageEvent<Req>) => {
   const m = e.data;
   try {
@@ -71,7 +74,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         ctx.postMessage({ id: m.id, ok: true });
         break;
       case "build": {
-        const res = await buildDoc(m.doc);
+        const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
         body?.delete?.();
         body = res.body;
         const { body: _b, ...plain } = res;
@@ -143,7 +146,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       }
       case "topology": {
         // sestavení + inspekce všech ploch a hran v jednom kroku: mezi sestavením a inspekcí nemůže přijít jiné sestavení (jiná záložka)
-        const res = await buildDoc(m.doc);
+        const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
         const sh = res.body;
         if (!sh || !res.metrics) {
           ctx.postMessage({ id: m.id, ok: true, result: null });
@@ -169,7 +172,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         }
         body?.delete?.();
         body = sh;
-        ctx.postMessage({ id: m.id, ok: true, result: { faces, edges, bbox: res.metrics.bbox, metrics: res.metrics } });
+        ctx.postMessage({ id: m.id, ok: true, result: { faces, edges, bbox: res.metrics.bbox, metrics: res.metrics, bodies: res.bodies } });
         break;
       }
       case "inspect": {

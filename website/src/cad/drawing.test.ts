@@ -200,3 +200,271 @@ describe("tabulka děr, pozice, detail, revize, listy", () => {
     expect(d.svg).toContain("List 2/3");
   });
 });
+
+describe("kóty podle vybrané geometrie (kružnice Ø / R, hrana, úhel)", async () => {
+  const { pathToEntities, fitCircle, pickViewEnt, arcCoverage, dimFromPicks, angleGeom, resolveDim, annotationStatus, annotationGeometry, withAnnotations } = await import("./drawing");
+  type Ent = ReturnType<typeof pathToEntities>[number];
+  type Ann = Parameters<typeof annotationGeometry>[1][number];
+  const V2 = (x: number, y: number): [number, number] => [x, y];
+  const lines = (e: Ent[]) => e.filter((x) => x.t === "line") as Extract<Ent, { t: "line" }>[];
+  const arcs = (e: Ent[]) => e.filter((x) => x.t === "arc") as Extract<Ent, { t: "arc" }>[];
+  const deg = (rad: number) => (rad * 180) / Math.PI;
+
+  // skutečné cesty z projekce (HLR): deska 100×60 s dírou Ø12 se zahloubením Ø18, zaoblené rohy R8
+  const TOP = [
+    "M 0 -8 L 0 -52 A 8 8 0 0 1 8 -60 L 92 -60 A 8 8 0 0 1 100 -52 L 100 -8 A 8 8 0 0 1 92 0 L 8 0 A 8 8 0 0 1 0 -8 Z",
+    "M 39 -30 A 9 9 0 0 0 21 -30 A 9 9 0 0 0 39 -30 Z",
+    "M 36 -30 A 6 6 0 0 0 24 -30 A 6 6 0 0 0 36 -30 Z",
+  ];
+  const topEnts = TOP.flatMap((p) => pathToEntities(p));
+
+  it("cesta pohledu → hrany, oblouky a celé kružnice s přesným středem a poloměrem", () => {
+    expect(lines(topEnts)).toHaveLength(4);
+    const a = arcs(topEnts);
+    expect(a.filter((x) => Math.abs(Math.abs(x.da) - 2 * Math.PI) < 1e-9).map((x) => [x.c[0], x.c[1], x.r])).toEqual([[30, -30, 9], [30, -30, 6]]);
+    const fillets = a.filter((x) => Math.abs(x.r - 8) < 1e-9);
+    expect(fillets).toHaveLength(4);
+    for (const f of fillets) expect(Math.abs(deg(f.da))).toBeCloseTo(90, 6);
+    expect(fillets.map((f) => f.c.map((v) => Math.round(v * 1e6) / 1e6))).toContainEqual([8, -52]);
+    const top = lines(topEnts).find((l) => l.a[1] === -60 && l.b[1] === -60)!;
+    expect(Math.abs(top.b[0] - top.a[0])).toBe(84);
+  });
+
+  it("kružnice viděná z boku (řada krátkých kroků tam a zpět) je jedna hrana; navazující kolineární kroky se spojí", () => {
+    // spodní hrana čelního pohledu: zaoblení z boku (0→8), rovná část (8→92), zaoblení (92→100)
+    const e = pathToEntities("M 0 0 L 0.0503 0 L 0.20058 0 L 0.79225 0 L 3.01208 0 L 8 0 L 92 0 L 96.98792 0 L 99.79942 0 L 100 0", true);
+    expect(e).toEqual([{ t: "line", a: [0, 0], b: [100, 0], hidden: true }]);
+    // díra z boku: 36 → 24 → 36
+    const h = pathToEntities("M 36 0 L 35.84957 0 L 33.74094 0 L 30 0 L 26.25906 0 L 24.15043 0 L 24 0 L 24.15043 0 L 30 0 L 35.84957 0 L 36 0");
+    expect(h).toHaveLength(1);
+    expect(h[0]).toMatchObject({ t: "line", a: [36, 0], b: [24, 0] });
+    // lomená čára se dvěma hranami a rohem
+    const c = pathToEntities("M 0 0 L 0 -17 L 3 -20");
+    expect(lines(c).map((l) => [l.a, l.b])).toEqual([[[0, 0], [0, -17]], [[0, -17], [3, -20]]]);
+  });
+
+  it("obrys zaoblení z Bézierových křivek se proloží kružnicí; elipsa a lomená náhrada křivky nejsou hrana ani kružnice", () => {
+    // čtvrtkružnice R5 se středem (−15, −25) jako tři kubiky (obrys anuloidu z projekce)
+    const seg = (a0: number, a1: number) => {
+      const R = 5;
+      const cx = -15;
+      const cy = -25;
+      const t = (4 / 3) * Math.tan((a1 - a0) / 4) * R; // délka tečny řídicích bodů
+      const p0 = [cx + R * Math.cos(a0), cy + R * Math.sin(a0)];
+      const p3 = [cx + R * Math.cos(a1), cy + R * Math.sin(a1)];
+      const c1 = [p0[0] - t * Math.sin(a0), p0[1] + t * Math.cos(a0)];
+      const c2 = [p3[0] + t * Math.sin(a1), p3[1] - t * Math.cos(a1)];
+      const f = (v: number[]) => v.map((x) => x.toFixed(5)).join(" ");
+      return { p0, d: `C ${f(c1)} ${f(c2)} ${f(p3)}` };
+    };
+    const s = [seg(Math.PI, (7 * Math.PI) / 6), seg((7 * Math.PI) / 6, (4 * Math.PI) / 3), seg((4 * Math.PI) / 3, (3 * Math.PI) / 2)];
+    const e = pathToEntities(`M -20 0 L -20 -25 ${s.map((x) => x.d).join(" ")}`);
+    expect(lines(e)).toHaveLength(1);
+    const a = arcs(e);
+    expect(a).toHaveLength(1);
+    expect(a[0].r).toBe(5);
+    expect(a[0].c[0]).toBeCloseTo(-15, 3);
+    expect(a[0].c[1]).toBeCloseTo(-25, 3);
+    expect(Math.abs(deg(a[0].da))).toBeCloseTo(90, 2);
+    // elipsa (kružnice viděná šikmo)
+    expect(pathToEntities("M 10 0 A 10 4 0 0 0 -10 0 A 10 4 0 0 0 10 0 Z")).toEqual([]);
+    // lomená náhrada křivky (parabola po 15 bodech) – žádné „hrany“ o délce kroku
+    const para = Array.from({ length: 15 }, (_, i) => `${i === 0 ? "M" : "L"} ${i * 2} ${(-(i * 2) * (i * 2)) / 40}`).join(" ");
+    expect(pathToEntities(para)).toEqual([]);
+    // dlouhá hrana tečně navazující na takovou křivku zůstane
+    const withEdge = pathToEntities("M -50 0 " + Array.from({ length: 15 }, (_, i) => `L ${i * 2} ${(-(i * 2) * (i * 2)) / 40}`).join(" "));
+    expect(withEdge).toEqual([{ t: "line", a: [-50, 0], b: [0, 0] }]);
+    // … i když leží uprostřed mezi dvěma takovými křivkami
+    const step = (x0: number, dir: 1 | -1) => Array.from({ length: 6 }, (_, i) => `L ${x0 + dir * (i + 1) * 2} ${(-((i + 1) * 2) * ((i + 1) * 2)) / 40}`);
+    const mid = pathToEntities(`M -62 -3.6 ${step(-50, -1).reverse().slice(1).join(" ")} L -50 0 L 0 0 ${step(0, 1).join(" ")}`);
+    expect(mid).toEqual([{ t: "line", a: [-50, 0], b: [0, 0] }]);
+    expect(fitCircle([[1, 0], [0, 1], [-1, 0], [0, -1]])).toMatchObject({ c: [0, 0], r: 1 });
+    expect(fitCircle([[0, 0], [1, 1], [2, 2]])).toBeNull();
+  });
+
+  it("výběr pod kurzorem: kružnice na obvodu, střed uprostřed, hrana uprostřed, bod u konce; viditelná hrana má přednost", () => {
+    expect(pickViewEnt(topEnts, [36.3, -30.2], 2)).toEqual({ kind: "circle", c: [30, -30], r: 6, full: true });
+    expect(pickViewEnt(topEnts, [39, -30.5], 2)).toMatchObject({ kind: "circle", r: 9, full: true });
+    expect(pickViewEnt(topEnts, [30.4, -30.2], 2)).toEqual({ kind: "point", p: [30, -30] });
+    expect(pickViewEnt(topEnts, [50, -60.5], 2)).toMatchObject({ kind: "line", a: [8, -60], b: [92, -60] });
+    expect(pickViewEnt(topEnts, [9, -60.3], 2)).toEqual({ kind: "point", p: [8, -60] });
+    // zaoblení rohu: oblouk 90° → výchozí poloměr (full = false)
+    const q = V2(8 - 8 * Math.SQRT1_2, -52 - 8 * Math.SQRT1_2);
+    expect(pickViewEnt(topEnts, q, 2)).toMatchObject({ kind: "circle", r: 8, full: false });
+    expect(pickViewEnt(topEnts, [60, -20], 2)).toBeNull();
+    // jen body / jen hrany
+    expect(pickViewEnt(topEnts, [36.3, -30.2], 2, "point")).toBeNull();
+    expect(pickViewEnt(topEnts, [10, -60.2], 2, "line")).toMatchObject({ kind: "line", a: [8, -60] });
+    // hrany ležící na sobě: viditelná má přednost před skrytou, delší před kratší; malá kružnice (r pod dosahem) jde stále vybrat na obvodu
+    const dup: Ent[] = [{ t: "line", a: [0, 0], b: [30, 0], hidden: true }, { t: "line", a: [2, 0], b: [8, 0] }, { t: "line", a: [0, 0], b: [20, 0] }];
+    expect(pickViewEnt(dup, [5, 0.1], 1)).toEqual({ kind: "line", a: [0, 0], b: [20, 0] });
+    const small: Ent[] = [{ t: "arc", c: [0, 0], r: 1, a0: 0, da: 2 * Math.PI }];
+    expect(pickViewEnt(small, [1, 0], 2)).toMatchObject({ kind: "circle", r: 1 });
+    expect(pickViewEnt(small, [0.1, 0], 2)).toEqual({ kind: "point", p: [0, 0] });
+  });
+
+  it("pokrytí kružnice oblouky: viditelná a skrytá část téže kružnice dohromady", () => {
+    const half: Ent[] = [
+      { t: "arc", c: [0, 0], r: 5, a0: 0, da: Math.PI * 1.1 },
+      { t: "arc", c: [0, 0], r: 5, a0: Math.PI * 1.1, da: Math.PI * 0.9, hidden: true },
+      { t: "arc", c: [20, 0], r: 5, a0: -0.5, da: 1 },
+      { t: "arc", c: [20, 0], r: 5, a0: 0.2, da: 1, hidden: true },
+    ];
+    expect(arcCoverage(half, [0, 0], 5)).toBeCloseTo(2 * Math.PI, 9);
+    expect(arcCoverage(half, [20, 0], 5)).toBeCloseTo(1.7, 9); // překryv se nepočítá dvakrát, oblouk přes 0° se rozdělí
+    expect(pickViewEnt(half, [5 * Math.cos(1), 5 * Math.sin(1)], 1)).toMatchObject({ kind: "circle", full: true });
+  });
+
+  // pohled „top“ v měřítku 1:2 umístěný na listu; souřadnice pohledu = mm modelu
+  const views = [{ key: "top", px: 40, py: 40, s: 0.5, x0: 0, y0: -60, w: 100, h: 60, ents: topEnts }];
+  const D = { views, scaleValue: 0.5 };
+  const modes = { linear: "auto" as const, circle: "auto" as const };
+  const withId = <T extends object>(a: T | null, id = "x") => ({ ...(a as T), id }) as unknown as Ann;
+
+  it("kružnice → průměr Ø (Shift / přepínač → poloměr R), oblouk → R; text, odkaz se šipkou a přípona", () => {
+    const circle = { view: "top", pick: { kind: "circle" as const, c: V2(30, -30), r: 6, full: true } };
+    // střed na listu = [55, 55], poloměr 3 mm; místo kóty 10 mm vpravo nahoru od středu
+    const dia = dimFromPicks(D, [circle], [55 + 8, 55 - 6], modes)!;
+    expect(dia).toMatchObject({ type: "dim", kind: "diameter", view: "top", c: [30, -30], r: 6, offset: 7 });
+    expect(dia.kind === "diameter" && dia.ang).toBeCloseTo(-36.87, 2);
+    expect(dimFromPicks(D, [circle], [70, 55], { ...modes, invert: true })).toMatchObject({ kind: "radius", r: 6, ang: 0, offset: 12 });
+    expect(dimFromPicks(D, [circle], [70, 55], { ...modes, circle: "radius" })).toMatchObject({ kind: "radius" });
+    const arc = { view: "top", pick: { kind: "circle" as const, c: V2(8, -52), r: 8, full: false } };
+    expect(dimFromPicks(D, [arc], [30, 30], modes)).toMatchObject({ kind: "radius", r: 8 });
+    expect(dimFromPicks(D, [arc], [30, 30], { ...modes, invert: true })).toMatchObject({ kind: "diameter" });
+
+    const g = annotationGeometry(D, [withId({ ...dia, suffix: "H7" })]);
+    expect(g.texts.map((t) => t.s)).toEqual(["Ø12H7"]);
+    expect(g.polys.filter((p) => p.fill)).toHaveLength(1); // šipka na kružnici
+    const leader = g.polys.find((p) => !p.fill)!;
+    expect(Math.hypot(leader.pts[0][0] - 55, leader.pts[0][1] - 55)).toBeCloseTo(3, 6); // začíná na kružnici (r = 6 · 0,5)
+    expect(Math.hypot(leader.pts[1][0] - 55, leader.pts[1][1] - 55)).toBeCloseTo(10, 6); // zlom v místě kóty
+    expect(leader.pts[2][1]).toBe(leader.pts[1][1]); // vodorovná police
+    const rad = annotationGeometry(D, [withId(dimFromPicks(D, [circle], [70, 55], { ...modes, invert: true }))]);
+    expect(rad.texts[0].s).toBe("R6");
+    // text uvnitř kružnice: průměr = čára přes celou kružnici se dvěma šipkami
+    const inner = annotationGeometry(D, [withId(dimFromPicks(D, [circle], [56, 55], modes))]);
+    expect(inner.polys.filter((p) => p.fill)).toHaveLength(2);
+  });
+
+  it("hrana jedním kliknutím → délka (konce z geometrie); dva body → délková kóta jako dosud", () => {
+    const edge = { view: "top", pick: { kind: "line" as const, a: V2(8, -60), b: V2(92, -60) } };
+    const dm = dimFromPicks(D, [edge], [60, 30], modes)!;
+    expect(dm).toMatchObject({ type: "dim", kind: "horizontal", a: [8, -60], b: [92, -60], edge: true, offset: -10 });
+    expect(annotationGeometry(D, [withId(dm)]).texts[0].s).toBe("84");
+    // šikmá hrana → skutečná délka (šikmá kóta), ne průmět
+    const slant = { view: "top", pick: { kind: "line" as const, a: V2(0, 0), b: V2(40, -30) } };
+    const sd = dimFromPicks(D, [slant], [0, 0], modes)!;
+    expect(sd).toMatchObject({ kind: "aligned", edge: true });
+    expect(annotationGeometry({ views: [{ ...views[0], ents: undefined }], scaleValue: 0.5 }, [withId(sd)]).texts[0].s).toBe("50");
+    expect(dimFromPicks(D, [slant], [0, 0], { ...modes, linear: "horizontal" })).toMatchObject({ kind: "horizontal" });
+    // dva body
+    const p = (x: number, y: number) => ({ view: "top", pick: { kind: "point" as const, p: V2(x, y) } });
+    expect(dimFromPicks(D, [p(0, -8)], [0, 0], modes)).toBeNull();
+    const two = dimFromPicks(D, [p(0, -8), p(100, -8)], [60, 80], modes)!;
+    expect(two).toMatchObject({ kind: "horizontal", a: [0, -8], b: [100, -8] });
+    expect("edge" in two).toBe(false);
+    expect(annotationGeometry(D, [withId(two)]).texts[0].s).toBe("100");
+    // druhý bod na listu mimo pohled se převede do souřadnic prvního pohledu
+    const mixed = dimFromPicks(D, [p(0, -8), { view: "sheet", pick: { kind: "point" as const, p: V2(90, 66) } }], [60, 80], modes)!;
+    expect(mixed).toMatchObject({ view: "top", b: [100, -8] });
+  });
+
+  it("dvě hrany → úhel se ° v sektoru podle místa kóty; rovnoběžné hrany → vzdálenost", () => {
+    const l1 = { view: "top", pick: { kind: "line" as const, a: V2(0, 0), b: V2(40, 0) } };
+    const l2 = { view: "top", pick: { kind: "line" as const, a: V2(60, -20), b: V2(80, -40) } }; // 45° k první (y dolů → stoupá)
+    // průsečík přímek: [40, 0] → list [60, 70]
+    const acute = dimFromPicks(D, [l1, l2], [60 + 20, 70 - 8], modes)!;
+    expect(acute).toMatchObject({ type: "dim", kind: "angle", a: [0, 0], b: [40, 0], a2: [60, -20], b2: [80, -40] });
+    const ga = annotationGeometry(D, [withId({ ...acute, suffix: "±1°" })]);
+    expect(ga.texts[0].s).toBe("45°±1°");
+    expect(ga.polys.filter((p) => p.fill)).toHaveLength(2);
+    const obtuse = dimFromPicks(D, [l1, l2], [60 - 10, 70 - 15], modes)!;
+    expect(annotationGeometry(D, [withId(obtuse)]).texts[0].s).toBe("135°");
+    const g = angleGeom([0, 0], [10, 0], [0, 0], [0, 10], 45)!;
+    expect(g.angle).toBeCloseTo(90, 9);
+    expect(g.X).toEqual([0, 0]);
+    expect(angleGeom([0, 0], [10, 0], [0, 5], [10, 5], 45)).toBeNull();
+    // rovnoběžné hrany 60 mm od sebe
+    const top = { view: "top", pick: { kind: "line" as const, a: V2(8, -60), b: V2(92, -60) } };
+    const bottom = { view: "top", pick: { kind: "line" as const, a: V2(8, 0), b: V2(92, 0) } };
+    const dist = dimFromPicks(D, [top, bottom], [70, 50], modes)!;
+    expect(dist).toMatchObject({ type: "dim", kind: "vertical" });
+    expect(annotationGeometry(D, [withId(dist)]).texts[0].s).toBe("60");
+  });
+
+  it("asociativita: kóta sleduje změnu průměru / délky hrany, ztracená geometrie a chybějící pohled se označí", () => {
+    const dia = withId(dimFromPicks(D, [{ view: "top", pick: { kind: "circle", c: [30, -30], r: 6, full: true } }], [70, 50], modes), "d");
+    const edge = withId(dimFromPicks(D, [{ view: "top", pick: { kind: "line", a: [8, -60], b: [92, -60] } }], [60, 30], modes), "e");
+    const two = { id: "t", view: "top", type: "dim" as const, kind: "horizontal" as const, a: V2(0, -8), b: V2(100, -8), offset: 10 };
+    expect(annotationStatus(D, [dia, edge, two])).toEqual({ d: "ok", e: "ok", t: "ok" });
+    // model se změnil: díra Ø12 → Ø14 (bez zahloubení), deska 100 → 120
+    const changed = [
+      "M 0 -8 L 0 -52 A 8 8 0 0 1 8 -60 L 112 -60 A 8 8 0 0 1 120 -52 L 120 -8 A 8 8 0 0 1 112 0 L 8 0 A 8 8 0 0 1 0 -8 Z",
+      "M 37 -30 A 7 7 0 0 0 23 -30 A 7 7 0 0 0 37 -30 Z",
+    ].flatMap((p) => pathToEntities(p));
+    const D2 = { views: [{ ...views[0], w: 120, ents: changed }], scaleValue: 0.5 };
+    expect(annotationStatus(D2, [dia, edge, two])).toEqual({ d: "ok", e: "ok", t: "ok" });
+    expect(annotationGeometry(D2, [dia, edge]).texts.map((t) => t.s)).toEqual(["Ø14", "104"]);
+    // uložená kóta se nemění (drží původní údaje), dohledání je jen pro vykreslení
+    expect(dia).toMatchObject({ r: 6 });
+    // dvě různé soustředné kružnice bez shody → nejednoznačné; díra odstraněna → ztraceno
+    expect(resolveDim(D.views, { ...(dia as Extract<Ann, { type: "dim" }>), r: 7.5 } as never).status).toBe("lost");
+    const noHole = { views: [{ ...views[0], ents: changed.filter((e) => e.t === "line") }], scaleValue: 0.5 };
+    expect(annotationStatus(noHole, [dia, edge, two])).toEqual({ d: "lost", e: "ok", t: "ok" });
+    expect(annotationGeometry(noHole, [dia]).texts[0].s).toBe("Ø12"); // kreslí se podle uložených údajů
+    // pohled není na listu → kóta se nekreslí a je označená (i dosavadní kóta dvou bodů a poznámka)
+    const note = { id: "n", view: "top", type: "note" as const, at: V2(0, 0), text: "x" };
+    const gone = { views: [{ ...views[0], key: "front" }], scaleValue: 0.5 };
+    expect(annotationStatus(gone, [dia, edge, two, note])).toEqual({ d: "noView", e: "noView", t: "noView", n: "noView" });
+    expect(annotationGeometry(gone, [dia, edge, two]).texts).toEqual([]);
+    // starší výsledek bez entit pohledu: kóty se kreslí z uložených údajů
+    const legacy = { views: [{ ...views[0], ents: undefined }], scaleValue: 0.5 };
+    expect(annotationStatus(legacy, [dia, edge])).toEqual({ d: "ok", e: "ok" });
+    expect(annotationGeometry(legacy, [dia]).texts[0].s).toBe("Ø12");
+  });
+
+  it("skutečná projekce: pohledy nesou hrany a kružnice; nové kóty jsou ve SVG, DXF i PDF", async () => {
+    const d = makeDrawing(plate(), meta);
+    const top = d.views.find((v) => v.key === "top")!;
+    const front = d.views.find((v) => v.key === "front")!;
+    expect(top.ents!.length).toBeGreaterThan(8);
+    // díra Ø20 uprostřed: celá kružnice r = 10 se středem [0, 0]
+    const big = top.ents!.find((e) => e.t === "arc" && Math.abs(e.r - 10) < 1e-6 && !e.hidden);
+    expect(big).toBeDefined();
+    expect(Math.hypot(...(big as Extract<Ent, { t: "arc" }>).c)).toBeLessThan(1e-6);
+    expect(Math.abs((big as Extract<Ent, { t: "arc" }>).da)).toBeCloseTo(2 * Math.PI, 6);
+    // horní hrana desky v čelním pohledu: 80 mm
+    expect(front.ents!.some((e) => e.t === "line" && !e.hidden && Math.abs(Math.abs(e.b[0] - e.a[0]) - 80) < 1e-6 && Math.abs(e.a[1] - e.b[1]) < 1e-9)).toBe(true);
+    // výběr kliknutím na obvod díry Ø6 [30, 15] v půdorysu (souřadnice pohledu: y dolů)
+    const pick = pickViewEnt(top.ents!, [33, -15.05], 0.5);
+    expect(pick).toMatchObject({ kind: "circle", full: true });
+    expect(pick?.kind === "circle" && pick.r).toBeCloseTo(3, 6);
+    const sel = [{ view: "top", pick: pick! }];
+    const at = [top.px + (30 - top.x0) * top.s + 12, top.py + (-15 - top.y0) * top.s - 9] as [number, number];
+    const dia = withId(dimFromPicks(d, sel, at, modes), "dia");
+    const rad = withId(dimFromPicks(d, sel, [at[0], at[1] + 30], { ...modes, invert: true }), "rad");
+    const edgePick = pickViewEnt(front.ents!, [20, front.y0 + 0.01], 0.5)!;
+    expect(edgePick.kind).toBe("line");
+    const len = withId({ ...dimFromPicks(d, [{ view: "front", pick: edgePick }], [front.px, front.py - 14], modes)!, suffix: "±0,1" }, "len");
+    const l1 = front.ents!.find((e) => e.t === "line" && !e.hidden && Math.abs(e.a[0] - e.b[0]) < 1e-9)!;
+    const ang = withId(dimFromPicks(d, [{ view: "front", pick: edgePick }, { view: "front", pick: { kind: "line", a: (l1 as Extract<Ent, { t: "line" }>).a, b: (l1 as Extract<Ent, { t: "line" }>).b } }], [front.px + 6, front.py + 6], modes), "ang");
+    const out = withAnnotations(d, [{ ...(dia as object), suffix: "H7" } as Ann, rad, len, ang]);
+    expect(annotationStatus(d, [dia, rad, len, ang])).toEqual({ dia: "ok", rad: "ok", len: "ok", ang: "ok" });
+    for (const s of ["Ø6H7", "R3", "80±0,1", "90°"]) expect(out.texts.some((t) => t.s === s), s).toBe(true);
+    expect(out.svg).toContain(">Ø6H7<");
+    expect(out.svg).toContain(">90°<");
+    // DXF: ne-ASCII znaky jako \U+XXXX (Ø = 00D8, ° = 00B0, ± = 00B1)
+    expect(out.dxf).toContain("\\U+00D86H7");
+    expect(out.dxf).toContain("\nR3\n");
+    expect(out.dxf).toContain("80\\U+00B10,1");
+    expect(out.dxf).toContain("90\\U+00B0");
+    const font = (n: string) => {
+      const b = fs.readFileSync(path.resolve(__dirname, "../../public/fonts", n));
+      return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+    };
+    const base = await drawingToPdf(d, { regular: font("Roboto-Regular.ttf"), bold: font("Roboto-Bold.ttf") });
+    const pdf = await drawingToPdf(out, { regular: font("Roboto-Regular.ttf"), bold: font("Roboto-Bold.ttf") });
+    expect(pdf.size).toBeGreaterThan(base.size);
+  }, 60_000);
+});

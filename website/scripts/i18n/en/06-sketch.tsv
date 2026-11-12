@@ -1,0 +1,9 @@
+# Skica: nastavitelné klávesové zkratky nástrojů skici (Nastavení → Klávesové zkratky → skupina „Skica“)
+
+# nadpisy a vysvětlení skupin zkratek
+3D model	3D model
+Platí v prostoru dílu a sestavy.	Applies in the part and assembly workspace.
+Platí při otevřené skice – stejnou klávesu lze použít zároveň ve 3D.	Applies while a sketch is open – the same key can also be used in 3D.
+
+#!dynamic – popisky příkazů zkratek se překládají za běhu (tr(SHORTCUT_LABELS[id])), v kódu jako literál tr("…") nejsou
+Vazba vodorovně (vybrané entity)	Horizontal constraint (selected entities)

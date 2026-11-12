@@ -3,6 +3,7 @@
  * vytáhnout/zatlačit plochu, odsadit plochu, odstranit plochu, zesílit plochy, žebro, pružina.
  * Běží ve workeru i v Node (testy).
  */
+import { subShapes } from "./fastbox";
 import { tr } from "./i18n";
 import * as r from "replicad";
 import { arcPoints, type Seg } from "./sketch";
@@ -231,7 +232,7 @@ function chainPoints(ordered: Seg[]): Vec2[] {
 }
 
 function solidsOf(s: Shape): Shape[] {
-  return Array.from(r.iterTopo(s.wrapped, "solid" as never), (x) => r.cast(x) as unknown as Shape);
+  return subShapes(s, "SOLID").map((x) => r.cast(x as never) as unknown as Shape);
 }
 
 /**
@@ -327,7 +328,7 @@ export function springSolid(f: { radius: number; pitch: number; turns: number; w
 /** Polohy topologických vrcholů tělesa (x, y, z po trojicích). */
 export function vertexPositions(body: Shape): Float32Array {
   const out: number[] = [];
-  for (const v of r.iterTopo(body.wrapped, "vertex" as never)) {
+  for (const v of subShapes(body, "VERTEX")) {
     const vx = new r.Vertex(v as never);
     out.push(...vx.asTuple());
   }

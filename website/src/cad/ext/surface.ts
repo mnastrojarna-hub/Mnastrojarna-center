@@ -8,6 +8,7 @@
  * `makeCompound([těleso, plocha…])`. Operace „Sešít / Uzavřít / Zesílit“ pracují s volnými plochami (ty, které
  * nejsou součástí žádného solidu). Běží ve workeru i v Node (testy) – žádné DOM API.
  */
+import { subShapes } from "../fastbox";
 import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
@@ -73,7 +74,7 @@ function closedFaces(sk: SketchF): r.AnyShape {
 /** Skořepina (nebo jediná plocha) z libovolného tvaru – pro OCCT operace, které chtějí Shell/Face. */
 function shellOrFace(shape: r.AnyShape): r.AnyShape {
   if (shape instanceof r.Shell || shape instanceof r.Face) return shape;
-  const shells = [...r.iterTopo(shape.wrapped, "shell" as never)].map((s) => r.cast(s as never));
+  const shells = subShapes(shape, "SHELL").map((s) => r.cast(s as never));
   if (shells.length === 1) return shells[0];
   if (shells.length > 1) throw new Error(tr("Plochy netvoří jednu souvislou skořepinu – nejdřív je sešijte (Sešít plochy) nebo zvětšete toleranci."));
   const faces = shape.faces;

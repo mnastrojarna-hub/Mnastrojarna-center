@@ -4,6 +4,9 @@
  */
 import { tr } from "./i18n";
 import * as r from "replicad";
+import { DEFAULT_BODY, isNewBodyMode, nextBodyName } from "./bodies";
+import "./fastbox";
+import { MESH_ANGULAR, meshTolerance } from "./fastbool";
 import { checkShape, describeCheck, sameSignature, signatureOf, tryFixShape, type ShapeSignature } from "./check";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { getExt } from "./ext/index";
@@ -15,7 +18,7 @@ import { resolveDoc } from "./params";
 import { entityIndex, planeDefToSketchPlane, pointOf, resolveAxis, resolveDirection, resolvePlaneDef, resolveRef, V, type ResolveCtx } from "./ref-resolve";
 import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
 import { findLoops, nestLoops, shapeSegs, splinePoints, type Loop, type Seg } from "./sketch";
-import type { Axis, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
+import type { Axis, BodyInfo, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, MeshData, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
 
@@ -138,6 +141,31 @@ export function profileSketch(sk: SketchF, plane: r.Plane, o: { outerOnly?: bool
 }
 
 /** Tělesa složeného tvaru (po booleovské operaci může vzniknout více kusů). */
+/** Složený tvar z více těles BEZ zániku vstupů (`r.makeCompound` vstupní tvary maže – tělesa dílu se ale dál používají). */
+export function compoundOf(shapes: Shape[]): Shape {
+  const oc = r.getOC();
+  const builder = new oc.TopoDS_Builder();
+  const compound = new oc.TopoDS_Compound();
+  builder.MakeCompound(compound);
+  for (const s of shapes) builder.Add(compound, s.wrapped);
+  builder.delete();
+  return r.cast(compound) as unknown as Shape;
+}
+/**
+ * Nezávislá kopie tvaru (nové plochy, hrany i vrcholy). Tělesa dílu nesmějí sdílet topologii – rozdělením vzniklé poloviny
+ * sdílejí plochu řezu a složený výsledek by ji počítal jen jednou (indexy ploch těles by pak nesouhlasily).
+ */
+export function deepCopy(s: Shape): Shape {
+  const oc = r.getOC();
+  const t = new oc.gp_Trsf();
+  const b = new oc.BRepBuilderAPI_Transform(s.wrapped, t, true);
+  try {
+    return r.cast(b.Shape()) as unknown as Shape;
+  } finally {
+    b.delete();
+    t.delete();
+  }
+}
 export function solidsOf(s: Shape): Shape[] {
   const list = (s as unknown as { solids?: Shape[] }).solids;
   return list && list.length ? list : [s];
@@ -324,8 +352,8 @@ const csDepthOf = (csD: number, d: number, angle: number) => Math.max(0, (csD / 
 
 type HoleF = Extract<Feature, { type: "hole" }>;
 
-/** Nástroj jedné díry v bodě `at`, vrtané ve směru `dir` (jednotkový). `end.flat` = rovné dno (ukončení k ploše). */
-function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { through: boolean; depth: number; flat: boolean }): Shape {
+/** Průměr vrtání a poloměr „hlavy“ díry (zahloubení) – z něj se odvozuje krátký nástup nad zadaným bodem. */
+function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; d: number; headR: number; back: number } {
   const kind = f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
   let d = f.diameter;
   if (kind === "tapped") {
@@ -334,9 +362,22 @@ function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { th
     d = t.tap;
   }
   if (!(d > 0)) throw new Error(tr("Průměr díry musí být kladný."));
+  const rd = d / 2;
+  const headR = kind === "counterbore" ? Math.max(rd, f.cbDiameter / 2) : kind === "countersink" ? Math.max(rd, (f.csDiameter ?? 0) / 2) : rd;
+  return { kind, d, headR, back: Math.max(headR, 0.5) };
+}
+
+/**
+ * Nástroj jedné díry v bodě `at`, vrtané ve směru `dir` (jednotkový). `end.flat` = rovné dno (ukončení k ploše).
+ * `strict` = bez nástupu nad bodem (přesně od bodu) – pro kontrolu, že díra ve směru vrtání opravdu zasáhne materiál.
+ */
+function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { through: boolean; depth: number; flat: boolean }, strict = false): Shape {
+  const { kind, d, back } = holeHead(f);
   const big = body ? bboxDiag(body) * 2 + V.len(V.sub(at, body.boundingBox.center as Vec3)) * 2 + 10 : 1000;
   const rd = d / 2;
-  const B = big; // přesah nad povrch
+  // Díra začíná v zadaném bodě a vrtá jen ve směru vrtání. Nad bodem se odebere jen krátký nástup (poloměr hlavy díry) –
+  // čistý začátek na šikmé nebo válcové ploše; materiál dál nad bodem (protější stěna) zůstane. `bothWays` = skrz oběma směry.
+  const B = f.bothWays && end.through ? big : strict ? 0 : back;
   const pts: [number, number][] = [[0, -B]];
   if (kind === "counterbore") {
     if (!(f.cbDiameter > d && f.cbDepth > 0)) throw new Error(tr("Zahloubení musí mít větší průměr než díra a kladnou hloubku."));
@@ -354,7 +395,9 @@ function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { th
     const tip = Math.min(170, Math.max(60, f.tipAngle ?? 118));
     pts.push([rd, end.depth], [0, end.flat ? end.depth : end.depth + rd / Math.tan((tip * Math.PI) / 360)]);
   }
-  return revolvedAlongAny(pts, dir, at);
+  // bez nástupu (strict) splývají dva body profilu zahloubení – nulová úsečka by jádro shodila
+  const clean = pts.filter((q, i) => i === 0 || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) > 1e-9);
+  return revolvedAlongAny(clean, dir, at);
 }
 
 /** Rotační profil (r, t) kolem +Z → natočený do libovolného jednotkového směru `dir`, posunutý do `at`. */
@@ -373,7 +416,7 @@ function revolvedAlongAny(profile: [number, number][], dir: Vec3, at: Vec3): Sha
 }
 
 /** Všechny díry prvku (více poloh), s ukončením slepá / skrz / k dalšímu / k ploše. */
-function holeTools(f: HoleF, ctx: Ctx): Shape {
+function holeTools(f: HoleF, ctx: Ctx, strict = false): Shape {
   const rc = rctx(ctx);
   const body = ctx.body;
   const pts: Vec3[] = f.points?.length ? f.points.map((p) => pointOf(rc, p, tr("bod díry"))) : [f.position];
@@ -384,8 +427,8 @@ function holeTools(f: HoleF, ctx: Ctx): Shape {
   } else dir = axisVec(f.axis).map((v) => (f.flip ? v : -v)) as Vec3;
   const end = f.end ?? (f.depth > 0 ? { kind: "blind" as const } : { kind: "throughAll" as const });
   const tools = pts.map((at) => {
-    if (end.kind === "blind") return holeToolAt(f, body, at, dir, { through: false, depth: f.depth, flat: false });
-    if (end.kind === "throughAll") return holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false });
+    if (end.kind === "blind") return holeToolAt(f, body, at, dir, { through: false, depth: f.depth, flat: false }, strict);
+    if (end.kind === "throughAll") return holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false }, strict);
     if (end.kind === "toFace") {
       const g = resolveRef(rc, end.ref);
       if (!g.plane || g.radius) throw new Error(tr("Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu."));
@@ -395,10 +438,10 @@ function holeTools(f: HoleF, ctx: Ctx): Shape {
       const o2 = V.add(g.plane.origin, V.mul(n, (end.offset ?? 0) * (den > 0 ? -1 : 1)));
       const t = V.dot(V.sub(o2, at), n) / den;
       if (!(t > 1e-6)) throw new Error(tr("Cílová plocha neleží ve směru vrtání (zkuste obrátit směr)."));
-      return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true });
+      return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true }, strict);
     }
     if (!body) throw new Error(tr("Ukončení „k dalšímu“ potřebuje těleso."));
-    const T = holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false });
+    const T = holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false }, strict);
     const inside = T.intersect(body);
     return nearestSolid(inside, at, dir).solid;
   });
@@ -674,16 +717,75 @@ function asShape(s: unknown): Shape | null {
 /** Vrátí výsledné těleso po prvek `untilIndex` (vč.) + stav prvků. Proměnné, vazby a aktivní stav se uplatní předem. */
 export type Resolved = NonNullable<BuildResult["resolved"]>;
 
-export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<{ body: Shape | null; status: FeatureStatus[]; paramErrors: string[]; resolved: Resolved }> {
+/** Průběh stavby: právě počítaný prvek (index od 0) z celkového počtu; `phase: "mesh"` = závěrečný výpočet sítě. */
+export type BuildProgress = { index: number; total: number; id?: string; name?: string; type?: string; phase: "feature" | "mesh" };
+export type BuildProgressFn = (p: BuildProgress) => void;
+
+/** Těleso dílu s názvem (více těles): první v seznamu je aktivní. */
+export type NamedBody = { name: string; shape: Shape };
+
+// ── mezipaměť stavby ──────────────────────────────────────────────────────────────────────────────────────────────
+// Stav po prvcích, jejichž výpočet trval déle. Další stavba dokumentu se stejným začátkem historie (přidaný prvek na konci,
+// úprava posledního prvku, návrat v historii, opakovaná stavba téhož dokumentu) začne od posledního shodného stavu místo od
+// nuly. Tvary se po vzniku nemění, proto stačí držet jejich kopie (kopie = další odkaz na tutéž geometrii, levné).
+type ToolEntry = { tool: Shape; mode: BoolMode };
+type Checkpoint = {
+  /** počet prvků, po kterých stav platí */
+  n: number;
+  ms: number;
+  body: Shape | null;
+  bodySig: ShapeSignature | null;
+  others: [string, Shape][];
+  activeName: string;
+  sketches: [string, SketchF][];
+  tools: [string, ToolEntry][];
+  status: FeatureStatus[];
+  features: Feature[];
+  resolved: Resolved;
+};
+type Chain = { docKey: string; keys: string[]; points: Checkpoint[]; used: number };
+const CHAIN_MAX = 3; // model, výkres (závity zjednodušeně) a jeden další dokument vedle sebe
+const CHECKPOINT_MIN_MS = 0; // stav se ukládá po každém prvku (kopie tvaru je jen další odkaz); počet stavů hlídá CHECKPOINT_MAX
+const CHECKPOINT_MAX = 24;
+let chains: Chain[] = [];
+let chainClock = 0;
+/** Zahodí mezipaměť stavby (testy, uvolnění paměti). */
+export function clearBuildCache() {
+  chains = [];
+  lastDocResult = null;
+}
+/** vstupy na úrovni dokumentu, které mohou ovlivnit geometrii prvků */
+const docKeyOf = (d: CadDoc) => JSON.stringify([d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null, d.material, d.kind ?? "part"]);
+
+/**
+ * `opts.preferActive`: po stavbě přepne aktivní těleso na `doc.activeBody` (jen pro zobrazení v editoru dílu – aktivní těleso je
+ * ve výsledném složeném tvaru první, takže indexy jeho ploch a hran souhlasí s tím, co prvky ukládají). Komponenty sestav se staví bez toho.
+ */
+export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { preferActive?: boolean; onProgress?: BuildProgressFn; noCache?: boolean } = {}): Promise<{ body: Shape | null; status: FeatureStatus[]; paramErrors: string[]; resolved: Resolved; bodies: NamedBody[] }> {
   const { doc, errors: paramErrors } = resolveDoc(input);
   const sketches = new Map<string, SketchF>();
-  const tools = new Map<string, { tool: Shape; mode: BoolMode }>();
+  const tools = new Map<string, ToolEntry>();
   const status: FeatureStatus[] = [];
   const features: Feature[] = doc.features.slice(); // vyřešené skici / pomocné roviny nahrazují původní (pro odkazy)
   const resolved: Resolved = { planes: {}, datums: {} };
   let body: Shape | null = null;
   /** podpis aktuálního tělesa (objem, plochy, hrany) – pro zjištění, že prvek těleso nezměnil */
   let bodySig: ShapeSignature | null = null;
+  // ── více těles: `body` je aktivní těleso `activeName`, ostatní čekají v `others` (viz bodies.ts) ──
+  const others = new Map<string, Shape>();
+  let activeName = DEFAULT_BODY;
+  const bodyNames = () => [activeName, ...others.keys()];
+  /** přepne aktivní těleso na existující odložené */
+  const activate = (name: string) => {
+    const s = others.get(name);
+    if (!s) throw new Error(tr("Těleso „{0}“ v dílu není (tělesa: {1}).", name, bodyNames().join(", ")));
+    if (body) others.set(activeName, body);
+    others.delete(name);
+    body = s;
+    activeName = name;
+    bodySig = signatureOf(body);
+  };
+  const shapeOfBody = (name: string): Shape | null => (name === activeName ? body : (others.get(name) ?? null));
   const ctxOf = (): Ctx => ({ sketches, body, features });
   /** Dokončení prvku: kontrola, že se operace projevila a že výsledek je platné objemové těleso → ✓ / ⚠ / ✗. */
   const finish = (f: Feature, next: Shape | null): Shape | null => {
@@ -715,14 +817,93 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
     return next;
   };
 
-  for (let i = 0; i < doc.features.length && i <= untilIndex; i++) {
+  // ── mezipaměť: najít nejdelší shodný začátek historie a navázat na uložený stav ──
+  const count = Math.min(doc.features.length, untilIndex === Infinity ? doc.features.length : untilIndex + 1);
+  let start = 0;
+  let mine: Chain | null = null;
+  if (!opts.noCache) {
+    const docKey = docKeyOf(doc);
+    const keys = doc.features.slice(0, count).map((f) => JSON.stringify(f));
+    let best: Chain | null = null;
+    let bestLen = 0;
+    for (const c of chains) {
+      if (c.docKey !== docKey) continue;
+      let m = 0;
+      while (m < keys.length && m < c.keys.length && keys[m] === c.keys[m]) m++;
+      if (m > bestLen) {
+        best = c;
+        bestLen = m;
+      }
+    }
+    const cp = best ? best.points.filter((p) => p.n <= bestLen).sort((a, b) => b.n - a.n)[0] : undefined;
+    mine = { docKey, keys, points: best ? best.points.filter((p) => p.n <= bestLen) : [], used: ++chainClock };
+    if (cp) {
+      start = cp.n;
+      body = cp.body ? (cp.body.clone() as Shape) : null;
+      bodySig = cp.bodySig;
+      for (const [k, v] of cp.others) others.set(k, v.clone() as Shape);
+      activeName = cp.activeName;
+      for (const [k, v] of cp.sketches) sketches.set(k, v);
+      for (const [k, v] of cp.tools) tools.set(k, { tool: v.tool.clone() as Shape, mode: v.mode });
+      status.push(...cp.status.map((x) => ({ ...x })));
+      for (let i = 0; i < cp.n; i++) features[i] = cp.features[i];
+      Object.assign(resolved.planes, cp.resolved.planes);
+      Object.assign(resolved.datums, cp.resolved.datums);
+    }
+    // řetěz, na který se navázalo, se nahradí; jinak se uvolní nejdéle nepoužitý
+    chains = chains.filter((c) => c !== best);
+    chains.push(mine);
+    if (chains.length > CHAIN_MAX) chains = chains.sort((a, b) => b.used - a.used).slice(0, CHAIN_MAX);
+  }
+  /** uloží stav po `n` prvcích (kopie tvarů – původní objekty může další prvek spotřebovat) */
+  const checkpoint = (n: number, ms: number) => {
+    if (!mine) return;
+    mine.points = mine.points.filter((p) => p.n !== n);
+    mine.points.push({
+      n,
+      ms,
+      body: body ? (body.clone() as Shape) : null,
+      bodySig,
+      others: [...others].map(([k, v]) => [k, v.clone() as Shape]),
+      activeName,
+      sketches: [...sketches],
+      tools: [...tools].map(([k, v]) => [k, { tool: v.tool.clone() as Shape, mode: v.mode }]),
+      status: status.map((x) => ({ ...x })),
+      features: features.slice(0, n),
+      resolved: { planes: { ...resolved.planes }, datums: { ...resolved.datums } },
+    });
+    if (mine.points.length > CHECKPOINT_MAX) {
+      // vyřadit nejlevnější stav (jeho prvek se příště přepočítá nejrychleji); poslední stav zůstává
+      const last = Math.max(...mine.points.map((p) => p.n));
+      const drop = mine.points.filter((p) => p.n !== last).sort((a, b) => a.ms - b.ms)[0];
+      mine.points = mine.points.filter((p) => p !== drop);
+    }
+  };
+
+  for (let i = start; i < doc.features.length && i <= untilIndex; i++) {
     const f = doc.features[i];
     if (f.suppressed) {
       status.push({ id: f.id, ok: true });
       if (f.type === "sketch") sketches.set(f.id, f);
       continue;
     }
+    /** stav před založením nového tělesa – při chybě prvku se vrátí */
+    let startedNew: { name: string } | null = null;
+    const tFeature = Date.now();
+    const nStatus = status.length;
+    opts.onProgress?.({ index: i, total: doc.features.length, id: f.id, name: f.name, type: f.type, phase: "feature" });
     try {
+      if (f.body && f.body !== activeName) {
+        if (others.has(f.body)) activate(f.body);
+        else if (!body) activeName = f.body; // první těleso s vlastním názvem
+        else if (isNewBodyMode(f)) {
+          startedNew = { name: activeName };
+          others.set(activeName, body);
+          body = null;
+          bodySig = null;
+          activeName = f.body;
+        } else throw new Error(tr("Těleso „{0}“ v dílu není – zvolte existující těleso, nebo operaci „Nové těleso“.", f.body));
+      }
       let next: Shape | null = body;
       const custom = f.type !== "sketch" && f.type !== "datum" && f.type !== "ext" ? getFeatureBuilder(f.type) : undefined;
       if (custom) {
@@ -798,6 +979,44 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           const keep = asShape(f.keep === "positive" ? res.positive : res.negative);
           if (!keep) throw new Error(tr("Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí."));
           next = keep;
+          break;
+        }
+        case "splitBodies": {
+          if (!body) throw new Error(tr("Není co rozdělit – nejdřív vytvořte těleso."));
+          const res = body.clone().split(f.planeDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef)) : axisPlane(f.plane, f.offset));
+          const pos = asShape(res.positive);
+          const neg = asShape(res.negative);
+          if (!pos || !neg || !solidsOf(pos).length || !solidsOf(neg).length) throw new Error(tr("Rovina těleso nerozdělí – musí jím procházet (změňte rovinu nebo posunutí)."));
+          const nameB = f.nameB?.trim() || nextBodyName(bodyNames());
+          if (bodyNames().includes(nameB)) throw new Error(tr("Těleso „{0}“ už v dílu je – zvolte jiný název.", nameB));
+          others.set(nameB, deepCopy(neg));
+          next = pos;
+          break;
+        }
+        case "copyBody": {
+          const srcName = f.source?.trim() || activeName;
+          const src = shapeOfBody(srcName);
+          if (!src) throw new Error(tr("Těleso „{0}“ v dílu není (tělesa: {1}).", srcName, bodyNames().join(", ")));
+          const name = f.newName?.trim() || nextBodyName(bodyNames());
+          if (bodyNames().includes(name)) throw new Error(tr("Těleso „{0}“ už v dílu je – zvolte jiný název.", name));
+          let copy = deepCopy(src);
+          if (f.translate.some((v) => v)) copy = copy.translate(f.translate);
+          others.set(name, copy);
+          break; // aktivní těleso se nemění
+        }
+        case "combine": {
+          const targetName = f.target?.trim() || activeName;
+          const toolName = f.tool?.trim();
+          if (!toolName) throw new Error(tr("Vyberte nástrojové těleso."));
+          if (toolName === targetName) throw new Error(tr("Cílové a nástrojové těleso musí být dvě různá tělesa."));
+          if (!shapeOfBody(targetName)) throw new Error(tr("Těleso „{0}“ v dílu není (tělesa: {1}).", targetName, bodyNames().join(", ")));
+          if (!shapeOfBody(toolName)) throw new Error(tr("Těleso „{0}“ v dílu není (tělesa: {1}).", toolName, bodyNames().join(", ")));
+          if (targetName !== activeName) activate(targetName); // výsledek patří cílovému tělesu – stane se aktivním
+          // ponechaný nástroj: operace pracuje s jeho nezávislou kopií, aby výsledek s nástrojem nesdílel plochy
+          const toolShape = f.keepTool ? deepCopy(others.get(toolName)!) : others.get(toolName)!;
+          const target = body!;
+          next = f.op === "cut" ? target.cut(toolShape) : f.op === "intersect" ? target.intersect(toolShape) : target.fuse(toolShape);
+          if (!f.keepTool) others.delete(toolName);
           break;
         }
         case "transform": {
@@ -878,7 +1097,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           const def = getExt(f.ext);
           if (!def) throw new Error(tr("Neznámý prvek rozšíření „{0}“ – modul není načten.", f.ext));
           if (!def.build) break;
-          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools });
+          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName });
           if (out !== null && out !== undefined) next = out; // null = prvek bez geometrie (těleso zůstává)
           break;
         }
@@ -889,18 +1108,51 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           const mode = modeOf(f);
           tools.set(f.id, { tool: tool.clone(), mode });
           next = applyMode(body, tool, mode);
+          if (f.type === "hole" && body && !f.bothWays) {
+            // Krátký nástup nad zadaným bodem nesmí být jediné, co díra odebrala: bod na spodní ploše s vrtáním ven z tělesa
+            // by jinak tiše vyřízl mělkou kapsu. Je-li úbytek jen v rozsahu nástupu, ověří se díra přesně od bodu.
+            const h = holeHead(f);
+            const n = f.points?.length || 1;
+            const v0 = bodySig?.volume ?? r.measureVolume(body);
+            const removed = v0 - r.measureVolume(next);
+            if (removed <= n * Math.PI * h.headR * h.headR * h.back * 1.001 + 1e-9) {
+              try {
+                const strict = applyMode(body, holeTools(f, ctxOf(), true), mode);
+                if (Math.abs(r.measureVolume(strict) - v0) <= 1e-9 * Math.max(1, Math.abs(v0))) next = strict; // ve směru vrtání není materiál → ⚠ „těleso nezměnil“
+              } catch {
+                /* kontrolu nelze provést – platí výsledek s nástupem */
+              }
+            }
+          }
         }
       }
       body = finish(f, next);
     } catch (e) {
       status.push({ id: f.id, ok: false, error: humanError(e) });
+      if (startedNew && !body) {
+        // nové těleso nevzniklo – vrátit se k původnímu aktivnímu
+        const prev = others.get(startedNew.name);
+        if (prev) {
+          others.delete(startedNew.name);
+          body = prev;
+          activeName = startedNew.name;
+          bodySig = signatureOf(body);
+        }
+      }
+    } finally {
+      const dt = Date.now() - tFeature;
+      if (status.length > nStatus && f.type !== "sketch" && dt >= 1) status[status.length - 1].ms = dt;
+      if (dt >= CHECKPOINT_MIN_MS || i === count - 1) checkpoint(i + 1, dt);
     }
   }
-  return { body, status, paramErrors, resolved };
+  if (opts.preferActive && input.activeBody && input.activeBody !== activeName && others.has(input.activeBody)) activate(input.activeBody);
+  const bodies: NamedBody[] = [...(body ? [{ name: activeName, shape: body as Shape }] : []), ...[...others].map(([name, shape]) => ({ name, shape }))];
+  const all = bodies.length > 1 ? compoundOf(bodies.map((b) => b.shape)) : (bodies[0]?.shape ?? null);
+  return { body: all, status, paramErrors, resolved, bodies };
 }
 
 /** Prvky, u kterých se očekává změna tělesa (přidání / odebrání materiálu, úprava tvaru). */
-const CHANGING_TYPES = new Set<string>(["extrude", "revolve", "sweep", "loft", "box", "cylinder", "sphere", "cone", "tube", "hole", "text", "spring", "import", "fillet", "chamfer", "shell", "draft", "split", "pattern", "pushPull", "offsetFace", "deleteFace", "thicken", "rib"]);
+const CHANGING_TYPES = new Set<string>(["extrude", "revolve", "sweep", "loft", "box", "cylinder", "sphere", "cone", "tube", "hole", "text", "spring", "import", "fillet", "chamfer", "shell", "draft", "split", "pattern", "pushPull", "offsetFace", "deleteFace", "thicken", "rib", "combine", "splitBodies"]);
 function expectsChange(f: Feature): boolean {
   if (f.type === "ext") return typeof f.data?.mode === "string";
   if (f.type === "thread") return !!f.modeled;
@@ -917,10 +1169,74 @@ function humanError(e: unknown): string {
   return tr("Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).");
 }
 
-export async function buildDoc(doc: CadDoc, opts: { tolerance?: number } = {}): Promise<BuildResult & { body: Shape | null }> {
+type DocResult = BuildResult & { body: Shape | null };
+/** poslední výsledek `buildDoc` – tentýž dokument podruhé (ověřovací stavba konzole a hned nato stavba aplikace, opakovaný „stav“) se nepočítá znovu */
+let lastDocResult: { key: string; res: DocResult } | null = null;
+const copyMeshData = (m: MeshData): MeshData => ({ vertices: m.vertices.slice(), normals: m.normals.slice(), triangles: m.triangles.slice(), faceGroups: m.faceGroups.slice(), lines: m.lines.slice(), edgeGroups: m.edgeGroups.slice() });
+/** kopie výsledku: pole sítě se do UI předávají přenosem (původní pole tím zanikají) a těleso si jádro po další stavbě uvolní */
+const copyDocResult = (x: DocResult): DocResult => ({ ...x, mesh: x.mesh ? copyMeshData(x.mesh) : null, vertices: x.vertices?.slice(), status: x.status.map((s) => ({ ...s })), body: x.body ? (x.body.clone() as Shape) : null });
+
+export async function buildDoc(doc: CadDoc, opts: { tolerance?: number; onProgress?: BuildProgressFn } = {}): Promise<DocResult> {
   const t0 = Date.now();
-  const { body, status, paramErrors, resolved } = await buildShape(doc);
-  return { ...shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance }), resolved };
+  const key = JSON.stringify([doc.features, doc.variables ?? null, doc.bindings ?? null, doc.configs ?? null, doc.activeConfig ?? null, doc.material, doc.kind ?? "part", doc.activeBody ?? null, opts.tolerance ?? null]);
+  if (lastDocResult?.key === key) return { ...copyDocResult(lastDocResult.res), ms: Date.now() - t0 };
+  const { body, status, paramErrors, resolved, bodies } = await buildShape(doc, Infinity, { preferActive: true, onProgress: opts.onProgress });
+  opts.onProgress?.({ index: doc.features.length, total: doc.features.length, phase: "mesh" });
+  const res: DocResult = { ...shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance }), resolved, bodies: bodyInfos(bodies) };
+  lastDocResult = { key, res: copyDocResult(res) };
+  return res;
+}
+
+/** Přehled těles dílu: rozsahy globálních indexů ploch a hran ve složeném tvaru (aktivní těleso je první) a objem. */
+export function bodyInfos(bodies: NamedBody[]): BodyInfo[] {
+  let fs = 0;
+  let es = 0;
+  return bodies.map((b, i) => {
+    const faceCount = b.shape.faces.length;
+    const edgeCount = b.shape.edges.length;
+    let volume = 0;
+    try {
+      volume = r.measureVolume(b.shape);
+    } catch {
+      /* otevřené těleso */
+    }
+    const info: BodyInfo = { name: b.name, active: i === 0, faceStart: fs, faceCount, edgeStart: es, edgeCount, volume };
+    fs += faceCount;
+    es += edgeCount;
+    return info;
+  });
+}
+
+/**
+ * Síť ploch a hran tělesa rovnou jako typovaná pole. replicad (`shape.mesh()`) převádí data z paměti jádra na obyčejná pole
+ * čísel prvek po prvku (u 240 tisíc trojúhelníků 1,5 s); tady se paměť jen zkopíruje.
+ */
+function meshArrays(body: Shape, tolerance: number, angular: number) {
+  const oc = r.getOC() as unknown as {
+    wasmMemory: { buffer: ArrayBuffer };
+    ReplicadMeshExtractor: { extract(s: unknown, t: number, a: number, x: boolean): Record<string, () => number> & { delete(): void } };
+    ReplicadEdgeMeshExtractor: { extract(s: unknown, t: number, a: number): Record<string, () => number> & { delete(): void } };
+  };
+  const raw = oc.ReplicadMeshExtractor.extract(body.wrapped, tolerance, angular, false);
+  let vertices: Float32Array, normals: Float32Array, triangles: Uint32Array, faceGroups: Int32Array;
+  try {
+    const buf = oc.wasmMemory.buffer; // až po výpočtu – paměť jádra se při něm mohla zvětšit
+    vertices = new Float32Array(buf, raw.getVerticesPtr() >>> 0, raw.getVerticesSize()).slice();
+    normals = new Float32Array(buf, raw.getNormalsPtr() >>> 0, raw.getNormalsSize()).slice();
+    triangles = new Uint32Array(buf, raw.getTrianglesPtr() >>> 0, raw.getTrianglesSize()).slice();
+    faceGroups = new Int32Array(buf, raw.getFaceGroupsPtr() >>> 0, raw.getFaceGroupsSize()).slice();
+  } finally {
+    raw.delete();
+  }
+  const er = oc.ReplicadEdgeMeshExtractor.extract(body.wrapped, tolerance, angular);
+  try {
+    const buf = oc.wasmMemory.buffer;
+    const lines = new Float32Array(buf, er.getLinesPtr() >>> 0, er.getLinesSize()).slice();
+    const edgeGroups = new Int32Array(buf, er.getEdgeGroupsPtr() >>> 0, er.getEdgeGroupsSize()).slice();
+    return { vertices, normals, triangles, faceGroups, lines, edgeGroups };
+  } finally {
+    er.delete();
+  }
 }
 
 /** Síť, hrany, vrcholy a metriky libovolného tělesa (i složeného – např. podsestavy). */
@@ -930,15 +1246,17 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
   const paramErrors = o.paramErrors ?? [];
   const opts = { tolerance: o.tolerance };
   if (!body) return { status, paramErrors, mesh: null, metrics: null, ms: Date.now() - t0, body: null };
-  const tol = opts.tolerance ?? Math.max(0.01, bboxDiag(body) / 2000);
-  const m = body.mesh({ tolerance: tol, angularTolerance: 0.2 });
-  const em = body.meshEdges({ tolerance: tol, angularTolerance: 0.2 });
-  const faceIndex = new Map(body.faces.map((f, i) => [f.hashCode, i]));
-  const edgeIndex = new Map(body.edges.map((e, i) => [e.hashCode, i]));
-  const faceGroups = new Int32Array(m.faceGroups.length * 3);
-  m.faceGroups.forEach((g, i) => faceGroups.set([g.start, g.count, faceIndex.get(g.faceId) ?? -1], i * 3));
-  const edgeGroups = new Int32Array(em.edgeGroups.length * 3);
-  em.edgeGroups.forEach((g, i) => edgeGroups.set([g.start, g.count, edgeIndex.get(g.edgeId) ?? -1], i * 3));
+  const tol = opts.tolerance ?? meshTolerance(bboxDiag(body));
+  const m = meshArrays(body, tol, MESH_ANGULAR);
+  const faces = body.faces;
+  const edges = body.edges;
+  const faceIndex = new Map(faces.map((f, i) => [f.hashCode, i]));
+  const edgeIndex = new Map(edges.map((e, i) => [e.hashCode, i]));
+  // skupiny [začátek, počet, otisk plochy / hrany] → [začátek, počet, index plochy / hrany]
+  const faceGroups = m.faceGroups;
+  for (let i = 2; i < faceGroups.length; i += 3) faceGroups[i] = faceIndex.get(faceGroups[i]) ?? -1;
+  const edgeGroups = m.edgeGroups;
+  for (let i = 2; i < edgeGroups.length; i += 3) edgeGroups[i] = edgeIndex.get(edgeGroups[i]) ?? -1;
   let volume = 0;
   let area = 0;
   try {
@@ -952,7 +1270,7 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
   let valid: boolean | undefined;
   let solids: number | undefined;
   try {
-    const chk = body.faces.length <= 2000 ? checkShape(body) : null;
+    const chk = faces.length <= 2000 ? checkShape(body) : null;
     if (chk) {
       valid = chk.valid;
       solids = chk.solids;
@@ -965,15 +1283,8 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
     paramErrors,
     body,
     ms: Date.now() - t0,
-    mesh: {
-      vertices: new Float32Array(m.vertices),
-      normals: new Float32Array(m.normals),
-      triangles: new Uint32Array(m.triangles),
-      faceGroups,
-      lines: new Float32Array(em.lines),
-      edgeGroups,
-    },
-    metrics: { volume, area, bbox: bb, faces: body.faces.length, edges: body.edges.length, valid, solids },
+    mesh: { vertices: m.vertices, normals: m.normals, triangles: m.triangles, faceGroups, lines: m.lines, edgeGroups },
+    metrics: { volume, area, bbox: bb, faces: faces.length, edges: edges.length, valid, solids },
     vertices: safeVertices(body),
   };
 }

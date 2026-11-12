@@ -96,6 +96,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       flip: boolean;
       diameter: number;
       depth: number; // 0 = skrz
+      /** díra „skrz“ vrtá od zadaného bodu jen ve směru vrtání; `bothWays` = oběma směry (skrz celé těleso) */
+      bothWays?: boolean;
       cbDiameter: number; // 0 = bez zahloubení
       cbDepth: number;
       /** výchozí "simple" (nebo "counterbore", pokud cbDiameter > 0) */
@@ -247,7 +249,7 @@ export type CadDoc = {
 export type BodyMeta = { name: string; color?: string; hidden?: boolean };
 
 /** Těleso ve výsledku stavby: indexy ploch/hran jsou globální (v pořadí těles ve složeném výsledku). */
-export type BodyInfo = { name: string; faces: number[]; edges: number[]; volume: number; area: number; createdBy: string; hidden?: boolean };
+export type BodyInfo = { name: string; active: boolean; faceStart: number; faceCount: number; edgeStart: number; edgeCount: number; volume: number };
 
 /** Umístění komponenty: posun (mm) a natočení kolem os X, Y, Z (°, v tomto pořadí). */
 export type Placement = { position: Vec3; rotation: Vec3 };
@@ -277,7 +279,8 @@ export type AsmComponent = {
  * Stav prvku po stavbě: `ok` = prvek se zpracoval; `warning` = zpracoval se, ale výsledek si zaslouží pozornost
  * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
  */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string };
+/** `ms` = doba výpočtu prvku (jen prvky, které se skutečně počítaly) */
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number };
 
 export type MeshData = {
   vertices: Float32Array;
@@ -328,7 +331,11 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
 export type DrawingAnnotation = { id: string; view: string } & (
-  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string }
+  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean }
+  /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
+  | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
+  /** úhel dvou hran pohledu (a–b, a2–b2): oblouk o poloměru `offset` [mm listu] v sektoru, kam míří směr `ang` [°] */
+  | { type: "dim"; kind: "angle"; a: Vec2; b: Vec2; a2: Vec2; b2: Vec2; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
   | { type: "note"; at: Vec2; leader?: Vec2; text: string }
   | { type: "roughness"; at: Vec2; ra: string; leader?: Vec2 }
   | { type: "gdt"; at: Vec2; symbol: GdtSymbol; value: string; datum?: string; leader?: Vec2 }

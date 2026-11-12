@@ -1,33 +1,69 @@
 "use client";
-import { tr, type CadLang } from "./i18n";
+import { getLang, tr, type CadLang } from "./i18n";
+import type { BuildProgress } from "./build";
 import type { EdgeLite, FaceLite } from "./agent";
 import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
 import type { DatumDisplay } from "./feat/refs-more";
 import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
-import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Vec3 } from "./types";
+import type { BodyInfo, BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Vec3 } from "./types";
 
 let worker: Worker | null = null;
 let seq = 0;
-const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; op: string; at: number }>();
+
+/**
+ * Průběh právě běžícího výpočtu v jádře: operace, počítaný prvek (k z n) a čas od začátku výpočtu / prvku.
+ * `phase: "start"` = operace běží, ale průběh po prvcích nehlásí (export, výkres, kolize).
+ */
+export type CadProgress = Omit<BuildProgress, "phase"> & { phase: BuildProgress["phase"] | "start"; op: string; startedAt: number; featureAt: number };
+/** operace, které mohou trvat dlouho – ukazuje se u nich průběh a jdou zrušit */
+const LONG_OPS = new Set(["build", "topology", "export", "drawing", "interference", "asmParts"]);
+const progressListeners = new Set<(p: CadProgress | null) => void>();
+let lastProgress: CadProgress | null = null;
+const emitProgress = (p: CadProgress | null) => {
+  lastProgress = p;
+  for (const l of progressListeners) l(p);
+};
+
+/** Výpočet zrušený uživatelem (tlačítko Zrušit) – volající ho nemá hlásit jako chybu jádra. */
+export class CadCancelled extends Error {
+  constructor() {
+    super(tr("Výpočet zrušen."));
+    this.name = "CadCancelled";
+  }
+}
+export const isCancelled = (e: unknown): e is CadCancelled => e instanceof CadCancelled;
 
 function w() {
   if (!worker) {
     worker = new Worker(new URL("./cad.worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (e: MessageEvent<{ id: number; ok: boolean; result?: unknown; error?: string }>) => {
+    worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; result?: unknown; error?: string; progress?: BuildProgress }>) => {
       const p = pending.get(e.data.id);
       if (!p) return;
+      if (e.data.progress) {
+        emitProgress({ ...e.data.progress, op: p.op, startedAt: p.at, featureAt: Date.now() });
+        return;
+      }
       pending.delete(e.data.id);
+      if (lastProgress) {
+        // další čekající dlouhá operace přebírá ukazatel průběhu; jinak se průběh ukončí
+        const next = [...pending.values()].find((x) => LONG_OPS.has(x.op));
+        emitProgress(next ? { op: next.op, phase: "start", index: -1, total: 0, startedAt: Date.now(), featureAt: Date.now() } : null);
+      }
       if (e.data.ok) p.resolve(e.data.result);
       else p.reject(new Error(e.data.error || tr("Chyba CAD jádra.")));
     };
     worker.onerror = (e) => {
       for (const p of pending.values()) p.reject(new Error(tr("CAD jádro se nepodařilo načíst: ") + (e.message || "")));
       pending.clear();
+      emitProgress(null);
       worker?.terminate();
       worker = null;
     };
+    // nové jádro (první start nebo po zrušení výpočtu) dostane jazyk rozhraní dřív než první požadavek
+    if (getLang() !== "cs") worker.postMessage({ id: ++seq, op: "lang", lang: getLang() });
   }
   return worker;
 }
@@ -35,15 +71,44 @@ function w() {
 function call<T>(msg: Record<string, unknown>): Promise<T> {
   const id = ++seq;
   return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
+    const op = String(msg.op);
+    const at = Date.now();
+    pending.set(id, { resolve: resolve as (v: unknown) => void, reject, op, at });
     w().postMessage({ id, ...msg });
+    if (LONG_OPS.has(op) && !lastProgress) emitProgress({ op, phase: "start", index: -1, total: 0, startedAt: at, featureAt: at });
   });
 }
 
-export type TopologyResult = { faces: FaceLite[]; edges: EdgeLite[]; bbox: [Vec3, Vec3]; metrics: NonNullable<BuildResult["metrics"]> };
+/**
+ * Zruší běžící výpočet: jádro počítá synchronně (WASM), takže jediný spolehlivý způsob je worker ukončit. Všechny čekající
+ * požadavky skončí chybou `CadCancelled`; další požadavek si jádro spustí znovu (mezipaměť stavby tím zaniká).
+ */
+function cancel(): boolean {
+  if (!worker || !pending.size) return false;
+  const waiting = [...pending.values()];
+  pending.clear();
+  worker.terminate();
+  worker = null;
+  emitProgress(null);
+  for (const p of waiting) p.reject(new CadCancelled());
+  return true;
+}
+
+export type TopologyResult = { faces: FaceLite[]; edges: EdgeLite[]; bbox: [Vec3, Vec3]; metrics: NonNullable<BuildResult["metrics"]>; /** tělesa dílu (aktivní první) s rozsahy indexů ploch a hran */ bodies?: BodyInfo[] };
 
 export const cad = {
   init: () => call<void>({ op: "init" }),
+  /** zruší běžící výpočet (viz `cancel`); vrací false, když nic neběží */
+  cancel,
+  /** běží v jádře právě nějaký požadavek? */
+  busy: () => pending.size > 0,
+  /** průběh běžícího výpočtu (null = nic dlouhého neběží) */
+  progress: () => lastProgress,
+  /** odběr průběhu výpočtu (prvek k z n); `null` = výpočet skončil. Vrací funkci pro odhlášení. */
+  onProgress: (fn: (p: CadProgress | null) => void) => {
+    progressListeners.add(fn);
+    return () => void progressListeners.delete(fn);
+  },
   /** jazyk hlášek jádra a textů výkresu (cs / en / de) – nastaví se při startu a při přepnutí jazyka */
   setLang: (lang: CadLang) => call<void>({ op: "lang", lang }),
   build: (doc: CadDoc) => call<BuildResult>({ op: "build", doc }),

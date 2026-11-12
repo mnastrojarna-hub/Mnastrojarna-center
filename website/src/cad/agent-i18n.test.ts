@@ -80,10 +80,14 @@ gewinde M18×1,5 länge 20 bei 0 0 10 achse Z innen modellieren`);
 
   it("neznámý příkaz hlásí chybu v jazyce rozhraní", () => {
     setLang("de");
-    expect(parseAgentText("foo 1 2").errors[0].message).toMatch(/^unbekannter Befehl „foo“ – Befehle: neu teil, quader/);
+    // seznam příkazů v hlášce pochází z tabulky příkazů (stejný jako v nápovědě), v jazyce rozhraní
+    expect(parseAgentText("foo 1 2").errors[0].message).toMatch(/^unbekannter Befehl „foo“ – Befehle: neu teil, neu baugruppe, name, werkstoff, farbe, quader/);
     setLang("en");
-    expect(parseAgentText("foo 1 2").errors[0].message).toMatch(/^unknown command “foo” – commands: new part, box/);
+    expect(parseAgentText("foo 1 2").errors[0].message).toMatch(/^unknown command “foo” – commands: new part, new assembly, name, material, color, box/);
+
     expect(parseAgentText("box 1").errors[0].message).toBe("box needs three positive dimensions: box X Y Z");
+    setLang("cs");
+    expect(parseAgentText("foo 1 2").errors[0].message).toMatch(/^neznámý příkaz „foo“ – příkazy: nový díl, nová sestava, název, materiál, barva, kvádr, válec/);
   });
 });
 
