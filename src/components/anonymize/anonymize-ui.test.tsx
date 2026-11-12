@@ -186,6 +186,9 @@ describe("render komponent anonymizace", () => {
     expect(two).toContain("Anonymizovat znovu vše, co se nepovedlo (3)");
     expect(two).toContain('data-testid="anon-retry-all"');
     expect(two).toContain("3 výkresy");
+    // 12. 11.: u nepovedeného výkresu i „Použít bez anonymizace" (originál)
+    expect(two).toContain("Použít bez anonymizace");
+    expect(two).toContain('data-testid="anon-use-original"');
     const one = html(<AnonReviewList pendingCount={0} pendingFileIds={[]} items={[failed("a")]} />);
     expect(one).not.toContain("anon-retry-all");
   });
